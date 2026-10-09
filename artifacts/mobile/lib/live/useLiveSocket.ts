@@ -30,7 +30,19 @@ import { API_BASE_URL } from '@/lib/api';
 export type LiveSocketEvent =
   | { type: 'comment'; comment: any }
   | { type: 'products'; productTags: any[] }
-  | { type: 'viewerCount'; count: number };
+  | { type: 'viewerCount'; count: number }
+  | { type: 'pinned'; productId: string | null }
+  | { type: 'liveCode'; code: { id: string; code: string; type: string; value: number } }
+  // Moderation + co-host (routes/live-moderation.ts, routes/live-cohost.ts)
+  | { type: 'comment_pinned'; comment: any | null }
+  | { type: 'comment_removed'; commentId: string }
+  | { type: 'moderation'; slowModeSeconds: number }
+  | { type: 'user_muted'; userId: string }
+  | { type: 'user_banned'; userId: string }
+  | { type: 'cohosts'; cohosts: any[] }
+  | { type: 'cohost_removed'; userId: string }
+  /** Synthesised client-side when the server closes this socket with 4003 (host banned this viewer). */
+  | { type: 'removed' };
 
 interface UseLiveSocketOptions {
   streamId: string | undefined;
@@ -139,9 +151,15 @@ export function useLiveSocket({ streamId, enabled, onEvent, onConnected, onFallb
         try { onEventRef.current(JSON.parse(String(event.data))); } catch { /* malformed frame */ }
       };
       socket.onerror = () => { /* onclose follows and handles reconnect */ };
-      socket.onclose = () => {
+      socket.onclose = (closeEvent: any) => {
         if (socketRef.current === socket) socketRef.current = null;
         if (heartbeatRef.current) { clearInterval(heartbeatRef.current); heartbeatRef.current = null; }
+        // 4003: the host banned this viewer — don't reconnect-loop against a server that will refuse.
+        if (closeEvent?.code === 4003) {
+          stoppedRef.current = true;
+          try { onEventRef.current({ type: 'removed' }); } catch { /* ignore */ }
+          return;
+        }
         if (!stoppedRef.current) scheduleReconnect();
       };
     }).catch(() => {

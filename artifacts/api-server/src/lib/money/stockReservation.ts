@@ -31,6 +31,7 @@
 import { sql } from "drizzle-orm";
 import type { DbExecutor } from "./ledger";
 import { reserveStockAtomic, restoreStockForOrder } from "../stockReservation";
+import { releaseForCheckout as releaseGiftCardsForCheckout } from "../giftCards/service";
 
 /** How long a checkout may sit between "Pay" and Stripe's answer before its units go back. */
 export const STOCK_RESERVATION_TTL_MS = 30 * 60_000;
@@ -96,6 +97,8 @@ export async function commitStockReservation(tx: DbExecutor, checkoutSessionId: 
 
 /** Puts this checkout's held units back. Idempotent. Returns how many lines went back. */
 export async function releaseStockReservation(tx: DbExecutor, checkoutSessionId: string): Promise<number> {
+  // A checkout that lets go of its stock also lets go of any gift card it was holding.
+  await releaseGiftCardsForCheckout(tx, checkoutSessionId);
   const released = rows<{ variant_id: string; quantity: number }>(await tx.execute(sql`
     UPDATE stock_reservations SET status = 'released', updated_at = now()
     WHERE checkout_session_id = ${checkoutSessionId}::uuid AND status = 'held'

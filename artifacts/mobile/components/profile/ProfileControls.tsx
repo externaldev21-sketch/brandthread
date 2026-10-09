@@ -16,6 +16,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { SHOP_PILL_HEIGHT } from './profileLayout';
+import { radius } from '@/constants/radii';
 
 type PressState = { pressed: boolean; hovered?: boolean; focused?: boolean };
 type FeatherName = keyof typeof Feather.glyphMap;
@@ -140,23 +141,28 @@ export function ProfileEditMessagesRow({
   const hitSlop = { top: 3, bottom: 3, left: 3, right: 3 };
   return (
     <View style={styles.editMessagesRow}>
-      <PressableScale
-        onPress={() => { hapticLight(); onEdit(); }}
-        onLongPress={onEditLongPress ? () => { hapticLight(); onEditLongPress(); } : undefined}
-        accessibilityRole="button"
-        accessibilityLabel="Edit profile"
-        accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
-        testID="profile-edit-details"
-        hitSlop={hitSlop}
-        style={[styles.editBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-      >
-        {(state) => (
-          <>
-            <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
-            <Text style={[styles.editMessagesLabel, { color: theme.text }]} numberOfLines={1}>Edit</Text>
-          </>
-        )}
-      </PressableScale>
+      {/* Two EQUAL columns (Dev): Edit and Messages each sit in a flex:1
+          wrapper — see the comment below for why the wrapper, not the
+          PressableScale, carries the flex. Same 39pt height. */}
+      <View style={styles.editBtnWrap}>
+        <PressableScale
+          onPress={() => { hapticLight(); onEdit(); }}
+          onLongPress={onEditLongPress ? () => { hapticLight(); onEditLongPress(); } : undefined}
+          accessibilityRole="button"
+          accessibilityLabel="Edit profile"
+          accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
+          testID="profile-edit-details"
+          hitSlop={hitSlop}
+          style={[styles.editBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          {(state) => (
+            <>
+              <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
+              <Text style={[styles.editMessagesLabel, { color: theme.text }]} numberOfLines={1}>Edit</Text>
+            </>
+          )}
+        </PressableScale>
+      </View>
       {/* PressableScale forwards a plain-object `style` only to its INNER
           Animated.View, never to the outer Pressable that actually
           participates in this row's flex layout (see its own comment) — so
@@ -250,7 +256,7 @@ export function ProfileWalletChip({ balanceLabel, onPress }: { balanceLabel: str
     >
       {(state) => (
         <>
-          <InteractionLayer state={state as PressState} radius={22} theme={theme} />
+          <InteractionLayer state={state as PressState} radius={radius.md} theme={theme} />
           <ThreadCashBillIcon size={20} />
           <Text style={[styles.walletText, { color: theme.text }]} numberOfLines={1}>{balanceLabel}</Text>
         </>
@@ -522,7 +528,7 @@ export function ShopPill({
       >
         {(state) => (
           <>
-            <InteractionLayer state={state as PressState} radius={RADIUS.pill} theme={theme} />
+            <InteractionLayer state={state as PressState} radius={radius.md} theme={theme} />
             <View style={[styles.pillIcon, { backgroundColor: theme.onAccent }]}>
               <Feather name="shopping-bag" size={20} color={theme.accent} />
             </View>
@@ -543,12 +549,12 @@ export function ShopPill({
 // ─── Chips ────────────────────────────────────────────────────────────────────
 
 /** Small non-interactive pill (role, plan, "Follows you"…). */
-export function ProfileChip({ label, icon, tone = 'muted' }: { label: string; icon?: FeatherName; tone?: 'muted' | 'accent' | 'warning' }) {
+export function ProfileChip({ label, icon, tone = 'muted', size = 'md' }: { label: string; icon?: FeatherName; tone?: 'muted' | 'accent' | 'warning'; size?: 'md' | 'sm' }) {
   const { theme } = useAppTheme();
   const color = tone === 'accent' ? theme.accent : tone === 'warning' ? theme.warning : theme.muted;
   return (
-    <View style={[styles.chip, { borderColor: tone === 'muted' ? theme.border : `${color}66`, backgroundColor: theme.cardGlass }]}>
-      {icon ? <Feather name={icon} size={11} color={color} /> : null}
+    <View style={[styles.chip, size === 'sm' && styles.chipSm, { borderColor: tone === 'muted' ? theme.border : `${color}66`, backgroundColor: theme.cardGlass }]}>
+      {icon ? <Feather name={icon} size={size === 'sm' ? 10 : 11} color={color} /> : null}
       <Text style={[styles.chipText, { color }]} numberOfLines={1}>{label}</Text>
     </View>
   );
@@ -581,8 +587,9 @@ const styles = StyleSheet.create({
   // leaving Messages' own `flex: 1` (below) with no extra space to grow
   // into and rendering it barely wider than Edit instead of filling the row.
   editMessagesRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, width: '100%' },
+  editBtnWrap: { flex: 1 },
   editBtn: {
-    height: 39, borderRadius: RADIUS.sm, borderWidth: 1,
+    width: '100%', height: 39, borderRadius: RADIUS.sm, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: SP.lg, overflow: 'hidden',
   },
@@ -606,7 +613,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   walletChip: {
-    height: 44, borderRadius: 22, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
+    height: 44, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
     gap: 6, paddingLeft: 7, paddingRight: 12, overflow: 'hidden',
   },
   walletText: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
@@ -644,7 +651,7 @@ const styles = StyleSheet.create({
   pillWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: SP.md },
   pillInline: { alignItems: 'stretch', paddingHorizontal: SP.md },
   pill: {
-    height: SHOP_PILL_HEIGHT, minWidth: 300, maxWidth: 460, borderRadius: RADIUS.pill,
+    height: SHOP_PILL_HEIGHT, minWidth: 300, maxWidth: 460, borderRadius: radius.md,
     flexDirection: 'row', alignItems: 'center', gap: SP.md,
     paddingLeft: 7, paddingRight: 7, overflow: 'hidden',
     shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.5, shadowRadius: 28, elevation: 14,
@@ -658,9 +665,11 @@ const styles = StyleSheet.create({
 
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
-    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4,
+    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 4,
   },
   chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
+  // ~10% more compact (padding only — the 11pt text is the type floor).
+  chipSm: { paddingHorizontal: 9, paddingVertical: 3, gap: 3 },
 
   rail: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingHorizontal: SP.md },
 });

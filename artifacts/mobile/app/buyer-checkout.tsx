@@ -70,7 +70,7 @@ import {
 } from '@/lib/checkoutReadiness';
 import {
   buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath, paymentErrorMessage,
-  isCartQuote, quoteKey, quoteTotals, recipientName, walletContactToCheckout,
+  isCartQuote, quoteKey, quoteOffersBnpl, quoteTotals, recipientName, walletContactToCheckout,
   type CartQuote, type PaymentIntentStart, type WalletContact,
 } from '@/lib/checkoutPayment';
 import { ApiError } from '@/lib/networkNotice';
@@ -83,9 +83,10 @@ import { CheckoutSection, GUTTER, useCheckoutColors, type CheckoutColors } from 
 import { ContactSection } from '@/components/checkout/ContactSection';
 import { ShippingSection, type CheckoutAddressDraft, type SavedAddress } from '@/components/checkout/ShippingSection';
 import {
-  ExpressSection, HostedExpressButton, NEW_CARD, PaymentSection, type SavedCard,
+  BNPL, ExpressSection, HostedExpressButton, NEW_CARD, PaymentSection, type SavedCard,
 } from '@/components/checkout/PaymentSection';
 import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
+import { GiftCardSection } from '@/components/checkout/GiftCardSection';
 import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
 import { OrderSummarySection } from '@/components/checkout/OrderSummarySection';
 import { CheckoutTermsLine } from '@/components/checkout/CheckoutTermsLine';
@@ -95,6 +96,7 @@ import {
 } from '@/components/checkout/StripePayment';
 import type { ConfirmOutcome, PaymentControllerApi } from '@/components/checkout/stripePaymentTypes';
 import { FONT, FS, SP } from '@/lib/theme';
+import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
 
@@ -317,6 +319,25 @@ export default function BuyerCheckoutScreen() {
   // preview products, so there is no server cart or Stripe to talk to.
   const previewOnly = !!current?.deliveryGroups?.length && current.deliveryGroups.every(isPreviewCheckoutGroup);
 
+  // ── Live-only code tapped in a live ─────────────────────────────────────
+  // A viewer who tapped a live code in the stream has it applied here once
+  // (the server still validates it against the live at checkout).
+  const liveCodeToApply = !previewOnly && session?.deliveryGroups?.length === 1 && !session.discounts.some(d => d.isValid)
+    ? getLiveCheckoutContext(session.deliveryGroups[0].sellerId)?.code ?? null
+    : null;
+  useEffect(() => {
+    if (!liveCodeToApply || !sessionRef.current) return;
+    let active = true;
+    void applyDiscount(liveCodeToApply, sessionRef.current.summary.subtotalCents, sessionRef.current.discounts)
+      .then(async discount => {
+        if (!active || !discount.isValid || !sessionRef.current) return;
+        await persist({ ...sessionRef.current, discounts: [discount], idempotencyKey: `ck_${randomUUID()}` });
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveCodeToApply]);
+
   // ── Thread Cash (item 109) ──────────────────────────────────────────────
   // Single-seller, signed-in orders only (a token discounts one Stripe
   // session), behind the OFF-by-default 'threadCashCheckoutDiscount' flag.
@@ -386,6 +407,7 @@ export default function BuyerCheckoutScreen() {
       const result = await validateCart(
         current.deliveryGroups.flatMap(g => g.items),
         current.discounts.filter(d => d.isValid).map(d => d.code),
+        getLiveCheckoutContext(current.deliveryGroups[0]?.sellerId)?.streamId,
       );
       if (!result.isValid) {
         // Out of stock / price changed / unavailable — shown inline, not as an alert.
@@ -543,7 +565,7 @@ export default function BuyerCheckoutScreen() {
     const getClientSecret = () => startPaymentIntent(current, who);
     let outcome: ConfirmOutcome | null;
     try {
-      outcome = selectedCard === NEW_CARD || !savedCards.some(card => card.id === selectedCard)
+      outcome = selectedCard === NEW_CARD || selectedCard === BNPL || !savedCards.some(card => card.id === selectedCard)
         ? await controller.confirmCard(getClientSecret, billing)
         : await controller.confirmSaved(getClientSecret, selectedCard);
     } catch {
@@ -698,9 +720,14 @@ export default function BuyerCheckoutScreen() {
               ...(current.threadCashRedemption && current.deliveryGroups.length === 1
                 ? { threadCashToken: current.threadCashRedemption.token }
                 : {}),
-              ...(current.deliveryGroups.length === 1 && current.discounts.find(d => d.isValid)
-                ? { discountCode: current.discounts.find(d => d.isValid)!.code }
-                : {}),
+              ...(() => {
+                const groupCode = current.discounts.find(d => d.isValid && (current.deliveryGroups.length === 1 || d.sellerId === group.sellerId));
+                const liveStreamId = groupCode ? getLiveCheckoutContext(group.sellerId)?.streamId : undefined;
+                return {
+                  ...(groupCode ? { discountCode: groupCode.code } : {}),
+                  ...(liveStreamId ? { liveStreamId } : {}),
+                };
+              })(),
             },
           );
         } else {
@@ -1040,11 +1067,38 @@ export default function BuyerCheckoutScreen() {
             onSelectCard={setSelectedCard}
             onCardComplete={setCardComplete}
             sellerCount={current.deliveryGroups.length}
+            bnplAvailable={Platform.OS === 'web' && quoteOffersBnpl(quote?.value)}
           />
 
-          <PromoCodeSection
+          {/* Multi-store: each store's code is its own section and only discounts that store's items. */}
+          {multiSeller && current.deliveryGroups.map(group => (
+            <PromoCodeSection
+              key={group.sellerId}
+              title={`Promo code · ${group.sellerName}`}
+              idSuffix={`-${group.sellerId}`}
+              discounts={current.discounts.filter(d => d.sellerId === group.sellerId)}
+              onApply={async (code): Promise<CheckoutDiscount> => {
+                const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts, group.sellerId);
+                if (discount.isValid) {
+                  await persist({
+                    ...current,
+                    discounts: [...current.discounts.filter(d => d.sellerId !== group.sellerId), discount],
+                    idempotencyKey: `ck_${randomUUID()}`,
+                  });
+                }
+                return discount;
+              }}
+              onRemove={code =>
+                void persist({
+                  ...current,
+                  discounts: current.discounts.filter(d => !(d.code === code && d.sellerId === group.sellerId)),
+                  idempotencyKey: `ck_${randomUUID()}`,
+                })
+              }
+            />
+          ))}
+          {!multiSeller && <PromoCodeSection
             discounts={current.discounts}
-            unavailableReason={multiSeller ? 'Promo codes apply to single-seller orders. Check out each seller separately to use a code.' : undefined}
             onApply={async (code): Promise<CheckoutDiscount> => {
               const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts);
               // Only a server-validated code is kept (the server takes one code per order).
@@ -1058,7 +1112,24 @@ export default function BuyerCheckoutScreen() {
                 persist({ ...current, discounts, idempotencyKey: `ck_${randomUUID()}` }),
               )
             }
-          />
+          />}
+
+          {/* Store gift cards: in-app, signed-in orders. Each card pays only its own store's items. */}
+          {inApp && isSignedIn && !previewOnly ? (
+            <GiftCardSection
+              groups={current.deliveryGroups.map(group => ({ sellerId: group.sellerId, sellerName: group.sellerName }))}
+              applied={current.giftCards ?? {}}
+              coveredCents={Object.fromEntries((activeQuote?.groups ?? []).map(group => [group.sellerId, group.giftCardCents ?? 0]))}
+              onApply={(sellerId, card) => void persist({
+                ...current, giftCards: { ...(current.giftCards ?? {}), [sellerId]: card }, idempotencyKey: `ck_${randomUUID()}`,
+              })}
+              onRemove={sellerId => {
+                const next = { ...(current.giftCards ?? {}) };
+                delete next[sellerId];
+                void persist({ ...current, giftCards: next, idempotencyKey: `ck_${randomUUID()}` });
+              }}
+            />
+          ) : null}
 
           {/* Thread Cash (item 109): hidden while the flag is off, for guests
               and for multi-seller orders. */}
@@ -1100,6 +1171,7 @@ export default function BuyerCheckoutScreen() {
             itemCount={itemCount}
             taxNote={taxNote}
             quotedGroups={inApp ? activeQuote?.groups : undefined}
+            giftCardCents={quoted?.giftCardCents ?? 0}
           />
 
           {/* Purchase protection trust row — the app's existing copy (Terms-sourced). */}
@@ -1145,7 +1217,7 @@ export default function BuyerCheckoutScreen() {
   );
   // Stripe (and Stripe.js on web) is only loaded when this order pays in the app.
   return inApp
-    ? <StripePaymentProvider amountCents={totals.totalCents} onUnavailable={() => setStripeLoadFailed(true)}>{page}</StripePaymentProvider>
+    ? <StripePaymentProvider amountCents={totals.totalCents} paymentMethodTypes={quote?.value.paymentMethodTypes} onUnavailable={() => setStripeLoadFailed(true)}>{page}</StripePaymentProvider>
     : page;
 }
 
@@ -1165,7 +1237,9 @@ function makeStyles(ck: CheckoutColors) {
     header: {
       flexDirection: 'row', alignItems: 'center',
       paddingHorizontal: SP.xs, paddingBottom: SP.xs,
-      backgroundColor: ck.bg, borderBottomWidth: 1, borderBottomColor: ck.divider,
+      // No divider under the header (app-wide header rule) — the solid
+      // ck.bg fill alone separates it from the content scrolling under it.
+      backgroundColor: ck.bg,
       zIndex: 2,
     },
     headerTitle: { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },

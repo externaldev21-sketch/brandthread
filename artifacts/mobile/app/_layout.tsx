@@ -1,14 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AffiliateRefCapture } from '@/components/AffiliateRefCapture';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
+import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
+import { runAfterFirstPaint } from '@/lib/deferStartup';
+import { isAccessCleared } from '@/lib/accessGate';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { KeyboardProvider } from '@/components/KeyboardProviderCompat';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { shouldReopenStudioMenu } from '@/lib/navigation/studioReturn';
 import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
+import { NAVIGATION_ISOLATION_TEST } from '@/lib/buildFlags';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -22,13 +28,14 @@ import * as SystemUI from 'expo-system-ui';
 import * as NavigationBar from 'expo-navigation-bar';
 import {
   DarkTheme, Stack, ThemeProvider as NavigationThemeProvider,
-  useGlobalSearchParams, useRootNavigationState, useRouter, useSegments,
+  useGlobalSearchParams, usePathname, useRootNavigationState, useRouter, useSegments,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
+import { flushPendingBuyerSurvey } from '@/lib/onboardingSurvey';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider, useAppTheme, peekPersistedTheme } from '@/contexts/AppThemeContext';
@@ -62,6 +69,7 @@ import { WebAppShell } from '@/components/web/WebAppShell';
 import { PhoneFrameSafeArea } from '@/components/web/PhoneFrameSafeArea';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
+import OfflineBanner from '@/components/OfflineBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
 import { RevenueCatProvider } from '@/lib/revenueCat';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
@@ -69,13 +77,18 @@ import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
 import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
+import { ReportSheetProvider } from '@/components/safety/ReportSheet';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
+import { SaveHeartHost } from '@/components/SaveHeartHost';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
+import AnalyticsBridge from '@/components/AnalyticsBridge';
+import { wrapRootComponent } from '@/lib/monitoring';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
+import { getDevWebPreviewRole } from '@/lib/devPreview';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
 import { ActionSheetHost } from '@/components/ui/ActionSheet';
@@ -87,10 +100,17 @@ import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
+import { StatusBarMask, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
+import { setRequestGuard } from '@workspace/api-client-react';
+
+// Generated API hooks share this guard with the app-local API clients so
+// signed-out seller preview never reaches the backend through an alternate
+// generated fetch path.
+setRequestGuard(() => isSellerDevPreview());
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
@@ -115,12 +135,41 @@ function dismissKeyboardUnlessTextInput(e: { nativeEvent?: { target?: unknown } 
   Keyboard.dismiss();
 }
 
-function IsolatedStackScene({ children }: { children: React.ReactNode }) {
+function IsolatedStackScene({
+  children,
+  routeName,
+  presentation,
+}: {
+  children: React.ReactNode;
+  routeName?: string;
+  presentation?: string;
+}) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, any>;
+  // Nothing may sit under or behind the floating seller tab bar (Dev's
+  // app-wide rule). The tab group's own screens pad their scroll content
+  // with useTabBarClearance(); every PUSHED seller screen the bar floats
+  // over gets the same clearance once, here, as a bottom margin on its
+  // content box — so its scroll views, sticky footers and absolutely-
+  // positioned bottom bars all end above the bar without touching each
+  // screen. A margin (not padding) on purpose: an absolutely-positioned
+  // `bottom: 0` child measures from its parent's padding box, so only a
+  // smaller box lifts it. Skipped where the bar never floats: the tab
+  // group (handles its own), full-screen routes the bar slides away on,
+  // and modal-presented routes (presented above the bar).
+  const { isActiveSeller } = useSellerShell();
+  const sellerBarShown = isActiveSeller || PREVIEW_ROLE === 'seller';
+  const barFloatsOverScene = sellerBarShown
+    && !!routeName
+    && routeName !== '(tabs)'
+    && !SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(routeName)
+    && (!presentation || presentation === 'card');
+  const bottomClearance = useSceneBottomClearance(barFloatsOverScene);
   return (
     <View style={{ flex: 1, backgroundColor: palette.background ?? '#0A0A0B' }}>
-      {children}
+      <View style={{ flex: 1, marginBottom: bottomClearance }} testID={bottomClearance > 0 ? 'scene-bottom-clearance' : undefined}>
+        {children}
+      </View>
     </View>
   );
 }
@@ -174,7 +223,7 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
     }
   }, [theme.accent]);
 
-  const navigationTheme = {
+  const navigationTheme = React.useMemo(() => ({
     ...DarkTheme,
     dark: true,
     colors: {
@@ -186,7 +235,7 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
       border: palette.border ?? 'rgba(255,255,255,0.12)',
       notification: theme.accent,
     },
-  };
+  }), [theme]);
 
   if (!isHydrated) return <BootScreen />;
   return (
@@ -239,12 +288,16 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'forgot-password',
   // Onboarding — session incomplete, role not yet confirmed
   'onboarding',
+  // Invite-only launch gate (shown before onboarding when the flag is on)
+  'access-code',
   // Post-onboarding buyer screen — not a seller route
   'thread-explainer',
   // Legal public pages — reachable without any session
   'privacy',
   'terms',
   'community-guidelines',
+  'seller-agreement',
+  'refund-policy',
   // CI navigation isolation probe
   'navigation-isolation-probe',
   // Buyer app group — buyer sessions only; seller role gating prevents cross-exposure
@@ -282,13 +335,24 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'quote-request',
   // Seller livestream — real full-screen camera/broadcast controls.
   'seller-go-live',
+  // Opened from Go Live setup (no tab bar there); keep it consistent.
+  'seller-schedule-live',
   'seller-live',
+  // Live moderation / co-host screens are pushed over the broadcast (and the
+  // invite screen turns into the co-host's full-screen camera once accepted).
+  'live-moderation',
+  'live-cohost',
+  'live-cohost-invite',
   // LIVE viewer pager — full-bleed video with its own comment bar.
   'live',
   // Pushed, modal-style profile editor with its own header Save button and
   // scroll footer — the bar has no business floating over its form/photo
   // pickers (screenshots showed it sitting on top of the last row).
   'edit-profile',
+  // Store identity setup steps — each pins its own Continue/Done button to the bottom.
+  'store-setup-name',
+  'store-setup-brand',
+  'store-setup-socials',
   // Brandthread AI screen — immersive full-screen chat takeover with its own
   // floating composer pinned to the safe-area bottom inset. The floating
   // seller tab bar previously stayed mounted on top of it (this route wasn't
@@ -337,13 +401,15 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'story-mention-viewer',
   'buyer-live',
   'live-feed',
+  // Full-screen live replay player.
+  'live-replay',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
 // Renders the global seller tab bar + Studio radial menu when:
 //   1. SellerShellContext reports an active seller session (set by AuthGate after
 //      it resolves onboarding completion and role from AsyncStorage/server), OR
-//   2. PREVIEW_ROLE === 'seller' in the dev web bypass (no Clerk required).
+//   2. The development seller preview is active on web (no Clerk required).
 //
 // AuthGate is the single authority that reads AsyncStorage and the server
 // profile. SellerBarGate consumes SellerShellContext — no parallel read.
@@ -363,10 +429,10 @@ function SellerBarGate() {
   // openRequestKey/closeRequestKey doc comments.
   const [isStudioOpen, setIsStudioOpen] = useState(false);
 
-  // Honor the dev web preview bypass: PREVIEW_ROLE is evaluated at module load
-  // time (before Clerk resolves) so it must be checked independently of
-  // isActiveSeller. It is inert in production builds (__DEV__ guard in PREVIEW_ROLE).
-  const isPreviewSeller = PREVIEW_ROLE === 'seller';
+  // Preview navigation must not depend on Clerk or completed onboarding.
+  // The session fallback covers reloads after the URL query has been dropped;
+  // PREVIEW_SESSION_ROLE is web-only, so native seller chrome requires a session.
+  const isPreviewSeller = PREVIEW_SESSION_ROLE === 'seller' || DEV_BYPASS_ROLE === 'seller';
 
   const showBar = isActiveSeller || isPreviewSeller;
 
@@ -383,6 +449,16 @@ function SellerBarGate() {
   useEffect(() => {
     if (isFullScreenRoute) setIsStudioOpen(false);
   }, [isFullScreenRoute]);
+
+  // "Menu → tile → back ⇒ menu" (docs/NAVIGATION.md): a tile opened from the
+  // Studio menu is pushed over the active tab; when that tile pops back to
+  // the very same tab, re-open the menu so the seller lands where they left.
+  // lib/navigation/studioReturn.ts decides; this gate (always mounted, unlike
+  // the menu itself on full-screen routes) is where every pathname is seen.
+  const pathname = usePathname();
+  useEffect(() => {
+    if (shouldReopenStudioMenu(pathname)) setStudioOpenRequestKey((k) => k + 1);
+  }, [pathname]);
 
   if (!showBar) return null;
 
@@ -505,39 +581,40 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // skip the Clerk/onboarding gates and jump straight to that dashboard for
 // design review. Without the query param, web behaves like every other
 // platform: real splash -> sign-up -> onboarding. Inert in production builds.
-const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
-
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   // Hard gate: never activate on the real production host, even if
   // NAVIGATION_ISOLATION_TEST somehow reached a production build — see
   // lib/devPreview.ts's isProductionPreviewHost doc comment.
   if (isProductionPreviewHost()) return null;
+  if (__DEV__) return getDevWebPreviewRole();
   const v = new URLSearchParams(window.location.search).get('bt_preview');
   if (v !== 'buyer' && v !== 'seller') return null;
   return v;
 })();
+const DEV_WEB_ONBOARDING_PREVIEW =
+  __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && PREVIEW_ROLE === null;
+
+// The preview role for THIS page: the one the URL asked for, or - after a reload of a plain tab URL
+// such as /orders, where in-app navigation had already dropped `?bt_preview=` - the role the first
+// load persisted (lib/devPreview.ts). Without the fallback a reloaded preview lost its seller tab
+// bar and waited on a Clerk session that preview never has.
+const PREVIEW_SESSION_ROLE: 'buyer' | 'seller' | null = PREVIEW_ROLE
+  ?? (Platform.OS === 'web' ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null) : null);
+
+// Remove the retired demo flag on device too. Never touch account data or
+// onboarding completion; the native preview bypass remains development-only.
+if (__DEV__ && Platform.OS !== 'web') {
+  AsyncStorage.removeItem('bt_preview_demo').catch(() => {});
+}
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
 if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
   localStorage.setItem('splash_seen', 'true');
   localStorage.setItem('onboarding_complete', 'true');
   localStorage.setItem('user_role', PREVIEW_ROLE);
-  // Reset (or set) the demo-data flag from THIS load's own query string,
-  // exactly like user_role just above — otherwise a `&demo=1` visited once,
-  // in any earlier session, in this same browser, would stick forever:
-  // lib/devPreview.ts's isPreviewDemoMode() only WRITES 'bt_preview_demo'
-  // when it sees demo=1 (so later in-app navigation, which drops the query
-  // string, can still recall it) — it never clears the flag, since a plain
-  // function called repeatedly through a session has no way to tell "the
-  // query string is gone because of in-app navigation" apart from "the user
-  // did a fresh reload without demo=1". This one-time, module-load-only
-  // block can tell the difference (it runs exactly once per real page load,
-  // the same reasoning user_role's own reset above relies on), so a plain
-  // `?bt_preview=buyer` reload always lands back on fresh, zero-state data.
-  const demoParam = new URLSearchParams(window.location.search).get('demo');
-  if (demoParam === '1') localStorage.setItem('bt_preview_demo', '1');
-  else localStorage.removeItem('bt_preview_demo');
+  // Demo is never stored; devPreview clears the old flag on module startup.
+  localStorage.removeItem('bt_preview_demo');
   // Preserve the ORIGINAL requested path for this load, so a preview
   // session can restore its real destination even after some other code
   // bounces it through "/" first — e.g. an onboarding-skip redirect that
@@ -566,13 +643,6 @@ if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
     }
   }
 }
-if (DEV_BYPASS_ROLE && Platform.OS !== 'web') {
-  AsyncStorage.multiSet([
-    ['splash_seen', 'true'],
-    ['onboarding_complete', 'true'],
-    ['user_role', DEV_BYPASS_ROLE],
-  ]);
-}
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
@@ -586,7 +656,7 @@ const DEV_FORCE_ONBOARDING_START = false;
 
 // Screens that don't require authentication
 const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
-const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
+const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
@@ -594,7 +664,7 @@ function AuthGate() {
   const api      = useApi();
   const router   = useRouter();
   const segments = useSegments();
-  const { addAccount } = useGlobalSearchParams<{ addAccount?: string }>();
+  const { addAccount, returnTo } = useGlobalSearchParams<{ addAccount?: string; returnTo?: string }>();
   const rootNavigationState = useRootNavigationState();
   const devForcedRef = useRef(false);
   const topSegment = segments[0];
@@ -607,7 +677,9 @@ function AuthGate() {
   const [storedRole, setStoredRole]               = useState<string | null>(null);
   const [threadExplainerSeen, setThreadExplainerSeen] = useState<boolean | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
+  const [accessRequired, setAccessRequired]       = useState(false);
   const [pendingInvite, setPendingInvite]         = useState<string | null>(null);
+  const [devWebPreviewReady, setDevWebPreviewReady] = useState(!DEV_WEB_ONBOARDING_PREVIEW);
   const [pendingCommunityInvite, setPendingCommunityInvite] = useState<string | null>(null);
   const prevSignedInRef = useRef<boolean | null>(null);
 
@@ -659,13 +731,52 @@ function AuthGate() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
 
+  // A full reload of the default dev-web preview always restarts the walkthrough.
+  useEffect(() => {
+    if (!DEV_WEB_ONBOARDING_PREVIEW || devForcedRef.current || !isLoaded) return;
+    devForcedRef.current = true;
+    void (async () => {
+      try { if (isSignedIn) await signOut(); } catch {}
+      await AsyncStorage.multiRemove([
+        ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', 'splash_seen',
+        'onboarding_draft', 'onboarding_pending_flow',
+        'onboarding_first_name', 'onboarding_brand_name',
+        'onboarding_brand_stage', 'onboarding_goals',
+        'onboarding_style_interests', 'onboarding_selected_plan',
+      ]);
+      setOnboardingDone(false);
+      setStoredRole(null);
+      setSplashSeen(false);
+      setActiveSeller(false);
+      setDevWebPreviewReady(true);
+      router.replace('/splash');
+    })();
+  // This reset is intentionally once per full dev-web page load.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
+
   // Read splash_seen once on mount
   useEffect(() => {
+    if (Platform.OS !== 'web' && DEV_BYPASS_ROLE === 'seller') {
+      setSplashSeen(true);
+      return;
+    }
     AsyncStorage.getItem('splash_seen').then(v => setSplashSeen(v === 'true'));
   }, []);
 
   // Read AsyncStorage whenever auth state or top segment changes
   useEffect(() => {
+    // Expo Go seller preview is a session-only route mode. Do not inspect or
+    // write account/onboarding state and do not make auth/profile requests.
+    if (Platform.OS !== 'web' && DEV_BYPASS_ROLE === 'seller') {
+      setOnboardingChecked(true);
+      setOnboardingDone(true);
+      setStoredRole('seller');
+      setThreadExplainerSeen(true);
+      setAccessRequired(false);
+      setActiveSeller(true);
+      return;
+    }
     if (!isSignedIn) { setOnboardingChecked(false); return; }
     let cancelled = false;
     setOnboardingChecked(false);
@@ -698,6 +809,9 @@ function AuthGate() {
         }
       }
 
+      // Retry a queued onboarding survey (sizes / liked brands) — optional, never throws.
+      if (userId) void flushPendingBuyerSurvey(userId, api);
+
       // Upgrade legitimately completed pre-server-marker installs. This runs
       // only when completion is already bound to the same Clerk user locally.
       if (done && (role === 'buyer' || role === 'seller')) {
@@ -729,7 +843,15 @@ function AuthGate() {
         }
       }
 
+      // Invite-only launch mode: only a not-yet-onboarded account can be gated,
+      // and only when the server says so (flag off => required is false).
+      let gated = false;
+      if (!done) {
+        try { gated = (await api.access.status()).required; } catch { /* server still enforces */ }
+      }
+
       if (cancelled) return;
+      setAccessRequired(gated);
       setOnboardingDone(done);
       setStoredRole(role);
       setThreadExplainerSeen(role !== 'buyer' || pairs[3][1] === 'true');
@@ -747,6 +869,7 @@ function AuthGate() {
     // its navigation key prevents the initial auth redirect from racing that
     // mount and producing a blank error screen in web previews.
     if (!rootNavigationState?.key) return;
+    if (!devWebPreviewReady) return;
 
     const inAuthScreen    = AUTH_SCREENS.includes(segments[0] as string);
     const inOnboarding    = segments[0] === 'onboarding';
@@ -759,7 +882,9 @@ function AuthGate() {
     const atRoot          = !segments[0] || (segments[0] as string) === 'index';
     // Team invite links must be viewable signed-out (deep-link entry point)
     // (community invite links share this: the preview is public, joining needs sign-in)
-    const inInvite        = (segments[0] as string) === 'team-invite' || (segments[0] as string) === 'community-join';
+    const inInvite        = (segments[0] as string) === 'team-invite' || (segments[0] as string) === 'community-join'
+      // Referral invite links (brandthread.app/invite/CODE) are public entry points too.
+      || (segments[0] as string) === 'invite';
     // Thread explainer is a post-onboarding buyer screen — let authenticated
     // users stay on it; the screen itself handles its own seen-state redirect.
     const inThreadExplainer = (segments[0] as string) === 'thread-explainer';
@@ -767,25 +892,15 @@ function AuthGate() {
     const inAddAccountFlow = addAccount === '1' && (inAuthScreen || inOnboarding);
 
     // Allow public access to specific buyer routes for guests
+    // (see lib/guestRoutes.ts — feed, discover, search, stores, products, drops,
+    // public profiles; account-only actions are gated inline at the action)
     const isGuestAllowedRoute =
-      (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
-      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
+      isGuestBrowseRoute(segments as string[]) || (segments[0] as string) === 'location';
 
-    // DEV bypass (all platforms): skip auth and go straight to dashboard.
-    // PREVIEW_ROLE only reads the query string once, at module load — it
-    // deliberately does NOT fall back to the persisted role (see its own
-    // comment: an explicit ?bt_preview= on a real reload must reset state).
-    // But isSellerDevPreview/isBuyerDevPreview (same gates: __DEV__ ||
-    // NAVIGATION_ISOLATION_TEST, web only, never on a production host) DO
-    // fall back to the persisted role for exactly the case that matters
-    // here — a full-page reload of a deep link (e.g. "/design", query
-    // string dropped by earlier in-app navigation, or simply not repeated
-    // on every reload) while a preview session is already active. Without
-    // this fallback, AuthGate stopped recognizing preview mode on such a
-    // reload and fell through into the real Clerk/onboarding gate below,
-    // which requires a genuinely signed-in account this bypass never sets
-    // up — leaving the deep link stuck rather than rendering the route it
-    // was pointed at.
+    // Development previews skip onboarding without writing completion flags.
+    // PREVIEW_ROLE reads the query only once, while these dev-only web helpers
+    // also recognize the persisted role when reloading a deep link without it.
+    // Expo Go still uses DEV_BYPASS_ROLE; normal accounts remain auth-gated.
     const webPreviewRole = Platform.OS === 'web'
       ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null)
       : null;
@@ -813,10 +928,12 @@ function AuthGate() {
       // "/profile?bt_preview=seller" actually asked for.
       if (!atRoot) {
         const rest = (segments as string[]).slice(1).join('/');
+        const previewQuery = Platform.OS === 'web' && typeof window !== 'undefined'
+          ? window.location.search : '';
         if (devRole === 'buyer' && inTabsGroup) {
-          router.replace(`/(buyer)/${rest}` as never);
+          router.replace(`/(buyer)/${rest}${previewQuery}` as never);
         } else if (devRole === 'seller' && inBuyerGroup) {
-          router.replace(`/(tabs)/${rest}` as never);
+          router.replace(`/(tabs)/${rest}${previewQuery}` as never);
         }
       }
       return;
@@ -842,6 +959,11 @@ function AuthGate() {
     // Exception: sellers are allowed on /plans after finishing the onboarding
     // wizard but before picking a subscription plan (onboarding_complete is
     // only written by plans.tsx after plan selection).
+    if (accessRequired && !onboardingDone && !isAccessCleared(userId)) {
+      if (segments[0] !== 'access-code') router.replace('/access-code' as never);
+      return;
+    }
+
     if (!onboardingDone && !inOnboarding && !inAuthScreen && !inPlans) {
       router.replace('/onboarding');
       return;
@@ -874,6 +996,12 @@ function AuthGate() {
     // bare "/" boot route to the correct dashboard.
     // Thread explainer is an intentional post-onboarding buyer screen — don't
     // redirect buyers away from it; it handles its own navigation.
+    // A guest who was sent to sign-in from an account-only action returns to it.
+    const returnDest = inAuthScreen ? safeReturnTo(returnTo) : null;
+    if (onboardingDone && returnDest && !inAddAccountFlow) {
+      router.replace(returnDest as never);
+      return;
+    }
     if (onboardingDone && (inAuthScreen || inOnboarding || atRoot) && !inThreadExplainer && !inAddAccountFlow) {
       const dest = storedRole === 'buyer' ? '/(buyer)/' : '/(tabs)/';
       router.replace(dest as never);
@@ -898,7 +1026,7 @@ function AuthGate() {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
-  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key]);
+  }, [addAccount, returnTo, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key, devWebPreviewReady]);
 
   return null;
 }
@@ -1029,10 +1157,15 @@ function PushRegistrar() {
   useEffect(() => {
     if (!isSignedIn) return;
     if (!userId || registeredUserRef.current === userId) return;
-    registeredUserRef.current = userId;
     // This checks/registers an existing grant only. Native prompting belongs to
     // the contextual value events below, never launch or onboarding.
-    void registerGrantedPushToken(userId, api);
+    // Deferred past first paint: checking/registering a grant is not needed to show a screen.
+    // The ref is set when the work runs, so a cancelled (re-rendered) pass retries.
+    return runAfterFirstPaint(() => {
+      if (registeredUserRef.current === userId) return;
+      registeredUserRef.current = userId;
+      void registerGrantedPushToken(userId, api);
+    });
   }, [api, isSignedIn, userId]);
   return null;
 }
@@ -1077,7 +1210,7 @@ function RootLayoutNav() {
   }, [pathname]);
 
   useEffect(() => {
-    void flushNotificationEvents(api, userId);
+    return runAfterFirstPaint(() => { void flushNotificationEvents(api, userId); });
   }, [api, userId]);
 
   useEffect(() => {
@@ -1201,12 +1334,36 @@ function RootLayoutNav() {
       <StoreContextBanner />
       <NotificationBanner />
       <NetworkNoticeBanner />
+      <OfflineBanner />
       <ActionSheetHost />
       <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
+          <AppStack />
+        </View>
+      </Pressable>
+      <StatusBarMask />
+      <SellerBarGate />
+      <AuthGate />
+      <ServiceConfigurer />
+      <PushRegistrar />
+      <AffiliateRefCapture />
+      <MarketingPixelTracker />
+      <AnalyticsBridge />
+      <LegalAcceptanceGate />
+      <AppLockGate />
+    </View>
+  );
+}
+
+// Route observers above must update on navigation. The static registration of
+// hundreds of screens must not be rebuilt with them on every tap.
+const AppStack = React.memo(function AppStack() {
+  return (
       <Stack
-        screenLayout={({ children }) => (
-          <IsolatedStackScene>{children}</IsolatedStackScene>
+        screenLayout={({ children, route, options }) => (
+          <IsolatedStackScene routeName={route.name} presentation={(options as { presentation?: string } | undefined)?.presentation}>
+            {children}
+          </IsolatedStackScene>
         )}
         screenOptions={{
           headerShown: false,
@@ -1225,6 +1382,7 @@ function RootLayoutNav() {
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
         <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="onboarding"        options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="access-code"       options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="thread-explainer"  options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, gestureEnabled: false }} />
         {/* Main app */}
         <Stack.Screen name="(tabs)"         options={{ headerShown: false }} />
@@ -1239,6 +1397,7 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-verification" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="create-post"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="post-analytics"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="post-captions-edit" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="setup"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="ai-studio"        options={{ headerShown: false }} />
         <Stack.Screen name="product-editor"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
@@ -1255,19 +1414,31 @@ function RootLayoutNav() {
         <Stack.Screen name="community" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="automation"       options={{ headerShown: false }} />
         <Stack.Screen name="payments"         options={{ headerShown: false }} />
-        <Stack.Screen name="website"          options={{ headerShown: false }} />
         <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-setup-name" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-setup-brand" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-setup-socials" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Seller dashboard screens */}
         <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="add-product" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
+        {/* `?presentation=modal` (the seller profile's Products empty state):
+            slides up as a modal over the profile, so closing it lands back
+            on the profile. Every other entry point keeps the push. */}
+        <Stack.Screen name="add-product" options={({ route }) => {
+            const asModal = (route.params as { presentation?: string } | undefined)?.presentation === 'modal';
+            return asModal
+              ? { headerShown: false, presentation: 'modal', animation: 'slide_from_bottom', contentStyle: OPAQUE_SCREEN_CONTENT }
+              : { headerShown: false, animation: consumeAnimationOverride('ios_from_right') };
+          }} />
         <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-builder"    options={{ headerShown: false }} />
         <Stack.Screen name="content" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
+        <Stack.Screen name="ai-helper" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="notification-channels" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="help"             options={{ headerShown: false }} />
         <Stack.Screen name="bg-removal"       options={{ headerShown: false }} />
         <Stack.Screen name="tech-pack-generator" options={{ headerShown: false }} />
@@ -1285,6 +1456,7 @@ function RootLayoutNav() {
         <Stack.Screen name="return-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="disputes"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-order-detail"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-generate"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-generating"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
@@ -1299,6 +1471,12 @@ function RootLayoutNav() {
         <Stack.Screen name="store-policies"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-seo"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-domain"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="growth-links" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="growth-link-new" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="growth-link-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="link-in-bio" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="link-in-bio-stats" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-pixels" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-publish"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-versions"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-from-logo"      options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1314,6 +1492,12 @@ function RootLayoutNav() {
         <Stack.Screen name="analytics-marketing"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-production"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-product-stats" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-audience" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-advanced" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-goals" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-export" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-cohorts"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
@@ -1353,11 +1537,14 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="activity-center"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-activity"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="activity-people"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="seller-agreement"        options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="refund-policy"           options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-collection"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1367,6 +1554,9 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-live"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', gestureEnabled: false, contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-live"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="live-moderation"    options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="live-cohost"        options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="live-cohost-invite" options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live-feed"       options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
 
         <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1378,6 +1568,8 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-my-sizes" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="find-friends-contacts" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1385,16 +1577,27 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-recently-watched" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings-menu"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="quote-post"                options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drops"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-category"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-trending"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drops"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-push-broadcast" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-push-broadcast-results" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-giveaways" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-giveaway-create" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-giveaway-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="giveaway" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-create"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-preview"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-highlight-stories"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-report"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-post-comments"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="ai-brain"         options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
@@ -1430,13 +1633,32 @@ function RootLayoutNav() {
         <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="payout-setup" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="payouts" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
+        <Stack.Screen name="fees"               options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="payout-schedule"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="payout-detail"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="thread-cash-history" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="thread-cash-ledger" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="statements" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="launch-checklist"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="launch-publish"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-preview-as-buyer" options={{ headerShown: false, animation: 'fade', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="product-size-chart" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="product-pairings" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-video" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-launches" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="waitlist-demand" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="products-bulk-edit" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-seo" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-variants" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="size-chart-templates" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="size-chart-template-edit" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="size-chart-template-apply" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="community-members"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="community-create"   options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1465,23 +1687,18 @@ function RootLayoutNav() {
         <Stack.Screen name="shopping-preferences"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="change-password"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="change-email"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="change-phone"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="backup-codes"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="disable-two-factor"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Account switching is a sheet on the profile screen now — see
             components/AccountSwitcherSheet.tsx — not a pushed route. */}
       </Stack>
-        </View>
-      </Pressable>
-      <SellerBarGate />
-      <AuthGate />
-      <ServiceConfigurer />
-      <PushRegistrar />
-      <MarketingPixelTracker />
-      <LegalAcceptanceGate />
-      <AppLockGate />
-    </View>
   );
-}
+});
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -1496,7 +1713,9 @@ export default function RootLayout() {
     // bitmap that was already resolved before the screen ever mounts. Never
     // gates app-ready — a slow preload just means the first Appearance visit
     // pays the (already-fast, bundled-locally) resolve cost instead.
-    void preloadAppearanceAssets();
+    // Deferred until after the first paint: it is only ever needed when the
+    // user opens Appearance, so it must not compete with the first screen.
+    return runAfterFirstPaint(() => { void preloadAppearanceAssets(); });
   }, []);
 
   useEffect(() => {
@@ -1535,8 +1754,11 @@ export default function RootLayout() {
                               <ThreadPullProvider>
                                 <CallSessionProvider>
                                   <FirstRunTipsProvider>
-                                    <RootLayoutNav />
+                                    <ReportSheetProvider>
+                                      <RootLayoutNav />
+                                    </ReportSheetProvider>
                                     <GlobalCallOverlay />
+                                    <SaveHeartHost />
                                   </FirstRunTipsProvider>
                                 </CallSessionProvider>
                               </ThreadPullProvider>
@@ -1562,8 +1784,8 @@ export default function RootLayout() {
     <AppIntroSplash ready={appReady}>
       <ClerkLoadErrorBoundary>
         <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-          {PREVIEW_ROLE ? (
-            // DEV preview bypass: don't wait for clerk-js — render screens directly.
+          {PREVIEW_SESSION_ROLE || DEV_BYPASS_ROLE ? (
+            // Explicit / persisted dev previews and the local dev bypass render without waiting for Clerk.
             appTree
           ) : (
             <>
@@ -1578,3 +1800,5 @@ export default function RootLayout() {
     </AppIntroSplash>
   );
 }
+
+export default wrapRootComponent(RootLayout);

@@ -6,6 +6,7 @@ import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS, type SellerPlanId } from '@/lib/sellerBilling';
 import { recommendSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
 import { FS } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 export function SellerPlanRecommendationStep({
   brandStage,
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
   features: { gap: 9, marginTop: 14 },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   feature: { flex: 1, color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular' },
-  continue: { borderRadius: 999, minHeight: 56, justifyContent: 'center', alignItems: 'center' },
+  continue: { borderRadius: radius.md, minHeight: 56, justifyContent: 'center', alignItems: 'center' },
   continueText: { fontSize: 16, fontFamily: 'Inter_700Bold' },
   chargeNote: { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 6, fontFamily: 'Inter_400Regular' },
 });

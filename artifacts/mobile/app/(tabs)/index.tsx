@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import SellerHomeCommerceDashboard from '@/components/SellerHomeCommerceDashboard';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { View, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
@@ -34,7 +33,6 @@ const DEFAULT_SETUP: SetupState = {
 // the dashboard's own data fetching and layout.
 export default function SellerHomeScreen() {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const { userId, isLoaded, isSignedIn } = useAuth();
   const api = useApi();
@@ -91,7 +89,7 @@ export default function SellerHomeScreen() {
     <View style={styles.root}>
       <StripeConnectWarning />
       <SellerHomeCommerceDashboard
-        topInset={insets.top}
+        topInset={headerTopInset}
         userId={userId}
         setupState={setupState}
         onSetupStateChange={setSetupState}

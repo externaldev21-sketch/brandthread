@@ -31,12 +31,14 @@ import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
-import { getPreviewSellerOrders } from '@/lib/previewOrders';
+import { allPreviewSellerOrders } from '@/lib/previewSellerOrders';
 import { sellerCountdown } from '@/lib/deliveryGuarantee';
 import { DeadlineChip } from '@/components/orders/SellerDelivery';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
+import { seedDetailOnInteraction, type DetailSeedSnapshot } from '@/lib/seedDetailOnInteraction';
+import { groupByLocalDate } from '@/lib/groupByLocalDate';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
@@ -80,8 +82,6 @@ type OrderRowActions = {
   press: (order: Order) => void;
   pressIn: (order: Order) => void;
   longPress: (orderId: string) => void;
-  markProcessing: (orderId: string) => void;
-  markReady: (orderId: string) => void;
   ship: (orderId: string) => void;
 };
 
@@ -93,12 +93,12 @@ type OrderListOrder = Order & {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
+const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+const timeFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+function fmtDate(iso: string): string { return dateFormatter.format(new Date(iso)); }
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return timeFormatter.format(new Date(iso));
 }
 
 function fmtMoney(cents: number): string {
@@ -107,20 +107,17 @@ function fmtMoney(cents: number): string {
 
 function getPaymentColor(status: string, theme: any): string {
   switch (status) {
-    case 'paid': return theme.success;
-    case 'pending': case 'authorized': return theme.warning;
-    case 'refunded': case 'partially_refunded': return theme.secondary;
-    case 'failed': case 'voided': return theme.error;
+    case 'paid': return theme.text;
+    case 'pending': case 'authorized': return theme.muted;
+    case 'refunded': case 'partially_refunded': case 'failed': case 'voided': return theme.error;
     default: return theme.muted;
   }
 }
 
 function getFulfillmentColor(status: string, theme: any): string {
   switch (status) {
-    case 'unfulfilled': return theme.warning;
-    case 'partially_fulfilled': return theme.secondary;
-    case 'fulfilled': return theme.success;
-    case 'manufacturer_pending': return theme.accentLight;
+    case 'unfulfilled': return theme.text;
+    case 'partially_fulfilled': case 'fulfilled': case 'manufacturer_pending': return theme.muted;
     default: return theme.muted;
   }
 }
@@ -140,7 +137,7 @@ function getPaymentLabel(status: string): string {
 
 function getFulfillmentLabel(status: string): string {
   switch (status) {
-    case 'unfulfilled': return 'Unfulfilled';
+    case 'unfulfilled': return 'To ship';
     case 'partially_fulfilled': return 'Partial';
     case 'fulfilled': return 'Fulfilled';
     case 'manufacturer_pending': return 'Mfg Pending';
@@ -168,31 +165,7 @@ function computeStats(orders: Order[]): OrderStats {
 
 /** Group a sorted order list into date-labelled sections. */
 function groupByDate(orders: Order[]): OrderSection[] {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-
-  const fmt = (d: Date) =>
-    d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-
-  const todayStr = fmt(today);
-  const yesterdayStr = fmt(yesterday);
-
-  const buckets = new Map<string, Order[]>();
-
-  for (const order of orders) {
-    const d = new Date(order.createdAt);
-    const label = fmt(d) === todayStr
-      ? 'Today'
-      : fmt(d) === yesterdayStr
-        ? 'Yesterday'
-        : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-
-    if (!buckets.has(label)) buckets.set(label, []);
-    buckets.get(label)!.push(order);
-  }
-
-  return Array.from(buckets.entries()).map(([title, data]) => ({ title, data }));
+  return groupByLocalDate(orders);
 }
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
@@ -279,7 +252,7 @@ export function apiRowToOrder(row: any): OrderListOrder {
 
 const FILTERS: { key: OrderListFilter; label: string }[] = [
   { key: 'all',        label: 'All' },
-  { key: 'unfulfilled', label: 'Unfulfilled' },
+  { key: 'unfulfilled', label: 'To ship' },
   { key: 'unpaid',     label: 'Unpaid' },
   { key: 'open',       label: 'Open' },
   { key: 'archived',   label: 'Archived' },
@@ -313,7 +286,7 @@ function filterOrderList(orders: Order[], filter: OrderListFilter): Order[] {
 const ALL_FILTERS: { key: OrderFilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'new', label: 'New' },
-  { key: 'unfulfilled', label: 'Unfulfilled' },
+  { key: 'unfulfilled', label: 'To ship' },
   { key: 'processing', label: 'Processing' },
   { key: 'ready_to_ship', label: 'Ready' },
   { key: 'shipped', label: 'Shipped' },
@@ -345,20 +318,18 @@ interface OrderRowProps {
   onPress: () => void;
   onPressIn?: () => void;
   onLongPress: () => void;
-  onMarkProcessing: () => void;
-  onMarkReady: () => void;
   onShip: () => void;
   isLast?: boolean;
 }
 
 export function OrderRow({
   order, selected, selectionMode, onPress, onPressIn, onLongPress,
-  onMarkProcessing, onMarkReady, onShip, isLast = false,
+  onShip, isLast = false,
 }: OrderRowProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
-  const { text: FG, error: RED, accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, success: SUCCESS, warning: ORANGE, muted: MUTED, border: BORDER, borderSubtle: BORDER_ACTIVE } = theme;
-  const BLUE = theme.accentLight, BLUE_DIM = theme.accentDim, RED_DIM = `${theme.error}22`, CYAN_DIM = `${theme.secondary}22`;
+  const { text: FG, error: RED, muted: MUTED, border: BORDER, borderSubtle: BORDER_ACTIVE } = theme;
+  const STRONG = theme.text, DIM = `${theme.text}14`, RED_DIM = `${theme.error}22`;
   const isHighRisk = order.riskLevel === 'high';
   const hasReturn = order.returns.length > 0;
   const hasDispute = order.disputes.length > 0;
@@ -380,19 +351,19 @@ export function OrderRow({
 
   return (
     <>
+      <View style={[s.orderCard, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}>
       <TouchableOpacity
         activeOpacity={0.86}
         onPress={onPress}
         onPressIn={onPressIn}
         onLongPress={onLongPress}
-        style={[s.orderCard, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}
         accessibilityRole="button"
         accessibilityLabel={`Order ${order.orderNumber}, ${order.customer.name}, ${fmtMoney(order.payment.totalCents)}`}
       >
         {/* Selection checkbox */}
         {selectionMode && (
           <View style={[s.selBox, selected && s.selBoxActive]}>
-            {selected && <Feather name="check" size={10} color={FG} />}
+            {selected && <Feather name="check" size={10} color={theme.background} />}
           </View>
         )}
 
@@ -448,8 +419,17 @@ export function OrderRow({
           </View>
         </View>
 
+      </TouchableOpacity>
         {/* Status pills row */}
         <View style={s.orderStatusRow}>
+          <TouchableOpacity
+            onPress={onPress}
+            onPressIn={onPressIn}
+            onLongPress={onLongPress}
+            accessibilityRole="button"
+            accessibilityLabel={`View status for order ${order.orderNumber}`}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: SP.xs }}
+          >
           <View style={s.statusPill}>
             <View style={[s.statusDot, { backgroundColor: payColor }]} />
             <Text style={[s.statusText, { color: payColor }]}>{getPaymentLabel(order.paymentStatus)}</Text>
@@ -464,8 +444,8 @@ export function OrderRow({
             </View>
           )}
           {order.isManufacturerFulfilled && (
-            <View style={[s.tagPill, { borderColor: BLUE + '44', backgroundColor: BLUE_DIM }]}>
-              <Text style={[s.tagText, { color: BLUE }]}>MFG</Text>
+            <View style={[s.tagPill, { borderColor: STRONG + '44', backgroundColor: DIM }]}>
+              <Text style={[s.tagText, { color: STRONG }]}>MFG</Text>
             </View>
           )}
           {isArchived && order.cancellation?.reason && (
@@ -477,30 +457,9 @@ export function OrderRow({
           )}
 
           {/* Quick action — pushed right */}
+          </TouchableOpacity>
           <View style={{ flex: 1 }} />
-          {order.status === 'new' && (
-            <Button
-              label="Accept"
-              icon="check-circle"
-              variant="primary"
-              size="compact"
-              style={s.quickAction}
-              onPress={e => { e?.stopPropagation?.(); onMarkProcessing(); }}
-              accessibilityLabel={`Accept order ${order.orderNumber}`}
-            />
-          )}
-          {order.status === 'processing' && (
-            <Button
-              label="Ready"
-              icon="package"
-              variant="primary"
-              size="compact"
-              style={s.quickAction}
-              onPress={e => { e?.stopPropagation?.(); onMarkReady(); }}
-              accessibilityLabel={`Mark order ${order.orderNumber} ready`}
-            />
-          )}
-          {order.status === 'ready_to_ship' && (
+          {(order.status === 'processing' || order.status === 'ready_to_ship') && (
             <Button
               label="Ship"
               icon="send"
@@ -513,7 +472,7 @@ export function OrderRow({
           )}
           {order.status === 'shipped' && order.shipments[0] && (
             <View style={s.trackingPill}>
-              <Feather name="truck" size={10} color={SUCCESS} />
+              <Feather name="truck" size={10} color={STRONG} />
               <Text style={s.trackingText}>
                 {order.shipments[0].carrier} · {order.shipments[0].trackingNumber?.slice(-6)}
               </Text>
@@ -525,7 +484,7 @@ export function OrderRow({
         <View style={s.cardTimelineWrap}>
           <OrderStatusTimeline status={order.status} compact />
         </View>
-      </TouchableOpacity>
+      </View>
     </>
   );
 }
@@ -544,8 +503,8 @@ function SortModal({
   onClose: () => void;
 }) {
   const { theme } = useAppTheme();
+  const STRONG = theme.text;
   const s = React.useMemo(() => createStyles(theme), [theme]);
-  const PURPLE_LIGHT = theme.accentLight;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sort menu" />
@@ -564,7 +523,7 @@ function SortModal({
             <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
               {label}
             </Text>
-            {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
+            {current === key && <Feather name="check" size={ICON.sm} color={STRONG} />}
           </TouchableOpacity>
         ))}
         <Button label="Cancel" variant="secondary" fullWidth style={s.modalCloseBtn} onPress={onClose} accessibilityLabel="Cancel sorting" />
@@ -584,8 +543,8 @@ function FilterSheet({
   onClose: () => void;
 }) {
   const { theme } = useAppTheme();
+  const STRONG = theme.text;
   const s = React.useMemo(() => createStyles(theme), [theme]);
-  const PURPLE_LIGHT = theme.accentLight;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close filter menu" />
@@ -605,7 +564,7 @@ function FilterSheet({
               <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
                 {label}
               </Text>
-              {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
+              {current === key && <Feather name="check" size={ICON.sm} color={STRONG} />}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -632,20 +591,17 @@ const OrderListRow = React.memo(function OrderListRow({
   actions: OrderRowActions;
 }) {
   const { theme } = useAppTheme();
-  const swipeAction =
-    order.status === 'new'
-      ? { label: 'Accept', icon: 'check-circle' as const, color: theme.accent, run: () => actions.markProcessing(order.id) }
-      : order.status === 'processing'
-        ? { label: 'Ready', icon: 'package' as const, color: theme.accentLight, run: () => actions.markReady(order.id) }
-        : order.status === 'ready_to_ship'
-          ? { label: 'Ship', icon: 'send' as const, color: theme.success, run: () => actions.ship(order.id) }
-          : { label: 'Open', icon: 'arrow-right' as const, color: theme.accent, run: () => actions.press(order) };
+  // Orders are automatic (paid orders arrive as "To ship"), so the only useful
+  // swipe is Ship, which opens the fulfil / label flow. Neutral, never coloured.
+  const swipeAction = order.status === 'processing' || order.status === 'ready_to_ship'
+    ? { label: 'Ship', icon: 'send' as const, run: () => actions.ship(order.id) }
+    : { label: 'Open', icon: 'arrow-right' as const, run: () => actions.press(order) };
 
   return (
     <SwipeActionRow
       label={swipeAction.label}
       icon={swipeAction.icon}
-      color={swipeAction.color}
+      color={theme.muted}
       onAction={swipeAction.run}
       disabled={selectionMode}
       accessibilityLabel={`${swipeAction.label} order ${order.orderNumber}`}
@@ -657,8 +613,6 @@ const OrderListRow = React.memo(function OrderListRow({
         onPress={() => actions.press(order)}
         onPressIn={() => actions.pressIn(order)}
         onLongPress={() => actions.longPress(order.id)}
-        onMarkProcessing={() => actions.markProcessing(order.id)}
-        onMarkReady={() => actions.markReady(order.id)}
         onShip={() => actions.ship(order.id)}
         isLast={isLast}
       />
@@ -718,8 +672,8 @@ export default function OrdersScreen() {
   const scrollResetRef = useScrollReset<any>(true, false);
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
-  const { background: BG, surface: SCREEN_BG, text: FG, muted: MUTED, subtle: SUBTLE, error: RED, success: SUCCESS, warning: ORANGE, accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM, border: BORDER, borderSubtle: BORDER_ACTIVE, card: CARD, cardElevatedGlass: CARD_ELEVATED_GLASS } = theme;
-  const BLUE = theme.accentLight, BLUE_DIM = theme.accentDim, SUCCESS_DIM = `${theme.success}22`, ORANGE_DIM = `${theme.warning}22`, RED_DIM = `${theme.error}22`, CARD_GLASS = theme.cardGlass, SURFACE = theme.surface;
+  const { background: BG, surface: SCREEN_BG, text: FG, muted: MUTED, subtle: SUBTLE, error: RED, border: BORDER, borderSubtle: BORDER_ACTIVE, card: CARD, cardElevatedGlass: CARD_ELEVATED_GLASS } = theme;
+  const STRONG = theme.text, DIM = `${theme.text}14`, RED_DIM = `${theme.error}22`, CARD_GLASS = theme.cardGlass, SURFACE = theme.surface;
   const palette = theme as typeof theme & Record<string, string>;
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -771,6 +725,7 @@ export default function OrdersScreen() {
   const generationRef = useRef(0);
   const requestGenerationRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
+  const detailSeedRef = useRef<DetailSeedSnapshot | null>(null);
 
   const loadData = useCallback(async (generation: number) => {
     // Design-preview bypass with no real signed-in account: there is no
@@ -779,14 +734,20 @@ export default function OrdersScreen() {
     // not a connectivity failure, so it resolves straight to the honest
     // empty state rather than the "couldn't load" retry banner a real
     // fetch failure shows.
-    if (isPreviewMode && !userId) {
+    if (isPreviewMode) {
+      // Preview never calls the orders API (a stubbed session would only get
+      // a 401). Demo mode lists the same order set the dashboard's numbers
+      // are summed from (lib/previewSellerOrders.ts); fresh mode is empty.
+      const rows = isPreviewDemoMode() ? allPreviewSellerOrders() : [];
+      const preview = rows.map(apiRowToOrder);
       if (generationRef.current === generation) {
-        // ?demo=1 only: the seeded delivery-guarantee fixtures.
-        const demo = isPreviewDemoMode() ? getPreviewSellerOrders().map(apiRowToOrder) : [];
-        setOrders(demo);
-        // Owner = the (absent) account, so the owner guard below lets the rows through.
-        setOrdersOwnerId(userId as string | null);
-        setStats(computeStats(demo));
+        detailSeedRef.current = {
+          ownerId: userId ?? null,
+          rows: new Map(rows.map(raw => [raw.id, raw])),
+        };
+        setOrders(preview);
+        setOrdersOwnerId(userId ?? null);
+        setStats(computeStats(preview));
         setLoadError(false);
         setLoading(false);
         setRefreshing(false);
@@ -803,14 +764,13 @@ export default function OrdersScreen() {
       if (generationRef.current !== generation) return;
       const all = Array.isArray(rows) ? (rows as any[]).map(apiRowToOrder) : [];
       setOrders(all);
-      // Seed order-detail.tsx's cache from data already in hand — no extra
-      // network call — so opening any row it renders can paint immediately
-      // instead of showing its own spinner first (stale-while-revalidate;
-      // order-detail.tsx still refetches in the background on mount).
-      (rows as unknown[]).forEach((raw) => {
-        const rawId = (raw as { id?: string })?.id;
-        if (rawId) queryClient.setQueryData(queryKeys.order(rawId), raw);
-      });
+      // Keep the raw snapshot outside the shared cache. Seed only the tapped
+      // order; hundreds of cache updates synchronously dehydrate the cache
+      // hundreds of times, despite throttled AsyncStorage writes.
+      detailSeedRef.current = {
+        ownerId: requestOwnerId,
+        rows: new Map((rows as { id: string }[]).filter(raw => !!raw.id).map(raw => [raw.id, raw])),
+      };
       setOrdersOwnerId(requestOwnerId);
       setStats(computeStats(all));
       setUpdatesPaused(false);
@@ -873,9 +833,9 @@ export default function OrdersScreen() {
       setUpdatesPaused(false);
       if (!hasLoadedRef.current) setLoading(true);
       loadData(generation);
-      // Preview mode with no account resolves once, synchronously, in
-      // loadData above — no real backend to poll every 30s.
-      if (userId || !isPreviewMode) {
+      // Preview mode resolves once, synchronously, in loadData above — no
+      // real backend to poll every 30s (even with a stubbed signed-in user).
+      if (!isPreviewMode) {
         timerRef.current = setInterval(() => loadData(generation), 30_000);
       }
       return () => {
@@ -979,26 +939,6 @@ export default function OrdersScreen() {
 
   // ─── Actions ───────────────────────────────────────────────────────────────
 
-  const handleMarkProcessing = useCallback(async (orderId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      await api.orders.updateStatus(orderId, 'processing');
-      await loadData(generationRef.current);
-    } catch {
-      Alert.alert('Error', 'Could not update order.');
-    }
-  }, [api, loadData]);
-
-  const handleMarkReady = useCallback(async (orderId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      await api.orders.updateStatus(orderId, 'fulfilled');
-      await loadData(generationRef.current);
-    } catch {
-      Alert.alert('Error', 'Could not update order.');
-    }
-  }, [api, loadData]);
-
   const handleShip = useCallback((orderId: string) => {
     router.push(('/fulfill-order?orderId=' + orderId) as never);
   }, [router]);
@@ -1014,21 +954,23 @@ export default function OrdersScreen() {
         prev.includes(order.id) ? prev.filter(id => id !== order.id) : [...prev, order.id]
       );
     } else {
+      seedDetailOnInteraction(queryClient, queryKeys.order(order.id), order.id, detailSeedRef.current, userId ?? null);
       router.push(('/order-detail?id=' + order.id) as never);
     }
-  }, [selectedIds, router]);
+  }, [selectedIds, router, queryClient, userId]);
 
   // Fires ~100-200ms before onPress (finger-down vs. finger-up): warms the
   // query cache order-detail.tsx reads on mount, so by the time the tap
   // completes and the screen mounts, its data is often already there.
   const handleCardPressIn = useCallback((order: Order) => {
     if (selectedIds.length > 0) return;
+    if (seedDetailOnInteraction(queryClient, queryKeys.order(order.id), order.id, detailSeedRef.current, userId ?? null)) return;
     prefetchOnPressIn(
       queryClient,
       queryKeys.order(order.id),
       () => api.orders.get(order.id),
     )();
-  }, [selectedIds, queryClient, api]);
+  }, [selectedIds, queryClient, api, userId]);
 
   const handleLongPress = useCallback((orderId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -1036,17 +978,6 @@ export default function OrdersScreen() {
       prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
     );
   }, []);
-
-  const handleBulkMarkProcessing = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'processing')));
-      setSelectedIds([]);
-      await loadData(generationRef.current);
-    } catch {
-      Alert.alert('Error', 'Could not bulk update orders.');
-    }
-  }, [api, selectedIds, loadData]);
 
   const handleBulkMarkReady = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1103,24 +1034,18 @@ export default function OrdersScreen() {
     press: handleCardPress,
     pressIn: handleCardPressIn,
     longPress: handleLongPress,
-    markProcessing: handleMarkProcessing,
-    markReady: handleMarkReady,
     ship: handleShip,
   });
   actionsRef.current = {
     press: handleCardPress,
     pressIn: handleCardPressIn,
     longPress: handleLongPress,
-    markProcessing: handleMarkProcessing,
-    markReady: handleMarkReady,
     ship: handleShip,
   };
   const rowActions = useMemo<OrderRowActions>(() => ({
     press: (order) => actionsRef.current.press(order),
     pressIn: (order) => actionsRef.current.pressIn(order),
     longPress: (orderId) => actionsRef.current.longPress(orderId),
-    markProcessing: (orderId) => actionsRef.current.markProcessing(orderId),
-    markReady: (orderId) => actionsRef.current.markReady(orderId),
     ship: (orderId) => actionsRef.current.ship(orderId),
   }), []);
 
@@ -1260,8 +1185,8 @@ export default function OrdersScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={PURPLE}
-              colors={[PURPLE]}
+              tintColor={STRONG}
+              colors={[STRONG]}
             />
           }
         />
@@ -1273,17 +1198,13 @@ export default function OrdersScreen() {
           <LinearGradient colors={theme.heroGradient} style={s.bulkBarInner}>
             <Text style={s.bulkCount}>{selectedIds.length} selected</Text>
             <View style={s.bulkActions}>
-              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkProcessing} accessibilityRole="button" accessibilityLabel="Mark selected orders processing">
-                <Feather name="play" size={ICON.xs} color={BLUE} />
-                <Text style={[s.bulkBtnText, { color: BLUE }]}>Processing</Text>
-              </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkReady} accessibilityRole="button" accessibilityLabel="Mark selected orders ready">
-                <Feather name="package" size={ICON.xs} color={SUCCESS} />
-                <Text style={[s.bulkBtnText, { color: SUCCESS }]}>Ready</Text>
+                <Feather name="package" size={ICON.xs} color={STRONG} />
+                <Text style={[s.bulkBtnText, { color: STRONG }]}>Ready</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={handleBulkFulfill} accessibilityRole="button" accessibilityLabel="Fulfill selected orders">
-                <Feather name="send" size={ICON.xs} color={BLUE} />
-                <Text style={[s.bulkBtnText, { color: BLUE }]}>Fulfill</Text>
+                <Feather name="send" size={ICON.xs} color={STRONG} />
+                <Text style={[s.bulkBtnText, { color: STRONG }]}>Fulfill</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={handleExportCsv} accessibilityRole="button" accessibilityLabel="Export selected orders">
                 <Feather name="download" size={ICON.xs} color={MUTED} />
@@ -1329,10 +1250,8 @@ export default function OrdersScreen() {
 const createStyles = (theme: any) => {
   const BG = theme.background, SCREEN_BG = theme.surface, SURFACE = theme.surface, CARD = theme.card;
   const CARD_GLASS = theme.cardGlass, CARD_ELEVATED_GLASS = theme.cardElevatedGlass;
-  const BORDER = theme.border, BORDER_ACTIVE = theme.accent, FG = theme.text, MUTED = theme.muted, SUBTLE = theme.subtle;
-  const SUCCESS = theme.success, SUCCESS_DIM = `${theme.success}22`, BLUE = theme.accentLight, BLUE_DIM = theme.accentDim;
-  const ORANGE = theme.warning, ORANGE_DIM = `${theme.warning}22`, RED = theme.error, RED_DIM = `${theme.error}22`;
-  const CYAN = theme.secondary, CYAN_DIM = `${theme.secondary}22`, PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim;
+  const BORDER = theme.border, BORDER_ACTIVE = theme.text, FG = theme.text, MUTED = theme.muted, SUBTLE = theme.subtle;
+  const STRONG = theme.text, DIM = `${theme.text}14`, RED = theme.error, RED_DIM = `${theme.error}22`;
   return StyleSheet.create({
   root: {
     flex: 1,
@@ -1353,7 +1272,7 @@ const createStyles = (theme: any) => {
   sortIndicator: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
+    color: STRONG,
   },
 
   // Section header
@@ -1424,8 +1343,8 @@ const createStyles = (theme: any) => {
     zIndex: 10,
   },
   selBoxActive: {
-    backgroundColor: PURPLE,
-    borderColor: PURPLE,
+    backgroundColor: STRONG,
+    borderColor: STRONG,
   },
 
   orderMainRow: {
@@ -1451,24 +1370,24 @@ const createStyles = (theme: any) => {
     letterSpacing: -0.1,
   },
   newDot: {
-    backgroundColor: ORANGE_DIM,
+    backgroundColor: DIM,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderWidth: 1,
-    borderColor: ORANGE + '44',
+    borderColor: MUTED + '44',
   },
   newDotText: {
      fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: ORANGE,
+    color: MUTED,
     letterSpacing: 0.4,
   },
   unreadDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: PURPLE,
+    backgroundColor: STRONG,
   },
   riskBadge: {
     flexDirection: 'row',
@@ -1488,7 +1407,7 @@ const createStyles = (theme: any) => {
     letterSpacing: 0.3,
   },
   returnBadge: {
-    backgroundColor: CYAN_DIM,
+    backgroundColor: DIM,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 5,
     paddingVertical: 1,
@@ -1496,7 +1415,7 @@ const createStyles = (theme: any) => {
   returnBadgeText: {
      fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: CYAN,
+    color: MUTED,
     letterSpacing: 0.3,
   },
   disputeBadge: {
@@ -1566,7 +1485,7 @@ const createStyles = (theme: any) => {
     fontFamily: FONT.semibold,
   },
   tagPill: {
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: DIM,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 5,
     paddingVertical: 1,
@@ -1576,7 +1495,7 @@ const createStyles = (theme: any) => {
   tagText: {
      fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: PURPLE_LIGHT,
+    color: STRONG,
     letterSpacing: 0.3,
   },
 
@@ -1588,17 +1507,17 @@ const createStyles = (theme: any) => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: SUCCESS_DIM,
+    backgroundColor: DIM,
     borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: SUCCESS + '44',
+    borderColor: STRONG + '44',
   },
   trackingText: {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    color: SUCCESS,
+    color: STRONG,
   },
 
   // Row divider
@@ -1620,10 +1539,10 @@ const createStyles = (theme: any) => {
     gap: SP.sm,
     marginHorizontal: SP.md,
     marginBottom: SP.xs,
-    backgroundColor: ORANGE_DIM,
+    backgroundColor: DIM,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: ORANGE + '44',
+    borderColor: MUTED + '44',
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
   },
@@ -1636,7 +1555,7 @@ const createStyles = (theme: any) => {
   pausedBannerAction: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: ORANGE,
+    color: MUTED,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -1662,7 +1581,7 @@ const createStyles = (theme: any) => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: DIM,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: BORDER_ACTIVE + '44',
@@ -1672,7 +1591,7 @@ const createStyles = (theme: any) => {
   errorRetryText: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
+    color: STRONG,
   },
 
   // Bulk bar
@@ -1760,7 +1679,7 @@ const createStyles = (theme: any) => {
     color: MUTED,
   },
   sortOptionTextActive: {
-    color: PURPLE_LIGHT,
+    color: STRONG,
     fontFamily: FONT.semibold,
   },
   modalCloseBtn: {

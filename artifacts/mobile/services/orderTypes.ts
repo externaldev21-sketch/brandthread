@@ -245,6 +245,8 @@ export interface PaymentSummary {
   manufacturerAllocationCents: number;
   shippingLabelAllocationCents: number;
   platformFeeCents: number;
+  /** Stripe processing charged to the seller on this order (0 when not recorded). */
+  processingFeeCents?: number;
   payoutStatus: 'available' | 'pending' | 'held' | 'paid';
 }
 
@@ -420,6 +422,8 @@ export interface Order {
   fulfillmentType: FulfillmentType;
   riskLevel: RiskLevel;
   riskFlags: RiskFlag[];
+  /** Seller-only Stripe Radar summary from GET /api/orders/:id (`risk`). */
+  sellerRisk?: { level: 'normal' | 'elevated' | 'highest'; score?: number | null; reviewed?: boolean; flags: { code: string; label: string; severity: 'info' | 'medium' | 'high' }[] } | null;
   customer: OrderCustomer;
   lineItems: OrderLineItem[];
   fulfillment: Fulfillment;

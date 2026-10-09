@@ -16,7 +16,7 @@ import { useAuth } from '@clerk/expo';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -41,6 +41,7 @@ import {
   ProfileChip, ProfileEditMessagesRow, ShopPill, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
+import { useSellerActivityUnread } from '@/hooks/useSellerActivityUnread';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
@@ -48,13 +49,14 @@ import {
   CoverCoachmarkSheet, CoverManageSheet, CoverTrimSheet, useProfileCover,
 } from '@/components/profile/ProfileCover';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
-import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
+import { PREVIEW_SELLER_IDENTITY, previewSellerBrandName } from '@/lib/previewIdentity';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -133,8 +135,9 @@ function DraftsFolderTile({
 export default function ProfileScreen() {
   const router  = useRouter();
   const api = useApi();
+  const hasUnreadActivity = useSellerActivityUnread();
   // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
-  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_4_5 });
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   // The seller tab bar floats over content (same metrics as the global bar).
   const sellerBarInset = useTabBarMetrics(2).occupiedHeight;
   const { isLoaded: authLoaded, userId } = useAuth();
@@ -460,7 +463,8 @@ export default function ProfileScreen() {
     }
   }
 
-  const brandTitle = profile?.brandName || profile?.displayName || 'My Brand';
+  // In the dev preview there is no account, so the one shared preview identity is shown here and in Settings / Edit profile.
+  const brandTitle = previewSellerBrandName() ?? (profile?.brandName || profile?.displayName || 'My Brand');
   const avatarInitials = brandTitle
     .split(/\s+/)
     .map((part) => part[0])
@@ -479,7 +483,10 @@ export default function ProfileScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const isLive = !post.isDraft && !(post.scheduledAt && new Date(post.scheduledAt).getTime() > Date.now());
     // Published posts play in the feed player; drafts and scheduled posts open the editor.
-    if (isLive) {
+    if (isLive && post.surface === 'profile') {
+      // POST (profile surface): the 3:4 carousel viewer, not the Threads video player.
+      router.push(('/buyer-post-viewer?postId=' + encodeURIComponent(post.id)) as never);
+    } else if (isLive) {
       router.push(profileVideosHref({ source: 'creator', id: userId, startPostId: post.id, title: brandTitle }) as never);
     } else {
       router.push(('/create-post?editId=' + encodeURIComponent(post.id)) as never);
@@ -605,7 +612,9 @@ export default function ProfileScreen() {
         tabsVariant="iconOnly"
         identity={{
           name: brandTitle,
-          handle: profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName
+          handle: previewSellerBrandName()
+            ? PREVIEW_SELLER_IDENTITY.handle
+            : profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName
             ? `@${profile.displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}`
             : null,
           initials: avatarInitials,
@@ -613,6 +622,9 @@ export default function ProfileScreen() {
           avatarVideoUrl: profile?.avatarVideoUrl ?? null,
           verified: !!profile?.verified,
           roleLabel: 'Seller',
+          // Dev's header layout: "Seller" chip on top, the plan chip
+          // directly below it — stacked, same height and style.
+          extraChips: [{ label: planLabel, icon: hasPaidPlan ? 'award' : 'layers' }],
         }}
         avatar={{
           // Accent ring = an unexpired story (verified shows as the check by the name).
@@ -636,7 +648,12 @@ export default function ProfileScreen() {
         topLeft={accountSwitcher}
         topRight={(
           <ProfileTopBarIconRow>
-            <ProfileTopBarIcon name="bell" onPress={() => nav('/notifications-settings')} accessibilityLabel="Notification settings" />
+            <ProfileTopBarIcon name="bell"
+              onPress={() => nav('/seller-activity')}
+              accessibilityLabel={hasUnreadActivity ? 'Activity, new activity' : 'Activity'}
+              badge={hasUnreadActivity}
+              testID="seller-activity-bell"
+            />
             <ProfileTopBarIcon
               name="share-2"
               onPress={() => {
@@ -657,9 +674,7 @@ export default function ProfileScreen() {
           </ProfileTopBarIconRow>
         )}
         meta={(
-          <ProfileMeta bio={profile?.bio}>
-            <ProfileChip label={planLabel} icon={hasPaidPlan ? 'award' : 'layers'} tone={hasPaidPlan ? 'accent' : 'muted'} />
-          </ProfileMeta>
+          <ProfileMeta bio={profile?.bio} />
         )}
         stats={stats}
         statsLoading={statsInitialLoading}
@@ -735,8 +750,9 @@ export default function ProfileScreen() {
             description={empty.message}
             action={empty.cta ? { label: empty.cta.label, onPress: () => nav(empty.cta!.route) } : undefined}
             testID={`seller-own-empty-${activeTab.toLowerCase()}`}
-            actionStyle="text"
-            showGridPreview={activeTab === 'Posts'}
+            // All three tabs: one shared empty state, identical layout (Dev)
+            // — badge + title (+ a slim white pill), ~32px under the tabs.
+            actionStyle="pill"
           />
         )}
         refreshing={refreshing}

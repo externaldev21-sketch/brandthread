@@ -1,13 +1,16 @@
 import { Router } from "express";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
+import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
 import healthRouter from "./health";
 import { responseCache, invalidateResponseCache } from "../middlewares/responseCache";
 import authRouter from "./auth";
+import ageRouter from "./age";
 import productsRouter from "./products";
 import ordersRouter from "./orders";
 import customersRouter from "./customers";
 import dropsRouter from "./drops";
 import analyticsRouter from "./analytics";
+import analyticsInsightsRouter from "./analytics-insights";
 import integrationsRouter from "./integrations";
 import logoRouter from "./logo";
 import mockupRouter from "./mockup";
@@ -22,11 +25,18 @@ import manufacturerFlowRouter from "./manufacturer-flow";
 import sampleOrdersRouter from "./sample-orders";
 import dropWalletRouter from "./drop-wallet";
 import inventoryRouter from "./inventory";
+import productVariantsRouter from "./product-variants";
+import catalogPublicRouter from "./catalog-public";
 import sellerHubRouter from "./seller-hub";
 import pushRouter from "./push";
 import aiRouter from "./ai";
+import aiCreditsRouter from "./ai-credits";
+import aiHelpersRouter from "./ai-helpers";
+import { aiCreditsGate } from "../lib/aiCredits/gate";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import accountDeletionPublicRouter from "./account-deletion-public";
+import discoveryRouter from "./discovery";
 import featuredPublicRouter from "./featured-public";
 import adminRouter from "./admin";
 import { auditModerationActions } from "../lib/admin/moderationAudit";
@@ -36,20 +46,24 @@ import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
 import checkoutIntentRouter from "./checkout-intent";
 import guestCheckoutRouter from "./guest-checkout";
-import connectRouter from "./connect";
+import connectRouter, { connectRedirectRouter } from "./connect";
 import subscriptionRouter from "./subscription";
 import webhooksRouter from "./webhooks";
 import reviewsRouter from "./reviews";
+import productQaRouter from "./product-qa";
 import sellerProfileRouter from "./seller-profile";
 import conversationsRouter from "./conversations";
 import communitiesRouter from "./communities";
 import brandthreadAgentRouter from "./brandthread-agent";
 import savedRouter from "./saved";
 import collectionsRouter from "./collections";
+import productBulkRouter from "./product-bulk";
+import productSeoRouter from "./product-seo";
 import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
 import postsRouter from "./posts";
+import postCaptionsRouter from "./post-captions";
 import feedRouter from "./feed";
 import reportsRouter from "./reports";
 import postCommentsRouter from "./post-comments";
@@ -57,13 +71,22 @@ import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
 import socialRouter from "./social";
 import storyMentionsRouter from "./story-mentions";
+import closeFriendsRouter from "./close-friends";
+import storyHighlightsRouter from "./story-highlights";
+import hashtagsRouter from "./hashtags";
+import followRequestsRouter from "./follow-requests";
+import placesRouter from "./places";
+import storyStickersRouter from "./story-stickers";
 import referralsRouter from "./referrals";
 import shippingRatesRouter from "./shipping-rates";
 import shippingZonesRouter from "./shipping-zones";
 import shippingLabelsRouter from "./shipping-labels";
 import disputesRouter from "./disputes";
 import financeRouter from "./finance";
+import financeStatementsRouter from "./finance-statements";
+import { financeFeesRouter, publicFeeScheduleRouter } from "./fees";
 import taxesRouter from "./taxes";
+import sellerPaymentSettingsRouter from "./seller-payment-settings";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import notificationEventsRouter from "./notification-events";
@@ -74,46 +97,82 @@ import notificationEventsRouter from "./notification-events";
  *  is a safe no-op on the second call. */
 const tc = teamContext();
 import storeRouter from "./store";
+import emailMarketingRouter from "./email-marketing";
+import emailMarketingPublicRouter from "./email-marketing-public";
+import emailMarketingWebhookRouter from "./email-marketing-webhook";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
+import salesRouter from "./sales";
 import returnsRouter from "./returns";
+import returnLabelsRouter from "./return-labels";
 import sellerVerificationRouter from "./seller-verification";
+import productLaunchesRouter from "./product-launches";
+import preorderTermsRouter from "./preorder-terms";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
+import productPairingsRouter from "./product-pairings";
+import productVideosRouter from "./product-videos";
 import buyerProductsRouter from "./buyer-products";
+import sizeChartTemplatesRouter from "./size-chart-templates";
 import recentlyViewedRouter from "./recently-viewed";
 import firstRunTipsRouter from "./first-run-tips";
+import sellerLaunchChecklistRouter from "./seller-launch-checklist";
 import sellerLocationsRouter from "./seller-locations";
 import sellerMetafieldsRouter from "./seller-metafields";
 import sellerSettingsExtRouter from "./seller-settings-route";
 import buyerPaymentsRouter from "./buyer-payments";
+import buyerPreferencesRouter from "./buyer-preferences";
+import buyerRecommendedBrandsRouter from "./buyer-recommended-brands";
+import socialContactsRouter from "./social-contacts";
 import supportRouter from "./support";
 import sellerExportRouter from "./seller-export";
+import dataExportJobsRouter from "./data-export-jobs";
 import supportChatRouter from "./support-chat";
 import freelancersRouter from "./freelancers";
 import freelancerConnectRouter from "./freelancer-connect";
 import freelancerJobsRouter from "./freelancer-jobs";
 import boostsRouter    from "./boosts";
+import promotionsRouter from "./promotions";
+import featuredSlotsRouter from "./featured-slots";
+import adminPromotionsRouter from "./admin-promotions";
 import adCampaignsRouter from "./ad-campaigns";
+import iapPromotionsRouter from "./iap-promotions";
 import metaAdsRouter from "./meta-ads";
 import vacationRouter  from "./vacation";
+import { quickRepliesRouter, awayMessageRouter } from "./seller-messaging-tools";
 import loyaltyRouter   from "./loyalty";
 import threadCashRouter from "./thread-cash";
+import giftCardsRouter from "./gift-cards";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
+import accessRouter from "./access";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
+import productImportRouter, { etsyCallbackRouter as etsyImportCallbackRouter } from "./product-import";
 import designStudioRouter from "./design-studio";
 import packagePresetsRouter from "./package-presets";
 import webhooksShippoRouter from "./webhooks-shippo";
+import releaseTestControlRouter from "./release-test-control";
 import webhooksShopifyRouter from "./webhooks-shopify";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
+import sharePreviewRouter from "./share-preview";
+import affiliatePublicRouter from "./affiliate-public";
+import affiliateCreatorRouter from "./affiliate-creator";
+import sellerAffiliateRouter from "./seller-affiliate";
+import growthRouter from "./growth";
+import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
+import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 
 const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/public/account-deletion", accountDeletionPublicRouter);
+router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
+router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
+router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
+router.use("/access",          accessRouter); // invite-only launch: validate/waitlist public, status/redeem authed
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
 // Shared response cache for the public read paths that dominate traffic. A no-op
 // unless REDIS_URL is set. Registered before the routers so a hit never reaches
@@ -130,10 +189,13 @@ router.use("/products", (req, res, next) => {
   next();
 });
 router.use("/public",          publicRouter);
+router.use("/public",          sharePreviewRouter); // /posts/:id/share-preview, /stores/:slug/share-preview (OG data)
+router.use("/public",          discoveryRouter); // /categories, /trending/products, /trending/brands
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
 router.use("/profile",         avatarVideoRouter);  // avatar video (moving profile picture), all account types
 router.use("/guest/checkout",  guestCheckoutRouter);
+router.use("/webhooks/resend-marketing", emailMarketingWebhookRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/webhooks/shopify", webhooksShopifyRouter);
@@ -141,35 +203,45 @@ router.use("/webhooks/shopify", webhooksShopifyRouter);
 // session) — mounted unauthenticated, before the authenticated /shopify group.
 router.use("/shopify/oauth/callback", shopifyOauthCallbackRouter);
 router.use("/support",         supportRouter);
-router.use("/support-chat",    supportChatRouter);
+router.use("/support-chat",    aiSafetyGuard("support-chat", { mode: "chat" }), supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
+router.use("/release-test-control", releaseTestControlRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
 router.use("/seller/export",   sellerExportRouter);
+router.use("/giveaways",       publicGiveawaysRouter); // public reads; per-viewer entry status when signed in
 
 // ─── Authenticated seller + shared routes ─────────────────────────────────────
 // tc (teamContext) is applied to every seller-scoped route so X-Store-Context
 // is honoured consistently. resolveTeamContext is idempotent (cached on req),
 // so routes that already mount it internally get a free no-op on the second call.
+// AI credits: debits every paid AI endpoint listed in lib/aiCredits/catalogue.ts
+// (and refunds on error). Must stay ahead of the AI routers below.
+router.use(aiCreditsGate);
+router.use("/ai/credits",      aiCreditsRouter);
+router.use("/ai-helpers",      tc, aiHelpersRouter); // caption, product description, size chart, save (priced in AI_TOOL_RULES)
 router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
+router.use("/auth/data-export", dataExportJobsRouter); // async emailed export (/jobs*, /download); instant POST stays in authRouter
 router.use("/auth",            authRouter);
+router.use("/auth",            ageRouter); // POST /auth/age (age gate)
 // This route is intentionally before paid AI mounts: it is the single,
 // server-enforced sample offered during seller onboarding.
-router.use("/onboarding-sample", logoRouter);
+router.use("/onboarding-sample", aiSafetyGuard("onboarding-logo"), logoRouter);
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);
 router.use("/drops",           tc, dropsRouter);
+router.use("/analytics/insights", tc, analyticsInsightsRouter);
 router.use("/analytics",       tc, analyticsRouter);
 router.use("/integrations",    tc, integrationsRouter);
 router.use("/shopify",         tc, shopifyRouter);
 // ─── Growth-plan-gated AI design routes ───────────────────────────────────────
-router.use("/logo",            tc, requirePlan("growth"), logoRouter);
-router.use("/mockup",          tc, requirePlan("growth"), mockupRouter);
-router.use("/photography",     tc, requirePlan("growth"), photographyRouter);
-router.use("/bg-removal",      tc, requirePlan("growth"), bgRemovalRouter);
-router.use("/lifestyle",       tc, requirePlan("growth"), lifestyleRouter);
-router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);
+router.use("/logo",            tc, requirePlan("growth"), aiSafetyGuard("logo"), logoRouter);
+router.use("/mockup",          tc, requirePlan("growth"), aiSafetyGuard("mockup"), mockupRouter);
+router.use("/photography",     tc, requirePlan("growth"), aiSafetyGuard("photography"), photographyRouter);
+router.use("/bg-removal",      tc, requirePlan("growth"), aiSafetyGuard("bg-removal"), bgRemovalRouter);
+router.use("/lifestyle",       tc, requirePlan("growth"), aiSafetyGuard("lifestyle"), lifestyleRouter);
+router.use("/techpack",        tc, requirePlan("growth"), aiSafetyGuard("techpack", { mode: "chat", scan: "all" }), techpackRouter);
 // Specific manufacturer sub-paths BEFORE the catch-all manufacturersRouter
 router.use("/manufacturers/public",          manufacturerPublicRouter);
 router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
@@ -178,23 +250,34 @@ router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
 router.use("/manufacturers",   tc, manufacturerFlowRouter);
 router.use("/manufacturers",   tc, manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
+router.use("/product-variants", tc, productVariantsRouter);
+router.use("/catalog-public",   catalogPublicRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);
 router.use("/push",            pushRouter);
 router.use("/notification-prefs", notificationPrefsRouter);
-router.use("/ai",              tc, aiRouter);
+router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), aiRouter);
 
 // ─── Buyer & Seller Connect / Subscription routes ─────────────────────────────
 // Mount specific sub-paths before the catch-all /buyer router so they don't
 // get swallowed by buyerRouter's lack of those handlers.
 // Buyer routes are intentionally NOT wrapped with tc — buyer context must stay
 // scoped to the actual buyer, not the team store owner.
+router.use("/product-launches",          tc, productLaunchesRouter);
+router.use("/preorder-terms",            tc, preorderTermsRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
+router.use("/product-pairings",          productPairingsRouter);
+router.use("/product-videos",            productVideosRouter);
 router.use("/buyer/products",            buyerProductsRouter);
+router.use("/buyer/preferences",         buyerPreferencesRouter);
+router.use("/size-chart-templates",      tc, sizeChartTemplatesRouter);
+router.use("/buyer/recommended-brands",  buyerRecommendedBrandsRouter);
 router.use("/buyer/recently-viewed",     recentlyViewedRouter);
 router.use("/first-run-tips",            firstRunTipsRouter);
 router.use("/buyer/saved",               savedRouter);
 router.use("/buyer/collections",         collectionsRouter);
+router.use("/product-bulk",              productBulkRouter);
+router.use("/product-seo",               productSeoRouter);
 router.use("/buyer/cart",                cartDbRouter);
 // One-page checkout (one PaymentIntent per cart). Before /buyer so its card-data guard runs first.
 router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);
@@ -205,41 +288,67 @@ router.use("/conversations",             conversationsRouter);
 // Topic group chats (unlimited members). Public discovery + invite preview are
 // declared inside before the router applies requireAuth.
 router.use("/communities",               communitiesRouter);
-router.use("/brandthread-agent",         brandthreadAgentRouter);
+router.use("/brandthread-agent",         aiSafetyGuard("brandthread-agent", { mode: "chat" }), brandthreadAgentRouter);
+// Stripe redirects the seller's browser here with no app session: mounted before the owner-only router.
+router.use("/seller/connect/onboard",    connectRedirectRouter);
+router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliate / creator program (seller side)
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
+router.use("/seller/push-broadcasts",    tc, sellerPushBroadcastsRouter);
+router.use("/seller/giveaways",          tc, sellerGiveawaysRouter);
+router.use("/seller/launch-checklist",   tc, sellerLaunchChecklistRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
+router.use("/product-qa",                tc, productQaRouter);
 // Comments are attributed to the person writing them, so they are mounted
 // ahead of the team-context posts router.
 router.use("/posts",                     postCommentsRouter);
+router.use("/posts",                     postCaptionsRouter);
 router.use("/posts",                     tc, postsRouter);
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
 router.use("/moderation",                auditModerationActions, moderationRouter);
 router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
 router.use("/safety",                    safetyRouter);
+router.use("/social/contacts",           socialContactsRouter);
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
+router.use("/social",                    closeFriendsRouter);
+router.use("/social",                    storyHighlightsRouter);
+router.use("/hashtags",                  hashtagsRouter); // public reads (optional viewer); follow endpoints require auth
+router.use("/social",                    followRequestsRouter);
+router.use("/places",                    placesRouter); // public reads (optional viewer); POST requires auth
+router.use("/social",                    storyStickersRouter);
 router.use("/referrals",                 referralsRouter);
+router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
+router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
 router.use("/shipping-labels",           shippingLabelsRouter);
 router.use("/discount-codes",            tc, discountCodesRouter);
+router.use("/sales",                     tc, salesRouter);
 router.use("/returns",                   tc, returnsRouter);
+router.use("/return-labels",             returnLabelsRouter);
 router.use("/sample-orders",             tc, sampleOrdersRouter);
 router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
+router.use("/finance/statements",        financeStatementsRouter);
+router.use("/finance/fees",              financeFeesRouter); // before financeRouter: no payout permission needed
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
+router.use("/seller/payment-settings",    tc, sellerPaymentSettingsRouter);
 // teamRouter owns its middleware ordering so membership discovery sees the
 // actual caller before any store-context rewrite.
 router.use("/team",                      teamRouter);
-router.use("/store/ai",                  tc, storeAiRouter);
+router.use("/store/ai",                  tc, aiSafetyGuard("store-ai", { mode: "chat", scan: "all" }), storeAiRouter);
 router.use("/store",                     tc, storeRouter);
+router.use("/marketing/email",           tc, emailMarketingRouter);
 router.use("/design-studio",             requireAuth, tc, designStudioRouter);
 router.use("/shopify-imports",           tc, shopifyImportRouter);
+// Etsy redirects the browser to the callback with no session; it is mounted before the authenticated group.
+router.use("/product-import/etsy/callback", etsyImportCallbackRouter);
+router.use("/product-import",             tc, productImportRouter);
 
 // ─── Freelancer marketplace (Community tab) ───────────────────────────────────
 // Connect sub-path BEFORE the generic /freelancers router so /connect/* isn't
@@ -256,17 +365,38 @@ router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 
 // ─── Live shopping ─────────────────────────────────────────────────────────────
 import liveRouter from "./live";
+import liveCommerceRouter from "./live-commerce";
 // Watching is open to every signed-in user; the host-only routes inside
 // (start / end / products) apply requirePlan("pro") themselves.
+// Moderation + co-host routers MUST be mounted before liveRouter: they own
+// literal paths (/moderation-defaults, /cohost-*) that liveRouter's GET /:id would otherwise swallow.
+import liveModerationRouter from "./live-moderation";
+import liveCohostRouter from "./live-cohost";
+router.use("/live",                      tc, liveModerationRouter);
+router.use("/live",                      tc, liveCohostRouter);
+router.use("/live",                      tc, liveCommerceRouter); // Pin / live codes / scheduled — before liveRouter so /scheduled/* never hits /:id
 router.use("/live",                      tc, liveRouter);
+import liveReplaysRouter from "./live-replays";
+import liveTipsRouter from "./live-tips";
+router.use("/live-replays",              tc, liveReplaysRouter);
+router.use("/live-tips",                 tc, liveTipsRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
 router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
+router.use("/promotions",                promotionsRouter); // viewer-scoped Sponsored delivery; no tc
+router.use("/featured-slots",            tc, featuredSlotsRouter); // /active is public; seller routes require auth
+router.use("/admin/promotions",          adminPromotionsRouter); // platform admins only
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
+router.use("/iap-promotions",            tc, iapPromotionsRouter);
 router.use("/meta-ads",                  tc, metaAdsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
+router.use("/seller/quick-replies",     tc, quickRepliesRouter);
+router.use("/seller/away-message",      tc, awayMessageRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
+// Seller growth tools: tracked UTM links, link-in-bio, store pixels.
+router.use("/growth",              tc, growthRouter);
+router.use("/gift-cards",          giftCardsRouter); // buyer + seller (own auth/permission checks); no tc
 
 export default router;

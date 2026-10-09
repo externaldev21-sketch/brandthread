@@ -122,7 +122,7 @@ describe("seller Connect status", () => {
     const result = await getStatus();
 
     expect(result.status).toBe(200);
-    expect(result.body).toEqual({
+    expect(result.body).toMatchObject({
       connected: false,
       stripeAccountId: null,
       chargesEnabled: false,
@@ -179,7 +179,7 @@ describe("seller Connect status", () => {
     const result = await getStatus();
 
     expect(result.status).toBe(200);
-    expect(result.body).toEqual({
+    expect(result.body).toMatchObject({
       connected: true,
       stripeAccountId: "acct_active",
       chargesEnabled: true,

@@ -124,12 +124,12 @@ async function verifyBuyerSearchNavigation() {
     ['buyer-tab-index', 'buyer-tab-index'],
     ['buyer-tab-discover', 'buyer-tab-discover'],
     ['buyer-tab-inbox', 'buyer-tab-inbox'],
+    ['buyer-tab-activity', 'buyer-tab-activity'],
     ['buyer-tab-profile', 'buyer-tab-profile'],
   ];
   for (const [control] of destinations) {
     await waitFor(control);
   }
-  await waitFor('buyer-tab-search');
 
   for (const [control, selected] of destinations.slice(1)) {
     await tap(control);
@@ -142,13 +142,15 @@ async function verifyBuyerSearchNavigation() {
   const transitionPath = resolve(outputDir, 'buyer-search-transition.png');
   const expandedPath = resolve(outputDir, 'buyer-search-expanded.png');
   await captureNativeScreenshot(standardPath);
-  await tap('buyer-tab-search');
+  await tap('buyer-tab-discover');
+  await waitFor('Search products and brands');
+  await tap('Search products and brands');
   await captureNativeScreenshot(transitionPath);
   await waitFor('Search Brandthread');
   await sleep(700);
   await captureNativeScreenshot(expandedPath);
   if (pixelHash(standardPath) === pixelHash(transitionPath) || pixelHash(transitionPath) === pixelHash(expandedPath)) {
-    throw new Error('Buyer Search tab did not produce a visible animated transition');
+    throw new Error('Buyer Search did not produce a visible animated transition');
   }
 
   for (const destination of ['Search Brandthread', 'Open search filters']) {
@@ -170,7 +172,7 @@ async function verifyBuyerSearchNavigation() {
   for (const [destination] of destinations) {
     await waitFor(destination);
   }
-  await waitFor('buyer-tab-search');
+  await waitFor('buyer-tab-activity');
   await expectMissing('Search Brandthread');
 }
 

@@ -13,6 +13,7 @@
  *  - turning a wallet sheet's contact into the page's address and contact.
  */
 import type { CheckoutAddress, CheckoutContact, CheckoutSession } from '@/services/cartTypes';
+import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 
 /** Stripe's minimum USD card charge (the server enforces it too). */
 export const MIN_CARD_CHARGE_CENTS_CLIENT = 50;
@@ -57,6 +58,10 @@ export function choosePaymentPath(input: {
 export type PaymentIntentGroup = {
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string;
+  /** Live the buyer is shopping from — lets a live-only code validate server-side. */
+  liveStreamId?: string;
+  /** A store gift card from the buyer's wallet, spent on this seller's group only. */
+  giftCard?: { cardId: string };
 };
 
 export type PaymentIntentAddress = {
@@ -83,19 +88,31 @@ export type QuoteBody = {
   shippingAddress: { street?: string; line2?: string | null; city?: string; state?: string; postalCode: string; country: string };
 };
 
-type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'>;
+type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'> & Partial<Pick<CheckoutSession, 'giftCards'>>;
 
-/** One group per seller. A promo code applies to single-seller orders, as before. */
+/**
+ * One group per seller. A single-seller order takes the one valid code; a
+ * multi-store order takes each seller's own code (a discount tagged with that
+ * seller's id), so a code never crosses stores.
+ */
 export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] {
-  const code = session.deliveryGroups.length === 1 ? session.discounts.find(d => d.isValid)?.code : undefined;
-  return session.deliveryGroups.map(group => ({
-    items: group.items.map(item => ({
-      variantId: String(item.variantId),
-      productId: String(item.productId),
-      quantity: Number(item.quantity),
-    })),
-    ...(code ? { discountCode: String(code) } : {}),
-  }));
+  const single = session.deliveryGroups.length === 1;
+  return session.deliveryGroups.map(group => {
+    const code = single
+      ? session.discounts.find(d => d.isValid)?.code
+      : session.discounts.find(d => d.isValid && d.sellerId === group.sellerId)?.code;
+    const liveStreamId = code ? getLiveCheckoutContext(group.sellerId ?? null)?.streamId : undefined;
+    return {
+      items: group.items.map(item => ({
+        variantId: String(item.variantId),
+        productId: String(item.productId),
+        quantity: Number(item.quantity),
+      })),
+      ...(code ? { discountCode: String(code) } : {}),
+      ...(liveStreamId ? { liveStreamId } : {}),
+      ...(session.giftCards?.[group.sellerId] ? { giftCard: { cardId: session.giftCards[group.sellerId].cardId } } : {}),
+    };
+  });
 }
 
 export function recipientName(address: Partial<CheckoutAddress>): string {
@@ -161,11 +178,19 @@ export type QuoteGroup = {
   shippingCents: number;
   discountCents: number;
   taxCents: number;
+  /** Covered by a store gift card; totalCents is what the card payment still covers. */
+  giftCardCents?: number;
   totalCents: number;
   processingDays: number | null;
 };
 
-export type CartQuote = { amountCents: number; groups: QuoteGroup[] };
+/** paymentMethodTypes: what the server will offer for this cart (card, plus klarna / afterpay_clearpay when every seller opted in). */
+export type CartQuote = { amountCents: number; groups: QuoteGroup[]; paymentMethodTypes?: string[] };
+
+/** Whether the quote offers Buy now, pay later (web Payment Element only; native keeps card / wallets). */
+export function quoteOffersBnpl(quote: CartQuote | null | undefined): boolean {
+  return !!quote?.paymentMethodTypes?.some(type => type === 'klarna' || type === 'afterpay_clearpay');
+}
 
 export type PaymentIntentStart = CartQuote & {
   paymentIntentId: string;
@@ -190,14 +215,23 @@ export function isCartQuote(value: unknown): value is CartQuote {
 }
 
 /** Totals for the page and the Pay button once the server has priced the cart. */
-export function quoteTotals(quote: CartQuote) {
-  return quote.groups.reduce((sum, group) => ({
+export type QuoteTotals = {
+  subtotalCents: number; shippingCents: number; discountCents: number; taxCents: number; totalCents: number;
+  /** Present only when a store gift card is applied. */
+  giftCardCents?: number;
+};
+
+export function quoteTotals(quote: CartQuote): QuoteTotals {
+  const base = quote.groups.reduce((sum, group) => ({
     subtotalCents: sum.subtotalCents + group.subtotalCents,
     shippingCents: sum.shippingCents + group.shippingCents,
     discountCents: sum.discountCents + group.discountCents,
     taxCents: sum.taxCents + group.taxCents,
     totalCents: sum.totalCents + group.totalCents,
   }), { subtotalCents: 0, shippingCents: 0, discountCents: 0, taxCents: 0, totalCents: 0 });
+  const giftCardCents = quote.groups.reduce((sum, group) => sum + (group.giftCardCents ?? 0), 0);
+  // Only present when a store gift card is applied, so other orders keep their exact shape.
+  return giftCardCents > 0 ? { ...base, giftCardCents } : base;
 }
 
 // ─── Delivery window ─────────────────────────────────────────────────────────

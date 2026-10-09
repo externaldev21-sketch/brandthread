@@ -50,7 +50,7 @@ export default function LegalAcceptanceGate() {
       }
       const pending = await readPendingConsent();
       if (pending && hasAcceptedCurrentTerms(pending.version)) {
-        await api.auth.acceptLegal(pending.version);
+        await api.auth.acceptLegal(pending.version, 'signup');
         await clearPendingConsent();
         setNeedsAgreement(false);
         return 'done';
@@ -87,7 +87,7 @@ export default function LegalAcceptanceGate() {
     setSaving(true);
     setError(null);
     try {
-      await api.auth.acceptLegal(LEGAL_VERSION);
+      await api.auth.acceptLegal(LEGAL_VERSION, 'update_prompt');
       await clearPendingConsent();
       setNeedsAgreement(false);
     } catch (err) {

@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 
 export function VerifiedMark({ size = 14 }: { size?: number }) {
@@ -16,5 +16,19 @@ export function VerifiedMark({ size = 14 }: { size?: number }) {
     >
       <Feather name="check" size={Math.round(size * 0.68)} color={colors.background} />
     </View>
+  );
+}
+
+/**
+ * The same mark as an inline glyph for use INSIDE a <Text> (after a name that may wrap onto two lines):
+ * it is text, so it stays glued to the last word instead of orphaning onto its own line.
+ */
+export function VerifiedGlyph({ size = 14 }: { size?: number }) {
+  const colors = useColors();
+  return (
+    <>
+      {'\u00A0'}
+      <Ionicons name="checkmark-circle" size={size} color={colors.foreground} accessibilityLabel="Official Brandthread community" />
+    </>
   );
 }

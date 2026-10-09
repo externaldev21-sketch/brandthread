@@ -23,6 +23,7 @@ import {
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
 import { applyPromptEdit } from '@/services/designService';
 import type { AIGenerationResult } from '@/services/designTypes';
+import { radius } from '@/constants/radii';
 
 const EXAMPLE_PROMPTS = [
   'Make the background black',
@@ -282,7 +283,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   promptInput:            { marginBottom: SP.sm },
   chipsLabel:             { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: SP.sm },
   chipsScroll:            { gap: SP.sm, paddingRight: SP.md },
-  chip:                   { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
+  chip:                   { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
   chipActive:             { backgroundColor: PURPLE_DIM, borderColor: theme.accent },
   chipText:               { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   chipTextActive:         { color: PURPLE_LIGHT },

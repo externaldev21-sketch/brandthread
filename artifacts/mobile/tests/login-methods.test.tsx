@@ -93,6 +93,8 @@ vi.mock('react-native-svg', () => {
   return {
     default: svgComponent('Svg'),
     Line: svgComponent('SvgLine'),
+    // The shared empty-state badge (components/layout/EmptyStateBadge.tsx) draws with these.
+    ...Object.fromEntries(['G', 'Path', 'Rect', 'Circle', 'Polyline', 'Polygon', 'Ellipse'].map((n) => [n, svgComponent(`Svg${n}`)])),
   };
 });
 

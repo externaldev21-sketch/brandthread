@@ -5,6 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -86,6 +87,7 @@ export default function ConversationSearchScreen() {
         <ActivityIndicator style={{ marginTop: SP.xl }} color={theme.text} />
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={results}
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}
@@ -108,7 +110,8 @@ export default function ConversationSearchScreen() {
 
 const makeStyles = () => StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  // No divider under the header (app-wide header rule).
+  header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   roundBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   searchPill: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: 40, borderRadius: RADIUS.pill, paddingHorizontal: SP.md },
   searchInput: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base, height: 40 },

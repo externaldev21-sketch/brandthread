@@ -1,3 +1,4 @@
+import { MAX_SLIDES_BY_SURFACE } from "./postLimits";
 /**
  * Shared strict validation for slideshow overlay payloads.
  *
@@ -11,7 +12,7 @@
  */
 
 // ─── Overlay field bounds ─────────────────────────────────────────────────────
-export const MAX_SLIDES           = 10;
+export const MAX_SLIDES           = Math.max(...Object.values(MAX_SLIDES_BY_SURFACE));
 export const MAX_OVERLAYS_PER_SLIDE = 10;
 export const MAX_TEXT_LENGTH      = 200;
 export const MIN_FONT_SIZE        = 10;

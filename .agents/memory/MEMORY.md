@@ -7,7 +7,7 @@
 - [Clerk Expo v3 Signals API](clerk-expo-v3-signals-api.md) — @clerk/expo v3 hooks return SignInFutureResource; use password()+finalize() not create()+setActive(); Metro needs _tmp_ blockList fix.
 - [Brandthread backend architecture](brandthread-backend-architecture.md) — ownerId scoping, transactional orders, lib/db build requirement, clerkClient usage, healthz double-path gotcha.
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.
-- [Buyer/Seller navigation](buyer-seller-nav.md) — buyer bar is Home·Discover·Inbox·Search plus a Profile/Close circle; search slides in beside a fixed Home; screens pad by useBuyerTabBarInset().
+- [Buyer/Seller navigation](buyer-seller-nav.md) — buyer bar is Home·Discover·Inbox·Activity plus a Profile/Close circle; Search remains accessible elsewhere; screens clear the bar.
 - [User-scoped onboarding state](user-scoped-onboarding-state.md) — auth-gated local completion and identity writes must be owned by a Clerk user, never a shared device-global key.
 - [Onboarding architecture](onboarding-architecture.md) — Clerk account creation is the literal first step for buyer and seller; user-scoped draft migration preserves equivalent screens across reorderings.
 - [Manufacturer payout and call integrity](manufacturer-payout-call-integrity.md) — payout truth, reversal accounting, exact callbacks, and participant-scoped call events must stay idempotent across provider races.
@@ -17,10 +17,11 @@
 - [expo-file-system v19 API](expo-file-system-v19.md) — legacy API (readAsStringAsync/writeAsStringAsync/EncodingType/cacheDirectory) removed; use File+Paths classes; for reading images before API call, request base64:true in ImagePicker instead.
 - [Dev API routing](expo-public-api-base-url.md) — base URL must be domain ROOT; proxy forwards /api/* verbatim; /api-server/* returns SPA HTML with 200 (silent fallback trap); verify via Metro's /proc environ, not shell env.
 - [Expo web boot & root route](expo-web-boot.md) — boot never blank; dev web preview defaults to seller and bypasses auth; ?bt_preview=buyer overrides for captures; static screenshots catch FOIT.
-- [Expo dependency repair](expo-dependency-repair.md) — never interrupt pnpm’s forced mobile relink; run long repairs in background and restart Metro only after package links return.
+- [Expo dependency repair](expo-dependency-repair.md) — avoid interrupted pnpm relinks; newly published SDK patches may be blocked by registry release age before online Expo checks advance.
 - [Expo Go native module boundary](expo-go-native-module-boundary.md) — Expo Go startup must not statically import custom native modules absent from its client; keep those behind compatible fallbacks.
-- [Expo root navigation readiness](expo-root-navigation-readiness.md) — defer preview redirects until Expo Router registers the root Stack or web preview crashes before first paint.
+- [Expo root navigation readiness](expo-root-navigation-readiness.md) — wait for root registration before redirecting; merged Stack screen names must stay unique.
 - [Expo proxied device startup](expo-tunnel-fallback.md) — use direct proxied LAN startup; an Ngrok-first handoff can leave Expo Go white even when Metro later recovers.
+- [Expo Go iOS account parity](expo-go-account-parity.md) — physical iOS on SDK 57 requires Expo CLI and Expo Go on the same account; prefer a personal token over managed CLI login.
 - [Expo native prebuild guards](expo-native-prebuild-guards.md) — package lifecycle scripts do not intercept direct `expo prebuild`; invariant checks belong in Expo config plugins.
 - [DB package project references](db-project-references.md) — lib/db uses composite:true + emitDeclarationOnly; must run tsc --build in lib/db before api-server TypeScript checks will see new exports.
 - [Buyer post privacy](buyer-post-privacy.md) — buyer profile posts are friend-only until the database has an enforceable per-post visibility field; never infer public visibility.
@@ -30,6 +31,7 @@
 - [Seller vacation enforcement](seller-vacation-enforcement.md) — vacation mode is a server-side commerce and buyer-to-seller messaging boundary; public surfaces expose its effective status and message.
 - [Freelancer marketplace payments](freelancer-marketplace.md) — escrow transfer-on-complete; live payout-readiness gate; source_transaction mandatory; claim-then-pay idempotency; 5% fee pending.
 - [DB migration runner](db-migrations-runner.md) — ordered schema_migrations-tracked runner; every migration statement must be idempotent; clean boot = push then migrate.
+- [Non-interactive DB bootstrap](test-database-bootstrap.md) — Drizzle push can print a TTY error and exit zero; unattended setup must independently verify the schema.
 - [Sample image upload security](sample-image-upload-security.md) — sample images use authenticated, size-limited proxy upload with byte-signature validation before storage.
 - [Store preview links](store-preview-links.md) — public preview tokens are bearer credentials: store only the latest SHA-256 fingerprint and reject all earlier links.
 - [Truthful seller profile metrics](truthful-seller-profile-metrics.md) — count settled paid orders and deduplicated signed-in storefront visits; never fabricate growth.
@@ -63,6 +65,7 @@
 - [Tax reporting boundaries](tax-reporting-boundaries.md) — annual gross uses successful-payment UTC year; preserve Stripe tax, gross, and final destination without inferring compliance.
 - [Notification response deduplication](notification-response-deduplication.md) — warm listeners and cold-start recovery can surface the same Expo response; dedupe navigation by request identifier.
 - [Notification measurement integrity](notification-measurement-integrity.md) — Expo tickets are provider results, not receipts; client events need stable IDs and an account-scoped durable outbox.
+- [Conversation mute semantics](conversation-mute-semantics.md) — muting one conversation suppresses its push alerts only, not unread messages or the in-app notification feed.
 - [Post-merge setup timeout](post-merge-timeout.md) — allow five minutes for cold or forced pnpm relinks before migrations and the API build.
 - [OpenAPI integer validation](openapi-integer-validation.md) — generated validators may accept fractions for integer fields; enforce integer semantics at sensitive server boundaries.
 - [Social relationship locking](social-relationship-locking.md) — pairwise follow/block mutations share one unordered-user lock; block checks happen inside the locked transaction.
@@ -72,9 +75,26 @@
 - [External object deletion](external-object-deletion.md) — commit ownership deletion and durable cleanup intent together; delete storage later only after rechecking live references.
 - [Seller cash-out safety](seller-cashout-safety.md) — cash-outs bind exact confirmed funds, account, bank, and durable provider reference; ambiguous old attempts fail closed.
 - [Create Post interaction](create-post-interaction.md) — use a TikTok-like media-first flow with a full-screen editor and compact final details, adapted to Brandthread.
+- [Profile video square](profile-video-square.md) — the square beside the buyer edit-profile photo edits the existing silent, looping cover video, not a second video identity.
 - [Persistent seller navigation](persistent-seller-navigation.md) — the seller tab bar is app-shell navigation and remains visible on every signed-in seller route.
 - [Reference-app adaptation](reference-app-adaptation.md) — audit reference archives for useful micro-interactions as well as major flows; adapt them without replacing Brandthread’s layout.
 - [Canonical buyer checkout](canonical-buyer-checkout.md) — every buyer purchase source uses one Brandthread checkout, confirmation, purchase-detail, and rating journey.
 - [Expo video screenshot capture](expo-video-screenshot-capture.md) — static preview screenshots may show black hardware-video planes; verify bundled clips through player logs and extracted frames.
 - [Expo stale preview bundles](expo-stale-preview-bundles.md) — if source checks pass but a phone still shows retired UI, clear Metro caches, restart Expo, and reload the open client.
 - [Friend-only repost identity](friend-only-repost-identity.md) — repost avatars are server-authorized for mutual buyer friends only; explicit add/remove and uniqueness keep state retry-safe.
+- [Native release fixtures](native-release-fixtures.md) — release runners use repository-owned lifecycle code; credentials stay in runner secrets and API failure controls stay buyer-scoped.
+- [Managed workflow collisions](install-workflow-collisions.md) — old listeners can outlive workflow startup or package sync; clear stale process groups before one managed restart.
+- [Expo web chat focus](expo-web-chat-focus.md) — browser taps can focus a textarea then immediately blur it through an ancestor press handler.
+- [Git provider vs connector auth](git-provider-vs-connector-auth.md) — a healthy GitHub API integration does not repair expired Git push credentials.
+- [Resend sender domain](resend-sender-domain.md) — brandthread.app was reported verified in Resend; use its domain for default customer mail.
+- [Expo screen layouts and route context](expo-screen-layout-route-context.md) — screenLayout wrappers render outside per-screen route context; pass the route argument explicitly.
+- [Concurrent Git operations](concurrent-git-rebase.md) — verify shared-checkout ancestry; ordered batches must check complete coverage before the designated final merge.
+- [GitHub design merge priority](github-design-merge-priority.md) — reviewed origin/dev UI files take precedence in sync conflicts; retain nonconflicting local runtime fixes.
+- [Swipe action color bleed](swipe-action-color-bleed.md) — colored actions behind Activity rows can appear as thin lines on device even when web looks clean; closed rows must not mount them.
+- [Recently watched semantics](recently-watched-semantics.md) — watch history means actual video playback, not a feed impression; show only the last 36 hours and currently accessible posts.
+- [Expo DevTools on Nix](expo-devtools-nix.md) — the optional RN DevTools binary can lack libglib while Metro and the web preview still work.
+- [Large source exports](large-source-exports.md) — downloadable asset registration rejected a project archive above 100 MiB; package runnable source separately from visual-reference captures.
+- [Merge-only test boundary](merge-only-test-boundary.md) — report stale test contracts separately rather than changing product behavior during a requested upstream sync.
+- [Store responsiveness boundary](store-responsiveness-boundary.md) — draft interactions must not wait on publication reads; fast draft rendering is not proof of live publication.
+- [Shared performance boundaries](shared-performance-boundaries.md) — cache persistence throttles storage, not dehydration; frozen scenes need imperative animation cleanup.
+- [Fresh seller preview](fresh-seller-preview.md) — owner requires a new-account zero state; native preview is always empty, and web demo requires the current URL's explicit demo=1.

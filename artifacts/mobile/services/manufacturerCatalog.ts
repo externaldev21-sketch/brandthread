@@ -4,6 +4,11 @@
  * management is a manufacturer-portal (web) concern, not this app's.
  */
 import { serviceRequest } from '../lib/serviceConfig';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import {
+  getPreviewManufacturerProduct,
+  getPreviewManufacturerProducts,
+} from '@/lib/previewManufacturers';
 
 export interface ManufacturerProductPriceTier {
   id: string;
@@ -71,6 +76,9 @@ function mapProduct(row: any): ManufacturerProduct {
 
 /** Browsable catalog for one manufacturer's ACTIVE products, tiers included. */
 export async function getManufacturerProducts(manufacturerId: string): Promise<ManufacturerProduct[]> {
+  if (isSellerDevPreview()) {
+    return isPreviewDemoMode() ? getPreviewManufacturerProducts(manufacturerId) : [];
+  }
   assertCanonicalId(manufacturerId);
   const rows = await serviceRequest<any[]>(`/api/manufacturers/public/${encodeURIComponent(manufacturerId)}/products`);
   if (!Array.isArray(rows)) throw new Error('Manufacturer catalog returned an invalid response.');
@@ -79,6 +87,9 @@ export async function getManufacturerProducts(manufacturerId: string): Promise<M
 
 /** Single catalog product with its full tier table. */
 export async function getManufacturerProduct(manufacturerId: string, productId: string): Promise<ManufacturerProduct | undefined> {
+  if (isSellerDevPreview()) {
+    return isPreviewDemoMode() ? getPreviewManufacturerProduct(manufacturerId, productId) : undefined;
+  }
   assertCanonicalId(manufacturerId);
   assertCanonicalId(productId);
   const row = await serviceRequest<any>(

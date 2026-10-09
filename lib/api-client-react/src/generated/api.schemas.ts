@@ -1124,10 +1124,30 @@ export interface DeletionBlocker {
   actionLabel: string;
 }
 
+/**
+ * Proof required by DELETE /auth/account
+ */
+export type AccountDeletionCheckReauth = typeof AccountDeletionCheckReauth[keyof typeof AccountDeletionCheckReauth];
+
+
+export const AccountDeletionCheckReauth = {
+  password: 'password',
+  email_code: 'email_code',
+} as const;
+
 export interface AccountDeletionCheck {
   canDelete: boolean;
   /** @nullable */
   accountType: string | null;
+  /** Days the account stays restorable before permanent deletion */
+  graceDays?: number;
+  /** Proof required by DELETE /auth/account */
+  reauth?: AccountDeletionCheckReauth;
+  /**
+     * Set for a week after signing back in cancelled a scheduled deletion
+     * @nullable
+     */
+  deletionCancelledAt?: string | null;
   blockers: DeletionBlocker[];
   willDelete: string[];
   willRetain: string[];
@@ -1180,11 +1200,24 @@ export const DeleteAccountInputConfirmation = {
 
 export interface DeleteAccountInput {
   confirmation: DeleteAccountInputConfirmation;
+  /** Required for accounts that have a password */
+  password?: string;
+  /** Emailed 6-digit code */
+  code?: string;
 }
+
+export type LegalAcceptanceInputSource = typeof LegalAcceptanceInputSource[keyof typeof LegalAcceptanceInputSource];
+
+
+export const LegalAcceptanceInputSource = {
+  signup: 'signup',
+  update_prompt: 'update_prompt',
+} as const;
 
 export interface LegalAcceptanceInput {
   /** @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]+)?$ */
   version: string;
+  source?: LegalAcceptanceInputSource;
 }
 
 export type RenewCallToken200 = CallCredentials & {
@@ -1277,6 +1310,13 @@ export const ListModerationReportsStatus = {
 export type ListMutedWords200 = {
   words: MutedWord[];
   limit: number;
+};
+
+export type DeleteAccount200 = {
+  ok: boolean;
+  /** @nullable */
+  scheduledFor?: string | null;
+  graceDays?: number;
 };
 
 export type DeleteAccount409Code = typeof DeleteAccount409Code[keyof typeof DeleteAccount409Code];

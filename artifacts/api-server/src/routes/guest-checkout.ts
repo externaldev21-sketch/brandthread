@@ -3,6 +3,7 @@
  * token is an authorization capability for post-redirect status only; the DB
  * stores a SHA-256 digest, never the capability itself.
  */
+import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 import { Router } from "express";
 import crypto from "node:crypto";
 import {
@@ -11,11 +12,13 @@ import {
 } from "@workspace/db";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { mapStripeError, requireStripe } from "../lib/stripe";
+import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
+import { recordCheckoutAttribution } from "../lib/growth/attribution";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -152,6 +155,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       if (variant.status !== "active" || variant.stock < quantity) return res.status(400).json({ error: `${variant.productName} is unavailable or out of stock` });
       if (sellerId && sellerId !== variant.sellerId) return res.status(400).json({ error: "All items must belong to the same seller" });
       sellerId = variant.sellerId;
+      variant.priceCents = (await effectiveUnitPrice({ productId: variant.productId, sellerId: variant.sellerId, priceCents: variant.priceCents })).priceCents;
       const variantLabel = [variant.size, variant.color].filter(Boolean).join(" / ");
       cartItems.push({ variantId: variant.variantId, productName: variant.productName, variantLabel, quantity, priceCents: variant.priceCents });
       cartWeightGrams += (variant.weightGrams ?? 0) * quantity;
@@ -243,11 +247,13 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       tax_behavior: "exclusive",
       product_data: { name: shippingLineName },
     }, quantity: 1 });
+    const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
       merchandiseCents: subtotalCents,
       preTaxTotalCents: subtotalCents + shippingCents,
+      platformFeeBps,
     });
     const checkoutIdValue = crypto.randomUUID();
     const accessToken = guestAccessToken(checkoutIdValue);
@@ -260,6 +266,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         chargeModel: money.chargeModel,
         dropId: chargePlan.dropId,
         platformFeeCents: money.platformFeeCents,
+        platformFeeBps,
         processingFeeEstimateCents: money.processingFeeEstimateCents,
       }).returning({ id: checkoutSessions.id });
     } catch (error: any) {
@@ -307,6 +314,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       },
     }, key ? { idempotencyKey: `guest_cs_${key}` } : {});
     await db.update(checkoutSessions).set({ stripeSessionId: session.id }).where(eq(checkoutSessions.id, checkout.id));
+    // Additive growth attribution (tracked link / UTM); best effort, never blocks checkout.
+    await recordCheckoutAttribution({
+      checkoutSessionId: checkout.id, stripeSessionId: session.id, sellerId, attribution: req.body?.attribution,
+    });
     // This is the sole response containing this token. It is not logged or stored raw.
     return void res.status(201).json({ sessionId: session.id, url: session.url, guestAccessToken: accessToken });
   } catch (error: any) {

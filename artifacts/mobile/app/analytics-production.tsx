@@ -121,7 +121,6 @@ export default function AnalyticsProductionScreen() {
     <View style={{ flex: 1 }}>
       <ScreenHeader
         title="Production Analytics"
-        subtitle={filter?.dateRange.label ?? '30 days'}
         rightElement={<HeaderPillButton label="Mfr. Hub" onPress={() => router.push('/manufacturer-hub' as never)} />}
       />
       {loading ? (

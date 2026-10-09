@@ -34,6 +34,7 @@ import {
   SECTION_TYPE_LABELS, StoreThemeSettings, THREAD_THEME_NAME,
   TYPOGRAPHY_STYLES,
 } from '@/services/storeTypes';
+import { radius } from '@/constants/radii';
 
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
@@ -81,7 +82,7 @@ const makeChipStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
   chip: {
     paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: RADIUS.pill, backgroundColor: CARD,
+    borderRadius: radius.sm, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
   },
   active: { backgroundColor: theme.accentDim, borderColor: theme.accentLight },
@@ -172,10 +173,10 @@ const swStyles = StyleSheet.create({
 
 export default function StoreEditor() {
   const { theme } = useAppTheme();
-  const styles = makeStyles(theme);
-  const sectionStyles = makeSectionStyles(theme);
-  const panelStyles = makePanelStyles(theme);
-  const brandStyles = makeBrandStyles(theme);
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
+  const sectionStyles = React.useMemo(() => makeSectionStyles(theme), [theme]);
+  const panelStyles = React.useMemo(() => makePanelStyles(theme), [theme]);
+  const brandStyles = React.useMemo(() => makeBrandStyles(theme), [theme]);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -207,7 +208,7 @@ export default function StoreEditor() {
   const [inlineHeadingDraft, setInlineHeadingDraft] = useState('');
 
   async function load() {
-    const s = await getStorefront();
+    const s = await getStorefront({ refreshRemote: false });
     setStore(s);
     setUndoAvailable(s.undoStack.length > 0);
     setRedoAvailable(s.redoStack.length > 0);
@@ -1146,7 +1147,6 @@ export default function StoreEditor() {
     <View style={styles.root}>
       <ScreenHeader
         title="Edit Store"
-        subtitle={savingStatus !== 'idle' ? saveStatusText() : undefined}
         onBack={() => goBackOr(router)}
         rightElement={
           <View style={styles.headerRight}>

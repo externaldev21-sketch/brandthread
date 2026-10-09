@@ -24,6 +24,13 @@ export default function SecurityScreen() {
     router.push('/login-activity' as any);
   }
 
+  const accountRows: Array<{ title: string; subtitle: string; label: string; route: string }> = [
+    { title: 'Password', subtitle: 'Change your password', label: 'Change', route: '/change-password' },
+    { title: 'Email address', subtitle: 'Change the email you sign in with', label: 'Change', route: '/change-email' },
+    { title: 'Two-factor authentication', subtitle: 'App and backup codes', label: 'Manage', route: '/login-methods' },
+    { title: 'Download my data', subtitle: 'Export your store data', label: 'Open', route: '/seller-data-export' },
+  ];
+
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Security" />
@@ -34,9 +41,27 @@ export default function SecurityScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>User activity logs</Text>
             <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Monitor and review user activities</Text>
           </View>
-          <Button label="View" variant="secondary" size="small" onPress={viewActivityLog} />
+          <Button label="View" variant="secondary" size="small" style={styles.rowBtn} onPress={viewActivityLog} />
         </View>
       </View>
+
+      {accountRows.map((row) => (
+        <View key={row.route} style={styles.section}>
+          <View style={styles.rowBetween}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{row.title}</Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>{row.subtitle}</Text>
+            </View>
+            <Button
+              label={row.label}
+              variant="secondary"
+              size="small"
+              style={styles.rowBtn}
+              onPress={() => { haptic(); router.push(row.route as any); }}
+            />
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -47,6 +72,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontFamily: FONT.semibold, marginBottom: 4 },
   sectionSubtitle: { fontSize: 13, fontFamily: FONT.regular, lineHeight: 18 },
   rowBetween: { flexDirection: 'row', alignItems: 'center' },
+  rowBtn: { width: 128 },
   divider: { height: 8 },
   collabRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   collabName: { fontSize: 14, fontFamily: FONT.medium, flexShrink: 1 },

@@ -96,12 +96,16 @@ const TABLE: Record<ProfileEmptyTab, {
     publicMessage: 'Orders are private.',
     cta: { label: 'Start shopping', route: '/(buyer)/discover' },
   },
+  // Seller's own Profile tab — Dev: same icon as the tab (grid / bag / tag),
+  // title only (no filler sentence), a slim white pill where there's a
+  // real next step. Other people's profiles keep their one-line message.
   'seller:post': {
-    icon: 'video',
+    icon: 'grid',
     title: 'No posts yet',
-    message: 'Videos you publish show up here and in the feed.',
+    message: '',
     publicMessage: 'Videos from this brand will appear here.',
-    cta: { label: 'Create your first post', route: '/create-post' },
+    // The create flow opens on the camera.
+    cta: { label: 'Create post', route: '/create-post' },
   },
   'seller:draft': {
     icon: 'file-text',
@@ -120,7 +124,7 @@ const TABLE: Record<ProfileEmptyTab, {
   'seller:tagged': {
     icon: 'tag',
     title: 'No tagged posts',
-    message: 'When shoppers tag your brand in a post, it shows up here.',
+    message: '',
     publicMessage: 'Posts that tag this brand will appear here.',
   },
   'seller:videos': {
@@ -133,9 +137,10 @@ const TABLE: Record<ProfileEmptyTab, {
   shop: {
     icon: 'shopping-bag',
     title: 'No products yet',
-    message: 'Products you list appear here for shoppers to buy.',
+    message: '',
     publicMessage: 'This shop has no live products right now.',
-    cta: { label: 'Add a product', route: '/add-product' },
+    // Presented as a modal over the profile, so closing it returns here.
+    cta: { label: 'Add a product', route: '/add-product?presentation=modal' },
   },
 };
 

@@ -7,7 +7,7 @@ import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { FS } from '@/lib/theme';
@@ -16,11 +16,13 @@ import { formatCents } from '@/lib/money';
 import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import { zeroFinanceSummary } from '@/lib/financeSummary';
+import { getPreviewFinanceDemo } from '@/lib/previewFinance';
+import type { FinanceTransactionRow } from '@/lib/previewFinance';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { RetryRow } from '@/components/ui/RetryRow';
 
-function fmtDate(iso: string) {
+function fmtDate(iso: string | number) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
@@ -38,16 +40,16 @@ export default function FinanceScreen() {
   const router = useRouter();
   const api = useApi();
   const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth();
-  // ?bt_preview=seller with no real signed-in account: no token to fetch
-  // real finance data with — resolve straight to the honest $0.00/empty
-  // state instead of a "couldn't load" retry banner (same convention as
-  // app/(tabs)/orders.tsx's isPreviewMode guard).
+  // Preview sessions never query protected finance endpoints. Fresh preview
+  // stays honestly empty; explicit demo mode derives a labeled ledger from
+  // the local order fixture and never claims Stripe or bank readiness.
   const isPreviewMode = isSellerDevPreview();
+  const isDemoPreview = isPreviewMode && isPreviewDemoMode();
   const isSignedOutSellerPreview = (isPreviewMode && !userId) || (isPreviewMode && (!isAuthLoaded || !isSignedIn));
-  const skipProtectedReads = isSignedOutSellerPreview;
+  const skipProtectedReads = isPreviewMode || isSignedOutSellerPreview;
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<FinanceTransactionRow[]>([]);
   const [balance,      setBalance]      = useState<any>(null);
   const [loading,      setLoading]      = useState(!skipProtectedReads);
   // Held vs on-the-way vs available vs paid out (owner only on the server).
@@ -64,9 +66,16 @@ export default function FinanceScreen() {
 
   const load = useCallback(async () => {
     if (skipProtectedReads) {
-      setTransactions([]);
-      setBalance({ available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false });
-      setSummary(zeroFinanceSummary());
+      if (isDemoPreview) {
+        const demo = getPreviewFinanceDemo();
+        setTransactions(demo.transactions);
+        setBalance(null);
+        setSummary(demo.summary);
+      } else {
+        setTransactions([]);
+        setBalance({ available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false });
+        setSummary(zeroFinanceSummary());
+      }
       setSummaryError(false);
       setBalanceError(false);
       setSubStatus(null);
@@ -97,7 +106,7 @@ export default function FinanceScreen() {
     }
     await summaryRequest;
     setLoading(false);
-  }, [api, skipProtectedReads]);
+  }, [api, isDemoPreview, skipProtectedReads]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -134,15 +143,17 @@ export default function FinanceScreen() {
      { label: 'Net (recent)',  value: formatCents(totalNet), positive: totalNet >= 0, highlight: true },
   ];
 
-  const documents = [
-    ...(!isReadOnly && !isSignedOutSellerPreview ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
-    ...(!isSignedOutSellerPreview ? [{ label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) }] : []),
+  const documents = isPreviewMode ? [] : [
+    ...(!isReadOnly ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
+    { label: 'Monthly Statements (PDF / CSV)', icon: 'calendar' as const, onPress: () => router.push('/statements' as any) },
+    { label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
+    { label: 'Chargebacks', icon: 'shield' as const, trailing: 'chevron-right' as const, onPress: () => router.push('/disputes' as any) },
   ];
 
   if (isLoadingRole && !isSignedOutSellerPreview) {
     return (
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-        <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
+        <ScreenHeader title="Finance" />
         <View style={styles.accessLoading}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -150,10 +161,10 @@ export default function FinanceScreen() {
     );
   }
 
-  if (!isSignedOutSellerPreview && !hasPayoutsAccess(currentRole) && !isReadOnly) {
+  if (!isPreviewMode && !hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-        <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
+        <ScreenHeader title="Finance" />
         <RoleLockedView screenTitle="finance" currentRole={currentRole ?? undefined} />
       </View>
     );
@@ -161,7 +172,7 @@ export default function FinanceScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
+      <ScreenHeader title="Finance" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
@@ -216,12 +227,12 @@ export default function FinanceScreen() {
 
       {/* Where the money is — from the money ledger + live Stripe balance.
           Managers cannot read owner balances, so they keep the overview. */}
-      {!isReadOnly && !isSignedOutSellerPreview && (
+      {!isReadOnly && (!isSignedOutSellerPreview || isDemoPreview) && (
         <FinanceMoneyFlow summary={summary} loading={loading} error={summaryError} onRetry={load} />
       )}
 
       {/* Overview (Stripe balance) — shown when the ledger summary is unavailable */}
-      {(isReadOnly || isSignedOutSellerPreview || (!summary && summaryError)) && (
+      {!isDemoPreview && (isReadOnly || isSignedOutSellerPreview || (!summary && summaryError)) && (
       <View style={styles.overviewRow}>
         {!loading && balanceError ? (
           <View style={[styles.overviewCard, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, alignItems: 'flex-start' }]}>
@@ -309,7 +320,7 @@ export default function FinanceScreen() {
                   <Feather name={item.icon} size={15} color={colors.mutedForeground} />
                 </View>
                 <Text style={[styles.docLabel, { color: colors.foreground }]}>{item.label}</Text>
-                <Feather name="download" size={15} color={colors.mutedForeground} />
+                <Feather name={'trailing' in item ? item.trailing : 'download'} size={15} color={colors.mutedForeground} />
               </TouchableOpacity>
             ))}
           </View>

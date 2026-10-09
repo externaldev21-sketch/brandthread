@@ -74,7 +74,7 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('disabled={!!oauthLoading || loading}');
     expect(onboarding).not.toContain('disabled={!!oauthLoading || loading || !isUsernameValid}');
     // OAuth options are pill-shaped secondary buttons (onboarding restyle).
-    expect(onboarding).toContain("oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 999");
+    expect(onboarding).toContain("oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md");
   });
 
   it('thread explainer screen exists and routes buyers to the feed', () => {
@@ -91,8 +91,8 @@ describe('onboarding visual structure', () => {
   it('draft version incremented to 7, migration lives in lib/onboardingFlow.ts', () => {
     const onboarding = read('app/onboarding.tsx');
     const flowModule = read('lib/onboardingFlow.ts');
-    expect(DRAFT_VERSION).toBe(7);
-    expect(flowModule).toContain('export const DRAFT_VERSION = 7');
+    expect(DRAFT_VERSION).toBe(8);
+    expect(flowModule).toContain('export const DRAFT_VERSION = 8');
     expect(flowModule).toContain('version === 5');
     expect(onboarding).toContain("PENDING_FLOW_KEY = 'onboarding_pending_flow'");
     expect(onboarding).toContain('[PENDING_FLOW_KEY, selectedFlow]');

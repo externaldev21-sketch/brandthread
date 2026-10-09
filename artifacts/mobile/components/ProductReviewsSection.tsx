@@ -13,15 +13,15 @@
  *
  * Renders nothing when there are no reviews — no empty box.
  *
- * Note: the reviews schema doesn't yet carry buyer size-bought / fit-note /
- * photo / helpful-count fields (would need a migration). Every real review
- * IS from a verified purchase (server-enforced in routes/reviews.ts), so
- * "Verified buyer" is always shown for real data; the richer optional fields
- * only render when present (seeded preview data has them; real API rows
- * won't until that migration lands).
+ * Migration 113 added photos, size bought, fit note, persisted helpful votes
+ * and the seller reply to the reviews API. "Verified buyer" comes from the
+ * server-derived `verifiedPurchase` flag; the optional rows render only when
+ * a review has them.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { useReviewActions } from '@/lib/useReviewActions';
+import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
@@ -30,21 +30,28 @@ import { StarRating } from '@/components/StarRating';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED } from '@/lib/theme';
 import * as Haptics from 'expo-haptics';
+import { applyHelpfulToggle, fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
 
 export interface ReviewItem {
   id: string;
   rating: number;
   body?: string | null;
+  buyerId?: string | null;
   buyerName?: string | null;
   buyerAvatar?: string | null;
   createdAt: string;
   /** Every real review is order-verified server-side; true for seeded preview data too. */
   verifiedBuyer?: boolean;
-  sizeBought?: string;
+  /** Server-derived: the review is tied to a real delivered order. */
+  verifiedPurchase?: boolean;
+  sellerReply?: string | null;
+  sellerRepliedAt?: string | null;
+  viewerHelpful?: boolean;
+  sizeBought?: string | null;
   /** e.g. "Runs small", "True to size", "Runs large". */
-  fitNote?: string;
+  fitNote?: string | null;
   /** -2 (runs very small) .. 0 (true to size) .. 2 (runs very large), drives the fit meter. */
-  fitScale?: number;
+  fitScale?: number | null;
   photos?: string[];
   helpfulCount?: number;
 }
@@ -85,6 +92,26 @@ function FitMeter({ avgFitScale }: { avgFitScale: number }) {
   );
 }
 
+/** The seller's public reply under a review card (shared with the full list). */
+export function SellerReplyBlock({ reply, repliedAt }: { reply?: string | null; repliedAt?: string | null }) {
+  const { theme } = useAppTheme();
+  if (!reply) return null;
+  return (
+    <View style={[replyS.box, { backgroundColor: theme.cardElevated }]} accessibilityLabel="Seller reply">
+      <View style={replyS.head}>
+        <Feather name="corner-down-right" size={12} color={theme.muted} />
+        <Text style={[replyS.label, { color: theme.text }]}>Seller reply</Text>
+        {!!repliedAt && (
+          <Text style={[replyS.date, { color: theme.muted }]}>
+            {new Date(repliedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          </Text>
+        )}
+      </View>
+      <Text style={[replyS.body, { color: theme.muted }]}>{reply}</Text>
+    </View>
+  );
+}
+
 function ReviewPhotoViewer({ photos, startIndex, onClose }: { photos: string[]; startIndex: number; onClose: () => void }) {
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
@@ -109,7 +136,23 @@ export function ProductReviewsSection({
   const [data, setData] = useState<ReviewsSeed | null>(seed ?? null);
   const [loading, setLoading] = useState(!seed);
   const [openPhoto, setOpenPhoto] = useState<{ photos: string[]; index: number } | null>(null);
-  const [helpfulVotes, setHelpfulVotes] = useState<Record<string, number>>({});
+  const openReviewActions = useReviewActions(!seed);
+  const { isSignedIn } = useAuth();
+  // Per-review helpful state layered over the server value (persisted via the API).
+  const [helpful, setHelpful] = useState<Record<string, { helpfulCount: number; viewerHelpful: boolean }>>({});
+
+  const toggleHelpful = (review: ReviewItem) => {
+    const current = helpful[review.id] ?? { helpfulCount: review.helpfulCount ?? 0, viewerHelpful: !!review.viewerHelpful };
+    const next = applyHelpfulToggle(current);
+    void Haptics.selectionAsync();
+    setHelpful(prev => ({ ...prev, [review.id]: next }));
+    // Seeded preview data has no server rows; everything else persists.
+    if (seed) return;
+    const call = current.viewerHelpful ? api.reviews.unmarkHelpful(review.id) : api.reviews.markHelpful(review.id);
+    call
+      .then(server => setHelpful(prev => ({ ...prev, [review.id]: server })))
+      .catch(() => setHelpful(prev => ({ ...prev, [review.id]: current })));
+  };
 
   useEffect(() => {
     if (seed) { setData(seed); setLoading(false); return; }
@@ -169,9 +212,11 @@ export function ProductReviewsSection({
       {avgFitScale != null && <FitMeter avgFitScale={avgFitScale} />}
 
       {topReviews.map(review => {
-        const helpfulCount = (review.helpfulCount ?? 0) + (helpfulVotes[review.id] ?? 0);
+        const { helpfulCount, viewerHelpful } = helpful[review.id]
+          ?? { helpfulCount: review.helpfulCount ?? 0, viewerHelpful: !!review.viewerHelpful };
+        const chip = fitChipText(review);
         return (
-          <View key={review.id} style={s.reviewCard}>
+          <Pressable key={review.id} style={s.reviewCard} onLongPress={() => openReviewActions(review)} delayLongPress={400}>
             <View style={s.reviewHeader}>
               {review.buyerAvatar ? (
                 <CachedImage source={{ uri: review.buyerAvatar }} style={s.avatar} recyclingKey={review.id} />
@@ -183,7 +228,7 @@ export function ProductReviewsSection({
               <View style={{ flex: 1 }}>
                 <View style={s.nameRow}>
                   <Text style={s.reviewerName}>{review.buyerName ?? 'Brandthread buyer'}</Text>
-                  {review.verifiedBuyer && (
+                  {isVerifiedReview(review) && (
                     <View style={s.verifiedBadge}>
                       <Feather name="check-circle" size={11} color={theme.accent} />
                       <Text style={[s.verifiedText, { color: theme.accent }]}>Verified buyer</Text>
@@ -197,13 +242,9 @@ export function ProductReviewsSection({
               </Text>
             </View>
 
-            {(review.sizeBought || review.fitNote) && (
+            {chip && (
               <View style={s.fitChip}>
-                <Text style={s.fitChipText}>
-                  {review.sizeBought ? `Size bought: ${review.sizeBought}` : ''}
-                  {review.sizeBought && review.fitNote ? ' · ' : ''}
-                  {review.fitNote ? `Fits ${review.fitNote.toLowerCase()}` : ''}
-                </Text>
+                <Text style={s.fitChipText}>{chip}</Text>
               </View>
             )}
 
@@ -224,19 +265,21 @@ export function ProductReviewsSection({
               </View>
             )}
 
+            <SellerReplyBlock reply={review.sellerReply} repliedAt={review.sellerRepliedAt} />
+
             <TouchableOpacity
               style={s.helpfulRow}
-              onPress={() => {
-                void Haptics.selectionAsync();
-                setHelpfulVotes(prev => ({ ...prev, [review.id]: (prev[review.id] ?? 0) + 1 }));
-              }}
+              onPress={() => toggleHelpful(review)}
+              // Signed-out visitors can read but not vote.
+              disabled={!isSignedIn && !seed}
               accessibilityRole="button"
+              accessibilityState={{ selected: viewerHelpful, disabled: !isSignedIn && !seed }}
               accessibilityLabel={`Mark helpful, ${helpfulCount} people found this helpful`}
             >
-              <Feather name="thumbs-up" size={12} color={MUTED} />
-              <Text style={s.helpfulText}>Helpful ({helpfulCount})</Text>
+              <Feather name="thumbs-up" size={12} color={viewerHelpful ? theme.text : MUTED} />
+              <Text style={[s.helpfulText, viewerHelpful && { color: theme.text }]}>Helpful ({helpfulCount})</Text>
             </TouchableOpacity>
-          </View>
+          </Pressable>
         );
       })}
 
@@ -284,6 +327,14 @@ const s = StyleSheet.create({
   photoThumb: { width: 56, height: 56, borderRadius: 6, backgroundColor: CARD_ELEVATED },
   helpfulRow: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start' },
   helpfulText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
+});
+
+const replyS = StyleSheet.create({
+  box: { borderRadius: 10, padding: 10, marginBottom: 8, gap: 4 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  label: { fontSize: FS.meta, fontFamily: FONT.bold, flex: 1 },
+  date: { fontSize: FS.meta, fontFamily: FONT.medium },
+  body: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 19 },
 });
 
 const fitS = StyleSheet.create({

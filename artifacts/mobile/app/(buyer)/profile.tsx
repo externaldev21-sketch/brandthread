@@ -67,7 +67,7 @@ import {
   CoverCoachmarkSheet, CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia,
 } from '@/components/profile/ProfileCover';
 import { profileEmptyState, computeEmptyArea, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
-import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
@@ -77,6 +77,7 @@ import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
+import { radius } from '@/constants/radii';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -309,7 +310,7 @@ export default function ProfileScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
-  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_4_5 });
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   const heroPosterOnly = useHeroPosterOnly();
   const threadCashEnabled = useFeatureFlag('threadCash');
   const celebrateThreadCash = useCelebrateThreadCash();
@@ -805,7 +806,7 @@ export default function ProfileScreen() {
   ];
 
   const highlightItems: ProfileStoryItem[] = highlights.map((h) => ({
-    id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor,
+    id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null,
   }));
 
   const topBar = (
@@ -928,8 +929,8 @@ export default function ProfileScreen() {
           onNew={() => { hapticSelection(); router.push('/buyer-highlights-manager?create=1' as any); }}
           onPressItem={(item) => {
             hapticSelection();
-            // Highlights are local label/emoji/colour records with no story
-            // media yet, so a tap opens that highlight in the manager.
+            // Tapping one of my highlights opens it in the manager, where its
+            // name, cover and saved stories are edited.
             router.push(`/buyer-highlights-manager?edit=${encodeURIComponent(item.id)}` as any);
           }}
         />
@@ -977,7 +978,7 @@ export default function ProfileScreen() {
             description={emptyDescription}
             action={emptyAction}
             actionStyle="text"
-            showGridPreview={activeTab === 'Posts'}
+            alignTop={activeTab === 'Posts'}
           />
         )}
         showsVerticalScrollIndicator={false}
@@ -1014,6 +1015,8 @@ export default function ProfileScreen() {
         visible={shareSheetOpen}
         onClose={() => setShareSheetOpen(false)}
         avatarUrl={avatarUri}
+        profileUsername={profile?.username}
+        profileDisplayName={displayName}
         buyerExtra={{
           statLabel: 'followers',
           statValue: socialCounts?.followers ?? profile?.friendsCount ?? 0,
@@ -1059,7 +1062,7 @@ function makeStyles(theme: AppThemePreset) {
 
 const topBarStyles = StyleSheet.create({
   walletChip: {
-    height: 28, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
+    height: 28, borderRadius: radius.sm, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
     gap: 4, paddingHorizontal: 8, overflow: 'hidden',
   },
   walletText: { fontFamily: FONT.bold, fontSize: FS.xs, fontVariant: ['tabular-nums'] },

@@ -31,6 +31,7 @@ import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls"
 import { CreateProductionOrderBody } from "@workspace/api-zod";
 import { connectReadiness } from "./manufacturer-connect";
 import { afterStageChange } from "../lib/manufacturerOrders";
+import { normalizeUploadedImage } from "../lib/productImageResize";
 
 const router = Router();
 router.use(requireAuth);
@@ -981,7 +982,8 @@ router.post("/:id/images/upload", express.raw({ type: "image/*", limit: MAX_IMAG
     if (auth.status === 404) { res.status(404).json({ error: "Order not found" }); return; }
     if (auth.status === 403) { res.status(403).json({ error: "Forbidden" }); return; }
 
-    const objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+    const stored = await normalizeUploadedImage(bytes, contentType);
+    const objectPath = await objectStorage.createObjectEntityFromBuffer(stored.buffer, stored.contentType);
     try {
       try {
         await objectStorage.trySetObjectEntityAclPolicy(objectPath, { owner: clerkUserId, visibility: "private" });

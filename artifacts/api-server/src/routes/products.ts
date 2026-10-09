@@ -12,6 +12,8 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { notifyNewProduct } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
+import { afterStockChange } from "../lib/stockRules";
+import { normalizeUploadedImage } from "../lib/productImageResize";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -91,7 +93,8 @@ router.post(
 
     let objectPath: string | null = null;
     try {
-      objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+      const stored = await normalizeUploadedImage(bytes, contentType);
+      objectPath = await objectStorage.createObjectEntityFromBuffer(stored.buffer, stored.contentType);
       await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
         owner: ownerId,
         visibility: "private",
@@ -174,7 +177,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
   // Validate ALL variants before any DB writes so we never leave a partial product
   const validatedVariants: Array<{
     size?: string; color?: string; sku: string;
-    priceCents: number; stock: number; lowStockThreshold: number;
+    priceCents: number; compareAtPriceCents: number | null; stock: number; lowStockThreshold: number;
   }> = [];
   for (let i = 0; i < rawVariantList.length; i++) {
     const v = rawVariantList[i];
@@ -183,6 +186,14 @@ router.post("/", requireRole("manager"), async (req, res) => {
     }
     if (!Number.isInteger(v.priceCents) || v.priceCents <= 0) {
       res.status(400).json({ error: `variants[${i}] (${v.sku}): priceCents must be a positive integer` }); return;
+    }
+    // Optional strike-through price; must be a positive integer above the price.
+    let compareAtPriceCents: number | null = null;
+    if (v.compareAtPriceCents !== undefined && v.compareAtPriceCents !== null) {
+      if (!Number.isInteger(v.compareAtPriceCents) || v.compareAtPriceCents <= v.priceCents) {
+        res.status(400).json({ error: `variants[${i}] (${v.sku}): compareAtPriceCents must be an integer greater than priceCents` }); return;
+      }
+      compareAtPriceCents = v.compareAtPriceCents;
     }
     const stock = v.stock ?? 0;
     if (!Number.isInteger(stock) || stock < 0) {
@@ -197,6 +208,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
       color:             v.color,
       sku:               v.sku.trim(),
       priceCents:        v.priceCents,
+      compareAtPriceCents,
       stock,
       lowStockThreshold: threshold,
     });
@@ -276,7 +288,14 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
     // A photo of the seller's own size chart — distinct from the structured
     // `sizeChart` table data above.
     sizeChartImageUrl,
+    // Product-level strike-through price applied to every variant that costs
+    // less than it (null clears). Per-variant control: PATCH /:id/variants/:variantId.
+    compareAtPriceCents,
   } = req.body;
+  if (compareAtPriceCents !== undefined && compareAtPriceCents !== null &&
+      (!Number.isInteger(compareAtPriceCents) || compareAtPriceCents <= 0)) {
+    res.status(400).json({ error: "compareAtPriceCents must be a positive integer or null" }); return;
+  }
 
   {
     const [stored] = await db.select({ isPreOrder: products.isPreOrder, shipDate: products.preOrderEstShipDate })
@@ -344,6 +363,13 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       .set(updateValues)
       .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
       .returning();
+    if (updated && compareAtPriceCents !== undefined) {
+      await tx.update(productVariants)
+        .set({ compareAtPriceCents: compareAtPriceCents === null
+          ? null
+          : sql`CASE WHEN ${compareAtPriceCents}::int > ${productVariants.priceCents} THEN ${compareAtPriceCents}::int ELSE NULL END` })
+        .where(eq(productVariants.productId, updated.id));
+    }
     return {
       updated,
       limited: false,
@@ -486,12 +512,13 @@ router.post("/:id/variants", requireRole("manager"), async (req, res) => {
     .limit(1);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
 
-  const { size, color, sku, priceCents, stock = 0, lowStockThreshold = 10 } = req.body;
+  const { size, color, sku, priceCents, compareAtPriceCents, stock = 0, lowStockThreshold = 10 } = req.body;
   if (!sku || !priceCents || priceCents <= 0) {
     res.status(400).json({ error: "sku and positive priceCents required" }); return;
   }
   const [variant] = await db.insert(productVariants)
-    .values({ productId: req.params.id, size, color, sku, priceCents, stock, lowStockThreshold })
+    .values({ productId: req.params.id, size, color, sku, priceCents, stock, lowStockThreshold,
+      ...(Number.isInteger(compareAtPriceCents) && compareAtPriceCents > priceCents && { compareAtPriceCents }) })
     .returning();
   res.status(201).json(variant);
 });
@@ -505,9 +532,14 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
     .limit(1);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
 
-  const { stock, priceCents, lowStockThreshold } = req.body;
+  const { stock, priceCents, lowStockThreshold, compareAtPriceCents } = req.body;
   if (stock !== undefined && (!Number.isInteger(stock) || stock < 0)) {
     res.status(400).json({ error: "stock must be a non-negative integer" }); return;
+  }
+  // null clears the strike-through price; otherwise it must exceed the price.
+  if (compareAtPriceCents !== undefined && compareAtPriceCents !== null &&
+      (!Number.isInteger(compareAtPriceCents) || compareAtPriceCents <= 0)) {
+    res.status(400).json({ error: "compareAtPriceCents must be a positive integer or null" }); return;
   }
 
   const [before] = await db.select({ stock: productVariants.stock, priceCents: productVariants.priceCents })
@@ -519,6 +551,7 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
       ...(stock             !== undefined && { stock }),
       ...(priceCents        !== undefined && priceCents > 0 && { priceCents }),
       ...(lowStockThreshold !== undefined && { lowStockThreshold }),
+      ...(compareAtPriceCents !== undefined && { compareAtPriceCents }),
       updatedAt: new Date(),
     })
     .where(and(eq(productVariants.id, req.params.variantId), eq(productVariants.productId, req.params.id)))
@@ -549,6 +582,7 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
     });
   }
 
+  if (stock !== undefined) await afterStockChange(req.params.id);
   res.json(updated);
 });
 

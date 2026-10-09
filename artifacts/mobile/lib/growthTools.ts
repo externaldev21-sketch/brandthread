@@ -1,3 +1,4 @@
+import { GROWTH_UI_BYPASS } from '@/lib/buildFlags';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import type { Feather } from '@expo/vector-icons';
 import {
@@ -39,8 +40,7 @@ export interface GrowthTool {
  * independent of this flag, so a paid feature is never reachable just
  * because a client build shipped with the bypass on.
  */
-export const GROWTH_PLAN_ENFORCEMENT_ENABLED =
-  !(__DEV__ || process.env.EXPO_PUBLIC_BT_GROWTH_BYPASS === '1');
+export const GROWTH_PLAN_ENFORCEMENT_ENABLED = !GROWTH_UI_BYPASS;
 
 export type GrowthToolId = (typeof GROWTH_STUDIO_TOOLS)[number]['id'];
 

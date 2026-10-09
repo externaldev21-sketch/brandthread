@@ -30,7 +30,7 @@ describe('Thread video sharing flow', () => {
     expect(source).toContain('actionInFlightRef.current');
     expect(source).toContain('Clipboard.setStringAsync');
     expect(source).toContain('File.downloadFileAsync');
-    expect(source).toContain('MediaLibrary.Asset.create');
+    expect(source).toContain('MediaLibrary.createAssetAsync');
   });
 
   it('shows cancellable save progress above the bottom tab bar', () => {

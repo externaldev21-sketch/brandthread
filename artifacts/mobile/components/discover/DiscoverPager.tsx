@@ -47,7 +47,7 @@ import { formatCents } from '@/lib/money';
 import { FONT, GRID_MAX_WIDTH, SP } from '@/lib/theme';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { CachedImage } from '@/components/CachedImage';
 import { CardSkeleton } from '@/components/layout';
 import { IconButton, Snackbar } from '@/components/ui';
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
   secondaryBtn: {
     flex: 1,
     minHeight: 50,
-    borderRadius: RADII.pill,
+    borderRadius: radius.md,
     borderWidth: 1,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 50,
-    borderRadius: RADII.pill,
+    borderRadius: radius.md,
   },
   primaryBtnText: { ...TYPE_SCALE.headline },
 });

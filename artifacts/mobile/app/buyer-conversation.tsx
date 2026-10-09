@@ -4,12 +4,13 @@ import {
   View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
   ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard, Linking,
 } from 'react-native';
-import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { TypingBubble } from '@/components/chat/TypingBubble';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
@@ -45,6 +46,7 @@ import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
+import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
@@ -63,6 +65,7 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
 import MediaViewer from '@/components/chat/MediaViewer';
+import VideoMessageViewer from '@/components/chat/VideoMessageViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } from '@/components/thread-cash/ChatAttachThreadCash';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
@@ -89,6 +92,7 @@ import {
   formatDate as sharedFormatDate, formatTime as sharedFormatTime,
   sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
+import { radius } from '@/constants/radii';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
  *  the preview seed (lib/previewInboxData.ts) and the api-server system
@@ -309,6 +313,7 @@ export default function BuyerConversationScreen() {
   const bubbleAnchorRefs = useRef<Record<string, View | null>>({});
   const [reactionAnchor, setReactionAnchor] = useState<ReactionOverlayAnchor | null>(null);
   const [viewerUri, setViewerUri]             = useState<string | null>(null);
+  const [viewerVideoUri, setViewerVideoUri]   = useState<string | null>(null);
   const [likeBurst, setLikeBurst] = useState<{ key: number; x: number; y: number } | null>(null);
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
@@ -380,7 +385,7 @@ export default function BuyerConversationScreen() {
     });
   }, [params.contextProductId, params.contextProductName, params.contextProductPriceCents, params.contextProductImage, theme.accent]);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
-  const [attachmentTab, setAttachmentTab] = useState<'product' | 'post'>('product');
+  const [attachmentTab, setAttachmentTab] = useState<'product' | 'post' | 'order'>('product');
   const [sellerProducts, setSellerProducts] = useState<SellerProduct[]>([]);
   const [sellerPosts, setSellerPosts] = useState<SellerPost[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -1121,11 +1126,16 @@ export default function BuyerConversationScreen() {
     }
     if (att.type === 'video') {
       return (
-        <View style={s.videoThumb}>
+        <PressableScale rippleEnabled={false}
+          style={s.videoThumb}
+          activeOpacity={0.9}
+          accessibilityLabel="Play video"
+          onPress={() => { if (att.uri && !att.meta?.uploading) setViewerVideoUri(att.uri); }}
+        >
           {att.uri ? <CachedImage source={{ uri: att.uri }} style={s.videoThumbImg} recyclingKey={att.uri} /> : null}
           <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
           {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
-        </View>
+        </PressableScale>
       );
     }
     if (att.type === 'voice') {
@@ -1147,6 +1157,7 @@ export default function BuyerConversationScreen() {
           onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
           onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
           onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+          hasTranscription={ALLOW_DEV_TOOLS}
           onViewTranscription={() => {
             setTranscriptionToast(true);
             setTimeout(() => setTranscriptionToast(false), 2600);
@@ -1229,6 +1240,18 @@ export default function BuyerConversationScreen() {
       meta: { productId: product.id },
     };
     setSelectedAttachment(attachment);
+    setShowAttachmentPicker(false);
+  }
+
+  function pickLinkedOrder() {
+    if (!conv?.contextOrderId) return;
+    setSelectedAttachment({
+      type: 'order',
+      title: conv.contextOrderNumber ?? 'Order',
+      subtitle: conv.contextOrderStatus,
+      accentColor: theme.accent,
+      meta: { orderId: conv.contextOrderId },
+    });
     setShowAttachmentPicker(false);
   }
 
@@ -1905,6 +1928,8 @@ export default function BuyerConversationScreen() {
             accessibilityRole={
               msg.attachment?.type === 'voice'
               || msg.attachment?.type === 'image'
+              || msg.attachment?.type === 'video'
+              || msg.attachment?.type === 'post'
                 ? 'none' : 'button'
             }
             accessibilityLabel={isOwn ? 'Your message' : `Message from ${msg.fromName}`}
@@ -2013,6 +2038,14 @@ export default function BuyerConversationScreen() {
               Seen {formatTime(new Date(msg.readAt!).getTime())}
             </Text>
           )}
+          {isOwn && msg.id === lastOwnMsgId && !msg.readAt && !!msg.deliveredAt && (
+            <Text style={s.seenReceipt} testID="conversation-delivered">Delivered</Text>
+          )}
+          {!!msg.automated && (
+            <Text style={[s.seenReceipt, { alignSelf: isOwn ? 'flex-end' : 'flex-start' }]} testID="conversation-automated-label">
+              Automated reply
+            </Text>
+          )}
         </View>
       </View>
     );
@@ -2061,7 +2094,8 @@ export default function BuyerConversationScreen() {
                 <Feather
                   name={
                     selectedAttachment.type === 'voice' ? 'mic' :
-                    selectedAttachment.type === 'post'  ? 'image' : 'shopping-bag'
+                    selectedAttachment.type === 'post'  ? 'image' :
+                    selectedAttachment.type === 'order' ? 'package' : 'shopping-bag'
                   }
                   size={ICON.sm}
                   color={theme.accent}
@@ -2074,7 +2108,8 @@ export default function BuyerConversationScreen() {
                     selectedAttachment.type === 'image' ? 'Photo attached' :
                     selectedAttachment.type === 'video' ? 'Video attached' :
                     selectedAttachment.type === 'voice' ? 'Voice message' :
-                    selectedAttachment.type === 'post'  ? 'Post attached'  : 'Product attached'
+                    selectedAttachment.type === 'post'  ? 'Post attached'  :
+                    selectedAttachment.type === 'order' ? 'Order attached' : 'Product attached'
                   }
                 </Text>
                 <Text style={s.selectedAttachmentTitle} numberOfLines={1}>
@@ -2341,6 +2376,7 @@ export default function BuyerConversationScreen() {
           item.type === 'message' ? item.msg.id : `${item.type}-${i}-${'key' in item ? item.key : ''}`
         }
         renderItem={renderItem}
+        ListFooterComponent={conv?.otherTyping ? <TypingBubble testID="conversation-typing-bubble" /> : null}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -2616,12 +2652,11 @@ export default function BuyerConversationScreen() {
             <View style={s.productPicker}>
               <ScreenHeader
                 title="Attach to message"
-                subtitle={`Choose from ${displayName}'s store`}
                 variant="modal"
                 onBack={() => setShowAttachmentPicker(false)}
               />
               <View style={s.attachmentTabs}>
-              <PressableScale rippleEnabled={false}
+              <View style={s.attachmentTabCell}><PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
               >
@@ -2629,8 +2664,8 @@ export default function BuyerConversationScreen() {
                 <Text style={[s.attachmentTabText, attachmentTab === 'product' && s.attachmentTabTextActive]}>
                   Products
                 </Text>
-              </PressableScale>
-              <PressableScale rippleEnabled={false}
+              </PressableScale></View>
+              <View style={s.attachmentTabCell}><PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('post')}
               >
@@ -2638,9 +2673,41 @@ export default function BuyerConversationScreen() {
                 <Text style={[s.attachmentTabText, attachmentTab === 'post' && s.attachmentTabTextActive]}>
                   Posts
                 </Text>
-              </PressableScale>
+              </PressableScale></View>
+              {conv?.contextOrderId ? (
+                <View style={s.attachmentTabCell}><PressableScale rippleEnabled={false}
+                  style={[s.attachmentTab, attachmentTab === 'order' && s.attachmentTabActive]}
+                  onPress={() => setAttachmentTab('order')}
+                  testID="attach-tab-order"
+                >
+                  <Feather name="package" size={ICON.sm} color={attachmentTab === 'order' ? theme.accent : theme.muted} />
+                  <Text style={[s.attachmentTabText, attachmentTab === 'order' && s.attachmentTabTextActive]}>
+                    Order
+                  </Text>
+                </PressableScale></View>
+              ) : null}
             </View>
-            {attachmentTab === 'product' ? (
+            {attachmentTab === 'order' && conv?.contextOrderId ? (
+              <ScrollView contentContainerStyle={s.productList} showsVerticalScrollIndicator={false}>
+                <PressableScale rippleEnabled={false}
+                  style={s.productOption}
+                  onPress={pickLinkedOrder}
+                  activeOpacity={0.75}
+                  testID="attach-order-row"
+                >
+                  <View style={s.productThumbPlaceholder}>
+                    <Feather name="package" size={ICON.md} color={theme.accent} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: SP.sm }}>
+                    <Text style={s.productOptionName} numberOfLines={1}>{conv.contextOrderNumber ?? 'Your order'}</Text>
+                    {conv.contextOrderStatus ? (
+                      <Text style={s.productOptionMeta} numberOfLines={1}>{conv.contextOrderStatus}</Text>
+                    ) : null}
+                  </View>
+                  <Feather name="plus-circle" size={ICON.md} color={theme.accent} />
+                </PressableScale>
+              </ScrollView>
+            ) : attachmentTab === 'product' ? (
               productsLoading ? (
                 <View style={s.pickerLoading}>
                   <ActivityIndicator color={theme.accent} />
@@ -2775,6 +2842,7 @@ export default function BuyerConversationScreen() {
       />
 
       <MediaViewer visible={viewerUri != null} uri={viewerUri} onClose={() => setViewerUri(null)} />
+      <VideoMessageViewer uri={viewerVideoUri} onClose={() => setViewerVideoUri(null)} />
 
       <Snackbar
         visible={copiedToast}
@@ -2929,7 +2997,7 @@ const requestPanelStyles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     height: 44,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3081,7 +3149,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   requestProfilePill: {
     height: 34,
     paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border,
     alignItems: 'center',
@@ -3382,7 +3450,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 3,
     backgroundColor: theme.card,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: theme.border,
     paddingHorizontal: SP.xs,
@@ -3498,13 +3566,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingTop: SP.sm,
     gap: SP.sm,
   },
+  attachmentTabCell: { flex: 1, minWidth: 0 },
   attachmentTab: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SP.xs,
     paddingVertical: SP.sm,
+    paddingHorizontal: SP.md,
     borderRadius: RADIUS.md,
     backgroundColor: theme.card,
     borderWidth: 1,
@@ -3540,7 +3609,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   productOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SP.sm,
+    padding: SP.md,
     backgroundColor: theme.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,

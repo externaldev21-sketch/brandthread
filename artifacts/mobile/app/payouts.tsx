@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAgeStatus } from '@/lib/ageGate';
+import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -19,10 +21,11 @@ import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
 import { useTeamRole } from '@/hooks/useTeamRole';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashCard';
 import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
@@ -62,6 +65,12 @@ function statusConfig(status: PayoutStatus, theme: AppThemePreset) {
 }
 
 export default function PayoutsScreen() {
+  const age = useAgeStatus();
+  if (age.status !== 'ok') return <AgeRestrictedScreen title="Payouts" status={age.status} onResolved={age.setBand} />;
+  return <PayoutsScreenContent />;
+}
+
+function PayoutsScreenContent() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
@@ -91,11 +100,13 @@ export default function PayoutsScreen() {
   const [cashOutVisible, setCashOutVisible] = useState(false);
 
   function leaveSetupDestination() {
-    if (launchedFromSellerSetup) {
-      router.replace(SELLER_HOME_ROUTE as never);
+    if (params.from === STUDIO_MENU_ORIGIN) {
+      returnToStudioMenu(router);
       return;
     }
-    goBackOr(router, '/(tabs)/more');
+    // Pop to the exact screen underneath (dashboard / setup checklist / tab);
+    // only a cold deep link with no history falls back to the `from` origin.
+    leaveSetupFlow(router, params.from, '/(tabs)/more');
   }
 
   const refreshConnectStatus = useCallback(async () => {
@@ -205,7 +216,9 @@ export default function PayoutsScreen() {
   const pendFmt    = balance?.pending?.formatted   ?? '$0.00';
   const nextDate   = balance?.nextPayout
     ? fmtDate(balance.nextPayout.arrivalDate)
-    : '—';
+    : balance?.nextPayoutEstimate?.date
+      ? fmtDate(balance.nextPayoutEstimate.date)
+      : '—';
 
   if (!isPreview && isLoadingRole) {
     return (
@@ -331,7 +344,13 @@ export default function PayoutsScreen() {
             payouts.map((p) => {
               const cfg = statusConfig(p.status, theme);
               return (
-                <View key={p.id} style={styles.payoutRow}>
+                <TouchableOpacity
+                  key={p.id}
+                  style={styles.payoutRow}
+                  onPress={() => { haptic(); router.push({ pathname: '/payout-detail', params: { id: p.id } } as never); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Payout ${p.amount}, ${cfg.label}`}
+                >
                   <View style={styles.payoutLeft}>
                     <Text style={styles.payoutDate}>{p.date}</Text>
                     <Text style={styles.payoutSub}>···{p.bankLast4}</Text>
@@ -342,7 +361,7 @@ export default function PayoutsScreen() {
                       <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
@@ -392,6 +411,19 @@ export default function PayoutsScreen() {
                </View>
              )}
           </View>
+
+           {!isPreview && !isReadOnly && !connectLoading && connectStatus?.providerConfigured && !connectStatus.verified && (
+             <TouchableOpacity
+               testID="seller-payouts-setup-checklist"
+               style={[styles.settingsRow, { borderTopWidth: 0, marginBottom: SP.sm }]}
+               onPress={() => { haptic(); router.push('/payout-setup' as never); }}
+               accessibilityRole="button"
+               accessibilityLabel="Open payout setup checklist"
+             >
+               <Text style={styles.settingsValue}>Payout setup checklist</Text>
+               <Feather name="chevron-right" size={16} color={theme.muted} />
+             </TouchableOpacity>
+           )}
 
            {!isReadOnly && (
              <TouchableOpacity
@@ -453,13 +485,31 @@ export default function PayoutsScreen() {
                     : connectStatus?.bankLast4 ? `Bank transfer ···${connectStatus.bankLast4}` : 'Not set up'}
                </Text>
              </View>
-             <View style={styles.settingsRow}>
+             <TouchableOpacity
+               style={styles.settingsRow}
+               testID="seller-payouts-schedule-row"
+               onPress={() => { haptic(); router.push('/payout-schedule' as never); }}
+               accessibilityRole="button"
+               accessibilityLabel="Payout schedule"
+             >
                <Text style={styles.settingsLabel}>Schedule</Text>
                <Text style={styles.settingsValue}>
                   {isPreview ? 'Not loaded' : connectLoading ? 'Loading…' : scheduleLabel(connectStatus?.payoutSchedule ?? null)}
                </Text>
-             </View>
+             </TouchableOpacity>
            </View>
+
+           {/* Fees & payments */}
+           <TouchableOpacity
+             style={[styles.settingsSection, styles.feesLinkRow]}
+             testID="seller-payouts-fees-link"
+             accessibilityRole="button"
+             accessibilityLabel="Fees and payments"
+             onPress={() => { haptic(); router.push('/fees' as never); }}
+           >
+             <Text style={styles.feesLinkLabel}>Fees &amp; payments</Text>
+             <Feather name="chevron-right" size={18} color={theme.muted} />
+           </TouchableOpacity>
 
            {/* Tax info status */}
             {!isPreview && connectStatus?.connected && connectStatus.providerConfigured && (() => {
@@ -536,6 +586,8 @@ const createStyles = (theme: AppThemePreset) => {
   settingsLabel:{ color: muted, fontSize: FS.sm, fontFamily: FONT.regular },
   settingsValue:{ color: text, fontSize: FS.sm, fontFamily: FONT.medium },
    addBankBtn:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: accent, borderStyle: 'dashed' },
+   feesLinkRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+   feesLinkLabel:{ color: text, fontSize: FS.base, fontFamily: FONT.medium },
    addBankText:  { color: accent, fontSize: FS.sm, fontFamily: FONT.medium },
   });
 };

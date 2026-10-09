@@ -26,12 +26,13 @@ describe('step sequencing', () => {
     expect(SELLER_STEP_INDEX.NAME).toBe(3);
   });
 
-  it('buyer flow inserts Brands-to-follow after Style, before Loading', () => {
+  it('buyer flow inserts Sizes after Style and Brands-to-follow before Loading', () => {
     expect(BUYER_STEP_INDEX.STYLE).toBe(4);
-    expect(BUYER_STEP_INDEX.BRANDS).toBe(5);
-    expect(BUYER_STEP_INDEX.LOADING).toBe(6);
-    expect(BUYER_STEP_INDEX.NOTIFICATIONS).toBe(7);
-    expect(BUYER_STEP_INDEX.SUCCESS).toBe(8);
+    expect(BUYER_STEP_INDEX.SIZES).toBe(5);
+    expect(BUYER_STEP_INDEX.BRANDS).toBe(6);
+    expect(BUYER_STEP_INDEX.LOADING).toBe(7);
+    expect(BUYER_STEP_INDEX.NOTIFICATIONS).toBe(8);
+    expect(BUYER_STEP_INDEX.SUCCESS).toBe(9);
   });
 
   it('seller flow keeps BrandName/BrandStage/Goals/Plan order after Name', () => {
@@ -61,8 +62,9 @@ describe('skip rules', () => {
     expect(isStepSkippable('seller', SELLER_STEP_INDEX.BRAND_NAME)).toBe(false);
   });
 
-  it('marks style picks and brand-follow as skippable', () => {
+  it('marks style picks, sizes and brand-follow as skippable', () => {
     expect(isStepSkippable('buyer', BUYER_STEP_INDEX.STYLE)).toBe(true);
+    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.SIZES)).toBe(true);
     expect(isStepSkippable('buyer', BUYER_STEP_INDEX.BRANDS)).toBe(true);
   });
 
@@ -106,7 +108,20 @@ describe('draft migration / resumption', () => {
     expect(restoreDraftStep('seller', SELLER_STEP_INDEX.GOALS, DRAFT_VERSION)).toBe(SELLER_STEP_INDEX.GOALS);
   });
 
-  it('migrates a v6 buyer draft (no Welcome/Brands) into v7 indices', () => {
+  it('migrates a v7 buyer draft: steps before Sizes stay, Brands and later shift by one', () => {
+    expect(restoreDraftStep('buyer', 3, 7)).toBe(BUYER_STEP_INDEX.NAME);
+    expect(restoreDraftStep('buyer', 4, 7)).toBe(BUYER_STEP_INDEX.STYLE);
+    expect(restoreDraftStep('buyer', 5, 7)).toBe(BUYER_STEP_INDEX.BRANDS);
+    expect(restoreDraftStep('buyer', 6, 7)).toBe(BUYER_STEP_INDEX.LOADING);
+    expect(restoreDraftStep('buyer', 8, 7)).toBe(BUYER_STEP_INDEX.SUCCESS);
+  });
+
+  it('leaves a v7 seller draft unchanged', () => {
+    expect(restoreDraftStep('seller', SELLER_STEP_INDEX.PLAN, 7)).toBe(SELLER_STEP_INDEX.PLAN);
+    expect(restoreDraftStep('seller', SELLER_STEP_INDEX.SUCCESS, 7)).toBe(SELLER_STEP_INDEX.SUCCESS);
+  });
+
+  it('migrates a v6 buyer draft (no Welcome/Brands) into current indices', () => {
     // v6: AccountType=0, Auth=1, Name=2, Style=3, Loading=4, Notifications=5, Success=6
     expect(restoreDraftStep('buyer', 0, 6)).toBe(BUYER_STEP_INDEX.ACCOUNT_TYPE);
     expect(restoreDraftStep('buyer', 1, 6)).toBe(BUYER_STEP_INDEX.AUTH);

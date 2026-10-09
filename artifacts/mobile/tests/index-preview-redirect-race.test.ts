@@ -60,10 +60,10 @@ describe('app/index.tsx redirect-away-from-"/" timer never fires on a stale atRo
       indexSource.indexOf('}, 150);'),
     );
     expect(timerBody).toContain("window.location.pathname !== '/'");
-    // Must come AFTER the ref check, as an additional guard, not a
-    // replacement for it — either check bailing out is enough to skip the
-    // wrong redirect.
-    expect(timerBody.indexOf('atRootRef.current')).toBeLessThan(timerBody.indexOf('window.location.pathname'));
+    // Both independent guards must run before redirecting; their relative
+    // order does not change the protection.
+    expect(timerBody.indexOf('atRootRef.current')).toBeLessThan(timerBody.indexOf('router.replace'));
+    expect(timerBody.indexOf('window.location.pathname')).toBeLessThan(timerBody.indexOf('router.replace'));
   });
 
   it('uses a 150ms delay, not the original 50ms, for more real-world slack', () => {
@@ -116,8 +116,8 @@ describe('a direct cold load of /seller-inbox with both bt_preview and demo para
 describe('preview entry path is preserved across ANY bounce back to "/", not just this file\'s own races', () => {
   it('app/_layout.tsx stashes the real page-load path (not "/") into sessionStorage, once per load', () => {
     const block = rootLayoutSource.slice(
-      rootLayoutSource.indexOf('const demoParam = new URLSearchParams'),
-      rootLayoutSource.indexOf('if (DEV_BYPASS_ROLE && Platform.OS'),
+      rootLayoutSource.indexOf("if (PREVIEW_ROLE && typeof localStorage !== 'undefined')"),
+      rootLayoutSource.indexOf('const publishableKey ='),
     );
     expect(block).toContain("sessionStorage.setItem('bt_preview_entry_path'");
     expect(block).toContain('window.location.pathname !== \'/\'');
@@ -127,8 +127,8 @@ describe('preview entry path is preserved across ANY bounce back to "/", not jus
 
   it('app/_layout.tsx clears any stale entry on a genuine bare "/" load', () => {
     const block = rootLayoutSource.slice(
-      rootLayoutSource.indexOf('const demoParam = new URLSearchParams'),
-      rootLayoutSource.indexOf('if (DEV_BYPASS_ROLE && Platform.OS'),
+      rootLayoutSource.indexOf("if (PREVIEW_ROLE && typeof localStorage !== 'undefined')"),
+      rootLayoutSource.indexOf('const publishableKey ='),
     );
     expect(block).toContain("sessionStorage.removeItem('bt_preview_entry_path')");
   });
@@ -150,6 +150,7 @@ describe('preview entry path is preserved across ANY bounce back to "/", not jus
   it('the redirect timer prefers the restored entry path over the plain dashboard root', () => {
     const timerBody = indexSource.slice(indexSource.indexOf('const redirect = setTimeout'));
     expect(timerBody).toContain('const entryPath = consumePreviewEntryPath();');
-    expect(timerBody).toContain("router.replace((entryPath ?? (effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/')) as never);");
+    expect(timerBody).toContain('router.replace((entryPath ?? previewRoot) as never);');
+    expect(timerBody).toContain("const previewRoot = (effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') + previewQuery;");
   });
 });

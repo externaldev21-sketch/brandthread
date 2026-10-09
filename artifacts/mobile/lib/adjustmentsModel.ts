@@ -231,10 +231,45 @@ export function liquifyToSvgTranslate(
   return `translate(${(dx * scaleX).toFixed(2)},${(dy * scaleY).toFixed(2)})`;
 }
 
+// ─── HSB (Hue / Saturation / Brightness) ──────────────────────────────────────
+
+/**
+ * HsbAdjustment — real HSB shift, applied as an SVG feColorMatrix (see
+ * layerRenderer.ts's hsbToColorMatrixString) to ALL layer types, not just
+ * drawing layers with accessible stroke colors — unlike Curves' histogram
+ * (which needs real per-pixel/per-stroke data to DISPLAY), applying a hue
+ * rotation / saturation / brightness matrix is a pure colour-space
+ * transform that works identically on raster and vector content, so there
+ * is no raster-layer "unavailable" case here.
+ */
+export interface HsbAdjustment {
+  hue: number;        // degrees, -180..180
+  saturation: number;  // multiplicative delta, -1 (grayscale) .. 1 (double saturation)
+  brightness: number;  // multiplicative delta, -1 (black) .. 1 (double brightness)
+}
+
+export function defaultHsbAdjustment(): HsbAdjustment {
+  return { hue: 0, saturation: 0, brightness: 0 };
+}
+
+/** True when the adjustment has no visible effect — used to skip the filter entirely. */
+export function isIdentityHsb(adj: HsbAdjustment): boolean {
+  return adj.hue === 0 && adj.saturation === 0 && adj.brightness === 0;
+}
+
+export function clampHsb(adj: HsbAdjustment): HsbAdjustment {
+  return {
+    hue: Math.max(-180, Math.min(180, adj.hue)),
+    saturation: Math.max(-1, Math.min(1, adj.saturation)),
+    brightness: Math.max(-1, Math.min(1, adj.brightness)),
+  };
+}
+
 // ─── DesignLayerAdjustments ───────────────────────────────────────────────────
 
 /** Persisted adjustments attached to a layer (stored in layer.adjustments). */
 export interface DesignLayerAdjustments {
   curves?:  CurvesAdjustment;
   liquify?: LiquifyAdjustment;
+  hsb?:     HsbAdjustment;
 }

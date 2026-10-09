@@ -30,6 +30,8 @@ import { EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
 import { formatCents } from '@/lib/money';
 import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
@@ -48,19 +50,25 @@ export default function BuyerCollection() {
   const [renameValue, setRenameValue] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  const load = useCallback(async (silent = false) => {
     if (!collectionId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const data = await getCollectionItems(collectionId);
       setCollection(data.collection);
       setItems(data.items);
+      setLoadFailed(false);
     } catch (error) {
-      reportNetworkError(error, load);
+      setLoadFailed(true);
+      reportNetworkError(error, () => load());
     } finally {
       setLoading(false);
     }
   }, [collectionId]);
+
+  const pull = usePullToRefresh(() => load(true));
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -212,6 +220,8 @@ export default function BuyerCollection() {
 
       {loading ? (
         <View style={styles.gridContent}><GridSkeleton columns={2} cardWidth={TILE_SIZE} rows={3} gap={GAP} /></View>
+      ) : loadFailed && items.length === 0 ? (
+        <ErrorState message="Couldn't load this collection." onRetry={() => { void load(); }} style={{ flex: 1 }} />
       ) : items.length === 0 ? (
         <EmptyState
           icon="folder"
@@ -226,6 +236,7 @@ export default function BuyerCollection() {
           numColumns={2}
           columnWrapperStyle={{ gap: GAP }}
           contentContainerStyle={styles.gridContent}
+          refreshControl={pull.refreshControl}
           renderItem={renderTile}
         />
       )}

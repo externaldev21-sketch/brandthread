@@ -16,6 +16,7 @@ import { destinationApplicationFeeCents } from "./fees";
 import { isDropLive } from "./dropLaunch";
 import type { DbExecutor } from "./ledger";
 import { payoutMode } from "../delivery/policy";
+import { unlaunchedProductIds } from "../productLaunch";
 
 export class CheckoutPlanError extends Error {
   constructor(message: string, readonly status: number, readonly code: string) {
@@ -40,6 +41,12 @@ export async function resolveChargePlan(input: {
   const now = input.now ?? new Date();
   const ids = [...new Set(input.productIds)];
   if (ids.length === 0) throw new CheckoutPlanError("Cart is empty", 400, "EMPTY_CART");
+
+  // Scheduled product launches: products with a launch row that hasn't
+  // opened yet can't be bought. Products without a row are unaffected.
+  if ((await unlaunchedProductIds(ids, now, executor)).length > 0) {
+    throw new CheckoutPlanError("This product hasn't launched yet.", 409, "PRODUCT_NOT_LAUNCHED");
+  }
 
   const rows = await executor.select({
     productId: products.id,
@@ -134,6 +141,8 @@ export function paymentIntentMoney(input: {
   sellerStripeAccountId: string;
   merchandiseCents: number;
   preTaxTotalCents: number;
+  /** Seller-plan commission in bps (lib/planPerks); defaults to the standard rate. */
+  platformFeeBps?: number | null;
 }): {
   paymentIntentData: Record<string, unknown>;
   /** The charge model to persist on the checkout (and then the order). */
@@ -144,6 +153,7 @@ export function paymentIntentMoney(input: {
   const fee = destinationApplicationFeeCents({
     merchandiseCents: input.merchandiseCents,
     preTaxTotalCents: input.preTaxTotalCents,
+    platformFeeBps: input.platformFeeBps,
   });
   if (input.plan.chargeModel === "held") {
     return {

@@ -21,7 +21,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, Animated, Dimensions, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, FontAwesome } from '@expo/vector-icons';
@@ -39,10 +39,11 @@ import { useStoryMentions } from '@/hooks/useStoryMentions';
 import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ON_DARK, RADIUS, SP, ICON } from '@/lib/theme';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { prefetchImage } from '@/lib/prefetch';
 import { useApi } from '@/lib/api';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { ApiError } from '@/lib/networkNotice';
 import { relativeTime } from '@/lib/activity';
 import { sendMessage } from '@/services/socialService';
@@ -146,6 +147,7 @@ function SlideMedia({ slide, overlays, original, paused }: {
 export default function StoryMentionViewerScreen() {
   const router = useRouter();
   const api = useApi();
+  const { openReport } = useReportSheet();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const topInset = useHeaderTopInset();
@@ -398,6 +400,12 @@ export default function StoryMentionViewerScreen() {
   }
 
   const { tagger } = current;
+  const tagName = tagger.name || atHandle(tagger.handle);
+  // Long-press the header to report the story.
+  const openReportSheet = () => openReport({
+    targetType: 'story', targetId: current.storyId, label: `${tagName}’s story`,
+    ownerId: tagger.userId, ownerName: tagName,
+  });
   const slides = currentUnavailable ? 1 : current.story.media.length;
   const hasText = text.trim().length > 0;
 
@@ -473,10 +481,10 @@ export default function StoryMentionViewerScreen() {
               <Text style={styles.avatarText} allowFontScaling={false}>{tagger.initials}</Text>
             )}
           </View>
-          <View style={styles.headerText}>
-            <Text style={styles.name} numberOfLines={1}>{tagger.name || atHandle(tagger.handle)}</Text>
+          <Pressable style={styles.headerText} onLongPress={openReportSheet} delayLongPress={400}>
+            <Text style={styles.name} numberOfLines={1}>{tagName}</Text>
             <Text style={styles.sub} numberOfLines={1}>Mentioned you · {relativeTime(current.mentionedAt)}</Text>
-          </View>
+          </Pressable>
           <IconButton name="x" onPress={close} accessibilityLabel="Close" color={ON_DARK} variant="plain" />
         </View>
 
@@ -580,7 +588,7 @@ const styles = StyleSheet.create({
   addRow: { paddingHorizontal: SP.md, paddingBottom: SP.sm, flexDirection: 'row' },
   addPill: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: 44, paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: 'rgba(0,0,0,0.45)',
   },
   addLabel: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.base },
   heartBtn: { width: 32, height: 40, alignItems: 'center', justifyContent: 'center' },

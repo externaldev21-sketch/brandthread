@@ -25,6 +25,7 @@
  */
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +47,8 @@ import { InteractionLayer, ProfileChip } from '@/components/profile/ProfileContr
 import { setSellerFollowing, removeFollower } from '@/services/socialService';
 import { RemoveFollowerSheet, type RemoveFollowerPerson } from '@/components/social/RemoveFollowerSheet';
 import { CenteredToast } from '@/components/social/CenteredToast';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { radius } from '@/constants/radii';
 
 export type ConnectionsTab = 'followers' | 'following';
 export type FollowSort = 'default' | 'latest' | 'earliest';
@@ -152,7 +155,7 @@ export default function ConnectionsScreen() {
     const generation = ++generationRef.current;
     setError(false);
     setLoading(true);
-    Promise.all([
+    return Promise.all([
       api.social.followers(listOwner),
       api.social.following(listOwner, activeSort),
     ])
@@ -170,6 +173,7 @@ export default function ConnectionsScreen() {
   // Refetch whenever the list regains focus — following someone from their
   // profile and coming back shows the change immediately.
   useFocusEffect(useCallback(() => { load(sort); }, [load, sort]));
+  const pull = usePullToRefresh(() => load(sort));
 
   // Re-sort the Following list server-side when the sheet's selection changes
   // (without re-showing the loading skeleton over an already-loaded screen).
@@ -205,7 +209,10 @@ export default function ConnectionsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       if (row.accountType === 'seller') await setSellerFollowing(row.id, true);
-      else await api.social.follow(row.id);
+      else if ((await api.social.follow(row.id))?.status === 'requested') {
+        // Private account: request sent, not following yet.
+        setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: false } : u)));
+      }
     } catch {
       setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: false } : u)));
     } finally {
@@ -398,9 +405,11 @@ export default function ConnectionsScreen() {
         />
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={filtered}
           keyExtractor={item => item.id}
           renderItem={renderItem}
+          refreshControl={pull.refreshControl}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
           keyboardShouldPersistTaps="handled"
@@ -508,7 +517,7 @@ function RemovePill({ onPress, theme }: { onPress: () => void; theme: AppThemePr
 }
 
 const pillStyles = StyleSheet.create({
-  pill: { height: 32, paddingHorizontal: 14, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+  pill: { height: 32, paddingHorizontal: 14, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   text: { fontFamily: FONT.semibold, fontSize: FS.xs },
 });
 

@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, Alert, StyleSheet, Dimensions,
   Modal, TextInput, Animated, Pressable,
 } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -368,6 +369,7 @@ export default function BuyerSaved() {
         />
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={list}
           keyExtractor={item => item.id}
           numColumns={2}

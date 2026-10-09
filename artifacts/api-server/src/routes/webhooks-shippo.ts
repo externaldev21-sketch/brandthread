@@ -26,6 +26,7 @@ import { applyShippoTrack, mapShippoStatus } from "../lib/delivery/trackingSync"
 import type { ShippoTrack } from "../lib/shippo";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
+import { handleReturnLabelTracking, returnLabelIdFromMetadata } from "../lib/returnLabels";
 
 const router = Router();
 
@@ -80,6 +81,12 @@ router.post("/", async (req, res) => {
   }
 
   try {
+    // A prepaid return label's scans move the return (and trigger its refund), never the order's own tracking.
+    const returnLabelId = returnLabelIdFromMetadata(metadata);
+    if (returnLabelId) {
+      const outcome = await handleReturnLabelTracking(returnLabelId, mapped);
+      return void res.status(200).json({ ok: true, return: true, refunded: outcome.refunded });
+    }
     const labelId = labelIdFromMetadata(metadata);
     let orderId: string | null = null;
     if (labelId) {

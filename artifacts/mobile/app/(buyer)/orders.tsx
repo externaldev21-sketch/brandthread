@@ -14,9 +14,10 @@ import * as Haptics from 'expo-haptics';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
 import { getBuyerOrdersWithStatus, mapApiBuyerOrder } from '@/services/orderService';
-import { isPreviewDemoMode } from '@/lib/devPreview';
-import { getPreviewBuyerOrders } from '@/lib/previewOrders';
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewBuyerOrders as getPreviewDeliveryBuyerOrders, isPreviewOrderId } from '@/lib/previewOrders';
+import { getPreviewBuyerOrders as getPreviewCommerceBuyerOrders, isPreviewCommerceId } from '@/lib/previewCommerce';
 import { formatCents } from '@/lib/money';
 import { deliveryHeadline } from '@/lib/deliveryGuarantee';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -26,6 +27,8 @@ import {
 } from '@/components/BrandthreadUI';
 import { Header, SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { useReorderFlow } from '@/components/orders/ReorderFlow';
+import { canReorderStatus } from '@/lib/reorderSummary';
 import { RetryRow } from '@/components/ui/RetryRow';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -94,7 +97,7 @@ function applyFilter(orders: BuyerOrderView[], filter: BuyerFilterKey): BuyerOrd
 // Visual, tracker-forward card: seller + order meta up top, a live compact
 // status tracker as the centerpiece, then item preview / total / actions.
 
-const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { order: BuyerOrderView; onOpen: (orderId: string) => void }) {
+const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReorder, reordering }: { order: BuyerOrderView; onOpen: (orderId: string) => void; onReorder?: (orderId: string) => void; reordering?: boolean }) {
   const onPress = () => onOpen(order.id);
   const { theme } = useAppTheme();
   const styles = useMemo(() => cardStyles(theme), [theme]);
@@ -102,12 +105,15 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
   const extraCount = order.lineItems.length - 1;
   const sellerInitial = order.sellerName.charAt(0).toUpperCase();
   const isTerminalStatus = order.status === 'cancelled' || order.status === 'refunded' || order.status === 'disputed';
+  // Preview orders are list-only here: never pass their synthetic IDs into
+  // a detail or mutation route that can reach the live API.
+  const isPreview = isPreviewOrderId(order.id) || isPreviewCommerceId(order.id);
   const autoRefunded = !!order.delivery?.autoRefund;
   const headline = deliveryHeadline(order);
   const thumbs = order.lineItems.slice(0, 4);
 
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} disabled={isPreview}>
       {/* Top row */}
       <View style={styles.cardTopRow}>
         <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
@@ -202,16 +208,17 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
           <Text style={styles.trackingText}>
             {trackingLabel(order.trackingStatus)}
             {order.estimatedDelivery ? ` → Est. ${fmtDate(order.estimatedDelivery)}` : ''}
+            {isPreview && order.trackingNumber ? ` · ${order.trackingNumber}` : ''}
           </Text>
         </View>
       )}
 
       {/* Actions */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8} disabled={isPreview}>
           <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>View Order Details</Text>
         </TouchableOpacity>
-        {order.trackingNumber && (
+        {order.trackingNumber && !isPreview && (
           <TouchableOpacity
              style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
             activeOpacity={0.8}
@@ -219,6 +226,19 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
           >
             <Feather name="map-pin" size={12} color={theme.secondary} />
             <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>
+          </TouchableOpacity>
+        )}
+        {onReorder && canReorderStatus(order.status) && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.reorderBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent, opacity: reordering ? 0.5 : 1 }]}
+            activeOpacity={0.8}
+            disabled={reordering}
+            accessibilityRole="button"
+            accessibilityLabel="Reorder"
+            onPress={() => onReorder(order.id)}
+          >
+            <Feather name="repeat" size={12} color={theme.accentLight} />
+            <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>{reordering ? 'Adding…' : 'Reorder'}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -271,9 +291,14 @@ export default function BuyerOrdersScreen() {
   const centeredPadding = useCenteredContentPadding();
   const router = useRouter();
   const openOrder = useCallback((orderId: string) => {
+    // Synthetic preview orders are list-only; never hand their IDs to a
+    // detail/mutation route backed by the live API.
+    if (isPreviewOrderId(orderId) || isPreviewCommerceId(orderId)) return;
     router.push(('/buyer-order-detail?id=' + orderId) as never);
   }, [router]);
   const { userId } = useAuth();
+  const buyerPreview = isBuyerDevPreview() && !userId;
+  const { reorder, busyOrderId, element: reorderElement } = useReorderFlow({ aboveTabBar: true });
 
   const [orders, setOrders] = useState<BuyerOrderView[]>([]);
   const [ordersOwnerId, setOrdersOwnerId] = useState<string | null | undefined>(userId);
@@ -293,11 +318,15 @@ export default function BuyerOrdersScreen() {
 
   const load = useCallback(async (generation: number) => {
     if (!userId) {
-      // No account: empty, except the demo=1 preview cast (lib/previewOrders.ts).
-      setOrders(isPreviewDemoMode() ? getPreviewBuyerOrders().map(mapApiBuyerOrder) : []);
+      // The explicit demo cast includes delivery-guarantee states; a fresh
+      // buyer preview retains its list-only synthetic commerce orders.
+      setOrders(isPreviewDemoMode()
+        ? getPreviewDeliveryBuyerOrders().map(mapApiBuyerOrder)
+        : buyerPreview ? getPreviewCommerceBuyerOrders() : []);
       setOrdersOwnerId(userId);
       setLoading(false);
       setRefreshing(false);
+      setLoadError(false);
       hasLoadedRef.current = true;
       return;
     }
@@ -332,7 +361,7 @@ export default function BuyerOrdersScreen() {
     setLoading(false);
     setRefreshing(false);
     hasLoadedRef.current = true;
-  }, [userId]);
+  }, [buyerPreview, userId]);
 
   const retry = useCallback(() => {
     if (refreshing) return;
@@ -459,12 +488,14 @@ export default function BuyerOrdersScreen() {
                 paddingTop: SP.sm,
                 paddingBottom: barInset + SP.md,
               }}
+              extraData={busyOrderId}
               ItemSeparatorComponent={OrderCardGap}
-              renderItem={({ item }) => <BuyerOrderCard order={item} onOpen={openOrder} />}
+              renderItem={({ item }) => <BuyerOrderCard order={item} onOpen={openOrder} onReorder={reorder} reordering={busyOrderId === item.id} />}
             />
           )}
         </>
       )}
+      {reorderElement}
     </BrandthreadScreen>
   );
 }
@@ -636,6 +667,11 @@ function cardStyles(theme: AppThemePreset) {
       borderColor: theme.border,
       flexDirection: 'row',
       gap: 4,
+    },
+    // Own line under View / Track so those two keep their existing width.
+    reorderBtn: {
+      flexBasis: '100%',
+      paddingHorizontal: SP.sm,
     },
     actionBtnSecondary: {
       backgroundColor: theme.secondaryDim,

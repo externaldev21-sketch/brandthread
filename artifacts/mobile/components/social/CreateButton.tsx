@@ -4,7 +4,8 @@ import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 type Props = {
   onPress: () => void;
@@ -52,7 +53,7 @@ const makeStyles = (theme: AppThemePreset, compact?: boolean) => StyleSheet.crea
   wrap: {
     height: compact ? 34 : 40,
     paddingHorizontal: compact ? SP.sm : SP.md,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

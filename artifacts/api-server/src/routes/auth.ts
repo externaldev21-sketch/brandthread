@@ -1,17 +1,31 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { clerkClient } from "@clerk/express";
 import {
   db, users, orders, orderItems, conversationParticipants, conversations, messages,
   passwordResetCodes,
 } from "@workspace/db";
 import { eq, sql, inArray, or, asc, desc } from "drizzle-orm";
+import { applyPrivateAccountToggle } from "../lib/privateAccount";
 import crypto from "node:crypto";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { awardLoyaltyPointsOnce } from "./loyalty";
 import { sendWelcomeEmail } from "../lib/brandthreadEmail";
 import { isMailerConfigured, sendPasswordResetEmail } from "../lib/mailer";
-import { getDeletionBlockers, hasDeletionConfirmation } from "../lib/accountDeletion";
+import {
+  DELETION_GRACE_DAYS,
+  recentDeletionCancellation,
+  getDeletionBlockers,
+  getReauthMethod,
+  graceSyncUpdates,
+  hasDeletionConfirmation,
+  isPendingDeletion,
+  issueDeletionCode,
+  restoreAccount,
+  revokeAllSessions,
+  scheduleAccountDeletion,
+  verifyDeletionReauth,
+} from "../lib/accountDeletion";
 import { getAuth } from "@clerk/express";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -22,6 +36,11 @@ import {
 } from "../lib/authProfile";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
+import { AGE_RESTRICTED_MESSAGE, bandMaySellOrEarn, denyIfAgeRestricted } from "../lib/ageGate";
+import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSource } from "../lib/legalAcceptance";
+import { buildAccountDataExport } from "../lib/dataExport";
+import { decideUsernameChange, usernameNextChangeAt } from "../lib/usernameCooldown";
+import { hasRedeemedAccessCode, isInviteOnlyEnabled } from "../lib/access/inviteOnly";
 
 const router = Router();
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
@@ -63,7 +82,8 @@ const profileBodySchema = z.object({
   socialLinks: z.record(z.string(), z.string().trim().max(300)).optional(),
 }).passthrough();
 const privacyBodySchema = z.object({
-  dmPrivacy: z.enum(["requests", "followers_only"]),
+  dmPrivacy: z.enum(["requests", "followers_only"]).optional(),
+  isPrivate: z.boolean().optional(),
 }).passthrough();
 const feedGesturesTipBodySchema = z.object({
   version: z.number().int().min(1),
@@ -124,7 +144,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
     // Sync runs both during app startup and explicitly during onboarding. Use a
     // conflict-safe insert so concurrent first requests cannot turn a real
     // account into a transient 500/error screen.
-    const { user, created } = await db.transaction(async (tx) => {
+    const { user, created, deletionCancelled } = await db.transaction(async (tx) => {
       const [inserted] = await tx
         .insert(users)
         .values({
@@ -147,7 +167,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
           referenceId: clerkUserId,
           note: "Welcome to Brandthread",
         }, tx);
-        return { user: inserted, created: true };
+        return { user: inserted, created: true, deletionCancelled: false };
       }
 
       const [existing] = await tx
@@ -156,6 +176,8 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
       if (!existing) throw new Error("User sync conflict did not yield a user record");
+      // Inside the 30-day grace window the person may still sign in (to
+      // restore); only a purged tombstone is gone for good.
       if (existing.deletedAt) {
         const error = new Error("This account has been deleted");
         (error as any).statusCode = 410;
@@ -167,6 +189,10 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         avatarUrl,
         updatedAt: new Date(),
       };
+      // Signing back in during the grace period cancels the deletion.
+      const cancellation = graceSyncUpdates(existing);
+      const cancelledDeletion = cancellation !== null;
+      if (cancellation) Object.assign(updates, cancellation);
       if (preferredName) {
         updates.name = preferredName;
         // Preserve a deliberately edited display name, but initialize it for
@@ -181,7 +207,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         .where(eq(users.clerkId, clerkUserId))
         .returning();
       if (!updated) throw new Error("User record disappeared during sync");
-      return { user: updated, created: false };
+      return { user: updated, created: false, deletionCancelled: cancelledDeletion };
     });
     if (created) {
       void sendWelcomeEmail({
@@ -197,7 +223,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         req.log.warn({ err, clerkUserId }, "Welcome email delivery failed");
       });
     }
-    res.status(created ? 201 : 200).json(user);
+    res.status(created ? 201 : 200).json({ ...user, deletionCancelled });
   } catch (err) {
     if ((err as any)?.statusCode === 410) {
       res.status(410).json({ error: "This account has been deleted." });
@@ -235,75 +261,7 @@ router.post("/data-export", requireAuth, async (req, res) => {
   }
 
   try {
-    const result: Record<string, unknown> = {};
-    if (include.includes("profile")) {
-      const [profile] = await db.select({
-        clerkId: users.clerkId,
-        email: users.email,
-        name: users.name,
-        displayName: users.displayName,
-        accountType: users.accountType,
-        username: users.username,
-        bio: users.bio,
-        website: users.website,
-        brandName: users.brandName,
-        brandType: users.brandType,
-        brandStage: users.brandStage,
-        notificationPreferences: users.notificationPreferences,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-      }).from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
-      result.profile = profile ?? null;
-    }
-
-    if (include.includes("orders")) {
-      const ownedOrders = await db.select().from(orders)
-        .where(or(eq(orders.buyerId, clerkUserId), eq(orders.ownerId, clerkUserId)))
-        .orderBy(asc(orders.createdAt));
-      const orderIds = ownedOrders.map((order) => order.id);
-      const items = orderIds.length
-        ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds))
-        : [];
-      const itemsByOrder = new Map<string, typeof items>();
-      for (const item of items) {
-        const group = itemsByOrder.get(item.orderId) ?? [];
-        group.push(item);
-        itemsByOrder.set(item.orderId, group);
-      }
-      result.orders = ownedOrders.map((order) => ({
-        ...order,
-        items: itemsByOrder.get(order.id) ?? [],
-        relationship: order.buyerId === clerkUserId ? "buyer" : "seller",
-      }));
-    }
-
-    if (include.includes("messages")) {
-      const memberships = await db.select({
-        conversationId: conversationParticipants.conversationId,
-      }).from(conversationParticipants).where(eq(conversationParticipants.userId, clerkUserId));
-      const conversationIds = memberships.map((membership) => membership.conversationId);
-      const conversationRows = conversationIds.length
-        ? await db.select().from(conversations).where(inArray(conversations.id, conversationIds)).orderBy(asc(conversations.createdAt))
-        : [];
-      const messageRows = conversationIds.length
-        ? await db.select({
-            id: messages.id,
-            conversationId: messages.conversationId,
-            senderId: messages.senderId,
-            senderName: messages.senderName,
-            body: messages.body,
-            attachment: messages.attachment,
-            attachments: messages.attachments,
-            replyToId: messages.replyToId,
-            status: messages.status,
-            deliveredAt: messages.deliveredAt,
-            readAt: messages.readAt,
-            deletedAt: messages.deletedAt,
-            createdAt: messages.createdAt,
-          }).from(messages).where(inArray(messages.conversationId, conversationIds)).orderBy(asc(messages.createdAt))
-        : [];
-      result.messages = { conversations: conversationRows, messages: messageRows };
-    }
+    const result = await buildAccountDataExport(clerkUserId, include as string[]);
 
     const exportedAt = new Date().toISOString();
     res.setHeader("Content-Disposition", `attachment; filename="brandthread-my-data-${Date.now()}.json"`);
@@ -321,33 +279,32 @@ router.post("/data-export", requireAuth, async (req, res) => {
 router.get("/account/deletion-check", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   try {
-    const [account] = await db.select({ accountType: users.accountType, deletedAt: users.deletedAt })
+    const [account] = await db.select({ accountType: users.accountType, deletedAt: users.deletedAt, deletionCancelledAt: users.deletionCancelledAt })
       .from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
     if (!account) {
       res.status(404).json({ error: "Account record was not found." });
       return;
     }
-    const blockers = await getDeletionBlockers(clerkUserId);
+    const [blockers, reauth] = await Promise.all([
+      getDeletionBlockers(clerkUserId),
+      getReauthMethod(clerkUserId),
+    ]);
     const isSeller = account.accountType === "seller";
     res.json({
       canDelete: blockers.length === 0,
       accountType: account.accountType,
+      graceDays: DELETION_GRACE_DAYS,
+      reauth,
+      deletionCancelledAt: recentDeletionCancellation(account.deletionCancelledAt),
       blockers,
       willDelete: [
-        "Your profile, username, photo and bio",
-        "Posts, comments, stories, likes, reposts and follows",
-        "Direct messages you sent",
-        "Saved items, cart, addresses and notification settings",
-        ...(isSeller ? [
-          "Your storefront, product listings, discount codes and shipping settings",
-          "Payout and subscription links to Stripe",
-        ] : []),
-        "Your sign-in (you'll be signed out on every device)",
+        "Your profile, posts, comments and messages",
+        "Your saved items, addresses and settings",
+        ...(isSeller ? ["Your storefront and product listings"] : []),
+        "Your sign-in",
       ],
       willRetain: [
-        "Order, payment, refund and tax records, with your name and address removed — kept as long as the law requires",
-        "Reports you made about other people's content, without your identity",
-        ...(isSeller ? ["Reviews buyers left on past orders, shown as from a deleted account"] : []),
+        "Order, payment and tax records, without your name and address, as the law requires",
       ],
     });
   } catch (err) {
@@ -356,131 +313,121 @@ router.get("/account/deletion-check", requireAuth, async (req, res) => {
   }
 });
 
+// ─── POST /api/auth/account/deletion-code ───────────────────────────────────
+// Re-auth for accounts without a password (Google/Apple sign-in): emails a
+// hashed, single-use, 15-minute code that DELETE /account then requires.
+router.post("/account/deletion-code", requireAuth, rateLimit("authentication"), async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  try {
+    const [account] = await db.select({ email: users.email, deletedAt: users.deletedAt })
+      .from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+    if (!account || account.deletedAt) {
+      res.status(404).json({ error: "Account record was not found." });
+      return;
+    }
+    const result = await issueDeletionCode(clerkUserId, account.email);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error, code: result.code });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err, clerkUserId }, "Account deletion code request failed");
+    res.status(502).json({ error: "We couldn't send the code. Try again in a moment.", code: "MAIL_SEND_FAILED" });
+  }
+});
+
 // ─── DELETE /api/auth/account ───────────────────────────────────────────────
-// Permanently erase an authenticated account. Financial/tax records are kept,
-// but are stripped of direct personal data. The user row is deliberately kept
-// as a tombstone so an old app cannot re-create it with /auth/sync.
-router.delete("/account", requireAuth, async (req, res) => {
+// Schedules deletion with a 30-day grace period. Needs the typed confirmation
+// AND fresh proof of identity (password, or an emailed code for password-less
+// accounts). The account is hidden immediately and every session is revoked;
+// the hard delete happens in jobs/accountPurge.ts (purgeAccount), which keeps
+// the user row as a tombstone so an old app cannot re-create it via /sync.
+// Exported so the public email-link flow can use the same scheduling, blocker,
+// and notification behavior after verifying ownership of the email address.
+export async function accountDeletionHandler(req: Request, res: Response) {
   const clerkUserId = (req as any).clerkUserId as string;
   if (!hasDeletionConfirmation(req.body)) {
-    res.status(400).json({ error: 'Type DELETE exactly to permanently delete your account.' });
+    res.status(400).json({ error: 'Type DELETE exactly to delete your account.' });
     return;
   }
 
   try {
     const [account] = await db.select({
       id: users.id, deletedAt: users.deletedAt,
+      deletionRequestedAt: users.deletionRequestedAt, deletionScheduledFor: users.deletionScheduledFor,
     }).from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
     if (!account) {
       res.status(404).json({ error: "Account record was not found." });
       return;
     }
 
-    if (!account.deletedAt) {
-      // Never strand a buyer or a seller's customers: open orders, held drop
-      // funds, disputes and in-flight payouts must be settled first.
-      const blockers = await getDeletionBlockers(clerkUserId);
-      if (blockers.length > 0) {
-        res.status(409).json({
-          error: "Settle the items below before deleting your account.",
-          code: "DELETION_BLOCKED",
-          blockers,
-        });
-        return;
-      }
-      await db.transaction(async (tx) => {
-        const deletedSubject = `deleted:${account.id}`;
-        // Private, device, social, preference and draft data.
-        await tx.execute(sql`DELETE FROM push_tokens WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM buyer_addresses WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM cart_items WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM saved_items WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM notifications_feed WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM blocks WHERE blocker_id = ${clerkUserId} OR blocked_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM follows WHERE follower_id = ${clerkUserId} OR following_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM story_likes WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM story_views WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM interactions WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM posts WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM stories WHERE author_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM product_reserves WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM waitlist_entries WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM drop_alert_subscriptions WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM checkout_sessions WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM loyalty_points WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM referrals WHERE inviter_id = ${clerkUserId} OR invitee_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM klaviyo_integrations WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM seller_subscription_entitlements WHERE clerk_user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM post_comment_likes WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM post_comments WHERE author_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM muted_words WHERE user_id = ${clerkUserId}`);
-        // Reports the person filed stay in the moderation record without
-        // their identity; reports about their content keep the snapshot.
-        await tx.execute(sql`UPDATE reports SET reporter_id = ${deletedSubject} WHERE reporter_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE reports SET target_owner_id = ${deletedSubject} WHERE target_owner_id = ${clerkUserId}`);
-
-        // Conversations are private content. Preserve a counterpart's thread,
-        // but remove the deleted person's messages, participant profile, and
-        // cached message preview.
-        await tx.execute(sql`UPDATE conversations SET last_message = NULL
-          WHERE id IN (SELECT conversation_id FROM conversation_participants WHERE user_id = ${clerkUserId})`);
-        await tx.execute(sql`DELETE FROM messages WHERE sender_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM conversation_participants WHERE user_id = ${clerkUserId}`);
-
-        // Retained commerce records keep amounts/statuses/payment references for
-        // legal and accounting purposes while removing customer-facing PII.
-        await tx.execute(sql`UPDATE orders SET buyer_id = NULL, guest_email = NULL,
-          shipping_address = NULL, notes = NULL, updated_at = NOW()
-          WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE orders SET owner_id = ${deletedSubject}, updated_at = NOW()
-          WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE customers SET owner_id = ${deletedSubject},
-          email = 'deleted@deleted.brandthread.invalid', name = 'Deleted customer',
-          phone = NULL, address = NULL, updated_at = NOW() WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE returns SET notes = NULL, seller_response = NULL, evidence_urls = '[]'::json
-          WHERE buyer_id = ${clerkUserId} OR seller_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE returns SET buyer_id = ${deletedSubject} WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE returns SET seller_id = ${deletedSubject} WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE disputes SET seller_id = ${deletedSubject}, customer_claim = '', evidence_json = '[]'::json,
-          stripe_evidence_details = '{}'::json, updated_at = NOW() WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE reviews SET buyer_id = 'deleted', body = NULL WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE reviews SET seller_id = ${deletedSubject} WHERE seller_id = ${clerkUserId}`);
-
-        // Seller catalog/profile content is no longer public. Products are
-        // archived rather than deleted because historical order line items can
-        // reference their variants.
-        await tx.execute(sql`UPDATE products SET status = 'archived', images = '[]'::json,
-          description = NULL, updated_at = NOW() WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM storefronts WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM seller_quote_requests WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM seller_tax_config WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM shipping_rates WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE discount_codes SET active = false WHERE seller_id = ${clerkUserId}`);
-
-        // Remove all direct identity, auth/billing linkage and public profile
-        // details. clerk_id remains solely as the non-reusable tombstone key.
-        await tx.update(users).set({
-          email: `deleted+${account.id}@deleted.brandthread.invalid`,
-          name: "Deleted user", displayName: "Deleted user", avatarUrl: null,
-          bio: null, profileImageUrl: null, username: null, brandName: null,
-          brandType: null, brandStage: null, sellModel: null, website: null,
-          stripeCustomerId: null, stripeAccountId: null, subscriptionId: null,
-          stripeVerificationSessionId: null, notificationPreferences: {},
-          termsAcceptedAt: null, termsVersion: null,
-          deletedAt: new Date(), updatedAt: new Date(),
-        }).where(eq(users.clerkId, clerkUserId));
-      });
+    // Already purged but Clerk removal failed earlier: finish it.
+    if (account.deletedAt) {
+      await clerkClient.users.deleteUser(clerkUserId);
+      res.json({ ok: true, purged: true });
+      return;
+    }
+    // Idempotent: a repeated request keeps the original date.
+    if (isPendingDeletion(account)) {
+      res.json({ ok: true, scheduledFor: account.deletionScheduledFor?.toISOString() ?? null, graceDays: DELETION_GRACE_DAYS });
+      return;
     }
 
-    // This happens only after the database cleanup commits. If Clerk rejects
-    // it, the tombstone remains and a retry is safe and explicit.
-    await clerkClient.users.deleteUser(clerkUserId);
-    res.json({ ok: true });
+    const emailLinkVerified = (req as Request & { deletionEmailVerified?: boolean }).deletionEmailVerified === true;
+    const reauth = emailLinkVerified
+      ? { ok: true as const }
+      : await verifyDeletionReauth(clerkUserId, req.body ?? {});
+    if (!reauth.ok) {
+      res.status(reauth.status).json({ error: reauth.error, code: reauth.code });
+      return;
+    }
+
+    // Never strand a buyer or a seller's customers: open orders, held drop
+    // funds, disputes and in-flight payouts must be settled first. Checked
+    // again when the grace period ends.
+    const blockers = await getDeletionBlockers(clerkUserId);
+    if (blockers.length > 0) {
+      res.status(409).json({
+        error: "Settle the items below before deleting your account.",
+        code: "DELETION_BLOCKED",
+        blockers,
+      });
+      return;
+    }
+
+    const scheduledFor = await scheduleAccountDeletion(clerkUserId);
+    try {
+      await revokeAllSessions(clerkUserId);
+    } catch (err) {
+      // The account is already hidden and scheduled; a failed revoke must not
+      // report the whole request as failed.
+      req.log.warn({ err, clerkUserId }, "Could not revoke sessions after scheduling account deletion");
+    }
+    res.json({ ok: true, scheduledFor: scheduledFor?.toISOString() ?? null, graceDays: DELETION_GRACE_DAYS });
   } catch (err) {
     req.log.error({ err, clerkUserId }, "Account deletion failed");
     res.status(502).json({
-      error: "We could not complete account deletion. Database cleanup may have completed, but Clerk sign-in removal failed. Retry the request or contact support.",
+      error: "We couldn't schedule your account deletion. Try again or contact support.",
     });
+  }
+}
+router.delete("/account", requireAuth, rateLimit("authentication"), accountDeletionHandler);
+
+// ─── POST /api/auth/account/restore ─────────────────────────────────────────
+// Explicit cancel for API clients; signing back in (POST /auth/sync) also cancels.
+router.post("/account/restore", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  try {
+    const restored = await restoreAccount(clerkUserId);
+    if (!restored) {
+      res.status(409).json({ error: "This account isn't scheduled for deletion.", code: "NOT_PENDING_DELETION" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err, clerkUserId }, "Account restore failed");
+    res.status(502).json({ error: "We couldn't restore your account. Try again." });
   }
 });
 
@@ -489,17 +436,17 @@ router.delete("/account", requireAuth, async (req, res) => {
 // and Privacy Policy version shown to them (sign-up checkbox or update prompt).
 const legalAcceptanceSchema = z.object({
   version: z.string().trim().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}(?:\.[0-9]+)?$/),
+  source: z.enum(LEGAL_ACCEPTANCE_SOURCES).optional(),
 }).passthrough();
 
 router.post("/legal-acceptance", requireAuth, validateRequest({ body: legalAcceptanceSchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
-  const { version } = req.body as { version: string };
+  const { version, source } = req.body as { version: string; source?: LegalAcceptanceSource };
   const acceptedAt = new Date();
-  const rows = await db.update(users)
-    .set({ termsAcceptedAt: acceptedAt, termsVersion: version, updatedAt: acceptedAt })
-    .where(eq(users.clerkId, clerkUserId))
-    .returning({ id: users.id });
-  if (rows.length === 0) {
+  // Latest agreement on the user row, plus one history row per version.
+  const found = await db.transaction((tx) =>
+    recordLegalAcceptance(tx, { clerkId: clerkUserId, version, source, acceptedAt }));
+  if (!found) {
     res.status(404).json({ error: "User not found — call POST /auth/sync first" });
     return;
   }
@@ -704,6 +651,12 @@ router.post(
           },
         } as const;
       }
+      if (accountType === "seller" && !bandMaySellOrEarn(existing.ageBand)) {
+        return {
+          status: 403,
+          body: { error: AGE_RESTRICTED_MESSAGE, code: "AGE_RESTRICTED" },
+        } as const;
+      }
       const hasIdentity =
         existing.name.trim().length >= 2 &&
         (existing.displayName?.trim().length ?? 0) >= 2 &&
@@ -718,6 +671,23 @@ router.post(
           body: {
             error: "Required onboarding profile fields are incomplete.",
             code: "ONBOARDING_PROFILE_INCOMPLETE",
+          },
+        } as const;
+      }
+
+      // Invite-only launch mode (feature flag `inviteOnlySignup`, off by
+      // default). Accounts that already finished onboarding returned above
+      // (grandfathered); platform staff bypass.
+      if (
+        existing.role !== "admin" &&
+        (await isInviteOnlyEnabled(tx)) &&
+        !(await hasRedeemedAccessCode(clerkUserId, tx))
+      ) {
+        return {
+          status: 403,
+          body: {
+            error: "An invite code is required to finish creating your account.",
+            code: "INVITE_REQUIRED",
           },
         } as const;
       }
@@ -860,6 +830,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
       res.status(400).json({ error: "accountType must be buyer or seller" });
       return;
     }
+    if (accountType === "seller" && await denyIfAgeRestricted(clerkId, res)) return;
     updates.accountType = accountType;
   }
   if (appThemeId !== undefined) updates.appThemeId = appThemeId;
@@ -870,29 +841,54 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   if (tags         !== undefined) updates.tags         = tags;
   if (socialLinks  !== undefined) updates.socialLinks   = socialLinks;
 
-  // Username: format + uniqueness check
+  // Username: format + uniqueness check + 30-day change cooldown
   if (username !== undefined) {
     const uname = String(username).trim().toLowerCase();
-    if (uname === "") {
-      // Allow clearing username
-      updates.username = null;
-    } else {
+    if (uname !== "") {
       const fmtErr = validateUsername(uname);
       if (fmtErr) {
         res.status(400).json({ error: fmtErr });
         return;
       }
-      // Check uniqueness — skip if this user already owns it
-      const [taken] = await db
-        .select({ clerkId: users.clerkId })
-        .from(users)
-        .where(eq(sql`lower(${users.username})`, uname))
-        .limit(1);
-      if (taken && taken.clerkId !== clerkId) {
-        res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
-        return;
+    }
+    const [existingHandle] = await db
+      .select({ username: users.username, usernameChangedAt: users.usernameChangedAt })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    const decision = decideUsernameChange({
+      current: existingHandle?.username ?? null,
+      requested: uname,
+      changedAt: existingHandle?.usernameChangedAt ?? null,
+    });
+    if (decision.kind === "blocked") {
+      const retryAfterSec = Math.max(1, Math.ceil((decision.nextChangeAt.getTime() - Date.now()) / 1000));
+      res.setHeader("Retry-After", String(retryAfterSec));
+      res.status(429).json({
+        error: "You can change your username once every 30 days.",
+        code: "USERNAME_COOLDOWN",
+        nextChangeAt: decision.nextChangeAt.toISOString(),
+      });
+      return;
+    }
+    if (decision.kind === "allowed") {
+      if (uname === "") {
+        // Allow clearing username
+        updates.username = null;
+      } else {
+        // Check uniqueness — skip if this user already owns it
+        const [taken] = await db
+          .select({ clerkId: users.clerkId })
+          .from(users)
+          .where(eq(sql`lower(${users.username})`, uname))
+          .limit(1);
+        if (taken && taken.clerkId !== clerkId) {
+          res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
+          return;
+        }
+        updates.username = uname;
       }
-      updates.username = uname;
+      if (decision.stamp) updates.usernameChangedAt = new Date();
     }
   }
 
@@ -907,7 +903,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
       res.status(404).json({ error: "User not found" });
       return;
     }
-    res.json(updated);
+    res.json({ ...updated, usernameNextChangeAt: usernameNextChangeAt(updated.usernameChangedAt)?.toISOString() ?? null });
   } catch (err) {
     // The pre-check above has a race window; the DB's own unique index is
     // the real guarantee. Map its violation to the same 409 the pre-check gives.
@@ -930,6 +926,28 @@ router.get("/username/check", requireAuth, async (req, res) => {
   const fmtErr = validateUsername(raw);
   if (fmtErr) {
     res.json({ available: false, error: fmtErr });
+    return;
+  }
+
+  // The 30-day @handle change cooldown surfaces here so the edit screens can
+  // explain it inline before anyone taps Save.
+  const [ownHandle] = await db
+    .select({ username: users.username, usernameChangedAt: users.usernameChangedAt })
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+  const cooldown = decideUsernameChange({
+    current: ownHandle?.username ?? null,
+    requested: raw,
+    changedAt: ownHandle?.usernameChangedAt ?? null,
+  });
+  if (cooldown.kind === "blocked") {
+    res.json({
+      available: false,
+      code: "USERNAME_COOLDOWN",
+      nextChangeAt: cooldown.nextChangeAt.toISOString(),
+      error: "You can change your username once every 30 days.",
+    });
     return;
   }
 
@@ -1011,11 +1029,15 @@ router.get("/account-types", requireAuth, async (req, res) => {
 router.get("/privacy", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const [user] = await db
-    .select({ dmPrivacy: users.dmPrivacy })
+    .select({ dmPrivacy: users.dmPrivacy, isPrivate: users.isPrivate, accountType: users.accountType })
     .from(users)
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
-  res.json({ dmPrivacy: user?.dmPrivacy ?? "requests" });
+  res.json({
+    dmPrivacy: user?.dmPrivacy ?? "requests",
+    isPrivate: user?.isPrivate ?? false,
+    canBePrivate: user?.accountType === "buyer",
+  });
 });
 
 // ─── PATCH /api/auth/privacy ─────────────────────────────────────────────────
@@ -1023,7 +1045,7 @@ router.get("/privacy", requireAuth, async (req, res) => {
 // — add more fields here as the product grows.
 router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
-  const { dmPrivacy } = req.body as { dmPrivacy?: string };
+  const { dmPrivacy, isPrivate } = req.body as { dmPrivacy?: string; isPrivate?: boolean };
 
   const validDmPrivacy = ["requests", "followers_only"];
   if (dmPrivacy !== undefined && !validDmPrivacy.includes(dmPrivacy)) {
@@ -1034,13 +1056,25 @@ router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema 
   const updates: Record<string, any> = { updatedAt: new Date() };
   if (dmPrivacy !== undefined) updates.dmPrivacy = dmPrivacy;
 
+  if (isPrivate !== undefined) {
+    const outcome = await applyPrivateAccountToggle(clerkUserId, isPrivate, updates);
+    if (outcome.status === "forbidden") {
+      res.status(403).json({ error: "Only buyer accounts can be private.", code: "PRIVATE_NOT_ALLOWED" });
+      return;
+    }
+    if (outcome.status === "opened") {
+      res.json({ dmPrivacy: outcome.row?.dmPrivacy ?? "requests", isPrivate: outcome.row?.isPrivate ?? false });
+      return;
+    }
+  }
+
   const [updated] = await db
     .update(users)
     .set(updates)
     .where(eq(users.clerkId, clerkUserId))
-    .returning({ dmPrivacy: users.dmPrivacy });
+    .returning({ dmPrivacy: users.dmPrivacy, isPrivate: users.isPrivate });
 
-  res.json({ dmPrivacy: updated?.dmPrivacy ?? "requests" });
+  res.json({ dmPrivacy: updated?.dmPrivacy ?? "requests", isPrivate: updated?.isPrivate ?? false });
 });
 
 // ─── GET /api/auth/feed-gestures-tip ──────────────────────────────────────────
@@ -1092,7 +1126,7 @@ router.get("/me", requireAuth, async (req, res) => {
     res.status(404).json({ error: "User not found — call POST /auth/sync first" });
     return;
   }
-  res.json(user);
+  res.json({ ...user, usernameNextChangeAt: usernameNextChangeAt(user.usernameChangedAt)?.toISOString() ?? null });
 });
 
 // ─── POST /api/auth/password-reset/request ──────────────────────────────────

@@ -548,7 +548,7 @@ const SELLER_QUOTE_REQUESTS = [
   { id: 'qr-3', manufacturerId: MANUFACTURERS[1].id, productName: 'Garment-Dyed Hoodie — Moss', status: 'submitted', type: 'bulk', quantity: 400, createdAt: iso(2 * DAY), updatedAt: iso(2 * DAY) },
 ];
 
-const SAMPLE_ORDERS = [
+export const SAMPLE_ORDERS = [
   { id: 'so-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'Heavyweight Hoodie — Bone', status: 'delivered', orderType: 'sample', priceCents: 8500, quantity: 1, revision: 2, threadId: 'th-1', createdAt: iso(21 * DAY), updatedAt: iso(3 * DAY) },
   { id: 'so-2', manufacturerId: MANUFACTURERS[2].id, manufacturerName: 'Harbour Outerwear', title: 'Field Shell Proto', status: 'cut_and_sew', orderType: 'sample', priceCents: 14000, quantity: 1, revision: 1, createdAt: iso(10 * DAY), updatedAt: iso(2 * DAY) },
   { id: 'bo-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'FW26 Core Hoodie Run', status: 'cut_and_sew', orderType: 'bulk', priceCents: 1680000, quantity: 300, revision: 3, threadId: 'th-1', createdAt: iso(33 * DAY), updatedAt: iso(4 * DAY) },
@@ -670,12 +670,12 @@ export function respond({ method, path, query, role, options = {} }) {
   // GET /api/communities/public — the real seeded rows from migration 110.
   if (p === '/communities/public') {
     const launch = [
-      ['Graphic Design Community', 'graphic-design', 'pen-tool', 'Logos, type, layouts and print-ready files. Share work, get feedback.', 12480],
-      ['Photography & Content', 'photography-content', 'camera', 'Product shots, lookbooks, reels and everything content.', 8915],
-      ['Ads & Marketing', 'ads-marketing', 'trending-up', "What's converting, what's not, and the tactics behind it.", 10342],
-      ['Creative Direction', 'creative-direction', 'compass', 'Concepts, moodboards and building a brand people remember.', 5207],
-      ['Streetwear Founders', 'streetwear-founders', 'shopping-bag', 'Founders talking drops, pricing and growing a label.', 9861],
-      ['Sourcing & Manufacturing', 'sourcing-manufacturing', 'package', 'Factories, fabrics, samples and getting production right.', 6733],
+      ['Graphic Design Community', 'graphic-design', 'pen-tool', 'Logos, type, layouts and print-ready files.', 12480],
+      ['Photography & Content', 'photography-content', 'camera', 'Product shots, lookbooks, reels and content.', 8915],
+      ['Ads & Marketing', 'ads-marketing', 'trending-up', "What's converting, what's not, and why.", 10342],
+      ['Creative Direction', 'creative-direction', 'compass', 'Concepts, moodboards and memorable brands.', 5207],
+      ['Streetwear Founders', 'streetwear-founders', 'shopping-bag', 'Drops, pricing and growing a label.', 9861],
+      ['Sourcing & Manufacturing', 'sourcing-manufacturing', 'package', 'Factories, fabrics, samples and production.', 6733],
     ];
     return {
       communities: launch.map(([name, slug, iconKey, description, memberCount]) => ({
@@ -830,6 +830,7 @@ export function respond({ method, path, query, role, options = {} }) {
   // distinct from /api/seller/notification-prefs) — unseeded, it 404'd on
   // load. Matches notification-prefs.ts's GET / response shape.
   if (p === '/notification-prefs') {
+    const SELLER_PREF_KEYS = ['new_orders', 'production_milestones', 'payout_confirmations', 'customer_messages', 'disputes', 'subscription_trial', 'inventory_alerts'];
     return {
       digest: 'realtime',
       role: 'seller',
@@ -838,6 +839,11 @@ export function respond({ method, path, query, role, options = {} }) {
       categories: {
         new_orders: true, production_milestones: true, payout_confirmations: true,
         customer_messages: true, disputes: true, subscription_trial: true, inventory_alerts: true,
+      },
+      channels: {
+        push: Object.fromEntries(SELLER_PREF_KEYS.map((k) => [k, true])),
+        inApp: Object.fromEntries(SELLER_PREF_KEYS.map((k) => [k, true])),
+        email: Object.fromEntries(SELLER_PREF_KEYS.map((k) => [k, !['customer_messages', 'inventory_alerts'].includes(k)])),
       },
     };
   }
@@ -1239,6 +1245,9 @@ export function respond({ method, path, query, role, options = {} }) {
     };
   }
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
+  // Shared first-run-tips seen-state read on every seller screen; nothing seen,
+  // nothing skipped (tips stay off in previews unless ?tips=1 — see lib/firstRunTips/rules.ts).
+  if (p === '/first-run-tips/seen') return { seenTipIds: [], skipAll: false };
   // Seller dashboard's secondary (range-independent) fetch group, plus
   // lib/appStartPrefetch.ts's warmSellerTabs() app-boot prefetch — without
   // these seeded, api.products.list()/api.inventory.list()/api.analytics
@@ -1247,7 +1256,7 @@ export function respond({ method, path, query, role, options = {} }) {
   // role/account this fixture wasn't written for) can leave
   // SellerDashboardTrafficSources-adjacent state undefined. Real seller
   // products/inventory/top-sellers, not fabricated for this response alone.
-  if (p === '/products') return role === 'seller' ? SELLER_PRODUCTS : [];
+  if (p === '/products') return role === 'seller' && !options.emptyProducts ? SELLER_PRODUCTS : [];
   if (p === '/inventory') return role === 'seller' ? SELLER_PRODUCTS.map((product) => product.inventory) : [];
   if (p === '/analytics/products') return role === 'seller'
     ? SELLER_PRODUCTS.filter((product) => product.totalRevenueCents > 0).map((product) => ({

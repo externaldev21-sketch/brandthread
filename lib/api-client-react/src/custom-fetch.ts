@@ -17,6 +17,7 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _requestGuard: (() => boolean) | null = null;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -42,6 +43,11 @@ export function setBaseUrl(url: string | null): void {
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+/** Optional client-side guard for dev-only offline preview modes. */
+export function setRequestGuard(guard: (() => boolean) | null): void {
+  _requestGuard = guard;
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -326,6 +332,9 @@ export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
 ): Promise<T> {
+  if (_requestGuard?.()) {
+    throw new Error('This action is unavailable in the signed-out seller preview.');
+  }
   input = applyBaseUrl(input);
   const { responseType = "auto", headers: headersInit, ...init } = options;
 

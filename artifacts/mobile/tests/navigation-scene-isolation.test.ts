@@ -8,12 +8,15 @@ const read = (relativePath: string) =>
 describe('navigation scene isolation', () => {
   it('gives every root-stack scene one opaque background plane', () => {
     const rootLayout = read('app/_layout.tsx');
-    const layoutStart = rootLayout.indexOf('screenLayout={({ children }) => (');
+    const layoutStart = rootLayout.indexOf('screenLayout={({ children, route, options }) => (');
     const stackOptions = rootLayout.indexOf('screenOptions={{', layoutStart);
 
     expect(layoutStart).toBeGreaterThan(-1);
-    expect(rootLayout.slice(layoutStart, stackOptions)).toContain(
-      '<IsolatedStackScene>{children}</IsolatedStackScene>',
+    // Still exactly one opaque plane per scene — the scene now also gets the
+    // route name/presentation so pushed seller screens can clear the
+    // floating tab bar (components/layout/ScreenChrome.tsx).
+    expect(rootLayout.slice(layoutStart, stackOptions)).toMatch(
+      /<IsolatedStackScene routeName=\{route\.name\}[^>]*>\s*\{children\}\s*<\/IsolatedStackScene>/,
     );
     expect(rootLayout).toContain('backgroundColor: palette.background');
     expect(rootLayout).toContain('contentStyle: OPAQUE_SCREEN_CONTENT');

@@ -2,8 +2,11 @@
  * Public (unauthenticated) product browsing endpoints for buyers.
  * Mounted at /api/public — no requireAuth middleware.
  */
+import { attachQuoteData } from "../lib/quotedPosts";
 import { Router } from "express";
+import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
+import { resolveDevice } from "../lib/sellerInsights";
 import { db, readDb, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
 import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
@@ -15,18 +18,20 @@ import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { buildFacets, parseSearchFilters, type FacetRow } from "../lib/searchFilters";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
-import { isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
+import { blockedUserIds, isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
 import {
   paginationMetadata,
   parsePagination,
   setPaginationHeaders,
 } from "../lib/pagination";
-import { setPublicCacheHeaders } from "../lib/httpCache";
+import { setPublicCacheHeaders, setViewerScopedCacheHeaders } from "../lib/httpCache";
+import { applySalesToVariants } from "../lib/pricing/salesRuntime";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -62,13 +67,14 @@ export async function resolveToClerkId(
       clerkId:     users.clerkId,
       accountType: users.accountType,
       deletedAt:   users.deletedAt,
+      deletionRequestedAt: users.deletionRequestedAt,
     })
     .from(users)
     .where(isUuid ? eq(users.id, idOrClerkId) : eq(users.clerkId, idOrClerkId))
     .limit(1);
 
   if (!user) return null;
-  if (user.deletedAt) return null;
+  if (user.deletedAt || user.deletionRequestedAt) return null;
   if (requiredAccountType && user.accountType !== requiredAccountType) return null;
   return user.clerkId;
 }
@@ -119,7 +125,10 @@ export function rankRelatedProducts<T extends {
 // Optional query params: ?category=apparel&tag=streetwear&ownerId=user_xxx&limit=50&offset=0
 router.get("/products", async (req, res) => {
   try {
-    setPublicCacheHeaders(res);
+    // Block-aware: a signed-in viewer's list omits blocked sellers, so it
+    // must not be shared-cached.
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const category = singleQueryValue(req.query.category);
     const tag = singleQueryValue(req.query.tag);
     const ownerId = singleQueryValue(req.query.ownerId);
@@ -151,6 +160,7 @@ router.get("/products", async (req, res) => {
       eq(products.status, "active"),
       isNull(products.deletedAt),
       resolvedOwnerId ? eq(products.ownerId, resolvedOwnerId) : undefined,
+      notBlockedWith(viewerId, products.ownerId),
       category ? eq(products.category, category) : undefined,
       tag
         ? or(
@@ -204,10 +214,10 @@ router.get("/products", async (req, res) => {
         })
         .catch(() => {});
     }
-    const variants = await db
+    const variants = await applySalesToVariants(filtered, await db
       .select()
       .from(productVariants)
-      .where(inArray(productVariants.productId, productIds));
+      .where(inArray(productVariants.productId, productIds)));
 
     const variantsByProduct: Record<string, typeof variants> = {};
     for (const v of variants) {
@@ -251,16 +261,18 @@ router.get("/products/high-demand", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
-    setPublicCacheHeaders(res);
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const activeProducts = await db.select().from(products)
-      .where(and(eq(products.status, "active"), isNull(products.deletedAt)));
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId)));
     if (activeProducts.length === 0) return res.json([]);
 
     const productIds = activeProducts.map((product) => product.id);
     const ownerIds = [...new Set(activeProducts.map((product) => product.ownerId))];
     const dropIds = [...new Set(activeProducts.map((product) => product.dropId).filter((id): id is string => Boolean(id)))];
     const [variantRows, sellerRows, dropRows, paidClaimRows] = await Promise.all([
-      db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
+      db.select().from(productVariants).where(inArray(productVariants.productId, productIds))
+        .then((rows) => applySalesToVariants(activeProducts, rows)),
       db.select({
         clerkId: users.clerkId,
         displayName: users.displayName,
@@ -337,7 +349,8 @@ router.get("/products/:id/videos", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
-    setPublicCacheHeaders(res);
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const rows = await db.select({
       postId: posts.id,
       mediaUrl: posts.mediaUrl,
@@ -354,6 +367,7 @@ router.get("/products/:id/videos", async (req, res) => {
         eq(postTaggedProducts.productId, req.params.id),
         eq(posts.mediaType, "video"),
         publicPostCondition(),
+        notBlockedWith(viewerId, posts.userId),
       ))
       .orderBy(desc(posts.createdAt))
       .limit(lim);
@@ -384,22 +398,24 @@ router.get("/products/:id/related", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
-    setPublicCacheHeaders(res);
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const [current] = await db.select().from(products)
-      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt))).limit(1);
+      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId))).limit(1);
     if (!current) return res.status(404).json({ error: "Product not found" });
 
     // Fetch the candidate set in one query and batch its dependent records below.
     // Ranking is application-side because tags/styleTags are JSON arrays.
     const candidates = await db.select().from(products)
-      .where(and(eq(products.status, "active"), isNull(products.deletedAt), ne(products.id, current.id)));
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt), ne(products.id, current.id), notBlockedWith(viewerId, products.ownerId)));
     const ranked = rankRelatedProducts(current, candidates).slice(0, lim);
     if (ranked.length === 0) return res.json([]);
 
     const productIds = ranked.map((product) => product.id);
     const ownerIds = [...new Set(ranked.map((product) => product.ownerId))];
     const [variants, sellerRows] = await Promise.all([
-      db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
+      db.select().from(productVariants).where(inArray(productVariants.productId, productIds))
+        .then((rows) => applySalesToVariants(ranked, rows)),
       db.select({ clerkId: users.clerkId, displayName: users.displayName })
         .from(users).where(inArray(users.clerkId, ownerIds)),
     ]);
@@ -421,11 +437,12 @@ router.get("/products/:id/related", async (req, res) => {
 // GET /api/public/products/:id
 router.get("/products/:id", async (req, res) => {
   try {
-    setPublicCacheHeaders(res);
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const [product] = await db
       .select()
       .from(products)
-      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt)))
+      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId)))
       .limit(1);
 
     if (!product) {
@@ -433,10 +450,10 @@ router.get("/products/:id", async (req, res) => {
       return;
     }
 
-    const variants = await db
+    const variants = await applySalesToVariants([product], await db
       .select()
       .from(productVariants)
-      .where(eq(productVariants.productId, product.id));
+      .where(eq(productVariants.productId, product.id)));
 
     // Attach seller display name
     const [seller] = await db
@@ -574,16 +591,15 @@ router.get("/search", async (req, res): Promise<void> => {
   try {
     const q = singleQueryValue(req.query.q);
     const sortValue = singleQueryValue(req.query.sort);
-    const category = singleQueryValue(req.query.category);
-    const sizeValue = singleQueryValue(req.query.size);
-    const brandValue = singleQueryValue(req.query.brand);
+    const filters = parseSearchFilters(req.query as Record<string, unknown>);
+    const wantFacets = req.query.facets === "1" || req.query.facets === "true";
     const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 20);
     const parsedOffset = parseNonNegativeInteger(req.query.offset, "offset", 0);
     const minPriceCents = req.query.minPriceCents === undefined
       ? undefined : parseNonNegativeInteger(req.query.minPriceCents, "minPriceCents");
     const maxPriceCents = req.query.maxPriceCents === undefined
       ? undefined : parseNonNegativeInteger(req.query.maxPriceCents, "maxPriceCents");
-    if (q === null || sortValue === null || category === null || sizeValue === null || brandValue === null ||
+    if (q === null || sortValue === null || filters === null ||
         typeof parsedLimit !== "number" || typeof parsedOffset !== "number" ||
         typeof minPriceCents === "object" || typeof maxPriceCents === "object") {
       res.status(400).json({ error: "Invalid search query values" }); return;
@@ -605,6 +621,23 @@ router.get("/search", async (req, res): Promise<void> => {
     const pattern = containsSearchPattern(term);
     const viewerId = optionalViewerId(req);
 
+    // Multi-value filters: values within one facet are OR'd, facets are AND'd.
+    // Size / colour / in-stock apply to the SAME variant (size M in black, in stock).
+    const lowerList = (vals: string[]) => sql.join(vals.map((v) => sql`${v.toLowerCase()}`), sql`, `);
+    const variantConds = [
+      filters.sizes.length ? sql`lower(pv.size) IN (${lowerList(filters.sizes)})` : undefined,
+      filters.colors.length ? sql`lower(pv.color) IN (${lowerList(filters.colors)})` : undefined,
+      filters.inStock ? sql`pv.stock > 0` : undefined,
+    ].filter((c): c is ReturnType<typeof sql> => c !== undefined);
+    const variantFilter = variantConds.length
+      ? sql`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = ${products.id} AND ${sql.join(variantConds, sql` AND `)})`
+      : undefined;
+    const brandFilter = filters.brands.length
+      ? sql`EXISTS (SELECT 1 FROM users bu WHERE bu.clerk_id = ${products.ownerId}
+          AND (${sql.join(filters.brands.map((b) => sql`(bu.clerk_id = ${b} OR bu.brand_name ILIKE ${containsSearchPattern(b)})`), sql` OR `)}))`
+      : undefined;
+    const categoryFilter = filters.categories.length ? inArray(products.category, filters.categories) : undefined;
+
     // Do not SQL-limit joined variants: first collapse each product to its
     // lowest price, then filter/sort products, and only then apply the limit.
     const productPrice = sql<number>`min(${productVariants.priceCents})`;
@@ -620,7 +653,7 @@ router.get("/search", async (req, res): Promise<void> => {
           eq(users.accountType, "seller"),
           eq(users.isSystemAccount, false),
           isNull(users.suspendedAt),
-          isNull(users.deletedAt),
+          isNull(users.deletedAt), isNull(users.deletionRequestedAt),
           notBlockedWith(viewerId, users.clerkId),
           or(
             trgmMatch(users.displayName, term, pattern),
@@ -644,13 +677,10 @@ router.get("/search", async (req, res): Promise<void> => {
         .where(and(
           eq(products.status, "active"), isNull(products.deletedAt),
           trgmMatch(products.name, term, pattern),
-          category ? eq(products.category, category) : undefined,
+          categoryFilter,
           notBlockedWith(viewerId, products.ownerId),
-          sizeValue ? sql`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = ${products.id} AND pv.size ILIKE ${sizeValue})` : undefined,
-          brandValue ? sql`EXISTS (
-            SELECT 1 FROM users bu WHERE bu.clerk_id = ${products.ownerId}
-              AND (bu.clerk_id = ${brandValue} OR bu.brand_name ILIKE ${containsSearchPattern(normalizeSearchTerm(brandValue))})
-          )` : undefined,
+          variantFilter,
+          brandFilter,
           sql`NOT EXISTS (SELECT 1 FROM users su WHERE su.clerk_id = ${products.ownerId} AND su.suspended_at IS NOT NULL)`))
         .groupBy(products.id)
         .having(and(
@@ -686,7 +716,7 @@ router.get("/search", async (req, res): Promise<void> => {
           createdAt: posts.createdAt,
           relevance: relevanceScore(sql`COALESCE(${posts.caption}, '')`, term),
         }).from(posts)
-          .where(and(eq(posts.mediaType, "video"), publicPostCondition(), match))
+          .where(and(eq(posts.mediaType, "video"), publicPostCondition(new Date(), viewerId), notBlockedWith(viewerId, posts.userId), match))
           .orderBy(desc(relevanceScore(sql`COALESCE(${posts.caption}, '')`, term)), desc(posts.createdAt))
           .limit(VIDEO_SEARCH_PAGE);
         const exact = await videoQuery(sql`${ilike(posts.caption, pattern)}`);
@@ -837,9 +867,36 @@ router.get("/search", async (req, res): Promise<void> => {
     const total = results.length;
     const limited = results.slice(off, off + lim);
 
+    // Opt-in facets (?facets=1) for the filter sheet: options + counts for the
+    // current query, computed over the unfiltered product matches so the
+    // sheet keeps offering every choice. Additive; response shape unchanged otherwise.
+    let facets: ReturnType<typeof buildFacets> | undefined;
+    if (wantFacets) {
+      const facetRows = await db.select({
+        productId: products.id,
+        category: products.category,
+        ownerId: products.ownerId,
+        brandName: sql<string | null>`COALESCE(${users.brandName}, ${users.displayName})`,
+        size: productVariants.size,
+        color: productVariants.color,
+        priceCents: productVariants.priceCents,
+        stock: productVariants.stock,
+      }).from(products)
+        .innerJoin(productVariants, eq(productVariants.productId, products.id))
+        .leftJoin(users, eq(users.clerkId, products.ownerId))
+        .where(and(
+          eq(products.status, "active"), isNull(products.deletedAt),
+          fuzzyMatch(products.name, term, pattern),
+          notBlockedWith(viewerId, products.ownerId),
+          sql`NOT EXISTS (SELECT 1 FROM users su WHERE su.clerk_id = ${products.ownerId} AND su.suspended_at IS NOT NULL)`))
+        .limit(3000);
+      facets = buildFacets(facetRows as FacetRow[]);
+    }
+
     res.json({
       results: limited,
       pagination: paginationMetadata({ limit: lim, offset: off }, limited.length, total),
+      ...(facets ? { facets } : {}),
     });
   } catch (err) {
     req.log.error({ err }, "Public search failed");
@@ -911,7 +968,7 @@ router.get("/search/trending", async (req, res) => {
       db.select({ sellerId: follows.followingId, followerCount: count() })
         .from(follows)
         .innerJoin(users, eq(users.clerkId, follows.followingId))
-        .where(and(eq(users.accountType, "seller"), isNull(users.suspendedAt), isNull(users.deletedAt)))
+        .where(and(eq(users.accountType, "seller"), isNull(users.suspendedAt), isNull(users.deletedAt), isNull(users.deletionRequestedAt)))
         .groupBy(follows.followingId)
         .orderBy(desc(count()))
         .limit(lim),
@@ -1011,7 +1068,7 @@ router.get("/search/suggested", async (req, res) => {
         .where(and(
           eq(users.accountType, "seller"),
           isNull(users.suspendedAt),
-          isNull(users.deletedAt),
+          isNull(users.deletedAt), isNull(users.deletionRequestedAt),
           notBlockedWith(viewerId, follows.followingId),
         ))
         .groupBy(follows.followingId)
@@ -1172,7 +1229,7 @@ router.get("/brands/discover", async (req, res) => {
       .where(and(
         eq(users.accountType, "seller"),
         isNull(users.suspendedAt),
-        isNull(users.deletedAt),
+        isNull(users.deletedAt), isNull(users.deletionRequestedAt),
         eq(users.policyRestricted, false),
         notBlockedWith(viewerId, users.clerkId),
       ))
@@ -1279,7 +1336,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
   // real current price instead of guessing from a bare product row.
   const sellerProductIds = sellerProducts.map((p) => p.id);
   const sellerVariants = sellerProductIds.length > 0
-    ? await db.select().from(productVariants).where(inArray(productVariants.productId, sellerProductIds))
+    ? await applySalesToVariants(sellerProducts, await db.select().from(productVariants).where(inArray(productVariants.productId, sellerProductIds)))
     : [];
   const sellerVariantsByProduct: Record<string, typeof sellerVariants> = {};
   for (const v of sellerVariants) {
@@ -1590,6 +1647,9 @@ router.post("/sellers/:sellerId/store-visits", async (req, res): Promise<void> =
   const source = STORE_VISIT_SOURCES.has(rawSource) ? rawSource : "external";
   const rawProductId = typeof req.body?.productId === "string" ? req.body.productId : null;
   const productId = rawProductId && UUID_RE.test(rawProductId) ? rawProductId : null;
+  // Which client the visit came from (Audience report's device split): the
+  // app declares it, a browser is sniffed from its User-Agent.
+  const device = resolveDevice(req.body?.device, req.get("user-agent"));
   // Optional — a signed-out shopper still counts; getAuth() never throws when
   // there is no session, it just returns a null userId.
   const { userId: viewerUserId } = getAuth(req);
@@ -1610,6 +1670,7 @@ router.post("/sellers/:sellerId/store-visits", async (req, res): Promise<void> =
       productId,
       source,
       viewerUserId: viewerUserId ?? null,
+      device,
     });
     res.status(204).end();
   } catch (err) {
@@ -1642,6 +1703,7 @@ router.get("/posts", async (req, res) => {
         mediaType:   posts.mediaType,
         aspectRatio: posts.aspectRatio,
         caption:     posts.caption,
+        placeId:     posts.placeId,
         hashtags:    posts.hashtags,
         styleTags:   posts.styleTags,
         sound:       posts.sound,
@@ -1659,6 +1721,7 @@ router.get("/posts", async (req, res) => {
       .where(and(
         ownerId ? eq(posts.userId, ownerId) : undefined,
         eq(users.accountType, "seller"),
+        ownerId ? undefined : eq(posts.surface, "thread"),
         publicPostCondition(),
         notBlockedWith(viewerId, posts.userId),
       ))
@@ -1736,7 +1799,9 @@ router.get("/posts", async (req, res) => {
     for (const r of saveRows) if (r.postId) savesByPost[r.postId] = Number(r.cnt);
     const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
 
-    const result = rows.map((p) => ({
+    const locationById = await locationsByPlaceId(rows.map((p) => p.placeId));
+    const baseResult = rows.map((p) => ({
+      location:       p.placeId ? locationById.get(p.placeId) ?? null : null,
       id:             p.id,
       userId:         p.userId,
       mediaUrl:       p.mediaUrl,
@@ -1768,7 +1833,7 @@ router.get("/posts", async (req, res) => {
       commentsCount: commentsByPost[p.id] ?? 0,
     }));
 
-    return res.json(result);
+    return res.json(await attachQuoteData(baseResult, viewerId));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch public posts");
     return res.status(500).json({ error: "Failed to fetch posts" });
@@ -1786,7 +1851,10 @@ router.get("/trending", async (req, res) => {
   try {
     // Trending is recomputed at most once a day server-side; a longer client
     // cache window is safe and cuts repeat load meaningfully.
-    setPublicCacheHeaders(res, { maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300 });
+    const viewerId = optionalViewerId(req);
+    if (viewerId) setViewerScopedCacheHeaders(res, viewerId);
+    else setPublicCacheHeaders(res, { maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300 });
+    const blocked = await blockedUserIds(viewerId);
     const page = parsePagination(req.query, { limit: 20 });
     if (!page.success || page.data.limit > 50 || page.data.offset !== 0) {
       return res.status(400).json({ error: "Invalid trending query", code: "VALIDATION_ERROR" });
@@ -1802,7 +1870,7 @@ router.get("/trending", async (req, res) => {
       .limit(1);
 
     if (cached && isCacheFresh(cached.computedAt) && Array.isArray(cached.results) && cached.results.length > 0) {
-      const items = (cached.results as any[]).slice(0, lim).map((item: any, i: number) => ({
+      const items = (cached.results as any[]).filter((item: any) => !blocked.has(item.brandId)).slice(0, lim).map((item: any, i: number) => ({
         ...item,
         rank: i + 1,
       }));
@@ -1826,7 +1894,7 @@ router.get("/trending", async (req, res) => {
       .limit(1);
 
     if (fresh && Array.isArray(fresh.results)) {
-      const items = (fresh.results as any[]).slice(0, lim).map((item: any, i: number) => ({
+      const items = (fresh.results as any[]).filter((item: any) => !blocked.has(item.brandId)).slice(0, lim).map((item: any, i: number) => ({
         ...item,
         rank: i + 1,
       }));
@@ -1885,6 +1953,7 @@ router.get("/profiles/:username", async (req, res) => {
         profileImageUrl: users.profileImageUrl,
         verified:    users.verified,
         deletedAt:   users.deletedAt,
+        deletionRequestedAt: users.deletionRequestedAt,
         coverVideoUrl:  users.coverVideoUrl,
         coverPosterUrl: users.coverPosterUrl,
         coverVideoModerationStatus: users.coverVideoModerationStatus,
@@ -1901,7 +1970,7 @@ router.get("/profiles/:username", async (req, res) => {
     }
 
     // Tombstoned / deleted account.
-    if (user.deletedAt) {
+    if (user.deletedAt || user.deletionRequestedAt) {
       res.status(404).json({ error: "Profile not found" });
       return;
     }
@@ -1964,8 +2033,14 @@ router.get("/discover/feed", async (req, res) => {
     }
     const { limit, offset } = page.data;
     const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD' UTC
+    // Sellers with a block relationship to the viewer are dropped from the
+    // shared daily ranking per request; signed-in responses are not shared-cached.
+    const viewerId = optionalViewerId(req);
+    if (viewerId) setViewerScopedCacheHeaders(res, viewerId);
+    const blocked = await blockedUserIds(viewerId);
 
-    const paginate = (allItems: any[], source: "cache" | "computed") => {
+    const paginate = (rawItems: any[], source: "cache" | "computed") => {
+      const allItems = blocked.size ? rawItems.filter((item) => !blocked.has(item.brandId)) : rawItems;
       const items = allItems.slice(offset, offset + limit).map((item, i) => ({
         ...item,
         rank: offset + i + 1,

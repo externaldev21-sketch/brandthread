@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Delete your account | Brandthread</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 32px 20px 64px; background: #0a0a0b; color: #f7f7fa; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.5; }
+      main { max-width: 480px; margin: 0 auto; }
+      h1 { font-size: 24px; font-weight: 700; margin: 0 0 12px; text-wrap: balance; }
+      p, li { text-wrap: pretty; }
+      h2 { font-size: 15px; font-weight: 600; margin: 28px 0 8px; }
+      p, li { font-size: 15px; color: #c7cdd5; }
+      ul { padding-left: 20px; margin: 0; }
+      label { display: block; font-size: 14px; font-weight: 600; margin: 24px 0 8px; }
+      input { width: 100%; height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid #3a3d42; background: #141416; color: #f7f7fa; font: inherit; font-size: 16px; }
+      button { width: 100%; height: 48px; margin-top: 16px; border: 0; border-radius: 999px; background: #f7f7fa; color: #0a0a0b; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+      button[disabled] { opacity: 0.5; cursor: default; }
+      .status { margin-top: 16px; font-size: 14px; color: #f7f7fa; }
+      .error { color: #ff6b6b; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Delete your Brandthread account</h1>
+      <p>Use this page to permanently delete your Brandthread account without opening the app. You can also do it in the app under Settings, Delete account.</p>
+
+      <section id="request-view">
+        <label for="email">Email address of your account</label>
+        <input id="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" />
+        <button id="request-button" type="button">Send confirmation link</button>
+        <p class="status" id="request-status" role="status"></p>
+      </section>
+
+      <section id="confirm-view" hidden>
+        <label for="confirmation">Type DELETE to confirm</label>
+        <input id="confirmation" type="text" autocomplete="off" autocapitalize="characters" />
+        <button id="confirm-button" type="button" disabled>Permanently delete my account</button>
+        <p class="status" id="confirm-status" role="status"></p>
+      </section>
+
+      <h2>What is deleted</h2>
+      <ul>
+        <li>Your profile, username, photo and bio</li>
+        <li>Posts, comments, stories, likes, reposts and follows</li>
+        <li>Direct messages you sent</li>
+        <li>Saved items, cart, addresses and notification settings</li>
+        <li>For sellers: your storefront, product listings, discount codes and shipping settings</li>
+        <li>Your sign-in on every device</li>
+      </ul>
+      <h2>What we keep</h2>
+      <ul>
+        <li>Order, payment, refund and tax records, with your name and address removed, for as long as the law requires</li>
+        <li>Reports you made about other people's content, without your identity</li>
+      </ul>
+      <p>Open orders, funds held for drops and unresolved disputes must be settled first. If any apply, we tell you what to do.</p>
+      <p>Questions: support@brandthread.app</p>
+    </main>
+    <script>
+      (function () {
+        var token = new URLSearchParams(location.search).get('token');
+        var $ = function (id) { return document.getElementById(id); };
+
+        function post(path, body) {
+          return fetch('/api/public/account-deletion/' + path, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body)
+          }).then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (data) { return { ok: res.ok, data: data }; });
+          });
+        }
+
+        if (token) {
+          $('request-view').hidden = true;
+          $('confirm-view').hidden = false;
+          $('confirmation').addEventListener('input', function () {
+            $('confirm-button').disabled = $('confirmation').value !== 'DELETE';
+          });
+          $('confirm-button').addEventListener('click', function () {
+            var status = $('confirm-status');
+            status.className = 'status';
+            status.textContent = '';
+            $('confirm-button').disabled = true;
+            post('confirm', { token: token, confirmation: $('confirmation').value }).then(function (r) {
+              if (r.ok) {
+                $('confirm-view').hidden = true;
+                $('request-view').hidden = false;
+                $('email').hidden = true;
+                document.querySelector('label[for="email"]').hidden = true;
+                $('request-button').hidden = true;
+                $('request-status').textContent = 'Your account has been deleted.';
+                return;
+              }
+              status.className = 'status error';
+              var blockers = r.data && r.data.blockers;
+              status.textContent = (r.data && r.data.error) || 'We could not complete the deletion. Try again.';
+              if (blockers && blockers.length) {
+                status.textContent += ' ' + blockers.map(function (b) { return b.title + ': ' + b.detail; }).join(' ');
+              }
+              $('confirm-button').disabled = $('confirmation').value !== 'DELETE';
+            }).catch(function () {
+              status.className = 'status error';
+              status.textContent = 'We could not reach Brandthread. Check your connection and try again.';
+              $('confirm-button').disabled = false;
+            });
+          });
+        } else {
+          $('request-button').addEventListener('click', function () {
+            var status = $('request-status');
+            var email = $('email').value.trim();
+            status.className = 'status';
+            if (!email) { status.className = 'status error'; status.textContent = 'Enter the email address of your account.'; return; }
+            $('request-button').disabled = true;
+            post('request', { email: email }).then(function (r) {
+              status.className = r.ok ? 'status' : 'status error';
+              status.textContent = r.ok ? r.data.message : ((r.data && r.data.error) || 'Something went wrong. Try again.');
+            }).catch(function () {
+              status.className = 'status error';
+              status.textContent = 'We could not reach Brandthread. Check your connection and try again.';
+            }).then(function () { $('request-button').disabled = false; });
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

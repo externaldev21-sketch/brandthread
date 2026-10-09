@@ -16,6 +16,8 @@ import type { AdCampaign } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { ListRow } from '@/components/ui/ListRow';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -37,6 +39,7 @@ type DiscountCode = {
 type ReferralStats = {
   total: number;
   pointsEarned: number;
+  earnedCents: number;
 };
 
 function formatCount(n: number): string {
@@ -80,7 +83,8 @@ export default function MarketingScreen() {
   const [reloadToken, setReloadToken] = useState(0);
   const retryAll = useCallback(() => setReloadToken((n) => n + 1), []);
 
-  const bottomPad = Platform.OS === 'web' ? 34 : 0;
+  // Content ends above the floating tab bar (shared app-wide rule).
+  const tabBarClearance = useTabBarClearance(2);
 
   useFocusEffect(
     useCallback(() => {
@@ -101,7 +105,7 @@ export default function MarketingScreen() {
         .then((res) => { if (!cancelled) { setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); setDiscountsError(false); } })
         .catch(() => { if (!cancelled) { setDiscounts([]); setDiscountsError(!isSellerDevPreview()); } });
       api.referrals.stats()
-        .then((res) => { if (!cancelled) setReferrals({ total: res.total ?? 0, pointsEarned: res.pointsEarned ?? 0 }); })
+        .then((res) => { if (!cancelled) setReferrals({ total: res.total ?? 0, pointsEarned: res.pointsEarned ?? 0, earnedCents: res.earnedCents ?? 0 }); })
         .catch(() => { if (!cancelled) setReferrals(null); });
       return () => { cancelled = true; };
     }, [api, reloadToken]),
@@ -130,7 +134,7 @@ export default function MarketingScreen() {
     <ScrollView
       ref={scrollResetRef}
       style={[styles.container, { backgroundColor: 'transparent' }]}
-      contentContainerStyle={{ paddingTop: 16, paddingBottom: bottomPad + 120, paddingHorizontal: 16 }}
+      contentContainerStyle={{ paddingTop: 16, paddingBottom: tabBarClearance, paddingHorizontal: 16 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Stats Row — flat, no card/border boxes; a single hairline divider
@@ -272,13 +276,69 @@ export default function MarketingScreen() {
           <Text style={[styles.referralTitle, { color: colors.foreground }]}>Invite and earn</Text>
           <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>
             {referrals == null
-              ? 'Share your invite link'
+              ? 'Give $10, get $10 Thread Cash'
               : referrals.total > 0
-                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts earned`
+                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts${referrals.earnedCents > 0 ? ` · $${(referrals.earnedCents / 100).toFixed(0)} Thread Cash` : ''} earned`
                 : 'No referrals yet'}
           </Text>
         </View>
         <Feather name="chevron-right" size={16} color={colors.primary} />
+      </TouchableOpacity>
+
+      {/* Growth: tracked links, link in bio, store pixels */}
+      <SectionHeader title="Growth" />
+      <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
+        <ListRow icon="link" title="Links" subtitle="Trackable links with clicks and sales" chevron onPress={() => router.push('/growth-links' as never)} />
+        <ListRow icon="user" title="Link in bio" subtitle="Your shareable page" chevron onPress={() => router.push('/link-in-bio' as never)} />
+        <ListRow icon="activity" title="Pixels" subtitle="Meta and TikTok" chevron onPress={() => router.push('/store-pixels' as never)} />
+      </View>
+
+      {/* Email campaigns — list capture from the store site + campaign composer */}
+      <SectionHeader title="Email" />
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/email-campaigns' as never); }}
+        accessibilityRole="button"
+        accessibilityLabel="Email campaigns and audience"
+        style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      >
+        <Feather name="mail" size={24} color={colors.foreground} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.referralTitle, { color: colors.foreground }]}>Email campaigns</Text>
+          <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>Grow your list and send to subscribers</Text>
+        </View>
+        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      </TouchableOpacity>
+
+      {/* Follower push + giveaways */}
+      <SectionHeader title="Reach your followers" />
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/seller-push-broadcast' as never); }}
+        style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Follower push"
+      >
+        <Feather name="bell" size={24} color={colors.foreground} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.referralTitle, { color: colors.foreground }]}>Follower push</Text>
+          <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>One push to your followers per day</Text>
+        </View>
+        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/seller-giveaways' as never); }}
+        style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Giveaways"
+      >
+        <Feather name="gift" size={24} color={colors.foreground} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.referralTitle, { color: colors.foreground }]}>Giveaways</Text>
+          <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>Follow and comment to enter</Text>
+        </View>
+        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
       </TouchableOpacity>
     </ScrollView>
     </View>

@@ -48,6 +48,8 @@ vi.mock('@expo/vector-icons', () => ({
 vi.mock('react-native-svg', () => ({
   default: nativeComponent('Svg'),
   Line: nativeComponent('Line'),
+  // The shared empty-state badge (components/layout/EmptyStateBadge.tsx) draws with these.
+  ...Object.fromEntries(['G', 'Path', 'Rect', 'Circle', 'Polyline', 'Polygon', 'Ellipse'].map((n) => [n, nativeComponent(n)])),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),

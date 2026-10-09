@@ -24,7 +24,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { BG, FG, MUTED, BORDER, CARD, FONT, FS, SP, RADIUS, ICON, GRAD_DARK_FADE } from '@/lib/theme';
+import { BG, FG, MUTED, BORDER, CARD, FONT, FS, SP, ICON, GRAD_DARK_FADE } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 const PRIMARY_HEIGHT = 52;
 
@@ -131,7 +132,7 @@ const pS = StyleSheet.create({
     justifyContent: 'center',
     gap: SP.sm,
     height: PRIMARY_HEIGHT,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     backgroundColor: FG,
     paddingHorizontal: SP.lg,
   },
@@ -188,7 +189,7 @@ const sS = StyleSheet.create({
   rootOutline: {
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
   },
   rootDisabled: {
     opacity: 0.5,

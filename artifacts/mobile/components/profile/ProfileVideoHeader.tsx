@@ -31,6 +31,7 @@ import { hapticSelection } from '@/lib/haptics';
 import { loadBuyerSettings } from '@/lib/buyerSettings';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import type { ProfileStat } from './ProfileControls';
+import { radius } from '@/constants/radii';
 
 /** Share of the video layer's height (from the bottom) covered by the fade. */
 export const PROFILE_VIDEO_FADE_FRACTION = 0.4;
@@ -72,6 +73,7 @@ export function ProfileVideoHeader({
   nameAccessory,
   handle,
   chip,
+  chips,
   meta,
   coverAffordance,
   stats,
@@ -91,7 +93,11 @@ export function ProfileVideoHeader({
   /** Inline after the name (e.g. a verified check). */
   nameAccessory?: React.ReactNode;
   handle?: string | null;
+  /** Inline after the handle (the buyer profile's layout — unchanged). */
   chip?: React.ReactNode;
+  /** Stacked vertically under the handle, left-aligned (Dev's seller-
+   *  profile layout: "Seller" on top, the plan chip directly below). */
+  chips?: React.ReactNode[];
   meta?: React.ReactNode;
   coverAffordance?: React.ReactNode;
   stats: ProfileStat[];
@@ -159,9 +165,12 @@ export function ProfileVideoHeader({
         </Text>
         {(handle || chip) ? (
           <View style={styles.handleRow}>
-            {handle ? <Text style={[styles.handle, { color: theme.muted }]} numberOfLines={1}>{handle}</Text> : null}
+            {handle ? <Text style={[styles.handle, chips ? styles.handleCompact : null, { color: theme.muted }]} numberOfLines={1}>{handle}</Text> : null}
             {chip}
           </View>
+        ) : null}
+        {chips && chips.length > 0 ? (
+          <View style={styles.chipStack} testID="profile-identity-chips">{chips}</View>
         ) : null}
         {meta ? <View style={styles.meta}>{meta}</View> : null}
         {coverAffordance ? <View style={styles.coverRow}>{coverAffordance}</View> : null}
@@ -269,12 +278,16 @@ const styles = StyleSheet.create({
   name: { fontFamily: FONT.bold, fontSize: 18, lineHeight: 23, letterSpacing: -0.3 },
   handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm, marginTop: 4 },
   handle: { fontFamily: FONT.medium, fontSize: 14, lineHeight: 18, flexShrink: 1 },
+  // Seller own profile (stacked-chips layout): a smaller handle under the name.
+  handleCompact: { fontSize: 13, lineHeight: 17 },
+  // Chips stacked vertically, left-aligned, one gap apart.
+  chipStack: { marginTop: 6, gap: 6, alignItems: 'flex-start' },
   meta: { paddingTop: 8, gap: 2 },
   coverRow: { paddingTop: 10, alignItems: 'flex-start' },
 
   affordance: {
     flexDirection: 'row', alignItems: 'center', gap: 4, height: 26,
-    borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10,
+    borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10,
   },
   affordancePressed: { opacity: 0.6 },
   affordanceText: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },

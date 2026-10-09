@@ -72,7 +72,7 @@ export function RecentlyViewedRow({ style }: { style?: object }) {
                 <Feather name="image" size={18} color={theme.muted} />
               </View>
             )}
-            <Text style={[s.name, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+            <Text style={[s.name, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
             {item.priceCents != null && (
               <Text style={[s.price, { color: theme.muted }]}>{formatCents(item.priceCents)}</Text>
             )}
@@ -90,6 +90,8 @@ const s = StyleSheet.create({
   },
   card: { width: 104 },
   image: { width: 104, height: 104, borderRadius: RADIUS.md },
-  name: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: 6 },
+  // Two fixed lines so long product names wrap instead of clipping with an ellipsis,
+  // and every card in the row stays the same height.
+  name: { fontSize: FS.xs, lineHeight: 15, height: 30, fontFamily: FONT.medium, marginTop: 6 },
   price: { fontSize: FS.xs, fontFamily: FONT.bold, marginTop: 2 },
 });

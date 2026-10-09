@@ -231,6 +231,27 @@ export function useBuyerTabBarInset(mode: BuyerTabBarMode = 'regular'): number {
   return useBuyerTabBarMetrics(1, mode).occupiedHeight;
 }
 
+/** Gap kept between the last scrolled content and the bar (Dev's rule: "+ 16"). */
+const CONTENT_CLEARANCE_GAP = 16;
+
+/**
+ * THE bottom padding for scroll content on any screen that renders behind
+ * the floating tab bar, so nothing ever ends under or behind it. Dev's
+ * rule: tab bar height + bottom safe inset + 16 — and never less than the
+ * bar's own `occupiedHeight` + 16, since on a device with no bottom inset
+ * the bar floats 12px up from the edge and the bare formula would leave
+ * only 4px above it. `sideCircleCount` is 1 for the buyer bar, 2 for the
+ * seller bar (Studio + AI circles), same as useBuyerTabBarMetrics.
+ */
+export function useTabBarClearance(sideCircleCount = 1, mode: BuyerTabBarMode = 'regular'): number {
+  const insets = useSafeAreaInsets();
+  const metrics = useBuyerTabBarMetrics(sideCircleCount, mode);
+  return Math.max(
+    metrics.capsuleHeight + insets.bottom + CONTENT_CLEARANCE_GAP,
+    metrics.occupiedHeight + CONTENT_CLEARANCE_GAP,
+  );
+}
+
 /**
  * Height, from the bottom of the screen, of the bar's own visible top edge —
  * "the line" a Reels/TikTok-style immersive video frame stops at. See

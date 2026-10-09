@@ -20,6 +20,7 @@ import { Order, RefundType } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
 import { adaptApiOrder } from '@/app/order-detail';
+import { radius } from '@/constants/radii';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -393,7 +394,7 @@ const styles = StyleSheet.create({
   chipRow:        { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.xs },
   chip:           {
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderRadius: RADIUS.pill, backgroundColor: CARD,
+    borderRadius: radius.sm, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
   },
   chipActive:     { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },

@@ -8,6 +8,7 @@ import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth, useUser } from '@clerk/expo';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, FeedSkeleton, EmptyState } from '@/components/BrandthreadUI';
@@ -30,6 +31,7 @@ import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_STORIES, PREVIEW_FOLLOWING, PREVIEW_FRIEND_ACTIVITY } from '@/lib/previewFriends';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 type ApiFollowing = {
   userId: string; name: string; username: string | null;
@@ -70,6 +72,7 @@ function PostCard({
   onNotInterested: (post: BuyerPost) => void;
 }) {
   const router = useRouter();
+  const { openReport } = useReportSheet();
   const { theme } = useAppTheme();
   const palette = useColors();
 
@@ -99,9 +102,13 @@ function PostCard({
               {
                 text: 'Report',
                 onPress: () =>
-                  router.push(
-                    `/buyer-report?targetType=post&targetId=${post.id}&targetLabel=Post` as never,
-                  ),
+                  openReport({
+                    targetType: 'post',
+                    targetId: post.id,
+                    label: 'Post',
+                    ownerId: post.authorId,
+                    ownerName: post.authorName,
+                  }),
               },
               { text: 'Not interested', onPress: () => onNotInterested(post) },
               { text: 'Cancel', style: 'cancel' },
@@ -111,7 +118,7 @@ function PostCard({
       </View>
 
       {/* Media */}
-      <PressableScale onPress={() => onOpenComments(post)} style={s.mediaPress}>
+      <PressableScale accessibilityLabel="Open comments" onPress={() => onOpenComments(post)} style={s.mediaPress}>
         {post.mediaUrl ? (
           <CachedImage source={{ uri: post.mediaUrl }} style={s.media} contentFit="cover" />
         ) : (
@@ -276,6 +283,7 @@ export default function FriendsScreen() {
   }
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
+  const pull = usePullToRefresh(loadData);
 
   useEffect(() => {
     const unsub = subscribeSocial(() => { loadData(); });
@@ -580,6 +588,7 @@ export default function FriendsScreen() {
           ref={scrollResetRef}
           data={feedPosts}
           keyExtractor={p => p.id}
+          refreshControl={pull.refreshControl}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: barInset + SPACING.md }}
           ListEmptyComponent={loading ? <FeedSkeleton /> : null}

@@ -105,7 +105,10 @@ const styles = StyleSheet.create({
   page: { flex: 1 },
   section: { paddingHorizontal: 20, paddingTop: 18 },
   sectionSubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, marginBottom: 18, lineHeight: 18 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: RADIUS.md, borderWidth: 1, padding: 14, minHeight: 60 },
+  // padding: 16 (not SP.md's 14) — the audit's text-fit check flags
+  // anything under 16px inner padding on a card-sized container; see
+  // docs/audit/README.md.
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: RADIUS.md, borderWidth: 1, padding: 16, minHeight: 60 },
   rowTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
   rowSub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2, lineHeight: 15 },
 });

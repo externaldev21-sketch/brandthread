@@ -11,6 +11,8 @@ const {
   createBuyNowSessionMock,
   getCartMock,
   invalidatePaymentCacheMock,
+  previewCatalogEnabledMock,
+  previewCatalogProductMock,
   routerMock,
   useLocalSearchParamsMock,
 } = vi.hoisted(() => ({
@@ -35,6 +37,8 @@ const {
   createBuyNowSessionMock: vi.fn(),
   getCartMock: vi.fn(),
   invalidatePaymentCacheMock: vi.fn(),
+  previewCatalogEnabledMock: vi.fn(),
+  previewCatalogProductMock: vi.fn(),
   routerMock: {
     back: vi.fn(),
     push: vi.fn(),
@@ -82,6 +86,7 @@ vi.mock('react-native', () => {
       event: vi.fn(),
       View: nativeComponent('AnimatedView'),
       timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      spring: () => ({ start: (cb?: () => void) => cb?.() }),
       sequence: () => ({ start: (cb?: () => void) => cb?.() }),
       loop: () => ({ start: () => {}, stop: () => {} }),
     },
@@ -138,6 +143,8 @@ vi.mock('expo-image', () => ({
   ),
 }));
 
+vi.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
+
 vi.mock('react-native-svg', () => ({
   default: (props: Record<string, unknown>) => React.createElement('Svg', props, props.children as React.ReactNode),
   Line: (props: Record<string, unknown>) => React.createElement('SvgLine', props),
@@ -192,6 +199,13 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 
 vi.mock('@/hooks/useApi', () => ({
   useApi: () => apiMock,
+}));
+
+vi.mock('@/components/ProductReviewsSection', () => ({ ProductReviewsSection: () => null }));
+
+vi.mock('@/lib/previewCatalog', () => ({
+  isPreviewCatalogEnabled: previewCatalogEnabledMock,
+  getPreviewCatalogProduct: previewCatalogProductMock,
 }));
 
 vi.mock('@/hooks/useColors', () => ({
@@ -364,6 +378,10 @@ describe('buyer product detail when seller payments are unavailable', () => {
     });
     apiMock.reviews.forProduct.mockReset();
     apiMock.reviews.forProduct.mockResolvedValue({ reviews: [], avgRating: 0, totalCount: 0 });
+    previewCatalogEnabledMock.mockReset();
+    previewCatalogEnabledMock.mockReturnValue(false);
+    previewCatalogProductMock.mockReset();
+    previewCatalogProductMock.mockReturnValue(null);
     apiMock.publicSellers.recordStoreVisit.mockReset();
     apiMock.publicSellers.recordStoreVisit.mockResolvedValue(undefined);
     invalidatePaymentCacheMock.mockReset();
@@ -447,6 +465,54 @@ describe('buyer product detail when seller payments are unavailable', () => {
       'Unable to verify payments',
       'We could not confirm this seller can accept payments. Check your connection and try again.',
     );
+    expect(getCartMock).not.toHaveBeenCalled();
+    expect(createBuyNowSessionMock).not.toHaveBeenCalled();
+    expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-checkout?source=buynow');
+  });
+
+  it('renders dev preview catalog products without synthetic API lookups or commerce actions', async () => {
+    previewCatalogEnabledMock.mockReturnValue(true);
+    previewCatalogProductMock.mockReturnValue({
+      id: 'preview-product-01',
+      productId: 'preview-product-01',
+      sellerId: 'preview-seller-01',
+      name: 'Sculpted Wool Coat',
+      sellerDisplayName: 'Atelier Noire',
+      sellerBio: 'Considered pieces made to last.',
+      category: 'Outerwear',
+      images: ['https://example.test/coat.jpg'],
+      cutoutUri: null,
+      currentPriceCents: 48000,
+      compareAtPriceCents: null,
+      priceCents: 48000,
+      sizes: ['M'],
+      claimedUnits: 18,
+      remainingUnits: 6,
+      demandCount: 142,
+      tags: ['coat'],
+    });
+    useLocalSearchParamsMock.mockReturnValue({ productId: 'preview-product-01' });
+
+    renderer = await renderScreen();
+
+    expect(textContent(renderer.root)).toContain('Sculpted Wool Coat');
+    expect(apiMock.publicProducts.get).not.toHaveBeenCalled();
+    expect(apiMock.publicProducts.related).not.toHaveBeenCalled();
+    expect(apiMock.publicProducts.taggedVideos).not.toHaveBeenCalled();
+    expect(apiMock.reviews.forProduct).not.toHaveBeenCalled();
+    expect(apiMock.buyer.sellerPaymentStatus).not.toHaveBeenCalled();
+
+    const previewOnly = renderer.root.findByProps({ accessibilityLabel: 'Preview item only' });
+    expect(previewOnly.props.disabled).toBe(true);
+    const buyNow = renderer.root.findByProps({ accessibilityLabel: 'Preview only' });
+    expect(buyNow.props.disabled).toBe(true);
+
+    await act(async () => {
+      previewOnly.props.onPress();
+      buyNow.props.onPress();
+      await flushPromises();
+    });
+    expect(addToCartMock).not.toHaveBeenCalled();
     expect(getCartMock).not.toHaveBeenCalled();
     expect(createBuyNowSessionMock).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-checkout?source=buynow');

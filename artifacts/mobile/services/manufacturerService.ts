@@ -24,10 +24,13 @@ import {
   SampleRevision,
 } from './manufacturerTypes';
 import { mapPublicManufacturer } from './manufacturerDirectoryMapper';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { getPreviewManufacturer, getPreviewManufacturers } from '@/lib/previewManufacturers';
 
 export { mapPublicManufacturer } from './manufacturerDirectoryMapper';
 
 const DRAFTS_KEY = 'mfg:local-quote-drafts:v2';
+const previewFavoriteManufacturerIds = new Set<string>(['preview-mfg-porto-knit']);
 
 function now(): string {
   return new Date().toISOString();
@@ -142,6 +145,29 @@ export async function searchManufacturers(opts: {
   unitPriceMaxCents?: number; leadTimeDaysMax?: number; verifiedOnly?: boolean;
   ratingMin?: number; material?: string; minYears?: number; hasPhotos?: boolean; sort?: DirectorySort;
 }): Promise<Manufacturer[]> {
+  if (isSellerDevPreview()) {
+    if (!isPreviewDemoMode()) return [];
+    const query = opts.query?.trim().toLowerCase();
+    let results = [...getPreviewManufacturers()];
+    if (query) results = results.filter((item) =>
+      `${item.name} ${item.city} ${item.country} ${item.specialties.join(' ')}`.toLowerCase().includes(query),
+    );
+    if (opts.country) results = results.filter((item) => item.country === opts.country);
+    if (opts.category) results = results.filter((item) => item.categories.includes(opts.category!) || item.specialties.includes(opts.category!));
+    if (opts.minYears !== undefined) results = results.filter((item) => item.yearsInBusiness >= opts.minYears!);
+    if (opts.moqMax !== undefined) results = results.filter((item) => item.moq <= opts.moqMax!);
+    if (opts.unitPriceMaxCents !== undefined) results = results.filter((item) => item.unitPriceMinCents <= opts.unitPriceMaxCents!);
+    if (opts.leadTimeDaysMax !== undefined) results = results.filter((item) => item.leadTimeDays <= opts.leadTimeDaysMax!);
+    if (opts.verifiedOnly) results = results.filter((item) => item.isVerified);
+    if (opts.ratingMin !== undefined) results = results.filter((item) => item.reviewCount > 0 && item.rating >= opts.ratingMin!);
+    if (opts.hasPhotos) results = results.filter((item) => item.galleryUris.length > 0 || !!item.profileImageUri);
+    if (opts.material) results = results.filter((item) => item.materials.some((material) => material.toLowerCase().includes(opts.material!.toLowerCase())));
+    if (opts.sort === 'newest') results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    else if (opts.sort === 'experience') results.sort((a, b) => b.yearsInBusiness - a.yearsInBusiness);
+    else if (opts.sort === 'rating') results.sort((a, b) => b.rating - a.rating);
+    else if (opts.sort === 'moq') results.sort((a, b) => a.moq - b.moq);
+    return results;
+  }
   const params = new URLSearchParams();
   if (opts.query) params.set('q', opts.query);
   if (opts.country) params.set('country', opts.country);
@@ -164,6 +190,9 @@ export async function searchManufacturers(opts: {
 }
 
 export async function getManufacturer(id: string): Promise<Manufacturer | undefined> {
+  if (isSellerDevPreview()) {
+    return isPreviewDemoMode() ? getPreviewManufacturer(id) : undefined;
+  }
   assertCanonicalManufacturerId(id);
   let row: any;
   try {
@@ -180,22 +209,93 @@ export async function getManufacturer(id: string): Promise<Manufacturer | undefi
 }
 
 export async function getFavoriteManufacturerIds(): Promise<string[]> {
+  if (isSellerDevPreview()) {
+    return isPreviewDemoMode() ? [...previewFavoriteManufacturerIds] : [];
+  }
   const rows = await serviceRequest<Array<{ manufacturerId: string }>>('/api/manufacturers/favorites');
   if (!Array.isArray(rows)) throw new Error('Favorite manufacturers returned an invalid response.');
   return rows.map((row) => row.manufacturerId);
 }
 
 export async function favoriteManufacturer(manufacturerId: string): Promise<void> {
+  if (isSellerDevPreview()) {
+    previewFavoriteManufacturerIds.add(manufacturerId);
+    return;
+  }
   assertCanonicalManufacturerId(manufacturerId);
   await serviceRequest('/api/manufacturers/favorites', { method: 'POST', body: JSON.stringify({ manufacturerId }) });
 }
 
 export async function unfavoriteManufacturer(manufacturerId: string): Promise<void> {
+  if (isSellerDevPreview()) {
+    previewFavoriteManufacturerIds.delete(manufacturerId);
+    return;
+  }
   assertCanonicalManufacturerId(manufacturerId);
   await serviceRequest(`/api/manufacturers/favorites/${encodeURIComponent(manufacturerId)}`, { method: 'DELETE' });
 }
 
+function previewPortoRelationship(): ManufacturerRelationship | undefined {
+  const manufacturer = getPreviewManufacturer('preview-mfg-porto-knit');
+  if (!manufacturer || !previewFavoriteManufacturerIds.has(manufacturer.id)) return undefined;
+  const updatedAt = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  return {
+    id: 'preview-relationship-porto-knit',
+    sellerId: '',
+    manufacturerId: manufacturer.id,
+    status: 'connected',
+    activeProductIds: [],
+    activeOrders: 0,
+    totalOrders: 0,
+    awaitingPayment: 0,
+    threadId: null,
+    manufacturer: {
+      id: manufacturer.id,
+      businessName: manufacturer.name,
+      country: manufacturer.country,
+      city: manufacturer.city,
+      specialty: manufacturer.specialties.join(', '),
+      yearsInBusiness: manufacturer.yearsInBusiness,
+      moq: manufacturer.moq,
+      timeZone: manufacturer.timeZone ?? null,
+      isPublicDirectory: true,
+      isVerified: manufacturer.isVerified,
+      payoutReady: false,
+      photo: null,
+    },
+    unreadCount: 0,
+    createdAt: new Date(Date.now() - 120 * 86_400_000).toISOString(),
+    updatedAt,
+  };
+}
+
+export async function saveManufacturer(manufacturerId: string): Promise<ManufacturerRelationship> {
+  if (isSellerDevPreview()) {
+    previewFavoriteManufacturerIds.add(manufacturerId);
+    if (isPreviewDemoMode() && manufacturerId === 'preview-mfg-porto-knit') {
+      const relationship = previewPortoRelationship();
+      if (relationship) return relationship;
+    }
+    throw new Error('Manufacturer relationship is unavailable in this preview.');
+  }
+  assertCanonicalManufacturerId(manufacturerId);
+  await Promise.all([
+    favoriteManufacturer(manufacturerId),
+    serviceRequest('/api/manufacturers/relationships', { method: 'POST', body: JSON.stringify({ manufacturerId }) }),
+  ]);
+  const relationship = await getRelationship(manufacturerId);
+  if (!relationship) throw new Error('Manufacturer was saved but the relationship could not be refreshed.');
+  return relationship;
+}
+
+export const unsaveManufacturer = unfavoriteManufacturer;
+
 export async function getRelationships(): Promise<ManufacturerRelationship[]> {
+  if (isSellerDevPreview()) {
+    if (!isPreviewDemoMode()) return [];
+    const relationship = previewPortoRelationship();
+    return relationship ? [relationship] : [];
+  }
   const rows = await serviceRequest<any[]>('/api/manufacturers/relationships');
   if (!Array.isArray(rows)) throw new Error('Manufacturer relationships returned an invalid response.');
   return rows.map((row) => {
@@ -222,19 +322,6 @@ export async function getRelationships(): Promise<ManufacturerRelationship[]> {
 export async function getRelationship(manufacturerId: string): Promise<ManufacturerRelationship | undefined> {
   return (await getRelationships()).find((item) => item.manufacturerId === manufacturerId);
 }
-
-export async function saveManufacturer(manufacturerId: string): Promise<ManufacturerRelationship> {
-  assertCanonicalManufacturerId(manufacturerId);
-  await Promise.all([
-    favoriteManufacturer(manufacturerId),
-    serviceRequest('/api/manufacturers/relationships', { method: 'POST', body: JSON.stringify({ manufacturerId }) }),
-  ]);
-  const relationship = await getRelationship(manufacturerId);
-  if (!relationship) throw new Error('Manufacturer was saved but the relationship could not be refreshed.');
-  return relationship;
-}
-
-export const unsaveManufacturer = unfavoriteManufacturer;
 
 export async function getInvitations(): Promise<ManufacturerInvitation[]> {
   const rows = await serviceRequest<any[]>('/api/manufacturers/invite-tokens');
@@ -388,6 +475,9 @@ export async function getCounteroffersForQuote(quoteId: string): Promise<Counter
 }
 
 export async function getManufacturerReviews(manufacturerId: string): Promise<ManufacturerReview[]> {
+  if (isSellerDevPreview()) {
+    return isPreviewDemoMode() ? getPreviewManufacturer(manufacturerId)?.reviews ?? [] : [];
+  }
   assertCanonicalManufacturerId(manufacturerId);
   const rows = await serviceRequest<ManufacturerReview[]>(
     `/api/manufacturers/public/${encodeURIComponent(manufacturerId)}/reviews`,
@@ -566,6 +656,7 @@ export async function getProductionOrder(id: string): Promise<ProductionOrder | 
 }
 
 export async function getConversations(): Promise<ManufacturerConversation[]> {
+  if (isSellerDevPreview()) return [];
   const rows = await serviceRequest<ManufacturerThread[]>('/api/manufacturers/threads');
   if (!Array.isArray(rows)) throw new Error('Manufacturer threads returned an invalid response.');
   return rows.map((row) => ({

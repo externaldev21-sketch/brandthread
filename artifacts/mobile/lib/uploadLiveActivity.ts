@@ -21,6 +21,7 @@
  * module's own doc comment — and are intentionally out of scope here.
  */
 import { Platform } from 'react-native';
+import { isExpoGo } from '@/lib/expoGoRuntime';
 
 export type UploadActivityKind = 'thread' | 'story';
 
@@ -87,7 +88,7 @@ let cachedModule: UploadLiveActivityNativeModule | null | undefined;
  */
 function getNativeModule(): UploadLiveActivityNativeModule | null {
   if (cachedModule !== undefined) return cachedModule;
-  if (!isSupported()) {
+  if (isExpoGo() || !isSupported()) {
     cachedModule = null;
     return cachedModule;
   }

@@ -310,8 +310,8 @@ vi.mock('@/app/_layout', () => ({
 vi.mock('@/components/legal/LegalConsent', () => {
   const React = require('react') as typeof import('react');
   return {
-    LegalConsent: ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) =>
-      React.createElement('TouchableOpacity', { testID: 'legal-consent-checkbox', onPress: () => onChange(!checked) }),
+    // Sign-up shows one linked line; continuing is the agreement (no checkbox).
+    LegalContinueNotice: () => React.createElement('Text', { testID: 'legal-consent-line' }),
   };
 });
 
@@ -435,7 +435,6 @@ async function driveThroughSignUp(renderer: ReactTestRenderer, role: 'buyer' | '
   await fill(findByLabel(renderer, 'Password'), 'Walkthrough!Pass1');
   await fill(findByLabel(renderer, 'Confirm password'), 'Walkthrough!Pass1');
   await fill(findByTestId(renderer, 'onboarding-username-input'), `wt_${role}_flow`);
-  await press(renderer, findByTestId(renderer, 'legal-consent-checkbox'));
 
   await press(renderer, findButtonByLabel(renderer, 'Create account'));
   await fill(findByTestId(renderer, 'onboarding-code-cells'), '000000');

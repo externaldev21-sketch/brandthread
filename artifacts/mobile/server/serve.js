@@ -10,7 +10,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { renderSharePreviewHtml } = require('./sharePreview');
+const { renderSharePreview } = require('./sharePreview');
 const { landingPathFor, shouldServeLanding } = require('./landing');
 
 const STATIC_ROOT = path.resolve(
@@ -142,6 +142,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const acceptEncoding = String(req.headers['accept-encoding'] || '');
+
+  // Public account-deletion page (Google Play requires a URL that works
+  // without the app). Plain HTML, not part of the SPA, so it never depends on
+  // a signed-in session; it calls /api/public/account-deletion/*.
+  if (/^\/account-deletion\/?$/.test(requestedPath)) {
+    const page = fs.readFileSync(path.join(__dirname, 'templates', 'account-deletion.html'), 'utf8');
+    sendHtml(res, 200, page, acceptEncoding);
+    return;
+  }
+
   // Signed-out visits to "/" (and "/welcome") get the static marketing page.
   // Everything else, including any session cookie or query string, falls
   // through to the unchanged app handling below.
@@ -189,8 +199,8 @@ const server = http.createServer(async (req, res) => {
     const shellPath = path.join(STATIC_ROOT, 'index.html');
     if (fs.existsSync(shellPath)) {
       const shellHtml = fs.readFileSync(shellPath, 'utf8');
-      const preview = await renderSharePreviewHtml(requestedPath, shellHtml).catch(() => null);
-      sendHtml(res, 200, preview || shellHtml, acceptEncoding);
+      const preview = await renderSharePreview(requestedPath, shellHtml).catch(() => null);
+      sendHtml(res, preview ? preview.status : 200, preview ? preview.html : shellHtml, acceptEncoding);
       return;
     }
   }

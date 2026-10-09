@@ -23,6 +23,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { createSection, getStorefront } from '@/services/storeService';
 import { StoreSectionType, SECTION_TYPE_LABELS } from '@/services/storeTypes';
+import { radius } from '@/constants/radii';
 
 const SECTION_CATALOG = [
   {
@@ -233,7 +234,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 3,
     backgroundColor: PURPLE_DIM,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: BORDER_ACTIVE,
     paddingHorizontal: SP.sm,

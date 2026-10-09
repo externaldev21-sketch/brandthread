@@ -59,6 +59,12 @@ describe('screens behind the floating buyer bar', () => {
 describe('buyer Home feed behind the bar', () => {
   const feed = read('app/(tabs)/feed.tsx');
 
+  it('keeps the upstream thin search bar above the tabs', () => {
+    expect(feed).toContain('style={styles.buyerSearchBarThin}');
+    expect(feed).toContain('placeholder="Search…"');
+    expect(feed).toContain('const buyerHeaderHeight = previewTopInset + 4 + TOP_SEARCH_BAR_HEIGHT + TOP_SEARCH_TO_TABS_GAP + TOP_TABS_ROW_HEIGHT + 6;');
+  });
+
   it('plays edge to edge and starts every overlay above the bar', () => {
     expect(feed).toContain('const isBuyerSurface = buyerMode || showFashionPreview;');
     // bottomClearance is exactly the tab bar's own zone now (no added

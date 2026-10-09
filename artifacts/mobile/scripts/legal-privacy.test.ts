@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 const projectRoot = path.resolve(__dirname, '..');
 const privacyLabelsDoc = path.resolve(projectRoot, '..', '..', 'docs', 'app-store', 'privacy-labels.md');
-const { REQUIRED_COLLECTED_TYPES, FORBIDDEN_COLLECTED_TYPES } = require('./verify-ios-privacy-manifest.js') as {
+const { REQUIRED_COLLECTED_TYPES, FORBIDDEN_COLLECTED_TYPES, getNativeConfigErrors } = require('./verify-ios-privacy-manifest.js') as {
   REQUIRED_COLLECTED_TYPES: string[];
   FORBIDDEN_COLLECTED_TYPES: string[];
+  getNativeConfigErrors: (expoConfig: unknown, packageJson: unknown) => string[];
 };
 
 describe('public legal documents', () => {
@@ -39,7 +40,8 @@ describe('public legal documents', () => {
   });
 
   it('does not claim GPS collection or cross-app advertising tracking', () => {
-    const legal = fs.readFileSync(path.join(projectRoot, 'content', 'legal.ts'), 'utf8');
+    // The policy text now lives in content/legal/privacy.md (the draft of record).
+    const legal = fs.readFileSync(path.join(projectRoot, 'content', 'legal', 'privacy.md'), 'utf8');
     expect(legal).toContain('We don’t request precise GPS location.');
     expect(legal).toContain('doesn’t use a device advertising identifier or track you across other companies’ apps');
   });
@@ -121,5 +123,47 @@ describe('Apple privacy manifest configuration', () => {
       expect(entry.NSPrivacyCollectedDataTypeTracking).toBe(false);
       expect(entry.NSPrivacyCollectedDataTypePurposes).toContain('NSPrivacyCollectedDataTypePurposeAppFunctionality');
     }
+  });
+});
+
+
+describe('native permission, encryption and Android config', () => {
+  const appConfig = JSON.parse(fs.readFileSync(path.join(projectRoot, 'app.json'), 'utf8')).expo;
+  const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+
+  it('has no purpose-string, encryption or Android permission gaps', () => {
+    expect(getNativeConfigErrors(appConfig, packageJson)).toEqual([]);
+  });
+
+  it('flags a missing purpose string for an installed native module', () => {
+    const broken = JSON.parse(JSON.stringify(appConfig));
+    broken.plugins = broken.plugins.filter((p: unknown) => (Array.isArray(p) ? p[0] : p) !== 'expo-camera');
+    expect(getNativeConfigErrors(broken, packageJson).join(' ')).toContain('expo-camera');
+  });
+
+  it('flags an ATT string, a duplicated plugin and a missing encryption flag', () => {
+    const broken = JSON.parse(JSON.stringify(appConfig));
+    broken.ios.infoPlist.NSUserTrackingUsageDescription = 'track';
+    broken.ios.config.usesNonExemptEncryption = true;
+    broken.plugins.push(['expo-local-authentication', { faceIDPermission: 'Brandthread uses Face ID to unlock the app.' }]);
+    const errors = getNativeConfigErrors(broken, packageJson).join(' ');
+    expect(errors).toContain('NSUserTrackingUsageDescription');
+    expect(errors).toContain('usesNonExemptEncryption');
+    expect(errors).toContain('more than once');
+  });
+
+  it('keeps the Face ID string a single, feature-specific sentence', () => {
+    const entries = appConfig.plugins.filter((p: unknown) => Array.isArray(p) && p[0] === 'expo-local-authentication');
+    expect(entries).toHaveLength(1);
+    expect(entries[0][1].faceIDPermission).toContain('App Lock');
+  });
+
+  it('whitelists Instagram Stories so canOpenURL can detect it on iOS', () => {
+    expect(appConfig.ios.infoPlist.LSApplicationQueriesSchemes).toContain('instagram-stories');
+  });
+
+  it('does not depend on an ATT, contacts or location module', () => {
+    const deps = Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies });
+    for (const pkg of ['expo-tracking-transparency', 'expo-contacts', 'expo-location']) expect(deps).not.toContain(pkg);
   });
 });

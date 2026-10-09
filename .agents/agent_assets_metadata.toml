@@ -103,3 +103,45 @@ mtime_ms = 1790115720999
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/eb036a0a-5a5c-4fb9-8cb1-e81564f27b8a/7abcfaab-9045-4d14-a0a9-e34c45d1057a"
 storage_version_token = "1790115746129644"
 content_type = "image/png"
+
+[[outputs]]
+id = "kCfvHrHtr9ImoOmMv-BF7"
+uri = "file://exports/brandthread-full-app-source-2026-09-28.zip"
+type = "unspecified"
+title = "Download Brandthread full app source"
+description = "Current source snapshot (HEAD 2d062621): every mobile screen and onboarding flow, API, shared code, manufacturer portal, design system, and runtime assets. ZIP, 89.8 MiB; excludes secrets, dependencies, and non-runtime screenshot galleries."
+logical_id = "12cb8517-09b6-46b7-a5b6-cc8cd4d04e6a"
+content_hash = "sha256:3db0759d72da18f064d42ae9845d757b38f1d87a3f5bb74d1402a6a0e9e5cc2c"
+size = 94140501
+mtime_ms = 1790632787065
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/12cb8517-09b6-46b7-a5b6-cc8cd4d04e6a/7e5a0400-f48d-4c57-a75a-dd42950ed90c"
+storage_version_token = "1790632794643556"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "0y7rnlVb5CFOOYZZi5IBh"
+uri = "file://.local/reports/replit-local-work-diff.txt"
+type = "text"
+title = "Backup verification and full changed-file list"
+description = "All 208 files differing from the merged upstream commit, commit/tree verification, and the two attachments received after snapshot capture."
+logical_id = "d88b9a03-97bf-45bd-812e-7f86d4a9d5bc"
+content_hash = "sha256:ea615c663d189a6f6bb17f6508ceefb360a9d79ef36965068fce54fb3e70d993"
+size = 10960
+mtime_ms = 1790804919685
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/d88b9a03-97bf-45bd-812e-7f86d4a9d5bc/eb7fe2a1-77a5-46b5-b735-74714430ce23"
+storage_version_token = "1790804920286611"
+content_type = "text/plain"
+
+[[outputs]]
+id = "bhy-EkIAIc9iE6XAU94HB"
+uri = "file://.local/ordered-pr-sync/pr-status.csv"
+type = "table"
+title = "Ordered PR merge audit"
+description = "All 103 requested PR heads: 102 normal merges, #661 already included, no skipped PRs; #629 is the final PR merge. Includes pinned head and merge SHAs."
+logical_id = "aaa71c83-07cc-420a-aaf1-0955f2634196"
+content_hash = "sha256:1041e96cfe83d0ce0bca3f85dcc5fdcae40f1217a0664a7a0130a4f12ecb7cf3"
+size = 9634
+mtime_ms = 1790895781353
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/aaa71c83-07cc-420a-aaf1-0955f2634196/f45f13db-1bf7-43ee-8cdf-b009c9cb0b77"
+storage_version_token = "1790895933784336"
+content_type = "text/csv"

@@ -21,7 +21,7 @@ import {
   AccessibilityInfo, useWindowDimensions,
 } from 'react-native';
 import { Asset } from 'expo-asset';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -50,6 +50,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import Composer from '@/components/ui/Composer';
+import { radius } from '@/constants/radii';
 
 // Same sample fashion footage the For You feed uses in dev preview, reused
 // here (not modified, not shared state) so a preview room shows a real
@@ -759,7 +760,7 @@ const styles = StyleSheet.create({
   // height (not padding-driven) so it reliably lands in the 28-30pt range
   // and centers against the avatar/name block via hostPill's alignItems.
   followBtn: {
-    height: 30, minWidth: 60, backgroundColor: '#fff', borderRadius: RADIUS.pill,
+    height: 30, minWidth: 60, backgroundColor: '#fff', borderRadius: radius.sm,
     paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center',
   },
   followBtnActive: { backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
@@ -815,7 +816,7 @@ const styles = StyleSheet.create({
   productInfo: { flex: 1 },
   productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 15 },
   productPrice: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
-  buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: RADIUS.pill, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: radius.sm, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   buyBtnText: { color: '#151517', fontFamily: FONT.bold, fontSize: FS.xs },
 
   chatWrap: { maxWidth: '70%' },

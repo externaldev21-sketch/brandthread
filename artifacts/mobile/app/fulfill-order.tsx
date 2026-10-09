@@ -32,6 +32,7 @@ import {
   updateFulfillmentChecklist, PackagePreset, getParcelSuggestion,
 } from '@/services/orderService';
 import { sharePackingSlip } from '@/lib/packingSlip';
+import { radius } from '@/constants/radii';
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
 const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL', 'Other'] as const;
@@ -54,7 +55,10 @@ export default function FulfillOrderScreen() {
     onAccent: ON_ACCENT,
   } = theme;
   const s = useMemo(() => createStyles(theme), [theme]);
-  const { orderId, step: stepParam } = useLocalSearchParams<{ orderId: string; step?: string }>();
+  const { orderId, step: stepParam, itemIds: itemIdsParam } = useLocalSearchParams<{ orderId: string; step?: string; itemIds?: string }>();
+  // Set when the seller is shipping only some items (from "Ship some items"): the label and tracking cover just those.
+  const partialItemIds = useMemo(() => (itemIdsParam ? String(itemIdsParam).split(',').filter(Boolean) : []), [itemIdsParam]);
+  const isPartial = partialItemIds.length > 0;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
@@ -65,7 +69,7 @@ export default function FulfillOrderScreen() {
   // the single consolidated fulfillment flow for a seller-fulfilled order.
   const initialStep = (() => {
     const n = Number(stepParam);
-    return n === 2 || n === 3 || n === 4 ? (n as Step) : 1;
+    return n === 2 || n === 3 || n === 4 ? (n as Step) : (itemIdsParam ? 2 : 1);
   })();
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -108,7 +112,7 @@ export default function FulfillOrderScreen() {
       .catch(() => { /* no suggestion: the seller types the weight */ });
   }, [orderId]);
 
-  const purchaseKey = useMemo(() => `fulfill-${orderId}`, [orderId]);
+  const purchaseKey = useMemo(() => `fulfill-${orderId}${itemIdsParam ? `-${String(itemIdsParam)}` : ''}`, [orderId, itemIdsParam]);
   // A voided label is no longer usable proof of shipment — treat it the same
   // as "no label yet" for gating Continue / Mark as Shipped.
   const hasValidLabel = !!label && label.status !== 'voided';
@@ -240,7 +244,7 @@ export default function FulfillOrderScreen() {
     setRatesError(null);
     try {
       const fromAddress = order.fulfillment.fromAddress ?? order.customer.shippingAddress;
-      const nextRates = await getShippingRates(orderId, { fromAddress, ...parcelDims });
+      const nextRates = await getShippingRates(orderId, { fromAddress, ...parcelDims, ...(isPartial ? { itemIds: partialItemIds } : {}) });
       const sorted = [...nextRates].sort((a, b) => a.priceCents - b.priceCents);
       setRates(sorted);
       if (sorted.length === 0) {
@@ -253,7 +257,7 @@ export default function FulfillOrderScreen() {
     } finally {
       setLoadingRates(false);
     }
-  }, [order, parcelDims, orderId]);
+  }, [order, parcelDims, orderId, isPartial, partialItemIds]);
 
   useEffect(() => {
     if (step === 3 && !hasValidLabel && rates.length === 0 && !loadingRates && !manualMode) {
@@ -266,7 +270,7 @@ export default function FulfillOrderScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     setBuying(true);
     try {
-      const lbl = await purchaseShippingLabel(orderId, rate, purchaseKey);
+      const lbl = await purchaseShippingLabel(orderId, rate, purchaseKey, isPartial ? partialItemIds : undefined);
       setLabel(lbl);
     } catch (err: any) {
       Alert.alert(
@@ -313,10 +317,17 @@ export default function FulfillOrderScreen() {
     }
     setMarking(true);
     try {
-      if (!hasValidLabel && manualTracking.trim()) {
-        await addTrackingService(orderId, manualCarrier, manualTracking.trim());
+      if (isPartial) {
+        // A bought label already shipped these items on the server.
+        if (!hasValidLabel) {
+          await api.orders.addItemsTracking(orderId, { itemIds: partialItemIds, trackingNumber: manualTracking.trim(), carrier: manualCarrier });
+        }
+      } else {
+        if (!hasValidLabel && manualTracking.trim()) {
+          await addTrackingService(orderId, manualCarrier, manualTracking.trim());
+        }
+        await api.orders.updateStatus(orderId, 'shipped');
       }
-      await api.orders.updateStatus(orderId, 'shipped');
       setDone(true);
       playSuccessAnimation(() => {
         router.replace('/(tabs)/orders');
@@ -406,7 +417,7 @@ export default function FulfillOrderScreen() {
   if (!order) {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Fulfill Order" />
+        <ScreenHeader title="Fulfill Order" divider={false} />
         <View style={s.centered}>
           <Text style={s.errorText}>Couldn't load this order.</Text>
         </View>
@@ -453,7 +464,7 @@ export default function FulfillOrderScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Fulfill Order" />
+      <ScreenHeader title="Fulfill Order" divider={false} />
 
       {/* Stepper */}
       <View style={s.stepperRow}>
@@ -753,7 +764,7 @@ const createStyles = (theme: { background: string; card: string; border: string;
     presetChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, gap: 2 },
     presetChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
     presetChipSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-    carrierChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+    carrierChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
 
     fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
     input: { backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingVertical: SP.sm, color: FG, fontSize: FS.base, fontFamily: FONT.regular },

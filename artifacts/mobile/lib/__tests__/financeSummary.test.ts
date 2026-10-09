@@ -49,6 +49,11 @@ describe('buildMoneyTiles', () => {
     expect(buildMoneyTiles(summary({ connected: false, available: null }))[2].caption).toBe('Connect Stripe to get paid');
   });
 
+  it('does not imply a bank transfer when there have been no payouts', () => {
+    const tiles = buildMoneyTiles(summary({ paidOut: { ...money(0), toBank: null } }));
+    expect(tiles[3].caption).toBe('No payouts yet');
+  });
+
   it('mentions money still settling', () => {
     expect(buildMoneyTiles(summary({ pending: money(1_050) }))[2].caption).toBe('$10.50 still settling');
   });

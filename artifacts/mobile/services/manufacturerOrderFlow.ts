@@ -40,7 +40,7 @@ export type OrderTimeline = {
   order: OrderCardSnapshot;
   manufacturer?: { id: string; businessName: string; country: string; timeZone: string | null };
   steps: TimelineStep[];
-  events: Array<{ id: string; actorRole: string; fromStatus: string | null; toStatus: string; note: string | null; createdAt: string }>;
+  events: Array<{ id: string; actorRole: string; fromStatus: string | null; toStatus: string; note: string | null; imageUrls?: string[]; createdAt: string }>;
   createdAt: string;
   paidAt: string | null;
   tracking: { carrier: string | null; carrierName: string | null; trackingNumber: string | null; url: string | null };
@@ -74,6 +74,26 @@ export async function declineOrderCard(orderId: string, reason?: string): Promis
 export async function confirmOrderDelivery(orderId: string): Promise<void> {
   assertOrderId(orderId);
   await serviceRequest(`/api/manufacturers/orders/${encodeURIComponent(orderId)}/confirm-delivery`, { method: 'POST', body: '{}' });
+}
+
+/** Uploads one production photo, returning its stable object path plus a short-lived viewing URL. */
+export async function uploadProductionPhoto(orderId: string, contentType: string, bytes: Uint8Array): Promise<{ objectPath: string; url: string }> {
+  assertOrderId(orderId);
+  return serviceRequest<{ objectPath: string; url: string }>(`/api/manufacturers/orders/${encodeURIComponent(orderId)}/updates/photo`, {
+    method: 'POST', headers: { 'Content-Type': contentType }, body: bytes as unknown as BodyInit,
+  });
+}
+
+/** Posts a same-stage production update (note and/or photos) without changing the order's status. */
+export async function postProductionUpdate(
+  orderId: string,
+  input: { note?: string; imageObjectPaths?: string[] },
+): Promise<OrderTimeline['events'][number]> {
+  assertOrderId(orderId);
+  return serviceRequest<OrderTimeline['events'][number]>(`/api/manufacturers/orders/${encodeURIComponent(orderId)}/updates`, {
+    method: 'POST',
+    body: JSON.stringify({ note: input.note, imageObjectPaths: input.imageObjectPaths ?? [] }),
+  });
 }
 
 export async function getDirectoryFacets(): Promise<DirectoryFacets> {

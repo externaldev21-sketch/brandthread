@@ -11,6 +11,7 @@ import {
   resolveTestDatabaseUrl,
   runDrizzlePushAgainst,
   runMigrationsAgainst,
+  verifyTestDatabaseSchema,
 } from "../../lib/db/src/testing/index";
 import { collectTestFiles, needsRealDatabase } from "./src/testUtils/dbFileScan";
 
@@ -39,6 +40,7 @@ if (resolution.ok) {
   await ensureDatabaseExists(resolution.url);
   await runDrizzlePushAgainst(resolution.url);
   await runMigrationsAgainst(resolution.url);
+  await verifyTestDatabaseSchema(resolution.url);
   // Setting this here (main thread, before the worker pool forks) means every
   // test file's `@workspace/db` import resolves against the isolated test
   // database, not whatever DATABASE_URL pointed at in the shell.

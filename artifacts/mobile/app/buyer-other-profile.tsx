@@ -25,6 +25,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
+import { GiveawayProfileCard } from '@/components/GiveawayProfileCard';
 import { hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
 import { muteUser, restrictUser, createOrGetConversation } from '@/services/socialService';
 import { useApi } from '@/lib/api';
@@ -35,6 +36,8 @@ import { emitProfileEvent, subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
+import { ProfileStoriesRow } from '@/components/profile/ProfileStoriesRow';
+import { highlightFromServer, type Highlight } from '@/lib/highlightsService';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
@@ -44,7 +47,7 @@ import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
-import { useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { isVisitorPreviewParam, resolveProfileMode } from '@/lib/profileAccess';
 import { taggedItemHref } from '@/services/profileService';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
@@ -53,6 +56,7 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
+import { radius } from '@/constants/radii';
 
 type ContentTab = 'Posts' | 'Tagged';
 const CONTENT_TAB_ITEMS: ProfileTab[] = [
@@ -70,6 +74,8 @@ type RemoteProfile = {
   isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
   iBlockedThem: boolean;
   postsCount: number;
+  /** Private account: a follow request from me is pending / the account is private. */
+  followRequested?: boolean; isPrivate?: boolean;
 };
 
 export default function BuyerOtherProfileScreen() {
@@ -78,7 +84,7 @@ export default function BuyerOtherProfileScreen() {
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
-  const layout  = useProfileLayout();
+  const layout  = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   const barInset = useBuyerTabBarInset();
   const { userId: currentUserId } = useAuth();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
@@ -107,6 +113,8 @@ export default function BuyerOtherProfileScreen() {
   const [msgLoading, setMsgLoading]     = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [storyIds, setStoryIds]         = useState<string[]>([]);
+  // Their saved-story highlights (only the ones my audience may open); empty hides the row.
+  const [highlights, setHighlights]     = useState<Highlight[]>([]);
   const [refreshing, setRefreshing]     = useState(false);
   // Canonical clerkId resolved from the profile API response. The route
   // `userId` may be a DB UUID alias when arriving from /u/[username]; every
@@ -121,6 +129,7 @@ export default function BuyerOtherProfileScreen() {
   const isFollowedBy  = profile?.isFollowedBy ?? false;
   const isMutual      = profile?.isMutual     ?? false;
   const iBlockedThem  = profile?.iBlockedThem ?? false;
+  const followRequested = profile?.followRequested ?? false;
 
   const videos = useCreatorVideos(canonicalReady && !iBlockedThem ? canonicalUserId : null, { asVisitor: previewAsVisitor });
 
@@ -156,6 +165,12 @@ export default function BuyerOtherProfileScreen() {
       setLoadFailed(false);
       const stories = await api.social.storiesForUser(resolvedId).catch(() => []);
       setStoryIds((Array.isArray(stories) ? stories : []).map((s: any) => s.id));
+      try {
+        const hl = await api.social.userHighlights(resolvedId);
+        setHighlights((Array.isArray(hl) ? hl : []).map(highlightFromServer));
+      } catch {
+        setHighlights([]); // highlights are optional: never fail the profile over them
+      }
     } catch {
       setLoadFailed(true);
     } finally {
@@ -195,17 +210,46 @@ export default function BuyerOtherProfileScreen() {
   const handleFollow = async () => {
     if (!canonicalReady || followLoading) return;
     const wasFollowing = isFollowing;
+    // Tapping "Requested" cancels the pending request (DELETE /follow).
+    if (followRequested) {
+      setFollowLoading(true);
+      setProfile(prev => prev ? { ...prev, followRequested: false } : prev);
+      try {
+        await api.social.unfollow(canonicalUserId);
+        hapticLight();
+      } catch {
+        setProfile(prev => prev ? { ...prev, followRequested: true } : prev);
+        Alert.alert("Couldn't cancel request", 'Try again.');
+      } finally {
+        setFollowLoading(false);
+      }
+      return;
+    }
     setFollowLoading(true);
-    setProfile(prev => prev ? {
+    // A private account turns a follow into a request: show "Requested" right away.
+    const optimisticRequest = !wasFollowing && profile?.isPrivate === true;
+    setProfile(prev => prev ? (optimisticRequest ? { ...prev, followRequested: true } : {
       ...prev,
       isFollowing: !wasFollowing,
       isMutual: wasFollowing ? false : prev.isFollowedBy,
       followersCount: Math.max(0, prev.followersCount + (wasFollowing ? -1 : 1)),
-    } : prev);
+    }) : prev);
     try {
       const result = wasFollowing
         ? await api.social.unfollow(canonicalUserId)
         : await api.social.follow(canonicalUserId);
+      if (!wasFollowing && result && 'status' in result && result.status === 'requested') {
+        // Private account: a request was sent, nothing was followed yet.
+        setProfile(prev => prev ? {
+          ...prev,
+          isFollowing: false,
+          isMutual: false,
+          followRequested: true,
+          followersCount: typeof result.followersCount === 'number' ? result.followersCount : Math.max(0, prev.followersCount - 1),
+        } : prev);
+        hapticLight();
+        return;
+      }
       if (!wasFollowing) void requestContextualPushPermission(currentUserId, api);
       const confirmedCount = typeof result?.followersCount === 'number' ? result.followersCount : undefined;
       if (confirmedCount != null) {
@@ -222,12 +266,12 @@ export default function BuyerOtherProfileScreen() {
       void videos.reload();
       hapticLight();
     } catch {
-      setProfile(prev => prev ? {
+      setProfile(prev => prev ? (optimisticRequest ? { ...prev, followRequested: false } : {
         ...prev,
         isFollowing: wasFollowing,
         isMutual: wasFollowing ? prev.isMutual : false,
         followersCount: Math.max(0, prev.followersCount + (wasFollowing ? 1 : -1)),
-      } : prev);
+      }) : prev);
       Alert.alert("Couldn't follow", 'Try again.');
     } finally {
       setFollowLoading(false);
@@ -324,11 +368,7 @@ export default function BuyerOtherProfileScreen() {
     else router.replace('/(buyer)/' as never);
   };
 
-  // Followers · Following — Posts was dropped (dev: a high count in any
-  // column was getting cut off). No honest "Likes" total exists for another
-  // buyer's public profile (their posts are paginated, so summing only the
-  // loaded page would undercount), so this stays a two-column row rather
-  // than showing a fabricated number.
+  // The server counts all eligible post likes; the paginated video grid is not a total.
   const stats: ProfileStat[] = [
     {
       key: 'followers', label: 'Followers', value: formatCompactCount(profile?.followersCount ?? 0),
@@ -398,11 +438,11 @@ export default function BuyerOtherProfileScreen() {
       <View style={styles.actionRow}>
         <View style={styles.flex}>
           <FollowMorphButton
-            following={isFollowing}
+            following={isFollowing || followRequested}
             onChange={handleFollow}
             disabled={followDisabled}
             followLabel={isFollowedBy ? 'Follow back' : 'Follow'}
-            followingLabel={isMutual ? 'Friends' : 'Following'}
+            followingLabel={followRequested ? 'Requested' : isMutual ? 'Friends' : 'Following'}
             style={styles.followMorphBtn}
             labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
           />
@@ -425,6 +465,7 @@ export default function BuyerOtherProfileScreen() {
         />
         <ProfileButton label="More" icon="more-horizontal" onPress={() => { hapticSelection(); setMoreSheetOpen(true); }} accessibilityLabel="More options" />
       </View>
+      <GiveawayProfileCard sellerId={canonicalUserId} enabled={canonicalReady && !iBlockedThem && !previewAsVisitor} />
     </>
   );
 
@@ -461,6 +502,17 @@ export default function BuyerOtherProfileScreen() {
           />
         )}
         meta={meta}
+        extras={highlights.length > 0 && !iBlockedThem ? (
+          <View testID="other-profile-highlights">
+            <ProfileStoriesRow
+              items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null }))}
+              onPressItem={(item) => {
+                hapticLight();
+                router.push({ pathname: '/buyer-story-viewer' as any, params: { highlightId: item.id } });
+              }}
+            />
+          </View>
+        ) : undefined}
         stats={stats}
         statsLoading={!apiLoaded}
         actions={actions}
@@ -580,7 +632,7 @@ function makeStyles(theme: AppThemePreset) {
     // deliberately non-interactive.
     chip: {
       flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
-      borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4,
+      borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 4,
     },
     chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
     followMorphBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },

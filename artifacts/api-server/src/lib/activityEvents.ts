@@ -169,23 +169,28 @@ export async function notifyPostLike(input: { postId: string; likerId: string })
 // ─── Reposts ──────────────────────────────────────────────────────────────────
 
 /** Tell a post's owner someone reposted it. Idempotent per (owner, reposter, post). */
-export async function notifyRepost(input: { postId: string; reposterId: string }): Promise<void> {
+export async function notifyRepost(input: { postId: string; reposterId: string; variant?: "repost" | "quote" }): Promise<void> {
+  const isQuote = input.variant === "quote";
   try {
     const post = await loadPost(input.postId);
     if (!post || post.userId === input.reposterId) return;
     if ((await blockedUserIds(post.userId)).has(input.reposterId)) return;
 
-    const [existing] = await db
-      .select({ id: notificationsFeed.id })
-      .from(notificationsFeed)
-      .where(and(
-        eq(notificationsFeed.userId, post.userId),
-        eq(notificationsFeed.type, "repost"),
-        eq(notificationsFeed.targetId, post.id),
-        eq(notificationsFeed.actorId, input.reposterId),
-      ))
-      .limit(1);
-    if (existing) return;
+    // A plain repost is a toggle, so one notification per reposter is enough.
+    // Every quote is its own new post, so quotes are never deduped.
+    if (!isQuote) {
+      const [existing] = await db
+        .select({ id: notificationsFeed.id })
+        .from(notificationsFeed)
+        .where(and(
+          eq(notificationsFeed.userId, post.userId),
+          eq(notificationsFeed.type, "repost"),
+          eq(notificationsFeed.targetId, post.id),
+          eq(notificationsFeed.actorId, input.reposterId),
+        ))
+        .limit(1);
+      if (existing) return;
+    }
 
     const actor = await actorFields(input.reposterId);
     if (!actor) return;
@@ -194,7 +199,7 @@ export async function notifyRepost(input: { postId: string; reposterId: string }
       userId: post.userId,
       category: "social",
       type: "repost",
-      title: `${actor.actorName} reposted your post`,
+      title: isQuote ? `${actor.actorName} quoted your post` : `${actor.actorName} reposted your post`,
       ...actor,
       targetId: post.id,
       targetType: "post",
@@ -204,6 +209,72 @@ export async function notifyRepost(input: { postId: string; reposterId: string }
     logger.warn({ err, postId: input.postId }, "Repost notification failed");
   }
 }
+
+// ─── Saves, shares and tags ───────────────────────────────────────────────────
+
+/**
+ * One alert per (owner, person, post) for lower-urgency post engagement —
+ * saves, shares, and being tagged. Idempotent, skips self-actions and blocks.
+ */
+async function notifyPostEngagement(input: {
+  postId: string;
+  actorId: string;
+  /** Recipient override (tags notify the tagged person, not the post owner). */
+  recipientId?: string;
+  type: "post_save" | "post_share" | "post_tag";
+  verb: string;
+}): Promise<void> {
+  try {
+    const post = await loadPost(input.postId);
+    if (!post) return;
+    const recipientId = input.recipientId ?? post.userId;
+    if (recipientId === input.actorId) return;
+    if ((await blockedUserIds(recipientId)).has(input.actorId)) return;
+
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, recipientId),
+        eq(notificationsFeed.type, input.type),
+        eq(notificationsFeed.targetId, post.id),
+        eq(notificationsFeed.actorId, input.actorId),
+      ))
+      .limit(1);
+    if (existing) return;
+
+    const actor = await actorFields(input.actorId);
+    if (!actor) return;
+
+    await publishNotification({
+      userId: recipientId,
+      category: "social",
+      type: input.type,
+      title: `${actor.actorName} ${input.verb}`,
+      ...actor,
+      targetId: post.id,
+      targetType: "post",
+      targetImageUrl: postThumbnail(post),
+    });
+  } catch (err) {
+    logger.warn({ err, postId: input.postId, type: input.type }, "Post engagement notification failed");
+  }
+}
+
+/** Tell a post's owner someone saved it. */
+export const notifyPostSave = (input: { postId: string; saverId: string }) =>
+  notifyPostEngagement({ postId: input.postId, actorId: input.saverId, type: "post_save", verb: "saved your post" });
+
+/** Tell a post's owner someone shared it out of the app. */
+export const notifyPostShare = (input: { postId: string; sharerId: string }) =>
+  notifyPostEngagement({ postId: input.postId, actorId: input.sharerId, type: "post_share", verb: "shared your post" });
+
+/** Tell a person they were tagged in a post (call from wherever post_user_tags rows are written). */
+export const notifyPostTag = (input: { postId: string; taggerId: string; taggedUserId: string }) =>
+  notifyPostEngagement({
+    postId: input.postId, actorId: input.taggerId, recipientId: input.taggedUserId,
+    type: "post_tag", verb: "tagged you in a post",
+  });
 
 // ─── Story / highlight likes ──────────────────────────────────────────────────
 
@@ -288,6 +359,46 @@ export async function notifyStoryMention(input: {
     });
   } catch (err) {
     logger.warn({ err, storyId: input.storyId }, "Story mention notification failed");
+  }
+}
+
+/**
+ * "@name answered your question" — sent to the story's author. One row per
+ * (author, story, answerer): the answer table's primary key already stops a
+ * second answer, and the lookup below covers a retried request.
+ */
+export async function notifyStoryQuestionAnswer(input: {
+  storyId: string; answererId: string; authorId: string; media: unknown;
+}): Promise<void> {
+  try {
+    if (input.answererId === input.authorId) return;
+    if ((await blockedUserIds(input.authorId)).has(input.answererId)) return;
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.authorId),
+        eq(notificationsFeed.type, "story_reply"),
+        eq(notificationsFeed.targetId, input.storyId),
+        eq(notificationsFeed.actorId, input.answererId),
+      ))
+      .limit(1);
+    if (existing) return;
+    const actor = await actorFields(input.answererId);
+    if (!actor) return;
+    const handle = actor.actorHandle ?? actor.actorName;
+    await publishNotification({
+      userId: input.authorId,
+      category: "social",
+      type: "story_reply",
+      title: `${handle.startsWith("@") ? handle : `@${handle}`} answered your question`,
+      ...actor,
+      targetId: input.storyId,
+      targetType: "story",
+      targetImageUrl: firstStoryImage(input.media),
+    });
+  } catch (err) {
+    logger.warn({ err, storyId: input.storyId }, "Story question notification failed");
   }
 }
 
@@ -376,6 +487,12 @@ export async function notifyCommentActivity(input: {
   authorId: string;
   body: string;
   parentAuthorId?: string | null;
+  /**
+   * Server-verified mentions (see commentMentions.ts). When provided they are
+   * the only people notified as "mention"; when omitted the body is re-parsed
+   * (legacy behaviour).
+   */
+  mentionedUserIds?: string[];
 }): Promise<void> {
   try {
     const post = await loadPost(input.postId);
@@ -408,12 +525,20 @@ export async function notifyCommentActivity(input: {
       deliveries.push({ ...base, userId: input.parentAuthorId, type: "comment_reply", title: `${actor.actorName} replied to your comment` });
     }
 
-    const handles = extractMentions(input.body);
+    if (input.mentionedUserIds) {
+      for (const clerkId of input.mentionedUserIds) {
+        if (notified.has(clerkId) || blocked.has(clerkId)) continue;
+        notified.add(clerkId);
+        deliveries.push({ ...base, userId: clerkId, type: "mention", title: `${actor.actorName} mentioned you in a comment` });
+      }
+    }
+
+    const handles = input.mentionedUserIds ? [] : extractMentions(input.body);
     if (handles.length > 0) {
       const mentioned = await db
         .select({ clerkId: users.clerkId })
         .from(users)
-        .where(and(inArray(sql`lower(${users.username})`, handles), isNull(users.deletedAt)));
+        .where(and(inArray(sql`lower(${users.username})`, handles), isNull(users.deletedAt), isNull(users.deletionRequestedAt)));
       for (const { clerkId } of mentioned) {
         if (notified.has(clerkId) || blocked.has(clerkId)) continue;
         notified.add(clerkId);
@@ -424,6 +549,45 @@ export async function notifyCommentActivity(input: {
     await fanOut(deliveries, (delivery) => publishNotification(delivery));
   } catch (err) {
     logger.warn({ err, postId: input.postId, commentId: input.commentId }, "Comment notification failed");
+  }
+}
+
+/**
+ * "Your comment was pinned" — tells a comment's author the post owner pinned
+ * it. Deduped per (comment, recipient): re-pinning after an unpin stays quiet.
+ */
+export async function notifyCommentPinned(input: {
+  postId: string; commentId: string; ownerId: string; commentAuthorId: string; body: string;
+}): Promise<void> {
+  try {
+    if (input.commentAuthorId === input.ownerId) return;
+    if ((await blockedUserIds(input.ownerId)).has(input.commentAuthorId)) return;
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.commentAuthorId),
+        eq(notificationsFeed.type, "comment_pinned"),
+        eq(notificationsFeed.commentId, input.commentId),
+      ))
+      .limit(1);
+    if (existing) return;
+    const [post, actor] = await Promise.all([loadPost(input.postId), actorFields(input.ownerId)]);
+    if (!post || !actor) return;
+    await publishNotification({
+      userId: input.commentAuthorId,
+      category: "social",
+      type: "comment_pinned",
+      title: "Your comment was pinned",
+      body: excerpt(input.body),
+      ...actor,
+      targetId: post.id,
+      targetType: "post",
+      targetImageUrl: postThumbnail(post),
+      commentId: input.commentId,
+    });
+  } catch (err) {
+    logger.warn({ err, commentId: input.commentId }, "Comment pinned notification failed");
   }
 }
 
@@ -535,5 +699,71 @@ export async function notifyNewProduct(input: { productId: string }): Promise<vo
     }));
   } catch (err) {
     logger.warn({ err, productId: input.productId }, "New product notification failed");
+  }
+}
+
+// ─── Referrals ────────────────────────────────────────────────────────────────
+
+/** Tell an inviter a friend joined with their code. Idempotent per invitee. */
+export async function notifyReferralJoined(input: { inviterId: string; inviteeId: string }): Promise<void> {
+  try {
+    if (input.inviterId === input.inviteeId) return;
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.inviterId),
+        eq(notificationsFeed.type, "referral_joined"),
+        eq(notificationsFeed.targetId, input.inviteeId),
+      ))
+      .limit(1);
+    if (existing) return;
+    const actor = await actorFields(input.inviteeId);
+    await publishNotification({
+      userId: input.inviterId,
+      category: "social",
+      type: "referral_joined",
+      title: `${actor?.actorName ?? "A friend"} joined with your invite`,
+      body: "You earn $10 Thread Cash after their first order of $10 or more",
+      ...(actor ?? {}),
+      targetId: input.inviteeId,
+      targetType: "referral",
+    });
+  } catch (err) {
+    logger.warn({ err, inviteeId: input.inviteeId }, "Referral joined notification failed");
+  }
+}
+
+/** Tell an inviter their $10 Thread Cash landed. Idempotent per invitee. */
+export async function notifyReferralReward(input: {
+  inviterId: string;
+  inviteeId: string;
+  amountCents: number;
+}): Promise<void> {
+  try {
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.inviterId),
+        eq(notificationsFeed.type, "referral_reward"),
+        eq(notificationsFeed.targetId, input.inviteeId),
+      ))
+      .limit(1);
+    if (existing) return;
+    const actor = await actorFields(input.inviteeId);
+    const dollars = (input.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+    await publishNotification({
+      userId: input.inviterId,
+      category: "social",
+      type: "referral_reward",
+      title: `${actor?.actorName ?? "Your friend"} placed their first order`,
+      body: `${dollars} Thread Cash added to your balance`,
+      ...(actor ?? {}),
+      targetId: input.inviteeId,
+      targetType: "thread_cash_transfer",
+    });
+  } catch (err) {
+    logger.warn({ err, inviteeId: input.inviteeId }, "Referral reward notification failed");
   }
 }

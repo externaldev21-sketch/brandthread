@@ -31,9 +31,11 @@ import {
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput,
 } from '@/components/BrandthreadUI';
 import { replaceBackground } from '@/services/designService';
+import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product, ProductMedia } from '@/services/productTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { radius } from '@/constants/radii';
 
 type BgTab = 'color' | 'gradient' | 'upload' | 'ai';
 
@@ -160,7 +162,11 @@ export default function DesignBgReplaceScreen({
     if (!resultUri) return;
     setIsSaving(true);
     try {
-      const MediaLibrary = await import('expo-media-library');
+      const MediaLibrary = getMediaLibrary();
+      if (!MediaLibrary) {
+        Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
+        return;
+      }
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission required', 'Allow photo library access to save this image.');
@@ -500,7 +506,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   bgUploadedRow:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm },
   bgUploadedText:     { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   sceneGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.sm },
-  scenePill:          { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  scenePill:          { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   scenePillActive:    { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
   scenePillText:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   scenePillTextActive:{ color: PURPLE_LIGHT },

@@ -13,7 +13,6 @@ import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useAuth } from '@clerk/expo';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -30,7 +29,7 @@ import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { FormInput } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
@@ -63,6 +62,39 @@ const EMPTY_STATS: Stats = {
   totalInventoryValueCents: 0,
 };
 
+function getPreviewProductStats(products: readonly Product[]): Stats {
+  return {
+    active: products.filter((product) => product.status === 'active').length,
+    draft: products.filter((product) => product.status === 'draft').length,
+    archived: products.filter((product) => product.status === 'archived').length,
+    lowStock: products.filter((product) =>
+      product.inventory.totalStock > 0 && product.inventory.totalStock <= product.inventory.lowStockThreshold,
+    ).length,
+    outOfStock: products.filter((product) =>
+      product.inventory.totalStock === 0 && product.inventory.policy === 'deny' && product.status === 'active',
+    ).length,
+    preOrder: products.filter((product) => product.salesModel === 'pre-order' || product.salesModel === 'both').length,
+    totalInventoryValueCents: products.reduce(
+      (sum, product) => sum + (product.pricing.costCents ?? 0) * product.inventory.totalStock,
+      0,
+    ),
+  };
+}
+
+function matchesPreviewProductFilter(product: Product, filter: ProductFilter): boolean {
+  switch (filter) {
+    case 'active': return product.status === 'active';
+    case 'draft': return product.status === 'draft';
+    case 'scheduled': return product.status === 'scheduled';
+    case 'archived': return product.status === 'archived';
+    case 'pre-order': return product.salesModel === 'pre-order' || product.salesModel === 'both';
+    case 'pre-made': return product.salesModel === 'pre-made' || product.salesModel === 'both';
+    case 'low-stock': return product.inventory.totalStock > 0 && product.inventory.totalStock <= product.inventory.lowStockThreshold;
+    case 'out-of-stock': return product.inventory.totalStock === 0 && product.inventory.policy === 'deny';
+    default: return true;
+  }
+}
+
 // ─── Action Sheet ─────────────────────────────────────────────────────────────
 
 interface ActionSheetProps {
@@ -83,6 +115,8 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
 
   const p = product as Product;
   const isArchived = p.status === 'archived';
+  // Pairings and video live on the server; only server-backed products (UUID ids) have them.
+  const canManageFit = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(p.id) || p.id.startsWith('preview-product-');
 
   function closeSheet() { onClose(); }
 
@@ -125,10 +159,17 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
   const actions: ActionItem[] = [
     { label: 'Edit', icon: 'edit-2', onPress: () => { closeSheet(); router.push(('/product-detail?id=' + p.id) as never); } },
     { label: 'Quick edit price', icon: 'dollar-sign', onPress: () => { closeSheet(); onQuickEditPrice(p); } },
+    { label: 'Variants & stock', icon: 'layers', onPress: () => { closeSheet(); router.push(('/product-variants?productId=' + p.id) as never); } },
     { label: 'View store page', icon: 'eye', onPress: () => { closeSheet(); router.push(('/product-store?id=' + p.id) as never); } },
     { label: 'Create content', icon: 'video', onPress: () => { closeSheet(); router.push(('/create-post?productId=' + p.id) as never); } },
     { label: 'Tag in post', icon: 'tag', onPress: () => { router.push(('/create-post?productId=' + p.id) as never); closeSheet(); } },
+    { label: 'Search listing (SEO)', icon: 'search', onPress: () => { closeSheet(); router.push(('/product-seo?productId=' + p.id) as never); } },
     { label: 'Duplicate', icon: 'copy', onPress: handleDuplicate },
+    ...(canManageFit ? [
+      { label: 'Complete the fit', icon: 'layers' as const, onPress: () => { closeSheet(); router.push(('/product-pairings?productId=' + p.id) as never); } },
+      { label: 'Product video', icon: 'film' as const, onPress: () => { closeSheet(); router.push(('/product-video?productId=' + p.id) as never); } },
+    ] : []),
+    { label: 'Schedule launch', icon: 'clock', onPress: () => { closeSheet(); router.push(('/product-launches?productId=' + p.id) as never); } },
     { label: 'Share', icon: 'share', onPress: handleShare },
     {
       label: 'Send to manufacturer', icon: 'tool', accent: theme.warning,
@@ -380,11 +421,11 @@ function SortModal({
 export default function ProductsScreen() {
   const scrollResetRef = useScrollReset<any>(true, false);
   const { theme } = useAppTheme();
-  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
   const sellerPreview = isSellerDevPreview();
-  // Do not treat the dev-web design preview as a real seller session. While
-  // Clerk is resolving, keep the screen in its safe, empty preview state.
-  const previewOnly = sellerPreview && (!authLoaded || !isSignedIn || !userId);
+  const previewDemo = sellerPreview && isPreviewDemoMode();
+  // Preview mode is always read-only, even if Clerk happens to have a real
+  // session. Demo mode may browse local fixtures; it never uses account data.
+  const previewOnly = sellerPreview;
   const previewOnlyRef = React.useRef(previewOnly);
   previewOnlyRef.current = previewOnly;
   const palette = theme as typeof theme & Record<string, string>;
@@ -424,6 +465,11 @@ export default function ProductsScreen() {
   }, []);
 
   const loadStats = useCallback(async () => {
+    if (previewDemo) {
+      const { getPreviewSellerProducts } = await import('@/lib/previewSellerProducts');
+      setStats(getPreviewProductStats(getPreviewSellerProducts()));
+      return;
+    }
     if (previewOnly || previewOnlyRef.current) {
       setStats(EMPTY_STATS);
       return;
@@ -444,7 +490,7 @@ export default function ProductsScreen() {
         totalInventoryValueCents: s.totalInventoryValueCents,
       });
     } catch { /* use defaults */ }
-  }, [previewOnly]);
+  }, [previewDemo, previewOnly]);
 
   // Search runs 250 ms after typing stops instead of on every keystroke.
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -454,6 +500,23 @@ export default function ProductsScreen() {
   }, [searchQuery]);
 
   const loadProducts = useCallback(async () => {
+    if (previewDemo) {
+      const { getPreviewSellerProducts } = await import('@/lib/previewSellerProducts');
+      const allProducts = getPreviewSellerProducts();
+      const query = debouncedQuery.toLowerCase();
+      const filtered = allProducts.filter((product) =>
+        matchesPreviewProductFilter(product, filter)
+        && (!query
+          || product.name.toLowerCase().includes(query)
+          || product.tags.some((tag) => tag.toLowerCase().includes(query))
+          || product.variants.some((variant) => variant.sku?.toLowerCase().includes(query))
+          || product.category.toLowerCase().includes(query)),
+      );
+      setProducts(filtered);
+      setStats(getPreviewProductStats(allProducts));
+      setLoading(false);
+      return;
+    }
     if (previewOnly || previewOnlyRef.current) {
       setProducts([]);
       setStats(EMPTY_STATS);
@@ -475,7 +538,7 @@ export default function ProductsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [filter, debouncedQuery, loadStats, previewOnly]);
+  }, [filter, debouncedQuery, loadStats, previewDemo, previewOnly]);
 
   // Re-apply the ?filter= deep link every time this screen is focused (not
   // just on first mount) — the seller tab bar keeps this screen mounted
@@ -570,7 +633,11 @@ export default function ProductsScreen() {
 
   async function handleRefresh() {
     if (previewOnly) {
-      setProducts([]);
+      if (previewDemo) await loadProducts();
+      else {
+        setProducts([]);
+        setStats(EMPTY_STATS);
+      }
       return;
     }
     setRefreshing(true);
@@ -599,7 +666,7 @@ export default function ProductsScreen() {
 
   // Sorted products
   const sortedProducts = useMemo(() => {
-    if (previewOnly) return [];
+    if (previewOnly && !previewDemo) return [];
     const arr = [...products];
     switch (sort) {
       case 'name': return arr.sort((a, b) => a.name.localeCompare(b.name));
@@ -610,7 +677,7 @@ export default function ProductsScreen() {
       case 'newest':
       default: return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
-  }, [products, sort, previewOnly]);
+  }, [products, sort, previewDemo, previewOnly]);
 
   // Status filter pills
   const filterPills: { label: string; value: ProductFilter }[] = [
@@ -623,15 +690,17 @@ export default function ProductsScreen() {
   ];
 
   const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
-  const hasActiveFilter = filter !== 'all';
+  // The selected status chip already shows Active/Draft/etc. as selected.
+  // Highlight the separate filter control only for choices outside that row.
+  const hasActiveFilter = filter !== 'all' && !filterPills.some(pill => pill.value === filter);
 
   const openProduct = useCallback((product: Product) => {
-    if (previewOnly) {
+    if (previewOnly && !previewDemo) {
       showPreviewOnlyFeedback();
       return;
     }
     router.push(('/product-detail?id=' + product.id) as never);
-  }, [router, previewOnly, showPreviewOnlyFeedback]);
+  }, [router, previewOnly, previewDemo, showPreviewOnlyFeedback]);
 
   const openActionSheet = useCallback((product: Product) => {
     if (previewOnly) {
@@ -644,10 +713,14 @@ export default function ProductsScreen() {
   }, [previewOnly, showPreviewOnlyFeedback]);
 
   const openStockEditor = useCallback((product: Product) => {
+    if (previewOnly) {
+      showPreviewOnlyFeedback();
+      return;
+    }
     hapticPrimaryAction();
     setStockEditProduct(product);
     setStockEditVisible(true);
-  }, []);
+  }, [previewOnly, showPreviewOnlyFeedback]);
 
   const handleStockChanged = useCallback((updated: Product) => {
     setProducts(prev => prev.map(p => (p.id === updated.id ? updated : p)));
@@ -657,13 +730,14 @@ export default function ProductsScreen() {
 
   const queryClient = useQueryClient();
   const onProductPressIn = useCallback((product: Product) => {
+    if (previewOnly) return;
     prefetchOnPressIn(
       queryClient,
       queryKeys.product(product.id),
       () => getProduct(product.id),
       product.media.find(m => m.isCover)?.uri ?? product.media[0]?.uri,
     )();
-  }, [queryClient]);
+  }, [previewOnly, queryClient]);
 
   const renderProduct = useCallback(({ item }: { item: Product }) => (
     <View style={{ paddingHorizontal: gridGap / 2 }}>
@@ -739,13 +813,21 @@ export default function ProductsScreen() {
         ]}
         titleAccessibilityLabel="Products, choose a view"
         actions={[
-          { icon: 'plus', onPress: () => router.push('/add-product' as never), accessibilityLabel: 'Add product' },
+          {
+            icon: 'plus',
+            onPress: () => router.push('/add-product' as never),
+            accessibilityLabel: 'Add product',
+          },
           {
             icon: 'more-horizontal',
             onPress: () => showActionSheet('Products', 'Choose an action', [
+              { text: 'Select products', onPress: () => router.push('/products-bulk-edit' as never) },
               { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
               { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
               { text: 'Export products', onPress: () => { void handleExportProducts(); } },
+              { text: 'Scheduled launches', onPress: () => router.push('/product-launches' as never) },
+              { text: 'Waitlist demand', onPress: () => router.push('/waitlist-demand' as never) },
+              { text: 'Size charts', onPress: () => router.push('/size-chart-templates' as never) },
               { text: 'Cancel', style: 'cancel' },
             ]),
             accessibilityLabel: 'More product actions',
@@ -756,7 +838,7 @@ export default function ProductsScreen() {
         searchPlaceholder="Search products…"
         onFilterPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
         hasActiveFilter={hasActiveFilter}
-        filterAccessibilityLabel={hasActiveFilter ? `Filter: ${filter}` : 'Filter products'}
+        filterAccessibilityLabel={filter !== 'all' ? `Filter: ${filter}` : 'Filter products'}
         onSortPress={() => { hapticPrimaryAction(); setSortModalVisible(true); }}
         sortAccessibilityLabel={`Sort: ${currentSortLabel}`}
         chips={filterPills.map(pill => ({

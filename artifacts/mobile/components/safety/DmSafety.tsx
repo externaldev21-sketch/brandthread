@@ -8,9 +8,10 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { radius } from '@/constants/radii';
 
 export interface DmCounterpart {
   userId: string;
@@ -146,6 +147,6 @@ const st = StyleSheet.create({
   icon: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: FONT.semibold, fontSize: FS.sm },
   body: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, marginTop: 2 },
-  btn: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 14, height: 34, alignItems: 'center', justifyContent: 'center' },
+  btn: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 14, height: 34, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: FONT.semibold, fontSize: FS.xs },
 });

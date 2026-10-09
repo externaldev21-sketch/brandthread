@@ -10,7 +10,7 @@ import { useColors } from '@/hooks/useColors';
 import { hapticToggle } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
-import { RADII } from '@/constants/radii';
+import { radius } from '@/constants/radii';
 
 export interface QuantityStepperProps {
   value: number;
@@ -57,7 +57,7 @@ export function QuantityStepper({
 
   return (
     <View
-      style={[styles.root, sm && styles.rootSm, { borderColor: palette.border, borderRadius: RADII.pill }]}
+      style={[styles.root, sm && styles.rootSm, { borderColor: palette.border, borderRadius: sm ? radius.sm : radius.md }]}
       testID={testID}
     >
       <Pressable

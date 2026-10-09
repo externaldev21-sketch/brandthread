@@ -18,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import { withOrigin } from '@/lib/navigation/flowOrigin';
 import { useSheetTransition } from '@/components/ui/BottomSheet';
 import {
   SetupState, SetupTask, SetupTaskId,
@@ -26,6 +26,7 @@ import {
   markSetupStarted, dismissWelcome, skipTask,
 } from '@/lib/setupStore';
 import SetupProgressRing from '@/components/SetupProgressRing';
+import { radius } from '@/constants/radii';
 
 export default function SetupWalkthroughSheet({
   visible,
@@ -77,7 +78,7 @@ export default function SetupWalkthroughSheet({
     onSetupStateChange(next);
     onClose();
     try {
-      router.push(withSellerSetupOrigin(task.route) as never);
+      router.push(withOrigin(task.route, 'dashboard') as never);
     } catch { /* ignore */ }
   }, [onClose, onSetupStateChange, router, userId]);
 
@@ -240,7 +241,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   rowDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   skip: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle },
   primaryBtn: {
-    marginTop: SP.md, height: 50, borderRadius: RADIUS.pill, backgroundColor: theme.accent,
+    marginTop: SP.md, height: 50, borderRadius: radius.md, backgroundColor: theme.accent,
     alignItems: 'center', justifyContent: 'center',
   },
   primaryBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },

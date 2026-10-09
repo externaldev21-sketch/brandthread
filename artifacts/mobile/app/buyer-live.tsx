@@ -10,11 +10,12 @@ import {
   ScrollView, Platform, ActivityIndicator,
   Alert, Dimensions, Share,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import * as ExpoLinking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
@@ -35,12 +36,14 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticLight, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import Composer from '@/components/ui/Composer';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
+import { useLiveModeration } from '@/lib/live/useLiveModeration';
+import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
+import { radius } from '@/constants/radii';
 
 const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Agora SDK (native-only) ──────────────────────────────────────────────────
-let AgoraModule: any = null;
-try { AgoraModule = require('react-native-agora'); } catch {}
+const AgoraModule = loadAgoraModule();
 
 interface Comment { id: string; user_id?: string; display_name: string; message: string; created_at: string; }
 interface ProductTag { productId: string; productName: string; priceCents: number; highlighted?: boolean; }
@@ -94,6 +97,9 @@ function BuyerLiveNativeScreen() {
   const [region, setRegion]               = useState('');
   const [postalCode, setPostalCode]       = useState('');
   const lastHighlightedRef = useRef<string | null>(null);
+  // Moderation + co-host: pinned comment above chat, co-host tiles, removal.
+  const mod = useLiveModeration(params.streamId);
+  const hostUidRef = useRef<number | null>(null);
 
   const engineRef       = useRef<any>(null);
   const scrollRef       = useRef<ScrollView>(null);
@@ -132,10 +138,19 @@ function BuyerLiveNativeScreen() {
         lastHighlightedRef.current = highlighted.productId;
         void openPurchase(highlighted);
       }
+    } else if (event.type === 'comment_removed') {
+      setComments(prev => prev.filter(c => c.id !== event.commentId));
+      mod.handleEvent(event);
+    } else if (event.type === 'comment_pinned' || event.type === 'cohosts') {
+      mod.handleEvent(event);
+    } else if (event.type === 'removed' || (event.type === 'user_banned' && event.userId === user?.id)) {
+      // The host banned this viewer: off the stream, no rejoin.
+      Alert.alert('Removed from the live', 'The host removed you from this live.');
+      handleLeave(true);
     } else if (event.type === 'viewerCount') {
       setViewerCount(event.count);
     }
-  }, []);
+  }, [user?.id, mod.handleEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startFallbackPolling = React.useCallback((active: boolean) => {
     if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
@@ -154,7 +169,7 @@ function BuyerLiveNativeScreen() {
     streamId: params.streamId,
     enabled: !loading && !ended && !!params.streamId,
     onEvent: handleLiveEvent,
-    onConnected: () => { void poll(); },
+    onConnected: () => { void poll(); mod.refresh(); },
     onFallback: startFallbackPolling,
   });
 
@@ -165,6 +180,7 @@ function BuyerLiveNativeScreen() {
       const s = streamData.stream;
       if (!s || s.status !== 'live') { setEnded(true); setLoading(false); return; }
       setStream(s);
+      hostUidRef.current = typeof s.agora_uid === 'number' ? s.agora_uid : null;
       setViewerCount(s.viewer_count ?? 0);
       setProductTags(Array.isArray(s.product_tags) ? s.product_tags : []);
 
@@ -184,8 +200,17 @@ function BuyerLiveNativeScreen() {
           engine.setClientRole(ClientRoleType.ClientRoleAudience);
           engine.enableVideo();
           engine.registerEventHandler({
-            onUserJoined: (uid: number) => { setBroadcastUid(uid); setAgoraReady(true); },
-            onUserOffline: () => { setEnded(true); },
+            // react-native-agora v6 passes (connection, remoteUid); accept either shape.
+            // With co-hosts there can be several publishers: only the host's uid is the
+            // main video, and only the host going offline ends the stream.
+            onUserJoined: (a: any, b?: number) => {
+              const uid: number = typeof a === 'number' ? a : (b as number);
+              if (hostUidRef.current == null || uid === hostUidRef.current) { setBroadcastUid(uid); setAgoraReady(true); }
+            },
+            onUserOffline: (a: any, b?: number) => {
+              const uid: number = typeof a === 'number' ? a : (b as number);
+              if (hostUidRef.current == null || uid === hostUidRef.current) setEnded(true);
+            },
             onJoinChannelSuccess: () => {},
             onError: (err: any) => console.warn('[Agora viewer]', err),
           });
@@ -201,7 +226,8 @@ function BuyerLiveNativeScreen() {
         }
       }
     } catch (e: any) {
-      Alert.alert('Couldn’t join the live', 'Try again.');
+      Alert.alert('Couldn’t join the live', apiErrorMessage(e, 'Try again.'));
+      if (e?.status === 403) { goBackOr(router); }
     } finally {
       setLoading(false);
     }
@@ -456,6 +482,9 @@ function BuyerLiveNativeScreen() {
         </View>
       )}
 
+      {/* Co-host tiles */}
+      <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={RemoteVideoView} top={headerTopInset + 96} />
+
       {/* Dark overlay */}
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
 
@@ -531,6 +560,7 @@ function BuyerLiveNativeScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={s.bottom}
       >
+        <PinnedCommentBar comment={mod.pinned} />
         <ScrollView
           ref={scrollRef}
           style={s.commentScroll}
@@ -683,7 +713,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   streamTitle:      { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 13 },
   productStrip:     { position: 'absolute', bottom: 155, left: 0, right: 0, zIndex: 8 },
   productStripInner:{ paddingHorizontal: 12, gap: 8 },
-  productChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 7 },
+  productChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7 },
   productChipName:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 90 },
   productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
   bottom:           { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 },
@@ -708,7 +738,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   purchasePrice: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl },
   fieldLabel: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: SP.xs },
   variantRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
-  variantChip: { borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: SP.xs },
+  variantChip: { borderWidth: 1, borderColor: BORDER, borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs },
   variantDisabled: { opacity: 0.35 },
   variantText: { color: FG, fontFamily: FONT.medium, fontSize: FS.xs },
   purchaseInput: { minHeight: 44, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, paddingHorizontal: SP.sm, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
@@ -724,7 +754,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   endedIcon:        { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   endedTitle:       { fontSize: FS.lg, fontFamily: FONT.bold },
   endedSub:         { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
-  backBtn:          { marginTop: 24, borderRadius: RADIUS.pill, paddingHorizontal: 28, paddingVertical: 12 },
+  backBtn:          { marginTop: 24, borderRadius: radius.md, paddingHorizontal: 28, paddingVertical: 12 },
   backBtnText:      { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
   });
 };

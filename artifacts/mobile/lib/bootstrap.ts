@@ -5,6 +5,8 @@
 import { LogBox } from 'react-native';
 import { initMonitoring } from '@/lib/monitoring';
 import { startBackgroundUpdateChecks } from '@/lib/otaUpdates';
+import { runAfterFirstPaint } from '@/lib/deferStartup';
+import { logNativeRuntimeDiagnostics } from '@/lib/startupDiagnostics';
 import { injectWebFocusOutlineStyles, injectWebRootClipStyles, injectWebScrollbarHideStyles, injectWebTextRenderingStyles } from '@/lib/webTextRendering';
 
 // React's own dev-only console.error warnings (e.g. "Encountered two
@@ -19,8 +21,10 @@ import { injectWebFocusOutlineStyles, injectWebRootClipStyles, injectWebScrollba
 // stops it from also painting an in-app banner over the real UI.
 LogBox.ignoreAllLogs(true);
 
+logNativeRuntimeDiagnostics();
 initMonitoring();
-startBackgroundUpdateChecks();
+// Registering the foreground update check is not needed for first paint.
+runAfterFirstPaint(startBackgroundUpdateChecks);
 injectWebTextRenderingStyles();
 injectWebFocusOutlineStyles();
 injectWebScrollbarHideStyles();

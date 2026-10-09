@@ -14,8 +14,9 @@
  *    an "Open player" hand-off to the existing /buyer-live Agora screen.
  *  - Realtime transport. The repo has no websocket/realtime layer, so
  *    `subscribe` polls every few seconds (same cadence buyer-live uses).
- *  - Scheduled lives / reminders and like counts: no tables exist, so
- *    `listUpcoming` returns [] and `setReminder` / `sendLike` are no-ops.
+ *  - Like counts: no counter exists, so `sendLike` is a no-op.
+ *  - Scheduled lives / reminders are real (routes/live-commerce.ts); see
+ *    lib/live/liveCommerce.ts.
  */
 import { serviceRequest } from '@/lib/serviceConfig';
 import { setSellerFollowing } from '@/services/socialService';
@@ -23,6 +24,9 @@ import type {
   LiveChatMessage, LiveHost, LiveProduct, LiveStream, LiveStreamProvider, SuggestedCreator,
 } from './types';
 import { orderLiveStreams } from './liveOrdering';
+import {
+  fetchUpcomingLives, pinnedProductIdFromRow, setScheduledLiveReminder,
+} from './liveCommerce';
 
 const POLL_MS = 3000;
 const MONO = ['#1F1F1F', '#3A3A3A', '#555555', '#2B2B2B', '#474747'];
@@ -68,7 +72,7 @@ export function productsFromTags(tags: unknown): { products: LiveProduct[]; pinn
 }
 
 export function streamFromRow(row: Row): LiveStream {
-  const { products, pinned } = productsFromTags(row.product_tags);
+  const { products } = productsFromTags(row.product_tags);
   return {
     id: row.id,
     host: hostFromRow(row),
@@ -78,7 +82,7 @@ export function streamFromRow(row: Row): LiveStream {
     startedAt: row.started_at ? new Date(row.started_at).getTime() : Date.now(),
     followedByViewer: row.followed === true,
     products,
-    pinnedProductId: pinned,
+    pinnedProductId: pinnedProductIdFromRow(row),
     topViewers: [],
     video: { kind: 'rtc', vendor: 'agora', posterUri: row.thumbnail_url ?? null },
   };
@@ -109,8 +113,18 @@ export function createApiLiveProvider(): LiveStreamProvider {
     },
 
     async listUpcoming() {
-      // No scheduled-live model exists yet (live_streams only has live/ended).
-      return [];
+      try {
+        const scheduled = await fetchUpcomingLives();
+        return scheduled.map(s => ({
+          id: s.id,
+          host: hostFromRow({ seller_id: s.sellerId, brand_name: s.seller.name, username: s.seller.username, avatar_url: s.seller.avatarUrl, verified: s.seller.verified }),
+          title: s.title,
+          startsAt: new Date(s.startsAt).getTime(),
+          reminderSet: s.reminderSet,
+        }));
+      } catch {
+        return [];
+      }
     },
 
     async listSuggestedCreators(): Promise<SuggestedCreator[]> {
@@ -158,7 +172,7 @@ export function createApiLiveProvider(): LiveStreamProvider {
           const s = detail.stream;
           if (!s || s.status !== 'live') { listener({ type: 'ended', streamId }); return; }
           listener({ type: 'viewers', streamId, viewerCount: Number(s.viewer_count) || 0 });
-          const { pinned } = productsFromTags(s.product_tags);
+          const pinned = pinnedProductIdFromRow(s);
           if (pinned !== lastPinned) {
             lastPinned = pinned;
             listener({ type: 'pinned', streamId, productId: pinned });
@@ -181,8 +195,8 @@ export function createApiLiveProvider(): LiveStreamProvider {
       // No live-like counter on the backend yet; the heart burst is local.
     },
 
-    async setReminder() {
-      // No scheduled lives yet — see listUpcoming.
+    async setReminder(upcomingId, on) {
+      await setScheduledLiveReminder(upcomingId, on);
     },
 
     async setFollowing(hostId, following) {

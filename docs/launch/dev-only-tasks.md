@@ -87,6 +87,9 @@ one-time setup this overlaps with).
 - [ ] **Sentry account + DSN** (optional but recommended before launch) — crash reporting
       stays off until a human creates the Sentry project and sets
       `EXPO_PUBLIC_SENTRY_DSN`/`SENTRY_AUTH_TOKEN` per `release-flow.md`.
+- [ ] **PostHog project** (optional) — funnel analytics stay off until a human creates the
+      project and sets `EXPO_PUBLIC_POSTHOG_KEY` (app) and `POSTHOG_API_KEY` (API). See
+      `docs/reliability/observability.md`.
 - [ ] **Legal sign-off** — Terms of Service and Privacy Policy content already ship
       without placeholder text (verified in `app-store-readiness.md`), but a lawyer should
       still confirm the final entity name, governing law and retention schedule are

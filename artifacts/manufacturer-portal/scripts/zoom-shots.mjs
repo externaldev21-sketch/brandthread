@@ -1,0 +1,35 @@
+/** Zoomed (3x) element captures at 393x852 for the PR: chips, stat cards, cards, action groups, forms, dialogs. */
+const pw = await import(process.env.PLAYWRIGHT_MODULE ?? "playwright");
+const chromium = pw.chromium ?? pw.default.chromium;
+const base = process.env.BASE_URL ?? "http://127.0.0.1:5602";
+const out = process.env.OUT ?? "zoom";
+const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
+const page = await (await browser.newContext({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 3 })).newPage();
+const shot = async (route, name, locator, act) => {
+  await page.goto(`${base}/admin/${route}`); await page.waitForLoadState("networkidle"); await page.waitForTimeout(300);
+  if (act) await act();
+  await locator(page).first().screenshot({ path: `${out}/${name}.png` });
+};
+const chips = (p) => p.locator("div.grid:has(> button.rounded-full)");
+const stat = (p) => p.locator("div.grid.grid-cols-2").first();
+await shot("users", "users-chips", chips);
+await shot("users", "users-card", (p) => p.locator("div.space-y-2 > div").first());
+await shot("orders", "orders-chips", chips);
+await shot("orders", "orders-card", (p) => p.locator("div.space-y-2 > div").first());
+await shot("orders", "orders-pager", (p) => p.locator("div.grid:has(> button.rounded-full)").first());
+await shot("revenue", "revenue-stats", stat);
+await shot("ai-spend", "ai-spend-stats", stat);
+await shot("ai-spend", "ai-spend-card", (p) => p.locator("div.space-y-2 > div").first());
+await shot("moderation", "moderation-card", (p) => p.locator("div.space-y-2 > div").first());
+await shot("moderation", "moderation-actions", (p) => p.locator("div.space-y-2 > div").first().locator("div.grid.auto-cols-fr"));
+await shot("promotions", "promotions-card", (p) => p.locator("div.space-y-2 > div").first());
+await shot("featured", "featured-form", (p) => p.locator("form").first());
+await shot("featured", "featured-card", (p) => p.locator("div.space-y-2 > div").first());
+await shot("announcements", "announcements-form", (p) => p.locator("div.rounded-lg.border.bg-card").first());
+await shot("invites", "invites-form", (p) => p.locator("form").first());
+await shot("invites", "invites-card", (p) => p.locator("div.space-y-2 > div").first());
+await shot("audit", "audit-card", (p) => p.locator("div.space-y-2 > div").first());
+await shot("users", "user-sheet", (p) => p.locator("[role=dialog]"), async () => { await page.locator("text=Atelier 9 >> visible=true").first().click(); await page.waitForTimeout(600); });
+await shot("users", "suspend-dialog", (p) => p.locator("[role=alertdialog]"), async () => { await page.locator("text=Atelier 9 >> visible=true").first().click(); await page.waitForTimeout(400); await page.getByRole("button", { name: "Suspend account" }).click(); await page.waitForTimeout(400); });
+await shot("promotions", "reject-dialog", (p) => p.locator("[role=alertdialog]"), async () => { await page.getByRole("button", { name: "Reject" }).first().click(); await page.waitForTimeout(400); });
+await browser.close();

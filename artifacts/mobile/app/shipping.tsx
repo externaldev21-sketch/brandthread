@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
 import { FS, SP, RADIUS } from '@/lib/theme';
@@ -16,6 +16,7 @@ import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
 import { parseDecimalToCents } from '@/lib/money';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { radius } from '@/constants/radii';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -153,11 +154,9 @@ export default function ShippingScreen() {
   const [zoneSaving, setZoneSaving] = useState(false);
 
   function leaveSetupDestination() {
-    if (launchedFromSellerSetup) {
-      router.replace(SELLER_HOME_ROUTE as never);
-      return;
-    }
-    goBackOr(router);
+    // Pop to the exact screen underneath (dashboard / setup checklist / tab);
+    // only a cold deep link with no history falls back to the `from` origin.
+    leaveSetupFlow(router, params.from);
   }
 
   const loadShipping = useCallback(() => {
@@ -1093,7 +1092,7 @@ const styles = StyleSheet.create({
   rateAmount: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   shipFromRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowLabelStrong: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  countryPill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
+  countryPill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8 },
   countryPillText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
   countryInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, width: 60, fontSize: 13, fontFamily: 'Inter_700Bold', textAlign: 'center' },
   smallBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
@@ -1121,7 +1120,7 @@ const styles = StyleSheet.create({
   tierRemoveBtn: { padding: 8 },
   addTierBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginTop: 8, alignSelf: 'flex-start' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  suggestionChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  suggestionChip: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 5 },
   suggestionChipText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: SP.sm },
   dimsRow: { flexDirection: 'row', gap: 8 },

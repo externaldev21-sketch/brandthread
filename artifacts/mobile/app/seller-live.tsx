@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, ActivityIndicator, Dimensions } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -15,21 +15,25 @@ import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import Composer from '@/components/ui/Composer';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+import { LiveCodesHostSheet } from '@/components/live/LiveCodesHostSheet';
+import { useLiveModeration } from '@/lib/live/useLiveModeration';
+import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
+import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
+import { radius } from '@/constants/radii';
+import { loadAgoraModule } from '@/lib/agoraAvailability';
 
 const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Agora SDK (native-only, gracefully skipped on web/Expo Go) ───────────────
-let AgoraModule: any = null;
-try {
-  AgoraModule = require('react-native-agora');
-} catch {}
+const AgoraModule = loadAgoraModule();
 
-interface Comment { id: string; display_name: string; message: string; created_at: string; }
+interface Comment { id: string; user_id?: string; display_name: string; message: string; created_at: string; }
 
 export default function SellerLiveScreen() {
   if (Platform.OS === 'web') {
@@ -70,9 +74,30 @@ function SellerLiveNativeScreen() {
   const [duration, setDuration]           = useState(0);
   const [productTags, setProductTags]     = useState<any[]>([]);
   const [showProductPicker, setShowProductPicker] = useState(false);
+  const [showLiveCodes, setShowLiveCodes]   = useState(false);
   const [allProducts, setAllProducts]     = useState<any[]>([]);
   const [ending, setEnding]               = useState(false);
   const [agoraReady, setAgoraReady]       = useState(false);
+  // Host-only tips total; stays null (and renders nothing) while the
+  // `live_tips` flag is OFF or the call fails.
+  const liveTipsEnabled = useFeatureFlag('live_tips');
+  const [tipsTotalCents, setTipsTotalCents] = useState<number | null>(null);
+  useEffect(() => {
+    if (!liveTipsEnabled || !params.streamId) return undefined;
+    let cancelled = false;
+    const load = () => {
+      api.liveTips.total(params.streamId)
+        .then(r => { if (!cancelled) setTipsTotalCents(r.enabled ? r.totalCents : null); })
+        .catch(() => {});
+    };
+    load();
+    const timer = setInterval(load, 8000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [api, liveTipsEnabled, params.streamId]);
+
+  // Moderation + co-host (pinned comment, co-host tiles, comment actions sheet).
+  const mod = useLiveModeration(params.streamId);
+  const [actionComment, setActionComment] = useState<CommentActionTarget | null>(null);
 
   const engineRef     = useRef<any>(null);
   const commentsRef   = useRef<ScrollView>(null);
@@ -156,8 +181,13 @@ function SellerLiveNativeScreen() {
       setProductTags(event.productTags);
     } else if (event.type === 'viewerCount') {
       setViewerCount(event.count);
+    } else if (event.type === 'comment_removed') {
+      setComments(prev => prev.filter(c => c.id !== event.commentId));
+      mod.handleEvent(event);
+    } else {
+      mod.handleEvent(event);
     }
-  }, []);
+  }, [mod.handleEvent]);
 
   const startFallbackPolling = React.useCallback((active: boolean) => {
     if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
@@ -170,7 +200,7 @@ function SellerLiveNativeScreen() {
     enabled: !!params.streamId,
     asHost: true,
     onEvent: handleLiveEvent,
-    onConnected: () => { void pollComments(generationRef.current); },
+    onConnected: () => { void pollComments(generationRef.current); mod.refresh(); },
     onFallback: startFallbackPolling,
   });
 
@@ -243,15 +273,34 @@ function SellerLiveNativeScreen() {
 
   async function highlightProduct(productId: string) {
     Haptics.selectionAsync();
+    // Tapping the featured product again unpins it. The pin is stored and
+    // broadcast by the server (POST /api/live/:id/pin), which also keeps the
+    // legacy `highlighted` flag in step.
+    const alreadyPinned = productTags.find(tag => tag.productId === productId)?.highlighted === true;
     const updated = productTags.map(tag => ({
       ...tag,
-      highlighted: tag.productId === productId,
+      highlighted: !alreadyPinned && tag.productId === productId,
     }));
     setProductTags(updated);
     try {
-      await (api as any).live.updateProducts(params.streamId, updated);
+      await (api as any).live.pin(params.streamId, alreadyPinned ? null : productId);
     } catch {
       Alert.alert('Could not feature product', 'The product highlight did not reach viewers. Please try again.');
+    }
+  }
+
+  async function runCommentAction(action: CommentAction, c: CommentActionTarget) {
+    const id = params.streamId;
+    try {
+      if (action === 'pin') await (api as any).liveMod.pin(id, c.id);
+      else if (action === 'unpin') await (api as any).liveMod.pin(id, null);
+      else if (action === 'remove') await (api as any).liveMod.removeComment(id, c.id);
+      else if (action === 'mute' && c.user_id) await (api as any).liveMod.mute(id, c.user_id);
+      else if (action === 'ban' && c.user_id) await (api as any).liveMod.ban(id, c.user_id);
+      if (action === 'ban' && c.user_id) setComments(prev => prev.filter(x => x.user_id !== c.user_id));
+      if (action === 'remove') setComments(prev => prev.filter(x => x.id !== c.id));
+    } catch {
+      Alert.alert('Couldn’t update', 'That action did not go through. Try again.');
     }
   }
 
@@ -316,6 +365,16 @@ function SellerLiveNativeScreen() {
         </View>
       </View>
 
+      {/* Tips total (live_tips flag ON and at least one tip) */}
+      {tipsTotalCents != null && tipsTotalCents > 0 && (
+        <View style={[s.tipsRow, { paddingTop: headerTopInset + 78 }]} pointerEvents="none">
+          <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]} testID="seller-live-tips-total">
+            <Feather name="gift" size={13} color="#fff" />
+            <Text style={s.viewerText}>{formatCents(tipsTotalCents)} in tips</Text>
+          </View>
+        </View>
+      )}
+
       {/* Right action rail */}
       <View style={[s.rightRail, { paddingTop: headerTopInset + 80 }]}>
         {/* Products */}
@@ -327,6 +386,10 @@ function SellerLiveNativeScreen() {
             </View>
           )}
         </TouchableOpacity>
+        {/* Live-only discount codes */}
+        <TouchableOpacity onPress={() => setShowLiveCodes(true)} style={s.railBtn} activeOpacity={0.7} accessibilityLabel="Live codes">
+          <Feather name="tag" size={21} color="#fff" />
+        </TouchableOpacity>
         {/* Switch camera */}
         <TouchableOpacity
           style={s.railBtn}
@@ -335,7 +398,30 @@ function SellerLiveNativeScreen() {
         >
           <Feather name="refresh-cw" size={20} color="#fff" />
         </TouchableOpacity>
+        {/* Moderation */}
+        <TouchableOpacity
+          style={s.railBtn}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Moderation"
+          onPress={() => router.push({ pathname: '/live-moderation', params: { streamId: params.streamId } } as any)}
+        >
+          <Feather name="shield" size={20} color="#fff" />
+        </TouchableOpacity>
+        {/* Co-host */}
+        <TouchableOpacity
+          style={s.railBtn}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Invite a co-host"
+          onPress={() => router.push({ pathname: '/live-cohost', params: { streamId: params.streamId } } as any)}
+        >
+          <Feather name="user-plus" size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
+
+      {/* Co-host tiles */}
+      <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={AgoraModule?.RtcSurfaceView ?? null} top={headerTopInset + 86} />
 
       {/* Tagged products strip */}
       {productTags.length > 0 && (
@@ -366,19 +452,30 @@ function SellerLiveNativeScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={s.bottomSection}
       >
-        {/* Comments scroll */}
+        {/* Pinned comment */}
+        <PinnedCommentBar comment={mod.pinned} />
+
+        {/* Comments scroll — tap or long-press a viewer comment for Pin / Remove / Mute / Ban */}
         <ScrollView
           ref={commentsRef}
           style={s.commentScroll}
           contentContainerStyle={s.commentContent}
           showsVerticalScrollIndicator={false}
-          pointerEvents="none"
         >
           {comments.map(c => (
-            <View key={c.id} style={s.commentBubble}>
+            <TouchableOpacity
+              key={c.id}
+              activeOpacity={0.8}
+              disabled={!c.user_id || c.user_id === user?.id}
+              onPress={() => setActionComment(c)}
+              onLongPress={() => setActionComment(c)}
+              accessibilityRole="button"
+              accessibilityHint="Opens moderation actions"
+              style={s.commentBubble}
+            >
               <Text style={s.commentAuthor}>{c.display_name} </Text>
               <Text style={s.commentText}>{c.message}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
 
@@ -393,6 +490,14 @@ function SellerLiveNativeScreen() {
           testID="seller-live-composer"
         />
       </KeyboardAvoidingView>
+
+      {showLiveCodes && <LiveCodesHostSheet streamId={params.streamId} onClose={() => setShowLiveCodes(false)} />}
+      <LiveCommentActionsSheet
+        comment={actionComment}
+        pinned={!!actionComment && mod.pinned?.id === actionComment.id}
+        onClose={() => setActionComment(null)}
+        onAction={(action, c) => { void runCommentAction(action, c); }}
+      />
 
       {/* Product picker modal */}
       {showProductPicker && (
@@ -457,6 +562,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   endBtn:           { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   endBtnText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 13 },
   viewerRow:        { position: 'absolute', top: 0, left: 16, zIndex: 9 },
+  tipsRow:          { position: 'absolute', top: 0, left: 16, zIndex: 9 },
   viewerBadge:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5 },
   viewerText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 12 },
   rightRail:        { position: 'absolute', right: 12, top: 0, zIndex: 10, gap: 16 },
@@ -465,7 +571,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   railBadgeText:    { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   productStrip:     { position: 'absolute', bottom: 160, left: 0, right: 0, zIndex: 8 },
   productStripContent: { paddingHorizontal: 12, gap: 8 },
-  productChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 7 },
+  productChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7 },
   productChipText:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 100 },
   productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
   featuredLabel: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },

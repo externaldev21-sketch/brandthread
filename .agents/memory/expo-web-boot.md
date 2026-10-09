@@ -16,15 +16,37 @@ Keep test and spec modules outside Expo Router's `app/` directory.
 - Put route regression tests in a top-level test directory, never beside route files under `app/`. Expo Router can evaluate those files while building the route graph; a Vitest import outside its runner makes static rendering return HTTP 500.
 
 ## Dev preview bypass
-Development web previews default to the buyer role, seed local onboarding/role state at module scope, and skip the Clerk gate + auth redirects. `?bt_preview=seller` explicitly switches design review to the seller role. Group segments are stripped from web URLs (`/(buyer)/discover` → `/discover`); bare `/` redirects to the effective preview role's home.
-**Why:** the screenshot browser and canvas iframes are stateless — no Clerk session, no localStorage — so without this, no auth-gated screen can ever be shown or captured outside a tester run.
-**How to apply:** use the bare preview URL for buyer review and add `?bt_preview=seller` for seller review. Screens tied to the Clerk user render fallbacks. The bypass is web + development only and never changes production or native end-user onboarding.
+The development web preview supports synthetic Demo Buyer and Demo Seller sessions. Explicit `?bt_preview=buyer` and `?bt_preview=seller` links select either side, and the dev-only account switcher exposes both identities. Onboarding remains intact behind the preview entry.
+**Why:** the owner needs to inspect either buyer or seller screens without repeating authentication or onboarding; the preferred default can change during testing.
+**How to apply:** use explicit role URLs for repeatable screen review; do not assume the bare preview URL always selects the same role. Keep synthetic identities and demo financial values limited to development previews. Production must retain real auth and onboarding; any native development exception must be temporary, explicit, and never persist fake completion.
 
-Authenticated seller tools cannot treat this navigation bypass as a real Clerk session. In dev web seller preview, initialize review-only UI state synchronously from the route role and skip protected API calls; keep uploads, writes, checkout, and activation behind real authentication.
+The dev-web account switcher's selected demo side must survive Expo Router removing query parameters and browser reloads, scoped to the current browser tab. This is preview navigation, not a Clerk account switch.
+**Why:** clicking Demo Buyer opened the buyer home, but the root redirect dropped the query; reloading silently returned to Demo Seller.
+**How to apply:** explicit preview URLs override the tab's selection, and seller/buyer preview detection, root redirects, and displayed account state must all resolve the same selected role.
 
-**Why:** paid promotion screens entered generic error states because the preview bypass opened them without a token, so every protected request returned 401. Async-only fallbacks also flashed or remained on loading states during direct web captures.
+Opening the demo account chooser from the buyer profile should use a full preview-only navigation rather than a client-side push; keep real accounts on normal in-app navigation.
+**Why:** early preview navigation can be reset to buyer home while Clerk finishes loading, hiding the chooser before Demo Seller can be tapped. Direct chooser loads remain stable during that startup window.
+**How to apply:** preserve the buyer preview URL when entering the chooser, then let the selected demo row navigate to its chosen side; do not treat demo rows as real Clerk sessions.
+
+Authenticated seller tools cannot treat this navigation bypass as a real Clerk session. In dev web seller preview, mount the actual seller screens, using their own zero/default states and skipping protected API calls. Do not replace routes with generic sign-in or “nothing here yet” screens; keep uploads, writes, checkout, and activation behind real authentication.
+
+**Why:** paid promotion screens entered generic error states because the preview bypass opened them without a token, so every protected request returned 401. Async-only fallbacks also flashed or remained on loading states during direct web captures. The owner explicitly rejected route-wide preview placeholders because they blocked navigation despite removing sign-in prompts.
 
 **How to apply:** derive preview role from route parameters so SSR and the first client frame agree. Use clearly labeled, non-financial preview fixtures only for reviewing UI; never fake successful writes, payments, entitlement, delivery, or activation.
 
 ## Debugging gotcha
 The Screenshot tool captures web pages before async boot completes (sub-second), so it shows the loading state even when the app works — it cannot observe anything time-based. Use the Playwright testing subagent to watch a page over tens of seconds (console timeline, network failures, final render). Verifying signed-in flows: Clerk programmatic login + seeding localStorage (`onboarding_complete`, `user_role`, `splash_seen`) reproduces any auth/role state.
+
+Protected buyer screens have the same boundary as seller tools: selecting a synthetic preview role does not create a Clerk token. A direct Notifications deep-link may show only a loader while its request returns 401, and unauthenticated client-side navigation may redirect to the feed. **Why:** visual checks of a filter row repeatedly captured authentication/loading rather than the rendered screen. **How to apply:** use an authenticated or properly seeded browser session for visual interaction checks; a direct preview screenshot is not proof that the controls are broken or usable.
+
+If Playwright is installed but its downloaded Chromium binary is missing, use the available system Chromium (`/repl/tools/bin/chromium`) as `executablePath` for read-only browser-console inspection instead of installing another browser.
+
+**Why:** The normal Playwright launch failed despite the package being present; the system binary opened the running Expo web preview and captured browser console messages.
+
+**How to apply:** Pass `executablePath` and `args: ['--no-sandbox']` to `chromium.launch` after confirming the system binary exists. Do not mistake a failed Playwright launch for an app startup failure.
+
+Read-only agent contexts can also prevent Chromium from starting because its configuration/crash-report directory resolves inside the workspace, even when the browser profile and HOME are temporary.
+
+**Why:** Chromium failed before page navigation while trying to write its crash-report settings in a read-only workspace; redirecting browser configuration and cache locations to writable temporary directories allowed the same installed browser to run.
+
+**How to apply:** Keep browser profiles, configuration, and caches in writable temporary directories for automated checks. Account for XDG/Chromium configuration-home selection rather than changing repository permissions or app authentication. Confirm the endpoint is serving before attributing a browser launch or HTTP failure to UI code.

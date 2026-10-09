@@ -6,8 +6,9 @@
  * actual checkout charge (buyer.ts POST /checkout/session) can never disagree.
  */
 import { and, eq, sql } from "drizzle-orm";
-import { db, discountCodes, discountCodeUses } from "@workspace/db";
+import { db, discountCodes, discountCodeUses, liveStreams } from "@workspace/db";
 import type { InferSelectModel } from "drizzle-orm";
+import { countCustomerUses, hasPriorPaidOrder, resolveCollectionProductIds } from "./discountLookups";
 
 export type DiscountCodeRow = InferSelectModel<typeof discountCodes>;
 
@@ -19,7 +20,12 @@ export type DiscountRejectionCode =
   | "MAX_USES_REACHED"
   | "ALREADY_USED_BY_CUSTOMER"
   | "MIN_ORDER_NOT_MET"
-  | "NO_ELIGIBLE_ITEMS";
+  | "MIN_QUANTITY_NOT_MET"
+  | "FIRST_ORDER_ONLY"
+  | "CUSTOMER_LIMIT_REACHED"
+  | "NO_ELIGIBLE_ITEMS"
+  | "LIVE_ONLY"
+  | "LIVE_ENDED";
 
 export class DiscountValidationError extends Error {
   constructor(readonly code: DiscountRejectionCode, message: string, readonly details?: Record<string, unknown>) {
@@ -44,13 +50,34 @@ export interface DiscountApplication {
   freeShipping: boolean;
 }
 
-/** Sum of cart lines the code is allowed to discount (all of them for entire_store). */
-function eligibleSubtotalCents(discount: DiscountCodeRow, lines: CartLine[]): number {
-  const productIds = Array.isArray(discount.productIds) ? new Set(discount.productIds as string[]) : new Set<string>();
-  const eligible = discount.appliesTo === "specific_products"
-    ? lines.filter((l) => productIds.has(l.productId))
-    : lines;
-  return eligible.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
+/** Cart lines the code is allowed to discount (all of them for entire_store). */
+function eligibleLines(discount: DiscountCodeRow, lines: CartLine[], collectionProductIds: Set<string>): CartLine[] {
+  if (discount.appliesTo === "specific_products") {
+    const productIds = Array.isArray(discount.productIds) ? new Set(discount.productIds as string[]) : new Set<string>();
+    return lines.filter((l) => productIds.has(l.productId));
+  }
+  if (discount.appliesTo === "collections") return lines.filter((l) => collectionProductIds.has(l.productId));
+  return lines;
+}
+
+/**
+ * Live-only codes (discount_codes.live_stream_id): valid solely for that
+ * stream and solely while it is live. Pure so the rule is unit-testable.
+ * Returns null when the code may be used.
+ */
+export function liveScopeRejection(
+  discountLiveStreamId: string | null | undefined,
+  requestLiveStreamId: string | null | undefined,
+  streamStatus: string | null | undefined,
+): { code: "LIVE_ONLY" | "LIVE_ENDED"; message: string } | null {
+  if (!discountLiveStreamId) return null;
+  if (!requestLiveStreamId || requestLiveStreamId.toLowerCase() !== discountLiveStreamId.toLowerCase()) {
+    return { code: "LIVE_ONLY", message: "This code only works during the live it was shared in." };
+  }
+  if (streamStatus !== "live") {
+    return { code: "LIVE_ENDED", message: "This code was only valid during the live, which has ended." };
+  }
+  return null;
 }
 
 /**
@@ -65,6 +92,8 @@ export async function validateDiscountCode(input: {
   cartSubtotalCents: number;
   lines: CartLine[];
   now?: Date;
+  /** The live stream the buyer is shopping from, if any (required for live-only codes). */
+  liveStreamId?: string | null;
 }): Promise<DiscountApplication> {
   const now = input.now ?? new Date();
   const normalizedCode = input.code.trim().toUpperCase();
@@ -80,6 +109,20 @@ export async function validateDiscountCode(input: {
   }
   if (!discount.active) {
     throw new DiscountValidationError("INACTIVE", "This discount code is paused.");
+  }
+  if (discount.liveStreamId) {
+    const requested = input.liveStreamId ?? null;
+    let streamStatus: string | null = null;
+    if (requested && requested.toLowerCase() === discount.liveStreamId.toLowerCase()) {
+      const [stream] = await db
+        .select({ status: liveStreams.status })
+        .from(liveStreams)
+        .where(eq(liveStreams.id, discount.liveStreamId))
+        .limit(1);
+      streamStatus = stream?.status ?? null;
+    }
+    const rejection = liveScopeRejection(discount.liveStreamId, requested, streamStatus);
+    if (rejection) throw new DiscountValidationError(rejection.code, rejection.message);
   }
   if (discount.startsAt && discount.startsAt.getTime() > now.getTime()) {
     throw new DiscountValidationError("NOT_STARTED", "This discount code isn't active yet.");
@@ -101,14 +144,42 @@ export async function validateDiscountCode(input: {
     }
   }
   if (input.cartSubtotalCents < (discount.minOrderCents ?? 0)) {
-    throw new DiscountValidationError("MIN_ORDER_NOT_MET", `Add ${((discount.minOrderCents ?? 0) / 100).toFixed(2)} more to use this code.`, {
+    throw new DiscountValidationError("MIN_ORDER_NOT_MET", `Spend $${((discount.minOrderCents ?? 0) / 100).toFixed(2)} or more to use this code.`, {
       minOrderCents: discount.minOrderCents,
     });
   }
+  if (discount.maxUsesPerCustomer != null && discount.maxUsesPerCustomer > 0) {
+    const used = await countCustomerUses(discount.id, input.customerKey);
+    if (used >= discount.maxUsesPerCustomer) {
+      throw new DiscountValidationError(
+        "CUSTOMER_LIMIT_REACHED",
+        discount.maxUsesPerCustomer === 1
+          ? "You've already used this discount code."
+          : `You've used this code the maximum ${discount.maxUsesPerCustomer} times.`,
+      );
+    }
+  }
+  if (discount.firstOrderOnly && (await hasPriorPaidOrder(input.sellerId, input.customerKey))) {
+    throw new DiscountValidationError("FIRST_ORDER_ONLY", "This code is only valid on your first order with this shop.");
+  }
 
-  const eligibleCents = eligibleSubtotalCents(discount, input.lines);
+  const collectionIds = Array.isArray(discount.collectionIds) ? (discount.collectionIds as string[]) : [];
+  const collectionProductIds = discount.appliesTo === "collections"
+    ? await resolveCollectionProductIds(discount.sellerId, collectionIds)
+    : new Set<string>();
+  const eligible = eligibleLines(discount, input.lines, collectionProductIds);
+  if ((discount.minQuantity ?? 0) > 0) {
+    const qty = eligible.reduce((sum, l) => sum + l.quantity, 0);
+    if (qty < discount.minQuantity) {
+      const short = discount.minQuantity - qty;
+      throw new DiscountValidationError("MIN_QUANTITY_NOT_MET", `Add ${short} more ${short === 1 ? "item" : "items"} to use this code.`, {
+        minQuantity: discount.minQuantity,
+      });
+    }
+  }
+  const eligibleCents = eligible.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
   if (eligibleCents <= 0 && discount.type !== "free_shipping") {
-    throw new DiscountValidationError("NO_ELIGIBLE_ITEMS", "No items in your cart are eligible for this code.");
+    throw new DiscountValidationError("NO_ELIGIBLE_ITEMS", discount.appliesTo === "entire_store" ? "No items in your cart are eligible for this code." : "This code only applies to selected products in this shop.");
   }
 
   const value = Number(discount.value);
@@ -131,11 +202,7 @@ export async function validateDiscountCode(input: {
       description = "Free shipping";
       break;
     case "free_item": {
-      const productIds = Array.isArray(discount.productIds) ? new Set(discount.productIds as string[]) : new Set<string>();
-      const eligibleLines = discount.appliesTo === "specific_products"
-        ? input.lines.filter((l) => productIds.has(l.productId))
-        : input.lines;
-      const cheapest = eligibleLines.reduce<CartLine | null>((min, l) => (!min || l.priceCents < min.priceCents ? l : min), null);
+      const cheapest = eligible.reduce<CartLine | null>((min, l) => (!min || l.priceCents < min.priceCents ? l : min), null);
       appliedAmountCents = cheapest ? cheapest.priceCents : 0;
       description = "Free item";
       break;

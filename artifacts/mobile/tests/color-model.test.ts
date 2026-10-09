@@ -3,6 +3,8 @@ import {
   rgbToHsv, hsvToRgb, parseHex, rgbToHex, isValidHex, hsvToHex, hexToHsv,
   discPointToHs, hsToDiscPoint,
   pushRecentColor, addColorToPalette, removeColorFromPalette, createPalette,
+  renamePalette, deletePalette, setDefaultPalette,
+  computeHarmonyHues, HARMONY_RULES, HARMONY_RULE_LABELS,
   relativeLuminance, contrastingBW,
   BrandPalette,
 } from '../lib/colorModel';
@@ -178,5 +180,78 @@ describe('contrast helpers', () => {
 
   it('contrastingBW falls back to black for invalid hex', () => {
     expect(contrastingBW('nope')).toBe('#000000');
+  });
+});
+
+describe('palette management (rename/delete/setDefault)', () => {
+  const base: BrandPalette[] = [
+    { id: 'a', name: 'Ascend', colors: ['#111111'] },
+    { id: 'b', name: 'Campfire', colors: ['#222222'] },
+  ];
+
+  it('renamePalette renames only the matching palette', () => {
+    const next = renamePalette(base, 'a', 'Renamed');
+    expect(next[0].name).toBe('Renamed');
+    expect(next[1].name).toBe('Campfire');
+    expect(next[1]).toBe(base[1]); // untouched reference
+  });
+
+  it('deletePalette removes only the matching palette', () => {
+    const next = deletePalette(base, 'a');
+    expect(next).toHaveLength(1);
+    expect(next[0].id).toBe('b');
+  });
+
+  it('setDefaultPalette marks exactly one palette as default, clearing others', () => {
+    const withDefault = setDefaultPalette(base, 'a');
+    expect(withDefault.find(p => p.id === 'a')!.isDefault).toBe(true);
+    expect(withDefault.find(p => p.id === 'b')!.isDefault).toBe(false);
+  });
+
+  it('setDefaultPalette re-targeting clears the previous default', () => {
+    const first = setDefaultPalette(base, 'a');
+    const second = setDefaultPalette(first, 'b');
+    expect(second.find(p => p.id === 'a')!.isDefault).toBe(false);
+    expect(second.find(p => p.id === 'b')!.isDefault).toBe(true);
+  });
+});
+
+describe('computeHarmonyHues', () => {
+  it('complementary returns the opposite hue', () => {
+    expect(computeHarmonyHues(0, 'complementary')).toEqual([180]);
+    expect(computeHarmonyHues(200, 'complementary')).toEqual([20]);
+  });
+
+  it('analogous returns two hues ±30°', () => {
+    expect(computeHarmonyHues(100, 'analogous')).toEqual([70, 130]);
+  });
+
+  it('triadic returns two hues 120° apart', () => {
+    expect(computeHarmonyHues(0, 'triadic')).toEqual([120, 240]);
+  });
+
+  it('splitComplementary returns two hues around the complement', () => {
+    expect(computeHarmonyHues(0, 'splitComplementary')).toEqual([150, 210]);
+  });
+
+  it('monochromatic returns no secondary hues', () => {
+    expect(computeHarmonyHues(50, 'monochromatic')).toEqual([]);
+  });
+
+  it('wraps hues into [0, 360) regardless of input range', () => {
+    expect(computeHarmonyHues(350, 'complementary')).toEqual([170]);
+    expect(computeHarmonyHues(-10, 'complementary')).toEqual([170]);
+    for (const rule of HARMONY_RULES) {
+      for (const h of computeHarmonyHues(370, rule)) {
+        expect(h).toBeGreaterThanOrEqual(0);
+        expect(h).toBeLessThan(360);
+      }
+    }
+  });
+
+  it('every harmony rule has a human-readable label', () => {
+    for (const rule of HARMONY_RULES) {
+      expect(HARMONY_RULE_LABELS[rule]).toBeTruthy();
+    }
   });
 });

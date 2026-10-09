@@ -14,6 +14,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { verifyWsToken } from "./auth";
 import { logger } from "../lib/logger";
+import { loadRestriction } from "../lib/liveModerationState";
 
 const WS_PATH = "/ws/live";
 
@@ -46,6 +47,17 @@ export function broadcastToRoom(streamId: string, payload: Record<string, unknow
   for (const socket of room) {
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(data);
+    }
+  }
+}
+
+/** Closes every socket `userId` holds in `streamId`'s room (used when the host bans a viewer). */
+export function disconnectUserFromRoom(streamId: string, userId: string): void {
+  const room = rooms.get(streamId);
+  if (!room) return;
+  for (const socket of [...room]) {
+    if (socket.userId === userId) {
+      try { socket.close(4003, "removed"); } catch { /* ignore */ }
     }
   }
 }
@@ -125,6 +137,15 @@ export function attachLiveWebSocket(httpServer: HttpServer): WebSocketServer {
     ws.userId = ctx.userId;
     ws.isAlive = true;
     roomFor(ctx.streamId).add(ws);
+
+    // A viewer the host banned can't re-enter the room by reconnecting.
+    // (Checked even for role=host: that flag is client-claimed, and a host can never be banned.)
+    void loadRestriction(ctx.streamId, ctx.userId).then((kind) => {
+      if (kind === "ban") {
+        leaveRoom(ws);
+        try { ws.close(4003, "removed"); } catch { /* ignore */ }
+      }
+    }).catch((err) => logger.warn({ err }, "live ws ban check failed"));
 
     if (!ctx.isHost) {
       void upsertViewer(ctx.streamId, ctx.userId).catch((err) =>

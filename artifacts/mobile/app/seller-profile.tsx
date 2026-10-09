@@ -24,7 +24,9 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import { useApi } from '@/hooks/useApi';
+import { useStoreGiftCards } from '@/hooks/useStoreGiftCards';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
@@ -59,7 +61,7 @@ import {
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
-import { useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import {
@@ -147,12 +149,14 @@ export default function SellerProfileScreen() {
   const routeSellerId = params.id ?? params.sellerId;
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const layout = useProfileLayout();
+  const { requireSignIn } = useSignInGate();
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   // Clears the floating buyer tab bar when this screen is reached from the
   // buyer shell (viewing a brand's public profile); a no-op elsewhere.
   const barInset = useBuyerTabBarInset();
 
   const [seller, setSeller] = useState<SellerView | null>(null);
+  const sellsGiftCards = useStoreGiftCards(seller?.sellerId);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
@@ -186,6 +190,18 @@ export default function SellerProfileScreen() {
   const caps = profileCapabilities('seller', mode);
   // The signed-out web preview (?bt_preview=…) must never reach protected APIs.
   const devPreview = isSellerDevPreview() || isBuyerDevPreview();
+
+  // Replays row in the "..." menu: only when this seller has >=1 saved live
+  // replay the viewer may see (public API; never called from the dev preview).
+  const [replayCount, setReplayCount] = useState(0);
+  useEffect(() => {
+    if (!canonicalSellerId || devPreview) return undefined;
+    let active = true;
+    api.liveReplays.bySeller(canonicalSellerId, { limit: 1 })
+      .then((res) => { if (active) setReplayCount(res.replays.length); })
+      .catch(() => { if (active) setReplayCount(0); });
+    return () => { active = false; };
+  }, [api, canonicalSellerId, devPreview]);
 
   // ── Profile load ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -235,11 +251,9 @@ export default function SellerProfileScreen() {
   // ── Social counts + follow state (public counts for everyone; follow
   // state only once signed in) ──────────────────────────────────────────────
   useEffect(() => {
-    // Counts must load for a signed-out guest too — the comment above always
-    // said so, but gating the whole effect on `userId` left it never firing
-    // for a guest (or before Clerk finishes loading), so Followers/Following
-    // stayed the "–" placeholder forever instead of the real number.
-    if (!canonicalSellerId) return;
+    // The public seller response supplies guest-safe totals; signed-in viewers
+    // also fetch their relationship state from the social endpoint.
+    if (!canonicalSellerId || !userId) return;
     let active = true;
     Promise.allSettled([
       (!isOwner && userId) ? getSellerFollowState(canonicalSellerId) : Promise.resolve(null),
@@ -346,6 +360,7 @@ export default function SellerProfileScreen() {
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleFollow = useCallback(async () => {
     if (followPending || !canonicalSellerId) return;
+    if (!requireSignIn()) return;
     const previous = { isFollowing, followers };
     const next = !isFollowing;
     setFollowPending(true);
@@ -362,7 +377,7 @@ export default function SellerProfileScreen() {
     } finally {
       setFollowPending(false);
     }
-  }, [canonicalSellerId, followPending, followers, isFollowing]);
+  }, [canonicalSellerId, followPending, followers, isFollowing, requireSignIn]);
 
   const handleShare = useCallback(() => {
     if (!seller) return;
@@ -393,6 +408,7 @@ export default function SellerProfileScreen() {
       Alert.alert('Seller is away', seller.vacationMessage ?? 'This seller is currently away and is not accepting new messages.');
       return;
     }
+    if (!requireSignIn()) return;
     hapticMedium();
     router.push(messageSellerHref({
       sellerId: seller.sellerId,
@@ -400,7 +416,7 @@ export default function SellerProfileScreen() {
       handle: seller.username,
       initials: seller.initials,
     }) as never);
-  }, [router, seller]);
+  }, [router, seller, requireSignIn]);
 
   const handleOpenInbox = useCallback(() => {
     hapticLight();
@@ -412,10 +428,22 @@ export default function SellerProfileScreen() {
     const sellerId = seller.sellerId;
     const items: ProfileMenuItem[] = [];
     if (caps.showShare) items.push({ key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShare });
+    if (replayCount > 0) {
+      items.push({
+        key: 'replays', icon: 'video', label: 'Replays',
+        onPress: () => router.push(`/live-replays?sellerId=${encodeURIComponent(sellerId)}` as never),
+      });
+    }
     if (caps.showViewAsVisitor) {
       items.push({
         key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
         onPress: () => router.push(viewAsVisitorHref('seller', sellerId) as never),
+      });
+    }
+    if (caps.showVisitorMenu && sellsGiftCards) {
+      items.push({
+        key: 'gift-cards', icon: 'gift', label: 'Gift cards',
+        onPress: () => router.push(`/gift-card-buy?sellerId=${encodeURIComponent(sellerId)}&name=${encodeURIComponent(seller.brandName)}` as never),
       });
     }
     if (caps.showVisitorMenu) {
@@ -438,10 +466,15 @@ export default function SellerProfileScreen() {
       );
     }
     return items;
-  }, [api, caps.showShare, caps.showViewAsVisitor, caps.showVisitorMenu, handleShare, router, seller]);
+  }, [api, caps.showShare, caps.showViewAsVisitor, caps.showVisitorMenu, handleShare, replayCount, router, seller, sellsGiftCards]);
 
   const openVideo = useCallback((item: ProfileGridItem) => {
     if (!seller) return;
+    if (item.surface === 'profile') {
+      // POST (3:4 carousel): its own viewer, not the Threads video player.
+      router.push(('/buyer-post-viewer?postId=' + encodeURIComponent(item.id)) as never);
+      return;
+    }
     router.push(profileVideosHref({ source: 'creator', id: seller.sellerId, startPostId: item.id, title: seller.brandName }) as never);
   }, [router, seller]);
 
@@ -540,10 +573,7 @@ export default function SellerProfileScreen() {
   const videosCount = Math.max(videos.total, seller?.videosCount ?? 0);
   const productsCount = seller?.productsCount ?? 0;
 
-  // Followers · Following · Rating — Videos/Posts was dropped (dev: a high
-  // count in any column was getting cut off; three columns gives each
-  // enough room). The grid's own "Videos" section header above still shows
-  // the count.
+  // Likes comes from the public profile total, not the paginated video grid.
   const stats: ProfileStat[] = [
     {
       key: 'followers', label: 'Followers', value: followers == null ? '–' : formatCompactCount(followers),
@@ -757,6 +787,8 @@ export default function SellerProfileScreen() {
           visible={shareSheetVisible}
           onClose={() => setShareSheetVisible(false)}
           avatarUrl={seller?.avatarUrl ?? null}
+          profileUsername={seller?.username}
+          profileBrandName={seller?.brandName}
           sellerExtra={{
             rating,
             products: videos.posts.slice(0, 3).map((post) => ({ id: post.id, uri: post.thumbnailUri ?? post.mediaUris[0] })),

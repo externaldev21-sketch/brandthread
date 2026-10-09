@@ -31,8 +31,10 @@ import {
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../shippingZones";
 import { getSellerVacationStatus } from "../sellerAvailability";
 import { validateDiscountCode, DiscountValidationError } from "../discounts";
+import { effectiveUnitPrice } from "../pricing/salesRuntime";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
+import { resolveSellerPlatformFeeBps } from "../planPerks";
 
 export const CART_CHECKOUT_KIND = "cart_checkout";
 /** Stripe's minimum USD card charge. */
@@ -134,6 +136,8 @@ export type PricedGroup = {
   merchandiseDiscountCents: number;
   shippingDiscountCents: number;
   platformFeeCents: number;
+  /** Commission rate (bps) fixed for this checkout from the seller's plan. */
+  platformFeeBps: number;
   processingFeeEstimateCents: number;
 };
 
@@ -141,6 +145,8 @@ export async function priceCartGroup(input: {
   buyerId: string;
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string | null;
+  /** Live stream the buyer is shopping from (live-only discount codes). */
+  liveStreamId?: string | null;
   shipping: CartShipping;
 }): Promise<PricedGroup> {
   const seen = new Set<string>();
@@ -156,6 +162,7 @@ export async function priceCartGroup(input: {
     const [row] = await db.select({
       variantId: productVariants.id,
       priceCents: productVariants.priceCents,
+      compareAtPriceCents: productVariants.compareAtPriceCents,
       stock: productVariants.stock,
       size: productVariants.size,
       color: productVariants.color,
@@ -177,11 +184,16 @@ export async function priceCartGroup(input: {
     }
     sellerId = row.sellerId;
     const variantLabel = [row.size, row.color].filter(Boolean).join(" / ");
+    // Automatic sale (lib/pricing/sales.ts): the sale price is the authoritative
+    // charge, and discount codes apply on top of it.
+    const unitCents = (await effectiveUnitPrice({
+      productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents, compareAtPriceCents: row.compareAtPriceCents,
+    })).priceCents;
     items.push({
       variantId: row.variantId, productId: item.productId, productName: row.productName, variantLabel,
-      quantity: item.quantity, priceCents: row.priceCents,
+      quantity: item.quantity, priceCents: unitCents,
     });
-    discountLines.push({ productId: item.productId, priceCents: row.priceCents, quantity: item.quantity });
+    discountLines.push({ productId: item.productId, priceCents: unitCents, quantity: item.quantity });
     weightGrams += (row.weightGrams ?? 0) * item.quantity;
   }
   if (!sellerId) throw new CartCheckoutError(400, "EMPTY_GROUP", "A seller group has no items.");
@@ -249,6 +261,7 @@ export async function priceCartGroup(input: {
     try {
       discount = await validateDiscountCode({
         sellerId, code: input.discountCode, customerKey: input.buyerId, cartSubtotalCents: subtotalCents, lines: discountLines,
+        liveStreamId: input.liveStreamId ?? null,
       });
     } catch (error) {
       if (error instanceof DiscountValidationError) {
@@ -263,9 +276,11 @@ export async function priceCartGroup(input: {
     : 0;
   const merchandiseDiscountCents = Math.max(0, Math.min(subtotalCents, discountCents - shippingDiscountCents));
 
+  const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
   const fee = destinationApplicationFeeCents({
     merchandiseCents: Math.max(0, subtotalCents - discountCents),
     preTaxTotalCents: Math.max(0, subtotalCents + shippingCents - discountCents),
+    platformFeeBps,
   });
 
   return {
@@ -282,6 +297,7 @@ export async function priceCartGroup(input: {
     merchandiseDiscountCents,
     shippingDiscountCents,
     platformFeeCents: fee.platformFeeCents,
+    platformFeeBps,
     processingFeeEstimateCents: fee.processingFeeEstimateCents,
   };
 }

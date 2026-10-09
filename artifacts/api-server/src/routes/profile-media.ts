@@ -22,6 +22,7 @@
  *   Public posts that tag the product, newest first — the "Featured in" strip
  *   on product detail links into these.
  */
+import { attachQuoteData } from "../lib/quotedPosts";
 import { Router, type Request } from "express";
 import { and, asc, count, desc, eq, inArray, lte, ne, or, sql } from "drizzle-orm";
 import {
@@ -53,6 +54,8 @@ const videoRowSelection = {
   mediaUrls:    posts.mediaUrls,
   mediaType:    posts.mediaType,
   aspectRatio:  posts.aspectRatio,
+  surface:      posts.surface,
+  slides:       posts.slides,
   caption:      posts.caption,
   hashtags:     posts.hashtags,
   styleTags:    posts.styleTags,
@@ -78,6 +81,8 @@ type VideoRow = {
   mediaUrls: string[];
   mediaType: string;
   aspectRatio: string;
+  surface: string;
+  slides: Array<{ kind: 'photo' | 'video'; path: string; url: string; thumbnailPath: string; thumbnailUrl: string; duration?: number }>;
   caption: string | null;
   hashtags: string[];
   styleTags: string[];
@@ -160,7 +165,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     tagsByPost.get(tag.postId)!.push(tag);
   }
 
-  return rows.map((row) => ({
+  const mapped = rows.map((row) => ({
     id:           row.id,
     userId:       row.userId,
     mediaUrl:     row.mediaUrl,
@@ -168,6 +173,8 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     mediaUrls:    row.mediaUrls,
     mediaType:    row.mediaType,
     aspectRatio:  row.aspectRatio,
+    surface:      row.surface,
+    slides:       row.slides ?? [],
     caption:      row.caption,
     hashtags:     row.hashtags,
     styleTags:    row.styleTags,
@@ -195,6 +202,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     viewsCount:    views.get(row.id) ?? 0,
     repostedByMe:  repostedByMe.has(row.id),
   }));
+  return attachQuoteData(mapped, viewerId);
 }
 
 async function isMutualFollow(a: string, b: string): Promise<boolean> {

@@ -22,7 +22,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Tabs, usePathname } from 'expo-router';
-import { useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
@@ -70,7 +70,7 @@ export default function TabLayout() {
     // would race that and can start the tab-bar's Animated.timing update
     // against the previous, static "settled" style.
     prevPathnameRef.current = pathname;
-    settled.unsettle();
+    if (Platform.OS !== 'web') settled.unsettle();
   }
   useEffect(() => {
     if (settled.value) return;
@@ -97,8 +97,11 @@ export default function TabLayout() {
         // unset — React Navigation's bottom-tabs enables per-frame
         // animation whenever a transitionSpec is present, and leaving it
         // out (rather than 'none') is what makes that so.
-        transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
-        sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value),
+        // Web already uses an instant cut. Don't run a JS-driven transition
+        // across retained tab scenes when its interpolation is never displayed.
+        animation: Platform.OS === 'web' ? 'none' : undefined,
+        transitionSpec: Platform.OS === 'web' ? undefined : reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
+        sceneStyleInterpolator: Platform.OS === 'web' ? undefined : reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value),
         sceneStyle: { backgroundColor: theme.background },
       }}
     >

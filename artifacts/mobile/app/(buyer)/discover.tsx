@@ -28,8 +28,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, View } from 'react-native';
+import { BrandsYouMightLikeRow } from '@/components/discover/BrandsYouMightLikeRow';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useApi } from '@/hooks/useApi';
 import { SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -44,12 +46,15 @@ import { isPreviewCatalogEnabled, getPreviewCatalog, getPreviewCatalogByDemand }
 import type { EditorialTileItem } from '@/components/discover/EditorialTile';
 import { DiscoverFilterRow, type DiscoverFilterKey } from '@/components/discover/DiscoverFilterRow';
 import { DiscoverGrid } from '@/components/discover/DiscoverGrid';
+import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
 import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
+import { DiscoverFeaturedRail } from '@/components/discover/DiscoverFeaturedRail';
 import { DiscoverPersonCard } from '@/components/discover/DiscoverPersonCard';
 import { DiscoverDropRow } from '@/components/discover/DiscoverDropRow';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
+import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_DISCOVER_GESTURE } from '@/lib/firstRunTips/content';
@@ -99,6 +104,7 @@ export default function DiscoverScreen() {
   const listRef = useScrollReset<FlatList<any>>(true, false);
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
+  const { openReport } = useReportSheet();
   const api = useApi();
   const { theme } = useAppTheme();
   const { isSignedIn } = useAuth();
@@ -132,7 +138,13 @@ export default function DiscoverScreen() {
   const [brands, setBrands] = useState<BrandCardData[]>([]);
   // Top slice of the same real brand data the Brands filter's own grid
   // shows — the For You rail is deliberately not a separate ranking.
-  const trendingBrands = useMemo(() => brands.slice(0, 8), [brands]);
+  // Real trending ranking (recent orders / follows / saves) leads the rail
+  // once any brand has signals; until then the rail keeps this same slice.
+  const shelves = useDiscoveryShelves();
+  const trendingBrands = useMemo(
+    () => (shelves.trendingBrands.length > 0 ? shelves.trendingBrands.slice(0, 8) : brands.slice(0, 8)),
+    [brands, shelves.trendingBrands],
+  );
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [brandsFetched, setBrandsFetched] = useState(false);
 
@@ -246,12 +258,12 @@ export default function DiscoverScreen() {
     forYouLimit.current = 30;
     fitsLimit.current = 30;
     Promise.all([
-      fetchJustDropped(), fetchHighDemand(), fetchPeople(),
+      fetchJustDropped(), fetchHighDemand(), fetchPeople(), shelves.reload(),
       filter === 'fits' ? fetchFits() : fetchForYou(),
       filter === 'brands' ? fetchBrands() : Promise.resolve(),
       filter === 'drops' ? fetchDrops() : Promise.resolve(),
     ]).finally(() => setRefreshing(false));
-  }, [filter, fetchJustDropped, fetchHighDemand, fetchPeople, fetchForYou, fetchFits, fetchBrands, fetchDrops]);
+  }, [filter, shelves.reload, fetchJustDropped, fetchHighDemand, fetchPeople, fetchForYou, fetchFits, fetchBrands, fetchDrops]);
 
   function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
     hapticLight();
@@ -288,6 +300,8 @@ export default function DiscoverScreen() {
         onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
       />
       <DiscoverFilterRow active={filter} onChange={setFilter} />
+      {filter === 'forYou' && <DiscoverFeaturedRail />}
+      {filter === 'forYou' && <BrandsYouMightLikeRow />}
     </>
   );
 
@@ -301,6 +315,10 @@ export default function DiscoverScreen() {
           loadingMore={forYouLoadingMore}
           justDroppedItems={justDroppedItems}
           trendingBrands={trendingBrands}
+          trendingProducts={shelves.trendingProducts}
+          shopCategories={shelves.categories}
+          onSeeAllTrendingProducts={() => router.push('/buyer-trending?type=products' as never)}
+          onSeeAllTrendingBrands={shelves.trendingBrands.length > 0 ? () => router.push('/buyer-trending?type=brands' as never) : undefined}
           highDemandItems={highDemandItems}
           shopTheLookPosts={shopTheLookPosts}
           onOpenShopTheLook={openShopTheLook}
@@ -314,6 +332,7 @@ export default function DiscoverScreen() {
           onTileLongPress={setSafetyMenuPost}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header as never}
+          ListFooterExtra={<RecentlyViewedRow style={{ paddingHorizontal: SP.md, marginTop: SP.lg }} />}
         />
       )}
 
@@ -438,7 +457,13 @@ export default function DiscoverScreen() {
             removePostFromLists(safetyMenuPost.authorId);
           }}
           onReport={() => {
-            api.reports.submit({ targetType: 'post', targetId: safetyMenuPost.id, reason: 'other', note: 'Reported from Discover' }).catch(() => {});
+            openReport({
+              targetType: 'post',
+              targetId: safetyMenuPost.id,
+              label: 'Post',
+              ownerId: safetyMenuPost.authorId,
+              ownerName: safetyMenuPost.authorName,
+            });
           }}
           onClose={() => setSafetyMenuPost(null)}
         />
