@@ -1018,15 +1018,58 @@ export async function createProblemReport(params: {
 }): Promise<BuyerProblemReport> {
   const k = keys();
   const problems = await loadProblems(k);
-  const report: BuyerProblemReport = {
-    id: uid(),
-    ...params,
-    escalatedToSupport: false,
-    status: 'open',
-    submittedAt: now(),
+  // A retry of a send that failed (same order/type/text, never confirmed)
+  // reuses its id, so the server's clientReportId dedupe can't file twice.
+  const retryOf = problems.find(p =>
+    !p.serverTicketId && p.orderId === params.orderId && p.type === params.type && p.description === params.description);
+  const report: BuyerProblemReport = retryOf
+    ? { ...retryOf, ...params }
+    : { id: uid(), ...params, escalatedToSupport: false, status: 'open', submittedAt: now() };
+  const saveLocal = async () => {
+    const next = problems.filter(p => p.id !== report.id);
+    next.push(report);
+    await AsyncStorage.setItem(k.problems, JSON.stringify(next));
   };
-  problems.push(report);
-  await AsyncStorage.setItem(k.problems, JSON.stringify(problems));
+  // The on-device list stays as a cache; it is written before the send so
+  // nothing the buyer typed is lost if the network fails.
+  await saveLocal();
+
+  // Signed-out, demo (&demo=1) and dev-preview sessions keep the previous
+  // local-only behavior and never call the protected endpoint.
+  let canSend = k.userId !== 'anon';
+  if (canSend) {
+    try {
+      const preview = await import('@/lib/devPreview');
+      if (preview.isPreviewDemoMode() || preview.isSellerDevPreview() || preview.isBuyerDevPreview()) canSend = false;
+    } catch { /* not in a preview build */ }
+  }
+  if (canSend) {
+    try {
+      const { hasServiceToken } = await import('@/lib/serviceConfig');
+      canSend = await hasServiceToken();
+    } catch { canSend = false; }
+  }
+  if (!canSend) return report;
+
+  const isRemote = (u: string) => /^https:\/\//i.test(u);
+  const isOrderUuid = !!params.orderId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.orderId);
+  const res = await serviceRequest<{ ticket?: { id?: string } | null }>('/api/support/problem-reports', {
+    method: 'POST',
+    body: JSON.stringify({
+      clientReportId: report.id,
+      ...(isOrderUuid ? { orderId: params.orderId } : {}),
+      ...(params.orderNumber ? { orderNumber: params.orderNumber.slice(0, 64) } : {}),
+      type: params.type,
+      description: params.description.slice(0, 5000),
+      evidenceUrls: params.evidenceUris.filter(isRemote).slice(0, 10),
+      localEvidenceCount: params.evidenceUris.filter(u => !isRemote(u)).length,
+      contactedSeller: params.contactedSeller,
+    }),
+  });
+  if (res?.ticket?.id) {
+    report.serverTicketId = String(res.ticket.id);
+    await saveLocal();
+  }
   return report;
 }
 

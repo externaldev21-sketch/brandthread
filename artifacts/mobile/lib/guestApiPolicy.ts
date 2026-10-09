@@ -16,6 +16,8 @@ const SIGNED_IN_ONLY_PREFIXES = [
   'buyer/notifications', 'buyer/payment-methods', 'buyer/saved', 'buyer/collections',
   'buyer/recently-viewed', 'buyer/cart', 'buyer/checkout/payment-intent',
   'feed/for-you', 'feed/events', 'loyalty', 'thread-cash',
+  // Account-scoped seller/buyer records synced from local caches
+  'product-drafts', 'support/problem-reports',
 ];
 
 function normalize(path: string): string {
