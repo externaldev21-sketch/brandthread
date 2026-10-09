@@ -65,6 +65,7 @@ import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
+import { useScreenInteractive } from '@/lib/perf';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
 // (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
@@ -295,6 +296,7 @@ export default function InboxScreen() {
   const cachedInbox = getCachedTabData<{ conversations: Conversation[] }>('inbox');
   const [conversations, setConversations] = useState<Conversation[]>(cachedInbox?.conversations ?? []);
   const [loading, setLoading] = useState(!cachedInbox);
+  useScreenInteractive('inbox', !loading);
   // Requests deleted (or "Delete all"-ed) in this session sit in a ~4s undo
   // window (lib/pendingRequestDeletes.ts) before the real delete actually
   // fires. Tracked here purely to force a re-render + filter them out of

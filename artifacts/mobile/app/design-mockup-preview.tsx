@@ -12,7 +12,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { captureRef } from 'react-native-view-shot';
 import Svg, { Path, Rect } from 'react-native-svg';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -74,6 +73,8 @@ export default function DesignMockupPreviewScreen() {
     if (!project || !previewShotRef.current || saving) return;
     setSaving(true);
     try {
+      // Loaded on demand: keeps view-shot (html2canvas on web) out of the startup bundle.
+      const { captureRef } = await import('react-native-view-shot');
       const uri = await captureRef(previewShotRef, { format: 'png', quality: 1, result: 'data-uri' });
       await createBrandAsset({
         name: `${project.name} Mockup`,

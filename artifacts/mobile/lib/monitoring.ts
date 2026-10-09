@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import type React from 'react';
 import type * as SentryModule from '@sentry/react-native';
 import { isExpoGo } from '@/lib/expoGoRuntime';
-import { registerServerErrorReporter } from '@/lib/monitoringHooks';
+import { registerPerformanceReporter, registerServerErrorReporter, type PerformanceTimings } from '@/lib/monitoringHooks';
 import {
   resolveDsn,
   resolveEnvironment,
@@ -77,6 +77,7 @@ export function initMonitoring(): boolean {
     });
     initialized = true;
     registerServerErrorReporter(reportServerErrorToSentry);
+    registerPerformanceReporter(reportPerformanceToSentry);
     try {
       // Which OTA bundle is running, so a crash can be tied to an update.
       if (Platform.OS !== 'web' && Updates.updateId) Sentry.setTag('expo_update_id', Updates.updateId);
@@ -149,6 +150,23 @@ export function wrapRootComponent<T extends React.ComponentType<any>>(Component:
     return Sentry.wrap(Component) as unknown as T;
   } catch {
     return Component;
+  }
+}
+
+/**
+ * Performance timings from lib/perf.ts (milliseconds and fixed labels only —
+ * no identifiers, routes with ids, or user data) as a `perf` breadcrumb; with
+ * `keepAsContext` (the cold start) also as a named context on later reports.
+ */
+function reportPerformanceToSentry(name: string, timings: PerformanceTimings, keepAsContext: boolean): void {
+  if (!initialized) return;
+  try {
+    const Sentry = getSentry();
+    if (!Sentry) return;
+    Sentry.addBreadcrumb({ category: 'perf', message: name, data: timings, level: 'info' });
+    if (keepAsContext) Sentry.setContext(name, timings);
+  } catch {
+    // ignore
   }
 }
 

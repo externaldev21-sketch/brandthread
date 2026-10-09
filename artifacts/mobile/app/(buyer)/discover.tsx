@@ -62,6 +62,7 @@ import {
   composeDiscoverPosts, composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
   type DiscoverPost, type DiscoverBrandCard as BrandCardData, type DiscoverPersonSuggestion, type DiscoverDrop,
 } from '@/lib/discoverFeed';
+import { useScreenInteractive } from '@/lib/perf';
 
 interface LiveProduct {
   id: string;
@@ -127,6 +128,7 @@ export default function DiscoverScreen() {
   // For You / Fits grid state (kept separate so switching filters doesn't refetch).
   const [forYouPosts, setForYouPosts] = useState<DiscoverPost[]>([]);
   const [forYouLoading, setForYouLoading] = useState(true);
+  useScreenInteractive('discover', !forYouLoading);
   const [forYouLoadingMore, setForYouLoadingMore] = useState(false);
   const forYouLimit = useRef(30);
 

@@ -99,6 +99,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
+import { useScreenInteractive } from '@/lib/perf';
 
 /**
  * A fully verified order reference returned from the server after payment.
@@ -150,6 +151,7 @@ export default function BuyerCheckoutScreen() {
   const [serverSaidHosted, setServerSaidHosted] = useState(false);
   const [stripeLoadFailed, setStripeLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
+  useScreenInteractive('checkout', !loading);
   const [loadFailed, setLoadFailed] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<CheckoutError | null>(null);

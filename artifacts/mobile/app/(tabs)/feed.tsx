@@ -58,7 +58,7 @@ import { formatCents } from '@/lib/money';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
 import { remoteVideoUri, withVideoCaching } from '@/lib/videoPreload';
 import { useFeedVideoPreload } from '@/hooks/useFeedVideoPreload';
-import { mark as perfMark } from '@/lib/perf';
+import { FEED_FRAME_SAMPLER_PROPS, mark as perfMark, useScreenInteractive } from '@/lib/perf';
 import { getLiveDirectory, useOpenLive } from '@/lib/live/useLiveDirectory';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import {
@@ -2567,6 +2567,7 @@ export default function FeedScreen({
     if (!buyerMode) return content;
     return [DEMAND_PAGE_SENTINEL, ...content];
   }, [buyerMode, filteredContentItems, canLoopFeed]);
+  useScreenInteractive('feed', !feedLoading || displayItems.length > 0);
 
   // buyerOffset: used to compute correct isActive for video playback when the
   // demand sentinel sits at index 0.
@@ -3068,6 +3069,8 @@ export default function FeedScreen({
         // active page ±2 mounted, and native overscroll is disabled (a slow
         // drag-then-release otherwise rubber-banded the whole page).
         {...verticalPagerListProps(pageHeight, displayItems.length)}
+        // Frame-drop sampler while scrolling; no props at all outside perf builds.
+        {...FEED_FRAME_SAMPLER_PROPS}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMoreFeed}

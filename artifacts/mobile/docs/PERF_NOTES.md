@@ -91,3 +91,32 @@ its own overhead on top of the dev-server issues above.
 - **Native**: an EAS Build (`eas build --profile preview` or `production`)
   or a local release build (`expo run:ios --configuration Release` / `expo
   run:android --variant release`) — not Expo Go, and not `expo start`.
+
+## Cold start and per-screen timing
+
+- **Startup path guard** (`tests/startup-heavy-imports.test.ts`): fails if
+  Skia, Agora, Stripe, RevenueCat, WebView, view-shot/html2canvas, QR, camera,
+  print, contacts, Sentry's native entry or any design-studio font package is
+  imported statically from the entry, the root/tab layouts or a launch screen.
+  Load those inside the function or screen that needs them.
+- **Inline requires** (`metro.config.js`): imports run where they are first
+  used instead of when a module loads, so a cold start only evaluates what the
+  first screen touches.
+- **Marks** (`lib/perf.ts`): the cold start (process start → first screen
+  interactive) is recorded in every build and sent to Sentry as a `perf`
+  breadcrumb plus a `cold_start` context (milliseconds and a screen label
+  only). Per-screen time-to-interactive (`useScreenInteractive`) and the feed
+  scroll frame-drop sampler only run in dev or in a build made with
+  `EXPO_PUBLIC_PERF_MARKS=1`; they print `[perf] …` lines and are readable
+  from `globalThis.__btPerf`.
+- **Web numbers**: `pnpm run build` (with
+  `EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST=1` for the demo=1 screens), then
+  `node scripts/perf-harness.mjs --screens [--throttle]`.
+- **Native numbers** have to be read on a device: make a release build with
+  `EXPO_PUBLIC_PERF_MARKS=1` (e.g. an EAS `preview` build with that env var),
+  install it, force-quit, launch, and read the `[perf] cold start …` line in
+  Xcode's device console / `adb logcat` (or the `cold_start` context on any
+  Sentry event from that build). Then open feed, discover, search, a product,
+  bag, checkout, inbox, profile and the seller dashboard, and scroll the feed,
+  for the per-screen and frame-drop lines. Target: cold start under 2 s on a
+  mid-range iPhone.

@@ -27,4 +27,26 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
+// Inline requires: a module's imports are evaluated where they are first used
+// instead of all at once when the module loads, so a cold start only runs the
+// code the first screen actually touches (React Native's own default; Expo
+// ships it off). Side-effect-only imports (`import './lib/bootstrap'`) are
+// never inlined, so the entry's start-up order in index.ts is unchanged.
+// `@sentry/core` stays a top-level import: an inlined `import` loses its ESM
+// marker and resolves the package's CommonJS build, which would bundle a
+// second copy of Sentry's core next to the ESM one the SDK uses.
+const NON_INLINED_REQUIRES = [
+  // Metro's defaults (metro/src/lib/transformHelpers.js).
+  'React', 'react', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'react-compiler-runtime', 'react-native',
+  '@sentry/core',
+];
+const expoGetTransformOptions = config.transformer.getTransformOptions;
+config.transformer.getTransformOptions = async (...args) => {
+  const base = expoGetTransformOptions ? await expoGetTransformOptions(...args) : {};
+  return {
+    ...base,
+    transform: { ...(base && base.transform), inlineRequires: true, nonInlinedRequires: NON_INLINED_REQUIRES },
+  };
+};
+
 module.exports = config;

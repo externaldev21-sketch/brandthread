@@ -9,9 +9,12 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import {
   createRevenueCatIdentityQueue,
   createRevenueCatSessionGuard,
+  createRevenueCatSetup,
   runRevenueCatSessionOperation,
+  switchRevenueCatIdentity,
 } from '@/lib/revenueCatSession';
 import { isExpoGo } from '@/lib/expoGoRuntime';
+import { runAfterFirstPaint } from '@/lib/deferStartup';
 
 export type RevenueCatPackage = import('react-native-purchases').PurchasesPackage;
 type PurchasesClient = typeof import('react-native-purchases').default;
@@ -48,8 +51,27 @@ function getPurchases(): PurchasesClient | null {
     return null;
   }
 }
+function configureOnce(client: PurchasesClient, apiKey: string): void {
+  if (configured) return;
+  client.configure({ apiKey });
+  configured = true;
+}
+
 /** Serializes SDK identity changes; RevenueCat has one process-wide customer. */
 export const queueRevenueCatIdentityTransition = createRevenueCatIdentityQueue();
+
+let ensureAccountSetup: ((appUserId?: string) => Promise<void>) | null = null;
+/** Configure + switch to the account, once per account (lib/revenueCatSession.ts). */
+function accountSetup(client: PurchasesClient, apiKey: string): (appUserId?: string) => Promise<void> {
+  if (!ensureAccountSetup) {
+    ensureAccountSetup = createRevenueCatSetup({
+      configure: () => configureOnce(client, apiKey),
+      queue: queueRevenueCatIdentityTransition,
+      switchTo: (appUserId) => switchRevenueCatIdentity(client, appUserId),
+    });
+  }
+  return ensureAccountSetup;
+}
 
 function apiKey(): string | undefined {
   if (__DEV__) return REVENUECAT_TEST_API_KEY;
@@ -78,8 +100,18 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     invalidatePlanCache();
   }, [api, currentRole, sessionGuard]);
 
+  // Every purchase / restore / customer-info read awaits the account's full
+  // setup (configure + logIn), starting it now if the deferred start-up setup
+  // has not run yet, so nothing runs under the anonymous store customer.
+  const accountReady = useCallback(async () => {
+    const appUserId = isSignedIn ? user?.id : undefined;
+    if (isSignedIn && !appUserId) throw new Error('Your account is still loading. Please try again.');
+    await accountSetup(Purchases!, key!)(appUserId);
+  }, [isSignedIn, user?.id, Purchases, key]);
+
   const refresh = useCallback(async () => {
     if (!available || !isSignedIn) return;
+    await accountReady();
     const generation = sessionGuard.current();
     const [info, offerings] = await Promise.all([Purchases!.getCustomerInfo(), Purchases!.getOfferings()]);
     if (!sessionGuard.isCurrent(generation)) return;
@@ -87,13 +119,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     setPackages(offerings.current?.availablePackages.filter((pkg) =>
       pkg.identifier === '$bt_starter' || pkg.identifier === '$bt_growth' || pkg.identifier === '$bt_pro',
     ) ?? []);
-  }, [available, isSignedIn, sessionGuard]);
-
-  useEffect(() => {
-    if (!available || configured) return;
-    Purchases!.configure({ apiKey: key! });
-    configured = true;
-  }, [available, key]);
+  }, [available, isSignedIn, sessionGuard, accountReady]);
 
   useEffect(() => {
     // Clear the old customer's price/management data before an identity
@@ -101,16 +127,13 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     const generation = sessionGuard.begin();
     setCustomerInfo(null);
     setPackages([]);
-    if (!available || !configured) return;
+    if (!available) return;
     let listener: ((info: CustomerInfo) => void) | null = null;
     const clerkId = isSignedIn ? user?.id : undefined;
-    (async () => {
+    const start = async () => {
       try {
-        await queueRevenueCatIdentityTransition(async () => {
-          // Always log out first: login A → B cannot inherit A's customer info.
-          await Purchases!.logOut();
-          if (clerkId) await Purchases!.logIn(clerkId);
-        });
+        // Always log out first: login A → B cannot inherit A's customer info.
+        await accountSetup(Purchases!, key!)(clerkId);
         if (!sessionGuard.isCurrent(generation)) return;
         listener = (info) => {
           if (!sessionGuard.isCurrent(generation)) return;
@@ -126,14 +149,20 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
         ) ?? []);
         if (clerkId) void sync(generation).catch(() => {});
       } catch { /* Billing remains unavailable until RevenueCat is reachable. */ }
-    })();
+    };
+    // At launch the store SDK setup and this sync wait until the first screen
+    // has painted; a purchase before then starts the same setup itself.
+    const cancelDeferred = configured ? null : runAfterFirstPaint(() => { void start(); });
+    if (configured) void start();
     return () => {
+      cancelDeferred?.();
       if (listener) Purchases!.removeCustomerInfoUpdateListener(listener);
     };
-  }, [available, isSignedIn, user?.id, sessionGuard, sync]);
+  }, [available, isSignedIn, user?.id, sessionGuard, sync, key]);
 
   const purchase = useCallback(async (pkg: RevenueCatPackage) => {
     if (!available) throw new Error('RevenueCat is not configured for this build.');
+    await accountReady();
     return runRevenueCatSessionOperation(
       sessionGuard,
       async () => (await Purchases!.purchasePackage(pkg)).customerInfo,
@@ -142,10 +171,11 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
         await sync(generation);
       },
     );
-  }, [available, sync, sessionGuard]);
+  }, [available, sync, sessionGuard, accountReady]);
 
   const restore = useCallback(async () => {
     if (!available) throw new Error('RevenueCat is not configured for this build.');
+    await accountReady();
     return runRevenueCatSessionOperation(
       sessionGuard,
       () => Purchases!.restorePurchases(),
@@ -154,28 +184,32 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
         await sync(generation);
       },
     );
-  }, [available, sync, sessionGuard]);
+  }, [available, sync, sessionGuard, accountReady]);
 
   const purchaseConsumable = useCallback(async (productId: string) => {
     if (!available) throw new Error('RevenueCat is not configured for this build.');
+    await accountReady();
     const [product] = await Purchases!.getProducts([productId], Purchases!.PRODUCT_CATEGORY.NON_SUBSCRIPTION);
     if (!product) throw new Error('This purchase is not available yet.');
     const result = await Purchases!.purchaseStoreProduct(product);
     return { transactionId: result.transaction.transactionIdentifier };
-  }, [available]);
+  }, [available, accountReady]);
 
   const creditPackPrices = useCallback(async (productIds: string[]) => {
     if (!available || !isSignedIn) return {};
+    // Prices only: configuring is enough, no account login needed.
+    configureOnce(Purchases!, key!);
     const products = await Purchases!.getProducts(productIds, Purchases!.PRODUCT_CATEGORY.NON_SUBSCRIPTION);
     return Object.fromEntries(products.map((p) => [p.identifier.split(':')[0]!, p.priceString]));
   }, [available, isSignedIn]);
 
   const purchaseCreditPack = useCallback(async (productId: string) => {
     if (!available) throw new Error('RevenueCat is not configured for this build.');
+    await accountReady();
     const [product] = await Purchases!.getProducts([productId], Purchases!.PRODUCT_CATEGORY.NON_SUBSCRIPTION);
     if (!product) throw new Error('This credit pack is not available in the store yet.');
     await Purchases!.purchaseStoreProduct(product);
-  }, [available]);
+  }, [available, accountReady]);
 
   const value = useMemo(() => ({
     available, packages, customerInfo, managementURL: customerInfo?.managementURL ?? null,

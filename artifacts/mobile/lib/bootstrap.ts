@@ -2,6 +2,7 @@
  * Side effects that must run before any screen module loads.
  * Imported first by the app entry (`index.ts`).
  */
+import { markAppJsStart } from '@/lib/perf';
 import { LogBox } from 'react-native';
 import { initMonitoring } from '@/lib/monitoring';
 import { startBackgroundUpdateChecks } from '@/lib/otaUpdates';
@@ -20,6 +21,9 @@ import { injectWebFocusOutlineStyles, injectWebRootClipStyles, injectWebScrollba
 // keeps logging to the console/terminal for developers either way; this only
 // stops it from also painting an in-app banner over the real UI.
 LogBox.ignoreAllLogs(true);
+
+// Start of the cold-start clock for app JS (lib/perf.ts).
+markAppJsStart();
 
 logNativeRuntimeDiagnostics();
 initMonitoring();

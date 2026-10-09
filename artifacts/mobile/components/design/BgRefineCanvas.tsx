@@ -13,7 +13,6 @@
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { PanResponder, Platform, View } from 'react-native';
 import Svg, { Defs, Image as SvgImage, Mask, Path, Rect } from 'react-native-svg';
-import { captureRef } from 'react-native-view-shot';
 import * as Haptics from 'expo-haptics';
 import { BG, FG } from '@/lib/theme';
 
@@ -99,6 +98,8 @@ const BgRefineCanvas = forwardRef<BgRefineHandle, Props>(function BgRefineCanvas
   useImperativeHandle(ref, () => ({
     exportPng: async () => {
       if (Platform.OS === 'web') return exportOnWeb(originalUri, cutoutUri, strokes, width, brush);
+      // Loaded on demand: keeps view-shot (html2canvas on web) out of the startup bundle.
+      const { captureRef } = await import('react-native-view-shot');
       const uri = await captureRef(shotRef, { format: 'png', quality: 1, result: 'data-uri' });
       return uri.startsWith('data:') ? uri : `data:image/png;base64,${uri}`;
     },

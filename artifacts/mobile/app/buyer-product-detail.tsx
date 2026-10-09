@@ -99,6 +99,7 @@ import {
   URGENCY_UNITS_THRESHOLD,
   HIGH_DEMAND_THRESHOLD,
 } from '@/components/CommerceSignal';
+import { useScreenInteractive } from '@/lib/perf';
 
 function useChrome() {
   const colors = useColors();
@@ -526,6 +527,7 @@ export default function BuyerProductDetailScreen() {
   const [product, setProduct] = useState<BuyerProduct | null>(null);
   const sizeBadgeModel = useSizeBadgeModel(product);
   const [loading, setLoading] = useState(true);
+  useScreenInteractive('product-detail', !loading);
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [selections, setSelections] = useState<Record<string, string>>({});

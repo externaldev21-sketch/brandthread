@@ -22,7 +22,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import { captureRef } from 'react-native-view-shot';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useUser } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -753,6 +752,8 @@ export default function StoryComposer() {
   const compositeGrid = useCallback(async (cells: string[]) => {
     setCompositing(true);
     try {
+      // Loaded on demand: keeps view-shot (html2canvas on web) out of the startup bundle.
+      const { captureRef } = await import('react-native-view-shot');
       const uri = await captureRef(gridCompositeRef, { format: 'png', quality: 0.92, result: 'tmpfile' });
       setMedia({ kind: 'photo', uri, originalUri: uri });
       setCropPending(true);
