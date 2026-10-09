@@ -21,8 +21,8 @@ vi.mock("../../lib/brandthreadEmail", async (importOriginal) => {
 });
 
 const suffix = crypto.randomBytes(6).toString("hex");
-const recent = `cart-recent-${suffix}`;      // 2h old → push only
-const stale = `cart-stale-${suffix}`;        // 30h old → feed + email
+const recent = `cart-recent-${suffix}`;      // 23h old → nothing yet
+const stale = `cart-stale-${suffix}`;        // 30h old → push + feed + email
 const optedOut = `cart-optout-${suffix}`;    // 30h old, email off
 const saved = `cart-saved-${suffix}`;        // saved for later → nothing
 const fresh = `cart-fresh-${suffix}`;        // 10 minutes old → nothing
@@ -36,8 +36,8 @@ beforeAll(async () => {
     notificationPreferences: clerkId === optedOut ? { "email:cart_reminders": false } : undefined,
   })));
   await db.insert(cartItems).values([
-    { userId: recent, variantId: "v1", itemData: line("Logo Tee"), updatedAt: hoursAgo(2) },
-    { userId: recent, variantId: "v2", itemData: line("Cap"), updatedAt: hoursAgo(2) },
+    { userId: recent, variantId: "v1", itemData: line("Logo Tee"), updatedAt: hoursAgo(23) },
+    { userId: recent, variantId: "v2", itemData: line("Cap"), updatedAt: hoursAgo(23) },
     { userId: stale, variantId: "v1", itemData: line("Hoodie"), updatedAt: hoursAgo(30) },
     { userId: optedOut, variantId: "v1", itemData: line("Hoodie"), updatedAt: hoursAgo(30) },
     { userId: saved, variantId: "v1", itemData: line("Tote"), savedForLater: true, updatedAt: hoursAgo(30) },
@@ -52,21 +52,35 @@ afterAll(async () => {
 });
 
 describe("runCartReminders", () => {
-  it("pushes at 1h, emails at 24h, once per window, honouring switches", async () => {
+  it("reminds once at 24h with a push, an Activity row and an email, honouring switches", async () => {
     const { runCartReminders } = await import("../abandonedCartRecovery");
     await runCartReminders();
     await runCartReminders();
 
     const mine = sent.pushes.filter((p) => ids.includes(p.userId));
-    expect(mine).toEqual([{ userId: recent, category: "cart", body: "Logo Tee and 1 more is waiting in your cart." }]);
+    expect(mine.sort((a, b) => a.userId.localeCompare(b.userId))).toEqual([
+      { userId: optedOut, category: "cart", body: "Hoodie is waiting in your cart." },
+      { userId: stale, category: "cart", body: "Hoodie is waiting in your cart." },
+    ]);
     expect(sent.emails.filter((e) => e.includes(suffix)).sort()).toEqual([`${stale}@test.local`]);
 
     const feed = await db.select().from(notificationsFeed).where(inArray(notificationsFeed.userId, ids));
+    expect(feed).toHaveLength(2);
     const byUser = Object.fromEntries(feed.map((f) => [f.userId, f.type]));
-    expect(byUser[recent]).toBe("cart_reminder");
     expect(byUser[stale]).toBe("abandoned_cart");
     expect(byUser[optedOut]).toBe("abandoned_cart");
+    expect(byUser[recent]).toBeUndefined();
     expect(byUser[saved]).toBeUndefined();
     expect(byUser[fresh]).toBeUndefined();
+  });
+
+  it("reminds the 23h cart once it crosses 24h, then never again in that window", async () => {
+    const { runCartReminders } = await import("../abandonedCartRecovery");
+    const later = new Date(Date.now() + 2 * 3600_000);
+    await runCartReminders(later);
+    await runCartReminders(later);
+    expect(sent.pushes.filter((p) => p.userId === recent)).toEqual([
+      { userId: recent, category: "cart", body: "Logo Tee and 1 more is waiting in your cart." },
+    ]);
   });
 });

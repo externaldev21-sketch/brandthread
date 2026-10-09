@@ -1,6 +1,7 @@
 /**
  * App Store / Play review prompt, shown only after a good moment — a
- * seller's first sale or a buyer's 5th order — and heavily rate limited:
+ * seller's first sale or a buyer's 2nd delivered order — and heavily rate
+ * limited:
  * each moment at most once per account, at least 120 days between prompts,
  * at most 3 prompts per account. State is scoped to the Clerk user so a
  * decision on a shared device never affects another account. The OS has its
@@ -10,7 +11,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import * as StoreReview from 'expo-store-review';
 
-export type ReviewMoment = 'first_sale' | 'fifth_order';
+// 'fifth_order' is retired (buyers are now asked after their 2nd delivery)
+// but stays in the type so state saved by older builds still parses.
+export type ReviewMoment = 'first_sale' | 'fifth_order' | 'second_delivery';
+const MOMENTS: readonly ReviewMoment[] = ['first_sale', 'fifth_order', 'second_delivery'];
 
 export interface ReviewPromptState {
   lastPromptAt: number | null;
@@ -28,6 +32,17 @@ const COUNTED_ORDER_STATUSES = ['pending', 'processing', 'fulfilled', 'shipped',
 export function countRealOrders(orders: unknown): number {
   if (!Array.isArray(orders)) return 0;
   return orders.filter((order) => COUNTED_ORDER_STATUSES.includes((order as { status?: string })?.status ?? '')).length;
+}
+
+/** Orders that actually reached the buyer. */
+export function countDeliveredOrders(orders: unknown): number {
+  if (!Array.isArray(orders)) return 0;
+  return orders.filter((order) => (order as { status?: string })?.status === 'delivered').length;
+}
+
+/** The buyer moment: their 2nd delivered order (or later, if it was missed). */
+export function isSecondDeliveryMoment(orders: unknown): boolean {
+  return countDeliveredOrders(orders) >= 2;
 }
 
 export const emptyReviewState = (): ReviewPromptState => ({ lastPromptAt: null, promptCount: 0, done: [] });
@@ -50,7 +65,7 @@ async function readState(userId: string): Promise<ReviewPromptState> {
     return {
       lastPromptAt: typeof parsed.lastPromptAt === 'number' ? parsed.lastPromptAt : null,
       promptCount: typeof parsed.promptCount === 'number' ? parsed.promptCount : 0,
-      done: Array.isArray(parsed.done) ? parsed.done.filter((m): m is ReviewMoment => m === 'first_sale' || m === 'fifth_order') : [],
+      done: Array.isArray(parsed.done) ? parsed.done.filter((m): m is ReviewMoment => MOMENTS.includes(m as ReviewMoment)) : [],
     };
   } catch {
     return emptyReviewState();

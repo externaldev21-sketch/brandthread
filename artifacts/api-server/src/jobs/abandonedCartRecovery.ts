@@ -1,38 +1,34 @@
 /**
  * Abandoned Cart Recovery — server-side background job.
  *
- * Two reminders per abandonment window, both skipped for items saved for
- * later:
- *   - 1 hour after the last cart change: a push (plus its Activity row).
- *   - 24 hours after: an Activity row and an email.
+ * One reminder per abandonment window, 24 hours after the last cart change:
+ * a push with its Activity row, plus an email. Items saved for later are
+ * skipped.
  *
  * The window resets whenever the buyer syncs their cart (every app session
  * replaces the rows), so this only fires when someone genuinely hasn't
- * touched their cart.
+ * touched their cart for a day.
  *
  * Claim-before-notify: eligible cart items are claimed with a single
  * conditional UPDATE ... RETURNING before anything is sent. Postgres
  * serializes concurrent UPDATEs against the same rows, so if this job
  * overlaps itself or runs on more than one server instance only the run that
  * wins the row lock sees a given cart item in its RETURNING set. A given
- * user is therefore notified at most once per channel per window, even under
- * concurrent execution. The push stage only claims carts younger than the
- * 24-hour window, so a long-idle cart gets the 24-hour reminder and not both
- * at once.
+ * user is therefore notified at most once per window, even under concurrent
+ * execution.
  *
  * Each reminder applies the recipient's own switches: push and in-app via
  * publishNotification (Settings → Notifications → cart_reminders), email via
  * the email channel.
  */
-import { db, cartItems, notificationsFeed, users } from "@workspace/db";
+import { db, cartItems, users } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { publishNotification } from "../routes/notifications-feed";
 import { sendAbandonedCartEmail, type EmailLineItem } from "../lib/brandthreadEmail";
 import { isChannelEnabledForUser } from "../lib/notificationChannels";
 
-export const PUSH_REMINDER_AFTER_MS = 60 * 60 * 1000;
-export const EMAIL_REMINDER_AFTER_MS = 24 * 60 * 60 * 1000;
+export const REMINDER_AFTER_MS = 24 * 60 * 60 * 1000;
 const INTERVAL_MS = 10 * 60 * 1000;
 
 type ClaimedRow = { userId: string; itemData: unknown };
@@ -61,29 +57,28 @@ function itemSummary(items: EmailLineItem[]): string {
 export async function runCartReminders(now: Date = new Date()): Promise<{ pushed: number; emailed: number }> {
   let pushed = 0;
   let emailed = 0;
+  const cutoff = new Date(now.getTime() - REMINDER_AFTER_MS);
 
-  const pushCutoff = new Date(now.getTime() - PUSH_REMINDER_AFTER_MS);
-  const emailCutoff = new Date(now.getTime() - EMAIL_REMINDER_AFTER_MS);
-
-  // 1 hour: push.
   try {
     const claimed = await db
       .update(cartItems)
-      .set({ pushRemindedAt: now })
-      .where(sql`${cartItems.updatedAt} < ${pushCutoff}
-        AND ${cartItems.updatedAt} >= ${emailCutoff}
-        AND ${cartItems.pushRemindedAt} IS NULL
-        AND ${cartItems.notifiedAbandonedAt} IS NULL
-        AND ${cartItems.savedForLater} = false`)
+      .set({ notifiedAbandonedAt: now, pushRemindedAt: now })
+      .where(sql`${cartItems.updatedAt} < ${cutoff} AND ${cartItems.notifiedAbandonedAt} IS NULL AND ${cartItems.savedForLater} = false`)
       .returning({ userId: cartItems.userId, itemData: cartItems.itemData });
 
-    for (const [userId, items] of groupByUser(claimed)) {
+    const byUser = groupByUser(claimed);
+    const userIds = [...byUser.keys()];
+    if (userIds.length === 0) return { pushed, emailed };
+
+    // Push + Activity row. If this fails after the claim above committed,
+    // the user misses this window's reminder rather than risk a duplicate.
+    for (const [userId, items] of byUser) {
       try {
         await publishNotification({
           userId,
           category: "orders",
           pushCategory: "cart",
-          type: "cart_reminder",
+          type: "abandoned_cart",
           title: "Still thinking it over?",
           body: `${itemSummary(items)} is waiting in your cart.`,
           targetType: "cart",
@@ -91,63 +86,30 @@ export async function runCartReminders(now: Date = new Date()): Promise<{ pushed
         });
         pushed += 1;
       } catch (err) {
-        logger.warn({ err, userId, job: "abandonedCartRecovery" }, "Cart push reminder failed");
+        logger.warn({ err, userId, job: "abandonedCartRecovery" }, "Cart reminder failed");
       }
     }
-  } catch (err) {
-    logger.error({ err, job: "abandonedCartRecovery", stage: "push" }, "Abandoned cart push stage failed");
-  }
 
-  // 24 hours: Activity row + email.
-  try {
-    const claimed = await db
-      .update(cartItems)
-      .set({ notifiedAbandonedAt: now })
-      .where(sql`${cartItems.updatedAt} < ${emailCutoff} AND ${cartItems.notifiedAbandonedAt} IS NULL AND ${cartItems.savedForLater} = false`)
-      .returning({ userId: cartItems.userId, itemData: cartItems.itemData });
-
-    const byUser = groupByUser(claimed);
-    const userIds = [...byUser.keys()];
-    if (userIds.length > 0) {
-      const inAppOn = new Map<string, boolean>();
-      for (const userId of userIds) {
-        inAppOn.set(userId, await isChannelEnabledForUser(userId, "cart", "inApp").catch(() => true));
+    const emails = await db
+      .select({ clerkId: users.clerkId, email: users.email })
+      .from(users)
+      .where(inArray(users.clerkId, userIds));
+    for (const { clerkId, email } of emails) {
+      try {
+        if (!email || !(await isChannelEnabledForUser(clerkId, "cart", "email"))) continue;
+        const sent = await sendAbandonedCartEmail({
+          to: email,
+          items: byUser.get(clerkId) ?? [],
+          idempotencyKey: `abandoned-cart/${clerkId}/${now.toISOString().slice(0, 13)}`,
+        });
+        if (sent) emailed += 1;
+      } catch (err) {
+        logger.warn({ err, userId: clerkId, job: "abandonedCartRecovery" }, "Cart email reminder failed");
       }
-      // If this insert fails after the claim above committed, those users
-      // miss this window's reminder rather than risk a duplicate.
-      const feedUsers = userIds.filter((userId) => inAppOn.get(userId));
-      if (feedUsers.length > 0) {
-        await db.insert(notificationsFeed).values(feedUsers.map((userId) => ({
-          userId,
-          category: "order",
-          type: "abandoned_cart",
-          title: "Still thinking it over?",
-          body: "You left something in your cart. Tap to finish your order before it sells out.",
-          targetType: "cart",
-        })));
-      }
-
-      const emails = await db
-        .select({ clerkId: users.clerkId, email: users.email })
-        .from(users)
-        .where(inArray(users.clerkId, userIds));
-      for (const { clerkId, email } of emails) {
-        try {
-          if (!email || !(await isChannelEnabledForUser(clerkId, "cart", "email"))) continue;
-          const sent = await sendAbandonedCartEmail({
-            to: email,
-            items: byUser.get(clerkId) ?? [],
-            idempotencyKey: `abandoned-cart/${clerkId}/${now.toISOString().slice(0, 13)}`,
-          });
-          if (sent) emailed += 1;
-        } catch (err) {
-          logger.warn({ err, userId: clerkId, job: "abandonedCartRecovery" }, "Cart email reminder failed");
-        }
-      }
-      logger.info({ job: "abandonedCartRecovery", notifiedUsers: userIds.length, emailed }, "Abandoned cart 24h reminders sent");
     }
+    logger.info({ job: "abandonedCartRecovery", notifiedUsers: userIds.length, pushed, emailed }, "Abandoned cart 24h reminders sent");
   } catch (err) {
-    logger.error({ err, job: "abandonedCartRecovery", stage: "email" }, "Abandoned cart email stage failed");
+    logger.error({ err, job: "abandonedCartRecovery" }, "Abandoned cart reminder job failed");
   }
 
   return { pushed, emailed };
