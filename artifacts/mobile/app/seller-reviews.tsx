@@ -13,6 +13,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
+import { PREVIEW_SELLER_REVIEW_SUMMARY, previewReviewsEnabled, previewSellerReviews } from '@/lib/previewReviews';
 
 type Review = {
   id: string;
@@ -205,6 +206,12 @@ export default function SellerReviewsScreen() {
   }, [api, clerkLoaded, user?.id]);
 
   useFocusEffect(useCallback(() => {
+    if (previewReviewsEnabled()) {
+      setReviews(previewSellerReviews());
+      setSummary(PREVIEW_SELLER_REVIEW_SUMMARY);
+      setLoading(false);
+      return;
+    }
     if (!clerkLoaded || !user?.id) {
       setReviews([]);
       setLoading(!clerkLoaded);
