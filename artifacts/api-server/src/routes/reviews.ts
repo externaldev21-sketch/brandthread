@@ -172,6 +172,16 @@ router.post(
       res.status(400).json({ error: "The uploaded file does not match its declared image type." });
       return;
     }
+    // Automatic screening before the photo is stored (off when the AI
+    // integration env is missing; a provider outage never blocks the upload).
+    // Review photos show on public review cards, so flagged ones are refused.
+    const { screenImageBuffer, MEDIA_REJECTED_MESSAGE } = await import("../lib/mediaModeration");
+    const screened = await screenImageBuffer(bytes, contentType);
+    if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
+      void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: buyerId, surface: "review_photo", verdict: { ...screened, verdict: "reject" } })).catch(() => {});
+      res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
+      return;
+    }
     let objectPath: string | null = null;
     try {
       objectPath = await objectStorage.createObjectEntityFromBuffer(

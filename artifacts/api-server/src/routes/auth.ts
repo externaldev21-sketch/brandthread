@@ -34,7 +34,8 @@ import {
   normalizeProfileName,
   preserveExistingEmail,
 } from "../lib/authProfile";
-import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
+import { isUniqueViolation, isUsernameUniqueViolation, violatedConstraint } from "../lib/dbErrors";
+import { validateHandle } from "../lib/storeIdentity";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
 import { AGE_RESTRICTED_MESSAGE, bandMaySellOrEarn, denyIfAgeRestricted } from "../lib/ageGate";
 import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSource } from "../lib/legalAcceptance";
@@ -117,6 +118,25 @@ function validateUsername(u: string): string | null {
   if (!USERNAME_REGEX.test(u))
     return "Username may only contain letters, numbers, and underscores (3–30 characters).";
   return null; // valid
+}
+
+/**
+ * Content rules for a buyer/seller @username: the same reserved-handle and
+ * profanity screening store handles get (lib/storeIdentity.ts). Format is
+ * checked by validateUsername above, so only RESERVED / BLOCKED surface here.
+ * Callers skip this when the requested name is the account's CURRENT username,
+ * so an existing handle chosen before these rules keeps working.
+ */
+function usernameContentProblem(u: string): { code: "USERNAME_RESERVED" | "USERNAME_NOT_ALLOWED"; error: string } | null {
+  const { problem } = validateHandle(u);
+  if (problem?.code === "RESERVED") return { code: "USERNAME_RESERVED", error: "That username is reserved." };
+  if (problem?.code === "BLOCKED") return { code: "USERNAME_NOT_ALLOWED", error: "That username is not allowed." };
+  return null;
+}
+
+async function currentUsername(clerkId: string): Promise<string | null> {
+  const [row] = await db.select({ username: users.username }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+  return row?.username ?? null;
 }
 
 // ─── POST /api/auth/sync ──────────────────────────────────────────────────────
@@ -551,6 +571,13 @@ router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodyS
       res.status(400).json({ error: fmtErr });
       return;
     }
+    if ((await currentUsername(clerkUserId))?.toLowerCase() !== uname) {
+      const contentProblem = usernameContentProblem(uname);
+      if (contentProblem) {
+        res.status(400).json({ error: contentProblem.error, code: contentProblem.code });
+        return;
+      }
+    }
     const [taken] = await db
       .select({ clerkId: users.clerkId })
       .from(users)
@@ -579,7 +606,7 @@ router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodyS
     // The pre-check above has a race window (two requests picking the same
     // free username concurrently); the DB's own unique index is the real
     // guarantee. Map its violation to the same 409 the pre-check gives.
-    if (isUniqueViolation(err) && violatedConstraint(err) === "users_username_ci_unique") {
+    if (isUsernameUniqueViolation(err)) {
       res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
       return;
     }
@@ -856,6 +883,13 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
       .from(users)
       .where(eq(users.clerkId, clerkId))
       .limit(1);
+    if (uname !== "" && (existingHandle?.username ?? "").toLowerCase() !== uname) {
+      const contentProblem = usernameContentProblem(uname);
+      if (contentProblem) {
+        res.status(400).json({ error: contentProblem.error, code: contentProblem.code });
+        return;
+      }
+    }
     const decision = decideUsernameChange({
       current: existingHandle?.username ?? null,
       requested: uname,
@@ -907,7 +941,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   } catch (err) {
     // The pre-check above has a race window; the DB's own unique index is
     // the real guarantee. Map its violation to the same 409 the pre-check gives.
-    if (isUniqueViolation(err) && violatedConstraint(err) === "users_username_ci_unique") {
+    if (isUsernameUniqueViolation(err)) {
       res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
       return;
     }
@@ -936,6 +970,13 @@ router.get("/username/check", requireAuth, async (req, res) => {
     .from(users)
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
+  if ((ownHandle?.username ?? "").toLowerCase() !== raw) {
+    const contentProblem = usernameContentProblem(raw);
+    if (contentProblem) {
+      res.json({ available: false, code: contentProblem.code, error: contentProblem.error });
+      return;
+    }
+  }
   const cooldown = decideUsernameChange({
     current: ownHandle?.username ?? null,
     requested: raw,
