@@ -33,9 +33,10 @@ describe('order detail: Message Buyer action', () => {
     expect(source).toContain("router.push(`/seller-conversation?id=${encodeURIComponent(conv.id)}` as never)");
   });
 
-  it('is wired into the always-visible Actions row, disabled while opening or with no buyer account', () => {
-    expect(source).toContain("label={messagingBuyer ? 'Opening…' : 'Message Buyer'}");
+  it('is a row in the Customer block (and in the ⋯ menu), disabled while opening or with no buyer account', () => {
+    expect(source).toContain("title={messagingBuyer ? 'Opening…' : 'Message buyer'}");
     expect(source).toContain('disabled={messagingBuyer || !order.customer.buyerUserId}');
+    expect(source).toContain("buttons.push({ text: 'Message buyer', onPress: handleMessageBuyer });");
   });
 
   it('never hardcodes a brand color for the conversation participants — monochrome only', () => {
@@ -45,11 +46,27 @@ describe('order detail: Message Buyer action', () => {
 });
 
 describe('order detail: Refund action', () => {
-  it('routes to the real refund-detail screen (orderId only — returnId stays optional there)', () => {
-    expect(source).toContain('router.push(`/refund-detail?orderId=${order.id}` as never)');
+  it('opens the Refund sheet on this screen (the old refund-detail route hands over to it)', () => {
+    expect(source).toContain('<RefundSheet');
+    expect(source).toContain("useState(refundParam === '1')");
+    const refundRoute = fs.readFileSync(path.resolve(__dirname, '../app/refund-detail.tsx'), 'utf8');
+    expect(refundRoute).toContain('/order-detail?id=${encodeURIComponent(orderId)}&refund=1');
   });
 
-  it('only shows when there is real refundable money left (paid minus already refunded)', () => {
-    expect(source).toContain('order.payment.amountPaidCents > order.payment.amountRefundedCents');
+  it('only offers a refund when there is real refundable money left (paid minus already refunded)', () => {
+    expect(source).toContain('order.payment.amountPaidCents > order.payment.amountRefundedCents && refundableCents > 0');
+  });
+
+  it('sends the sheet request (amount, reason, note, one request id per opening) to POST /:id/refund', () => {
+    expect(source).toContain('await api.orders.refund(id, request);');
+    const sheet = fs.readFileSync(path.resolve(__dirname, '../components/orders/RefundSheet.tsx'), 'utf8');
+    expect(sheet).toContain('requestIdRef.current = newRefundRequestId();');
+    expect(sheet).toContain('SELLER_REFUND_REASONS');
+    expect(sheet).toContain('parseRefundAmount(amount, refundableCents)');
+  });
+
+  it('shows what was refunded in the Paid block', () => {
+    expect(source).toContain('label={`Refunded · ${refundReasonLabel(r.reason)}`}');
+    expect(source).toContain('<InfoRow label="Refunded" value={`-${usd(order.payment.amountRefundedCents)}`} />');
   });
 });

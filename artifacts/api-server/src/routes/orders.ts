@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { db, orders, orderItems, orderRefunds, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
-import { withItemProductIds } from "../lib/orderItemProducts";
+import { withItemImageUrls, withItemProductIds } from "../lib/orderItemProducts";
 import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds";
 import { orderStatusMachine, type OrderStatus } from "../lib/money/stateMachines";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -310,9 +310,9 @@ router.get("/:id", async (req, res) => {
     .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
     .limit(1);
   if (!order) { res.status(404).json({ error: "Not found" }); return; }
-  const items = await withItemProductIds(
+  const items = await withItemImageUrls(await withItemProductIds(
     await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
-  );
+  ));
 
   // Resolve customer: prefer the customers record, fall back to the buyer's user row
   let customer: any = null;
@@ -385,6 +385,9 @@ const CANCELLATION_NOTES_MAX_LENGTH = 1000;
 router.patch("/:id/status", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { status, reason, notes } = req.body;
+  // "Send notification to customer" off on the seller's fulfil sheet: only
+  // the shipped message is optional; cancellation notices always go out.
+  const quietShip = status === "shipped" && req.body?.notifyCustomer === false;
   const valid = ["pending", "processing", "fulfilled", "shipped", "delivered", "cancelled"];
   if (!valid.includes(status)) {
     res.status(400).json({ error: `status must be one of: ${valid.join(", ")}` }); return;
@@ -572,7 +575,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
     delivered: { type: "order_delivered", title: "Your order was delivered!", body: `Order #${transitioned.orderNumber} has been delivered.` },
     cancelled: { type: "order_cancelled", title: "Order cancelled", body: `Order #${transitioned.orderNumber} has been cancelled.${cancellationReasonLabel}` },
   };
-  const notif = notifMap[status];
+  const notif = quietShip ? undefined : notifMap[status];
   if (transitioned.buyerId && notif) {
     publishNotification({
       userId:     transitioned.buyerId,
@@ -584,7 +587,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
       targetType: "order",
     }).catch(() => { /* non-critical */ });
   }
-  if (status === "shipped") {
+  if (status === "shipped" && !quietShip) {
     void notifyOrderShipped(transitioned).catch((err) => {
       logger.error({ err, orderId: transitioned!.id }, "Shipping email delivery failed");
     });
@@ -711,6 +714,10 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     trackingStatus,
     estimatedDelivery: rawEstimatedDelivery,
   } = req.body;
+  // The seller's fulfil sheet can ship without telling the buyer (Shopify's
+  // "Send notification to customer" switch). Only the shipped/tracking
+  // message is skipped; carrier status alerts are unaffected.
+  const notifyCustomer = req.body?.notifyCustomer !== false;
 
   if (trackingStatus === "delivered") {
     res.status(409).json({
@@ -894,7 +901,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   }
 
   // Notify buyer only when status genuinely transitioned to shipped
-  if (statusTransition?.buyerId) {
+  if (statusTransition?.buyerId && notifyCustomer) {
     const carrierLabel = updated.carrier ?? carrier ?? "carrier";
     publishNotification({
       userId:     statusTransition.buyerId,
@@ -941,11 +948,11 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       targetType: "buyer_order",
     }).catch(() => { /* non-critical */ });
   }
-  if (statusTransition) {
+  if (notifyCustomer && statusTransition) {
     void notifyOrderShipped(updated).catch((err) => {
       logger.error({ err, orderId: statusTransition!.id }, "Shipping email delivery failed");
     });
-  } else if (trackingChange && (trackingNumber !== undefined || carrier !== undefined)) {
+  } else if (notifyCustomer && trackingChange && (trackingNumber !== undefined || carrier !== undefined)) {
     // Each committed material change is its own event. The atomic IS DISTINCT
     // FROM predicate suppresses identical retries, while a fresh event ID keeps
     // A → B → A changes distinct inside Resend's idempotency window.
@@ -987,6 +994,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
 router.patch("/:id/items-tracking", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { itemIds, trackingNumber: rawTracking, carrier: rawCarrier } = req.body ?? {};
+  const notifyCustomer = req.body?.notifyCustomer !== false;
   const trackingNumber = typeof rawTracking === "string" ? rawTracking.trim() : "";
   if (!Array.isArray(itemIds) || itemIds.length === 0 || itemIds.some((id) => typeof id !== "string")) {
     res.status(400).json({ error: "itemIds must be a non-empty array of order item ids" }); return;
@@ -1011,7 +1019,7 @@ router.patch("/:id/items-tracking", requireRole("staff"), async (req, res) => {
       "order", req.params.id, { itemIds: result.shippedItemIds, trackingNumber, carrier },
     );
   }
-  if (result.buyerId) {
+  if (result.buyerId && notifyCustomer) {
     publishNotification({
       userId: result.buyerId, category: "orders", pushCategory: "order", type: "order_shipped",
       title: "Part of your order has shipped!",

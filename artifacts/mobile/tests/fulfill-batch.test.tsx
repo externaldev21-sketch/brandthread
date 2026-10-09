@@ -81,15 +81,40 @@ vi.mock('@/components/BrandthreadUI', () => ({
 
 const orderGetMock = vi.fn();
 const updateStatusMock = vi.fn();
+const addTrackingMock = vi.fn();
+const addItemsTrackingMock = vi.fn();
 const apiStub = {
   orders: {
     get: (...args: unknown[]) => orderGetMock(...args),
     updateStatus: (...args: unknown[]) => updateStatusMock(...args),
+    addTracking: (...args: unknown[]) => addTrackingMock(...args),
+    addItemsTracking: (...args: unknown[]) => addItemsTrackingMock(...args),
   },
 };
 vi.mock('@/lib/api', () => ({
   useApi: () => apiStub,
 }));
+
+vi.mock('@/components/ui', () => ({
+  Button: ({ label, onPress, disabled, loading }: any) =>
+    React.createElement('Button', { label, onPress, disabled, loading, accessibilityLabel: label }),
+}));
+
+const sheetProps: { current: any } = { current: null };
+vi.mock('@/components/orders/FulfillSheet', () => ({
+  FulfillSheet: (props: any) => {
+    sheetProps.current = props;
+    return React.createElement('FulfillSheet', { visible: props.visible });
+  },
+}));
+
+vi.mock('@/lib/previewOrderEdits', () => ({
+  isLocalPreviewSellerOrderId: () => false,
+  loadPreviewSellerOrder: () => null,
+  savePreviewSellerOrder: vi.fn(),
+}));
+
+vi.mock('@/lib/deliveryGuarantee', () => ({ sellerOrderConflictMessage: () => null }));
 
 vi.mock('@/app/order-detail', () => ({
   adaptApiOrder: (raw: any) => raw,
@@ -108,8 +133,12 @@ function order(id: string, orderNumber: string, overrides: Record<string, unknow
   return {
     id,
     orderNumber,
+    status: 'processing',
+    isPreOrder: false,
+    deliverBy: null,
+    autoRefundedAt: null,
     customer: { name: `Customer ${orderNumber}`, shippingAddress: { name: 'x', line1: '1 Main', city: 'LA', state: 'CA', zip: '90001', country: 'US' } },
-    lineItems: [],
+    lineItems: [{ id: `${id}-item`, quantity: 1, trackingNumber: null, refundedAt: null }],
     fulfillment: { fromAddress: undefined },
     labels: [],
     ...overrides,
@@ -129,25 +158,56 @@ beforeEach(() => {
 });
 
 describe('fulfill-batch per-row summary', () => {
-  it('reports per-order success and failure for bulk mark-shipped with no silent partial failures', async () => {
+  it('runs the shared Fulfill sheet once per order in sequence ("1 of 2"), with Skip, and reports each order', async () => {
     orderGetMock.mockImplementation((id: string) => Promise.resolve(order(id, id === 'order-1' ? '1001' : '1002')));
-    updateStatusMock.mockImplementation((id: string) =>
-      id === 'order-1' ? Promise.resolve({}) : Promise.reject(new Error('Order changed while cancelling')));
+    addTrackingMock.mockResolvedValue({});
 
     let renderer!: ReactTestRenderer;
     await act(async () => { renderer = create(<FulfillBatchScreen />); });
     await flush();
 
-    const shipBtn = findByLabel(renderer, 'SecondaryButton', 'Mark shipped');
-    await act(async () => { await shipBtn.props.onPress(); });
-    await flush();
+    expect(sheetProps.current.visible).toBe(false);
+    const shipBtn = findByLabel(renderer, 'Button', 'Fulfill orders');
+    await act(async () => { shipBtn.props.onPress(); });
+    expect(sheetProps.current.visible).toBe(true);
+    expect(sheetProps.current.order.id).toBe('order-1');
+    expect(sheetProps.current.batch).toMatchObject({ index: 0, total: 2 });
+
+    // Confirm order 1 with tracking: the same request builder → PATCH /:id/tracking.
+    await act(async () => {
+      await sheetProps.current.onSubmit({ kind: 'order-tracking', body: { trackingNumber: '1Z', carrier: 'UPS' } });
+    });
+    expect(addTrackingMock).toHaveBeenCalledWith('order-1', { trackingNumber: '1Z', carrier: 'UPS' });
+    expect(sheetProps.current.order.id).toBe('order-2');
+    expect(sheetProps.current.batch).toMatchObject({ index: 1, total: 2 });
+
+    // Skip order 2: the sheet closes, nothing is sent for it.
+    await act(async () => { sheetProps.current.batch.onSkip(); });
+    expect(sheetProps.current.visible).toBe(false);
+    expect(updateStatusMock).not.toHaveBeenCalled();
 
     const text = renderer.root.findAll(n => (n.type as any) === 'SectionHeader').map(n => String(n.children)).join(' ');
-    expect(text).toContain('1 succeeded, 1 failed');
-
+    expect(text).toContain('1 fulfilled, 1 skipped');
     const messages = renderer.root.findAllByType('Text' as any).map(n => (Array.isArray(n.props.children) ? n.props.children.join('') : n.props.children));
-    expect(messages).toContain('Marked shipped');
-    expect(messages).toContain('Order changed while cancelling');
+    expect(messages).toContain('Fulfilled');
+    expect(messages).toContain('Skipped');
+  });
+
+  it('keeps the sheet on the order when the server refuses, so the seller can fix it', async () => {
+    orderGetMock.mockImplementation((id: string) => Promise.resolve(order(id, id === 'order-1' ? '1001' : '1002')));
+    updateStatusMock.mockRejectedValue(new Error('Add a tracking number to ship this order.'));
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<FulfillBatchScreen />); });
+    await flush();
+    await act(async () => { findByLabel(renderer, 'Button', 'Fulfill orders').props.onPress(); });
+
+    let error: unknown;
+    await act(async () => {
+      await sheetProps.current.onSubmit({ kind: 'order-status', notifyCustomer: true }).catch((e: unknown) => { error = e; });
+    });
+    expect((error as Error).message).toBe('Add a tracking number to ship this order.');
+    expect(sheetProps.current.order.id).toBe('order-1');
   });
 
   it('purchases labels for unlabeled orders and skips already-labeled ones', async () => {
@@ -168,7 +228,7 @@ describe('fulfill-batch per-row summary', () => {
     await act(async () => { renderer = create(<FulfillBatchScreen />); });
     await flush();
 
-    const printBtn = findByLabel(renderer, 'PrimaryButton', 'Print labels');
+    const printBtn = findByLabel(renderer, 'Button', 'Print labels');
     await act(async () => { await printBtn.props.onPress(); });
     await flush();
 

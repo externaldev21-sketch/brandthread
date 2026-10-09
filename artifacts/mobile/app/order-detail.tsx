@@ -1,54 +1,56 @@
 /**
- * Order Detail — full rewrite
- * Tabs: overview | customer | payment | fulfillment | timeline | returns | disputes | notes
+ * Seller order detail — Shopify iOS order screen, 1:1 in black/white/silver:
+ * header with the order number, share and ⋯; the unfulfilled items with
+ * "Create shipping label" + "Fulfill item"; fulfilled shipments with their
+ * tracking number; the Paid block; customer, contact, shipping address and
+ * the timeline. "Fulfill item" and "Refund" open full sheets
+ * (components/orders/FulfillSheet.tsx, RefundSheet.tsx).
  */
 
 import { shareInvoice, invoiceFromSellerOrder } from '@/lib/invoice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
-import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
+import { BottomSheet, Button, Chip, ListRow } from '@/components/ui';
+import { showActionSheet, type ActionSheetButton } from '@/components/ui/ActionSheet';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { RADII, radius } from '@/constants/radii';
+import { RADII } from '@/constants/radii';
+import { TYPE_SCALE } from '@/constants/typography';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { useFeeSchedule } from '@/hooks/useFeeSchedule';
 import { quoteFromSchedule } from '@/lib/feeSchedule';
 import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
-import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
+import { Order, CANCELLATION_REASONS, CancellationReason, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
-import { getGeneratedSellerOrder, isGeneratedSellerOrderId } from '@/lib/previewSellerOrders';
 import { useQueryClient } from '@tanstack/react-query';
 import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
 import { queryKeys } from '@/lib/queryClient';
-import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
-import { SellerDeliveryBanner, ShipItemsSheet } from '@/components/orders/SellerDelivery';
-import { getPreviewSellerOrder } from '@/lib/previewOrders';
+import { formatLocalDate, sellerOrderConflictMessage } from '@/lib/deliveryGuarantee';
+import { SellerDeliveryBanner } from '@/components/orders/SellerDelivery';
+import { FulfillSheet } from '@/components/orders/FulfillSheet';
+import { RefundSheet } from '@/components/orders/RefundSheet';
+import { SHEET_FIELD_BG } from '@/components/orders/FullSheet';
+import { sharePackingSlip } from '@/lib/packingSlip';
+import {
+  applyFulfillLocally, applyRefundLocally, linesToFulfill, orderTitle, refundableCentsOf, shipmentGroups,
+  submitFulfillRequest, type FulfillRequest,
+} from '@/lib/orderFulfillment';
+import { isLocalPreviewSellerOrderId, loadPreviewSellerOrder, savePreviewSellerOrder } from '@/lib/previewOrderEdits';
+import { refundReasonLabel, type OrderRefundsResponse, type SellerRefundRequest } from '@/lib/sellerRefund';
 import { ApiError } from '@/lib/networkNotice';
-
-function useThemeAliases() {
-  const { theme } = useAppTheme();
-  return {
-    theme,
-    BG: theme.background, SURFACE: theme.surface, CARD: theme.card, CARD_ELEVATED: theme.cardElevated,
-    BORDER: theme.border, BORDER_ACTIVE: theme.accentLight, FG: theme.text, MUTED: theme.muted, SUBTLE: theme.subtle,
-    SUCCESS: theme.success, SUCCESS_DIM: `${theme.success}26`, BLUE: theme.accentLight, BLUE_DIM: `${theme.accentLight}26`,
-    ORANGE: theme.warning, ORANGE_DIM: `${theme.warning}26`, RED: theme.error, RED_DIM: `${theme.error}26`,
-    GOLD: theme.accent, PURPLE: theme.accent, PURPLE_LIGHT: theme.accentLight, PURPLE_DIM: theme.accentDim,
-    CYAN: theme.secondary, CYAN_DIM: theme.secondaryDim,
-  };
-}
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
 
@@ -134,6 +136,7 @@ export function adaptApiOrder(raw: any): Order {
     discountAmountCents: 0,
     taxAmountCents:   0,
     totalCents:       (item.priceCents ?? 0) * item.quantity,
+    imageUri:         typeof item.imageUrl === 'string' && item.imageUrl ? item.imageUrl : undefined,
     fulfillmentSource: 'seller' as FulfillmentType,
     isPreOrder:       raw.isPreorder === true,
     deliverBy:        item.deliverBy ?? null,
@@ -277,7 +280,9 @@ export function adaptApiOrder(raw: any): Order {
        totalCents,
       // Payment was received for active/shipped/delivered; held in limbo for refund_pending
        amountPaidCents:         isRefundPending ? 0 : (uiStatus === 'cancelled' || uiStatus === 'refunded') ? 0 : totalCents,
-       amountRefundedCents:     uiStatus === 'refunded' ? totalCents : 0,
+       // Partial refunds from the order detail (POST /:id/refund) keep the
+       // order open; refundedCents is what has gone back so far.
+       amountRefundedCents:     uiStatus === 'refunded' ? Math.max(totalCents, raw.refundedCents ?? 0) : Math.max(0, raw.refundedCents ?? 0),
        amountHeldCents:         isRefundPending ? totalCents : 0,
        amountPendingCents:      0,
        sellerAllocationCents:   subtotalCents,
@@ -326,79 +331,26 @@ export function adaptApiOrder(raw: any): Order {
   };
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type Tab = 'overview' | 'customer' | 'payment' | 'fulfillment' | 'timeline' | 'returns' | 'disputes' | 'notes';
-
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'overview',    label: 'Overview' },
-  { key: 'customer',    label: 'Customer' },
-  { key: 'payment',     label: 'Payment' },
-  { key: 'fulfillment', label: 'Fulfillment' },
-  { key: 'timeline',    label: 'Timeline' },
-  { key: 'returns',     label: 'Returns' },
-  { key: 'disputes',    label: 'Disputes' },
-  // The Notes tab is hidden: notes aren't persisted by any API, and the
-  // 15-second order poll overwrites local edits, silently discarding
-  // anything a seller types. Bring this back once notes are backed by
-  // a real endpoint.
-];
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmt(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-function fmtShort(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+/** "Aug 4, 2026 at 11:37 AM" — the reference's fulfilment / completed stamp. */
+function fmtStamp(iso: string) {
+  const d = new Date(iso);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const day = d.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${day} at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 }
 function usd(cents: number) {
   return formatCents(cents);
 }
-
-function orderStatusVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
-  switch (status) {
-    case 'new': return 'info';
-    case 'processing': return 'warning';
-    case 'ready_to_ship': return 'purple';
-    case 'shipped': return 'info';
-    case 'delivered': return 'success';
-    case 'cancelled': return 'neutral';
-    case 'refunded': return 'neutral';
-    case 'disputed': return 'error';
-    default: return 'neutral';
-  }
-}
-
-function paymentVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
-  switch (status) {
-    case 'paid': return 'success';
-    case 'pending': case 'authorized': return 'warning';
-    case 'refunded': case 'partially_refunded': return 'info';
-    case 'failed': case 'voided': return 'error';
-    default: return 'neutral';
-  }
-}
-
-function timelineColor(type: string, theme: ReturnType<typeof useAppTheme>['theme']): string {
-  switch (type) {
-    case 'order_created': return theme.secondary;
-    case 'payment_confirmed': return theme.success;
-    case 'shipped': case 'label_purchased': case 'tracking_added': return theme.accentLight;
-    case 'delivered': return theme.success;
-    case 'return_requested': case 'refund_issued': return theme.warning;
-    case 'dispute_opened': case 'cancelled': return theme.error;
-    case 'risk_review': return theme.error;
-    case 'note_added': return theme.accent;
-    default: return theme.muted;
-  }
-}
-
-function returnReasonLabel(key: string): string {
-  return RETURN_REASONS.find(r => r.key === key)?.label ?? key;
+function plural(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
 function cancellationReasonLabel(key: string): string {
@@ -406,59 +358,204 @@ function cancellationReasonLabel(key: string): string {
 }
 
 const TRACKING_STATUS_OPTIONS: { key: TrackingStatus; label: string }[] = [
-  { key: 'label_created', label: 'Label Created' },
+  { key: 'label_created', label: 'Label created' },
   { key: 'accepted', label: 'Accepted' },
-  { key: 'in_transit', label: 'In Transit' },
-  { key: 'out_for_delivery', label: 'Out for Delivery' },
+  { key: 'in_transit', label: 'In transit' },
+  { key: 'out_for_delivery', label: 'Out for delivery' },
   { key: 'exception', label: 'Exception' },
-  { key: 'returned_to_sender', label: 'Returned to Sender' },
+  { key: 'returned_to_sender', label: 'Returned to sender' },
 ];
 
-function chunkPairs<T>(items: T[]): T[][] {
-  const rows: T[][] = [];
-  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
-  return rows;
+function trackingStatusLabel(status: string | undefined | null): string | null {
+  if (!status) return null;
+  if (status === 'delivered') return 'Delivered';
+  return TRACKING_STATUS_OPTIONS.find(option => option.key === status)?.label ?? null;
 }
 
-function trackingStatusLabel(status: TrackingStatus): string {
-  return TRACKING_STATUS_OPTIONS.find(option => option.key === status)?.label ?? status;
+/** Paid / Partially refunded / Refunded / Payment pending — the Paid block's pill. */
+function paymentPillLabel(order: Order): string {
+  const p = order.payment;
+  if (p.amountRefundedCents > 0) return p.amountRefundedCents >= p.totalCents ? 'Refunded' : 'Partially refunded';
+  if (order.paymentStatus === 'pending' || order.paymentStatus === 'authorized') return 'Payment pending';
+  if (order.paymentStatus === 'voided') return 'Voided';
+  return 'Paid';
+}
+
+function addressLines(a: OrderAddress): string[] {
+  return [a.name, a.line1, a.line2, [a.city, [a.state, a.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '), a.country]
+    .filter((l): l is string => !!l && !!String(l).trim());
 }
 
 // ─── InfoRow ─────────────────────────────────────────────────────────────────
 
 function InfoRow({ label, value, valueColor, bold }: { label: string; value: string; valueColor?: string; bold?: boolean }) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={s.infoRow}>
-      <Text style={s.infoLabel}>{label}</Text>
-      <Text style={[s.infoValue, bold && s.infoValueBold, valueColor ? { color: valueColor } : {}]}>{value}</Text>
+      <Text style={[s.infoLabel, bold && s.infoBold]}>{label}</Text>
+      <Text style={[s.infoValue, bold && s.infoBold, valueColor ? { color: valueColor } : null]}>{value}</Text>
     </View>
   );
 }
 
-// ─── AddressCard ─────────────────────────────────────────────────────────────
+/** "Fees" row: the recorded fees for this order, else the schedule's estimate; hidden with neither. */
+function FeesRow({ payment: p }: { payment: Order['payment'] }) {
+  const schedule = useFeeSchedule();
+  const recorded = p.platformFeeCents + (p.processingFeeCents ?? 0);
+  let fees = recorded;
+  if (!recorded && schedule && p.totalCents > 0) {
+    const q = quoteFromSchedule(schedule, Math.max(0, p.subtotalCents - p.discountTotalCents), { shippingCents: p.shippingTotalCents });
+    fees = q.platformFeeCents + q.processingFeeCents;
+  }
+  if (!fees) return null;
+  return <InfoRow label="Fees" value={`-${usd(fees)}`} />;
+}
 
-function AddressCard({ title, addr }: { title: string; addr: { name: string; line1: string; line2?: string; city: string; state: string; zip: string; country: string } }) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+// ─── Building blocks ─────────────────────────────────────────────────────────
+
+/** A full-width block, separated from the next by a thick band (Shopify grouping). */
+function Block({ children, testID }: { children: React.ReactNode; testID?: string }) {
+  const { theme } = useAppTheme();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
+  return <View style={s.block} testID={testID}>{children}</View>;
+}
+
+function Pill({ icon, label }: { icon: keyof typeof Feather.glyphMap; label: string }) {
+  const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   return (
-    <BrandthreadCard style={s.addressCard}>
-      <Text style={s.addressTitle}>{title}</Text>
-      <Text style={s.addressText}>{addr.name}</Text>
-      <Text style={s.addressText}>{addr.line1}{addr.line2 ? `, ${addr.line2}` : ''}</Text>
-      <Text style={s.addressText}>{addr.city}, {addr.state} {addr.zip}</Text>
-      <Text style={s.addressText}>{addr.country}</Text>
-    </BrandthreadCard>
+    <View style={s.pill}>
+      <Feather name={icon} size={14} color={theme.text} />
+      <Text style={s.pillText}>{label}</Text>
+    </View>
+  );
+}
+
+function MoreButton({ onPress, label }: { onPress: () => void; label: string }) {
+  const { theme } = useAppTheme();
+  return (
+    <PressableScale onPress={onPress} hitSlop={10} accessibilityRole="button" accessibilityLabel={label} style={{ width: 36, height: 32, alignItems: 'flex-end', justifyContent: 'center' }}>
+      <Feather name="more-horizontal" size={ICON.md} color={theme.text} />
+    </PressableScale>
+  );
+}
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const { theme } = useAppTheme();
+  const [copied, setCopied] = useState(false);
+  return (
+    <PressableScale
+      onPress={() => {
+        Clipboard.setStringAsync(text).then(() => {
+          hapticToggle();
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }).catch(() => {});
+      }}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={copied ? 'Copied' : label}
+      style={{ width: 32, height: 32, alignItems: 'flex-end', justifyContent: 'center' }}
+    >
+      <Feather name={copied ? 'check' : 'copy'} size={ICON.sm} color={theme.muted} />
+    </PressableScale>
+  );
+}
+
+function ItemRow({ item, onPress }: { item: OrderLineItem; onPress?: () => void }) {
+  const { theme } = useAppTheme();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const body = (
+    <View style={s.itemRow}>
+      <View style={s.itemThumb}>
+        {item.imageUri
+          ? <Image source={{ uri: item.imageUri }} style={s.itemThumbImg} />
+          : <Feather name="package" size={ICON.md} color={theme.muted} />}
+      </View>
+      <View style={s.itemBody}>
+        <Text style={s.itemName} numberOfLines={2}>{item.productName}</Text>
+        {item.variant ? <Text style={s.itemMeta} numberOfLines={1}>{item.variant}</Text> : null}
+        <Text style={s.itemMeta}>{usd(item.unitPriceCents)}</Text>
+        {item.refundedAt ? <Text style={s.itemMeta}>Refunded {formatLocalDate(item.refundedAt)}</Text> : null}
+      </View>
+      <Text style={s.itemQty}>× {item.quantity}</Text>
+    </View>
+  );
+  if (!onPress) return body;
+  return (
+    <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={`${item.productName}, open product`}>
+      {body}
+    </PressableScale>
+  );
+}
+
+// ─── Delivery status sheet (was the Fulfillment tab's tracking form) ─────────
+
+function DeliveryStatusSheet({ visible, order, onClose, onSave }: {
+  visible: boolean;
+  order: Order;
+  onClose: () => void;
+  onSave: (status: TrackingStatus, estimatedDelivery: string | null) => Promise<void>;
+}) {
+  const { theme } = useAppTheme();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const [status, setStatus] = useState<TrackingStatus>(order.trackingStatus ?? 'label_created');
+  const [estimated, setEstimated] = useState(order.estimatedDelivery ?? '');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!visible) return;
+    setStatus(order.trackingStatus && order.trackingStatus !== 'delivered' ? order.trackingStatus : 'label_created');
+    setEstimated(order.estimatedDelivery ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+  return (
+    <BottomSheet visible={visible} onClose={onClose} testID="delivery-status-sheet">
+      <View style={{ paddingHorizontal: SP.md, gap: SP.sm, paddingBottom: SP.md }}>
+        <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>Delivery status</Text>
+        {TRACKING_STATUS_OPTIONS.map(option => (
+          <ListRow
+            key={option.key}
+            title={option.label}
+            onPress={() => setStatus(option.key)}
+            right={status === option.key ? <Feather name="check" size={18} color={theme.text} /> : undefined}
+            testID={`tracking-status-${option.key}`}
+          />
+        ))}
+        <View style={s.sheetField}>
+          <Text style={s.sheetFieldLabel}>Estimated delivery</Text>
+          <TextInput
+            style={s.sheetFieldInput}
+            value={estimated}
+            onChangeText={setEstimated}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={theme.subtle}
+            autoCapitalize="none"
+            autoCorrect={false}
+            accessibilityLabel="Estimated delivery date"
+            testID="estimated-delivery-input"
+          />
+        </View>
+        <Button
+          label="Save"
+          fullWidth
+          loading={saving}
+          onPress={async () => {
+            setSaving(true);
+            try { await onSave(status, estimated.trim() || null); onClose(); } catch { /* alert already shown */ } finally { setSaving(false); }
+          }}
+        />
+      </View>
+    </BottomSheet>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OrderDetailScreen() {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
+  const { id, refund: refundParam } = useLocalSearchParams<{ id: string; refund?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
@@ -470,15 +567,15 @@ export default function OrderDetailScreen() {
   // further on press-in. When it's there, paint it immediately instead of
   // the spinner below — `load` still runs on focus and refreshes silently.
   const cachedOrder = id ? queryClient.getQueryData<any>(queryKeys.order(id)) : undefined;
+  const [raw, setRaw] = useState<any>(cachedOrder ?? null);
   const [order, setOrder] = useState<Order | null>(() => (cachedOrder ? adaptApiOrder(cachedOrder) : null));
   const [loading, setLoading] = useState(!cachedOrder);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [orderLoadFailed, setOrderLoadFailed] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>((tab as Tab) || 'overview');
   // Item 108: this order's real return requests (GET /api/returns, seller).
-  // null = not loaded yet; the Returns tab shows a spinner until then.
   const [orderReturns, setOrderReturns] = useState<ReturnView[] | null>(null);
-  const [returnsError, setReturnsError] = useState(false);
+  // Refunds already issued (GET /:id/refunds); null until loaded.
+  const [refundInfo, setRefundInfo] = useState<OrderRefundsResponse | null>(null);
 
   // Cancel modal
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -487,17 +584,11 @@ export default function OrderDetailScreen() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
 
-  // Note form
-  const [noteText, setNoteText] = useState('');
-  const [noteType, setNoteType] = useState<'internal' | 'customer' | 'manufacturer'>('internal');
-  const [addingNote, setAddingNote] = useState(false);
-
-  // Tracking form per group
-  const [trackingForms, setTrackingForms] = useState<Record<string, { carrier: string; tracking: string; visible: boolean }>>({});
-  const [updatingTracking, setUpdatingTracking] = useState(false);
-
-  // Tracking events modal
-  const [trackingModalShipmentId, setTrackingModalShipmentId] = useState<string | null>(null);
+  // Sheets
+  const [fulfillOpen, setFulfillOpen] = useState(false);
+  const [fulfilledAt, setFulfilledAt] = useState<string | null>(null);
+  const [refundOpen, setRefundOpen] = useState(refundParam === '1');
+  const [deliveryStatusOpen, setDeliveryStatusOpen] = useState(false);
 
   // Message buyer
   const [messagingBuyer, setMessagingBuyer] = useState(false);
@@ -508,6 +599,12 @@ export default function OrderDetailScreen() {
   const generationRef = useRef(0);
   const requestGenerationRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(!!cachedOrder);
+
+  const applyRaw = useCallback((next: any) => {
+    setRaw(next);
+    setOrder(adaptApiOrder(next));
+    if (id) queryClient.setQueryData(queryKeys.order(id), next);
+  }, [id, queryClient]);
 
   const load = useCallback(async (generation: number) => {
     // No order id at all (e.g. a bad/incomplete deep link) — nothing to
@@ -522,14 +619,13 @@ export default function OrderDetailScreen() {
     // poll can overlap the next tick and an older success can clear the
     // paused state after a later failure has already stopped the timer.
     if (requestGenerationRef.current === generation) return;
-    // Preview demo orders (lib/previewSellerOrders.ts) live only on this
-    // device: never fetch them (or returns) from the API.
-    if (isGeneratedSellerOrderId(id)) {
-      const raw = getGeneratedSellerOrder(id);
-      if (raw) {
-        setOrder(adaptApiOrder(raw));
-        queryClient.setQueryData(queryKeys.order(id), raw);
-      } else if (!hasLoadedRef.current) setOrder(null);
+    // Preview demo orders (lib/previewSellerOrders.ts, lib/previewOrders.ts)
+    // live only on this device: never fetch them (or returns) from the API,
+    // and keep whatever the demo seller already did to them this session.
+    if (isLocalPreviewSellerOrderId(id)) {
+      const previewRaw = loadPreviewSellerOrder(id);
+      if (previewRaw) applyRaw(previewRaw);
+      else if (!hasLoadedRef.current) setOrder(null);
       setOrderReturns([]);
       setLoading(false);
       hasLoadedRef.current = true;
@@ -541,25 +637,19 @@ export default function OrderDetailScreen() {
       .then(rows => {
         if (generationRef.current !== generation) return;
         setOrderReturns((Array.isArray(rows) ? rows : []).filter((row: any) => row?.orderId === id).map(adaptReturnRow));
-        setReturnsError(false);
       })
       .catch(() => {
         if (generationRef.current !== generation) return;
-        setReturnsError(true);
         setOrderReturns(prev => prev ?? []);
       });
+    api.orders.refunds(id)
+      .then(info => { if (generationRef.current === generation) setRefundInfo(info); })
+      .catch(() => { /* the Paid block falls back to the order's refundedCents */ });
     try {
-      // Demo preview has no account; a fixture id falls back to its fixture
-      // (lib/previewOrders.ts, demo=1 only) instead of a failed request.
-      const raw = await api.orders.get(id).catch((err: unknown) => {
-        const preview = getPreviewSellerOrder(id);
-        if (preview) return preview;
-        throw err;
-      });
+      const fetched = await api.orders.get(id);
       if (generationRef.current !== generation) return; // stale focus cycle
-      setOrder(adaptApiOrder(raw));
+      applyRaw(fetched);
       setOrderLoadFailed(false);
-      queryClient.setQueryData(queryKeys.order(id), raw);
       setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
     } catch (loadErr) {
@@ -584,7 +674,7 @@ export default function OrderDetailScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [id, api, queryClient]);
+  }, [id, api, applyRaw]);
 
   // Poll every 15 s while focused so status updates surface quickly.
   // After 3 consecutive failures the interval clears to avoid hammering a
@@ -616,25 +706,9 @@ export default function OrderDetailScreen() {
     load(generation);
   }, [load]);
 
+  const isPreview = isLocalPreviewSellerOrderId(id);
+
   // ── Actions ──────────────────────────────────────────────────────────────
-
-  async function handleMarkProcessing() {
-    hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
-    load(generationRef.current);
-  }
-
-  async function handleMarkReadyToShip() {
-    hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
-    load(generationRef.current);
-  }
-
-  async function handleMarkShipped() {
-    hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
-    load(generationRef.current);
-  }
 
   // 409 AUTO_REFUNDED / DELIVERY_NOT_SELLER_CONFIRMED get their own copy.
   function writeFailed(title: string, e: any) {
@@ -642,20 +716,54 @@ export default function OrderDetailScreen() {
     if (e?.code === 'AUTO_REFUNDED') load(generationRef.current);
   }
 
-  const [showShipItems, setShowShipItems] = useState(false);
-  const [shippingItems, setShippingItems] = useState(false);
+  async function handleStatus(status: 'processing' | 'fulfilled') {
+    hapticSuccessAction();
+    try { await api.orders.updateStatus(id, status); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
+    load(generationRef.current);
+  }
 
-  async function handleShipItems(itemIds: string[], trackingNumber: string, carrier: string) {
-    setShippingItems(true);
-    try {
-      await api.orders.addItemsTracking(id, { itemIds, trackingNumber, ...(carrier ? { carrier } : {}) });
-      hapticSuccessAction();
-      setShowShipItems(false);
+  /** The fulfil sheet's request: same endpoints and server rules as before (tracking / items-tracking / status). */
+  async function handleFulfill(request: FulfillRequest) {
+    const now = new Date().toISOString();
+    if (isPreview && raw) {
+      const next = applyFulfillLocally(raw, request, now);
+      savePreviewSellerOrder(next);
+      applyRaw(next);
+    } else {
+      try {
+        await submitFulfillRequest(api.orders, id, request);
+      } catch (e: any) {
+        if (e?.code === 'AUTO_REFUNDED') load(generationRef.current);
+        throw new Error(sellerOrderConflictMessage(e?.code) ?? fulfillErrorMessage(e));
+      }
       load(generationRef.current);
+    }
+    setFulfillOpen(false);
+    setFulfilledAt(now);
+  }
+
+  async function handleRefund(request: SellerRefundRequest) {
+    if (isPreview && raw) {
+      const next = applyRefundLocally(raw, request.amountCents);
+      savePreviewSellerOrder(next);
+      applyRaw(next);
+    } else {
+      const result = await api.orders.refund(id, request);
+      setRefundInfo(prev => ({ refundedCents: result.refundedCents, refundableCents: result.refundableCents, refunds: prev?.refunds ?? [] }));
+      api.orders.refunds(id).then(setRefundInfo).catch(() => {});
+      load(generationRef.current);
+    }
+    hapticSuccessAction();
+    setRefundOpen(false);
+  }
+
+  async function handleUpdateTracking(status: TrackingStatus, estimatedDelivery: string | null) {
+    try {
+      await api.orders.updateTracking(id, { trackingStatus: status, estimatedDelivery });
+      await load(generationRef.current);
     } catch (e: any) {
-      writeFailed('Couldn’t add tracking', e);
-    } finally {
-      setShippingItems(false);
+      writeFailed('Couldn’t update tracking', e);
+      throw e;
     }
   }
 
@@ -734,78 +842,14 @@ export default function OrderDetailScreen() {
     load(generationRef.current);
   }
 
-  async function handleAddNote() {
-    if (!noteText.trim()) return;
-    setAddingNote(true);
-    // Notes are stored locally (no API endpoint) — optimistically append
-    if (order) {
-      const newNote = {
-        id: `note-${Date.now()}`,
-        orderId: id,
-        type: noteType,
-        content: noteText.trim(),
-        isPinned: false,
-        fileIds: [],
-        authorName: 'You',
-        createdAt: new Date().toISOString(),
-      };
-      setOrder({ ...order, notes: [...order.notes, newNote] });
-    }
-    setNoteText('');
-    setAddingNote(false);
-  }
-
-  async function handleAddTracking(groupId: string) {
-    const form = trackingForms[groupId];
-    if (!form?.carrier.trim() || !form?.tracking.trim()) {
-      Alert.alert('Missing info', 'Please enter carrier and tracking number.');
-      return;
-    }
-    try {
-      await api.orders.addTracking(id, {
-        trackingNumber: form.tracking.trim(),
-        carrier:        form.carrier.trim(),
-      });
-    } catch (e: any) {
-      writeFailed('Couldn’t add tracking', e);
-      return;
-    }
-    setTrackingForms(prev => ({ ...prev, [groupId]: { ...prev[groupId], visible: false } }));
-    load(generationRef.current);
-  }
-
-  async function handleAddTrackingQuick(carrier: string, trackingNumber: string) {
-    try {
-      await api.orders.addTracking(id, { trackingNumber, carrier });
-      load(generationRef.current);
-    } catch (e: any) {
-      writeFailed('Couldn’t add tracking', e);
-    }
-  }
-
-  async function handleUpdateTracking(status: TrackingStatus, estimatedDelivery: string | null) {
-    setUpdatingTracking(true);
-    try {
-      await api.orders.updateTracking(id, {
-        trackingStatus: status,
-        estimatedDelivery,
-      });
-      await load(generationRef.current);
-    } catch (e: any) {
-      writeFailed('Couldn’t update tracking', e);
-      throw e;
-    } finally {
-      setUpdatingTracking(false);
-    }
-  }
-
-  async function handlePinNote(noteId: string, current: boolean) {
+  function shareOrderInvoice() {
     if (!order) return;
-    // Toggle pin locally (no API endpoint)
-    setOrder({
-      ...order,
-      notes: order.notes.map(n => n.id === noteId ? { ...n, isPinned: !current } : n),
-    });
+    shareInvoice(invoiceFromSellerOrder(order)).catch((err: any) => Alert.alert('Could not create invoice', err?.message ?? 'Please try again.'));
+  }
+
+  function printPackingSlip() {
+    if (!order) return;
+    sharePackingSlip(order).catch(() => Alert.alert('Couldn’t create the packing slip', 'Try again.'));
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -813,7 +857,7 @@ export default function OrderDetailScreen() {
   if (loading) {
     return (
       <View style={s.centered}>
-        <ActivityIndicator color={PURPLE} size="large" />
+        <ActivityIndicator color={theme.text} size="large" />
       </View>
     );
   }
@@ -829,10 +873,9 @@ export default function OrderDetailScreen() {
             accessibilityLabel="Live updates paused. Tap to retry."
             testID="order-detail-live-updates-retry"
           >
-            <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
+            <Feather name="wifi-off" size={ICON.sm} color={theme.text} />
             <Text style={s.pausedBannerText}>Live updates paused</Text>
             <Text style={s.pausedBannerAction}>Tap to retry</Text>
-            <Feather name="refresh-cw" size={12} color={ORANGE} />
           </PressableScale>
         )}
         <EmptyState
@@ -847,43 +890,106 @@ export default function OrderDetailScreen() {
     );
   }
 
-  const trackingModal = order.shipments.find(sh => sh.id === trackingModalShipmentId);
+  const readOnly = !!order.autoRefundedAt;
+  const toFulfill = linesToFulfill(order);
+  const fulfillable = toFulfill.length > 0;
+  const groups = shipmentGroups({
+    ...order,
+    trackingNumber: order.shipments[0]?.trackingNumber ?? null,
+    carrier: order.shipments[0]?.carrier ?? null,
+  });
+  const shippedAt = order.timeline.find(ev => ev.type === 'shipped')?.createdAt ?? null;
+  const unfulfilledQty = toFulfill.reduce((sum, li) => sum + li.quantity, 0);
+  const closed = order.status === 'cancelled' || order.status === 'refunded';
+  // Lines with no shipment that aren't fulfillable: a cancelled order's items.
+  const removedLines = closed ? order.lineItems.filter(li => !li.trackingNumber) : [];
+  const cancellable = !readOnly && (order.status === 'new' || order.status === 'processing' || order.status === 'ready_to_ship');
+  const refundableCents = refundInfo?.refundableCents ?? (raw ? refundableCentsOf(raw) : 0);
+  const canRefund = !readOnly && order.payment.amountPaidCents > order.payment.amountRefundedCents && refundableCents > 0;
+  const itemCount = order.lineItems.reduce((sum, li) => sum + li.quantity, 0);
+  const partiallyShipped = order.lineItems.some(li => !!li.trackingNumber) && fulfillable;
+  const labelHref = partiallyShipped
+    ? `/fulfill-order?orderId=${order.id}&itemIds=${toFulfill.map(li => li.id).join(',')}`
+    : `/fulfill-order?orderId=${order.id}&step=3`;
+  const openProduct = (li: OrderLineItem) => (li.productId ? () => router.push(productDetailHref(li.productId, { isOwner: true }) as never) : undefined);
+  const refundRows = (refundInfo?.refunds ?? []).filter(r => r.state !== 'failed');
+  const c = order.customer;
+
+  function openFulfill() {
+    hapticPrimaryAction();
+    setFulfillOpen(true);
+  }
+  function openRefund() {
+    hapticPrimaryAction();
+    setRefundOpen(true);
+  }
+
+  function showMoreActions() {
+    const buttons: ActionSheetButton[] = [];
+    if (fulfillable) {
+      buttons.push({ text: toFulfill.length > 1 ? 'Fulfill items' : 'Fulfill item', onPress: openFulfill });
+      buttons.push({ text: 'Create shipping label', onPress: () => router.push(labelHref as never) });
+    }
+    if (!readOnly && order!.status === 'new') buttons.push({ text: 'Mark as processing', onPress: () => handleStatus('processing') });
+    if (!readOnly && order!.status === 'processing') buttons.push({ text: 'Mark as ready to ship', onPress: () => handleStatus('fulfilled') });
+    if (!readOnly && order!.status === 'shipped') buttons.push({ text: 'Update delivery status', onPress: () => setDeliveryStatusOpen(true) });
+    buttons.push({ text: 'Print packing slip', onPress: printPackingSlip });
+    if (order!.customer.buyerUserId) buttons.push({ text: 'Message buyer', onPress: handleMessageBuyer });
+    if (canRefund) buttons.push({ text: 'Refund', onPress: openRefund });
+    buttons.push({ text: 'Share invoice', onPress: shareOrderInvoice });
+    if (cancellable) buttons.push({ text: 'Cancel order', style: 'destructive', onPress: () => setShowCancelModal(true) });
+    buttons.push({ text: 'Close', style: 'cancel' });
+    showActionSheet(orderTitle(order!.orderNumber), undefined, buttons);
+  }
+
+  function showPaidActions() {
+    const buttons: ActionSheetButton[] = [];
+    if (canRefund) buttons.push({ text: 'Refund', onPress: openRefund });
+    buttons.push({ text: 'Share invoice', onPress: shareOrderInvoice });
+    buttons.push({ text: 'Close', style: 'cancel' });
+    showActionSheet(paymentPillLabel(order!), undefined, buttons);
+  }
+
+  function showUnfulfilledActions() {
+    const buttons: ActionSheetButton[] = [];
+    if (!readOnly && order!.status === 'new') buttons.push({ text: 'Mark as processing', onPress: () => handleStatus('processing') });
+    if (!readOnly && order!.status === 'processing') buttons.push({ text: 'Mark as ready to ship', onPress: () => handleStatus('fulfilled') });
+    buttons.push({ text: 'Print packing slip', onPress: printPackingSlip });
+    if (cancellable) buttons.push({ text: 'Cancel order', style: 'destructive', onPress: () => setShowCancelModal(true) });
+    buttons.push({ text: 'Close', style: 'cancel' });
+    showActionSheet('Unfulfilled', undefined, buttons);
+  }
+
+  function showFulfilledActions() {
+    const buttons: ActionSheetButton[] = [];
+    if (!readOnly && order!.status === 'shipped') buttons.push({ text: 'Update delivery status', onPress: () => setDeliveryStatusOpen(true) });
+    buttons.push({ text: 'Print packing slip', onPress: printPackingSlip });
+    buttons.push({ text: 'Close', style: 'cancel' });
+    showActionSheet('Fulfilled', undefined, buttons);
+  }
+
+  const pinnedNotes = order.notes.filter(n => n.isPinned);
+  const timeline = [
+    ...order.timeline,
+    ...refundRows.map(r => ({
+      id: `tl-refund-${r.id}`, type: 'refund_issued', message: `Refunded ${usd(r.amountCents)} · ${refundReasonLabel(r.reason)}`,
+      isCustomerVisible: true, isSystemEvent: true, isSellerNote: false, createdAt: r.succeededAt ?? r.createdAt,
+    })),
+  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
     <View style={s.root}>
-      {/* Header */}
       <ScreenHeader
-        title={order.orderNumber}
+        title={orderTitle(order.orderNumber)}
         divider={false}
         variant="push"
         onBack={() => goBackOr(router, '/(tabs)/orders')}
-        actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
+        actions={[
+          { icon: 'share', onPress: shareOrderInvoice, accessibilityLabel: 'Share invoice' },
+          { icon: 'more-horizontal', onPress: showMoreActions, accessibilityLabel: 'More order actions' },
+        ]}
       />
 
-      {/* Tab bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={s.tabBar}
-        contentContainerStyle={s.tabBarContent}
-      >
-        {TABS.map(t => (
-          <PressableScale
-            key={t.key}
-            onPress={() => { hapticToggle(); setActiveTab(t.key); }}
-            style={[s.tabItem, activeTab === t.key && s.tabItemActive]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeTab === t.key }}
-            accessibilityLabel={t.label}
-          >
-            <Text style={[s.tabLabel, activeTab === t.key && s.tabLabelActive]}>
-              {t.key === 'returns' && orderReturns && orderReturns.length > 0 ? `${t.label} (${orderReturns.length})` : t.label}
-            </Text>
-          </PressableScale>
-        ))}
-      </ScrollView>
-
-      {/* Cancellation confirmed banner */}
       {updatesPaused && (
         <PressableScale
           style={s.pausedBanner}
@@ -892,58 +998,271 @@ export default function OrderDetailScreen() {
           accessibilityLabel="Live updates paused. Tap to retry."
           testID="order-detail-live-updates-retry"
         >
-          <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
+          <Feather name="wifi-off" size={ICON.sm} color={theme.text} />
           <Text style={s.pausedBannerText}>Live updates paused</Text>
           <Text style={s.pausedBannerAction}>Tap to retry</Text>
-          <Feather name="refresh-cw" size={12} color={ORANGE} />
         </PressableScale>
       )}
 
-      {cancelConfirmed && (
-        <View style={s.cancelBanner}>
-          <Feather name="check-circle" size={ICON.sm} color={FG} />
-          <Text style={s.cancelBannerText}>Order cancelled successfully.</Text>
-          <PressableScale onPress={() => { hapticPrimaryAction(); setCancelConfirmed(false); }} accessibilityRole="button" accessibilityLabel="Dismiss">
-            <Feather name="x" size={ICON.sm} color={FG} />
-          </PressableScale>
-        </View>
-      )}
-
-      {/* Content */}
       <ScrollView
         style={s.content}
         contentContainerStyle={{ paddingBottom: insets.bottom + SP.xxl }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        testID="order-detail-scroll"
       >
-        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onShipSome={() => setShowShipItems(true)} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
-        {activeTab === 'customer'    && <CustomerTab order={order} />}
-        {activeTab === 'payment'     && <PaymentTab order={order} />}
-        {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onUpdateTracking={handleUpdateTracking} updatingTracking={updatingTracking} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
-        {activeTab === 'timeline'    && <TimelineTab order={order} noteText={noteText} setNoteText={setNoteText} onAddNote={handleAddNote} addingNote={addingNote} />}
-        {activeTab === 'returns'     && <ReturnsTab returns={orderReturns} loadError={returnsError} router={router} />}
-        {activeTab === 'disputes'    && <DisputesTab order={order} router={router} />}
-        {activeTab === 'notes'       && <NotesTab order={order} noteText={noteText} setNoteText={setNoteText} noteType={noteType} setNoteType={setNoteType} onAddNote={handleAddNote} addingNote={addingNote} onPinNote={handlePinNote} />}
+        {/* "Completed" banner (reference 3) after the fulfil sheet confirms. */}
+        {fulfilledAt ? (
+          <View style={s.band} testID="order-fulfilled-banner">
+            <View style={s.doneBanner}>
+              <View style={s.doneIcon}><Feather name="check" size={16} color={theme.background} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.doneTitle}>Fulfilled</Text>
+                <Text style={s.doneText}>Items fulfilled {fmtStamp(fulfilledAt)}.</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {cancelConfirmed && (
+          <View style={s.band}>
+            <View style={s.doneBanner}>
+              <View style={s.doneIcon}><Feather name="check" size={16} color={theme.background} /></View>
+              <Text style={[s.doneText, { flex: 1 }]}>Order cancelled.</Text>
+            </View>
+          </View>
+        )}
+
+        <View style={s.bannerWrap}>
+          <SellerDeliveryBanner order={order} shipped={order.status === 'shipped' || order.status === 'delivered'} />
+        </View>
+
+        {pinnedNotes.map(note => (
+          <View key={note.id} style={s.noticeRow}>
+            <Feather name="alert-triangle" size={ICON.sm} color={theme.text} />
+            <Text style={s.noticeText}>{note.content.replace(/^⚠️\s*/, '')}</Text>
+          </View>
+        ))}
+
+        {(order.isPreOrder || (order.sellerRisk && order.sellerRisk.level !== 'normal')) ? (
+          <View style={s.flagRow}>
+            {order.isPreOrder ? <Pill icon="clock" label="Pre-order" /> : null}
+            <OrderRiskBadge risk={order.sellerRisk} />
+          </View>
+        ) : null}
+
+        {/* Fulfilled shipments (reference 4) */}
+        {groups.map((group, index) => (
+          <Block key={group.key} testID="order-fulfilled-block">
+            <View style={s.blockHead}>
+              <View style={s.pillLine}>
+                <Pill icon="check-square" label={`${order.status === 'delivered' ? 'Delivered' : 'Fulfilled'} (${group.quantity})`} />
+                {groups.length > 1 ? <Text style={s.blockHeadMeta}>{`${orderTitle(order.orderNumber)}-F${index + 1}`}</Text> : null}
+              </View>
+              <MoreButton onPress={showFulfilledActions} label="Fulfillment actions" />
+            </View>
+            <Text style={s.blockSub}>
+              {[shippedAt || group.items[0]?.deliveredAt ? fmtStamp((shippedAt ?? group.items[0]?.deliveredAt)!) : null, 'Shipping'].filter(Boolean).join(' • ')}
+            </Text>
+            {group.trackingNumber ? (
+              <View style={s.trackingBox} testID="order-tracking-box">
+                <Text style={s.trackingLabel}>Tracking number</Text>
+                <Text style={s.trackingValue} selectable>{[group.carrier, group.trackingNumber].filter(Boolean).join(' • ')}</Text>
+                {trackingStatusLabel(order.trackingStatus) ? (
+                  <Text style={s.trackingLabel}>{[trackingStatusLabel(order.trackingStatus), order.estimatedDelivery ? `Est. ${fmt(`${order.estimatedDelivery}T12:00:00`)}` : null].filter(Boolean).join(' · ')}</Text>
+                ) : null}
+              </View>
+            ) : null}
+            {group.items.map((li, i) => (
+              <View key={li.id} style={i > 0 ? s.rowDivider : null}>
+                <ItemRow item={li} onPress={openProduct(li)} />
+              </View>
+            ))}
+          </Block>
+        ))}
+
+        {/* Unfulfilled items (reference 1) */}
+        {fulfillable || removedLines.length > 0 ? (
+          <Block testID="order-unfulfilled-block">
+            <View style={s.blockHead}>
+              <Pill
+                icon={closed ? 'x-circle' : 'package'}
+                label={closed ? `Cancelled (${removedLines.reduce((n, li) => n + li.quantity, 0)})` : `Unfulfilled (${unfulfilledQty})`}
+              />
+              {!closed ? <MoreButton onPress={showUnfulfilledActions} label="Unfulfilled item actions" /> : null}
+            </View>
+            {order.status === 'cancelled' && order.cancellation ? (
+              <Text style={s.blockSub}>
+                {[cancellationReasonLabel(order.cancellation.reason), order.cancellation.notes, fmt(order.cancellation.cancelledAt)].filter(Boolean).join(' • ')}
+              </Text>
+            ) : !closed ? <Text style={s.blockSub}>Shipping</Text> : null}
+            {(closed ? removedLines : toFulfill).map((li, i) => (
+              <View key={li.id} style={i > 0 ? s.rowDivider : null}>
+                <ItemRow item={li} onPress={openProduct(li)} />
+              </View>
+            ))}
+            {fulfillable ? (
+              <View style={s.blockActions}>
+                <Button label="Create shipping label" fullWidth onPress={() => router.push(labelHref as never)} testID="order-create-label" />
+                <Button label={toFulfill.length > 1 ? 'Fulfill items' : 'Fulfill item'} variant="secondary" fullWidth onPress={openFulfill} testID="order-fulfill-item" />
+              </View>
+            ) : null}
+          </Block>
+        ) : null}
+
+        {readOnly ? (
+          <Block>
+            <Text style={s.blockFoot}>Auto-refunded orders are read-only. Fulfillment is turned off.</Text>
+          </Block>
+        ) : null}
+
+        {/* Shopify-linked products */}
+        {order.shopifyFulfillment ? (
+          <Block>
+            <Text style={s.blockTitle}>Fulfilled via Shopify</Text>
+            <InfoRow label="Sent to Shopify" value={order.shopifyFulfillment.sentToShopify ? (order.shopifyFulfillment.shopifyOrderName ?? 'Yes') : 'Pending'} />
+            <InfoRow label="Fulfilled by partner" value={order.shopifyFulfillment.fulfilledByPartner ? 'Yes — tracking received' : 'Not yet'} />
+          </Block>
+        ) : null}
+
+        {/* Paid */}
+        <Block testID="order-paid-block">
+          <View style={s.blockHead}>
+            <Pill icon="file-text" label={paymentPillLabel(order)} />
+            <MoreButton onPress={showPaidActions} label="Payment actions" />
+          </View>
+          <Text style={s.itemCount}>{plural(itemCount, 'item')}</Text>
+          <InfoRow label="Subtotal" value={usd(order.payment.subtotalCents)} />
+          {order.payment.discountTotalCents > 0 ? <InfoRow label="Discounts" value={`-${usd(order.payment.discountTotalCents)}`} /> : null}
+          {order.payment.shippingTotalCents > 0 ? <InfoRow label="Shipping" value={usd(order.payment.shippingTotalCents)} /> : null}
+          {order.payment.taxTotalCents > 0 ? <InfoRow label="Tax" value={usd(order.payment.taxTotalCents)} /> : null}
+          <View style={s.totalRow}><InfoRow label="Total" value={usd(order.payment.totalCents)} bold /></View>
+          <View style={s.hair} />
+          {order.payment.amountPaidCents > 0 ? <InfoRow label="Paid" value={usd(order.payment.amountPaidCents)} /> : null}
+          {order.payment.amountHeldCents > 0 ? <InfoRow label="Held" value={usd(order.payment.amountHeldCents)} /> : null}
+          {refundRows.length > 0
+            ? refundRows.map(r => (
+              <InfoRow key={r.id} label={`Refunded · ${refundReasonLabel(r.reason)}`} value={`-${usd(r.amountCents)}`} />
+            ))
+            : order.payment.amountRefundedCents > 0
+              ? <InfoRow label="Refunded" value={`-${usd(order.payment.amountRefundedCents)}`} />
+              : null}
+          <FeesRow payment={order.payment} />
+          {canRefund ? (
+            <View style={s.blockActions}>
+              <Button label="Refund" variant="secondary" fullWidth onPress={openRefund} testID="order-refund" />
+            </View>
+          ) : null}
+        </Block>
+
+        {order.threadCashPayout ? (
+          <Block testID="order-thread-cash-payout">
+            <Text style={s.blockTitle}>Your payout</Text>
+            {order.threadCashPayout.lines.map(line => (
+              <View key={line.key}>
+                <InfoRow label={line.label} value={`${line.cents < 0 ? '-' : ''}${usd(Math.abs(line.cents))}`} />
+                {line.note ? <Text style={s.payoutNote}>{line.note}</Text> : null}
+              </View>
+            ))}
+            <View style={s.hair} />
+            <InfoRow label="Your payout" value={usd(order.threadCashPayout.payoutCents)} bold />
+            <Text style={s.payoutNote}>Same as if the buyer had paid everything by card. Thread Cash never comes out of your pay.</Text>
+          </Block>
+        ) : null}
+
+        {orderReturns && orderReturns.length > 0 ? (
+          <Block>
+            <Text style={s.blockTitle}>Returns</Text>
+            {orderReturns.map(ret => (
+              <ListRow
+                key={ret.id}
+                title={`${returnRequestStatusLabel(ret.status)} · ${returnRequestReasonLabel(ret.reason)}`}
+                subtitle={`${ret.status === 'pending' ? 'Needs your review' : `Updated ${fmt(ret.updatedAt)}`} · Items ${formatCents(itemsTotalCents(ret.items))}`}
+                chevron
+                onPress={() => router.push(`/return-detail?returnId=${encodeURIComponent(ret.id)}` as never)}
+                testID={`seller-return-${ret.id}`}
+              />
+            ))}
+          </Block>
+        ) : null}
+
+        {/* Customer */}
+        <Block>
+          <Text style={s.blockTitle}>Customer</Text>
+          <ListRow
+            title={c.name}
+            subtitle={plural(c.totalOrders, 'order')}
+            chevron={!!c.id}
+            onPress={c.id ? () => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never) : undefined}
+            testID="order-customer"
+          />
+          {c.buyerUserId ? (
+            <ListRow
+              icon="user"
+              title="View profile"
+              chevron
+              onPress={() => router.push(profileHref({ userId: c.buyerUserId!, accountType: 'buyer', name: c.name, initials: c.initials }) as never)}
+            />
+          ) : null}
+          <ListRow
+            icon="message-circle"
+            title={messagingBuyer ? 'Opening…' : 'Message buyer'}
+            onPress={handleMessageBuyer}
+            disabled={messagingBuyer || !order.customer.buyerUserId}
+            chevron
+            testID="order-message-buyer"
+          />
+        </Block>
+
+        <Block>
+          <Text style={s.blockTitle}>Contact information</Text>
+          <View style={s.copyRow}>
+            <Text style={[s.bodyText, { flex: 1 }]} selectable>{c.email || 'No email address'}</Text>
+            {c.email ? <CopyButton text={c.email} label="Copy email" /> : null}
+          </View>
+          <Text style={[s.bodyText, !c.phone && s.mutedText]}>{c.phone || 'No phone number'}</Text>
+        </Block>
+
+        <Block>
+          <View style={s.copyRow}>
+            <Text style={[s.blockTitle, { flex: 1, marginBottom: 0 }]}>Shipping address</Text>
+            <CopyButton text={addressLines(c.shippingAddress).join('\n')} label="Copy shipping address" />
+          </View>
+          {addressLines(c.shippingAddress).map((line, i) => <Text key={i} style={s.bodyText} selectable>{line}</Text>)}
+        </Block>
+
+        {/* Timeline */}
+        <View style={s.timelineWrap}>
+          <Text style={s.blockTitle}>Timeline</Text>
+          {timeline.map((ev, i) => (
+            <View key={ev.id} style={s.timelineRow}>
+              <View style={s.timelineRail}>
+                <View style={[s.timelineDot, i === 0 && { backgroundColor: theme.text }]} />
+                {i < timeline.length - 1 ? <View style={s.timelineLine} /> : null}
+              </View>
+              <View style={s.timelineBody}>
+                <Text style={s.timelineMessage}>{ev.message}</Text>
+                <Text style={s.timelineTime}>{fmtTime(ev.createdAt)}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
       </ScrollView>
 
       {/* Cancel Modal */}
       <Modal visible={showCancelModal} transparent animationType="fade" onRequestClose={() => setShowCancelModal(false)}>
         <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Cancel Order</Text>
+          <View style={[s.modalCard, { paddingBottom: insets.bottom + SP.lg }]}>
+            <Text style={s.modalTitle}>Cancel order</Text>
             <Text style={s.modalSubtitle}>Select a reason</Text>
             <View style={s.chipRow}>
               {CANCELLATION_REASONS.map(r => (
-                <PressableScale
+                <Chip
                   key={r.key}
+                  label={r.label}
+                  selected={cancelReason === r.key}
                   onPress={() => { hapticToggle(); setCancelReason(r.key); }}
-                  style={[s.chip, cancelReason === r.key && s.chipActive]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: cancelReason === r.key }}
-                  accessibilityLabel={r.label}
-                >
-                  <Text style={[s.chipText, cancelReason === r.key && s.chipTextActive]}>{r.label}</Text>
-                </PressableScale>
+                />
               ))}
             </View>
             <TextInput
@@ -951,1021 +1270,56 @@ export default function OrderDetailScreen() {
               value={cancelNote}
               onChangeText={setCancelNote}
               placeholder="Additional notes (optional)"
-              placeholderTextColor={SUBTLE}
+              placeholderTextColor={theme.subtle}
               multiline
             />
-            {/* Warning */}
-            <BrandthreadCard style={s.warningCard}>
-              <View style={s.warningRow}>
-                <Feather name="alert-triangle" size={ICON.sm} color={RED} />
-                <Text style={s.warningText}>
-                  This will cancel the order. Any refund must be issued separately through your payment provider. This cannot be undone.
-                </Text>
-              </View>
-            </BrandthreadCard>
-            <View style={s.modalActions}>
-              <SecondaryButton label="Go Back" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />
-              <PrimaryButton
-                label="Confirm Cancel"
-                onPress={handleCancelOrder}
-                loading={cancelling}
-                colors={[RED, RED]}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <ShipItemsSheet
-        visible={showShipItems}
-        busy={shippingItems}
-        items={unshippedItems(order.lineItems).map(li => ({ id: li.id, productName: li.productName, variant: li.variant, quantity: li.quantity }))}
-        onClose={() => setShowShipItems(false)}
-        onSubmit={handleShipItems}
-        onBuyLabel={(itemIds) => {
-          setShowShipItems(false);
-          router.push(`/fulfill-order?orderId=${id}&itemIds=${itemIds.join(',')}`);
-        }}
-      />
-
-      {/* Tracking Events Modal */}
-      <Modal visible={!!trackingModalShipmentId} transparent animationType="slide" onRequestClose={() => setTrackingModalShipmentId(null)}>
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Tracking Events</Text>
-            {trackingModal && (
-              <>
-                <Text style={s.modalSubtitle}>{trackingModal.carrier} · {trackingModal.trackingNumber}</Text>
-                {trackingModal.trackingEvents.map(ev => (
-                  <View key={ev.id} style={s.trackingEventRow}>
-                    <View style={[s.trackingDot, { backgroundColor: timelineColor(ev.status, theme) }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.trackingEvDesc}>{ev.description}</Text>
-                      {ev.location && <Text style={s.trackingEvLoc}>{ev.location}</Text>}
-                      <Text style={s.trackingEvTime}>{fmtTime(ev.timestamp)}</Text>
-                    </View>
-                  </View>
-                ))}
-              </>
-            )}
-            <SecondaryButton label="Close" onPress={() => setTrackingModalShipmentId(null)} style={{ marginTop: SP.md }} />
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TAB: OVERVIEW
-// ═══════════════════════════════════════════════════════
-
-function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onShipSome, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onAddTrackingQuick }: {
-  order: Order;
-  onMarkProcessing: () => void;
-  onMarkReadyToShip: () => void;
-  onMarkShipped: () => void;
-  onShipSome: () => void;
-  onCancelPress: () => void;
-  onMessageBuyer: () => void;
-  messagingBuyer: boolean;
-  router: ReturnType<typeof useRouter>;
-  reload: () => void;
-  onAddTrackingQuick: (carrier: string, trackingNumber: string) => Promise<void>;
-}) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const [addingTracking, setAddingTracking] = useState(false);
-  const [trackingCarrier, setTrackingCarrier] = useState('');
-  const [trackingNum, setTrackingNum] = useState('');
-
-  async function handleAddTrackingAndShip() {
-    if (!trackingCarrier.trim() || !trackingNum.trim()) {
-      Alert.alert('Missing info', 'Enter carrier and tracking number.');
-      return;
-    }
-    await onAddTrackingQuick(trackingCarrier.trim(), trackingNum.trim());
-    setAddingTracking(false);
-  }
-
-  return (
-    <View style={s.tabContent}>
-      {/* Hero card */}
-      <GradientCard glow style={s.heroCard}>
-        <View style={s.heroRow}>
-          <Text style={s.heroOrderNum}>{order.orderNumber}</Text>
-          <View style={s.badgeRow}>
-            <StatusBadge label={order.status.replace(/_/g, ' ').toUpperCase()} variant={orderStatusVariant(order.status)} />
-            <StatusBadge label={order.paymentStatus.replace(/_/g, ' ').toUpperCase()} variant={paymentVariant(order.paymentStatus)} />
-          </View>
-        </View>
-        {order.customer.name ? <Text style={s.heroCustomer}>{order.customer.name}</Text> : null}
-        <Text style={s.heroDate}>{fmt(order.createdAt)}</Text>
-        <View style={s.heroMeta}>
-          <Text style={s.heroMetaText}>Source: {order.source}</Text>
-          <Text style={s.heroMetaText}>·</Text>
-          <Text style={s.heroMetaText}>{order.salesChannel}</Text>
-          <Text style={s.heroMetaText}>·</Text>
-          <Text style={s.heroMetaText}>{order.currency}</Text>
-        </View>
-        {order.riskLevel !== 'low' && (
-          <View style={s.riskBadge}>
-            <Feather name="alert-triangle" size={ICON.xs} color={FG} />
-            <Text style={s.riskBadgeText}>⚠ High Risk</Text>
-          </View>
-        )}
-        <OrderRiskBadge risk={order.sellerRisk} />
-        {order.isPreOrder && (
-          <View style={s.preOrderBadge}>
-            <Text style={s.preOrderBadgeText}>PRE-ORDER</Text>
-          </View>
-        )}
-      </GradientCard>
-
-      {/* Live status tracker — the visual centerpiece: where this order stands right now */}
-      <BrandthreadCard style={s.timelineCard}>
-        <OrderStatusTimeline status={order.status} />
-      </BrandthreadCard>
-
-      <SellerDeliveryBanner order={order} shipped={order.status === 'shipped' || order.status === 'delivered'} />
-
-      {/* Fulfillment via Shopify — only shown for orders containing a Shopify-linked product */}
-      {order.shopifyFulfillment && (
-        <View style={s.section}>
-          <BrandthreadCard style={s.cancellationCard}>
-            <View style={s.cancellationHeader}>
-              <Feather name="shopping-bag" size={ICON.sm} color={FG} />
-              <Text style={s.cancellationTitle}>Fulfilled via Shopify</Text>
-            </View>
-            <InfoRow
-              label="Sent to Shopify"
-              value={order.shopifyFulfillment.sentToShopify
-                ? (order.shopifyFulfillment.shopifyOrderName ?? 'Yes')
-                : 'Pending'}
-              valueColor={order.shopifyFulfillment.sentToShopify ? FG : MUTED}
-            />
-            <InfoRow
-              label="Fulfilled by partner"
-              value={order.shopifyFulfillment.fulfilledByPartner ? 'Yes — tracking received' : 'Not yet'}
-              valueColor={order.shopifyFulfillment.fulfilledByPartner ? FG : MUTED}
-            />
-            {order.shipments[0]?.trackingNumber && (
-              <InfoRow label="Tracking" value={order.shipments[0].trackingNumber} valueColor={MUTED} />
-            )}
-          </BrandthreadCard>
-        </View>
-      )}
-
-      {/* Cancellation reason card */}
-      {order.status === 'cancelled' && order.cancellation && !order.autoRefundedAt && (
-        <View style={s.section}>
-          <BrandthreadCard style={s.cancellationCard}>
-            <View style={s.cancellationHeader}>
-              <Feather name="x-circle" size={ICON.sm} color={RED} />
-              <Text style={s.cancellationTitle}>Order Cancelled</Text>
-            </View>
-            <InfoRow label="Reason" value={cancellationReasonLabel(order.cancellation.reason)} valueColor={FG} />
-            {order.cancellation.notes ? (
-              <InfoRow label="Notes" value={order.cancellation.notes} valueColor={MUTED} />
-            ) : null}
-            <InfoRow label="Cancelled" value={fmt(order.cancellation.cancelledAt)} valueColor={MUTED} />
-          </BrandthreadCard>
-        </View>
-      )}
-
-      {/* Action Buttons */}
-      <View style={s.actionSection}>
-        <SectionHeader title="Actions" />
-        <View style={s.actionCol}>
-          <SecondaryButton
-            label={messagingBuyer ? 'Opening…' : 'Message Buyer'}
-            onPress={onMessageBuyer}
-            icon="message-circle"
-            disabled={messagingBuyer || !order.customer.buyerUserId}
-          />
-          {order.payment.amountPaidCents > order.payment.amountRefundedCents && (
-            <SecondaryButton
-              label="Refund"
-              onPress={() => router.push(`/refund-detail?orderId=${order.id}` as never)}
-              icon="credit-card"
-            />
-          )}
-        </View>
-        {order.autoRefundedAt ? (
-          <Text style={s.readOnlyNote}>Auto-refunded orders are read-only. Mark shipped and Add tracking are turned off.</Text>
-        ) : null}
-        {!order.autoRefundedAt && order.status === 'new' && (
-          <View style={s.actionCol}>
-            <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" />
-            <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" accent={RED} />
-          </View>
-        )}
-        {!order.autoRefundedAt && order.status === 'processing' && (
-          <View style={s.actionCol}>
-            <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" />
-            <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
-          </View>
-        )}
-        {!order.autoRefundedAt && order.status === 'ready_to_ship' && (
-          <View style={s.actionCol}>
-            <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
-            <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" />
-            {addingTracking && (
-              <BrandthreadCard style={s.inlineForm}>
-                <TextInput style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
-                <TextInput style={s.inlineInput} value={trackingNum} onChangeText={setTrackingNum} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
-                <PrimaryButton label="Save & Mark Shipped" onPress={handleAddTrackingAndShip} small />
-              </BrandthreadCard>
-            )}
-            <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" />
-          </View>
-        )}
-        {!order.autoRefundedAt && order.status === 'shipped' && (
-          <View style={s.actionCol}>
-            {order.shipments[0]?.trackingNumber && (
-              <SecondaryButton label="View Tracking" onPress={() => Alert.alert('Tracking', order.shipments[0].trackingNumber ?? '')} icon="map-pin" />
-            )}
-            <Text style={s.readOnlyNote}>{DELIVERY_CONFIRMED_BY_NOTE}</Text>
-          </View>
-        )}
-        {!order.autoRefundedAt && order.lineItems.length > 1 && unshippedItems(order.lineItems).length > 0
-          && (order.status === 'processing' || order.status === 'ready_to_ship' || order.status === 'shipped') && (
-          <SecondaryButton label="Ship some items" onPress={onShipSome} icon="package" />
-        )}
-        {order.status === 'delivered' && (
-          <BrandthreadCard style={s.deliveredCard}>
-            <Feather name="check-circle" size={ICON.md} color={SUCCESS} />
-            <Text style={s.deliveredText}>Order delivered · Read-only</Text>
-          </BrandthreadCard>
-        )}
-        {!order.autoRefundedAt && (order.status === 'processing' || order.status === 'ready_to_ship') && (
-          <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" accent={RED} />
-        )}
-      </View>
-
-      {/* Risk Flags */}
-      {order.riskFlags.length > 0 && (
-        <View style={s.section}>
-          <SectionHeader title="Risk Flags" />
-          {order.riskFlags.map(f => (
-            <View key={f.id} style={s.riskRow}>
-              <Feather name="alert-circle" size={ICON.sm} color={f.severity === 'high' ? RED : ORANGE} />
-              <Text style={s.riskRowText}>{f.label}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Pre-order info */}
-      {order.isPreOrder && order.preOrder && (
-        <View style={s.section}>
-          <SectionHeader title="Pre-Order Details" />
-          <BrandthreadCard>
-            <InfoRow label="Manufacturer" value={order.preOrder.manufacturerName ?? 'Not assigned yet'} />
-            <InfoRow label="Production Status" value={order.preOrder.productionStatus.replace(/_/g, ' ')} />
-            {order.preOrder.estimatedShipDate && (
-              <InfoRow label="Est. Ship Date" value={fmtShort(order.preOrder.estimatedShipDate)} />
-            )}
-            <InfoRow label="Units Ordered" value={String(order.preOrder.unitsOrdered)} />
-          </BrandthreadCard>
-        </View>
-      )}
-
-      {/* Line items summary */}
-      <View style={s.section}>
-        <SectionHeader title="Items" />
-        {order.lineItems.map(li => (
-          <BrandthreadCard
-            key={li.id}
-            style={s.lineItemCard}
-            onPress={li.productId ? () => router.push(productDetailHref(li.productId, { isOwner: true }) as never) : undefined}
-          >
-            <View style={s.lineItemRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.lineItemName}>{li.productName}</Text>
-                <Text style={s.lineItemVariant}>{li.variant}</Text>
-                {li.sku && <Text style={s.lineItemSku}>SKU: {li.sku}</Text>}
-                {(order.deliverBy || li.trackingNumber || li.refundedAt) ? (
-                  <Text style={s.lineItemVariant}>
-                    {li.refundedAt
-                      ? `Refunded ${formatLocalDate(li.refundedAt)}`
-                      : li.trackingNumber
-                        ? `${li.deliveredAt ? 'Delivered' : 'Shipped'} · ${[li.carrier, li.trackingNumber].filter(Boolean).join(' ')}`
-                        : `Not shipped${li.deliverBy ? ` · ship by ${formatLocalDate(li.deliverBy)}` : ''}`}
-                  </Text>
-                ) : null}
-              </View>
-              <View style={s.lineItemRight}>
-                <Text style={s.lineItemQty}>×{li.quantity}</Text>
-                <Text style={s.lineItemTotal}>{usd(li.totalCents)}</Text>
-              </View>
-              {li.productId ? <Feather name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
-            </View>
-          </BrandthreadCard>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TAB: CUSTOMER
-// ═══════════════════════════════════════════════════════
-
-function CustomerTab({ order }: { order: Order }) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const router = useRouter();
-  const c = order.customer;
-  return (
-    <View style={s.tabContent}>
-      <BrandthreadCard elevated style={s.customerHero}>
-        <View style={s.avatarCircle}>
-          <Text style={s.avatarInitials}>{c.initials}</Text>
-        </View>
-        <Text style={s.customerName}>{c.name}</Text>
-        <Text style={s.customerEmail}>{c.email}</Text>
-        {c.phone && <Text style={s.customerPhone}>{c.phone}</Text>}
-      </BrandthreadCard>
-
-      <BrandthreadCard style={s.customerStatsCard}>
-        <InfoRow label="Total Orders" value={String(c.totalOrders)} />
-        <InfoRow label="Lifetime Value" value={usd(c.lifetimeValueCents)} bold />
-      </BrandthreadCard>
-
-      {c.tags.length > 0 && (
-        <View style={s.section}>
-          <SectionHeader title="Customer Tags" />
-          <View style={s.chipRow}>
-            {c.tags.map(t => (
-              <View key={t} style={s.chip}><Text style={s.chipText}>{t}</Text></View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      <View style={s.section}>
-        <AddressCard title="Shipping Address" addr={c.shippingAddress} />
-      </View>
-      <View style={s.section}>
-        <AddressCard title="Billing Address" addr={c.billingAddress} />
-      </View>
-
-      {(!!c.id || !!c.buyerUserId) && (
-        <View style={[s.actionCol, { marginHorizontal: SP.md }]}>
-          {!!c.id && (
-            <SecondaryButton
-              label="View customer"
-              onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
-              icon="user"
-            />
-          )}
-          {!!c.buyerUserId && (
-            <SecondaryButton
-              label="View profile"
-              onPress={() => router.push(profileHref({ userId: c.buyerUserId!, accountType: 'buyer', name: c.name, initials: c.initials }) as never)}
-              icon="external-link"
-            />
-          )}
-        </View>
-      )}
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TAB: PAYMENT
-// ═══════════════════════════════════════════════════════
-
-/** "Fees" row: the recorded fees for this order, else the schedule's estimate; hidden with neither. */
-function FeesRow({ payment: p }: { payment: Order['payment'] }) {
-  const schedule = useFeeSchedule();
-  const recorded = p.platformFeeCents + (p.processingFeeCents ?? 0);
-  let fees = recorded;
-  if (!recorded && schedule && p.totalCents > 0) {
-    const q = quoteFromSchedule(schedule, Math.max(0, p.subtotalCents - p.discountTotalCents), { shippingCents: p.shippingTotalCents });
-    fees = q.platformFeeCents + q.processingFeeCents;
-  }
-  if (!fees) return null;
-  return <InfoRow label="Fees" value={`-${usd(fees)}`} />;
-}
-
-function PaymentTab({ order }: { order: Order }) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const p = order.payment;
-  return (
-    <View style={s.tabContent}>
-      {order.threadCashPayout ? <ThreadCashPayoutCard payout={order.threadCashPayout} /> : null}
-
-      <SectionHeader title="Payment Breakdown" />
-      <BrandthreadCard>
-        <InfoRow label="Subtotal" value={usd(p.subtotalCents)} />
-        {p.discountTotalCents > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotalCents)}`} />}
-        <InfoRow label="Shipping" value={usd(p.shippingTotalCents)} />
-        <InfoRow label="Tax" value={usd(p.taxTotalCents)} />
-        <View style={s.divider} />
-        <InfoRow label="Total" value={usd(p.totalCents)} bold />
-        <FeesRow payment={p} />
-        <InfoRow label="Amount Paid" value={usd(p.amountPaidCents)} valueColor={SUCCESS} />
-        {p.amountRefundedCents > 0 && <InfoRow label="Amount Refunded" value={`-${usd(p.amountRefundedCents)}`} valueColor={RED} />}
-        <InfoRow label="Amount Held" value={usd(p.amountHeldCents)} valueColor={ORANGE} />
-      </BrandthreadCard>
-      <SecondaryButton
-        label="Download invoice"
-        icon="file-text"
-        onPress={() => { shareInvoice(invoiceFromSellerOrder(order)).catch((err: any) => Alert.alert('Could not create invoice', err?.message ?? 'Please try again.')); }}
-      />
-
-      {order.heldFunds && (
-        <View style={s.section}>
-          <SectionHeader title="Held Funds" />
-          <GradientCard style={{ borderColor: ORANGE + '55' }}>
-            <View style={s.heldFundsNotice}>
-              <Feather name="lock" size={ICON.sm} color={ORANGE} />
-              <Text style={s.heldFundsNoticeText}>
-                Funds are held based on fulfillment milestones. This is not legally guaranteed escrow.
-              </Text>
-            </View>
-            <View style={s.heldFundsGrid}>
-              <View style={s.heldFundStat}>
-                <Text style={s.heldFundLabel}>Currently Held</Text>
-                <Text style={[s.heldFundValue, { color: ORANGE }]}>{usd(order.heldFunds.currentlyHeldCents)}</Text>
-              </View>
-              <View style={s.heldFundStat}>
-                <Text style={s.heldFundLabel}>Seller Pending</Text>
-                <Text style={[s.heldFundValue, { color: SUCCESS }]}>{usd(order.heldFunds.sellerPendingCents)}</Text>
-              </View>
-              <View style={s.heldFundStat}>
-                <Text style={s.heldFundLabel}>Platform Fee</Text>
-                <Text style={s.heldFundValue}>{usd(order.heldFunds.platformFeeCents)}</Text>
-              </View>
-            </View>
-            <Text style={s.milestoneTitle}>Payout Milestones</Text>
-            {order.heldFunds.milestones.map(m => (
-              <View key={m.key} style={s.milestoneRow}>
-                <Feather name={m.completedAt ? 'check-circle' : 'circle'} size={ICON.sm} color={m.completedAt ? SUCCESS : SUBTLE} />
-                <Text style={[s.milestoneLabel, m.completedAt && { color: FG }]}>{m.label}</Text>
-                {m.completedAt && <Text style={s.milestoneDate}>{fmtShort(m.completedAt)}</Text>}
-              </View>
-            ))}
-            {order.heldFunds.expectedReleaseDate && (
-              <Text style={s.expectedRelease}>Expected release: {fmt(order.heldFunds.expectedReleaseDate)}</Text>
-            )}
-          </GradientCard>
-        </View>
-      )}
-
-      {order.refunds.length > 0 && (
-        <View style={s.section}>
-          <SectionHeader title="Refunds" />
-          {order.refunds.map(r => (
-            <BrandthreadCard key={r.id} style={s.refundCard}>
-              <View style={s.refundHeader}>
-                <StatusBadge label={r.status.toUpperCase()} variant={r.status === 'completed' ? 'success' : r.status === 'failed' ? 'error' : 'warning'} />
-                <StatusBadge label={r.type.replace(/_/g, ' ')} variant="neutral" />
-                <Text style={s.refundAmount}>{usd(r.totalAmountCents)}</Text>
-              </View>
-              <Text style={s.refundDate}>{fmt(r.createdAt)}</Text>
-            </BrandthreadCard>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
-/**
- * Item 109: a Thread Cash order, from the seller's side. The buyer paid part
- * with Thread Cash, which Brandthread pays to the seller separately, so
- * the payout is what a card-only sale would have been. Monochrome, and
- * every line adds up to "Your payout".
- */
-function ThreadCashPayoutCard({ payout }: { payout: NonNullable<Order['threadCashPayout']> }) {
-  const { theme } = useThemeAliases();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  return (
-    <View style={s.section} testID="order-thread-cash-payout">
-      <SectionHeader title="Your Payout" />
-      <BrandthreadCard>
-        {payout.lines.map(line => (
-          <View key={line.key}>
-            <InfoRow label={line.label} value={`${line.cents < 0 ? '-' : ''}${usd(Math.abs(line.cents))}`} />
-            {line.note ? <Text style={[s.payoutNote, { color: theme.muted }]}>{line.note}</Text> : null}
-          </View>
-        ))}
-        <View style={s.divider} />
-        <InfoRow label="Your payout" value={usd(payout.payoutCents)} bold />
-        <Text style={[s.payoutNote, { color: theme.muted }]}>
-          Same as if the buyer had paid everything by card. Thread Cash never comes out of your pay.
-        </Text>
-      </BrandthreadCard>
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TAB: FULFILLMENT
-// ═══════════════════════════════════════════════════════
-
-function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking, onMarkShipped, onUpdateTracking, updatingTracking, onShowTracking, router }: {
-  order: Order;
-  trackingForms: Record<string, { carrier: string; tracking: string; visible: boolean }>;
-  setTrackingForms: React.Dispatch<React.SetStateAction<Record<string, { carrier: string; tracking: string; visible: boolean }>>>;
-  onAddTracking: (groupId: string) => void;
-  onMarkShipped: () => void;
-  onUpdateTracking: (status: TrackingStatus, estimatedDelivery: string | null) => Promise<void>;
-  updatingTracking: boolean;
-  onShowTracking: (shipmentId: string) => void;
-  router: ReturnType<typeof useRouter>;
-}) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const { fulfillment, shipments } = order;
-  const readOnly = !!order.autoRefundedAt;
-  const [trackingStatus, setTrackingStatus] = useState<TrackingStatus>(
-    order.trackingStatus ?? shipments[0]?.trackingStatus ?? 'label_created',
-  );
-  const [estimatedDelivery, setEstimatedDelivery] = useState(order.estimatedDelivery ?? '');
-  const [trackingFormDirty, setTrackingFormDirty] = useState(false);
-
-  useEffect(() => {
-    if (trackingFormDirty) return;
-    setTrackingStatus(order.trackingStatus ?? shipments[0]?.trackingStatus ?? 'label_created');
-    setEstimatedDelivery(order.estimatedDelivery ?? shipments[0]?.estimatedDelivery ?? '');
-  }, [order.trackingStatus, order.estimatedDelivery, shipments, trackingFormDirty]);
-
-  async function saveTrackingUpdate() {
-    await onUpdateTracking(trackingStatus, estimatedDelivery.trim() || null);
-    setTrackingFormDirty(false);
-  }
-
-  function getForm(groupId: string) {
-    return trackingForms[groupId] ?? { carrier: '', tracking: '', visible: false };
-  }
-  function updateForm(groupId: string, key: 'carrier' | 'tracking', val: string) {
-    setTrackingForms(prev => ({ ...prev, [groupId]: { ...getForm(groupId), [key]: val } }));
-  }
-  function toggleForm(groupId: string) {
-    setTrackingForms(prev => ({ ...prev, [groupId]: { ...getForm(groupId), visible: !getForm(groupId).visible } }));
-  }
-
-  return (
-    <View style={s.tabContent}>
-      {readOnly ? <SellerDeliveryBanner order={order} shipped={false} /> : null}
-      {!readOnly && <View style={s.section}>
-        <SectionHeader title="Tracking Status" />
-        <BrandthreadCard style={s.trackingStatusCard}>
-          <Text style={s.trackingStatusHint}>
-            Keep buyers up to date as this order moves through delivery.
-          </Text>
-          <View style={s.trackingStatusOptions}>
-            {chunkPairs(TRACKING_STATUS_OPTIONS).map((pair, rowIndex) => (
-              <View key={rowIndex} style={s.trackingStatusRow}>
-                {pair.map(option => {
-                  const selected = trackingStatus === option.key;
-                  return (
-                    <View key={option.key} style={s.trackingStatusCell}>
-                      <PressableScale
-                      onPress={() => {
-                        hapticToggle();
-                        setTrackingStatus(option.key);
-                        setTrackingFormDirty(true);
-                      }}
-                      style={[s.trackingStatusOption, selected && s.trackingStatusOptionSelected]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      accessibilityLabel={`Set tracking status to ${option.label}`}
-                      testID={`tracking-status-${option.key}`}
-                    >
-                      <Text style={[s.trackingStatusOptionText, selected && s.trackingStatusOptionTextSelected]}>
-                        {option.label}
-                      </Text>
-                    </PressableScale>
-                    </View>
-                  );
-                })}
-                {pair.length === 1 ? <View style={s.trackingStatusCell} /> : null}
-              </View>
-            ))}
-          </View>
-          <Text style={s.estimatedDeliveryLabel}>Estimated delivery (optional)</Text>
-          <TextInput
-            style={s.inlineInput}
-            value={estimatedDelivery}
-            onChangeText={value => {
-              setEstimatedDelivery(value);
-              setTrackingFormDirty(true);
-            }}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={SUBTLE}
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel="Estimated delivery date"
-            testID="estimated-delivery-input"
-          />
-          <PrimaryButton
-            label="Save Tracking Update"
-            icon="check"
-            small
-            loading={updatingTracking}
-            disabled={updatingTracking || !trackingFormDirty}
-            onPress={saveTrackingUpdate}
-          />
-        </BrandthreadCard>
-      </View>}
-
-      {fulfillment.groups.map((group, idx) => {
-        const groupItems = order.lineItems.filter(li => group.lineItemIds.includes(li.id));
-        const form = getForm(group.id);
-        const groupShipments = shipments.filter(sh => sh.fulfillmentGroupId === group.id);
-        const isManufacturer = group.type === 'manufacturer';
-
-        return (
-          <View key={group.id} style={s.section}>
-            <View style={s.groupHeader}>
-              <Text style={s.groupTitle}>Group {idx + 1} — {isManufacturer ? 'Manufacturer Fulfilled' : 'Seller Fulfilled'}</Text>
-              <StatusBadge label={group.status.replace(/_/g, ' ').toUpperCase()} variant={group.status === 'fulfilled' ? 'success' : 'warning'} />
-            </View>
-
-            {/* Line items */}
-            {groupItems.map(li => (
-              <BrandthreadCard key={li.id} style={s.lineItemCard}>
-                <Text style={s.lineItemName}>{li.productName}</Text>
-                <Text style={s.lineItemVariant}>{li.variant} · ×{li.quantity}</Text>
-              </BrandthreadCard>
-            ))}
-
-            {isManufacturer ? (
-              <BrandthreadCard style={s.manufacturerCard}>
-                <Text style={s.manufacturerName}>{group.manufacturerName ?? 'Manufacturer'}</Text>
-                <Text style={s.manufacturerStatus}>Status: {group.status.replace(/_/g, ' ')}</Text>
-                <Text style={s.manufacturerNotice}>Fulfillment request sent to manufacturer</Text>
-                <SecondaryButton label="Add Tracking from Manufacturer" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ marginTop: SP.sm }} disabled={readOnly} />
-              </BrandthreadCard>
-            ) : (
-              <BrandthreadCard style={s.sellerFulfillCard}>
-                {/* Checklist */}
-                <View style={s.checklistRow}>
-                  <View style={[s.checkItem, fulfillment.isPicked && s.checkItemDone]}>
-                    <Feather name={fulfillment.isPicked ? 'check-square' : 'square'} size={ICON.sm} color={fulfillment.isPicked ? SUCCESS : MUTED} />
-                    <Text style={s.checkLabel}>Picked</Text>
-                  </View>
-                  <View style={[s.checkItem, fulfillment.isPacked && s.checkItemDone]}>
-                    <Feather name={fulfillment.isPacked ? 'check-square' : 'square'} size={ICON.sm} color={fulfillment.isPacked ? SUCCESS : MUTED} />
-                    <Text style={s.checkLabel}>Packed</Text>
-                  </View>
-                </View>
-
-                {fulfillment.fromAddress && (
-                  <View style={s.fromAddrRow}>
-                    <Feather name="map-pin" size={ICON.xs} color={MUTED} />
-                    <Text style={s.fromAddrText}>From: {fulfillment.fromAddress.city}, {fulfillment.fromAddress.state}</Text>
-                  </View>
-                )}
-
-                {!readOnly && <View style={s.actionCol}>
-                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small />
-                  <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small />
-                </View>}
-              </BrandthreadCard>
-            )}
-
-            {/* Inline tracking form */}
-            {form.visible && (
-              <BrandthreadCard style={s.inlineForm}>
-                <Text style={s.inlineFormTitle}>Add Tracking</Text>
-                <TextInput style={s.inlineInput} value={form.carrier} onChangeText={v => updateForm(group.id, 'carrier', v)} placeholder="Carrier (USPS, UPS, FedEx...)" placeholderTextColor={SUBTLE} />
-                <TextInput style={s.inlineInput} value={form.tracking} onChangeText={v => updateForm(group.id, 'tracking', v)} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
-                <View style={s.actionCol}>
-                  <SecondaryButton label="Cancel" onPress={() => toggleForm(group.id)} small />
-                  <PrimaryButton label="Save" onPress={() => onAddTracking(group.id)} small />
-                </View>
-                {form.tracking.trim().length > 0 && (
-                  <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" small style={{ marginTop: SP.sm }} />
-                )}
-              </BrandthreadCard>
-            )}
-
-            {/* Shipments */}
-            {groupShipments.length > 0 && (
-              <View style={{ marginTop: SP.sm }}>
-                <Text style={s.shipmentsTitle}>Shipments</Text>
-                {groupShipments.map(sh => (
-                  <BrandthreadCard key={sh.id} style={s.shipmentCard}>
-                    <View style={s.shipmentHeader}>
-                      <Text style={s.shipmentCarrier}>{sh.carrier}</Text>
-                      {sh.trackingStatus && <StatusBadge label={sh.trackingStatus.replace(/_/g, ' ')} variant={sh.trackingStatus === 'delivered' ? 'success' : 'info'} />}
-                    </View>
-                    {sh.trackingNumber && <Text style={s.trackingNum}>{sh.trackingNumber}</Text>}
-                    {sh.trackingEvents.length > 0 && (
-                      <Text style={s.latestEvent}>{sh.trackingEvents[sh.trackingEvents.length - 1].description}</Text>
-                    )}
-                    <PressableScale
-                      onPress={() => { hapticPrimaryAction(); onShowTracking(sh.id); }}
-                      style={s.viewTrackingBtn}
-                      accessibilityRole="button"
-                      accessibilityLabel="View tracking"
-                    >
-                      <Feather name="map-pin" size={ICON.xs} color={CYAN} />
-                      <Text style={s.viewTrackingText}>View tracking</Text>
-                    </PressableScale>
-                  </BrandthreadCard>
-                ))}
-              </View>
-            )}
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TAB: TIMELINE
-// ═══════════════════════════════════════════════════════
-
-function TimelineTab({ order, noteText, setNoteText, onAddNote, addingNote }: {
-  order: Order;
-  noteText: string;
-  setNoteText: (v: string) => void;
-  onAddNote: () => void;
-  addingNote: boolean;
-}) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const events = [...order.timeline].reverse();
-  return (
-    <View style={s.tabContent}>
-      <SectionHeader title="Timeline" />
-      {events.map(ev => (
-        <View key={ev.id} style={s.timelineRow}>
-          <View style={[s.timelineDot, { backgroundColor: timelineColor(ev.type, theme) }]} />
-          <View style={s.timelineBody}>
-            <Text style={s.timelineMessage}>{ev.message}</Text>
-            <View style={s.timelineMeta}>
-              <Text style={s.timelineTime}>{fmtTime(ev.createdAt)}</Text>
-              {ev.isCustomerVisible && (
-                <View style={s.timelineTag}>
-                  <Feather name="eye" size={10} color={CYAN} />
-                  <Text style={[s.timelineTagText, { color: CYAN }]}>Customer</Text>
-                </View>
-              )}
-              {ev.isSellerNote && (
-                <View style={s.timelineTag}>
-                  <Feather name="lock" size={10} color={ORANGE} />
-                  <Text style={[s.timelineTagText, { color: ORANGE }]}>Internal</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-      ))}
-
-      <View style={s.divider} />
-      <SectionHeader title="Add Internal Note" />
-      <View style={s.noteFormCard}>
-        <TextInput
-          style={s.noteInput}
-          value={noteText}
-          onChangeText={setNoteText}
-          placeholder="Write an internal note..."
-          placeholderTextColor={SUBTLE}
-          multiline
-        />
-        <PrimaryButton label="Add Note" onPress={onAddNote} loading={addingNote} icon="plus" small />
-      </View>
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TAB: RETURNS
-// ═══════════════════════════════════════════════════════
-
-/**
- * Item 108: the buyer's real return requests for this order (it used to
- * render `order.returns`, which the API adapter always left empty, with
- * Approve / Deny buttons that only changed local state). Each card opens
- * /return-detail, where approving (refund) and declining call the API.
- */
-function ReturnsTab({ returns, loadError, router }: {
-  returns: ReturnView[] | null;
-  loadError: boolean;
-  router: ReturnType<typeof useRouter>;
-}) {
-  const { theme } = useThemeAliases();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  if (returns === null) {
-    return (
-      <View style={[s.tabContent, { alignItems: 'center', paddingVertical: SP.xl }]}>
-        <ActivityIndicator color={theme.text} />
-      </View>
-    );
-  }
-  if (returns.length === 0) {
-    return (
-      <View style={s.tabContent}>
-        <EmptyState
-          icon="rotate-ccw"
-          title={loadError ? 'Couldn’t load returns' : 'No return requests'}
-          description={loadError ? 'Check your connection. This tab refreshes with the order.' : 'If the buyer asks to return this order, the request shows up here and in Activity.'}
-        />
-      </View>
-    );
-  }
-  return (
-    <View style={s.tabContent}>
-      {returns.map(ret => (
-        <TouchableOpacity
-          key={ret.id}
-          onPress={() => router.push(`/return-detail?returnId=${encodeURIComponent(ret.id)}` as never)}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`Return ${returnRequestStatusLabel(ret.status)} from ${ret.buyerName}. Open to review`}
-          testID={`seller-return-${ret.id}`}
-        >
-          <BrandthreadCard style={s.returnCard}>
-            <View style={s.returnHeader}>
-              <StatusBadge label={returnRequestStatusLabel(ret.status).toUpperCase()} variant="neutral" />
-              <Text style={[s.returnResolution, { color: theme.muted, textTransform: 'none' }]}>{ret.status === 'pending' ? 'Needs your review' : `Updated ${fmtShort(ret.updatedAt)}`}</Text>
-              <View style={{ flex: 1 }} />
-              <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-            </View>
-            <Text style={s.returnCustomer}>{ret.buyerName}</Text>
-            <Text style={[s.returnItemReason, { color: theme.text }]}>{returnRequestReasonLabel(ret.reason)}</Text>
-            {ret.notes ? <Text style={s.returnExplanation} numberOfLines={3}>{ret.notes}</Text> : null}
-            {ret.items.map(item => (
-              <View key={item.lineItemId} style={s.returnItemRow}>
-                <Feather name="package" size={ICON.xs} color={theme.muted} />
-                <Text style={s.returnItemText}>{[item.productName, item.variantTitle, `×${item.quantity}`].filter(Boolean).join(' · ')}</Text>
-              </View>
-            ))}
-            <Text style={[s.returnExplanation, { marginTop: 2 }]}>
-              {ret.evidenceUrls.length > 0 ? `${ret.evidenceUrls.length} photo${ret.evidenceUrls.length === 1 ? '' : 's'} · ` : ''}Items {formatCents(itemsTotalCents(ret.items))}
+            <Text style={s.warningText}>
+              This will cancel the order. Any refund must be issued separately through your payment provider. This cannot be undone.
             </Text>
-          </BrandthreadCard>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TAB: DISPUTES
-// ═══════════════════════════════════════════════════════
-
-function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeof useRouter> }) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  if (order.disputes.length === 0) {
-    return (
-      <View style={s.tabContent}>
-        <EmptyState icon="shield" title="No Disputes" description="No disputes have been opened for this order." />
-      </View>
-    );
-  }
-
-  return (
-    <View style={s.tabContent}>
-      {order.disputes.map(d => {
-        const daysUntilDeadline = d.evidenceDeadline
-          ? Math.ceil((new Date(d.evidenceDeadline).getTime() - Date.now()) / 86400000)
-          : null;
-        const deadlineUrgent = daysUntilDeadline !== null && daysUntilDeadline <= 5;
-
-        return (
-          <GradientCard key={d.id} colors={['rgba(248,113,113,0.12)', 'rgba(248,113,113,0.04)']} style={s.disputeCard} glow>
-            <View style={s.disputeHeader}>
-              <StatusBadge label={d.status.replace(/_/g, ' ').toUpperCase()} variant={d.status === 'won' ? 'success' : d.status === 'lost' ? 'error' : 'warning'} />
-              <Text style={s.disputeType}>{d.type.replace(/_/g, ' ')}</Text>
-              <Text style={s.disputeAmount}>{usd(d.amountCents)}</Text>
+            <View style={s.modalActions}>
+              <Button label="Go back" variant="secondary" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} fullWidth />
+              <Button label="Cancel order" variant="destructive" onPress={handleCancelOrder} loading={cancelling} style={{ flex: 1 }} fullWidth />
             </View>
-
-            <Text style={s.disputeClaim}>{d.customerClaim}</Text>
-
-            {d.evidenceDeadline && (
-              <View style={s.disputeDeadlineRow}>
-                <Feather name="clock" size={ICON.xs} color={deadlineUrgent ? ORANGE : MUTED} />
-                <Text style={[s.disputeDeadline, deadlineUrgent && { color: ORANGE }]}>
-                  Evidence due {fmt(d.evidenceDeadline)}{deadlineUrgent ? ` (${daysUntilDeadline}d)` : ''}
-                </Text>
-              </View>
-            )}
-
-            <Text style={s.disputeEvCount}>Evidence: {d.evidence.length} item{d.evidence.length !== 1 ? 's' : ''}</Text>
-
-            <View style={s.disputeActions}>
-              {/* "Accept Dispute" is hidden here until it calls a real disputes API —
-                  see dispute-detail.tsx, which owns evidence and concede actions. */}
-              <SecondaryButton label="Review Dispute" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="plus" small style={{ flex: 1 }} />
-            </View>
-            {d.status === 'evidence_needed' && (
-              <PrimaryButton label="Submit Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="upload" small style={{ marginTop: SP.sm }} />
-            )}
-          </GradientCard>
-        );
-      })}
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TAB: NOTES
-// ═══════════════════════════════════════════════════════
-
-function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNote, addingNote, onPinNote }: {
-  order: Order;
-  noteText: string;
-  setNoteText: (v: string) => void;
-  noteType: 'internal' | 'customer' | 'manufacturer';
-  setNoteType: (t: 'internal' | 'customer' | 'manufacturer') => void;
-  onAddNote: () => void;
-  addingNote: boolean;
-  onPinNote: (noteId: string, current: boolean) => void;
-}) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const sorted = [...order.notes].sort((a, b) => {
-    if (a.isPinned && !b.isPinned) return -1;
-    if (!a.isPinned && b.isPinned) return 1;
-    return b.createdAt.localeCompare(a.createdAt);
-  });
-
-  function noteTypeColor(t: string) {
-    switch (t) {
-      case 'internal': return PURPLE;
-      case 'customer': return CYAN;
-      case 'manufacturer': return ORANGE;
-      default: return MUTED;
-    }
-  }
-  function noteTypeVariant(t: string): 'purple' | 'info' | 'warning' {
-    switch (t) {
-      case 'internal': return 'purple';
-      case 'customer': return 'info';
-      case 'manufacturer': return 'warning';
-      default: return 'purple';
-    }
-  }
-
-  return (
-    <View style={s.tabContent}>
-      {sorted.length === 0 && (
-        <Text style={s.emptyNotes}>No notes yet. Add one below.</Text>
-      )}
-      {sorted.map(note => (
-        <BrandthreadCard key={note.id} style={s.noteCard}>
-          <View style={s.noteHeader}>
-            <StatusBadge label={note.type.toUpperCase()} variant={noteTypeVariant(note.type)} />
-            {note.isPinned && <Feather name="bookmark" size={ICON.xs} color={GOLD} />}
-            <PressableScale
-              onPress={() => { hapticToggle(); onPinNote(note.id, note.isPinned); }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={{ marginLeft: 'auto' }}
-              accessibilityRole="button"
-              accessibilityLabel={note.isPinned ? 'Unpin note' : 'Pin note'}
-            >
-              <Text style={[s.pinToggle, { color: note.isPinned ? ORANGE : MUTED }]}>{note.isPinned ? 'Unpin' : 'Pin'}</Text>
-            </PressableScale>
           </View>
-          <Text style={s.noteContent}>{note.content}</Text>
-          <Text style={s.noteMeta}>{note.authorName} · {fmtTime(note.createdAt)}</Text>
-        </BrandthreadCard>
-      ))}
+        </View>
+      </Modal>
 
-      <View style={s.divider} />
-      <SectionHeader title="Add Note" />
+      <FulfillSheet
+        visible={fulfillOpen}
+        order={order}
+        onCancel={() => setFulfillOpen(false)}
+        onSubmit={handleFulfill}
+      />
 
-      {/* Type selector */}
-      <View style={s.noteTypeRow}>
-        {(['internal', 'customer', 'manufacturer'] as const).map(t => (
-          <PressableScale
-            key={t}
-            onPress={() => { hapticToggle(); setNoteType(t); }}
-            style={[s.noteTypeChip, noteType === t && { borderColor: noteTypeColor(t), backgroundColor: noteTypeColor(t) + '22' }]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: noteType === t }}
-            accessibilityLabel={t}
-          >
-            <Text style={[s.noteTypeText, noteType === t && { color: noteTypeColor(t) }]}>{t}</Text>
-          </PressableScale>
-        ))}
-      </View>
+      <RefundSheet
+        visible={refundOpen}
+        orderNumber={order.orderNumber}
+        refundableCents={refundableCents}
+        onCancel={() => setRefundOpen(false)}
+        onSubmit={handleRefund}
+      />
 
-      <View style={s.noteFormCard}>
-        <TextInput
-          style={s.noteInput}
-          value={noteText}
-          onChangeText={setNoteText}
-          placeholder="Write a note..."
-          placeholderTextColor={SUBTLE}
-          multiline
-        />
-        <PrimaryButton label="Add Note" onPress={onAddNote} loading={addingNote} icon="plus" small />
-      </View>
+      <DeliveryStatusSheet
+        visible={deliveryStatusOpen}
+        order={order}
+        onClose={() => setDeliveryStatusOpen(false)}
+        onSave={handleUpdateTracking}
+      />
     </View>
   );
+}
+
+/** The server's own words for a refused shipment (e.g. "Add a tracking number to ship a preorder…"). */
+function fulfillErrorMessage(e: any): string {
+  const body = e?.body;
+  if (typeof body === 'string') {
+    try {
+      const parsed = JSON.parse(body);
+      if (typeof parsed?.error === 'string') return parsed.error;
+    } catch { /* not JSON */ }
+  }
+  if (body && typeof body === 'object' && typeof body.error === 'string') return body.error;
+  return 'Couldn’t fulfill. Check your connection and try again.';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1973,224 +1327,83 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
 // ═══════════════════════════════════════════════════════
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const { background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
-    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE, accent: PURPLE,
-    accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN,
-    secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
-    onAccent: ON_DARK } = theme;
-  const SUCCESS_DIM = `${SUCCESS}26`;
-  const ORANGE_DIM = `${ORANGE}26`;
-  const RED_DIM = `${RED}26`;
-  const BLUE = theme.accentLight;
-  const BLUE_DIM = `${BLUE}26`;
-  const BORDER_ACTIVE = theme.accentLight;
-  const GOLD = theme.accent;
-  const GRAD_CARD_GLOW = theme.glowGradient;
+  const { text: FG, muted: MUTED, subtle: SUBTLE, border: BORDER, background: BG } = theme;
   return StyleSheet.create({
   root:             { flex: 1, backgroundColor: 'transparent' },
   centered:         { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-
-  // Tab bar
-  tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
-  tabBarContent:    { paddingHorizontal: SP.md, paddingVertical: SP.xs, gap: SP.xs, alignItems: 'center' },
-  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: radius.sm, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
-  tabItemActive:    { borderColor: PURPLE_DIM, backgroundColor: PURPLE_DIM },
-  tabLabel:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  tabLabelActive:   { color: FG, fontFamily: FONT.semibold },
-
-  // Content
   content:          { flex: 1 },
-  tabContent:       { padding: SP.md, gap: SP.md },
-  section:          { gap: SP.sm },
 
-  // Hero / Overview
-  heroCard:         { marginBottom: SP.sm },
-  heroRow:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  timelineCard:     { marginBottom: SP.md, paddingVertical: SP.md },
-  heroOrderNum:     { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
-  badgeRow:         { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
-  heroDate:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs },
-  heroMeta:         { flexDirection: 'row', gap: SP.xs, marginTop: SP.xs, flexWrap: 'wrap' },
-  heroMetaText:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  riskBadge:        { flexDirection: 'row', gap: SP.xs, alignItems: 'center', backgroundColor: RED_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginTop: SP.sm, alignSelf: 'flex-start' },
-  riskBadgeText:    { fontSize: FS.xs, fontFamily: FONT.bold, color: RED },
-  preOrderBadge:    { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginTop: SP.xs, alignSelf: 'flex-start' },
-  preOrderBadgeText:{ fontSize: FS.xs, fontFamily: FONT.bold, color: PURPLE },
+  block:            { paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: 8, borderBottomColor: SHEET_FIELD_BG },
+  blockHead:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
+  blockHeadMeta:    { ...TYPE_SCALE.footnote, color: MUTED },
+  blockTitle:       { ...TYPE_SCALE.headline, color: FG, marginBottom: SP.xs },
+  blockSub:         { ...TYPE_SCALE.footnote, color: MUTED, marginTop: SP.xs },
+  blockFoot:        { ...TYPE_SCALE.footnote, color: MUTED, marginTop: SP.sm },
+  blockActions:     { gap: SP.sm, marginTop: SP.md },
+  pillLine:         { flexDirection: 'row', alignItems: 'center', gap: SP.sm, flexShrink: 1 },
+  pill:             { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.sm, backgroundColor: SHEET_FIELD_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER },
+  pillText:         { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold, color: FG },
+  bannerWrap:       { paddingHorizontal: SP.md, paddingTop: SP.sm },
+  flagRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md },
 
-  // Actions
-  actionSection:    { gap: SP.sm },
-  heroCustomer:     { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: SP.xs },
-  actionCol:        { gap: SP.sm },
-  readOnlyNote:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
-  deliveredCard:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  deliveredText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS },
+  itemRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm, marginTop: SP.xs },
+  itemThumb:        { width: 60, height: 60, borderRadius: RADIUS.sm, backgroundColor: SHEET_FIELD_BG, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  itemThumbImg:     { width: '100%', height: '100%' },
+  itemBody:         { flex: 1, minWidth: 0, gap: 2 },
+  itemName:         { ...TYPE_SCALE.body, fontFamily: FONT.semibold, color: FG },
+  itemMeta:         { ...TYPE_SCALE.footnote, color: MUTED },
+  itemQty:          { ...TYPE_SCALE.headline, color: FG },
+  rowDivider:       { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER },
+  itemCount:        { ...TYPE_SCALE.footnote, color: MUTED, marginTop: SP.md },
 
-  // Risk
-  riskRow:          { flexDirection: 'row', gap: SP.sm, alignItems: 'center', paddingVertical: SP.xs },
-  riskRowText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, flex: 1 },
+  trackingBox:      { marginTop: SP.sm, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: 2 },
+  trackingLabel:    { ...TYPE_SCALE.footnote, color: MUTED },
+  trackingValue:    { ...TYPE_SCALE.body, fontFamily: FONT.medium, color: FG },
 
-  // InfoRow
-  infoRow:          { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SP.xs },
-  infoLabel:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  infoValue:        { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-  infoValueBold:    { fontFamily: FONT.bold, fontSize: FS.base },
+  infoRow:          { flexDirection: 'row', justifyContent: 'space-between', gap: SP.md, paddingVertical: 5 },
+  infoLabel:        { ...TYPE_SCALE.body, color: FG, flexShrink: 1 },
+  infoValue:        { ...TYPE_SCALE.body, color: FG },
+  infoBold:         { fontFamily: FONT.bold },
+  totalRow:         { marginTop: SP.xs },
+  hair:             { height: StyleSheet.hairlineWidth, backgroundColor: BORDER, marginVertical: SP.sm },
+  payoutNote:       { ...TYPE_SCALE.footnote, color: MUTED, marginBottom: SP.xs },
 
-  // Line items
-  lineItemCard:     { marginBottom: SP.xs },
-  lineItemRow:      { flexDirection: 'row', alignItems: 'center' },
-  lineItemName:     { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  lineItemVariant:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  lineItemSku:      { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  lineItemRight:    { alignItems: 'flex-end' },
-  lineItemQty:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  lineItemTotal:    { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
+  bodyText:         { ...TYPE_SCALE.body, color: FG, lineHeight: 22 },
+  mutedText:        { color: MUTED },
+  copyRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs },
 
-  // Customer
-  customerHero:     { alignItems: 'center', gap: SP.sm },
-  avatarCircle:     { width: 64, height: 64, borderRadius: RADII.pill, backgroundColor: PURPLE_DIM, borderWidth: 2, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials:   { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE },
-  customerName:     { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  customerEmail:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  customerPhone:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  customerStatsCard:{ gap: SP.xs },
-  addressCard:      { gap: SP.xs, marginBottom: SP.sm },
-  addressTitle:     { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.xs },
-  addressText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
+  band:             { borderBottomWidth: 8, borderBottomColor: SHEET_FIELD_BG },
+  doneBanner:       { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.md, borderLeftWidth: 3, borderLeftColor: FG },
+  doneIcon:         { width: 24, height: 24, borderRadius: 6, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  doneTitle:        { ...TYPE_SCALE.headline, color: FG },
+  doneText:         { ...TYPE_SCALE.body, color: FG },
+  noticeRow:        { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: 8, borderBottomColor: SHEET_FIELD_BG },
+  noticeText:       { ...TYPE_SCALE.footnote, color: FG, flex: 1 },
 
-  // Chips
+  timelineWrap:     { paddingHorizontal: SP.md, paddingVertical: SP.md },
+  timelineRow:      { flexDirection: 'row', gap: SP.sm },
+  timelineRail:     { width: 12, alignItems: 'center' },
+  timelineDot:      { width: 10, height: 10, borderRadius: RADII.pill, backgroundColor: SUBTLE, marginTop: 5 },
+  timelineLine:     { flex: 1, width: 2, backgroundColor: BORDER, marginTop: 2 },
+  timelineBody:     { flex: 1, paddingBottom: SP.md },
+  timelineMessage:  { ...TYPE_SCALE.body, color: FG },
+  timelineTime:     { ...TYPE_SCALE.footnote, color: MUTED, marginTop: 2 },
+
+  sheetField:       { backgroundColor: SHEET_FIELD_BG, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  sheetFieldLabel:  { fontSize: 12, lineHeight: 16, fontFamily: FONT.regular, color: MUTED },
+  sheetFieldInput:  { fontSize: 17, lineHeight: 22, fontFamily: FONT.regular, color: FG, paddingVertical: 2 },
+
+  // Cancel modal
   chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  chip:             { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  chipActive:       { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
-  chipText:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  chipTextActive:   { color: FG },
-
-  // Payment
-  divider:          { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
-  payoutNote:       { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: -2, marginBottom: SP.xs, lineHeight: 16 },
-  heldFundsNotice:  { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', marginBottom: SP.md },
-  heldFundsNoticeText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
-  heldFundsGrid:    { flexDirection: 'row', gap: SP.md, marginBottom: SP.md },
-  heldFundStat:     { flex: 1, alignItems: 'center' },
-  heldFundLabel:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  heldFundValue:    { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  milestoneTitle:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
-  milestoneRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs },
-  milestoneLabel:   { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  milestoneDate:    { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  expectedRelease:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
-  refundCard:       { gap: SP.xs, marginBottom: SP.xs },
-  refundHeader:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
-  refundAmount:     { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginLeft: 'auto' },
-  refundDate:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-
-  // Fulfillment
-  trackingStatusCard: { gap: SP.sm, borderColor: BORDER_ACTIVE },
-  trackingStatusHint: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
-  trackingStatusOptions: { gap: SP.sm },
-  trackingStatusRow: { flexDirection: 'row', gap: SP.sm },
-  trackingStatusCell: { flex: 1, flexBasis: 0, minWidth: 0 },
-  trackingStatusOption: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: SURFACE },
-  trackingStatusOptionSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
-  trackingStatusOptionText: { textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  trackingStatusOptionTextSelected: { color: FG },
-  estimatedDeliveryLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.xs },
-  groupHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
-  groupTitle:       { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  manufacturerCard: { gap: SP.sm },
-  manufacturerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  manufacturerStatus:{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  manufacturerNotice:{ fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  sellerFulfillCard:{ gap: SP.sm },
-  checklistRow:     { flexDirection: 'row', gap: SP.md },
-  checkItem:        { flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
-  checkItemDone:    {},
-  checkLabel:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  fromAddrRow:      { flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
-  fromAddrText:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  inlineForm:       { gap: SP.sm, borderColor: BORDER_ACTIVE },
-  inlineFormTitle:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  inlineInput:      { backgroundColor: SURFACE, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  shipmentsTitle:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.xs },
-  shipmentCard:     { gap: SP.xs, marginBottom: SP.xs },
-  shipmentHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  shipmentCarrier:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  trackingNum:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  latestEvent:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  viewTrackingBtn:  { flexDirection: 'row', gap: SP.xs, alignItems: 'center', marginTop: SP.xs },
-  viewTrackingText: { fontSize: FS.xs, fontFamily: FONT.medium, color: CYAN },
-
-  // Timeline
-  timelineRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  timelineDot:      { width: 10, height: 10, borderRadius: RADII.pill, marginTop: 4 },
-  timelineBody:     { flex: 1 },
-  timelineMessage:  { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
-  timelineMeta:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: 2 },
-  timelineTime:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  timelineTag:      { flexDirection: 'row', gap: 3, alignItems: 'center' },
-  timelineTagText:  { fontSize: FS.xs, fontFamily: FONT.medium },
-
-  // Notes
-  noteFormCard:     { gap: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md },
-  noteInput:        { color: FG, fontFamily: FONT.regular, fontSize: FS.sm, minHeight: 80, textAlignVertical: 'top' },
-  emptyNotes:       { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingVertical: SP.lg },
-  noteCard:         { gap: SP.sm, marginBottom: SP.xs },
-  noteHeader:       { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
-  noteContent:      { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
-  noteMeta:         { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  pinToggle:        { fontSize: FS.xs, fontFamily: FONT.medium },
-  noteTypeRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  noteTypeChip:     { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
-  noteTypeText:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
-
-  // Returns
-  returnCard:       { gap: SP.sm, marginBottom: SP.sm },
-  returnHeader:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
-  returnResolution: { fontSize: FS.xs, fontFamily: FONT.medium, color: CYAN, textTransform: 'capitalize' },
-  returnCustomer:   { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  returnExplanation:{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
-  returnItemRow:    { flexDirection: 'row', gap: SP.xs, alignItems: 'center', paddingVertical: 2 },
-  returnItemText:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, flex: 1 },
-  returnItemReason: { fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE },
-  returnActions:    { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap', marginTop: SP.xs },
-  denyForm:         { gap: SP.sm, marginTop: SP.xs },
-  denyLabel:        { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  denyInput:        { minHeight: 72, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, color: FG, padding: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, textAlignVertical: 'top' },
-
-  // Disputes
-  disputeCard:      { gap: SP.sm, marginBottom: SP.sm },
-  disputeHeader:    { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
-  disputeType:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
-  disputeAmount:    { fontSize: FS.base, fontFamily: FONT.bold, color: RED, marginLeft: 'auto' },
-  disputeClaim:     { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
-  disputeDeadlineRow:{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
-  disputeDeadline:  { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  disputeEvCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  disputeActions:   { flexDirection: 'row', gap: SP.sm },
-
-  // Modal
   modalOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
-  modalCard:        { backgroundColor: CARD_ELEVATED, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderWidth: 1, borderColor: BORDER, padding: SP.lg, gap: SP.md, maxHeight: '90%' },
-  modalTitle:       { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
-  modalSubtitle:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  modalCard:        { backgroundColor: SHEET_FIELD_BG, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, gap: SP.md, maxHeight: '90%' },
+  modalTitle:       { ...TYPE_SCALE.title2, color: FG },
+  modalSubtitle:    { ...TYPE_SCALE.footnote, color: MUTED },
   modalActions:     { flexDirection: 'row', gap: SP.sm },
-  cancelNoteInput:  { backgroundColor: SURFACE, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, padding: SP.md, minHeight: 80, textAlignVertical: 'top' },
-  cancellationCard:   { borderColor: RED + '44' },
-  cancellationHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  cancellationTitle:  { fontSize: FS.base, fontFamily: FONT.semibold, color: RED },
-  warningCard:        { borderColor: RED + '44' },
-  warningRow:       { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
-  warningText:      { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: RED, lineHeight: 20 },
-  pausedBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: ORANGE_DIM, borderBottomWidth: 1, borderBottomColor: ORANGE + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  pausedBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
-  pausedBannerAction: { fontSize: FS.xs, fontFamily: FONT.semibold, color: ORANGE },
-  cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: SUCCESS_DIM, borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  cancelBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
-
-  // Tracking modal
-  trackingEventRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  trackingDot:      { width: 10, height: 10, borderRadius: RADII.pill, marginTop: 4 },
-  trackingEvDesc:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
-  trackingEvLoc:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  trackingEvTime:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  cancelNoteInput:  { backgroundColor: BG, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: 15, padding: SP.md, minHeight: 80, textAlignVertical: 'top' },
+  warningText:      { ...TYPE_SCALE.footnote, color: MUTED },
+  pausedBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: SHEET_FIELD_BG, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  pausedBannerText: { flex: 1, ...TYPE_SCALE.footnote, color: FG },
+  pausedBannerAction: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: FG },
   });
 };

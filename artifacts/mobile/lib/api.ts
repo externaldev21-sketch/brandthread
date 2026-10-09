@@ -1341,11 +1341,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       listForBuyer:   (buyerId: string)        => quietGet(`/api/orders?buyerId=${encodeURIComponent(buyerId)}`),
       get:            (id: string)             => get(`/api/orders/${id}`),
       create:         (body: unknown)          => post('/api/orders', body),
-      updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
+      /** `notifyCustomer: false` (shipped only) skips the buyer's shipped push + email. */
+      updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string; notifyCustomer?: false }) =>
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
       /** Ship only the selected order items with their own tracking number. */
-      addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string }) =>
+      addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string; notifyCustomer?: false }) =>
         patch(`/api/orders/${id}/items-tracking`, body),
       updateTracking: (id: string, body: {
         trackingStatus: 'label_created' | 'accepted' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned_to_sender';
