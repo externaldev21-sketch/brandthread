@@ -33,6 +33,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
 import { queryKeys } from '@/lib/queryClient';
 import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
+import { errorMessageOr } from '@/lib/errorMessage';
 import { SellerDeliveryBanner, ShipItemsSheet } from '@/components/orders/SellerDelivery';
 import { getPreviewSellerOrder } from '@/lib/previewOrders';
 import { ApiError } from '@/lib/networkNotice';
@@ -469,7 +470,7 @@ export default function OrderDetailScreen() {
   // seeds this same cache entry from data it already fetched, and warms it
   // further on press-in. When it's there, paint it immediately instead of
   // the spinner below — `load` still runs on focus and refreshes silently.
-  const cachedOrder = id ? queryClient.getQueryData<any>(queryKeys.order(id)) : undefined;
+  const cachedOrder = id ? queryClient.getQueryData<unknown>(queryKeys.order(id)) : undefined;
   const [order, setOrder] = useState<Order | null>(() => (cachedOrder ? adaptApiOrder(cachedOrder) : null));
   const [loading, setLoading] = useState(!cachedOrder);
   const [updatesPaused, setUpdatesPaused] = useState(false);
@@ -540,7 +541,7 @@ export default function OrderDetailScreen() {
     api.returns.listSeller()
       .then(rows => {
         if (generationRef.current !== generation) return;
-        setOrderReturns((Array.isArray(rows) ? rows : []).filter((row: any) => row?.orderId === id).map(adaptReturnRow));
+        setOrderReturns((Array.isArray(rows) ? rows : []).filter((row: { orderId?: unknown } | null) => row?.orderId === id).map(adaptReturnRow));
         setReturnsError(false);
       })
       .catch(() => {
@@ -620,26 +621,28 @@ export default function OrderDetailScreen() {
 
   async function handleMarkProcessing() {
     hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
+    try { await api.orders.updateStatus(id, 'processing'); } catch (e: unknown) { writeFailed('Couldn’t update this order', e); return; }
     load(generationRef.current);
   }
 
   async function handleMarkReadyToShip() {
     hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
+    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: unknown) { writeFailed('Couldn’t update this order', e); return; }
     load(generationRef.current);
   }
 
   async function handleMarkShipped() {
     hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
+    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: unknown) { writeFailed('Couldn’t update this order', e); return; }
     load(generationRef.current);
   }
 
   // 409 AUTO_REFUNDED / DELIVERY_NOT_SELLER_CONFIRMED get their own copy.
-  function writeFailed(title: string, e: any) {
-    Alert.alert(title, sellerOrderConflictMessage(e?.code) ?? 'Check your connection and try again.');
-    if (e?.code === 'AUTO_REFUNDED') load(generationRef.current);
+  function writeFailed(title: string, e: unknown) {
+    const rawCode = (e as { code?: unknown } | null | undefined)?.code;
+    const code = typeof rawCode === 'string' ? rawCode : undefined;
+    Alert.alert(title, sellerOrderConflictMessage(code) ?? 'Check your connection and try again.');
+    if (code === 'AUTO_REFUNDED') load(generationRef.current);
   }
 
   const [showShipItems, setShowShipItems] = useState(false);
@@ -652,7 +655,7 @@ export default function OrderDetailScreen() {
       hapticSuccessAction();
       setShowShipItems(false);
       load(generationRef.current);
-    } catch (e: any) {
+    } catch (e: unknown) {
       writeFailed('Couldn’t add tracking', e);
     } finally {
       setShippingItems(false);
@@ -726,7 +729,7 @@ export default function OrderDetailScreen() {
       setCancelConfirmed(true);
       // Auto-dismiss the banner after 6 seconds
       setTimeout(() => setCancelConfirmed(false), 6000);
-    } catch (e: any) {
+    } catch {
       Alert.alert('Couldn’t cancel this order', 'Check your connection and try again.');
     } finally {
       setCancelling(false);
@@ -766,7 +769,7 @@ export default function OrderDetailScreen() {
         trackingNumber: form.tracking.trim(),
         carrier:        form.carrier.trim(),
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       writeFailed('Couldn’t add tracking', e);
       return;
     }
@@ -778,7 +781,7 @@ export default function OrderDetailScreen() {
     try {
       await api.orders.addTracking(id, { trackingNumber, carrier });
       load(generationRef.current);
-    } catch (e: any) {
+    } catch (e: unknown) {
       writeFailed('Couldn’t add tracking', e);
     }
   }
@@ -791,7 +794,7 @@ export default function OrderDetailScreen() {
         estimatedDelivery,
       });
       await load(generationRef.current);
-    } catch (e: any) {
+    } catch (e: unknown) {
       writeFailed('Couldn’t update tracking', e);
       throw e;
     } finally {
@@ -1374,7 +1377,7 @@ function PaymentTab({ order }: { order: Order }) {
       <SecondaryButton
         label="Download invoice"
         icon="file-text"
-        onPress={() => { shareInvoice(invoiceFromSellerOrder(order)).catch((err: any) => Alert.alert('Could not create invoice', err?.message ?? 'Please try again.')); }}
+        onPress={() => { shareInvoice(invoiceFromSellerOrder(order)).catch((err: unknown) => Alert.alert('Could not create invoice', errorMessageOr(err, 'Please try again.'))); }}
       />
 
       {order.heldFunds && (

@@ -79,10 +79,42 @@ function daysFromNow(n: number): string {
 // Returns null when the product is not found — callers must handle the absent case.
 // No fallback substitution: an unavailable product must not silently become another.
 
-function adaptApiProduct(row: any): BuyerProduct {
-  const apiVariants: any[] = Array.isArray(row?.variants) ? row.variants : [];
-  const sizes = [...new Set<string>(apiVariants.map(v => v.size).filter(Boolean))];
-  const colors = [...new Set<string>(apiVariants.map(v => v.color).filter(Boolean))];
+/** Variant row of GET /api/public/products/:id (only the fields read here). */
+interface PublicProductVariantRow {
+  id: string;
+  size?: string | null;
+  color?: string | null;
+  priceCents?: number | null;
+  stock?: number | null;
+}
+
+/** GET /api/public/products/:id response (only the fields read here). */
+interface PublicProductRow {
+  id: string;
+  ownerId: string;
+  name: string;
+  sellerDisplayName?: string | null;
+  sellerHandle?: string | null;
+  sellerAvatarUri?: string | null;
+  sellerVerified?: boolean | null;
+  claimedUnits?: unknown;
+  description?: string | null;
+  images?: string[] | null;
+  category?: string | null;
+  isPreOrder?: boolean | null;
+  preOrderClosingDate?: string | null;
+  preOrderEstShipDate?: string | null;
+  status?: string | null;
+  tags?: string[] | null;
+  sizeChart?: BuyerProduct['sizeChart'];
+  variants?: PublicProductVariantRow[] | null;
+}
+
+function adaptApiProduct(row: PublicProductRow): BuyerProduct {
+  const apiVariants: PublicProductVariantRow[] = Array.isArray(row?.variants) ? row.variants : [];
+  const isNonEmpty = (value: string | null | undefined): value is string => Boolean(value);
+  const sizes = [...new Set<string>(apiVariants.map(v => v.size).filter(isNonEmpty))];
+  const colors = [...new Set<string>(apiVariants.map(v => v.color).filter(isNonEmpty))];
 
   const options: BuyerProductOption[] = [];
   if (sizes.length > 0) {
@@ -156,7 +188,7 @@ function adaptApiProduct(row: any): BuyerProduct {
 export async function getBuyerProduct(productId: string): Promise<BuyerProduct | null> {
   if (!productId) return null;
   try {
-    const row = await serviceRequest<any>(
+    const row = await serviceRequest<PublicProductRow | null>(
       `/api/public/products/${encodeURIComponent(productId)}`,
     );
     return row?.id ? adaptApiProduct(row) : getPreviewBuyerProduct(productId);
@@ -173,7 +205,7 @@ export async function getBuyerProduct(productId: string): Promise<BuyerProduct |
 
 // ─── DB sync ──────────────────────────────────────────────────────────────────
 
-async function syncToDb(items: any[], savedItems: any[], expectedUserId: string): Promise<void> {
+async function syncToDb(items: CartItem[], savedItems: SavedCartItem[], expectedUserId: string): Promise<void> {
   // Guard: if the account has changed since saveCart() was called, discard this
   // sync so user A's cart payload is never POSTed using user B's Clerk token.
   if (_cartUserId !== expectedUserId) return;
@@ -214,7 +246,7 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
   // Uses the already-captured k so the continuation can't pick up a changed userId.
   let remoteConfirmed = false;
   try {
-    const { items, savedItems } = await serviceRequest<{ items: any[]; savedItems: any[] }>('/api/buyer/cart', {});
+    const { items, savedItems } = await serviceRequest<{ items: CartItem[]; savedItems: SavedCartItem[] }>('/api/buyer/cart', {});
     remoteConfirmed = true;
     if (items.length > 0 || savedItems.length > 0) {
       // DB has data — use it and update local cache.
@@ -761,24 +793,26 @@ export async function applyDiscount(
 ): Promise<CheckoutDiscount> {
   const trimmedCode = code.trim().toUpperCase();
   if (!trimmedCode) {
-    return { code: '', type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: 'Please enter a code.' };
+    return { code: '', type: 'percentage', value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: 'Please enter a code.' };
   }
   // Get current checkout session to find the seller and line items (for
   // product-scoped codes — an entire_store code ignores these anyway).
   const sess = await getCheckoutSession();
-  const groups: any[] = (sess as any)?.deliveryGroups ?? [];
+  // Persisted session data — read defensively (entries may be partial).
+  const groups: Array<Partial<CheckoutDeliveryGroup> | null | undefined> = sess?.deliveryGroups ?? [];
   const group = forSellerId ? groups.find(g => g?.sellerId === forSellerId) : groups[0];
-  if (forSellerId && Array.isArray(group?.items)) {
-    subtotalCents = group.items.reduce((sum: number, item: CartItem) => sum + item.priceCents * item.quantity, 0);
+  const groupItems: CartItem[] | undefined = group && Array.isArray(group.items) ? group.items : undefined;
+  if (forSellerId && groupItems) {
+    subtotalCents = groupItems.reduce((sum: number, item: CartItem) => sum + item.priceCents * item.quantity, 0);
   }
   const sellerId = group?.sellerId ?? '';
   if (!sellerId) {
     // No seller context to validate a code against — fail closed rather than
     // accepting an unvalidated code.
-    return { code: trimmedCode, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Add items to your cart before applying a discount code.' };
+    return { code: trimmedCode, type: 'percentage', value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Add items to your cart before applying a discount code.' };
   }
-  const items = Array.isArray(group?.items)
-    ? group.items.map((item: CartItem) => ({ productId: item.productId, priceCents: item.priceCents, quantity: item.quantity }))
+  const items = groupItems
+    ? groupItems.map((item: CartItem) => ({ productId: item.productId, priceCents: item.priceCents, quantity: item.quantity }))
     : undefined;
   try {
     const { api } = await import('@/lib/api');
@@ -794,7 +828,8 @@ export async function applyDiscount(
       errorMessage: undefined,
       ...(forSellerId ? { sellerId: forSellerId } : {}),
     } as CheckoutDiscount;
-  } catch (err: any) {
+  } catch (caught: unknown) {
+    const err = caught as { status?: unknown; body?: unknown; message?: unknown } | null | undefined;
     // Only a 4xx answer is the server saying "this code isn't valid". A
     // network failure, timeout or 5xx means the code was never checked —
     // rethrow so the caller shows "couldn't check that code" instead of
@@ -807,7 +842,9 @@ export async function applyDiscount(
     try {
       // ApiError keeps the raw JSON body ({ error: CODE, message }); older
       // error shapes only carry it inside the message text.
-      const body = typeof err?.body === 'string' && err.body ? err.body : (err?.message ?? '');
+      const body = typeof err?.body === 'string' && err.body
+        ? err.body
+        : (typeof err?.message === 'string' ? err.message : '');
       const match = body.match(/\{.*\}/);
       if (match) {
         const parsed = JSON.parse(match[0]);
@@ -826,7 +863,7 @@ export async function applyDiscount(
                 errCode === 'CUSTOMER_LIMIT_REACHED' ? "You've reached the limit for this code." :
                 errCode === 'MIN_QUANTITY_NOT_MET' ? (errMessage || 'Add more items to use this code.') :
                 'Invalid or expired discount code.';
-    return { code: trimmedCode, type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: msg };
+    return { code: trimmedCode, type: 'percentage', value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: msg };
   }
 }
 
@@ -944,10 +981,29 @@ async function loadReturns(k: CartKeys = keys()): Promise<BuyerReturnRequest[]> 
   return [];
 }
 
+/** GET /api/returns/buyer row (only the fields read here). */
+interface BuyerReturnApiRow {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  sellerName?: string | null;
+  requestedItems?: BuyerReturnRequest['items'] | null;
+  reason: BuyerReturnReason;
+  notes?: string | null;
+  evidenceUrls?: string[] | null;
+  resolutionRequested: BuyerReturnResolution;
+  status: BuyerReturnRequest['status'];
+  refundAmountCents?: number | null;
+  totalCents?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  sellerResponse?: string | null;
+}
+
 export async function getBuyerReturns(): Promise<BuyerReturnRequest[]> {
   const { api } = await import('@/lib/api');
   const rows = await api.returns.listBuyer();
-  return rows.map((row: any) => ({
+  return (rows as BuyerReturnApiRow[]).map((row) => ({
     id: row.id,
     orderId: row.orderId,
     orderNumber: row.orderNumber,

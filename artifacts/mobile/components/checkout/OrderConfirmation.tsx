@@ -97,11 +97,20 @@ function LinkRow({ icon, label, hint, onPress, subtle, testID }: {
   );
 }
 
+/** A product row from GET /api/public/sellers/:id (only the fields read here). */
+interface SellerCarouselProduct {
+  id: string;
+  name: string;
+  images?: string[] | null;
+  priceCents?: number | null;
+  variants?: Array<{ priceCents?: number | null }> | null;
+}
+
 function SellerProductsCarousel({ sellerId, sellerName }: { sellerId: string; sellerName: string }) {
   const { theme } = useAppTheme();
   const router = useRouter();
   const api = useApi();
-  const [products, setProducts] = useState<any[] | null>(null);
+  const [products, setProducts] = useState<SellerCarouselProduct[] | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -119,7 +128,7 @@ function SellerProductsCarousel({ sellerId, sellerName }: { sellerId: string; se
       <View style={styles.moreScroll} testID="order-confirmation-more-scroll">
         {products.map((product) => {
           const priceCents = product.variants?.length
-            ? product.variants.reduce((min: number, v: any) => Math.min(min, v.priceCents ?? 0), product.variants[0]?.priceCents ?? 0)
+            ? product.variants.reduce((min: number, v) => Math.min(min, v.priceCents ?? 0), product.variants[0]?.priceCents ?? 0)
             : (product.priceCents ?? 0);
           return (
             <PressableScale
@@ -127,7 +136,7 @@ function SellerProductsCarousel({ sellerId, sellerName }: { sellerId: string; se
               style={styles.moreTile}
               onPress={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push({ pathname: '/buyer-product-detail' as any, params: { productId: product.id } });
+                router.push({ pathname: '/buyer-product-detail', params: { productId: product.id } });
               }}
               accessibilityRole="button"
               accessibilityLabel={product.name}

@@ -17,7 +17,7 @@
  * and passes it in.
  */
 import React from 'react';
-import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
@@ -64,7 +64,7 @@ export function CaptionBlock({
   captionExpanded: boolean;
   onToggleCaptionExpanded: () => void;
   onOpenCreator: () => void;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   /** Reports this block's real rendered height — bigger than the
    *  `CAPTION_BLOCK_HEIGHT`/`_WITH_REPOST` *minimums* whenever a 2-line
    *  caption, a repost row, or just different font metrics push it taller.

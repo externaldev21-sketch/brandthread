@@ -10,7 +10,7 @@ import { isAccessCleared } from '@/lib/accessGate';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from '@/components/KeyboardProviderCompat';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorBoundary, ScreenErrorFallback } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { shouldReopenStudioMenu } from '@/lib/navigation/studioReturn';
 import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
@@ -1360,6 +1360,12 @@ function RootLayoutNav() {
 const AppStack = React.memo(function AppStack() {
   return (
       <Stack
+        // Per-screen error boundary: Expo Router wraps every root-stack route
+        // in its own instance, so a render crash in one screen shows a
+        // Retry/back fallback for that screen only instead of the whole-app
+        // ErrorBoundary above. The (tabs)/(buyer) group layouts install their
+        // own per-tab boundary (TabScreenErrorFallback).
+        unstable_screenErrorBoundary={ScreenErrorFallback}
         screenLayout={({ children, route, options }) => (
           <IsolatedStackScene routeName={route.name} presentation={(options as { presentation?: string } | undefined)?.presentation}>
             {children}

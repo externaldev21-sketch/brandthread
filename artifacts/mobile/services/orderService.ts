@@ -270,7 +270,7 @@ export async function markReadyToShip(orderId: string): Promise<Order | undefine
   return o;
 }
 
-export async function addTracking(orderId: string, carrier: string, trackingNumber: string): Promise<any> {
+export async function addTracking(orderId: string, carrier: string, trackingNumber: string): Promise<unknown> {
   // Try real API first, fall back to local demo
   try {
     const { api } = await import('@/lib/api');
@@ -338,6 +338,18 @@ export async function getParcelSuggestion(orderId: string): Promise<ParcelSugges
   return await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/parcel-suggestion`) as ParcelSuggestion;
 }
 
+/** Label row returned by the /api/shipping-labels purchase and void endpoints. */
+interface ShippingLabelApiRow {
+  id: string;
+  carrier?: string | null;
+  service?: string | null;
+  trackingNumber?: string | null;
+  labelUrl?: string | null;
+  priceCents: number;
+  status: ShippingLabel['status'];
+  createdAt: string;
+}
+
 export async function getShippingRates(orderId: string, parcel: {
   itemIds?: string[];
   fromAddress: OrderAddress;
@@ -362,7 +374,7 @@ export async function purchaseShippingLabel(
   const result = await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/purchase`, {
     method: 'POST',
     body: JSON.stringify({ rateId: rate.id, priceCents: rate.priceCents, idempotencyKey, ...(itemIds?.length ? { itemIds } : {}) }),
-  }) as { label: any; fundingSource: 'pending_order_funds'; purchasePending?: boolean };
+  }) as { label: ShippingLabelApiRow; fundingSource: 'pending_order_funds'; purchasePending?: boolean };
   if (result.purchasePending) {
     throw Object.assign(new Error('The carrier is still processing this label. Try again shortly.'), {
       code: 'LABEL_PURCHASE_PENDING',
@@ -428,7 +440,7 @@ export async function voidShippingLabel(orderId: string, labelId: string): Promi
   const result = await serviceRequest(
     `/api/shipping-labels/${encodeURIComponent(orderId)}/${encodeURIComponent(labelId)}/void`,
     { method: 'POST', body: JSON.stringify({}) },
-  ) as { label: any; refundPending: boolean };
+  ) as { label: ShippingLabelApiRow; refundPending: boolean };
   return {
     id: result.label.id,
     orderId,
@@ -624,7 +636,66 @@ function mapBuyerFulfillmentStatus(dbStatus: string): FulfillmentStatus {
   }
 }
 
-export function mapApiBuyerOrder(o: any): BuyerOrderView {
+/** Line item of a GET /api/buyer/orders row (only the fields read here). */
+export interface BuyerOrderItemApiRow {
+  productId?: unknown;
+  productName?: string | null;
+  name?: string | null;
+  variantLabel?: string | null;
+  quantity?: number | null;
+  priceCents?: number | null;
+  imageUri?: string | null;
+  imageUrl?: string | null;
+}
+
+/** GET /api/buyer/orders(/:id) row (only the fields read here). */
+export interface BuyerOrderApiRow {
+  id: string;
+  orderNumber: string;
+  ownerId?: string | null;
+  sellerDisplayName?: string | null;
+  sellerName?: string | null;
+  sellerHandle?: string | null;
+  status?: string | null;
+  stripePaymentIntentId?: string | null;
+  items?: BuyerOrderItemApiRow[] | null;
+  shippingAddress?: {
+    name?: string | null;
+    line1?: string | null;
+    street?: string | null;
+    line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
+    country?: string | null;
+    phone?: string | null;
+  } | null;
+  subtotalCents?: number | null;
+  shippingCents?: number | null;
+  totalCents?: number | null;
+  trackingNumber?: string | null;
+  carrier?: string | null;
+  trackingStatus?: TrackingStatus | null;
+  estimatedDelivery?: string | null;
+  shippedAt?: string | null;
+  paidAt?: string | null;
+  cancellationReason?: string | null;
+  delivery?: unknown;
+  createdAt?: string | null;
+  // Read by the buyer order detail screen (app/buyer-order-detail.tsx).
+  taxCents?: number | null;
+  discountAmountCents?: number | null;
+  threadCashAppliedCents?: number | null;
+  cancellationNotes?: string | null;
+  isCustomerVisible?: boolean | null;
+}
+
+/**
+ * Accepts the API row, or an untyped record of the same shape (the
+ * dev-preview fixtures in lib/previewOrders.ts).
+ */
+export function mapApiBuyerOrder(raw: BuyerOrderApiRow | Record<string, unknown>): BuyerOrderView {
+  const o = raw as BuyerOrderApiRow;
   const address = o.shippingAddress;
   const delivery = mapDelivery(o.delivery);
   return {
@@ -636,7 +707,7 @@ export function mapApiBuyerOrder(o: any): BuyerOrderView {
     status:            mapBuyerOrderStatus(o.status ?? 'pending'),
     paymentStatus:     o.stripePaymentIntentId ? 'paid' : 'pending',
     fulfillmentStatus: mapBuyerFulfillmentStatus(o.status ?? 'pending'),
-    lineItems:         (o.items ?? []).map((item: any) => ({
+    lineItems:         (o.items ?? []).map((item: BuyerOrderItemApiRow) => ({
       productName: item.productName ?? item.name ?? '',
       variant:     item.variantLabel ?? '',
       quantity:    item.quantity     ?? 1,
@@ -741,7 +812,7 @@ export async function getBuyerOrder(id: string): Promise<BuyerOrderView | undefi
   // only ever 404).
   if (!isSellerDevPreview() && !isBuyerDevPreview()) {
     try {
-      const apiOrder = await serviceRequest(`/api/buyer/orders/${encodeURIComponent(id)}`) as any;
+      const apiOrder = await serviceRequest(`/api/buyer/orders/${encodeURIComponent(id)}`) as BuyerOrderApiRow | null;
       if (apiOrder?.id) {
         const mapped = mapApiBuyerOrder(apiOrder);
         // Update in-memory cache

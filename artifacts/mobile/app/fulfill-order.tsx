@@ -33,6 +33,7 @@ import {
 } from '@/services/orderService';
 import { sharePackingSlip } from '@/lib/packingSlip';
 import { radius } from '@/constants/radii';
+import { errorMessageOr } from '@/lib/errorMessage';
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
 const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL', 'Other'] as const;
@@ -211,8 +212,8 @@ export default function FulfillOrderScreen() {
       setPackageChoice({ kind: 'preset', presetId: created.id });
       setAddingPreset(false);
       setNewPreset({ name: '', weightOz: '', lengthIn: '', widthIn: '', heightIn: '' });
-    } catch (err: any) {
-      Alert.alert('Could not save preset', err?.message ?? 'Please try again.');
+    } catch (err: unknown) {
+      Alert.alert('Could not save preset', errorMessageOr(err, 'Please try again.'));
     }
   }
 
@@ -221,8 +222,8 @@ export default function FulfillOrderScreen() {
       await deletePackagePreset(id);
       setPresets(prev => prev.filter(p => p.id !== id));
       setPackageChoice(prev => (prev?.kind === 'preset' && prev.presetId === id ? null : prev));
-    } catch (err: any) {
-      Alert.alert('Could not delete preset', err?.message ?? 'Please try again.');
+    } catch (err: unknown) {
+      Alert.alert('Could not delete preset', errorMessageOr(err, 'Please try again.'));
     }
   }
 
@@ -251,8 +252,8 @@ export default function FulfillOrderScreen() {
         setRatesError('No carrier rates were returned for this package.');
         setManualMode(true);
       }
-    } catch (err: any) {
-      setRatesError(err?.message ?? 'Could not load carrier rates.');
+    } catch (err: unknown) {
+      setRatesError(errorMessageOr(err, 'Could not load carrier rates.'));
       setManualMode(true);
     } finally {
       setLoadingRates(false);
@@ -272,10 +273,10 @@ export default function FulfillOrderScreen() {
     try {
       const lbl = await purchaseShippingLabel(orderId, rate, purchaseKey, isPartial ? partialItemIds : undefined);
       setLabel(lbl);
-    } catch (err: any) {
+    } catch (err: unknown) {
       Alert.alert(
         'Label not purchased',
-        err?.message ?? 'Could not purchase this label. You can enter tracking manually instead.',
+        errorMessageOr(err, 'Could not purchase this label. You can enter tracking manually instead.'),
       );
       setManualMode(true);
     } finally {
@@ -332,8 +333,8 @@ export default function FulfillOrderScreen() {
       playSuccessAnimation(() => {
         router.replace('/(tabs)/orders');
       });
-    } catch (err: any) {
-      Alert.alert('Could not mark shipped', err?.message ?? 'Please try again.');
+    } catch (err: unknown) {
+      Alert.alert('Could not mark shipped', errorMessageOr(err, 'Please try again.'));
     } finally {
       setMarking(false);
     }
@@ -343,8 +344,8 @@ export default function FulfillOrderScreen() {
     if (!order) return;
     try {
       await sharePackingSlip(order);
-    } catch (err: any) {
-      Alert.alert('Could not create packing slip', err?.message ?? 'Please try again.');
+    } catch (err: unknown) {
+      Alert.alert('Could not create packing slip', errorMessageOr(err, 'Please try again.'));
     }
   }
 
@@ -397,8 +398,8 @@ export default function FulfillOrderScreen() {
               const updated = await voidShippingLabel(orderId, label.id);
               setLabel(updated);
               if (updated.refundPending) Alert.alert('Void requested', 'The carrier is processing the label refund.');
-            } catch (err: any) {
-              Alert.alert('Could not void label', err?.message ?? 'Try again later.');
+            } catch (err: unknown) {
+              Alert.alert('Could not void label', errorMessageOr(err, 'Try again later.'));
             }
           },
         },

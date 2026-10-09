@@ -43,6 +43,7 @@ import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceM
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
+import { errorMessageOr } from '@/lib/errorMessage';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
 import { confirmUnblock, apiErrorMessage, apiErrorCode, BLOCK_EXPLAINER } from '@/lib/safety';
 import {
@@ -1282,8 +1283,8 @@ export default function SellerConversationScreen() {
                     setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
                   }
                   celebrateThreadCash({ amount: amountCents, from: msg.fromName || displayName });
-                } catch (e: any) {
-                  Alert.alert('Could not claim', e?.message ?? 'Please try again.');
+                } catch (e: unknown) {
+                  Alert.alert('Could not claim', errorMessageOr(e, 'Please try again.'));
                   throw e;
                 }
               }}
@@ -1295,8 +1296,8 @@ export default function SellerConversationScreen() {
                     await api.threadCash.cancel({ transferId });
                     setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
                   }
-                } catch (e: any) {
-                  Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+                } catch (e: unknown) {
+                  Alert.alert('Could not cancel', errorMessageOr(e, 'Please try again.'));
                   throw e;
                 }
               } : undefined}
@@ -1962,8 +1963,8 @@ export default function SellerConversationScreen() {
                 const msg = await api.conversations.send(id, { text: '', attachment });
                 setMessages((prev) => [...prev, msg as Msg]);
                 setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
-              } catch (e: any) {
-                Alert.alert('Sent, but the chat message failed', e?.message ?? 'The Thread Cash send went through — refresh to see it in chat.');
+              } catch (e: unknown) {
+                Alert.alert('Sent, but the chat message failed', errorMessageOr(e, 'The Thread Cash send went through — refresh to see it in chat.'));
               }
             }}
           />

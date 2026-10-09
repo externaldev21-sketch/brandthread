@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON, ANIM } from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
@@ -105,7 +105,7 @@ function fmtMoney(cents: number): string {
   return formatCents(cents);
 }
 
-function getPaymentColor(status: string, theme: any): string {
+function getPaymentColor(status: string, theme: AppThemePreset): string {
   switch (status) {
     case 'paid': return theme.text;
     case 'pending': case 'authorized': return theme.muted;
@@ -114,7 +114,7 @@ function getPaymentColor(status: string, theme: any): string {
   }
 }
 
-function getFulfillmentColor(status: string, theme: any): string {
+function getFulfillmentColor(status: string, theme: AppThemePreset): string {
   switch (status) {
     case 'unfulfilled': return theme.text;
     case 'partially_fulfilled': case 'fulfilled': case 'manufacturer_pending': return theme.muted;
@@ -184,7 +184,31 @@ const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
   disputed:      'unfulfilled',
 };
 
-export function apiRowToOrder(row: any): OrderListOrder {
+/** A GET /api/orders list row (only the fields read here). */
+export interface SellerOrderListRow {
+  id: string;
+  orderNumber?: string | null;
+  status?: string | null;
+  paidAt?: string | Date | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  totalCents?: number | null;
+  cancellationReason?: string | null;
+  trackingNumber?: string | null;
+  carrier?: string | null;
+  isPreorder?: boolean | null;
+  deliverBy?: string | null;
+  promisedShipDate?: string | null;
+  deliveredAt?: string | null;
+  autoRefundedAt?: string | null;
+  disputePausedAt?: string | null;
+  itemCount?: unknown;
+  dropName?: unknown;
+  createdAt: string | number | Date;
+  updatedAt: string | number | Date;
+}
+
+export function apiRowToOrder(row: SellerOrderListRow): OrderListOrder {
   const ordStatus: OrderStatus = dbStatusToOrderStatus(row.status as string);
   const rowPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(row.status as string, row.paidAt) as PaymentStatus;
   const fStatus: FulfillmentStatus = FULFILLMENT_MAP[ordStatus] ?? 'unfulfilled';
@@ -241,7 +265,7 @@ export function apiRowToOrder(row: any): OrderListOrder {
     autoRefundedAt: row.autoRefundedAt ?? null,
     disputePausedAt: row.disputePausedAt ?? null,
     currency: 'USD', tags: [],
-    listItemCount: Number.isSafeInteger(row.itemCount) && row.itemCount >= 0 ? row.itemCount : undefined,
+    listItemCount: typeof row.itemCount === 'number' && Number.isSafeInteger(row.itemCount) && row.itemCount >= 0 ? row.itemCount : undefined,
     listItemLabel: typeof row.dropName === 'string' && row.dropName.trim() ? row.dropName.trim() : undefined,
     createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date(row.createdAt).toISOString(),
     updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : new Date(row.updatedAt).toISOString(),
@@ -762,7 +786,7 @@ export default function OrdersScreen() {
     try {
       const rows = await api.orders.list();
       if (generationRef.current !== generation) return;
-      const all = Array.isArray(rows) ? (rows as any[]).map(apiRowToOrder) : [];
+      const all = Array.isArray(rows) ? (rows as SellerOrderListRow[]).map(apiRowToOrder) : [];
       setOrders(all);
       // Keep the raw snapshot outside the shared cache. Seed only the tapped
       // order; hundreds of cache updates synchronously dehydrate the cache
@@ -1247,7 +1271,7 @@ export default function OrdersScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const createStyles = (theme: any) => {
+const createStyles = (theme: AppThemePreset) => {
   const BG = theme.background, SCREEN_BG = theme.surface, SURFACE = theme.surface, CARD = theme.card;
   const CARD_GLASS = theme.cardGlass, CARD_ELEVATED_GLASS = theme.cardElevatedGlass;
   const BORDER = theme.border, BORDER_ACTIVE = theme.text, FG = theme.text, MUTED = theme.muted, SUBTLE = theme.subtle;
