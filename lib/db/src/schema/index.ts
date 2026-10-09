@@ -4,6 +4,7 @@ export * from './manufacturers';
 export * from './sizeCharts';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
+export * from './sellerStoreShares';
 export * from './productVariantsStock';
 export * from './security';
 export * from './money';

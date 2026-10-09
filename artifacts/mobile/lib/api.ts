@@ -2345,6 +2345,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get: () => get<LaunchChecklistResponse>('/api/seller/launch-checklist'),
         previewSeen: () => post<void>('/api/seller/launch-checklist/preview-seen', {}),
         dismiss: () => post<void>('/api/seller/launch-checklist/dismiss', {}),
+        /** Dashboard "Get ready to sell": six steps + whether the first sale happened. */
+        readyToSell: () => get<import('./readyToSell').ReadyToSellResponse>('/api/seller/launch-checklist/ready-to-sell'),
+        /** The seller copied / shared / saved their store link. */
+        storeShared: () => post<void>('/api/seller/launch-checklist/store-shared', {}),
       },
       verification: {
         /** Returns the seller's current identity verification status. */
