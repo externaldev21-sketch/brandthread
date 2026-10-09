@@ -1,5 +1,5 @@
 - [Brandthread theme](brandthread-theme.md) — buyer/seller chrome is strictly black, white, and gray; color is reserved for semantic status and authored content.
-- [Brandthread design system](brandthread-woven-system.md) — Inter hierarchy and clean primitives replace the retired Woven/thread/stitch presentation.
+- [Brandthread design system](brandthread-woven-system.md) — system fonts, native icons and flat cards; preserve seller tab-bar swipe and glow.
 - [Runtime app themes](runtime-app-themes.md) — 12 account-scoped palettes have matching native launcher icons; null icon preference follows the active theme.
 - [Onboarding value-first contract](onboarding-value-first.md) — defaults stay editable; seller personalization and one optional, durable AI success precede plan commitment.
 - [Seller trial reminder delivery](seller-trial-reminder-delivery.md) — create on day four of an exact five-day trial; leases, retries, preferences, and per-token dedupe protect delivery.

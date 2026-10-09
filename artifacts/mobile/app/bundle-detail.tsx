@@ -17,7 +17,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { CachedImage } from '@/components/CachedImage';
@@ -213,7 +213,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   saveText: { fontFamily: FONT.semibold, fontSize: FS.meta, color: theme.text },
   description: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, color: theme.muted, marginTop: SP.md },
   sectionLabel: {
-    fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4,
+    fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.muted,
     marginTop: SP.lg, marginBottom: SP.sm,
   },
   item: { paddingVertical: SP.md },
@@ -227,7 +227,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   itemMeta: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted, marginTop: 4 },
   choice: { marginTop: SP.md },
   choiceHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SP.sm },
-  choiceLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, textTransform: 'uppercase', letterSpacing: 0.4 },
+  choiceLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
   required: { fontFamily: FONT.medium, fontSize: FS.meta, color: theme.subtle },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   error: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted, marginBottom: SP.sm, textAlign: 'center' },

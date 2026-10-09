@@ -72,7 +72,7 @@ export type InsertDispute = {
 export type EventRow = { id: string; inserted: boolean; notifiedAt: Date | null };
 
 export interface DisputeStore {
-  resolveSellerAndOrder(paymentIntentId: string | null, chargeId: string | null): Promise<{ sellerId: string; orderId: string | null }>;
+  resolveSellerAndOrder(paymentIntentId: string | null, chargeId: string | null, amountCents?: number): Promise<{ sellerId: string; orderId: string | null }>;
   /** Insert if the Stripe dispute is new; always return the stored row. */
   upsertDispute(values: InsertDispute): Promise<DisputeRowLike>;
   updateDispute(id: string, patch: {
@@ -163,7 +163,7 @@ export async function processDisputeEvent(event: StripeEventLike, deps: DisputeD
   const mappedStatus = mapDisputeStatus(d.status ?? "needs_response");
 
   // 1. Dispute row.
-  const { sellerId, orderId } = await store.resolveSellerAndOrder(paymentIntentId, chargeId);
+  const { sellerId, orderId } = await store.resolveSellerAndOrder(paymentIntentId, chargeId, d.amount ?? 0);
   const dispute = await store.upsertDispute({
     stripeDisputeId: d.id,
     stripeChargeId: chargeId,

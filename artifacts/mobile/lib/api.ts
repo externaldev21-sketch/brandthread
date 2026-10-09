@@ -4117,9 +4117,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       iapVerify: (id: string, transactionId: string) =>
         post<{ status: string }>(`/api/iap-promotions/featured/${encodeURIComponent(id)}/verify`, { transactionId }),
       cancel: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/cancel`, {}),
-      /** Native store purchase (RevenueCat consumable): server re-reads it and moves the slot to review. */
-      iapVerify: (id: string, transactionId: string) =>
-        post<{ status: string }>(`/api/iap-promotions/featured/${encodeURIComponent(id)}/verify`, { transactionId }),
       iapApplyCredit: (id: string) =>
         post<{ status: string; transactionId?: string }>(`/api/iap-promotions/featured/${encodeURIComponent(id)}/apply-credit`, {}),
     },

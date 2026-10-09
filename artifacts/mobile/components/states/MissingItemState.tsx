@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -30,7 +30,7 @@ export function MissingItemState({
   headerTitle: string;
   title: string;
   message?: string;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: React.ComponentProps<typeof Feather>['name'];
   actionLabel?: string;
   onAction?: () => void;
   /** false when the screen already renders its own ScreenHeader above this. */

@@ -30,7 +30,7 @@ import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/Keyboard
 import { TypingBubble } from '@/components/chat/TypingBubble';
 import VideoMessageViewer from '@/components/chat/VideoMessageViewer';
 import * as Clipboard from 'expo-clipboard';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useScrollToEndOnContentChange } from '@/hooks/useScrollToEndOnContentChange';
@@ -242,7 +242,7 @@ function buildListRows(msgs: Message[], unreadDividerId: string | null): ListRow
 
 // ─── Attachment icon ──────────────────────────────────────────────────────────
 
-function attachmentIcon(type: MessageAttachment['type']): keyof typeof Feather.glyphMap {
+function attachmentIcon(type: MessageAttachment['type']): React.ComponentProps<typeof Feather>['name'] {
   switch (type) {
     case 'product': return 'shopping-bag';
     case 'order':   return 'package';

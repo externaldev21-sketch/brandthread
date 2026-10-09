@@ -26,7 +26,7 @@ import {
   Alert, StyleSheet, ScrollView, RefreshControl,
   Modal, TextInput, ActivityIndicator, Platform, Animated,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -2085,8 +2085,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   composeSectionTitle: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     paddingTop: SP.sm,
     paddingBottom: SP.xs,
   },
@@ -2209,8 +2207,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   composeSectionTitleLoose: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     marginBottom: SP.sm,
   },
   suggestedRow: {
@@ -2248,7 +2244,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginLeft: 4, paddingHorizontal: 5, height: 17, borderRadius: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  aiTagText: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  aiTagText: { fontSize: 11, fontFamily: FONT.bold },
 
   // Requests-tab header: a small gray explainer line + a quiet "Delete all"
   // text action, right-aligned on its own line beneath — Instagram-style.

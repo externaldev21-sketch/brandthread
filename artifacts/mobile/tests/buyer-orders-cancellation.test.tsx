@@ -1,4 +1,5 @@
 import React from 'react';
+vi.mock('expo-store-review', () => ({ isAvailableAsync: async () => false, requestReview: async () => {} }));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BuyerOrderView } from '@/services/orderTypes';

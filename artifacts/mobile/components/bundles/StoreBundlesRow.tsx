@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -81,7 +81,7 @@ export function StoreBundlesRow({ sellerId }: { sellerId: string | null | undefi
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { paddingTop: SP.sm, paddingBottom: SP.md },
   header: {
-    fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4,
+    fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.muted,
     paddingHorizontal: SP.md, marginBottom: SP.sm,
   },
   rail: { paddingHorizontal: SP.md, gap: SP.md },

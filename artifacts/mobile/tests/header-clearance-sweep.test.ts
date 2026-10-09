@@ -98,7 +98,7 @@ describe('nothing under the tab bar: one shared clearance', () => {
 describe('Analytics tab', () => {
   const src = read('app/(tabs)/analytics.tsx');
   it('Visits and Revenue are two EQUAL columns (both wrapped in flex: 1 cells)', () => {
-    expect(src).toMatch(/<View style=\{\{ flex: 1, minWidth: 0 \}\}>\s*<StatTile label="Visits"/);
+    expect(src).toMatch(/<TouchableOpacity\s+style=\{\{ flex: 1, minWidth: 0 \}\}[\s\S]*?<StatTile label="Visits"/);
     expect(src).toMatch(/ref=\{revenueTileRef\}[^>]*style=\{\{ flex: 1 \}\}/);
     expect(src).toContain('<StatTile label="Visits"');
     expect(src).toContain('<StatTile label="Revenue"');

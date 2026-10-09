@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, gap: SP.sm },
   rowLabel: { fontSize: FS.sm, flexShrink: 1 },
   rowValue: { fontSize: FS.sm },
-  section: { fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 0.5, marginTop: SP.sm, marginBottom: SP.sm },
+  section: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: SP.sm, marginBottom: SP.sm },
   cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingTop: SP.sm, paddingBottom: SP.xs },
   cardTitle: { fontFamily: FONT.semibold, fontSize: FS.base },
   cardSub: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },

@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   LEGACY_ROUTES,
+  RETAINED_FEATURE_ROUTES,
   mergeHref,
   normalizeLegacyPath,
   resolveLegacyRoute,
@@ -70,8 +71,8 @@ describe('legacy route map', () => {
     for (const f of froms) expect(f, f).toBe(normalizeLegacyPath(f));
   });
 
-  it('only lists paths that no longer have a screen (otherwise the redirect never runs)', () => {
-    for (const r of LEGACY_ROUTES) expect(routeExists(r.from), `${r.from} still has a screen file`).toBe(false);
+  it('distinguishes removed routes from explicitly retained functional screens', () => {
+    for (const r of LEGACY_ROUTES) expect(routeExists(r.from), r.from).toBe(RETAINED_FEATURE_ROUTES.has(r.from));
   });
 
   it('sends every old path to a screen that exists, in one hop', () => {
@@ -116,7 +117,7 @@ describe('no broken in-app links', () => {
   });
 
   it('nothing links to an old path; links go straight to the new home', () => {
-    const froms = new Set(LEGACY_ROUTES.map((r) => r.from));
+    const froms = new Set(LEGACY_ROUTES.filter(r => !RETAINED_FEATURE_ROUTES.has(r.from)).map((r) => r.from));
     const stale = navTargets()
       .filter((t) => froms.has(normalizeLegacyPath(t.target)))
       .map((t) => `${t.file}:${t.line} → ${t.target}`);

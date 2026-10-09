@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -159,6 +159,8 @@ export function AccountTypeStep({
 
 export default function AccountTypeScreen() {
   const router = useRouter();
+  const { theme } = useAppTheme();
+  const [authTimedOut, setAuthTimedOut] = useState(false);
   const { isLoaded, isSignedIn } = useAuth();
   const inPreview = isSellerDevPreview() || isBuyerDevPreview();
   useEffect(() => {
@@ -173,11 +175,18 @@ export default function AccountTypeScreen() {
   useEffect(() => {
     // Never strand the user on a blank screen if Clerk never hydrates.
     if (inPreview || isLoaded) return;
-    const t = setTimeout(() => router.replace('/onboarding' as never), 4000);
+    const t = setTimeout(() => setAuthTimedOut(true), 4000);
     return () => clearTimeout(t);
   }, [router, inPreview, isLoaded]);
 
-  return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: 'center', padding: 24 }}>
+      <Text style={{ color: theme.text, fontFamily: FONT.medium, textAlign: 'center', marginBottom: 16 }}>
+        {authTimedOut ? 'Sign-in is taking longer than usual.' : 'Loading your account…'}
+      </Text>
+      {authTimedOut && <PillButton label="Try again" onPress={() => router.replace('/onboarding' as never)} />}
+    </View>
+  );
 }
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({

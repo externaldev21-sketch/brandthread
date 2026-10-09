@@ -51,8 +51,8 @@ import {
 } from './aiService';
 import { DEFAULT_AI_SETTINGS } from './aiTypes';
 
-const SETTINGS_KEY = 'bt:ai:settings:v1';
-const PENDING_KEY = 'bt:ai:settings:pending:v1';
+const SETTINGS_KEY = 'bt:ai:settings:v1:u:anon';
+const PENDING_KEY = 'bt:ai:settings:pending:v1:u:anon';
 
 function setLocal(over: Record<string, unknown>) {
   store[SETTINGS_KEY] = JSON.stringify({ ...DEFAULT_AI_SETTINGS, ...over });

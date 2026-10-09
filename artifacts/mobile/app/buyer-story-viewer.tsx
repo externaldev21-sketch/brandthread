@@ -1,3 +1,4 @@
+import { trackStoryView } from '@/services/socialService';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { relativeTime } from '@/lib/activity';
 import { goBackOr } from '@/lib/navigation/goBackOr';

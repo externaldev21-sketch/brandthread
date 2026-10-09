@@ -381,14 +381,27 @@ export async function requestOrderRelease(
       .groupBy(ledgerPostings.orderId);
     const remainingWeight = waiting.reduce((sum, row) => sum + Math.max(0, Number(row.held)), 0);
 
-    const bulkShare = runningProRataShareCents({
+    const costShare = runningProRataShareCents({
       unallocatedCostCents: unallocatedBulk,
       orderWeightCents: orderHeld,
       remainingWeightCents: Math.max(remainingWeight, orderHeld),
       isLastRemainingOrder: waiting.length <= 1,
       capCents: orderHeld,
     });
-    const amount = orderHeld - bulkShare;
+    // Refunds can leave non-refundable processor costs at drop level too.
+    // They must reduce the payout, but are not manufacturing expenditure.
+    const bulkPaid = Math.max(0, await accountBalanceCents(tx, { account: "manufacturer_paid", dropId }));
+    const [allocated] = await tx.select({
+      cents: sql<string>`COALESCE(SUM(${orderReleases.bulkShareCents}), 0)`,
+    }).from(orderReleases).where(eq(orderReleases.dropId, dropId));
+    const bulkShare = Math.min(costShare, runningProRataShareCents({
+      unallocatedCostCents: Math.max(0, bulkPaid - Number(allocated?.cents ?? 0)),
+      orderWeightCents: orderHeld,
+      remainingWeightCents: Math.max(remainingWeight, orderHeld),
+      isLastRemainingOrder: waiting.length <= 1,
+      capCents: orderHeld,
+    }));
+    const amount = orderHeld - costShare;
     const labelCents = await accountBalanceCents(tx, { account: "shipping_carrier", orderId });
 
     const [release] = await tx.insert(orderReleases).values({
@@ -402,7 +415,7 @@ export async function requestOrderRelease(
       bulkShareCents: bulkShare,
     }).returning({ id: orderReleases.id });
 
-    if (bulkShare > 0) {
+    if (costShare > 0) {
       // Charge this order its share of the bulk manufacturing payment, which
       // until now sat against the drop as a whole.
       await postLedgerTransaction(tx, {
@@ -411,10 +424,10 @@ export async function requestOrderRelease(
         sellerId,
         orderId,
         dropId,
-        memo: "This order's share of the bulk manufacturing payment",
+        memo: `Manufacturing share: ${bulkShare} cents; unrecovered processing costs: ${costShare - bulkShare} cents`,
         postings: [
-          { account: "seller_held", partyId: sellerId, orderId, amountCents: -bulkShare },
-          { account: "seller_held", partyId: sellerId, orderId: null, amountCents: bulkShare },
+          { account: "seller_held", partyId: sellerId, orderId, amountCents: -costShare },
+          { account: "seller_held", partyId: sellerId, orderId: null, amountCents: costShare },
         ],
       });
     }

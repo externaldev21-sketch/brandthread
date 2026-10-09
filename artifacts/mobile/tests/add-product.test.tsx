@@ -1,4 +1,5 @@
 import React from 'react';
+vi.mock('react-native-qrcode-svg', () => ({ default: () => null }));
 vi.mock('@/contexts/FirstRunTipsContext', () => ({
   useFirstRunTipsController: () => ({
     ready: true, hasSeen: () => true, skipAll: true, claim: () => false,

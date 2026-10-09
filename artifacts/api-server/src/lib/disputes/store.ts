@@ -8,15 +8,22 @@ import type { DisputeDeps, DisputeStore } from "./webhook";
 const STATUS_EVENT_KINDS = ["created", "updated", "evidence_submitted", "won", "lost", "warning_closed"] as const;
 
 export const dbDisputeStore: DisputeStore = {
-  async resolveSellerAndOrder(paymentIntentId, chargeId) {
+  async resolveSellerAndOrder(paymentIntentId, chargeId, amountCents) {
+    const selectOrder = (covered: Array<{ id: string; ownerId: string; grossChargedCents: number | null; totalCents: number }>) => {
+      const gross = (order: typeof covered[number]) => order.grossChargedCents || order.totalCents;
+      const exact = covered.filter(order => gross(order) === amountCents);
+      return exact.length === 1 ? exact[0] : [...covered].sort((a, b) => gross(b) - gross(a) || a.id.localeCompare(b.id))[0];
+    };
     if (paymentIntentId) {
-      const [ord] = await db.select({ id: orders.id, ownerId: orders.ownerId })
-        .from(orders).where(eq(orders.stripePaymentIntentId, paymentIntentId)).limit(1);
+      const covered = await db.select({ id: orders.id, ownerId: orders.ownerId, grossChargedCents: orders.grossChargedCents, totalCents: orders.totalCents })
+        .from(orders).where(eq(orders.stripePaymentIntentId, paymentIntentId));
+      const ord = selectOrder(covered);
       if (ord) return { sellerId: ord.ownerId, orderId: ord.id };
     }
     if (chargeId) {
-      const [ord] = await db.select({ id: orders.id, ownerId: orders.ownerId })
-        .from(orders).where(eq(orders.stripeChargeId, chargeId)).limit(1);
+      const covered = await db.select({ id: orders.id, ownerId: orders.ownerId, grossChargedCents: orders.grossChargedCents, totalCents: orders.totalCents })
+        .from(orders).where(eq(orders.stripeChargeId, chargeId));
+      const ord = selectOrder(covered);
       if (ord) return { sellerId: ord.ownerId, orderId: ord.id };
     }
     return { sellerId: "unknown", orderId: null };

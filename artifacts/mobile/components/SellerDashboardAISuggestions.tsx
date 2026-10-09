@@ -1,7 +1,7 @@
 import { radius as ControlRadius } from '@/constants/radii';
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 
@@ -145,8 +145,6 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
     marginBottom: SP.sm,
   },
   row: {

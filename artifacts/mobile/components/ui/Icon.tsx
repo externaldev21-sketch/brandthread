@@ -13,6 +13,7 @@
  * sizes still render for older call sites.
  */
 import React from 'react';
+import { MEDIA } from '@/lib/theme';
 import { Platform, type StyleProp, type ViewStyle } from 'react-native';
 import * as VectorIcons from '@expo/vector-icons';
 import { Feather } from '@expo/vector-icons';
@@ -71,7 +72,7 @@ function getMaterialIcons(): typeof VectorIcons.MaterialIcons | undefined {
   }
 }
 
-export function Icon({ name, size = ICON_SIZE.md, color = '#FFFFFF', style, testID }: IconProps) {
+export function Icon({ name, size = ICON_SIZE.md, color = MEDIA.foreground, style, testID }: IconProps) {
   const { sf, material } = iconMappingFor(name);
   const MaterialIcons = material ? getMaterialIcons() : undefined;
   const fallback = material && MaterialIcons

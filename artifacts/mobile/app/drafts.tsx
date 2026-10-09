@@ -67,7 +67,7 @@ function DraftRow({
     <View style={styles.row}>
       <View style={styles.rowHeading}>
         <View style={styles.draftIcon}>
-          <Feather name="edit-3" size={ICON.sm} color={FG} />
+          <Feather name="edit-3" size={ICON.sm} color={colors.foreground} />
         </View>
         <View style={styles.rowTitleWrap}>
           <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
@@ -88,7 +88,7 @@ function DraftRow({
           accessibilityRole="button"
           accessibilityLabel={`Resume ${name}`}
         >
-          <Feather name="play" size={13} color={BG} />
+          <Feather name="play" size={13} color={colors.background} />
           <Text style={styles.resumeLabel}>Resume</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -98,7 +98,7 @@ function DraftRow({
           accessibilityRole="button"
           accessibilityLabel={`Discard ${name}`}
         >
-          <Feather name="trash-2" size={13} color={FG} />
+          <Feather name="trash-2" size={13} color={colors.foreground} />
           <Text style={styles.discardLabel}>Discard</Text>
         </TouchableOpacity>
       </View>
@@ -302,7 +302,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
   },
   sortOptionActive: {
     borderColor: colors.primary,
@@ -325,7 +325,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     justifyContent: 'center',
   },
   row: {
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: BORDER,
@@ -339,7 +339,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     width: 38,
     height: 38,
     borderRadius: RADIUS.sm,
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: BORDER,
     alignItems: 'center',
@@ -353,7 +353,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   rowTitle: {
     fontSize: FS.base,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: colors.foreground,
   },
   rowDate: {
     fontSize: FS.xs,
@@ -380,7 +380,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   progressFill: {
     height: '100%',
     borderRadius: RADIUS.pill,
-    backgroundColor: FG,
+    backgroundColor: colors.foreground,
   },
   rowActions: {
     flexDirection: 'row',
@@ -417,7 +417,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   discardLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: colors.foreground,
   },
   rowSeparator: {
     height: SP.sm,

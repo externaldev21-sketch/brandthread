@@ -14,6 +14,7 @@ import { Icon, ICON_SIZE, type IconName } from '@/components/ui/Icon';
 import { hapticLight } from '@/lib/haptics';
 import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { RADII } from '@/constants/radii';
+import { MEDIA } from '@/lib/theme';
 
 export interface GlassIconButtonProps {
   name: IconName;
@@ -39,7 +40,7 @@ export function GlassIconButton({ name, onPress, accessibilityLabel, size = 40, 
     >
       <View style={[styles.circle, { borderRadius: size / 2 }]}>
         <Glass variant="regular" tint="dark" radius={RADII.pill} style={StyleSheet.absoluteFill} />
-        <Icon name={name} size={size >= 44 ? ICON_SIZE.lg : ICON_SIZE.sm} color="#FFFFFF" />
+        <Icon name={name} size={size >= 44 ? ICON_SIZE.lg : ICON_SIZE.sm} color={MEDIA.foreground} />
       </View>
     </Pressable>
   );

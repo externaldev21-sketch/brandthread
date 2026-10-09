@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 
 import { Button } from '@/components/ui';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -41,7 +41,7 @@ export function ReadyToSellChecklist({ data, hasPlan, onOpen, testID = 'ready-to
         <Text style={[styles.pillText, { color: theme.muted }]}>{completedLabel(data)}</Text>
       </View>
 
-      <View style={[styles.group, { borderColor: theme.borderSubtle }]}>
+      <View style={[styles.group, { backgroundColor: theme.surface }]}>
         {data.steps.map((step, i) => {
           const meta = READY_TO_SELL_STEPS[step.id];
           return (
@@ -68,7 +68,7 @@ export function ReadyToSellChecklist({ data, hasPlan, onOpen, testID = 'ready-to
       </View>
 
       {hasPlan === false ? (
-        <View style={[styles.plan, { borderColor: theme.borderSubtle }]} testID={`${testID}-plan`}>
+        <View style={[styles.plan, { backgroundColor: theme.surface }]} testID={`${testID}-plan`}>
           <Text style={[styles.planTitle, { color: theme.text }]}>Start your 5-day free trial</Text>
           <Text style={[styles.planBody, { color: theme.muted }]}>
             {`Plans start at $${STARTING_PRICE / 100}/month.`}
@@ -95,12 +95,12 @@ const styles = StyleSheet.create({
     borderRadius: 999, borderWidth: StyleSheet.hairlineWidth,
   },
   pillText: { ...TYPE_SCALE.caption },
-  group: { marginTop: 14, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  group: { marginTop: 14, borderRadius: 12, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, paddingHorizontal: 16 },
   dashed: { width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, borderWidth: 1.5, borderStyle: 'dashed' },
   check: { width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, alignItems: 'center', justifyContent: 'center' },
   rowTitle: { ...TYPE_SCALE.body, flex: 1 },
-  plan: { marginTop: 16, borderRadius: 12, borderWidth: 1, padding: 16 },
+  plan: { marginTop: 16, borderRadius: 12, padding: 16 },
   planTitle: { ...TYPE_SCALE.headline },
   planBody: { ...TYPE_SCALE.footnote, marginTop: 4 },
   planButton: { marginTop: 14 },

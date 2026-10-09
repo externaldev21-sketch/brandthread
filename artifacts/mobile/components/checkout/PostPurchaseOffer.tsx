@@ -16,7 +16,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { randomUUID } from 'expo-crypto';
@@ -227,7 +227,7 @@ export function PostPurchaseOffer({
 function makeStyles(ck: CheckoutColors) {
   return StyleSheet.create({
     section: { borderTopWidth: 1, borderTopColor: ck.divider, paddingTop: SP.md, marginBottom: SP.md },
-    heading: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.9, textTransform: 'uppercase', color: ck.muted, marginBottom: SP.sm + 4 },
+    heading: { fontFamily: FONT.semibold, fontSize: FS.xs, color: ck.muted, marginBottom: SP.sm + 4 },
     productRow: { flexDirection: 'row', gap: SP.sm + 4, alignItems: 'flex-start', marginBottom: SP.sm + 4 },
     thumb: { width: 72, height: 96, borderRadius: RADII.chip, borderWidth: StyleSheet.hairlineWidth, borderColor: ck.fieldBorder, overflow: 'hidden' },
     thumbFallback: { alignItems: 'center', justifyContent: 'center' },

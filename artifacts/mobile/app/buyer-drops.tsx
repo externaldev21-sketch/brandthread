@@ -17,7 +17,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { SectionError } from '@/components/InlineFeedback';
 import { LivePulseDot, UpcomingCountdown } from '@/components/CommerceSignal';
 import { DropsCalendar } from '@/components/drops/DropsCalendar';
-import { BORDER, CARD, FG, FONT, FS, MUTED, RADIUS, SP } from '@/lib/theme';
+import { BORDER, FONT, FS, MUTED, RADIUS, SP } from '@/lib/theme';
 
 type DropsTab = 'live' | 'upcoming' | 'recent';
 
@@ -52,6 +52,7 @@ function mapDrop(d: any, tab: DropsTab): DropRowItem {
 function DropBrowseRow({ item }: { item: DropRowItem }) {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const styles = createStyles(theme);
 
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -100,6 +101,7 @@ export default function BuyerDrops() {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const [tab, setTab] = useState<DropsTab>('live');
+  const styles = createStyles(theme);
   const [refreshing, setRefreshing] = useState(false);
   const [upcomingView, setUpcomingView] = useState<'list' | 'calendar'>('list');
 
@@ -210,7 +212,7 @@ export default function BuyerDrops() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flex: 1 },
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
   tabItem: { flex: 1, paddingVertical: SP.sm + 2, alignItems: 'center' },
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
   tabUnderline: { height: 2, width: '60%', borderRadius: 1, marginTop: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1 },
   avatar: { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },
-  name: { fontSize: 13, fontFamily: FONT.semibold, color: FG },
+  name: { fontSize: 13, fontFamily: FONT.semibold, color: theme.text },
   brand: { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   liveText: { fontSize: 11, fontFamily: FONT.semibold },

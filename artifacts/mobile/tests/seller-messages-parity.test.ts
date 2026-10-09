@@ -64,7 +64,7 @@ describe('TabPageHeader back arrow is additive', () => {
   it('renders the arrow only when onBack is passed', () => {
     expect(src).toContain('onBack?: () => void;');
     expect(src).toContain('{onBack ? (');
-    expect(src).toContain('<Feather name="arrow-left" size={ICON.md} color={theme.text} />');
+    expect(src).toContain('<Icon name="arrow-left" size={ICON.md} color={theme.text} />');
   });
 });
 

@@ -29,7 +29,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FullWindowOverlay } from 'react-native-screens';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FONT, RED } from '@/lib/theme';
+import { FONT, RED, MEDIA } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
@@ -282,7 +282,7 @@ function AlertSheet({ req }: { req: Extract<AppAlertRequest, { kind: 'sheet' }> 
 }
 
 const sheetStyles = StyleSheet.create({
-  backdrop: { backgroundColor: 'rgba(0,0,0,0.6)' },
+  backdrop: { backgroundColor: `${MEDIA.background}99` },
   card: { borderRadius: RADII.sheet, overflow: 'hidden' },
   // Dialog
   dialogCenter: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.xl },

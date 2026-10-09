@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { CardDivider, SectionTitle } from '@/components/analytics/AnalyticsKit';
 import { FONT, FS, SP } from '@/lib/theme';

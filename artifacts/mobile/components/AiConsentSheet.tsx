@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { PressableScale, PrimaryButton } from '@/components/BrandthreadUI';

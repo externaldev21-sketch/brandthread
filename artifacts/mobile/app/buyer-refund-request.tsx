@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Brandthread Buyer Refund Request
  */
@@ -154,7 +155,7 @@ export default function BuyerRefundRequestScreen() {
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <ScreenHeader title="Request refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-          <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
+          <View style={s.successIcon}><Feather name="check" size={32} color={MEDIA.foreground} /></View>
           <Text style={s.successTitle}>Refund Request Submitted</Text>
           <Text style={s.successSub}>Your request is under review. Refunds are not automatic — the seller or payment provider must confirm.</Text>
           <Text style={s.successNote}>Refund updates will appear here.</Text>
@@ -203,7 +204,7 @@ export default function BuyerRefundRequestScreen() {
               <View style={[s.radio, reason === r && s.radioSelected]}>
                 {reason === r && <View style={s.radioDot} />}
               </View>
-              <Text style={[s.optionLabel, reason === r && { color: FG }]}>{r}</Text>
+              <Text style={[s.optionLabel, reason === r && { color: colors.foreground }]}>{r}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -241,10 +242,10 @@ export default function BuyerRefundRequestScreen() {
                 <View key={idx} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
                   <Image source={{ uri }} style={{ width: 72, height: 72 }} resizeMode="cover" />
                   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove photo"
-                    style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
+                    style={{ position: 'absolute', top: 2, right: 2, backgroundColor: `${MEDIA.background}99`, borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
                   >
-                    <Feather name="x" size={10} color="#fff" />
+                    <Feather name="x" size={10} color={MEDIA.foreground} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -267,36 +268,36 @@ export default function BuyerRefundRequestScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, BORDER_ACTIVE = `${theme.accent}73`;
   return StyleSheet.create({
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
+  card: { backgroundColor: theme.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
   sectionTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   maxCard: { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER_ACTIVE, padding: SP.md, marginBottom: SP.md },
   maxLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 },
-  maxAmount: { fontSize: FS.xxl, fontFamily: FONT.bold, color: FG, marginBottom: 4 },
+  maxAmount: { fontSize: FS.xxl, fontFamily: FONT.bold, color: theme.text, marginBottom: 4 },
   maxNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 16 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 6 },
   itemBorder: { borderTopWidth: 1, borderTopColor: BORDER },
-  itemName: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  itemName: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   itemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  itemPrice: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  itemPrice: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 8 },
   radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   radioSelected: { borderColor: PURPLE },
   radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: PURPLE },
   optionLabel: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  textarea: { minHeight: 100, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
-  evidenceNote: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, padding: SP.sm, marginBottom: SP.md },
+  textarea: { minHeight: 100, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20 },
+  evidenceNote: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, padding: SP.sm, marginBottom: SP.md },
   evidenceNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, flex: 1 },
   disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },
-  bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
+  bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: theme.background, borderTopWidth: 1, borderTopColor: BORDER },
   submitBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },
   submitGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-  submitText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
+  submitText: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },
   successIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: SUCCESS, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
-  successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm },
+  successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, marginBottom: SP.sm },
   successSub: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 22, marginBottom: SP.sm },
   successNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', marginBottom: SP.lg },
   doneBtn: { width: '100%', borderRadius: RADIUS.lg, overflow: 'hidden' },
   doneBtnGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-  doneBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
+  doneBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },
   });
 };

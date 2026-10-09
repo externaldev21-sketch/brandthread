@@ -17,6 +17,17 @@ import type { LegacyParams, LegacyRoute } from './types';
 
 export type { LegacyParams, LegacyRoute } from './types';
 
+/**
+ * Keep functional screens and compatibility redirects from the local app.
+ * They are not dead destinations: the router opens their existing screen,
+ * while the fallback map remains available for older deep-link consumers.
+ */
+export const RETAINED_FEATURE_ROUTES = new Set([
+  '/shipping-label', '/buyer-refund-request', '/drafts', '/automation',
+  '/mobile-app-builder', '/metafields', '/ai-brand-memory', '/seller-drops',
+  '/seller-drop-create', '/seller-drop-preview', '/buyer-drops',
+]);
+
 export const LEGACY_ROUTES: readonly LegacyRoute[] = [
   ...CORE_LEGACY_ROUTES,
   ...ANALYTICS_LEGACY_ROUTES,

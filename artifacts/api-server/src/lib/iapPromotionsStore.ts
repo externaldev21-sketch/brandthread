@@ -137,14 +137,6 @@ export const drizzlePromoStore: PromoStore = {
         .from(boosts).where(where).orderBy(desc(boosts.createdAt)).limit(1);
       return row ?? null;
     }
-    if (kind === "featured_slot") {
-      const where = explicitId
-        ? and(eq(featuredSlots.id, explicitId), eq(featuredSlots.sellerId, ownerId))
-        : and(eq(featuredSlots.sellerId, ownerId), eq(featuredSlots.status, "pending_payment"));
-      const [row] = await db.select({ id: featuredSlots.id, budgetCents: featuredSlots.priceCents })
-        .from(featuredSlots).where(where).orderBy(desc(featuredSlots.createdAt)).limit(1);
-      return row ?? null;
-    }
     const where = explicitId
       ? and(eq(adCampaigns.id, explicitId), eq(adCampaigns.sellerId, ownerId))
       : and(eq(adCampaigns.sellerId, ownerId), eq(adCampaigns.status, "pending_payment"));

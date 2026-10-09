@@ -29,10 +29,6 @@ import { Button } from '@/components/ui/Button';
 import {
   buildFeaturedReturnUrl, featuredStateLabel, needsStoreRefund, storeName, storeRefundUrl,
 } from '@/services/featuredSlotService';
-import { useRevenueCat } from '@/lib/revenueCat';
-import {
-  confirmNativePromotion, featuredProductId, isPurchaseCancelled, nativePromotionsEnabled,
-} from '@/lib/iapPromotions';
 import type { FeaturedAvailability, FeaturedSlot } from '@/lib/api';
 import { useRevenueCat } from '@/lib/revenueCat';
 import {

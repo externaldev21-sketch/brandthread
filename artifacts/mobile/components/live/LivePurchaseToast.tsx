@@ -8,7 +8,7 @@ import { MEDIA } from '@/lib/theme';
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
 import { FONT, RADIUS } from '@/lib/theme';
 import { purchaseLine } from '@/lib/live/liveAnalytics';
 import type { LivePurchaseEvent } from '@/lib/live/useLiveSocket';

@@ -1760,7 +1760,7 @@ function WornInVideos({ productId, productName }: { productId: string; productNa
 
 const wv = StyleSheet.create({
   divider: { height: 1, marginVertical: SP.md },
-  header: { fontSize: FS.sm, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  header: { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.sm },
   card: { width: 104 },
   thumb: { width: 104, height: 150, borderRadius: RADIUS.md },
   playBadge: {

@@ -105,7 +105,7 @@ describe('saveStorefront server sync', () => {
     const store = await updateSettings({ storeName: 'Offline' });
     await flush();
     expect(store.settings.storeName).toBe('Offline');
-    expect(JSON.parse(storage.get('bt:store:v1')!).settings.storeName).toBe('Offline');
+    expect(JSON.parse(storage.get('bt:store:v1:u:anon')!).settings.storeName).toBe('Offline');
     expect(getStoreSyncStatus()).toEqual({ state: 'failed', error: 'API 500: boom' });
     expect(alertMock).toHaveBeenCalledTimes(1);
     expect(alertMock.mock.calls[0][0]).toBe("Store changes didn't sync");
