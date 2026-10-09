@@ -12,6 +12,7 @@ import {
   runRevenueCatSessionOperation,
 } from '@/lib/revenueCatSession';
 import { isExpoGo } from '@/lib/expoGoRuntime';
+import { runAfterFirstPaint } from '@/lib/deferStartup';
 
 export type RevenueCatPackage = import('react-native-purchases').PurchasesPackage;
 type PurchasesClient = typeof import('react-native-purchases').default;
@@ -48,6 +49,12 @@ function getPurchases(): PurchasesClient | null {
     return null;
   }
 }
+function configureOnce(client: PurchasesClient, apiKey: string): void {
+  if (configured) return;
+  client.configure({ apiKey });
+  configured = true;
+}
+
 /** Serializes SDK identity changes; RevenueCat has one process-wide customer. */
 export const queueRevenueCatIdentityTransition = createRevenueCatIdentityQueue();
 
@@ -80,6 +87,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
 
   const refresh = useCallback(async () => {
     if (!available || !isSignedIn) return;
+    configureOnce(Purchases!, key!);
     const generation = sessionGuard.current();
     const [info, offerings] = await Promise.all([Purchases!.getCustomerInfo(), Purchases!.getOfferings()]);
     if (!sessionGuard.isCurrent(generation)) return;
@@ -89,10 +97,20 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     ) ?? []);
   }, [available, isSignedIn, sessionGuard]);
 
+  // Configuring the store SDK and the identity sync below are not needed for
+  // the first screen, so they wait until it has painted. Anything that needs
+  // the SDK sooner (a purchase, a price lookup) configures it on the spot.
+  const [sdkReady, setSdkReady] = useState(configured);
   useEffect(() => {
-    if (!available || configured) return;
-    Purchases!.configure({ apiKey: key! });
-    configured = true;
+    if (!available) return;
+    if (configured) {
+      setSdkReady(true);
+      return;
+    }
+    return runAfterFirstPaint(() => {
+      configureOnce(Purchases!, key!);
+      setSdkReady(true);
+    });
   }, [available, key]);
 
   useEffect(() => {
@@ -101,7 +119,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     const generation = sessionGuard.begin();
     setCustomerInfo(null);
     setPackages([]);
-    if (!available || !configured) return;
+    if (!available || !sdkReady) return;
     let listener: ((info: CustomerInfo) => void) | null = null;
     const clerkId = isSignedIn ? user?.id : undefined;
     (async () => {
@@ -130,10 +148,11 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     return () => {
       if (listener) Purchases!.removeCustomerInfoUpdateListener(listener);
     };
-  }, [available, isSignedIn, user?.id, sessionGuard, sync]);
+  }, [available, sdkReady, isSignedIn, user?.id, sessionGuard, sync]);
 
   const purchase = useCallback(async (pkg: RevenueCatPackage) => {
     if (!available) throw new Error('RevenueCat is not configured for this build.');
+    configureOnce(Purchases!, key!);
     return runRevenueCatSessionOperation(
       sessionGuard,
       async () => (await Purchases!.purchasePackage(pkg)).customerInfo,
@@ -146,6 +165,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
 
   const restore = useCallback(async () => {
     if (!available) throw new Error('RevenueCat is not configured for this build.');
+    configureOnce(Purchases!, key!);
     return runRevenueCatSessionOperation(
       sessionGuard,
       () => Purchases!.restorePurchases(),
@@ -158,6 +178,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
 
   const purchaseConsumable = useCallback(async (productId: string) => {
     if (!available) throw new Error('RevenueCat is not configured for this build.');
+    configureOnce(Purchases!, key!);
     const [product] = await Purchases!.getProducts([productId], Purchases!.PRODUCT_CATEGORY.NON_SUBSCRIPTION);
     if (!product) throw new Error('This purchase is not available yet.');
     const result = await Purchases!.purchaseStoreProduct(product);
@@ -166,12 +187,14 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
 
   const creditPackPrices = useCallback(async (productIds: string[]) => {
     if (!available || !isSignedIn) return {};
+    configureOnce(Purchases!, key!);
     const products = await Purchases!.getProducts(productIds, Purchases!.PRODUCT_CATEGORY.NON_SUBSCRIPTION);
     return Object.fromEntries(products.map((p) => [p.identifier.split(':')[0]!, p.priceString]));
   }, [available, isSignedIn]);
 
   const purchaseCreditPack = useCallback(async (productId: string) => {
     if (!available) throw new Error('RevenueCat is not configured for this build.');
+    configureOnce(Purchases!, key!);
     const [product] = await Purchases!.getProducts([productId], Purchases!.PRODUCT_CATEGORY.NON_SUBSCRIPTION);
     if (!product) throw new Error('This credit pack is not available in the store yet.');
     await Purchases!.purchaseStoreProduct(product);
