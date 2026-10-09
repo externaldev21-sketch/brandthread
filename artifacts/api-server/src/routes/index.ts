@@ -111,6 +111,7 @@ import preorderTermsRouter from "./preorder-terms";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
 import productPairingsRouter from "./product-pairings";
+import productDraftsRouter from "./product-drafts";
 import productVideosRouter from "./product-videos";
 import buyerProductsRouter from "./buyer-products";
 import sizeChartTemplatesRouter from "./size-chart-templates";
@@ -267,6 +268,7 @@ router.use("/preorder-terms",            tc, preorderTermsRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
 router.use("/product-pairings",          productPairingsRouter);
+router.use("/product-drafts",            tc, productDraftsRouter); // Add Product wizard drafts synced across devices
 router.use("/product-videos",            productVideosRouter);
 router.use("/buyer/products",            buyerProductsRouter);
 router.use("/buyer/preferences",         buyerPreferencesRouter);
