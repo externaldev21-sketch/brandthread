@@ -25,6 +25,8 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isBuyerDevPreview } from '@/lib/devPreview';
+import { canSyncAccountServer, fetchAccountSettings, patchAccountSettings, withTimeout } from '@/lib/accountSettings';
+import { profileExtrasFromSettings, profileExtrasToSettings } from '@/lib/buyerProfile';
 import { CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia } from '@/components/profile/ProfileCover';
 import { COVER_MAX_SECONDS } from '@/components/profile/profileCoverRules';
 
@@ -311,8 +313,14 @@ export default function BuyerEditProfileScreen() {
   }
 
   const loadProfile = useCallback(() => {
-    Promise.all([loadStyleBadge(), loadBuyerProfile(), getMyProfile()])
-      .then(([badgeState, profileState, socialProfile]) => {
+    // Pronouns / gender / AI-creator follow the account (/api/me/settings);
+    // the server copy wins over this device's cache when it has one.
+    const remoteSettings = preview || !canSyncAccountServer()
+      ? Promise.resolve(null)
+      : withTimeout(fetchAccountSettings({ force: true }), 3_000).then(r => r.settings).catch(() => null);
+    Promise.all([loadStyleBadge(), loadBuyerProfile(), getMyProfile(), remoteSettings])
+      .then(([badgeState, rawProfileState, socialProfile, remote]) => {
+        const profileState = { ...rawProfileState, ...profileExtrasFromSettings(remote) };
         setBadge(badgeState);
         const merged: CoreFields = {
           name: profileState.name || socialProfile.name,
@@ -333,7 +341,7 @@ export default function BuyerEditProfileScreen() {
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
-  }, []);
+  }, [preview]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
@@ -445,7 +453,13 @@ export default function BuyerEditProfileScreen() {
           name: cleanedFields.name,
           bio: cleanedFields.bio,
           website: cleanedFields.links,
+          location: cleanedFields.location.trim() || undefined,
         }),
+        // Best effort: the local copy above is already saved, and an older
+        // server without /api/me/settings must not block saving the profile.
+        preview || !canSyncAccountServer()
+          ? Promise.resolve()
+          : patchAccountSettings(profileExtrasToSettings(cleanedFields)).catch(() => {}),
       ]);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

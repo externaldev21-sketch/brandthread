@@ -56,6 +56,7 @@ import {
   useApi,
 } from '@/lib/api';
 import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socialKeysForUser } from '@/services/socialService';
+import { setAccountStorageScope } from '@/lib/accountStorage';
 import { clearCartCache, initCartService } from '@/services/cartService';
 import { initDesignService } from '@/services/designService';
 import { initProductService } from '@/services/productService';
@@ -1081,6 +1082,9 @@ function ServiceConfigurer() {
     setQueryKeyScope(newUserId);
     initTabDataCache(newUserId);
     initFeedPostsCache(newUserId);
+    // Per-account local caches (settings, highlights, store draft, AI
+    // settings, ...) — see lib/accountStorage.ts.
+    setAccountStorageScope(newUserId);
     initSocialService(newUserId);
     initCartService(newUserId);
     initDesignService(newUserId);

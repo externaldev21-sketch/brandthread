@@ -7,17 +7,20 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { resolveAccountKey } from '@/lib/accountStorage';
 import {
   BrandMemory, BrandMemoryField, BrandMemorySummary, DEFAULT_BRAND_MEMORY,
 } from './aiTypes';
 
+/** Legacy device-wide key; stored per account (first signed-in account claims it). */
 const MEMORY_KEY = 'bt:ai:brand-memory:v1';
+const memoryKey = () => resolveAccountKey(MEMORY_KEY, 'claim');
 
 // ─── Load ─────────────────────────────────────────────────────────────────────
 
 export async function getBrandMemory(): Promise<BrandMemory> {
   try {
-    const raw = await AsyncStorage.getItem(MEMORY_KEY);
+    const raw = await AsyncStorage.getItem(await memoryKey());
     if (!raw) return { ...DEFAULT_BRAND_MEMORY };
     const parsed = JSON.parse(raw) as Partial<BrandMemory>;
     // Merge with defaults so new fields are always present
@@ -34,7 +37,7 @@ export async function getBrandMemory(): Promise<BrandMemory> {
 // ─── Save ─────────────────────────────────────────────────────────────────────
 
 export async function saveBrandMemory(memory: BrandMemory): Promise<void> {
-  await AsyncStorage.setItem(MEMORY_KEY, JSON.stringify(memory));
+  await AsyncStorage.setItem(await memoryKey(), JSON.stringify(memory));
 }
 
 export async function updateMemoryField(

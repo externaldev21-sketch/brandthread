@@ -296,7 +296,7 @@ describe('7. Empty-row repair', () => {
     store[key] = JSON.stringify(legacySession);
 
     // Also enable session memory
-    store['bt:ai:settings:v1'] = JSON.stringify({ sessionMemoryEnabled: true });
+    store['bt:ai:settings:v1:u:anon'] = JSON.stringify({ sessionMemoryEnabled: true });
 
     const session = await loadSession({ screen: 'general' });
 
@@ -324,7 +324,7 @@ describe('7. Empty-row repair', () => {
     _resetSessionForTest();
 
     store['bt:ai:session:v2:anon:default'] = JSON.stringify(legacySession);
-    store['bt:ai:settings:v1'] = JSON.stringify({ sessionMemoryEnabled: true });
+    store['bt:ai:settings:v1:u:anon'] = JSON.stringify({ sessionMemoryEnabled: true });
 
     const session = await loadSession({ screen: 'general' });
     expect(session.messages).toHaveLength(2);
@@ -359,7 +359,7 @@ describe('9. Persistence', () => {
     const { loadSession, sendMessage, _resetSessionForTest } = await getService();
     mockFetchOk({ content: 'Persisted reply' });
 
-    store['bt:ai:settings:v1'] = JSON.stringify({ sessionMemoryEnabled: true });
+    store['bt:ai:settings:v1:u:anon'] = JSON.stringify({ sessionMemoryEnabled: true });
 
     const s0 = await loadSession({ screen: 'general' }, 'user123', 'own');
     await sendMessage({ userText: 'Remember me', session: s0, authToken: 'tok', userId: 'user123', storeContext: 'own' });
@@ -379,7 +379,7 @@ describe('9. Persistence', () => {
     const { loadSession, sendMessage, _resetSessionForTest } = await getService();
     mockFetchOk({ content: 'Clean response' });
 
-    store['bt:ai:settings:v1'] = JSON.stringify({ sessionMemoryEnabled: true });
+    store['bt:ai:settings:v1:u:anon'] = JSON.stringify({ sessionMemoryEnabled: true });
     const s0 = await loadSession({ screen: 'general' }, 'u1', null);
     await sendMessage({ userText: 'Hello', session: s0, authToken: 'tok', userId: 'u1' });
 
@@ -395,7 +395,7 @@ describe('10. Account switching', () => {
   it('isolates sessions between different userIds', async () => {
     const { loadSession, sendMessage, _resetSessionForTest } = await getService();
 
-    store['bt:ai:settings:v1'] = JSON.stringify({ sessionMemoryEnabled: true });
+    store['bt:ai:settings:v1:u:anon'] = JSON.stringify({ sessionMemoryEnabled: true });
 
     // User A sends a message
     mockFetchOk({ content: 'Reply for A' });
@@ -417,7 +417,7 @@ describe('10. Account switching', () => {
   it('isolates sessions between different store contexts', async () => {
     const { loadSession, sendMessage, _resetSessionForTest } = await getService();
 
-    store['bt:ai:settings:v1'] = JSON.stringify({ sessionMemoryEnabled: true });
+    store['bt:ai:settings:v1:u:anon'] = JSON.stringify({ sessionMemoryEnabled: true });
 
     // Same user, store context "own"
     mockFetchOk({ content: 'Reply for own store' });
