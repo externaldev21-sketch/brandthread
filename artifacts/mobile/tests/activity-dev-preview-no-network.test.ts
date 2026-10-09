@@ -18,10 +18,10 @@ const read = (relativePath: string) =>
 describe('activity/login-activity screens never hit the real API in dev-preview, however Clerk is stubbed', () => {
   it('activity-center.tsx: loadSuggested and loadFirstPage check isPreviewActivityEnabled() BEFORE calling the real endpoint, not just in a catch/fallback after', () => {
     const src = read('app/activity-center.tsx');
-    expect(src).toContain('if (isPreviewActivityEnabled()) { showPreviewSuggestions(); return; }');
+    expect(src).toContain('if (isPreviewActivityEnabled() && (isBuyerDevPreview() || isSellerDevPreview())) { showPreviewSuggestions(); return; }');
     // loadFirstPage's preview branch runs before its own try/await, not inside the catch.
     const loadFirstPageIdx = src.indexOf('const loadFirstPage = useCallback');
-    const previewBranchIdx = src.indexOf('if (isPreviewActivityEnabled()) {', loadFirstPageIdx);
+    const previewBranchIdx = src.indexOf('if (isPreviewActivityEnabled() && (isBuyerDevPreview() || isSellerDevPreview())) {', loadFirstPageIdx);
     const awaitIdx = src.indexOf('await getActivity(', loadFirstPageIdx);
     expect(previewBranchIdx).toBeGreaterThan(loadFirstPageIdx);
     expect(previewBranchIdx).toBeLessThan(awaitIdx);
