@@ -664,13 +664,13 @@ export default function BuyerSearchScreen() {
       <View>
         {topPeople.length > 0 && (
           <AnimatedEntrance>
-            <Text style={styles.sectionLabel}>ACCOUNTS</Text>
+            <Text style={styles.sectionLabel}>People</Text>
             {personRows(topPeople)}
           </AnimatedEntrance>
         )}
         {videoResults.length > 0 && (
           <AnimatedEntrance delay={40}>
-            <Text style={styles.sectionLabel}>POSTS</Text>
+            <Text style={styles.sectionLabel}>Posts</Text>
             {videoGrid(videoResults)}
           </AnimatedEntrance>
         )}
@@ -839,14 +839,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingLeft: SPACING.sm, paddingRight: 10,
     // theme-exempt: fixed dark fill per spec, same pattern as profile.tsx's
     // store-details section — regardless of light/dark theme.
-    backgroundColor: '#1f1f1f',
+    backgroundColor: '#1C1C1E',
     borderWidth: 0,
   },
   // Focused state stays the same pill as unfocused — no border/box appears.
   // Only a very subtle fill change signals focus (the browser's own default
   // outline is separately suppressed via WEB_INPUT_RESET on the TextInput).
-  fieldFocused: { backgroundColor: 'rgba(255,255,255,0.10)' },
-  fieldInput: { flex: 1, ...TYPE_SCALE.body, padding: 0 },
+  fieldFocused: { backgroundColor: '#1C1C1E' },
+  fieldInput: { flex: 1, minWidth: 0, ...TYPE_SCALE.body, padding: 0 },
   headerSideButton: { minWidth: 24, alignItems: 'flex-end' },
   headerSideButtonText: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   sectionHeaderRow: {
