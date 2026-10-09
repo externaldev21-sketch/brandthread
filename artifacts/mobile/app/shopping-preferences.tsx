@@ -2,10 +2,10 @@
  * Shopping Preferences — full buyer preferences screen
  * Sizes, fit, categories, alerts, and activity toggles
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, } from 'react-native';
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,6 +21,10 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
+import { useBuyerPreferences } from '@/hooks/useBuyerPreferences';
+import {
+  mergeStyleInterests, selectedCategoriesFromInterests, type ShoppingSizeField,
+} from '@/lib/shoppingPreferences';
 import { radius } from '@/constants/radii';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -84,13 +88,37 @@ export default function ShoppingPreferences() {
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [hasChanges, setHasChanges] = useState(false);
+  // Sizes and style categories live on the account (buyer_preferences, the
+  // same source as My sizes). Signed out / dev preview: local settings only.
+  const { preferences, status: prefsStatus, update: updatePreferences } = useBuyerPreferences();
+  const signedIn = prefsStatus !== 'signed-out';
+  const prefsLoaded = prefsStatus === 'loaded';
+  const catsTouched = useRef(false);
+  // The tapped size shows immediately while the account save is in flight.
+  const [sizeOverride, setSizeOverride] = useState<Partial<Record<ShoppingSizeField, string>>>({});
+
+  const serverCatsRef = useRef<string[]>([]);
+  serverCatsRef.current = prefsLoaded ? selectedCategoriesFromInterests(preferences.styleInterests, CATEGORIES) : [];
 
   useFocusEffect(useCallback(() => {
+    catsTouched.current = false;
     loadBuyerSettings().then(s => {
       setSettings(s);
-      setSelectedCats(new Set(s.styleCategories ?? ['streetwear', 'vintage']));
+      const fromServer = serverCatsRef.current;
+      setSelectedCats(new Set(fromServer.length ? fromServer : (s.styleCategories ?? ['streetwear', 'vintage'])));
     });
   }, []));
+
+  // Once the account's saved interests arrive, show them (unless already edited here).
+  useEffect(() => {
+    if (!prefsLoaded || catsTouched.current) return;
+    const fromServer = selectedCategoriesFromInterests(preferences.styleInterests, CATEGORIES);
+    if (fromServer.length) setSelectedCats(new Set(fromServer));
+  }, [prefsLoaded, preferences.styleInterests]);
+
+  const sizeTops = sizeOverride.tops || (prefsLoaded && preferences.sizes.tops) || settings?.sizeTops || '';
+  const sizeBottoms = sizeOverride.bottoms || (prefsLoaded && preferences.sizes.bottoms) || settings?.sizeBottoms || '';
+  const sizeShoes = sizeOverride.shoes || (prefsLoaded && preferences.sizes.shoes) || settings?.sizeShoes || '';
 
   async function patch(updates: Partial<BuyerSettingsState>) {
     const next = await patchBuyerSettings(updates);
@@ -98,15 +126,44 @@ export default function ShoppingPreferences() {
     setHasChanges(true);
   }
 
+  async function selectSize(field: ShoppingSizeField, value: string) {
+    const localKey = field === 'tops' ? 'sizeTops' : field === 'bottoms' ? 'sizeBottoms' : 'sizeShoes';
+    await patch({ [localKey]: value } as Partial<BuyerSettingsState>);
+    if (!signedIn) return;
+    setSizeOverride(prev => ({ ...prev, [field]: value }));
+    try {
+      await updatePreferences({ sizes: { [field]: value } });
+    } catch {
+      Alert.alert('Could not update setting', 'Try again.');
+    } finally {
+      setSizeOverride(prev => {
+        if (prev[field] !== value) return prev;
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  }
+
   async function save() {
     // Persist selected style categories alongside other preferences
-    await patchBuyerSettings({ styleCategories: Array.from(selectedCats) });
+    const cats = Array.from(selectedCats);
+    await patchBuyerSettings({ styleCategories: cats });
+    if (signedIn) {
+      try {
+        await updatePreferences({ styleInterests: mergeStyleInterests(preferences.styleInterests, cats, CATEGORIES) });
+      } catch {
+        Alert.alert('Could not save preferences', 'Try again.');
+        return;
+      }
+    }
     setHasChanges(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     goBackOr(router);
   }
 
   function toggleCat(key: string) {
+    catsTouched.current = true;
     Haptics.selectionAsync();
     setSelectedCats(prev => {
       const next = new Set(prev);
@@ -130,11 +187,11 @@ export default function ShoppingPreferences() {
         <Text style={s.sectionTitle}>Your Sizes</Text>
         <Text style={s.sectionDesc}>Used for size recommendations and filtering.</Text>
         <View style={s.card}>
-          <SizeSelector label="Tops" options={TOPS} selected={settings.sizeTops} onSelect={v => patch({ sizeTops: v })} />
+          <SizeSelector label="Tops" options={TOPS} selected={sizeTops} onSelect={v => selectSize('tops', v)} />
           <View style={s.divider} />
-          <SizeSelector label="Bottoms" options={BOTTOMS} selected={settings.sizeBottoms} onSelect={v => patch({ sizeBottoms: v })} />
+          <SizeSelector label="Bottoms" options={BOTTOMS} selected={sizeBottoms} onSelect={v => selectSize('bottoms', v)} />
           <View style={s.divider} />
-          <SizeSelector label="Shoes (US)" options={SHOES} selected={settings.sizeShoes} onSelect={v => patch({ sizeShoes: v })} />
+          <SizeSelector label="Shoes (US)" options={SHOES} selected={sizeShoes} onSelect={v => selectSize('shoes', v)} />
         </View>
 
         {/* Fit */}
