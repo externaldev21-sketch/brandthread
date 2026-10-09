@@ -2,15 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const configListeners: Array<() => void> = [];
 let token: string | null = 'tok-a';
-let preview = false;
 
 vi.mock('react-native', () => ({ AppState: { addEventListener: () => ({ remove() {} }) } }));
-vi.mock('@/lib/api', () => ({ API_BASE_URL: 'https://api.example.test' }));
 vi.mock('@/lib/serviceConfig', () => ({
   getServiceToken: async () => token,
   onServicesConfigured: (fn: () => void) => { configListeners.push(fn); return () => {}; },
 }));
-vi.mock('@/lib/devPreview', () => ({ isBuyerDevPreview: () => preview, isSellerDevPreview: () => false }));
 
 class FakeSocket {
   static instances: FakeSocket[] = [];
@@ -29,6 +26,7 @@ class FakeSocket {
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
+process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test';
 
 describe('messagesSocket helpers', () => {
   it('backs off exponentially and caps at 30s', async () => {
@@ -59,7 +57,6 @@ describe('messagesSocket connection', () => {
     FakeSocket.instances = [];
     configListeners.length = 0;
     token = 'tok-a';
-    preview = false;
     (globalThis as any).WebSocket = FakeSocket;
   });
   afterEach(() => {
@@ -106,20 +103,12 @@ describe('messagesSocket connection', () => {
     expect(FakeSocket.instances[1].url).toContain('token=tok-b');
   });
 
-  it('never connects signed out or in the signed-out preview', async () => {
+  it('never connects signed out (the signed-out preview has no session token)', async () => {
     token = null;
     const mod = await import('./messagesSocket');
-    const off = mod.subscribeRealtime(() => {});
+    mod.subscribeRealtime(() => {});
     await flush();
-    expect(FakeSocket.instances).toHaveLength(0);
-    off();
-
-    vi.resetModules();
-    token = 'tok-a';
-    preview = true;
-    const mod2 = await import('./messagesSocket');
-    mod2.subscribeRealtime(() => {});
-    await flush();
+    await vi.advanceTimersByTimeAsync(5_000);
     expect(FakeSocket.instances).toHaveLength(0);
   });
 
