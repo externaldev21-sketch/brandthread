@@ -30,17 +30,22 @@ export async function shareLink(url: string, message: string): Promise<ShareLink
 }
 
 export async function copyLink(url: string): Promise<boolean> {
+  return copyText(url, 'Link copied', 'Couldn’t copy link');
+}
+
+/** Copies any text (an order number, a code) with a short confirmation. */
+export async function copyText(text: string, done = 'Copied', failed = 'Couldn’t copy'): Promise<boolean> {
   try {
     if (Platform.OS === 'web') {
-      await (navigator as Navigator | undefined)?.clipboard?.writeText?.(url);
+      await (navigator as Navigator | undefined)?.clipboard?.writeText?.(text);
     } else {
       const Clipboard = await import('expo-clipboard');
-      await Clipboard.setStringAsync(url);
+      await Clipboard.setStringAsync(text);
     }
-    Alert.alert('Link copied');
+    Alert.alert(done);
     return true;
   } catch {
-    Alert.alert('Couldn’t copy link', 'Try again.');
+    Alert.alert(failed, 'Try again.');
     return false;
   }
 }

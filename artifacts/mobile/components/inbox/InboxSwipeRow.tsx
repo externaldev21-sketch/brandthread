@@ -1,143 +1,61 @@
-import React, { useMemo, useRef } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
 import { Feather } from '@expo/vector-icons';
 
-import { FONT, FS, SP } from '@/lib/theme';
-
-const ACTION_WIDTH = 72;
+import SwipeRow, { type SwipeRowAction, type SwipeTone } from '@/components/ui/SwipeRow';
 
 export interface InboxSwipeAction {
   key: string;
   label: string;
   icon: keyof typeof Feather.glyphMap;
-  color: string;
-  textColor: string;
+  /** Kept for existing callers; the shared swipe row uses the palette's
+   *  neutral greys and the destructive red instead (see `tone`). */
+  color?: string;
+  textColor?: string;
+  tone?: SwipeTone;
   onPress: () => void | Promise<void>;
   accessibilityLabel?: string;
 }
 
 interface InboxSwipeRowProps {
   children: React.ReactNode;
+  /** Trailing actions (swipe left), listed left-to-right; the last one is
+   *  the full-swipe action. */
   actions: InboxSwipeAction[];
+  /** Leading actions (swipe right), listed left-to-right; the first one is
+   *  the full-swipe action. */
+  leadingActions?: InboxSwipeAction[];
   rowId: string;
   disabled?: boolean;
 }
 
-/**
- * A swipe-to-reveal row supporting several trailing actions (mute, delete,
- * mark read, …), unlike SwipeActionRow which only supports one. Swiping left
- * reveals a fixed action panel; tapping an action runs it and snaps back.
- */
-export default function InboxSwipeRow({ children, actions, rowId, disabled = false }: InboxSwipeRowProps) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const openRef = useRef(false);
-  const panelWidth = ACTION_WIDTH * Math.max(actions.length, 1);
+const DESTRUCTIVE_KEYS = new Set(['delete', 'block', 'remove']);
 
-  const reset = () => {
-    openRef.current = false;
-    Animated.spring(translateX, {
-      toValue: 0,
-      useNativeDriver: true,
-      damping: 20,
-      stiffness: 220,
-    }).start();
+function toSwipeAction(action: InboxSwipeAction, index: number, all: InboxSwipeAction[]): SwipeRowAction {
+  return {
+    key: action.key,
+    label: action.label,
+    icon: action.icon,
+    tone: action.tone ?? (DESTRUCTIVE_KEYS.has(action.key) ? 'destructive' : index === all.length - 1 ? 'neutral' : 'muted'),
+    onPress: action.onPress,
+    accessibilityLabel: action.accessibilityLabel,
   };
-
-  const open = () => {
-    openRef.current = true;
-    Animated.spring(translateX, {
-      toValue: -panelWidth,
-      useNativeDriver: true,
-      damping: 20,
-      stiffness: 220,
-    }).start();
-  };
-
-  const runAction = async (action: InboxSwipeAction) => {
-    reset();
-    await action.onPress();
-  };
-
-  const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) =>
-      !disabled &&
-      Math.abs(gesture.dx) > 10 &&
-      Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.25,
-    onPanResponderMove: (_, gesture) => {
-      const base = openRef.current ? -panelWidth : 0;
-      translateX.setValue(Math.max(-panelWidth, Math.min(0, base + gesture.dx)));
-    },
-    onPanResponderRelease: (_, gesture) => {
-      const base = openRef.current ? -panelWidth : 0;
-      const projected = base + gesture.dx;
-      if (projected <= -panelWidth / 2) {
-        open();
-      } else {
-        reset();
-      }
-    },
-    onPanResponderTerminate: reset,
-  }), [disabled, panelWidth]);
-
-  return (
-    <View style={styles.clip}>
-      <View style={[styles.actionPanel, { width: panelWidth }]}>
-        {actions.map(action => (
-          <Pressable
-            key={action.key}
-            style={[styles.action, { backgroundColor: action.color, width: ACTION_WIDTH }]}
-            onPress={() => { void runAction(action); }}
-            testID={`inbox-swipe-${action.key}-${rowId}`}
-            accessibilityRole="button"
-            accessibilityLabel={action.accessibilityLabel ?? action.label}
-          >
-            <Feather name={action.icon} size={17} color={action.textColor} />
-            <Text style={[styles.actionText, { color: action.textColor }]} numberOfLines={1}>
-              {action.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      <Animated.View
-        style={[styles.foreground, { transform: [{ translateX }] }]}
-        {...panResponder.panHandlers}
-      >
-        {children}
-      </Animated.View>
-    </View>
-  );
 }
 
-const styles = StyleSheet.create({
-  clip: {
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  // Explicit stacking order (rather than relying on incidental DOM/paint
-  // order) so the swipe actions can never show through the closed row on
-  // web — without this, a sub-pixel layout rounding at the row's edge could
-  // let a sliver of an action's tinted background peek past the foreground.
-  actionPanel: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    zIndex: 0,
-    elevation: 0,
-  },
-  foreground: {
-    zIndex: 1,
-    elevation: 1,
-  },
-  action: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.xs / 2,
-    height: '100%',
-  },
-  actionText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.xs,
-  },
-});
+/**
+ * Inbox / requests row swipe actions — the shared Apple Mail / Instagram DMs
+ * swipe row (components/ui/SwipeRow.tsx): leading actions on the left,
+ * trailing on the right, full swipe runs the outermost one.
+ */
+export default function InboxSwipeRow({ children, actions, leadingActions = [], rowId, disabled = false }: InboxSwipeRowProps) {
+  return (
+    <SwipeRow
+      rowId={rowId}
+      disabled={disabled}
+      testIDPrefix="inbox-swipe"
+      leading={leadingActions.map((a, i, all) => toSwipeAction(a, all.length - 1 - i, all))}
+      trailing={actions.map(toSwipeAction)}
+    >
+      {children}
+    </SwipeRow>
+  );
+}

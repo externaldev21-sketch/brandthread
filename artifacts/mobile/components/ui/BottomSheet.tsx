@@ -75,6 +75,10 @@ export interface SheetTransition {
    *  `<GestureDetector gesture={scrollGesture}>` so it scrolls alongside the
    *  sheet's pan instead of fighting it. */
   scrollGesture: ReturnType<typeof Gesture.Native>;
+  /** Only with `opts.detents`: keeps a footer (e.g. "Show results") pinned to
+   *  the bottom of the screen at the half detent, riding with the sheet
+   *  only once it is dragged below half. */
+  footerStyle: AnimatedStyle<{ transform?: { translateY: number }[] }>;
 }
 
 /** Half rests at ~55% of the screen like Instagram comments; full stops just
@@ -171,6 +175,9 @@ export function useSheetTransition(
   // this bug: "Shop the Post never opens" on web. A ever-present transform
   // key (even an identity one) always gets diffed and applied.
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+  const footerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -Math.max(0, Math.min(translateY.value, halfOffset)) }],
+  }));
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
 
   const closeFromGesture = () => {
@@ -258,6 +265,7 @@ export function useSheetTransition(
     contentScrollEnabled: !detents || detent === 'full',
     onContentScroll,
     scrollGesture,
+    footerStyle,
   };
 }
 
@@ -270,9 +278,12 @@ export interface BottomSheetProps {
   /** Half/full detents with a grabber, like Apple Maps / Instagram comments:
    *  opens at half, drag up for full, drag down from half to dismiss. */
   detents?: boolean;
+  /** Pinned under the scrolling content (a primary action). With `detents`
+   *  it stays on screen at the half detent too. */
+  footer?: React.ReactNode;
 }
 
-export function BottomSheet({ visible, onClose, children, testID, reduceMotion, detents }: BottomSheetProps) {
+export function BottomSheet({ visible, onClose, children, testID, reduceMotion, detents, footer }: BottomSheetProps) {
   const palette = useColors();
   const insets = useSafeAreaInsets();
   // Modal portals straight to <body> on web, outside WebAppShell's centered
@@ -283,13 +294,14 @@ export function BottomSheet({ visible, onClose, children, testID, reduceMotion, 
   const fullHeight = sheetFullHeight(insets.top);
   const {
     modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout,
-    contentScrollEnabled, onContentScroll, scrollGesture,
+    contentScrollEnabled, onContentScroll, scrollGesture, footerStyle,
   } = useSheetTransition(visible, onClose, { reduceMotion, detents: detents ? { fullHeight } : undefined });
   const content = (
     <KeyboardAwareScrollViewCompat
       keyboardShouldPersistTaps="handled"
       bottomOffset={24}
       scrollEnabled={contentScrollEnabled}
+      style={detents ? styles.fill : footer ? styles.shrink : undefined}
       onScroll={detents ? onContentScroll : undefined}
       scrollEventThrottle={detents ? 16 : undefined}
     >
@@ -330,6 +342,11 @@ export function BottomSheet({ visible, onClose, children, testID, reduceMotion, 
               <View style={[styles.handle, { backgroundColor: palette.mutedForeground }]} />
             </View>
             {detents ? <GestureDetector gesture={scrollGesture}>{content}</GestureDetector> : content}
+            {footer ? (
+              <Animated.View style={[styles.footer, { backgroundColor: palette.card }, detents && footerStyle]}>
+                {footer}
+              </Animated.View>
+            ) : null}
           </Animated.View>
         </GestureDetector>
       </View>
@@ -357,6 +374,9 @@ const styles = StyleSheet.create({
     maxWidth: WEB_SHELL_MAX_WIDTH,
     alignSelf: 'center',
   },
+  footer: { paddingTop: SPACING.sm },
+  fill: { flex: 1 },
+  shrink: { flexShrink: 1 },
   handleWrap: { alignItems: 'center', paddingTop: SPACING.xs, paddingBottom: SPACING.xxs },
   handle: { width: 36, height: 4, borderRadius: RADII.pill, opacity: 0.3 },
 });

@@ -16,6 +16,9 @@ import {
   TouchableWithoutFeedback, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { Feather } from '@expo/vector-icons';
 import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -104,6 +107,9 @@ export function VariantPickerSheet({
   const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
   const lowStock = !!variant && variant.isAvailable && variant.inventoryQuantity > 0 && variant.inventoryQuantity <= 5;
 
+  // Opens on the shared sheet curve; a drag down on the grabber dismisses.
+  const sheetMotion = useSheetTransition(true, onClose);
+
   async function handleConfirm() {
     if (!product) return;
     if (!allSelected || !variant || !variant.isAvailable) {
@@ -126,18 +132,28 @@ export function VariantPickerSheet({
     : `Add to bag · ${formatCents(price * quantity)}`;
 
   return (
-    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={s.backdrop} />
-      </TouchableWithoutFeedback>
-      <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-        <View style={s.handleWrap}><View style={s.handle} /></View>
-        <View style={s.header}>
-          <Text style={s.title}>Choose options</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={s.closeBtn}>
-            <Feather name="x" size={18} color={theme.text} />
-          </TouchableOpacity>
-        </View>
+    <Modal transparent animationType="none" visible onRequestClose={onClose}>
+      <Animated.View style={[StyleSheet.absoluteFill, sheetMotion.backdropStyle]}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={s.backdrop} />
+        </TouchableWithoutFeedback>
+      </Animated.View>
+      <Animated.View
+        onLayout={sheetMotion.onSheetLayout}
+        style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.md) }, sheetMotion.sheetStyle]}
+      >
+        {/* Grabber + header: drag down to dismiss (shared sheet engine). */}
+        <GestureDetector gesture={sheetMotion.panGesture}>
+          <Animated.View>
+            <View style={s.handleWrap}><View style={s.handle} /></View>
+            <View style={s.header}>
+              <Text style={s.title}>Choose options</Text>
+              <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={s.closeBtn}>
+                <Feather name="x" size={18} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </GestureDetector>
 
         {loading ? (
           <View style={s.centerBox}><ActivityIndicator color={theme.accent} /></View>
@@ -250,7 +266,7 @@ export function VariantPickerSheet({
             </View>
           </>
         ) : null}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }

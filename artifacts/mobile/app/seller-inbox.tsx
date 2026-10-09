@@ -41,6 +41,7 @@ import { BLOCK_EXPLAINER } from '@/lib/safety';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
+import { openContextMenu } from '@/lib/contextMenu';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -358,8 +359,26 @@ export default function SellerInboxScreen() {
     router.push(('/seller-conversation?id=' + encodeURIComponent(conversationId)) as never);
   }
 
+  // Long-press a conversation: the long-press preview menu (Instagram) — the
+  // thread's last message previewed over a blurred inbox, actions under it.
   function longPressConversation(c: ConvView) {
-    haptics.rigid();
+    const other = otherParticipant(c);
+    const opened = other ? openContextMenu({
+      preview: {
+        title: other.name || other.handle,
+        subtitle: other.name ? other.handle : undefined,
+        avatarUri: other.avatarUri,
+        body: c.lastMessage || ' ',
+      },
+      onPreviewPress: () => openConversation(c.id),
+      items: [
+        ...(c.unreadCount > 0 ? [{ key: 'read', label: 'Mark as read', icon: 'check-circle' as const, onPress: () => { void swipeMarkReadConversation(c); } }] : []),
+        { key: 'pin', label: c.isPinned ? 'Unpin' : 'Pin', icon: 'bookmark', onPress: () => { void swipePinConversation(c); } },
+        { key: 'mute', label: 'Mute', icon: 'bell-off', onPress: () => { void swipeMuteConversation(c); } },
+        { key: 'archive', label: 'Archive', icon: 'archive', destructive: true, onPress: () => { void swipeArchiveConversation(c); } },
+      ],
+    }) : false;
+    if (opened) return;
     showActionSheet('Options', undefined, [
       { text: 'Archive', onPress: () => swipeArchiveConversation(c), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
@@ -517,15 +536,6 @@ export default function SellerInboxScreen() {
           : `Pin conversation with ${other.name || other.handle || 'buyer'}`,
       },
       {
-        key: 'mute',
-        label: 'Mute',
-        icon: 'bell-off',
-        color: theme.cardElevated,
-        textColor: theme.muted,
-        onPress: () => swipeMuteConversation(item),
-        accessibilityLabel: `Mute ${other.name || other.handle || 'buyer'}`,
-      },
-      {
         key: 'delete',
         label: 'Delete',
         icon: 'trash-2',
@@ -537,7 +547,17 @@ export default function SellerInboxScreen() {
     ];
 
     return (
-      <InboxSwipeRow rowId={item.id} actions={swipeActions}>
+      <InboxSwipeRow rowId={item.id} actions={swipeActions} leadingActions={[
+        {
+        key: 'mute',
+        label: 'Mute',
+        icon: 'bell-off',
+        color: theme.cardElevated,
+        textColor: theme.muted,
+        onPress: () => swipeMuteConversation(item),
+        accessibilityLabel: `Mute ${other.name || other.handle || 'buyer'}`,
+        },
+      ]}>
         <PressableScale
           testID={`seller-conversation-${item.id}`}
           style={[s.row, { backgroundColor: theme.background }]}

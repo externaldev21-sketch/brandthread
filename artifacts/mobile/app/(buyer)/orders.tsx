@@ -30,6 +30,8 @@ import { useReorderFlow } from '@/components/orders/ReorderFlow';
 import { canReorderStatus } from '@/lib/reorderSummary';
 import { RetryRow } from '@/components/ui/RetryRow';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
+import { openContextMenu } from '@/lib/contextMenu';
+import { copyText } from '@/lib/shareActions';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -111,8 +113,27 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
   const headline = deliveryHeadline(order);
   const thumbs = order.lineItems.slice(0, 4);
 
+  // Long-press: the long-press preview menu (Instagram) — the order enlarged
+  // over a blurred list with its actions under it; tapping it opens the order.
+  const openMenu = () => {
+    openContextMenu({
+      preview: {
+        imageUri: firstItem?.imageUri,
+        aspectRatio: 1,
+        title: order.sellerName,
+        subtitle: [order.orderNumber, headline?.text].filter(Boolean).join(' · '),
+      },
+      onPreviewPress: onPress,
+      items: [
+        { key: 'open', label: 'View order', icon: 'package', onPress },
+        ...(onReorder ? [{ key: 'reorder', label: 'Buy again', icon: 'rotate-cw' as const, onPress: () => onReorder(order.id) }] : []),
+        { key: 'copy', label: 'Copy order number', icon: 'copy', onPress: () => { void copyText(order.orderNumber, 'Order number copied'); } },
+      ],
+    });
+  };
+
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} disabled={isPreview}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} onLongPress={isPreview ? undefined : openMenu} delayLongPress={350} disabled={isPreview}>
       {/* Top row */}
       <View style={styles.cardTopRow}>
         <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>

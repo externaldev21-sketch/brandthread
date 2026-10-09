@@ -53,7 +53,7 @@ import { useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetric
 import { FollowPill } from '@/components/search/PersonRow';
 import { ThemedRefreshControl } from '@/components/ui';
 import { showActionSheet } from '@/components/ui/ActionSheet';
-import SwipeableActions from '@/components/SwipeableActions';
+import SwipeRow, { type SwipeRowAction } from '@/components/ui/SwipeRow';
 import { RemoveFollowerSheet } from '@/components/social/RemoveFollowerSheet';
 import { CenteredToast } from '@/components/social/CenteredToast';
 import { Glass } from '@/components/ui/Glass';
@@ -364,32 +364,30 @@ export const ActivityRowView = React.memo(function ActivityRowView({
       </View>
     ) : null;
 
-  // Swipe left reveals "..." (open the menu) then a red trash icon (delete
-  // this notification) — Mobbin: "Instagram iOS Removing a follower" flow,
-  // screen 1 (https://mobbin.com/screens/c404cbe7-e8c0-4b09-904c-62ba9d1b0a71).
-  // Monochrome swap: Instagram's own row background for "...", theme.error
-  // (not Instagram's red-on-red, but the same destructive semantic) for trash.
-  const swipeActions = useMemo(() => [
+  // Swipe left reveals More then Delete — the shared Apple Mail /
+  // Instagram swipe row (components/ui/SwipeRow.tsx): a full swipe left
+  // deletes this notification.
+  const swipeActions = useMemo<SwipeRowAction[]>(() => [
     {
       key: 'more',
-      icon: 'more-horizontal' as const,
-      color: theme.cardElevated,
-      iconColor: theme.text,
+      label: 'More',
+      icon: 'more-horizontal',
+      tone: 'muted',
       accessibilityLabel: 'More options',
       onPress: () => onOpenMenu(row),
     },
     {
       key: 'delete',
-      icon: 'trash-2' as const,
-      color: theme.error,
-      iconColor: '#FFFFFF',
+      label: 'Delete',
+      icon: 'trash-2',
+      tone: 'destructive',
       accessibilityLabel: 'Delete this notification',
       onPress: () => onDismiss(row),
     },
-  ], [onDismiss, onOpenMenu, row, theme.cardElevated, theme.error, theme.text]);
+  ], [onDismiss, onOpenMenu, row]);
 
   return (
-    <SwipeableActions actions={swipeActions} backgroundColor={theme.background}>
+    <SwipeRow rowId={row.key} trailing={swipeActions}>
     <View style={styles.row}>
       {/* Unread dot — LinkedIn-style leading dot in the row's own 16pt
           gutter (https://mobbin.com/screens/e455bcf1-7b85-4c0b-b4fd-76df1241fd5f),
@@ -462,7 +460,7 @@ export const ActivityRowView = React.memo(function ActivityRowView({
         />
       ) : trailingThumb}
     </View>
-    </SwipeableActions>
+    </SwipeRow>
   );
 });
 

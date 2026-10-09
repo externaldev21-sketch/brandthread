@@ -65,6 +65,7 @@ import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
+import { openContextMenu } from '@/lib/contextMenu';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
 // (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
@@ -764,11 +765,28 @@ export default function InboxScreen() {
     }
   }
 
+  // Long-press a conversation: the long-press preview menu (Instagram) — the
+  // thread's last message previewed over a blurred inbox, actions under it.
+  // Tapping the preview opens the conversation.
   function longPressConversation(conv: Conversation) {
-    haptics.rigid();
-    // Alert.alert() with a button array is a silent no-op on web — this left
-    // the row long-press menu completely dead in the web preview. See
-    // components/ui/ActionSheet.tsx's header comment.
+    const participant = getParticipant(conv);
+    const opened = participant ? openContextMenu({
+      preview: {
+        title: participant.name,
+        subtitle: participant.handle,
+        avatarUri: participant.avatarUri,
+        body: conv.lastMessage || ' ',
+      },
+      onPreviewPress: () => openConversation(conv),
+      items: [
+        ...(conv.unreadCount > 0 ? [{ key: 'read', label: 'Mark as read', icon: 'check-circle' as const, onPress: () => { void swipeMarkReadConversation(conv); } }] : []),
+        ...(conv.isOfficial ? [] : [{ key: 'pin', label: conv.isPinned ? 'Unpin' : 'Pin', icon: 'bookmark' as const, onPress: () => { void swipePinConversation(conv); } }]),
+        { key: 'mute', label: 'Mute', icon: 'bell-off', onPress: () => { void swipeMuteConversation(conv); } },
+        { key: 'archive', label: 'Archive', icon: 'archive', onPress: () => { void swipeArchiveConversation(conv); } },
+        { key: 'delete', label: 'Delete', icon: 'trash-2', destructive: true, onPress: () => { void swipeDeleteConversation(conv); } },
+      ],
+    }) : false;
+    if (opened) return;
     showActionSheet('Options', undefined, [
       { text: 'Archive', onPress: () => swipeArchiveConversation(conv), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
@@ -1111,15 +1129,6 @@ export default function InboxScreen() {
           : `Pin conversation with ${participant.name}`,
       }]),
       {
-        key: 'mute',
-        label: 'Mute',
-        icon: 'bell-off',
-        color: theme.cardElevated,
-        textColor: theme.muted,
-        onPress: () => swipeMuteConversation(conv),
-        accessibilityLabel: `Mute ${participant.name}`,
-      },
-      {
         key: 'delete',
         label: 'Delete',
         icon: 'trash-2',
@@ -1130,9 +1139,31 @@ export default function InboxScreen() {
       },
     ];
 
+    // Apple Mail / Instagram DMs: archive and mute on the left (a full
+    // swipe right archives), read / pin / delete on the right (a full swipe
+    // left deletes).
+    const leadingSwipeActions: InboxSwipeAction[] = [
+      {
+        key: 'archive',
+        label: 'Archive',
+        icon: 'archive',
+        onPress: () => swipeArchiveConversation(conv),
+        accessibilityLabel: `Archive conversation with ${participant.name}`,
+      },
+      {
+        key: 'mute',
+        label: 'Mute',
+        icon: 'bell-off',
+        color: theme.cardElevated,
+        textColor: theme.muted,
+        onPress: () => swipeMuteConversation(conv),
+        accessibilityLabel: `Mute ${participant.name}`,
+      },
+    ];
+
     return (
       <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
-        <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
+        <InboxSwipeRow rowId={conv.id} actions={swipeActions} leadingActions={leadingSwipeActions}>
           <PressableScale
             style={[s.convRow, { backgroundColor: theme.background }]}
             onPress={() => openConversation(conv)}

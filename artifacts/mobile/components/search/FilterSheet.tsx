@@ -133,7 +133,19 @@ export function FilterSheet({
   );
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} testID="search-filter-sheet">
+    <BottomSheet visible={visible} onClose={onClose} testID="search-filter-sheet" detents footer={(
+      <PressableScale
+        onPress={handleApply}
+        style={[styles.applyBtn, { backgroundColor: theme.accent }]}
+        accessibilityRole="button"
+        accessibilityLabel={draftCount > 0 ? `Show results, ${draftCount} filters active` : 'Show results'}
+        testID="search-filter-apply"
+      >
+        <Text style={[styles.applyText, { color: theme.onAccent }]}>
+          {draftCount > 0 ? `Show results · ${draftCount}` : 'Show results'}
+        </Text>
+      </PressableScale>
+    )}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>Filters</Text>
         <PressableScale
@@ -236,17 +248,6 @@ export function FilterSheet({
         </>
       )}
 
-      <PressableScale
-        onPress={handleApply}
-        style={[styles.applyBtn, { backgroundColor: theme.accent }]}
-        accessibilityRole="button"
-        accessibilityLabel={draftCount > 0 ? `Show results, ${draftCount} filters active` : 'Show results'}
-        testID="search-filter-apply"
-      >
-        <Text style={[styles.applyText, { color: theme.onAccent }]}>
-          {draftCount > 0 ? `Show results · ${draftCount}` : 'Show results'}
-        </Text>
-      </PressableScale>
     </BottomSheet>
   );
 }

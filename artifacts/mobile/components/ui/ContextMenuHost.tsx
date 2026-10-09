@@ -20,7 +20,8 @@ import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, RED } from '@/lib/theme';
+import { FONT } from '@/lib/theme';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { haptics } from '@/lib/haptics';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { a11yModalProps } from '@/lib/a11y/modal';
@@ -29,11 +30,12 @@ import {
   type ContextMenuRequest, type MenuItem, type PullDownRequest,
 } from '@/lib/contextMenu';
 
-/** Solid menu surface (BRANDTHREAD_DESIGN: inputs and sheets #1C1C1E). */
-const SURFACE = '#1C1C1E';
-const SEPARATOR = 'rgba(235,235,245,0.16)';
-const LABEL = '#FFFFFF';
-const SECONDARY = '#C0C0C0';
+/** Solid menu surface: #1C1C1E on the default Monochrome theme
+ *  (BRANDTHREAD_DESIGN: inputs and sheets #1C1C1E), the theme's own card
+ *  colour on the other Appearance themes. */
+export function menuSurface(theme: AppThemePreset): string {
+  return theme.id === 'monochrome' ? '#1C1C1E' : theme.cardElevated;
+}
 const PULLDOWN_WIDTH = 250;
 const ROW_HEIGHT = 44;
 const nativeDriver = Platform.OS !== 'web';
@@ -64,10 +66,11 @@ function useClosing(anim: Animated.Value, onClosed: () => void) {
 }
 
 function MenuRows({ items, onPick, compact }: { items: MenuItem[]; onPick: (item: MenuItem) => void; compact?: boolean }) {
+  const { theme } = useAppTheme();
   return (
     <>
       {items.map((item, index) => {
-        const color = item.destructive ? RED : LABEL;
+        const color = item.destructive ? theme.error : theme.text;
         return (
           <Pressable
             key={item.key ?? `${item.label}-${index}`}
@@ -79,14 +82,14 @@ function MenuRows({ items, onPick, compact }: { items: MenuItem[]; onPick: (item
             style={({ pressed }) => [
               styles.row,
               compact && styles.rowCompact,
-              index > 0 && styles.rowSeparator,
-              pressed && styles.rowPressed,
+              index > 0 && [styles.rowSeparator, { borderTopColor: theme.border }],
+              pressed && { backgroundColor: theme.card },
               item.disabled && styles.rowDisabled,
             ]}
             testID={`menu-item-${index}`}
           >
             {item.checked !== undefined ? (
-              <View style={styles.check}>{item.checked ? <Feather name="check" size={16} color={LABEL} /> : null}</View>
+              <View style={styles.check}>{item.checked ? <Feather name="check" size={16} color={theme.text} /> : null}</View>
             ) : null}
             <Text style={[styles.rowLabel, { color }]} numberOfLines={1}>{item.label}</Text>
             {item.icon ? <Feather name={item.icon} size={18} color={color} style={styles.rowIcon} /> : null}
@@ -98,6 +101,8 @@ function MenuRows({ items, onPick, compact }: { items: MenuItem[]; onPick: (item
 }
 
 function PreviewMenu({ req }: { req: ContextMenuRequest }) {
+  const { theme } = useAppTheme();
+  const surface = menuSurface(theme);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
@@ -128,7 +133,7 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={() => close()}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
         <BlurView intensity={Platform.OS === 'ios' ? 60 : 40} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, styles.previewScrim]} />
+        <View style={[StyleSheet.absoluteFill, styles.previewScrim, { backgroundColor: theme.surfaceGlass }]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={() => close()} accessibilityRole="button" accessibilityLabel="Close menu" />
       </Animated.View>
       <View pointerEvents="box-none" style={[styles.previewColumn, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
@@ -138,15 +143,15 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
             disabled={!req.onPreviewPress}
             accessibilityRole={req.onPreviewPress ? 'button' : undefined}
             accessibilityLabel={preview.title ?? undefined}
-            style={styles.previewCard}
+            style={[styles.previewCard, { backgroundColor: surface }]}
             testID="context-menu-preview"
           >
             {hasHeader ? (
               <View style={styles.previewHeader}>
-                {preview.avatarUri ? <Image source={{ uri: preview.avatarUri }} style={styles.previewAvatar} contentFit="cover" /> : null}
+                {preview.avatarUri ? <Image source={{ uri: preview.avatarUri }} style={[styles.previewAvatar, { backgroundColor: theme.card }]} contentFit="cover" /> : null}
                 <View style={styles.previewHeaderText}>
-                  {preview.title ? <Text style={styles.previewTitle} numberOfLines={1}>{preview.title}</Text> : null}
-                  {preview.subtitle ? <Text style={styles.previewSubtitle} numberOfLines={1}>{preview.subtitle}</Text> : null}
+                  {preview.title ? <Text style={[styles.previewTitle, { color: theme.text }]} numberOfLines={1}>{preview.title}</Text> : null}
+                  {preview.subtitle ? <Text style={[styles.previewSubtitle, { color: theme.muted }]} numberOfLines={1}>{preview.subtitle}</Text> : null}
                 </View>
               </View>
             ) : null}
@@ -154,10 +159,10 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
               <Image source={{ uri: preview.imageUri }} style={{ width: cardWidth, height: mediaHeight }} contentFit="cover" transition={0} />
             ) : null}
             {preview.body ? (
-              <Text style={styles.previewBody} numberOfLines={8}>{preview.body}</Text>
+              <Text style={[styles.previewBody, { color: theme.text }]} numberOfLines={8}>{preview.body}</Text>
             ) : null}
           </Pressable>
-          <ScrollView style={styles.previewList} scrollEnabled={listHeight > 360} bounces={false}>
+          <ScrollView style={[styles.previewList, { backgroundColor: surface }]} scrollEnabled={listHeight > 360} bounces={false}>
             <MenuRows items={req.items} onPick={(item) => close(item.onPress)} />
           </ScrollView>
         </Animated.View>
@@ -167,6 +172,7 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
 }
 
 function PullDown({ req }: { req: PullDownRequest }) {
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
@@ -195,12 +201,13 @@ function PullDown({ req }: { req: PullDownRequest }) {
         accessibilityRole="menu"
         style={[
           styles.pullDown,
+          { backgroundColor: menuSurface(theme), shadowColor: theme.shadowColor },
           { left: pos.left, top: pos.top, maxHeight: height * 0.6, opacity: anim, transform: [{ translateX }, { translateY }, { scale }] },
         ]}
         testID="pulldown-menu"
       >
         <ScrollView bounces={false} scrollEnabled={menuHeight > height * 0.6}>
-          {req.title ? <Text style={styles.pullDownTitle} numberOfLines={1}>{req.title}</Text> : null}
+          {req.title ? <Text style={[styles.pullDownTitle, { color: theme.muted, borderBottomColor: theme.border }]} numberOfLines={1}>{req.title}</Text> : null}
           <MenuRows items={req.items} onPick={(item) => close(item.onPress)} compact />
         </ScrollView>
       </Animated.View>
@@ -209,20 +216,19 @@ function PullDown({ req }: { req: PullDownRequest }) {
 }
 
 const styles = StyleSheet.create({
-  previewScrim: { backgroundColor: 'rgba(0,0,0,0.45)' },
+  previewScrim: {},
   previewColumn: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  previewCard: { borderRadius: 16, overflow: 'hidden', backgroundColor: SURFACE },
+  previewCard: { borderRadius: 16, overflow: 'hidden' },
   previewHeader: { flexDirection: 'row', alignItems: 'center', height: 52, paddingHorizontal: 12, gap: 10 },
-  previewAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#2C2C2E' },
+  previewAvatar: { width: 32, height: 32, borderRadius: 16 },
   previewHeaderText: { flex: 1, minWidth: 0 },
-  previewTitle: { color: LABEL, fontSize: 14, fontFamily: FONT.semibold },
-  previewSubtitle: { color: SECONDARY, fontSize: 12, fontFamily: FONT.regular, marginTop: 1 },
-  previewBody: { color: LABEL, fontSize: 15, lineHeight: 20, fontFamily: FONT.regular, padding: 14 },
-  previewList: { marginTop: 12, borderRadius: 14, backgroundColor: SURFACE, maxHeight: 360 },
+  previewTitle: { fontSize: 14, fontFamily: FONT.semibold },
+  previewSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 1 },
+  previewBody: { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular, padding: 14 },
+  previewList: { marginTop: 12, borderRadius: 14, maxHeight: 360 },
   row: { minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
   rowCompact: { minHeight: ROW_HEIGHT },
-  rowSeparator: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: SEPARATOR },
-  rowPressed: { backgroundColor: '#2C2C2E' },
+  rowSeparator: { borderTopWidth: StyleSheet.hairlineWidth },
   rowDisabled: { opacity: 0.4 },
   rowLabel: { flex: 1, fontSize: 17, fontFamily: FONT.regular },
   rowIcon: { marginLeft: 12 },
@@ -231,17 +237,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: PULLDOWN_WIDTH,
     borderRadius: 13,
-    backgroundColor: SURFACE,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOpacity: 0.5,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 8 },
     elevation: 12,
   },
   pullDownTitle: {
-    color: SECONDARY, fontSize: 13, fontFamily: FONT.regular,
+    fontSize: 13, fontFamily: FONT.regular,
     paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: SEPARATOR,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
 });

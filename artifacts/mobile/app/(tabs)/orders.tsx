@@ -28,7 +28,7 @@ import { useApi } from '@/hooks/useApi';
 import { useAuth } from '@clerk/expo';
 import { clearBadge } from '@/lib/orderBadgeStore';
 import { formatCents } from '@/lib/money';
-import SwipeActionRow from '@/components/SwipeActionRow';
+import SwipeRow from '@/components/ui/SwipeRow';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
@@ -599,13 +599,17 @@ const OrderListRow = React.memo(function OrderListRow({
     : { label: 'Open', icon: 'arrow-right' as const, run: () => actions.press(order) };
 
   return (
-    <SwipeActionRow
-      label={swipeAction.label}
-      icon={swipeAction.icon}
-      color={theme.muted}
-      onAction={swipeAction.run}
+    // Apple Mail swipe: the action sits on the right; a full swipe runs it.
+    <SwipeRow
+      rowId={order.id}
       disabled={selectionMode}
-      accessibilityLabel={`${swipeAction.label} order ${order.orderNumber}`}
+      trailing={[{
+        key: swipeAction.label.toLowerCase(),
+        label: swipeAction.label,
+        icon: swipeAction.icon,
+        onPress: swipeAction.run,
+        accessibilityLabel: `${swipeAction.label} order ${order.orderNumber}`,
+      }]}
     >
       <OrderRow
         order={order}
@@ -617,7 +621,7 @@ const OrderListRow = React.memo(function OrderListRow({
         onShip={() => actions.ship(order.id)}
         isLast={isLast}
       />
-    </SwipeActionRow>
+    </SwipeRow>
   );
 });
 

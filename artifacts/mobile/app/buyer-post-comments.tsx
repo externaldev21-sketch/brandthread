@@ -561,7 +561,13 @@ export default function BuyerPostCommentsScreen() {
     const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
-  const sheetBaseHeight = windowHeight * 0.65;
+  // Half / full detents (Instagram comments, Apple Maps): opens at half,
+  // drag the grabber up for full, down from full back to half, down from
+  // half to dismiss.
+  const [expanded, setExpanded] = useState(false);
+  const expandedRef = useRef(false);
+  expandedRef.current = expanded;
+  const sheetBaseHeight = windowHeight * (expanded ? 0.92 : 0.65);
   const sheetMaxHeight = windowHeight * 0.92;
   const sheetHeight = Math.min(sheetBaseHeight + keyboardHeight, sheetMaxHeight);
 
@@ -601,12 +607,18 @@ export default function BuyerPostCommentsScreen() {
   const DISMISS_THRESHOLD = 120;
   const dragResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_evt, gesture) => gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onMoveShouldSetPanResponder: (_evt, gesture) => Math.abs(gesture.dy) > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
       onPanResponderMove: (_evt, gesture) => {
         if (gesture.dy > 0) dragY.setValue(gesture.dy);
       },
       onPanResponderRelease: (_evt, gesture) => {
-        if (gesture.dy > DISMISS_THRESHOLD || gesture.vy > 1.2) {
+        if (!expandedRef.current && (gesture.dy < -40 || gesture.vy < -0.8)) {
+          setExpanded(true);
+          Animated.spring(dragY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
+        } else if (expandedRef.current && (gesture.dy > 60 || gesture.vy > 0.8)) {
+          setExpanded(false);
+          Animated.spring(dragY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
+        } else if (gesture.dy > DISMISS_THRESHOLD || gesture.vy > 1.2) {
           Animated.timing(dragY, { toValue: windowHeight, duration: 180, useNativeDriver: true }).start(() => goBackOr(router));
         } else {
           Animated.spring(dragY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
