@@ -30,6 +30,8 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
+import { StoreLinkCard } from '@/components/StoreLinkCard';
+import { useStoreLink } from '@/hooks/useStoreLink';
 
 import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
@@ -248,6 +250,8 @@ export default function AddProductScreen() {
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
+  // The store link handed out in the publish sheet (Copy / Share).
+  const storeLink = useStoreLink();
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
   const [sizeChartUploadStatus, setSizeChartUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
@@ -2205,7 +2209,13 @@ export default function AddProductScreen() {
         }}
         secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
         testID="add-product-success-sheet"
-      />
+      >
+        {/* A newly published product: hand the seller their store link to
+            share right away (Copy / Share open the system share sheet). */}
+        {publishSuccess?.kind === 'created' && currentStatus === 'active' ? (
+          <StoreLinkCard link={storeLink} compact testID="add-product-store-link" />
+        ) : null}
+      </SuccessSheet>
 
       {cropTargetId && (() => {
         const cropItem = (draftData.media ?? []).find(m => m.id === cropTargetId);

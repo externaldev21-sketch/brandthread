@@ -32,11 +32,13 @@ export interface SuccessSheetProps {
   subtitle?: string;
   primaryAction: SuccessSheetAction;
   secondaryAction?: SuccessSheetAction;
+  /** Optional content between the subtitle and the actions (e.g. the store link after a publish). */
+  children?: React.ReactNode;
   testID?: string;
 }
 
 export function SuccessSheet({
-  visible, onClose, title, subtitle, primaryAction, secondaryAction, testID,
+  visible, onClose, title, subtitle, primaryAction, secondaryAction, children, testID,
 }: SuccessSheetProps) {
   const { theme } = useAppTheme();
   return (
@@ -47,6 +49,7 @@ export function SuccessSheet({
         {subtitle ? (
           <Text style={[TYPE_SCALE.body, styles.subtitle, { color: theme.muted }]}>{subtitle}</Text>
         ) : null}
+        {children ? <View style={styles.extra}>{children}</View> : null}
         <View style={styles.actions}>
           <Button
             label={primaryAction.label}
@@ -73,6 +76,7 @@ const styles = StyleSheet.create({
   content: { alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.sm, gap: SPACING.xs },
   title: { textAlign: 'center', marginTop: SPACING.md },
   subtitle: { textAlign: 'center' },
+  extra: { width: '100%', marginTop: SPACING.md },
   actions: { width: '100%', marginTop: SPACING.md, gap: SPACING.sm },
   secondaryBtn: { marginTop: 0 },
 });
