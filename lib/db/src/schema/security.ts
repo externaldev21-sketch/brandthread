@@ -50,6 +50,24 @@ export const onboardingAiSamples = pgTable("onboarding_ai_samples", {
 }));
 
 /**
+ * Person/device claims for the onboarding AI sample (migration 270). Keys are
+ * salted SHA-256 hashes of a normalized email, an install device id, or a
+ * per-day IP slot, so a new account on the same device or inbox can't take a
+ * second free generation.
+ */
+export const onboardingAiSampleClaims = pgTable("onboarding_ai_sample_claims", {
+  claimKey: text("claim_key").primaryKey(),
+  kind: text("kind").notNull(),
+  accountId: text("account_id").notNull(),
+  reservationId: text("reservation_id").notNull(),
+  status: text("status").notNull().default("reserved"),
+  reservedAt: timestamp("reserved_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => ({
+  reservationIdx: index("onboarding_ai_sample_claims_reservation_idx").on(table.reservationId),
+}));
+
+/**
  * Provenance registry: one row per AI-generated image returned to a user
  * (SHA-256 of the bytes). Lets saved assets and posts be labelled
  * `ai_generated` by lookup. Written by the api-server AI safety guard.
