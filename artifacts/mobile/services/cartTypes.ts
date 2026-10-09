@@ -368,6 +368,9 @@ export interface BuyerProblemReport {
   escalatedToSupport: boolean;
   status: 'open' | 'under_review' | 'resolved' | 'closed';
   submittedAt: string;
+  /** Support ticket id once the report reached the server; absent while it
+   *  exists only in the on-device cache (preview/demo, or a failed send). */
+  serverTicketId?: string;
 }
 
 export type BuyerDisputeStatus = 'open' | 'evidence_requested' | 'under_review' | 'resolved' | 'closed';

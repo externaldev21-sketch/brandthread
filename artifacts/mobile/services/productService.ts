@@ -15,7 +15,11 @@ import {
 } from '@/services/productTypes';
 import { calcTotalInventory } from '@/lib/productUtils';
 import { centsAtBasisPoints } from '@/lib/money';
-import { serviceRequest } from '@/lib/serviceConfig';
+import { hasServiceToken, serviceRequest, serviceUploadProductImage } from '@/lib/serviceConfig';
+import {
+  collectLocalImageUris, draftFromServer, mergeDrafts, timeOf, withRemoteImageUris,
+  type DraftSyncMetaMap, type ServerDraftRow,
+} from '@/lib/productDraftSync';
 
 // ─── Demo preview overlay (?bt_preview=seller&demo=1) ─────────────────────────
 // A real account's store always starts empty (see header comment above) —
@@ -32,9 +36,14 @@ import { serviceRequest } from '@/lib/serviceConfig';
 // so `vi.mock` can still substitute them in tests that do exercise demo mode.
 let _previewProducts: Product[] | null = null;
 
+let _devPreviewModule: Promise<typeof import('@/lib/devPreview')> | null = null;
+
 async function demoActive(): Promise<boolean> {
   try {
-    const { isPreviewDemoMode } = await import('@/lib/devPreview');
+    // One shared import: draft sync can ask from a background push and a
+    // list at the same moment.
+    _devPreviewModule ??= import('@/lib/devPreview');
+    const { isPreviewDemoMode } = await _devPreviewModule;
     return isPreviewDemoMode();
   } catch {
     // Narrowly-scoped tests that mock only this module's own direct
@@ -526,27 +535,185 @@ export async function getCollections(): Promise<ProductCollection[]> {
 }
 
 // ─── Draft persistence ────────────────────────────────────────────────────────
+//
+// Drafts are written to AsyncStorage first (instant, offline-safe — the
+// wizard never waits on the network), then synced in the background to
+// /api/product-drafts so they follow the account to other devices. Merge
+// rules live in lib/productDraftSync.ts. Sync is skipped entirely when
+// signed out, in the demo overlay (&demo=1), and in the signed-out seller
+// preview (no token there; serviceRequest/uploads also throw 403).
 
-export async function saveDraft(draft: ProductDraft): Promise<void> {
-  try {
-    await AsyncStorage.setItem(keys().draftPrefix + draft.id, JSON.stringify({ ...draft, lastSavedAt: new Date().toISOString() }));
-  } catch { /* non-fatal */ }
+const DRAFTS_API = '/api/product-drafts';
+/** listDrafts/loadDraft never wait longer than this on the server. */
+const DRAFT_FETCH_BUDGET_MS = 4_000;
+
+function draftSyncKeys(uid = _productUserId) {
+  return {
+    meta:    `@brandthread/draftsync_${uid}`,
+    uploads: `@brandthread/draftuploads_${uid}`,
+  };
 }
 
-export async function loadDraft(id: string): Promise<ProductDraft | null> {
+async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {
-    const raw = await AsyncStorage.getItem(keys().draftPrefix + id);
-    return raw ? JSON.parse(raw) : null;
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch { return fallback; }
+}
+
+// Sync-bookkeeping read-modify-writes are serialized so overlapping syncs of
+// different drafts can't drop each other's updates.
+let _draftSyncChain: Promise<unknown> = Promise.resolve();
+function serialized(task: () => Promise<void>): Promise<void> {
+  const run = _draftSyncChain.then(task);
+  _draftSyncChain = run.catch(() => {});
+  return run.catch(() => {});
+}
+
+function updateDraftMeta(uid: string, fn: (meta: DraftSyncMetaMap) => DraftSyncMetaMap): Promise<void> {
+  return serialized(async () => {
+    const key = draftSyncKeys(uid).meta;
+    const next = fn(await readJson<DraftSyncMetaMap>(key, {}));
+    try { await AsyncStorage.setItem(key, JSON.stringify(next)); } catch { /* non-fatal */ }
+  });
+}
+
+async function draftSyncAvailable(): Promise<boolean> {
+  try {
+    if (_productUserId === 'anon') return false;
+    if (await demoActive()) return false;
+    return typeof hasServiceToken === 'function' && (await hasServiceToken());
+  } catch { return false; }
+}
+
+function withinBudget<T>(p: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error('draft sync timeout')), DRAFT_FETCH_BUDGET_MS); }),
+  ]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
+function errorStatus(err: unknown): number | undefined {
+  const s = (err as { status?: unknown } | null)?.status;
+  return typeof s === 'number' ? s : undefined;
+}
+
+function isDraftRow(r: unknown): r is ServerDraftRow {
+  const row = r as ServerDraftRow | null;
+  return !!row && typeof row.clientDraftId === 'string' && typeof row.updatedAt === 'string'
+    && !!row.data && typeof row.data === 'object' && !Array.isArray(row.data);
+}
+
+/** The server copy carried by a 409 DRAFT_STALE response, if any. */
+function serverDraftFromError(err: unknown): ServerDraftRow | null {
+  try {
+    const body = (err as { body?: unknown } | null)?.body;
+    const parsed = typeof body === 'string' ? JSON.parse(body) : null;
+    return isDraftRow(parsed?.draft) ? parsed.draft : null;
   } catch { return null; }
 }
 
-export async function deleteDraft(id: string): Promise<void> {
-  try { await AsyncStorage.removeItem(keys().draftPrefix + id); } catch { /* non-fatal */ }
+/** Uploads device-local images once (cached by local URI) through the same
+ *  pipeline Add Product publishes with, and returns the local→remote map. A
+ *  failed upload is left out: the server copy keeps the local URI and the
+ *  next save retries it. */
+async function uploadDraftImages(uid: string, draft: ProductDraft): Promise<Record<string, string>> {
+  const local = collectLocalImageUris(draft);
+  if (local.length === 0) return {};
+  const key = draftSyncKeys(uid).uploads;
+  const cache = await readJson<Record<string, string>>(key, {});
+  const missing = local.filter(u => !cache[u]);
+  if (missing.length > 0 && typeof serviceUploadProductImage === 'function') {
+    const fresh: Record<string, string> = {};
+    for (const uri of missing) {
+      if (_productUserId !== uid) break;
+      try { fresh[uri] = await serviceUploadProductImage({ uri }); } catch { /* retry on next save */ }
+    }
+    if (Object.keys(fresh).length > 0) {
+      Object.assign(cache, fresh);
+      await serialized(async () => {
+        const latest = await readJson<Record<string, string>>(key, {});
+        try { await AsyncStorage.setItem(key, JSON.stringify({ ...latest, ...fresh })); } catch { /* non-fatal */ }
+      });
+    }
+  }
+  const map: Record<string, string> = {};
+  for (const u of local) if (cache[u]) map[u] = cache[u];
+  return map;
 }
 
-export async function listDrafts(): Promise<ProductDraft[]> {
+/** Writes a winning server copy into the local cache, unless the local copy
+ *  has meanwhile become newer. Returns the cached draft, or null if skipped. */
+async function cacheServerDraft(uid: string, row: ServerDraftRow): Promise<ProductDraft | null> {
+  const key = keys(uid).draftPrefix + row.clientDraftId;
+  const current = await readJson<ProductDraft | null>(key, null);
+  if (current && timeOf(current.lastSavedAt) >= timeOf(row.updatedAt)) return null;
+  const draft = draftFromServer(row);
+  try { await AsyncStorage.setItem(key, JSON.stringify(draft)); } catch { /* non-fatal */ }
+  await updateDraftMeta(uid, m => ({ ...m, [row.clientDraftId]: { syncedAt: row.updatedAt } }));
+  return draft;
+}
+
+const _draftSyncInFlight = new Map<string, Promise<void>>();
+const _draftSyncAgain = new Set<string>();
+
+/** Pushes one local draft to the server in the background. Coalesces: saves
+ *  landing while a push for the same draft is in flight queue exactly one
+ *  follow-up push (which reads the latest local copy). */
+function syncDraftInBackground(id: string): Promise<void> {
+  const uid = _productUserId;
+  const flightKey = `${uid}:${id}`;
+  const existing = _draftSyncInFlight.get(flightKey);
+  if (existing) { _draftSyncAgain.add(flightKey); return existing; }
+  const run = (async () => {
+    try {
+      do {
+        _draftSyncAgain.delete(flightKey);
+        await pushDraft(uid, id);
+      } while (_draftSyncAgain.has(flightKey) && _productUserId === uid);
+    } catch { /* stays unsynced; retried on the next save or list */ }
+    finally { _draftSyncInFlight.delete(flightKey); }
+  })();
+  _draftSyncInFlight.set(flightKey, run);
+  return run;
+}
+
+async function pushDraft(uid: string, id: string): Promise<void> {
+  if (_productUserId !== uid || !(await draftSyncAvailable())) return;
+  const local = await readJson<ProductDraft | null>(keys(uid).draftPrefix + id, null);
+  if (!local) return;
+  const remoteFor = await uploadDraftImages(uid, local);
+  const updatedAt = local.lastSavedAt;
   try {
-    const draftPrefix = keys().draftPrefix;
+    const res = await serviceRequest<{ draft?: ServerDraftRow }>(
+      `${DRAFTS_API}/${encodeURIComponent(id)}`,
+      { method: 'PUT', body: JSON.stringify({ updatedAt, data: withRemoteImageUris(local, remoteFor) }) },
+      false,
+    );
+    const syncedAt = isDraftRow(res?.draft) ? res.draft.updatedAt : updatedAt;
+    await updateDraftMeta(uid, m => ({ ...m, [id]: { syncedAt } }));
+  } catch (err) {
+    if (errorStatus(err) !== 409) throw err;
+    // Another device saved newer work: the server copy wins locally.
+    const server = serverDraftFromError(err);
+    if (server && _productUserId === uid) await cacheServerDraft(uid, server);
+  }
+}
+
+async function deleteServerDraft(uid: string, id: string): Promise<void> {
+  if (_productUserId !== uid || !(await draftSyncAvailable())) return;
+  await serviceRequest(`${DRAFTS_API}/${encodeURIComponent(id)}`, { method: 'DELETE' }, false);
+  await updateDraftMeta(uid, m => {
+    const next = { ...m };
+    delete next[id];
+    return next;
+  });
+}
+
+async function listLocalDrafts(uid: string): Promise<ProductDraft[]> {
+  try {
+    const draftPrefix = keys(uid).draftPrefix;
     const allKeys = await AsyncStorage.getAllKeys();
     const draftKeys = allKeys.filter(k => k.startsWith(draftPrefix));
     if (draftKeys.length === 0) return [];
@@ -556,6 +723,90 @@ export async function listDrafts(): Promise<ProductDraft[]> {
       .filter((d): d is ProductDraft => d !== null)
       .sort((a, b) => b.lastSavedAt.localeCompare(a.lastSavedAt));
   } catch { return []; }
+}
+
+export async function saveDraft(draft: ProductDraft): Promise<void> {
+  try {
+    await AsyncStorage.setItem(keys().draftPrefix + draft.id, JSON.stringify({ ...draft, lastSavedAt: new Date().toISOString() }));
+  } catch { return; /* non-fatal; nothing new to sync either */ }
+  // Fire-and-forget: the wizard's autosave never waits on the network.
+  void syncDraftInBackground(draft.id);
+}
+
+export async function loadDraft(id: string): Promise<ProductDraft | null> {
+  const uid = _productUserId;
+  try {
+    const raw = await AsyncStorage.getItem(keys(uid).draftPrefix + id);
+    if (raw) return JSON.parse(raw);
+  } catch { /* fall through to the server copy */ }
+  // Only new-product wizard ids (draft_…) can be server-only; a product id
+  // (Edit product) must not pay a network round-trip before its form loads.
+  if (!id.startsWith('draft_') || !(await draftSyncAvailable())) return null;
+  try {
+    const meta = await readJson<DraftSyncMetaMap>(draftSyncKeys(uid).meta, {});
+    if (meta[id]?.deleted) return null;
+    const res = await withinBudget(serviceRequest<{ draft?: ServerDraftRow }>(`${DRAFTS_API}/${encodeURIComponent(id)}`, {}, false));
+    if (!isDraftRow(res?.draft) || _productUserId !== uid) return null;
+    return (await cacheServerDraft(uid, res.draft)) ?? draftFromServer(res.draft);
+  } catch { return null; }
+}
+
+export async function deleteDraft(id: string): Promise<void> {
+  const uid = _productUserId;
+  try { await AsyncStorage.removeItem(keys(uid).draftPrefix + id); } catch { /* non-fatal */ }
+  if (!(await draftSyncAvailable())) return;
+  // Tombstone first so an offline discard can't come back from the server on
+  // the next list; cleared once the server delete is confirmed. The server
+  // call itself is not awaited — publish/discard never wait on the network.
+  await updateDraftMeta(uid, m => ({ ...m, [id]: { deleted: true } }));
+  // Let an in-flight autosave push land first, so it can't re-create the
+  // server row after the delete (its follow-up finds no local copy and stops).
+  const inFlight = _draftSyncInFlight.get(`${uid}:${id}`);
+  void (async () => {
+    if (inFlight) await inFlight.catch(() => {});
+    await deleteServerDraft(uid, id);
+  })().catch(() => {});
+}
+
+export async function listDrafts(): Promise<ProductDraft[]> {
+  const uid = _productUserId;
+  const local = await listLocalDrafts(uid);
+  if (!(await draftSyncAvailable())) return local;
+
+  let rows: ServerDraftRow[];
+  try {
+    const res = await withinBudget(serviceRequest<{ drafts?: unknown[] }>(DRAFTS_API, {}, false));
+    if (!Array.isArray(res?.drafts)) return local;
+    rows = res.drafts.filter(isDraftRow);
+  } catch { return local; }
+  if (_productUserId !== uid) return [];
+
+  try {
+    const meta = await readJson<DraftSyncMetaMap>(draftSyncKeys(uid).meta, {});
+    const merged = mergeDrafts(local, rows, meta);
+    const prefix = keys(uid).draftPrefix;
+    if (merged.cacheWrites.length > 0) {
+      await AsyncStorage.multiSet(merged.cacheWrites.map(d => [prefix + d.id, JSON.stringify(d)] as [string, string]));
+    }
+    if (merged.localDeletes.length > 0) {
+      await AsyncStorage.multiRemove(merged.localDeletes.map(id => prefix + id));
+    }
+    // Apply only what this merge decided, leaving entries other syncs wrote
+    // since we read `meta` alone.
+    await updateDraftMeta(uid, current => {
+      const next = { ...current };
+      for (const id of new Set([...Object.keys(meta), ...Object.keys(merged.meta)])) {
+        const unchanged = JSON.stringify(current[id]) === JSON.stringify(meta[id]);
+        if (!unchanged) continue;
+        if (merged.meta[id]) next[id] = merged.meta[id];
+        else delete next[id];
+      }
+      return next;
+    });
+    for (const id of merged.pushIds) void syncDraftInBackground(id);
+    for (const id of merged.retryDeleteIds) void deleteServerDraft(uid, id).catch(() => {});
+    return merged.drafts;
+  } catch { return local; }
 }
 
 // ─── Taggable products (for content system) ───────────────────────────────────

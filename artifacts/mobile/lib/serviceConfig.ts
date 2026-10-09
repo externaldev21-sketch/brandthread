@@ -12,7 +12,7 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
-import { storeContextHeaders, versionApiPath } from '@/lib/api';
+import { createApi, storeContextHeaders, versionApiPath } from '@/lib/api';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import { isSellerDevPreview } from '@/lib/devPreview';
 
@@ -88,6 +88,29 @@ export async function hasServiceToken(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+let _uploadApi: ReturnType<typeof createApi> | null = null;
+
+/**
+ * Upload one product photo through the same pipeline Add Product uses
+ * (api.products.uploadImage → POST /api/products/images) for services that
+ * have no React hook context — e.g. background draft sync. Resolves to the
+ * stored object path/URL. Throws in the signed-out seller preview, like
+ * every other protected call.
+ */
+export async function serviceUploadProductImage(image: { uri: string; mimeType?: string | null }): Promise<string> {
+  if (isSellerDevPreview()) {
+    throw new ApiError(403, JSON.stringify({
+      error: { message: 'This action is unavailable in the signed-out seller preview.', code: 'dev_preview_offline' },
+    }));
+  }
+  await whenConfigured();
+  _uploadApi ??= createApi(() => _getToken!());
+  const uploaded = await _uploadApi.products.uploadImage(image) as { objectPath?: string; url?: string } | null;
+  const remote = uploaded?.objectPath || uploaded?.url;
+  if (!remote) throw new Error('Upload returned no image path');
+  return remote;
 }
 
 /**
