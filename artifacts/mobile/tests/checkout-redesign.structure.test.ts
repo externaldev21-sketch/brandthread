@@ -153,10 +153,12 @@ describe('checkout screen structure', () => {
       'controller.confirmCard(',
       'controller.confirmSaved(',
       'choosePaymentPath(',
-      // hosted fallback, unchanged
+      // hosted fallback: an auth session that closes on the brandthread://
+      // return, verified with Stripe before "cancelled" is ever shown (BT-251)
       'api.buyer.checkout.createSession(',
       'api.guest.checkout.createSession(',
-      'WebBrowser.openBrowserAsync(result.url)',
+      'WebBrowser.openAuthSessionAsync(result.url, currentCheckoutReturnUrls().redirectUrl)',
+      'hostedCheckoutVerdict(',
       'api.buyer.checkout.verifySession(',
       'api.guest.checkout.verifySession(',
       'validateCart(',

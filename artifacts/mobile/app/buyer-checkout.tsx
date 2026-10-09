@@ -44,6 +44,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@clerk/expo';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { currentCheckoutReturnUrls, hostedCheckoutVerdict } from '@/lib/checkoutReturn';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useCheckoutThreadCash } from '@/hooks/useCheckoutThreadCash';
@@ -759,26 +760,43 @@ export default function BuyerCheckoutScreen() {
         };
         await persist({ ...current, paidGroups });
 
-        const browser = await WebBrowser.openBrowserAsync(result.url);
-        if (browser.type === 'cancel' || browser.type === 'dismiss') {
-          showError({ title: 'Payment cancelled', message: 'You closed secure checkout before paying. Your order is still saved — place it again whenever you’re ready.' });
-          setPlacing(false);
-          return;
-        }
+        // An auth session closes itself on Stripe's redirect back to the
+        // app, so a multi-store cart moves straight on to the next store.
+        const browser = await WebBrowser.openAuthSessionAsync(result.url, currentCheckoutReturnUrls().redirectUrl);
+        const returnedUrl = browser.type === 'success' ? browser.url : null;
 
+        // Closing the page is not proof the buyer didn't pay (Done on
+        // Stripe's success page reads as a cancel), so ask Stripe first.
         // Verify with retries — webhook may be slightly behind.
         let verification: any;
-        for (let attempt = 0; attempt < 6; attempt++) {
+        const attempts = browser.type === 'success' && !/[?&]cancelled=1/.test(returnedUrl ?? '') ? 6 : 2;
+        for (let attempt = 0; attempt < attempts; attempt++) {
           if (isSignedIn) {
             verification = await api.buyer.checkout.verifySession(result.sessionId);
           } else {
             verification = await api.guest.checkout.verifySession(result.sessionId, result.guestAccessToken);
           }
           if (verification.orderId || verification.paymentStatus === 'paid') break;
-          await wait(2000);
+          if (attempt < attempts - 1) await wait(2000);
         }
 
-        if (verification?.paymentStatus !== 'paid') {
+        const verdict = hostedCheckoutVerdict({
+          browserType: browser.type,
+          returnedUrl,
+          paymentStatus: verification?.paymentStatus,
+          orderId: verification?.orderId,
+          declineReason: verification?.declineReason,
+        });
+
+        if (verdict === 'cancelled') {
+          setVerifiedOrders(confirmed);
+          showError({ title: 'Payment cancelled', message: 'You closed secure checkout before paying. Your order is still saved — place it again whenever you’re ready.' });
+          setPlacing(false);
+          return;
+        }
+
+        if (verdict !== 'paid') {
+          setVerifiedOrders(confirmed);
           showError({
             title: verification?.declineReason ? 'Payment declined' : 'Payment not confirmed yet',
             message: verification?.declineReason
