@@ -21,6 +21,7 @@
 import { Router } from "express";
 import { db, teamMembers, teamActivityLogs, users } from "@workspace/db";
 import { eq, and, ne, or, asc, desc, gt, inArray, sql } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   teamContext,
@@ -478,14 +479,20 @@ router.get("/members", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const viewerIsOwner = (((req as any).actorRole as string) ?? "owner") === "owner";
 
-  const rows = await db
+  // Opt-in ?limit=&offset= over the member rows; the virtual owner row is
+  // always prepended on the first page. No params = same array, capped.
+  const page = parseListPage(req.query, { defaultLimit: 200, maxLimit: 200 });
+  const fetched = await db
     .select()
     .from(teamMembers)
     .where(and(eq(teamMembers.ownerId, ownerId), ne(teamMembers.status, "removed")))
-    .orderBy(desc(teamMembers.createdAt));
+    .orderBy(desc(teamMembers.createdAt), desc(teamMembers.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  const rows = finishListPage(res, page, fetched);
 
-  const owner = await ownerRow(ownerId, viewerIsOwner);
-  res.json([owner, ...rows.map((m) => decorateMember(m, viewerIsOwner))]);
+  const members = rows.map((m) => decorateMember(m, viewerIsOwner));
+  res.json(page.offset === 0 ? [await ownerRow(ownerId, viewerIsOwner), ...members] : members);
 });
 
 // GET /api/team/members/:id — one member + recent activity ('owner' = virtual row)

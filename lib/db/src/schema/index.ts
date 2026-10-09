@@ -36,10 +36,12 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   clerkId: text('clerk_id').notNull().unique(),
   // Case-insensitive uniqueness (one email = one account, 'A@x.com' and
-  // 'a@x.com' can't both exist) is enforced by a UNIQUE INDEX on
-  // lower(email) — migration 109 — not by this .unique(), which Drizzle's
-  // DSL can't express as case-insensitive. Always compare/store lowercased.
-  email: text('email').notNull().unique(),
+  // 'a@x.com' can't both exist) is enforced by the users_email_ci_unique
+  // UNIQUE INDEX on lower(email) declared below (migration 109). There is
+  // deliberately no case-sensitive .unique() here: routes key their 409
+  // handling off the users_email_ci_unique name, and a second, case-sensitive
+  // constraint would win the race for exact duplicates. Always compare/store lowercased.
+  email: text('email').notNull(),
   name: text('name').notNull(),
   // role: 'owner' | 'admin' | 'member' (seller side) | 'buyer' | 'seller'
   role: text('role').notNull().default('owner'),
@@ -148,9 +150,10 @@ export const users = pgTable('users', {
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected. Case-insensitive platform-wide uniqueness
   // ('GalleryDesires' and 'gallerydesires' can't both exist) is enforced by
-  // a UNIQUE INDEX on lower(username) WHERE username IS NOT NULL —
-  // migration 109 — not by this .unique(). Always store/compare lowercased.
-  username: text('username').unique(),
+  // the users_username_ci_unique UNIQUE INDEX on lower(username) WHERE
+  // username IS NOT NULL declared below (migration 109) — never by a
+  // case-sensitive .unique(). Always store/compare lowercased.
+  username: text('username'),
   // When the @handle last changed (migration 117). Drives the 30-day change cooldown.
   usernameChangedAt: timestamp('username_changed_at', { withTimezone: true }),
   // Storefront visit counter — incremented by a public endpoint each time a buyer
@@ -216,7 +219,14 @@ export const users = pgTable('users', {
   isReviewAccount: boolean('is_review_account').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (t) => ({
+  // Migration 109 — case-insensitive uniqueness. Names must match the
+  // migration exactly (routes check violatedConstraint() against them).
+  usernameCiUnique: uniqueIndex('users_username_ci_unique')
+    .on(sql`lower(${t.username})`)
+    .where(sql`${t.username} IS NOT NULL`),
+  emailCiUnique: uniqueIndex('users_email_ci_unique').on(sql`lower(${t.email})`),
+}));
 
 // ─── Storefront Visits ─────────────────────────────────────────────────────────
 // A signed-in viewer is counted once per seller per UTC day. This makes seller
@@ -295,6 +305,15 @@ export const products = pgTable('products', {
 }, (table) => ({
   dropIdx: index('products_drop_id_idx').on(table.dropId),
   deletedIdx: index('products_deleted_at_idx').on(table.deletedAt),
+  // Migration 431: public discovery (newest active) and category browse.
+  // .desc().nullsFirst() == Postgres' plain `DESC`, so these match the SQL
+  // migration exactly and serve `ORDER BY created_at DESC`.
+  statusCreatedIdx: index('products_status_created_idx')
+    .on(table.status, table.createdAt.desc().nullsFirst())
+    .where(sql`${table.deletedAt} IS NULL`),
+  categoryStatusCreatedIdx: index('products_category_status_created_idx')
+    .on(table.category, table.status, table.createdAt.desc().nullsFirst())
+    .where(sql`${table.deletedAt} IS NULL`),
 }));
 
 // ─── Intellectual-property cases and immutable case history ───────────────────
@@ -431,7 +450,10 @@ export const drops = pgTable('drops', {
   escrowFailureReason: text('escrow_failure_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (t) => ({
+  // Migration 431: seller drop list (drops.ts GET /).
+  ownerCreatedIdx: index('drops_owner_created_idx').on(t.ownerId, t.createdAt.desc().nullsFirst()),
+}));
 
 export const dropAlertSubscriptions = pgTable('drop_alert_subscriptions', {
   id:        uuid('id').primaryKey().defaultRandom(),
@@ -551,6 +573,10 @@ export const orders = pgTable('orders', {
 }, (table) => ({
   customerIdx: index('orders_customer_id_idx').on(table.customerId),
   dropIdx: index('orders_drop_id_idx').on(table.dropId),
+  // Migration 431: buyer order history (buyer.ts GET /orders).
+  buyerCreatedIdx: index('orders_buyer_created_idx')
+    .on(table.buyerId, table.createdAt.desc().nullsFirst())
+    .where(sql`${table.buyerId} IS NOT NULL`),
 }));
 
 // ─── Order Items ──────────────────────────────────────────────────────────────
@@ -1568,6 +1594,9 @@ export const follows = pgTable('follows', {
   pk:           primaryKey({ columns: [t.followerId, t.followingId] }),
   followingIdx: index('follows_following_idx').on(t.followingId),
   createdAtIdx: index('follows_created_at_idx').on(t.createdAt),
+  // Migration 431: follower / following lists, newest first.
+  followingCreatedIdx: index('follows_following_created_idx').on(t.followingId, t.createdAt.desc().nullsFirst()),
+  followerCreatedIdx: index('follows_follower_created_idx').on(t.followerId, t.createdAt.desc().nullsFirst()),
 }));
 
 // Pending follow requests to a private account; approval moves the row into follows.

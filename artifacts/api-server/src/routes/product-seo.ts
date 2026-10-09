@@ -12,7 +12,7 @@
  */
 import { Router } from "express";
 import { db, products, productSeo, storefronts } from "@workspace/db";
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -55,6 +55,8 @@ const liveProduct = (ownerId: string) => and(
   isNull(products.deletedAt),
 );
 
+const SITEMAP_MAX_ENTRIES = 50_000;
+
 router.get("/public/:storeSlug/sitemap", rateLimit("public-read"), async (req, res): Promise<void> => {
   const sf = await publishedStore(String(req.params.storeSlug));
   if (!sf) { res.status(404).json({ error: "Store not found" }); return; }
@@ -71,7 +73,11 @@ router.get("/public/:storeSlug/sitemap", rateLimit("public-read"), async (req, r
     })
     .from(products)
     .leftJoin(productSeo, eq(productSeo.productId, products.id))
-    .where(liveProduct(sf.ownerId));
+    .where(liveProduct(sf.ownerId))
+    // The sitemap must stay complete, so this is only the sitemap protocol's
+    // own per-file ceiling (50,000 URLs), not a page size.
+    .orderBy(desc(products.updatedAt), desc(products.id))
+    .limit(SITEMAP_MAX_ENTRIES);
 
   const entries = rows
     .map((r) => {

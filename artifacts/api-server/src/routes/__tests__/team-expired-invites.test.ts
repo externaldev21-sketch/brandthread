@@ -121,7 +121,16 @@ vi.mock("@workspace/db", () => {
   };
 
   const memberQuery = (condition: unknown) => ({
-    orderBy: async () => state.members.filter((row) => matches(row, condition)),
+    // Thenable (legacy `await ...orderBy()`) that also supports the paged
+    // `.orderBy().limit(n).offset(o)` chain GET /members now uses.
+    orderBy: () => {
+      const rows = state.members.filter((row) => matches(row, condition));
+      return Object.assign(Promise.resolve(rows), {
+        limit: (n: number) => Object.assign(Promise.resolve(rows.slice(0, n)), {
+          offset: async (o: number) => rows.slice(o, o + n),
+        }),
+      });
+    },
     limit: async () => state.members.filter((row) => matches(row, condition)).slice(0, 1),
   });
 

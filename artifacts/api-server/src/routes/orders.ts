@@ -2,6 +2,7 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
 import { withItemProductIds } from "../lib/orderItemProducts";
 import { refundOrder, RefundError } from "../lib/money/refunds";
@@ -86,7 +87,12 @@ router.get("/", async (req, res) => {
   // narrow a seller's own orders down to one buyer, never expose another
   // seller's orders for that buyer.
   const buyerId = typeof req.query.buyerId === "string" && req.query.buyerId ? req.query.buyerId : null;
-  const rows = await db
+  // Opt-in ?limit=&offset=. The app calls this without params and derives
+  // seller stats (ever-sold count, to-ship tile, badge) from the whole list,
+  // so the default cap is deliberately very high — it bounds pathological
+  // stores without changing what any real seller sees today.
+  const page = parseListPage(req.query, { defaultLimit: 2000, maxLimit: 2000 });
+  const fetched = await db
     .select({
       id: orders.id,
       orderNumber: orders.orderNumber,
@@ -117,7 +123,9 @@ router.get("/", async (req, res) => {
       customerEmail: sql<string>`COALESCE(${customers.email}, ${users.email}, ${orders.guestEmail})`,
       dropName: drops.name,
       dropType: drops.type,
-      itemCount: sql<number>`count(${orderItems.id})::int`,
+      // Correlated count instead of a join + GROUP BY so the planner can walk
+      // orders_owner_created_idx and stop at the page limit.
+      itemCount: sql<number>`(SELECT count(*)::int FROM ${orderItems} WHERE ${orderItems.orderId} = ${orders.id})`,
       riskLevel: orders.riskLevel,
       riskScore: orders.riskScore,
       riskFlags: orders.riskFlags,
@@ -127,10 +135,11 @@ router.get("/", async (req, res) => {
     .leftJoin(customers, eq(orders.customerId, customers.id))
     .leftJoin(users, eq(orders.buyerId, users.clerkId))
     .leftJoin(drops, eq(orders.dropId, drops.id))
-    .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
     .where(buyerId ? and(eq(orders.ownerId, ownerId), eq(orders.buyerId, buyerId)) : eq(orders.ownerId, ownerId))
-    .groupBy(orders.id, customers.name, customers.email, drops.name, drops.type, users.displayName, users.name, users.email)
-    .orderBy(desc(orders.createdAt));
+    .orderBy(desc(orders.createdAt), desc(orders.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  const rows = finishListPage(res, page, fetched);
   // Seller-only Radar summary: one `risk` object instead of the raw columns.
   res.json(rows.map(withRiskView));
 });

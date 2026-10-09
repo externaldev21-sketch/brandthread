@@ -11,6 +11,7 @@ import {
   productVariants,
 } from "@workspace/db";
 import { eq, desc, and, notExists, isNull, sql } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole } from "../middlewares/requireRole";
 import { deliverDropBroadcast } from "../lib/dropBroadcast";
@@ -62,7 +63,9 @@ async function getBroadcastAudience(sellerId: string, dropId: string): Promise<s
 // GET /api/drops
 router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const rows = await db
+  // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+  const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
+  const fetched = await db
     .select({
       ...dropFields,
       broadcastSentAt: dropBroadcasts.sentAt,
@@ -76,8 +79,10 @@ router.get("/", async (req, res) => {
       ),
     )
     .where(eq(drops.ownerId, ownerId))
-    .orderBy(desc(drops.createdAt));
-  res.json(rows);
+    .orderBy(desc(drops.createdAt), desc(drops.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  res.json(finishListPage(res, page, fetched));
 });
 
 // POST /api/drops

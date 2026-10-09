@@ -5,6 +5,7 @@
 import { Router } from "express";
 import { db, sales, productSales, products } from "@workspace/db";
 import { and, eq, inArray, isNull, desc } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
 import { clearSalesCache } from "../lib/pricing/salesRuntime";
@@ -68,8 +69,13 @@ async function ownsAll(sellerId: string, productIds: string[]): Promise<boolean>
 router.get("/", async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
-    const rows = await db.select().from(sales).where(eq(sales.sellerId, sellerId)).orderBy(desc(sales.createdAt));
-    res.json(await withProducts(rows));
+    // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+    const page = parseListPage(req.query, { defaultLimit: 200, maxLimit: 200 });
+    const fetched = await db.select().from(sales).where(eq(sales.sellerId, sellerId))
+      .orderBy(desc(sales.createdAt), desc(sales.id))
+      .limit(page.limit + 1)
+      .offset(page.offset);
+    res.json(await withProducts(finishListPage(res, page, fetched)));
   } catch (err) {
     req.log.error({ err }, "Failed to list sales");
     res.status(500).json({ error: "Internal server error" });

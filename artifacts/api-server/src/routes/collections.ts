@@ -9,6 +9,7 @@
 import { Router } from "express";
 import { db, savedCollections, savedItems } from "@workspace/db";
 import { eq, and, asc, desc, inArray, sql } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireAuth } from "../middlewares/requireAuth";
 import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
@@ -58,10 +59,14 @@ async function withCovers(userId: string, rows: (typeof savedCollections.$inferS
 
 router.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const rows = await db.select().from(savedCollections)
+  // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+  const page = parseListPage(req.query, { defaultLimit: 200, maxLimit: 200 });
+  const fetched = await db.select().from(savedCollections)
     .where(eq(savedCollections.userId, userId))
-    .orderBy(asc(savedCollections.sortOrder), asc(savedCollections.createdAt));
-  return res.json(await withCovers(userId, rows));
+    .orderBy(asc(savedCollections.sortOrder), asc(savedCollections.createdAt), asc(savedCollections.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  return res.json(await withCovers(userId, finishListPage(res, page, fetched)));
 });
 
 router.get("/:id/items", async (req, res) => {

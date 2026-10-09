@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { db, returns, orders, orderItems, users } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireAuth } from "../middlewares/requireAuth";
 import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds";
 import crypto from "crypto";
@@ -294,8 +295,10 @@ router.post("/", async (req, res) => {
 router.get("/buyer", async (req, res) => {
   try {
     const clerkUserId = (req as any).clerkUserId as string;
+    // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+    const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
 
-    const rows = await db
+    const fetched = await db
       .select({
         id: returns.id,
         orderId: returns.orderId,
@@ -325,7 +328,10 @@ router.get("/buyer", async (req, res) => {
       .innerJoin(orders, eq(orders.id, returns.orderId))
       .leftJoin(users, eq(users.clerkId, returns.sellerId))
       .where(eq(returns.buyerId, clerkUserId))
-      .orderBy(sql`${returns.createdAt} DESC`);
+      .orderBy(sql`${returns.createdAt} DESC`, sql`${returns.id} DESC`)
+      .limit(page.limit + 1)
+      .offset(page.offset);
+    const rows = finishListPage(res, page, fetched);
 
     return res.json(await Promise.all(rows.map(signEvidence)));
   } catch (err: any) {
@@ -340,8 +346,10 @@ router.get("/buyer", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const clerkUserId = (req as any).clerkUserId as string;
+    // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+    const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
 
-    const rows = await db
+    const fetched = await db
       .select({
         id: returns.id,
         orderId: returns.orderId,
@@ -371,7 +379,10 @@ router.get("/", async (req, res) => {
       .innerJoin(orders, eq(orders.id, returns.orderId))
       .leftJoin(users, eq(users.clerkId, returns.buyerId))
       .where(eq(returns.sellerId, clerkUserId))
-      .orderBy(sql`${returns.createdAt} DESC`);
+      .orderBy(sql`${returns.createdAt} DESC`, sql`${returns.id} DESC`)
+      .limit(page.limit + 1)
+      .offset(page.offset);
+    const rows = finishListPage(res, page, fetched);
 
     return res.json(await Promise.all(rows.map(signEvidence)));
   } catch (err: any) {
