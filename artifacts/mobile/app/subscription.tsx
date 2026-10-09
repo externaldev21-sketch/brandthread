@@ -7,7 +7,7 @@
  *   pro     $199/mo
  *
  * All plans carry a 5% platform commission on sales.
- * New subscriptions start with a 5-day free trial (card collected upfront).
+ * New subscriptions start with a 7-day free trial (card collected upfront).
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {

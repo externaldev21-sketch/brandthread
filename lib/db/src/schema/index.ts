@@ -85,6 +85,9 @@ export const users = pgTable('users', {
   subscriptionTrialStartedAt: timestamp('subscription_trial_started_at', { withTimezone: true }),
   subscriptionTrialEndsAt:    timestamp('subscription_trial_ends_at', { withTimezone: true }),
   subscriptionTrialBannerDismissedTrialEnd: text('subscription_trial_banner_dismissed_trial_end'),
+  // When the Stripe subscription went past_due; the plan's grace period
+  // (PAST_DUE_GRACE_DAYS) runs from here. NULL when not past_due.
+  subscriptionPastDueSince: timestamp('subscription_past_due_since', { withTimezone: true }),
   // Buyer-only "Watching Threads" gesture coach mark on the feed. Stores the
   // FEED_GESTURES_TIP_VERSION the user has already seen (0 = never shown).
   // Bumping the client-side version constant shows the tip one more time per

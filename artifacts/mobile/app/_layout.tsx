@@ -1503,6 +1503,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
         <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="checkout-return"       options={{ headerShown: false, animation: 'none' }} />
         {/*
           slide_from_bottom (not 'none'): Buy now from the Shop sheet needs a
           full-screen cover that slides up over BOTH the feed and the sheet in

@@ -43,3 +43,16 @@ export const PLAN_IDS = Object.keys(PLAN_CATALOGUE) as SellerPlanId[];
 export function isSellerPlanId(value: unknown): value is SellerPlanId {
   return typeof value === "string" && value in PLAN_CATALOGUE;
 }
+
+/** Free trial length on every rail: Stripe web, App Store and Google Play. */
+export const SELLER_TRIAL_DAYS = 7;
+
+/**
+ * Limits for a seller with no paid access (BT-002): never subscribed,
+ * cancelled, or past_due beyond PAST_DUE_GRACE_DAYS. Paid plans use their own
+ * `limits` above. Only the first `products` live listings can be sold.
+ */
+export const FREE_TIER_LIMITS: SellerPlanLimits = { products: 5, teamSeats: 0 };
+
+/** Days a past_due Stripe subscription keeps its plan before the free limits apply. */
+export const PAST_DUE_GRACE_DAYS = 7;

@@ -32,6 +32,7 @@ import { isDefinitiveStripeRejection, stripeErrorCode } from "./stripeMoney";
 import {
   expiredReservationCheckouts, releaseStockReservation,
 } from "./stockReservation";
+import { CART_CHECKOUT_KIND } from "./cartCheckout";
 
 type StripeTransfers = Pick<Stripe, "transfers">;
 
@@ -148,24 +149,47 @@ export async function sweepTransferOrders(options: { stripe?: StripeTransfers | 
 
 type StripeIntents = Pick<Stripe, "paymentIntents">;
 
+/** Builds the cart's orders for a paid intent (routes/webhooks.ts handleCartPaymentSucceeded). */
+export type CartPaidHandler = (intent: Stripe.PaymentIntent, providerEventId: string, paidAt: Date) => Promise<void>;
+
+async function defaultCartPaidHandler(): Promise<CartPaidHandler> {
+  // Lazy: routes/webhooks.ts imports this module.
+  return (await import("../../routes/webhooks")).handleCartPaymentSucceeded;
+}
+
 /**
  * Releases stock held by checkouts whose payment never finished. The
  * PaymentIntent is cancelled first, so it can't succeed after its units went
  * back. If Stripe says it already succeeded, the units stay: the paid
- * webhook commits them.
+ * webhook commits them. A reservation that is still held past expiry on a
+ * succeeded intent means that webhook never arrived (for example the
+ * endpoint was missing payment_intent.succeeded), so the sweep builds the
+ * orders itself. handleCartPaymentSucceeded is idempotent per seller group,
+ * so a late webhook afterwards changes nothing.
  */
 export async function expireStockReservations(
-  options: { stripe?: StripeIntents | null; now?: Date } = {},
+  options: { stripe?: StripeIntents | null; now?: Date; onPaid?: CartPaidHandler } = {},
 ): Promise<number> {
   const stripeClient = options.stripe === undefined ? defaultStripe : options.stripe;
   const expired = await expiredReservationCheckouts(db, options.now ?? new Date());
   let released = 0;
   const cancelled = new Set<string>();
+  const reconciled = new Set<string>();
   for (const { checkoutSessionId, paymentIntentId } of expired) {
     if (paymentIntentId && stripeClient && !cancelled.has(paymentIntentId)) {
       try {
+        if (reconciled.has(paymentIntentId)) continue;
         const intent = await stripeClient.paymentIntents.retrieve(paymentIntentId);
-        if (intent.status === "succeeded" || intent.status === "processing") continue;
+        if (intent.status === "succeeded") {
+          reconciled.add(paymentIntentId);
+          if (intent.metadata?.kind === CART_CHECKOUT_KIND) {
+            const onPaid = options.onPaid ?? await defaultCartPaidHandler();
+            logger.warn({ paymentIntentId }, "Paid cart had no orders past its reservation window; creating them from the sweep");
+            await onPaid(intent, `sweep:${paymentIntentId}`, new Date((intent.created ?? Date.now() / 1000) * 1000));
+          }
+          continue;
+        }
+        if (intent.status === "processing") continue;
         if (intent.status !== "canceled") {
           await stripeClient.paymentIntents.cancel(paymentIntentId, { cancellation_reason: "abandoned" });
         }

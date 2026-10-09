@@ -68,7 +68,7 @@ import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfi
 import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlanRecommendationStep';
 import { recommendSellerPlan } from '@/lib/sellerPlans';
 import type { SellerPlanId } from '@/lib/sellerBilling';
-import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+import { registerGrantedPushToken, requestOnboardingPushPermission } from '@/lib/contextualPushPermission';
 import {
   queueBuyerOnboardingSync,
   isRecoverableBuyerOnboardingSyncError,
@@ -2437,7 +2437,10 @@ export default function OnboardingScreen() {
       await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
       api.ai.brandMemoryRebuild().catch(() => {});
-      router.replace('/(tabs)/' as never);
+      // The paywall (trial) comes right after the store preview and plan
+      // pick; plans.tsx preselects onboarding_selected_plan and opens the
+      // dashboard after a purchase or "Not now" (BT-001).
+      router.replace('/plans?fromOnboarding=true' as never);
     } catch (error) {
       setFinishing(false);
       console.error('[seller-onboarding] save failed', {
@@ -2632,7 +2635,7 @@ export default function OnboardingScreen() {
       if (step === BUYER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="buyer"
-          onEnable={() => transitionTo(BUYER_STEP_INDEX.SUCCESS, 1)}
+          onEnable={() => { void requestOnboardingPushPermission(user?.id).finally(() => transitionTo(BUYER_STEP_INDEX.SUCCESS, 1)); }}
           onSkip={() => transitionTo(BUYER_STEP_INDEX.SUCCESS, 1)}
         />
       );
@@ -2805,7 +2808,7 @@ export default function OnboardingScreen() {
       if (step === SELLER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="seller"
-          onEnable={() => transitionTo(SELLER_STEP_INDEX.SUCCESS, 1)}
+          onEnable={() => { void requestOnboardingPushPermission(user?.id).finally(() => transitionTo(SELLER_STEP_INDEX.SUCCESS, 1)); }}
           onSkip={() => transitionTo(SELLER_STEP_INDEX.SUCCESS, 1)}
         />
       );

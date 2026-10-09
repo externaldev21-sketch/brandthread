@@ -29,3 +29,17 @@ describe('getEntitlementRejection', () => {
     expect(getEntitlementRejection(new ApiError(500, '{"error":"failed"}'))).toBeNull();
   });
 });
+describe('free-tier product limit (BT-002)', () => {
+  it('points a seller without a plan to Starter', () => {
+    const error = new ApiError(403, JSON.stringify({
+      code: 'PLAN_LIMIT_REACHED',
+      requiredPlan: 'starter',
+      message: 'Your free plan includes 5 products. Start a plan to add more.',
+    }));
+    expect(getEntitlementRejection(error)).toEqual({
+      code: 'PLAN_LIMIT_REACHED',
+      requiredPlan: 'starter',
+      message: 'Your free plan includes 5 products. Start a plan to add more.',
+    });
+  });
+});

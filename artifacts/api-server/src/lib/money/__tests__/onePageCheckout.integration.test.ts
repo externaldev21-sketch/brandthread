@@ -361,6 +361,31 @@ describe("payment_intent webhooks", () => {
   });
 });
 
+describe("paid cart whose webhook never arrived (BT-054)", () => {
+  it("the sweep builds the orders from Stripe's succeeded intent, once, and keeps the stock committed", async () => {
+    const cart = await seedCart("nowebhook");
+    const res = await call(app.base, "POST", "/api/buyer/checkout/payment-intent", cart.buyer, body(cart.groups));
+    const intent = succeeded(res.body.paymentIntentId);
+    intent.created = Math.floor(Date.now() / 1000);
+    // No payment_intent.succeeded delivery: the reservation outlives its window.
+    const later = new Date(Date.now() + 31 * 60_000);
+    await expireStockReservations({ now: later });
+    await expireStockReservations({ now: later }); // next sweep: nothing more to do
+
+    const made = await db.select().from(orders).where(eq(orders.stripePaymentIntentId, intent.id));
+    expect(made).toHaveLength(2);
+    expect(new Set(made.map((o) => o.ownerId))).toEqual(new Set([cart.sellerA, cart.sellerB]));
+    expect(fake.state.paymentIntents.get(intent.id).status).toBe("succeeded");
+    expect(await stockOf(cart.productA.variantId)).toBe(3);
+    expect(await stockOf(cart.productB.variantId)).toBe(4);
+
+    // A late webhook delivery afterwards creates nothing new.
+    await handleCartPaymentSucceeded(intent, `evt_${uid("pi")}`, new Date());
+    expect(await db.select().from(orders).where(eq(orders.stripePaymentIntentId, intent.id))).toHaveLength(2);
+    await expectLedgerBalanced();
+  });
+});
+
 describe("card data never reaches Brandthread (PCI SAQ-A)", () => {
   const cases: Array<[string, (b: Record<string, any>) => Record<string, any>]> = [
     ["a card number field", (b) => ({ ...b, cardNumber: TEST_CARD })],

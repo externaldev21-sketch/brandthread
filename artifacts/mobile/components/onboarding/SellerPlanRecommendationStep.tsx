@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS, type SellerPlanId } from '@/lib/sellerBilling';
-import { recommendSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
+import { recommendSellerPlan, SELLER_PLANS, SELLER_TRIAL_DAYS } from '@/lib/sellerPlans';
 import { FS } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 
@@ -32,7 +32,7 @@ export function SellerPlanRecommendationStep({
       <Text style={styles.reason}>{recommendation.reason}</Text>
       <Text style={styles.guidance}>This is guidance, not a gate. Pick any plan, and change it before subscribing.</Text>
       <View style={[styles.trialBadge, { borderColor: theme.accent }]}>
-        <Text style={[styles.trialBadgeText, { color: theme.accentLight }]}>5-day free trial</Text>
+        <Text style={[styles.trialBadgeText, { color: theme.accentLight }]}>{`${SELLER_TRIAL_DAYS}-day free trial`}</Text>
       </View>
 
       <View style={styles.planRow}>

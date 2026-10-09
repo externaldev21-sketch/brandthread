@@ -42,6 +42,11 @@ export function buildProductUrl(productId: string | null | undefined): string | 
   return productId && ID_RE.test(productId) ? `${SHARE_ORIGIN}/store/product/${productId}` : null;
 }
 
+/** In-app route a shared product link opens: the buyer product page (BT-253). */
+export function productLinkHref(productId: string): string {
+  return `/buyer-product-detail?productId=${encodeURIComponent(productId)}`;
+}
+
 export function buildProfileUrl(username: string | null | undefined): string | null {
   const url = buildCanonicalProfileUrl(username);
   return url ? url.replace(BRANDTHREAD_ORIGIN, SHARE_ORIGIN) : null;
@@ -109,7 +114,7 @@ export function parseShareLink(raw: string | null | undefined): ShareLinkTarget 
     return /^[a-z0-9_]{3,30}$/.test(username) ? { kind: 'profile', username, href: `/u/${q(username)}` } : null;
   }
   if (head === 'store' && a === 'product' && parts.length === 3 && ID_RE.test(b)) {
-    return { kind: 'product', id: b, href: `/product-detail?id=${q(b)}` };
+    return { kind: 'product', id: b, href: productLinkHref(b) };
   }
   if (head === 'store' && a && a !== 'product' && parts.length === 2 && HANDLE_RE.test(a)) {
     const handle = a.toLowerCase();

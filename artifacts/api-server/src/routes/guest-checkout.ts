@@ -15,6 +15,7 @@ import { mapStripeError, requireStripe } from "../lib/stripe";
 import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { productsBeyondSellerPlan, SELLER_PLAN_LIMIT_CODE, SELLER_PLAN_LIMIT_MESSAGE } from "../lib/planGate";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -173,6 +174,9 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         code: "SELLER_ON_VACATION",
         vacationUntil: vacation.until?.toISOString() ?? null,
       });
+    }
+    if ((await productsBeyondSellerPlan(sellerId, items.map((item: { productId: string }) => item.productId))).length > 0) {
+      return res.status(409).json({ error: SELLER_PLAN_LIMIT_MESSAGE, code: SELLER_PLAN_LIMIT_CODE });
     }
     if (!seller?.stripeAccountId || seller.stripeAccountStatus !== "active") {
       return res.status(400).json({ error: "Seller payment account is not active. Please try again later." });

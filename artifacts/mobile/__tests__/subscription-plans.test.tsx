@@ -280,7 +280,7 @@ describe('SellerPlanRecommendationStep', () => {
       );
     });
     const json = JSON.stringify(renderer.toJSON());
-    expect(json).toContain('5-day free trial');
+    expect(json).toContain('7-day free trial');
   });
 
   it('renders continue CTA with selected plan name', async () => {

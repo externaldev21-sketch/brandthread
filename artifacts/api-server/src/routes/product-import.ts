@@ -214,7 +214,7 @@ async function runCommit(req: express.Request, res: express.Response, source: Im
   const summary = await commitProducts({ ownerId, source, items: mapped.products, planLimit: access.limits.products, runId, log: req.log ?? logger });
   const c = summary.runCounts;
   if (summary.planLimitReached && c.created === 0 && c.updated === 0 && c.unchanged === 0) {
-    sendPlanLimitReached(res, { resource: "products", currentPlan: access.planId, requiredPlan: "growth", limit: access.limits.products! });
+    sendPlanLimitReached(res, { resource: "products", currentPlan: access.planId, paid: access.paid, requiredPlan: "growth", limit: access.limits.products! });
     return;
   }
   const rowErrors = mapped.issues.filter((i) => i.severity === "error");

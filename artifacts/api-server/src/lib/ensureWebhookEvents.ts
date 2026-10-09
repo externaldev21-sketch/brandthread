@@ -17,14 +17,21 @@ import { getWebOrigin } from "./webOrigin";
 
 /**
  * Full set of event types the /api/webhooks/stripe handler processes.
- * Keep this in sync with the switch statement in routes/webhooks.ts.
+ * Keep this in sync with the switch statement in routes/webhooks.ts
+ * (ensureWebhookEvents.test.ts fails when a handled case is missing here).
  */
-const REQUIRED_EVENTS = [
+export const REQUIRED_EVENTS = [
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
   "checkout.session.async_payment_failed",
   "checkout.session.expired",
+  // One-page in-app checkout and gift card purchases create their orders
+  // only from these (routes/checkout-intent.ts, routes/webhooks.ts).
+  "payment_intent.succeeded",
+  "payment_intent.payment_failed",
+  "payment_intent.canceled",
   "account.updated",
+  "payout.paid",
   "transfer.created",
   "transfer.updated",
   "transfer.reversed",
@@ -43,6 +50,8 @@ const REQUIRED_EVENTS = [
   "charge.dispute.closed",
   "charge.dispute.funds_withdrawn",
   "charge.dispute.funds_reinstated",
+  "review.opened",
+  "review.closed",
 ] as const;
 
 const WEBHOOK_PATH = "/api-server/api/webhooks/stripe";
