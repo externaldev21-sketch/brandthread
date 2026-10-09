@@ -3,24 +3,34 @@ import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { getEffectiveEntitlement } from "../nativeEntitlements";
 import { logger } from "../logger";
-import { LOW_CREDITS_FRACTION, creditPolicyForPlan, getSpendCaps, type AiCreditPlan } from "./catalogue";
+import { LOW_CREDITS_FRACTION, creditPolicyForPlan, getSpendCaps, trialAllowance, type AiCreditPlan } from "./catalogue";
 import { raiseSpendAlerts } from "./alerts";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const GLOBAL_SCOPE = "*";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Where a subscription is in its billing life. Only 'paid' (an invoice has
+ * been paid for the current period) earns the full monthly allowance.
+ */
+export type AiBillingState = "paid" | "trial" | "past_due";
+
+export type AiAccess = { plan: AiCreditPlan; billing: AiBillingState };
 
 export type AccountSnapshot = {
   plan: AiCreditPlan;
-  /** Pro: no balance concept. */
+  billing: AiBillingState;
+  /** Always false: no plan is unlimited. Kept for API compatibility. */
   unlimited: boolean;
   rolloverBalance: number;
   monthlyBalance: number;
   purchasedBalance: number;
-  /** Everything spendable now. 0 for unlimited accounts (callers must check `unlimited`). */
+  /** Everything spendable now. */
   balance: number;
-  /** null when unlimited. */
-  monthlyAllowance: number | null;
+  /** This month's allowance (reduced while trialing or past due). */
+  monthlyAllowance: number;
   resetsAt: string;
   /** 20% of the allowance; `balance` at or below it counts as low. */
   lowCreditsThreshold: number;
@@ -28,11 +38,15 @@ export type AccountSnapshot = {
   packsEligible: boolean;
 };
 
-export type DebitFailure = "insufficient_credits" | "global_daily_cap" | "rate_limited";
+export type DebitFailure = "insufficient_credits" | "global_daily_cap" | "rate_limited" | "billing_issue";
 
 export type DebitResult =
   | { ok: true; entryId: string; balance: number; unlimited: boolean; lowPriority: boolean }
   | { ok: false; reason: DebitFailure; balance: number };
+
+export type MeterResult =
+  | { ok: true; entryId: string }
+  | { ok: false; reason: "rate_limited" | "global_daily_cap" };
 
 export function currentPeriod(now = new Date()): string {
   return now.toISOString().slice(0, 7);
@@ -44,20 +58,40 @@ function nextPeriodStart(now = new Date()): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
 }
 
-export async function resolvePlan(clerkUserId: string): Promise<AiCreditPlan> {
+/** Stripe 'trialing' / store 'trial' are trials; Stripe 'past_due' / store 'grace' are past due. */
+export function billingStateOf(status: string | null | undefined): AiBillingState {
+  const s = (status ?? "").toLowerCase();
+  if (s === "trial" || s === "trialing") return "trial";
+  if (s === "past_due" || s === "grace") return "past_due";
+  return "paid";
+}
+
+export async function resolveAccess(clerkUserId: string): Promise<AiAccess> {
   try {
     const ent = await getEffectiveEntitlement(clerkUserId);
-    return ent.provider === "none" ? "free" : ent.planId;
+    if (ent.provider === "none") return { plan: "free", billing: "paid" };
+    return { plan: ent.planId, billing: billingStateOf(ent.status) };
   } catch (err) {
     // Entitlement lookup must never block the user; fall back to no plan.
     logger.warn({ err }, "AI credits: plan lookup failed, treating as no plan");
-    return "free";
+    return { plan: "free", billing: "paid" };
   }
+}
+
+export async function resolvePlan(clerkUserId: string): Promise<AiCreditPlan> {
+  return (await resolveAccess(clerkUserId)).plan;
 }
 
 type AccountRow = {
   rollover_balance: number; monthly_balance: number; purchased_balance: number;
-  monthly_allowance: number; monthly_period: string;
+  monthly_allowance: number; monthly_period: string; billing_issue_since: Date | string | null;
+};
+
+type LockedAccount = {
+  row: AccountRow;
+  allowance: number;
+  /** Past due beyond the grace period: AI tools are off until a payment succeeds. */
+  blocked: boolean;
 };
 
 async function ledgerRow(tx: Tx, userId: string, r: {
@@ -71,23 +105,42 @@ async function ledgerRow(tx: Tx, userId: string, r: {
 /**
  * Locks (creating if needed) the user's account row and applies the monthly
  * roll. New period: last period's rollover expires, the monthly leftover moves
- * to rollover (capped at one allowance, Starter/Growth only) and a fresh
- * allowance is granted, so rollover + monthly never exceeds 2x the allowance.
- * A mid-month upgrade tops the monthly bucket up by the difference.
- * `allowance` null (Pro) leaves the buckets untouched.
+ * to rollover (capped at one allowance, paid Starter/Growth/Pro only) and a
+ * fresh allowance is granted, so rollover + monthly never exceeds 2x the
+ * allowance. A raised allowance mid-month (upgrade, or the first paid invoice
+ * after a trial) tops the monthly bucket up by the difference.
+ *
+ * Trials and past-due subscriptions get the reduced trialAllowance(). A
+ * past-due subscription keeps it for AI_PAST_DUE_GRACE_DAYS from the first time
+ * it is seen past due, then is blocked (and earns nothing new) until paid.
  */
-async function lockAccount(tx: Tx, userId: string, plan: AiCreditPlan, now: Date): Promise<AccountRow> {
-  const policy = creditPolicyForPlan(plan);
-  const allowance = policy.monthlyAllowance;
+async function lockAccount(tx: Tx, userId: string, access: AiAccess, now: Date): Promise<LockedAccount> {
+  const policy = creditPolicyForPlan(access.plan);
   const period = currentPeriod(now);
   await tx.execute(sql`INSERT INTO ai_credit_accounts (clerk_user_id) VALUES (${userId}) ON CONFLICT DO NOTHING`);
-  const res = await tx.execute(sql`SELECT rollover_balance, monthly_balance, purchased_balance, monthly_allowance, monthly_period
+  const res = await tx.execute(sql`SELECT rollover_balance, monthly_balance, purchased_balance, monthly_allowance, monthly_period, billing_issue_since
     FROM ai_credit_accounts WHERE clerk_user_id = ${userId} FOR UPDATE`);
   let row = res.rows[0] as AccountRow;
-  if (allowance === null) return row;
+
+  let blocked = false;
+  if (access.billing === "past_due") {
+    let since = row.billing_issue_since ? new Date(row.billing_issue_since) : null;
+    if (!since) {
+      since = now;
+      await tx.execute(sql`UPDATE ai_credit_accounts SET billing_issue_since = ${now.toISOString()}::timestamptz WHERE clerk_user_id = ${userId}`);
+      row = { ...row, billing_issue_since: now };
+    }
+    blocked = now.valueOf() - since.valueOf() >= getSpendCaps().pastDueGraceDays * DAY_MS;
+  } else if (row.billing_issue_since) {
+    await tx.execute(sql`UPDATE ai_credit_accounts SET billing_issue_since = NULL WHERE clerk_user_id = ${userId}`);
+    row = { ...row, billing_issue_since: null };
+  }
+
+  const allowance = blocked ? 0 : access.billing === "paid" ? policy.monthlyAllowance : trialAllowance(access.plan);
+  const rollover = policy.rollover && access.billing === "paid";
 
   if (row.monthly_period !== period) {
-    const newRollover = policy.rollover ? Math.min(row.monthly_balance, allowance) : 0;
+    const newRollover = rollover ? Math.min(row.monthly_balance, allowance) : 0;
     let running = row.rollover_balance + row.monthly_balance + row.purchased_balance;
     if (row.rollover_balance > 0) {
       running -= row.rollover_balance;
@@ -119,107 +172,99 @@ async function lockAccount(tx: Tx, userId: string, plan: AiCreditPlan, now: Date
       monthly_allowance = ${allowance}, updated_at = NOW() WHERE clerk_user_id = ${userId}`);
     row = { ...row, monthly_balance: row.monthly_balance + topUp, monthly_allowance: allowance };
   }
-  return row;
+  return { row, allowance: Math.max(allowance, blocked ? 0 : row.monthly_allowance), blocked };
 }
 
-function snapshotOf(plan: AiCreditPlan, row: AccountRow | null, now: Date): AccountSnapshot {
-  const policy = creditPolicyForPlan(plan);
-  const allowance = policy.monthlyAllowance;
-  const unlimited = allowance === null;
-  const rollover = row?.rollover_balance ?? 0;
-  const monthly = row?.monthly_balance ?? 0;
-  const purchased = row?.purchased_balance ?? 0;
-  const balance = unlimited ? 0 : rollover + monthly + purchased;
-  const threshold = unlimited ? 0 : Math.floor((allowance ?? 0) * LOW_CREDITS_FRACTION);
+function snapshotOf(access: AiAccess, locked: LockedAccount, now: Date): AccountSnapshot {
+  const policy = creditPolicyForPlan(access.plan);
+  const { row, allowance } = locked;
+  const balance = locked.blocked ? 0 : row.rollover_balance + row.monthly_balance + row.purchased_balance;
+  const threshold = Math.floor(allowance * LOW_CREDITS_FRACTION);
   return {
-    plan, unlimited,
-    rolloverBalance: unlimited ? 0 : rollover,
-    monthlyBalance: unlimited ? 0 : monthly,
-    purchasedBalance: unlimited ? 0 : purchased,
+    plan: access.plan,
+    billing: access.billing,
+    unlimited: false,
+    rolloverBalance: locked.blocked ? 0 : row.rollover_balance,
+    monthlyBalance: locked.blocked ? 0 : row.monthly_balance,
+    purchasedBalance: locked.blocked ? 0 : row.purchased_balance,
     balance,
     monthlyAllowance: allowance,
     resetsAt: nextPeriodStart(now),
     lowCreditsThreshold: threshold,
-    isLow: !unlimited && balance <= threshold,
+    isLow: balance <= threshold,
     packsEligible: policy.packsEligible,
   };
 }
 
 export async function getAccount(clerkUserId: string, now = new Date()): Promise<AccountSnapshot> {
-  const plan = await resolvePlan(clerkUserId);
-  if (creditPolicyForPlan(plan).monthlyAllowance === null) return snapshotOf(plan, null, now);
-  const row = await db.transaction((tx) => lockAccount(tx, clerkUserId, plan, now));
-  return snapshotOf(plan, row, now);
+  const access = await resolveAccess(clerkUserId);
+  const locked = await db.transaction((tx) => lockAccount(tx, clerkUserId, access, now));
+  return snapshotOf(access, locked, now);
 }
 
-type UsageRow = { period: string; credits_used: number; day: string; generations_today: number };
+/** Per-user per-day counter row in ai_spend_daily, locked for the transaction. */
+async function lockCounter(tx: Tx, day: string, key: string): Promise<number> {
+  await tx.execute(sql`INSERT INTO ai_spend_daily (day, clerk_user_id, spent) VALUES (${day}, ${key}, 0) ON CONFLICT DO NOTHING`);
+  const row = (await tx.execute(sql`SELECT spent FROM ai_spend_daily WHERE day = ${day} AND clerk_user_id = ${key} FOR UPDATE`)).rows[0] as { spent: number };
+  return row.spent;
+}
+
+const generationCounterKey = (clerkUserId: string) => `gen:${clerkUserId}`;
+const toolCounterKey = (toolKey: string, clerkUserId: string) => `tool:${toolKey}:${clerkUserId}`;
 
 /**
- * Atomically reserves `cost` credits for one tool call.
- *  - Starter / Growth / no plan: spends rollover, then monthly, then purchased
- *    credits. There is no per-user daily cap; only the balance and the global
- *    emergency cap apply.
- *  - Pro: never blocked by balance. Usage is tracked for the hidden fair-use
- *    queue and a hidden per-day generation ceiling.
+ * Atomically reserves `cost` credits for one tool call of `units` generations
+ * (a Mockup to Model run with 3 references is 3 units).
+ *  - Spends rollover, then monthly, then purchased credits.
+ *  - A per-user daily generation ceiling counts units (tighter while trialing
+ *    or past due), and the global emergency cap counts credits.
+ *  - A past-due subscription beyond its grace period is refused.
  * Everything happens in one transaction, so concurrent requests can never
- * overspend a balance or the cap.
+ * overspend a balance, a ceiling or the cap.
  */
 export async function debitCredits(input: {
   clerkUserId: string;
   cost: number;
   toolKey: string;
+  units?: number;
   now?: Date;
 }): Promise<DebitResult> {
   const { clerkUserId, cost, toolKey } = input;
+  const units = input.units ?? 1;
   const now = input.now ?? new Date();
   if (!Number.isInteger(cost) || cost <= 0) throw new Error("AI credit cost must be a positive integer");
-  const plan = await resolvePlan(clerkUserId);
-  const unlimited = creditPolicyForPlan(plan).monthlyAllowance === null;
+  if (!Number.isInteger(units) || units <= 0) throw new Error("AI credit units must be a positive integer");
+  const access = await resolveAccess(clerkUserId);
   const caps = getSpendCaps();
   const day = currentDay(now);
-  const period = currentPeriod(now);
+  const ceiling = access.billing === "paid" ? caps.dailyGenerations : caps.trialDailyGenerations;
 
   const result = await db.transaction(async (tx): Promise<DebitResult & { globalSpent?: number }> => {
-    const acct = await lockAccount(tx, clerkUserId, plan, now);
-    const total = unlimited ? 0 : acct.rollover_balance + acct.monthly_balance + acct.purchased_balance;
+    // Fixed lock order (account -> user counter -> global counter) avoids deadlocks.
+    const { row: acct, blocked } = await lockAccount(tx, clerkUserId, access, now);
+    if (blocked) return { ok: false, reason: "billing_issue", balance: 0 };
+    const total = acct.rollover_balance + acct.monthly_balance + acct.purchased_balance;
+    if (total < cost) return { ok: false, reason: "insufficient_credits", balance: total };
 
-    let usage: UsageRow | null = null;
-    if (unlimited) {
-      await tx.execute(sql`INSERT INTO ai_pro_usage (clerk_user_id) VALUES (${clerkUserId}) ON CONFLICT DO NOTHING`);
-      usage = (await tx.execute(sql`SELECT period, credits_used, day, generations_today FROM ai_pro_usage
-        WHERE clerk_user_id = ${clerkUserId} FOR UPDATE`)).rows[0] as UsageRow;
-      if (usage.period !== period) usage = { ...usage, period, credits_used: 0 };
-      if (usage.day !== day) usage = { ...usage, day, generations_today: 0 };
-      if (usage.generations_today + 1 > caps.proDailyGenerations) return { ok: false, reason: "rate_limited", balance: 0 };
-    }
+    const genKey = generationCounterKey(clerkUserId);
+    const generationsToday = await lockCounter(tx, day, genKey);
+    if (generationsToday + units > ceiling) return { ok: false, reason: "rate_limited", balance: total };
 
-    // Fixed lock order (account -> usage -> global counter) avoids deadlocks.
-    await tx.execute(sql`INSERT INTO ai_spend_daily (day, clerk_user_id, spent) VALUES (${day}, ${GLOBAL_SCOPE}, 0) ON CONFLICT DO NOTHING`);
-    const globalRow = (await tx.execute(sql`SELECT spent FROM ai_spend_daily WHERE day = ${day} AND clerk_user_id = ${GLOBAL_SCOPE} FOR UPDATE`)).rows[0] as { spent: number };
-    if (globalRow.spent + cost > caps.globalDaily) return { ok: false, reason: "global_daily_cap", balance: total, globalSpent: globalRow.spent };
+    const globalSpent = await lockCounter(tx, day, GLOBAL_SCOPE);
+    if (globalSpent + cost > caps.globalDaily) return { ok: false, reason: "global_daily_cap", balance: total, globalSpent };
 
     const entryId = randomUUID();
-    if (unlimited) {
-      const lowPriority = usage!.credits_used >= caps.proFairUseCredits;
-      await tx.execute(sql`UPDATE ai_pro_usage SET period = ${period}, credits_used = ${usage!.credits_used + cost},
-        day = ${day}, generations_today = ${usage!.generations_today + 1}, updated_at = NOW() WHERE clerk_user_id = ${clerkUserId}`);
-      await tx.execute(sql`UPDATE ai_spend_daily SET spent = spent + ${cost} WHERE day = ${day} AND clerk_user_id = ${GLOBAL_SCOPE}`);
-      await tx.execute(sql`INSERT INTO ai_credit_ledger (id, clerk_user_id, kind, delta, tool_key, balance_after, meta)
-        VALUES (${entryId}, ${clerkUserId}, 'usage', 0, ${toolKey}, 0, ${JSON.stringify({ day, period, cost })}::jsonb)`);
-      return { ok: true, entryId, balance: 0, unlimited: true, lowPriority, globalSpent: globalRow.spent + cost };
-    }
-
-    if (total < cost) return { ok: false, reason: "insufficient_credits", balance: total };
     const fromRollover = Math.min(acct.rollover_balance, cost);
     const fromMonthly = Math.min(acct.monthly_balance, cost - fromRollover);
     const fromPurchased = cost - fromRollover - fromMonthly;
     await tx.execute(sql`UPDATE ai_credit_accounts SET rollover_balance = rollover_balance - ${fromRollover},
       monthly_balance = monthly_balance - ${fromMonthly}, purchased_balance = purchased_balance - ${fromPurchased},
       updated_at = NOW() WHERE clerk_user_id = ${clerkUserId}`);
+    await tx.execute(sql`UPDATE ai_spend_daily SET spent = spent + ${units} WHERE day = ${day} AND clerk_user_id = ${genKey}`);
     await tx.execute(sql`UPDATE ai_spend_daily SET spent = spent + ${cost} WHERE day = ${day} AND clerk_user_id = ${GLOBAL_SCOPE}`);
     await tx.execute(sql`INSERT INTO ai_credit_ledger (id, clerk_user_id, kind, delta, tool_key, rollover_delta, monthly_delta, purchased_delta, balance_after, meta)
-      VALUES (${entryId}, ${clerkUserId}, 'debit', ${-cost}, ${toolKey}, ${-fromRollover}, ${-fromMonthly}, ${-fromPurchased}, ${total - cost}, ${JSON.stringify({ day })}::jsonb)`);
-    return { ok: true, entryId, balance: total - cost, unlimited: false, lowPriority: false, globalSpent: globalRow.spent + cost };
+      VALUES (${entryId}, ${clerkUserId}, 'debit', ${-cost}, ${toolKey}, ${-fromRollover}, ${-fromMonthly}, ${-fromPurchased}, ${total - cost}, ${JSON.stringify({ day, units })}::jsonb)`);
+    return { ok: true, entryId, balance: total - cost, unlimited: false, lowPriority: false, globalSpent: globalSpent + cost };
   });
 
   if (result.ok || result.reason === "global_daily_cap") {
@@ -235,24 +280,87 @@ export async function debitCredits(input: {
   return publicResult as DebitResult;
 }
 
-/** Gives a debit back (same buckets, same spend counters). Safe to call twice. */
-export async function refundDebit(entryId: string): Promise<boolean> {
+/**
+ * Records one call of a metered tool (free to the user): counts it toward the
+ * user's daily ceiling for that tool and adds its credits-worth of provider
+ * cost to the global emergency cap. Refunded like a debit if the call fails.
+ */
+export async function meterRequest(input: {
+  clerkUserId: string;
+  toolKey: string;
+  cost: number;
+  dailyLimit: number;
+  now?: Date;
+}): Promise<MeterResult> {
+  const { clerkUserId, toolKey, cost, dailyLimit } = input;
+  const now = input.now ?? new Date();
+  const day = currentDay(now);
+  const caps = getSpendCaps();
+  const counter = toolCounterKey(toolKey, clerkUserId);
+
+  const result = await db.transaction(async (tx): Promise<MeterResult & { globalSpent?: number }> => {
+    const usedToday = await lockCounter(tx, day, counter);
+    if (usedToday + 1 > dailyLimit) return { ok: false, reason: "rate_limited" };
+    const globalSpent = await lockCounter(tx, day, GLOBAL_SCOPE);
+    if (globalSpent + cost > caps.globalDaily) return { ok: false, reason: "global_daily_cap", globalSpent };
+    const entryId = randomUUID();
+    await tx.execute(sql`UPDATE ai_spend_daily SET spent = spent + 1 WHERE day = ${day} AND clerk_user_id = ${counter}`);
+    await tx.execute(sql`UPDATE ai_spend_daily SET spent = spent + ${cost} WHERE day = ${day} AND clerk_user_id = ${GLOBAL_SCOPE}`);
+    await tx.execute(sql`INSERT INTO ai_credit_ledger (id, clerk_user_id, kind, delta, tool_key, balance_after, meta)
+      VALUES (${entryId}, ${clerkUserId}, 'metered', 0, ${toolKey}, 0, ${JSON.stringify({ day, cost, counter })}::jsonb)`);
+    return { ok: true, entryId, globalSpent: globalSpent + cost };
+  });
+
+  if (result.ok || result.reason === "global_daily_cap") {
+    void raiseSpendAlerts({
+      day,
+      clerkUserId,
+      globalSpent: result.globalSpent,
+      blocked: result.ok ? null : "global_daily_cap",
+    }).catch((err) => logger.warn({ err }, "AI spend alert failed"));
+  }
+  const { globalSpent: _g, ...publicResult } = result;
+  return publicResult as MeterResult;
+}
+
+type DebitRow = {
+  clerk_user_id: string; kind: "debit" | "usage" | "metered"; delta: number; rollover_delta: number; monthly_delta: number;
+  purchased_delta: number; tool_key: string | null;
+  meta: { day?: string; period?: string; cost?: number; units?: number; counter?: string } | null;
+};
+
+/**
+ * Gives a debit back (same buckets, same spend counters). With `units`, gives
+ * back only that many of the debit's units (the failed references of a
+ * partly successful run). A debit is refunded at most once, fully or partly.
+ */
+export async function refundDebit(entryId: string, opts: { units?: number } = {}): Promise<boolean> {
   return db.transaction(async (tx) => {
     const found = await tx.execute(sql`SELECT clerk_user_id, kind, delta, rollover_delta, monthly_delta, purchased_delta, tool_key, meta
-      FROM ai_credit_ledger WHERE id = ${entryId} AND kind IN ('debit', 'usage')`);
-    const debit = found.rows[0] as undefined | {
-      clerk_user_id: string; kind: "debit" | "usage"; delta: number; rollover_delta: number; monthly_delta: number;
-      purchased_delta: number; tool_key: string | null; meta: { day?: string; period?: string; cost?: number } | null;
-    };
+      FROM ai_credit_ledger WHERE id = ${entryId} AND kind IN ('debit', 'usage', 'metered')`);
+    const debit = found.rows[0] as DebitRow | undefined;
     if (!debit) return false;
+    const day = debit.meta?.day ?? currentDay();
+
+    if (debit.kind === "metered") {
+      const inserted = await tx.execute(sql`INSERT INTO ai_credit_ledger (clerk_user_id, kind, delta, tool_key, reference, idempotency_key)
+        VALUES (${debit.clerk_user_id}, 'metered_refund', 0, ${debit.tool_key}, ${entryId}, ${`refund:${entryId}`})
+        ON CONFLICT DO NOTHING RETURNING id`);
+      if (inserted.rows.length === 0) return false;
+      if (debit.meta?.counter) {
+        await tx.execute(sql`UPDATE ai_spend_daily SET spent = GREATEST(0, spent - 1) WHERE day = ${day} AND clerk_user_id = ${debit.meta.counter}`);
+      }
+      await tx.execute(sql`UPDATE ai_spend_daily SET spent = GREATEST(0, spent - ${debit.meta?.cost ?? 0}) WHERE day = ${day} AND clerk_user_id = ${GLOBAL_SCOPE}`);
+      return true;
+    }
 
     if (debit.kind === "usage") {
+      // Usage rows from when Pro was unlimited.
       const inserted = await tx.execute(sql`INSERT INTO ai_credit_ledger (clerk_user_id, kind, delta, tool_key, reference, idempotency_key)
         VALUES (${debit.clerk_user_id}, 'usage_refund', 0, ${debit.tool_key}, ${entryId}, ${`refund:${entryId}`})
         ON CONFLICT DO NOTHING RETURNING id`);
       if (inserted.rows.length === 0) return false;
       const cost = debit.meta?.cost ?? 0;
-      const day = debit.meta?.day ?? currentDay();
       await tx.execute(sql`UPDATE ai_pro_usage SET
           credits_used = CASE WHEN period = ${debit.meta?.period ?? currentPeriod()} THEN GREATEST(0, credits_used - ${cost}) ELSE credits_used END,
           generations_today = CASE WHEN day = ${day} THEN GREATEST(0, generations_today - 1) ELSE generations_today END,
@@ -262,21 +370,30 @@ export async function refundDebit(entryId: string): Promise<boolean> {
       return true;
     }
 
-    const inserted = await tx.execute(sql`INSERT INTO ai_credit_ledger (clerk_user_id, kind, delta, tool_key, reference, idempotency_key, rollover_delta, monthly_delta, purchased_delta)
-      VALUES (${debit.clerk_user_id}, 'refund', ${-debit.delta}, ${debit.tool_key}, ${entryId}, ${`refund:${entryId}`}, ${-debit.rollover_delta}, ${-debit.monthly_delta}, ${-debit.purchased_delta})
+    const debitUnits = debit.meta?.units ?? 1;
+    const refundUnits = Math.min(Math.max(opts.units ?? debitUnits, 0), debitUnits);
+    if (refundUnits <= 0) return false;
+    const cost = -debit.delta;
+    const amount = refundUnits === debitUnits ? cost : Math.floor((cost * refundUnits) / debitUnits);
+    // A partial refund goes back in reverse spend order: purchased, monthly, rollover.
+    let left = amount;
+    const purchased = Math.min(-debit.purchased_delta, left); left -= purchased;
+    const monthly = Math.min(-debit.monthly_delta, left); left -= monthly;
+    const rollover = Math.min(-debit.rollover_delta, left);
+
+    const inserted = await tx.execute(sql`INSERT INTO ai_credit_ledger (clerk_user_id, kind, delta, tool_key, reference, idempotency_key, rollover_delta, monthly_delta, purchased_delta, meta)
+      VALUES (${debit.clerk_user_id}, 'refund', ${amount}, ${debit.tool_key}, ${entryId}, ${`refund:${entryId}`}, ${rollover}, ${monthly}, ${purchased}, ${JSON.stringify({ units: refundUnits })}::jsonb)
       ON CONFLICT DO NOTHING RETURNING id`);
     if (inserted.rows.length === 0) return false;
     // Monthly / rollover credits from a past period have expired; only same-period refunds go back to them.
     const acct = await tx.execute(sql`SELECT monthly_period FROM ai_credit_accounts WHERE clerk_user_id = ${debit.clerk_user_id} FOR UPDATE`);
-    const samePeriod = (acct.rows[0] as { monthly_period: string } | undefined)?.monthly_period === (debit.meta?.day ?? currentDay()).slice(0, 7);
-    const rolloverBack = samePeriod ? -debit.rollover_delta : 0;
-    const monthlyBack = samePeriod ? -debit.monthly_delta : 0;
-    const purchasedBack = -debit.purchased_delta;
-    await tx.execute(sql`UPDATE ai_credit_accounts SET rollover_balance = rollover_balance + ${rolloverBack},
-      monthly_balance = monthly_balance + ${monthlyBack}, purchased_balance = purchased_balance + ${purchasedBack},
+    const samePeriod = (acct.rows[0] as { monthly_period: string } | undefined)?.monthly_period === day.slice(0, 7);
+    await tx.execute(sql`UPDATE ai_credit_accounts SET rollover_balance = rollover_balance + ${samePeriod ? rollover : 0},
+      monthly_balance = monthly_balance + ${samePeriod ? monthly : 0}, purchased_balance = purchased_balance + ${purchased},
       updated_at = NOW() WHERE clerk_user_id = ${debit.clerk_user_id}`);
-    const day = debit.meta?.day ?? currentDay();
-    await tx.execute(sql`UPDATE ai_spend_daily SET spent = GREATEST(0, spent - ${-debit.delta})
+    await tx.execute(sql`UPDATE ai_spend_daily SET spent = GREATEST(0, spent - ${refundUnits})
+      WHERE day = ${day} AND clerk_user_id = ${generationCounterKey(debit.clerk_user_id)}`);
+    await tx.execute(sql`UPDATE ai_spend_daily SET spent = GREATEST(0, spent - ${amount})
       WHERE day = ${day} AND clerk_user_id = ${GLOBAL_SCOPE}`);
     return true;
   });
@@ -290,9 +407,9 @@ export async function grantPurchasedCredits(input: {
   reference?: string;
   meta?: Record<string, unknown>;
 }): Promise<{ granted: boolean }> {
-  const plan = await resolvePlan(input.clerkUserId);
+  const access = await resolveAccess(input.clerkUserId);
   return db.transaction(async (tx) => {
-    const acct = await lockAccount(tx, input.clerkUserId, plan, new Date());
+    const { row: acct } = await lockAccount(tx, input.clerkUserId, access, new Date());
     const inserted = await tx.execute(sql`INSERT INTO ai_credit_ledger (clerk_user_id, kind, delta, reference, idempotency_key, purchased_delta, balance_after, meta)
       VALUES (${input.clerkUserId}, 'pack_purchase', ${input.credits}, ${input.reference ?? null}, ${input.idempotencyKey}, ${input.credits},
         ${acct.rollover_balance + acct.monthly_balance + acct.purchased_balance + input.credits}, ${JSON.stringify(input.meta ?? {})}::jsonb)
@@ -319,12 +436,12 @@ export type LedgerEntry = {
   id: string; kind: string; delta: number; toolKey: string | null; balanceAfter: number; createdAt: string;
 };
 
-/** Newest first. A 'rollover' row reports the credits carried over (its net effect on the total is zero). Pro usage rows are never listed. */
+/** Newest first. A 'rollover' row reports the credits carried over (its net effect on the total is zero). Usage and metered rows are never listed. */
 export async function listHistory(clerkUserId: string, opts: { limit?: number; before?: string } = {}): Promise<{ entries: LedgerEntry[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(opts.limit ?? 30, 1), 100);
   const before = opts.before && !Number.isNaN(Date.parse(opts.before)) ? opts.before : null;
   const res = await db.execute(sql`SELECT id, kind, CASE WHEN kind = 'rollover' THEN rollover_delta ELSE delta END AS delta, tool_key, balance_after, created_at FROM ai_credit_ledger
-    WHERE clerk_user_id = ${clerkUserId} AND kind NOT IN ('usage', 'usage_refund') ${before ? sql`AND created_at < ${before}` : sql``}
+    WHERE clerk_user_id = ${clerkUserId} AND kind NOT IN ('usage', 'usage_refund', 'metered', 'metered_refund') ${before ? sql`AND created_at < ${before}` : sql``}
     ORDER BY created_at DESC, id DESC LIMIT ${limit + 1}`);
   const rows = res.rows as Array<{ id: string; kind: string; delta: number; tool_key: string | null; balance_after: number; created_at: Date }>;
   const page = rows.slice(0, limit);

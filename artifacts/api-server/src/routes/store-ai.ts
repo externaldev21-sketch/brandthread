@@ -1,7 +1,8 @@
-import { Router } from "express";
-import { db, storefronts } from "@workspace/db";
+import { Router, type NextFunction, type Request, type Response } from "express";
+import { db, storefronts, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import OpenAI from "openai";
+import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { generateText } from "@workspace/integrations-openai-ai-server/text";
 
@@ -12,6 +13,69 @@ const openai = new OpenAI({
 
 const router = Router();
 router.use(requireAuth);
+
+// The store builder is a seller tool: buyers cannot spend its AI calls.
+// teamContext has already resolved clerkUserId to the store owner.
+export async function requireStoreSeller(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const ownerId = (req as any).clerkUserId as string;
+  const [account] = await db.select({ accountType: users.accountType }).from(users).where(eq(users.clerkId, ownerId)).limit(1);
+  if (account?.accountType !== "seller" && account?.accountType !== "both") {
+    res.status(403).json({ error: "Store AI is available to seller accounts.", code: "seller_only" });
+    return;
+  }
+  next();
+}
+router.use(requireStoreSeller);
+
+// ─── Input limits ─────────────────────────────────────────────────────────────
+// `answers` is pasted into the model prompt, so only the questionnaire keys the
+// app sends are kept (unknown keys, such as local photo URIs, are dropped),
+// every string is at most 500 characters and the whole object at most 4 KB.
+// Free-text fields are clamped rather than refused: the app's text boxes have
+// no length limit and an AI-drafted brand story can run past 500 characters.
+export const STORE_AI_MAX_STRING = 500;
+export const STORE_AI_MAX_ANSWERS_BYTES = 4096;
+const short = z.string().max(STORE_AI_MAX_STRING);
+const freeText = z.string().transform((s) => s.slice(0, STORE_AI_MAX_STRING));
+const list = z.array(short).max(20);
+
+export const storeAnswersSchema = z.object({
+  primaryStyle: short.nullable(),
+  secondaryStyles: list,
+  moods: list,
+  colors: z.object({
+    primary: short, secondary: short, accent: short, background: short, text: short, buttonText: short,
+  }).partial(),
+  typography: short,
+  homepagePriority: short.nullable(),
+  additionalSections: list,
+  brandStory: freeText,
+  targetCustomers: list,
+  ageRange: z.object({ min: z.number().int().min(0).max(120), max: z.number().int().min(0).max(120) }).nullable(),
+  audienceDescription: freeText,
+  existingContent: list,
+  features: list,
+  // Context sent by the social import flow.
+  screenshotCount: z.number().int().min(0).max(20),
+  postCount: z.number().int().min(0).max(100),
+  postTitles: freeText,
+}).partial();
+
+export type StoreAnswers = z.infer<typeof storeAnswersSchema>;
+
+/** Parses `answers`; null (with a 400 sent) when it is not acceptable. */
+export function parseStoreAnswers(raw: unknown, res: Response): StoreAnswers | null {
+  const parsed = storeAnswersSchema.safeParse(raw ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "answers is invalid", code: "invalid_answers" });
+    return null;
+  }
+  if (Buffer.byteLength(JSON.stringify(parsed.data), "utf8") > STORE_AI_MAX_ANSWERS_BYTES) {
+    res.status(400).json({ error: "answers is too large", code: "answers_too_large" });
+    return null;
+  }
+  return parsed.data;
+}
 
 // ─── Shared system prompt ─────────────────────────────────────────────────────
 const SYSTEM = `You are a professional Brandthread store designer. 
@@ -64,8 +128,9 @@ function parseStoreJson(raw: string): Record<string, unknown> {
 // POST /api/store/ai/generate — generate store from questionnaire answers
 router.post("/generate", async (req, res): Promise<void> => {
   const ownerId = (req as any).clerkUserId as string;
-  const { answers } = req.body;
-  if (!answers) { res.status(400).json({ error: "answers required" }); return; }
+  if (!req.body?.answers) { res.status(400).json({ error: "answers required" }); return; }
+  const answers = parseStoreAnswers(req.body.answers, res);
+  if (!answers) return;
 
   const prompt = `Generate a store configuration for a seller with these details:\n${JSON.stringify(answers, null, 2)}`;
   const raw = await generateText(SYSTEM, prompt);
@@ -91,8 +156,10 @@ router.post("/generate", async (req, res): Promise<void> => {
 
 // POST /api/store/ai/from-logo — extract palette from logo using GPT-5 vision
 router.post("/from-logo", async (req, res): Promise<void> => {
-  const { base64, answers } = req.body;
+  const { base64 } = req.body;
   if (!base64) { res.status(400).json({ error: "base64 image required" }); return; }
+  const answers = parseStoreAnswers(req.body.answers, res);
+  if (!answers) return;
 
   try {
     const response = await openai.chat.completions.create({
@@ -108,7 +175,7 @@ router.post("/from-logo", async (req, res): Promise<void> => {
             },
             {
               type: "text",
-              text: `Analyze this brand logo and generate a complete store configuration that matches its visual identity, color palette, and brand personality. Additional context: ${JSON.stringify(answers ?? {})}`,
+              text: `Analyze this brand logo and generate a complete store configuration that matches its visual identity, color palette, and brand personality. Additional context: ${JSON.stringify(answers)}`,
             },
           ] as any,
         },
@@ -124,8 +191,10 @@ router.post("/from-logo", async (req, res): Promise<void> => {
 
 // POST /api/store/ai/from-moodboard — generate from moodboard images using GPT-5 vision
 router.post("/from-moodboard", async (req, res): Promise<void> => {
-  const { base64List, answers } = req.body;
-  if (!base64List?.length) { res.status(400).json({ error: "base64List required" }); return; }
+  const { base64List } = req.body;
+  if (!Array.isArray(base64List) || !base64List.length) { res.status(400).json({ error: "base64List required" }); return; }
+  const answers = parseStoreAnswers(req.body.answers, res);
+  if (!answers) return;
 
   try {
     // Send up to 4 images to stay within token budget
@@ -144,7 +213,7 @@ router.post("/from-moodboard", async (req, res): Promise<void> => {
             ...imageContent,
             {
               type: "text" as const,
-              text: `Analyze these ${base64List.length} mood board images and generate a store configuration that captures their collective visual aesthetic, color palette, and brand mood. Additional context: ${JSON.stringify(answers ?? {})}`,
+              text: `Analyze these ${imageContent.length} mood board images and generate a store configuration that captures their collective visual aesthetic, color palette, and brand mood. Additional context: ${JSON.stringify(answers)}`,
             },
           ] as any,
         },
@@ -160,8 +229,12 @@ router.post("/from-moodboard", async (req, res): Promise<void> => {
 
 // POST /api/store/ai/from-social — generate from social media account or screenshots
 router.post("/from-social", async (req, res): Promise<void> => {
-  const { socialUrl, base64List, ...answers } = req.body;
-  if (!socialUrl) { res.status(400).json({ error: "socialUrl required" }); return; }
+  const { socialUrl: rawSocialUrl, base64List, ...context } = req.body;
+  if (!rawSocialUrl || typeof rawSocialUrl !== "string") { res.status(400).json({ error: "socialUrl required" }); return; }
+  // The post-based flow sends "brand whose posts include: <titles>" here.
+  const socialUrl = rawSocialUrl.slice(0, STORE_AI_MAX_STRING);
+  const answers = parseStoreAnswers(context, res);
+  if (!answers) return;
 
   // Vision-based analysis when screenshots are provided
   if (Array.isArray(base64List) && base64List.length > 0) {

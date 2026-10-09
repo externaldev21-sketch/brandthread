@@ -83,6 +83,27 @@ describe("store AI visual import payload limits", () => {
     expect(state.authCalls).toBe(0);
   });
 
+  it.each(["/api/store/ai/generate", "/api/v1/store/ai/generate/", "/api/Store/AI/Generate", "/api/store/ai/anything"])(
+    "limits the text-only route %s to 64 KB", async (route) => {
+      const response = await fetch(`${baseUrl}${route}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ answers: { brandStory: "x".repeat(70 * 1024) } }),
+      });
+      expect(response.status).toBe(413);
+      expect(state.clerkMiddlewareCalls).toBe(0);
+    },
+  );
+
+  it("keeps the 10 MB limit for image routes under path variants", async () => {
+    const response = await fetch(`${baseUrl}/api/store/ai/From-Logo/`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ base64: "x".repeat(200 * 1024) }),
+    });
+    expect(response.status).toBe(401);
+  });
+
   it("allows a small visual import request to continue through parsing", async () => {
     const response = await fetch(`${baseUrl}/api/store/ai/from-logo`, {
       method: "POST",

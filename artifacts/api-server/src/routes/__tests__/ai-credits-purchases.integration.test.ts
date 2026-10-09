@@ -9,6 +9,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { inArray } from "drizzle-orm";
 import { aiCreditAccounts, aiCreditLedger, aiCreditPurchases, db, revenueCatWebhookEvents } from "@workspace/db";
+import { PLAN_CREDIT_POLICY } from "../../lib/aiCredits/catalogue";
 
 const stripeState = vi.hoisted(() => ({ sessions: new Map<string, any>(), lastCreate: null as any }));
 const stripeFake = vi.hoisted(() => ({
@@ -114,11 +115,12 @@ describe("pack checkout", () => {
     expect((await call("GET", "/api/ai/credits", { user: userA })).body.packs.map((p: any) => p.credits)).toEqual([500, 1500, 5000]);
   });
 
-  it("returns an unlimited shape for Pro with no counts", async () => {
+  it("gives Pro a finite balance with tool costs, like every plan", async () => {
     const r = (await call("GET", "/api/ai/credits", { user: proUser })).body;
-    expect(r).toMatchObject({ plan: "pro", unlimited: true, balance: null, monthlyAllowance: null, isLow: false, packs: [] });
-    expect(r.tools.every((t: any) => t.cost === undefined)).toBe(true);
-    expect((await call("GET", "/api/ai/credits/history", { user: proUser })).body.entries).toEqual([]);
+    const allowance = PLAN_CREDIT_POLICY.pro.monthlyAllowance;
+    expect(r).toMatchObject({ plan: "pro", unlimited: false, balance: allowance, monthlyAllowance: allowance, isLow: false, packs: [] });
+    expect(r.tools.every((t: any) => Number.isInteger(t.cost) && t.cost > 0)).toBe(true);
+    expect((await call("GET", "/api/ai/credits/history", { user: proUser })).body.entries.map((e: any) => e.kind)).toEqual(["monthly_grant"]);
   });
 
   it("answers 503 when Stripe is not configured", async () => {

@@ -6,6 +6,13 @@ export {
   type ImageGenerationOptions,
 } from "./client";
 export {
+  DEFAULT_OPENAI_IMAGE_MODEL,
+  DEFAULT_OPENAI_IMAGE_MODEL_FALLBACKS,
+  getImageModelChain,
+  isModelUnavailableError,
+  withImageModelFallback,
+} from "./model";
+export {
   buildFashionPrompt,
   fashionPromptStandards,
   type ImageOperation,

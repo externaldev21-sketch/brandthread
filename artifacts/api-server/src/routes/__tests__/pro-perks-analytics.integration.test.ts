@@ -9,6 +9,7 @@ import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { db, orders, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { PLAN_CREDIT_POLICY } from "../../lib/aiCredits/catalogue";
 
 const suffix = crypto.randomBytes(6).toString("hex");
 const sellerId = `pro-perks-seller-${suffix}`;
@@ -92,10 +93,14 @@ describe("GET /api/seller/subscription/perks", () => {
     expect(body.currentPlan).toBe("growth");
     expect(body.hasAdvancedAnalytics).toBe(false);
     expect(body.plans).toEqual([
-      expect.objectContaining({ planId: "starter", amountCents: 2900, platformFeeBps: 500, monthlyAiCredits: 1000, advancedAnalytics: false }),
-      expect.objectContaining({ planId: "growth", amountCents: 7900, platformFeeBps: 400, monthlyAiCredits: 4000, advancedAnalytics: false }),
-      expect.objectContaining({ planId: "pro", amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true }),
+      expect.objectContaining({ planId: "starter", amountCents: 2900, advancedAnalytics: false }),
+      expect.objectContaining({ planId: "growth", amountCents: 7900, advancedAnalytics: false }),
+      expect.objectContaining({ planId: "pro", amountCents: 19900, advancedAnalytics: true }),
     ]);
+    // AI allowances come from the credit policy; no plan is unlimited.
+    for (const plan of body.plans) {
+      expect(plan).toMatchObject({ monthlyAiCredits: PLAN_CREDIT_POLICY[plan.planId as "starter"].monthlyAllowance, unlimitedAiCredits: false });
+    }
   });
 
   it("flags advanced analytics for Pro sellers", async () => {

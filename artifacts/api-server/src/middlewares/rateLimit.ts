@@ -2,6 +2,7 @@ import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { consumeRateLimitRedis } from "../lib/rateLimitStore";
+import { normalizeGatePath } from "../lib/gatePath";
 import type { Request, RequestHandler } from "express";
 
 export type RateLimitPolicyName =
@@ -222,7 +223,7 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
 };
 
 const EXPENSIVE_PATH =
-  /\/(ai|logo|mockup|photography|lifestyle|techpack|bg-removal|store\/ai|support-chat\/message)(\/|$)/;
+  /\/(ai|logo|mockup|photography|lifestyle|techpack|bg-removal|store\/ai|support-chat\/message|onboarding-sample)(\/|$)/;
 // Binary uploads are recognised by what they carry, not only by route name, so
 // a new upload endpoint is covered the day it ships.
 const UPLOAD_PATH = /\/(?:upload|upload-media|upload-photo|images\/upload|avatar\/upload|logo\/upload|banner\/upload|media)(?:\/|$)/;
@@ -270,6 +271,9 @@ export function rateLimitPolicyFor(
   authenticated: boolean,
   contentType?: string,
 ): RateLimitPolicy | null {
+  // Express matches routes case-insensitively and ignores trailing slashes,
+  // so the policy must too (`/AI/chat/` is the same handler as `/ai/chat`).
+  path = normalizeGatePath(path);
   if (WEBHOOK_PATH.test(path)) return RATE_LIMIT_POLICIES.webhook;
   if (AUTH_PATH.test(path)) return RATE_LIMIT_POLICIES.authentication;
   if (CHECKOUT_PATH.test(path)) return RATE_LIMIT_POLICIES.checkout;
