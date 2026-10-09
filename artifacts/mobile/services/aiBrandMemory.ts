@@ -6,10 +6,11 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   BrandMemory, BrandMemoryField, BrandMemorySummary, DEFAULT_BRAND_MEMORY,
 } from './aiTypes';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 
 const MEMORY_KEY = 'bt:ai:brand-memory:v1';
 
