@@ -26,7 +26,7 @@ const SECTIONS: { key: ExportSectionKey; label: string; detail: string }[] = [
   { key: 'goals', label: 'Goals', detail: 'Targets with progress and pace' },
 ];
 
-export default function AnalyticsExportScreen() {
+export default function ExportReport() {
   const colors = useColors();
   const s = React.useMemo(() => styles(colors), [colors]);
   const bottom = useReportBottomInset();

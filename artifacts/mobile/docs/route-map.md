@@ -7,7 +7,7 @@ query string is carried over). In-app links point straight at the new home;
 `tests/legacy-routes.test.ts` fails if anything links to an old path, if a
 target is missing, or if this file falls out of date.
 
-Screens in `app/` now: **353** (route files, excluding layouts and tests).
+Screens in `app/` now: **340** (route files, excluding layouts and tests).
 
 | Old route | New home | Why |
 |---|---|---|
@@ -30,3 +30,18 @@ Screens in `app/` now: **353** (route files, excluding layouts and tests).
 | `/inventory` | `/(tabs)/products?filter=low-stock` | AI help link; stock lives on the Products tab. |
 | `/shipping-rates` | `/shipping` | AI help link; rates live in Shipping & Fulfillment. |
 | `/discount-codes` | `/discounts` | AI help link; codes live in Discounts. |
+| `/analytics-product-stats` | `/analytics-reports?report=product-stats` | Reports → Product stats. |
+| `/analytics-content` | `/analytics-reports?report=content` | Reports → Threads and videos. |
+| `/analytics-audience` | `/analytics-reports?report=audience` | Reports → Audience. |
+| `/analytics-goals` | `/analytics-reports?report=goals` | Reports → Goals. |
+| `/analytics-export` | `/analytics-reports?report=export` | Reports → Export. |
+| `/analytics-advanced` | `/analytics-reports?report=advanced` | Reports → Advanced analytics (PRO). |
+| `/analytics-cohorts` | `/analytics-reports?report=cohorts` | Reports → Customer cohorts (PRO). |
+| `/analytics-sales` | `/(tabs)/analytics` | Revenue and visits are on Analytics. |
+| `/analytics-products` | `/analytics-reports?report=product-stats` | Top products by revenue are in Reports → Product stats. |
+| `/analytics-customers` | `/analytics-reports?report=cohorts` | Repeat buyers and lifetime value are in Reports → Customer cohorts. |
+| `/analytics-store` | `/(tabs)/analytics` | Store visits are on Analytics (the Dashboard traffic card links there). |
+| `/analytics-marketing` | `/(tabs)/marketing` | No backend; campaign results live in Marketing. |
+| `/analytics-production` | `/manufacturer-hub` | No backend; production lives in the Manufacturer hub. |
+| `/analytics-profit` | `/finance` | No backend; payouts and fees live in Finance. |
+| `/analytics-inventory` | `/(tabs)/products?filter=low-stock` | Removed earlier; stock lives on the Products tab. |

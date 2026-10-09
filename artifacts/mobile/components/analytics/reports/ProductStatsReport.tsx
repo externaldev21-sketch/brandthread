@@ -20,7 +20,7 @@ import { DEFAULT_INSIGHT_RANGE, getProductStats, type InsightRange } from '@/ser
 
 const pct = (v: number | null) => (v === null ? '—' : `${v}%`);
 
-export default function AnalyticsProductStatsScreen() {
+export default function ProductStatsReport() {
   const colors = useColors();
   const router = useRouter();
   const s = React.useMemo(() => styles(colors), [colors]);

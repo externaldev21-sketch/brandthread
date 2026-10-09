@@ -17,6 +17,7 @@ import { getEntitlementRejection } from '@/lib/entitlementError';
 import { monthLabel } from '@/lib/proPerks';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useReportBottomInset } from '@/components/analytics/InsightFrame';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ProLockedState } from '@/components/analytics/ProLockedState';
 import {
@@ -64,11 +65,12 @@ function dollars(cents: number): string {
   return d >= 1000 ? `$${(d / 1000).toFixed(1)}k` : `$${d.toFixed(0)}`;
 }
 
-export default function AnalyticsAdvancedScreen() {
+export default function CohortsReport() {
   const colors = useColors();
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
   const s = useMemo(() => createStyles(colors), [colors]);
+  const bottomInset = useReportBottomInset();
 
   const previewDemo = isPreviewDemoMode();
   const previewFresh = !previewDemo && isSellerDevPreview();
@@ -133,7 +135,7 @@ export default function AnalyticsAdvancedScreen() {
       ) : (
         <ScrollView
           style={s.scroll}
-          contentContainerStyle={s.content}
+          contentContainerStyle={[s.content, { paddingBottom: bottomInset }]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
         >
@@ -194,7 +196,7 @@ export default function AnalyticsAdvancedScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll: { flex: 1, backgroundColor: 'transparent' },
-  content: { paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: 120 },
+  content: { paddingHorizontal: SP.md, paddingTop: SP.md },
   statRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm, minHeight: 52, paddingHorizontal: SP.md },
   statLabel: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground },
   statValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },

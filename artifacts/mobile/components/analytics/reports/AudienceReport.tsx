@@ -37,7 +37,7 @@ function SplitCard({ title, split }: { title: string; split: SplitCounts }) {
   );
 }
 
-export default function AnalyticsAudienceScreen() {
+export default function AudienceReport() {
   const colors = useColors();
   const s = React.useMemo(() => styles(colors), [colors]);
   const [range, setRange] = useState<InsightRange>(DEFAULT_INSIGHT_RANGE);

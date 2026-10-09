@@ -55,7 +55,7 @@ function ProGate() {
   );
 }
 
-export default function AnalyticsAdvancedScreen() {
+export default function AdvancedAnalyticsReport() {
   const { isPro, checking } = useIsPro();
   if (checking) {
     return (
