@@ -989,7 +989,14 @@ export default function CartScreen() {
   }
 
   async function handleCheckoutSelected() {
-    await startCheckout(selectedItems);
+    // Same rule as "Checkout from {Seller}": a line the bag flags unavailable
+    // (sold out / removed by the seller) is never sent to checkout.
+    const available = selectedItems.filter(item => item.isAvailable);
+    if (available.length === 0 && selectedItems.length > 0) {
+      Alert.alert('Review your cart', 'The selected items are no longer available. Remove them or save them for later.', [{ text: 'OK' }]);
+      return;
+    }
+    await startCheckout(available);
   }
 
   // "Checkout from {Seller}": that seller's available lines as one payment.

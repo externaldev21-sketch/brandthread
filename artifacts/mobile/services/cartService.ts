@@ -25,6 +25,9 @@ import { formatCents } from '@/lib/money';
 import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
+import {
+  reconcileCartLoad, mergeGuestLines, createSerialSync, type CartDirtyState,
+} from './cartSync';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
@@ -42,6 +45,8 @@ function keys(uid = _cartUserId) {
     /** Baked-in user ID — compare against _cartUserId after awaits to detect account switches. */
     userId:          uid,
     cart:            `bt:cart:${uid}:v1`,
+    /** '1' while the cached bag holds edits the server hasn't accepted yet. */
+    cartDirty:       `bt:cart:${uid}:dirty:v1`,
     checkout:        `bt:checkout:${uid}:v1`,
     returns:         `bt:buyer:${uid}:returns:v1`,
     refunds:         `bt:buyer:${uid}:refunds:v1`,
@@ -172,33 +177,82 @@ export async function getBuyerProduct(productId: string): Promise<BuyerProduct |
 }
 
 // ─── DB sync ──────────────────────────────────────────────────────────────────
+//
+// Signed in, the server bag is the source of truth and AsyncStorage is its
+// cache (rules in ./cartSync.ts). Every local edit marks the bag dirty and is
+// pushed through one serialized queue per account (one request in flight, the
+// latest bag sent last). A failed push leaves the bag dirty; the next load or
+// app foreground pushes it again before the server copy is trusted.
 
-async function syncToDb(items: any[], savedItems: any[], expectedUserId: string): Promise<void> {
-  // Guard: if the account has changed since saveCart() was called, discard this
-  // sync so user A's cart payload is never POSTed using user B's Clerk token.
-  if (_cartUserId !== expectedUserId) return;
-  try {
-    await serviceRequest('/api/buyer/cart/sync', {
-      method: 'POST',
-      body: JSON.stringify({ items, savedItems }),
+type SyncPayload = { items: CartItem[]; savedItems: SavedCartItem[]; userId: string };
+
+const syncQueues = new Map<string, ReturnType<typeof createSerialSync<SyncPayload>>>();
+/** Bumped per push so only the newest push may clear the dirty flag. */
+const pushSeq = new Map<string, number>();
+
+function syncQueueFor(userId: string) {
+  let q = syncQueues.get(userId);
+  if (!q) {
+    q = createSerialSync<SyncPayload>(async ({ items, savedItems, userId: expected }) => {
+      // Guard: if the account has changed since the push was queued, discard it
+      // so user A's cart payload is never POSTed using user B's Clerk token.
+      if (_cartUserId !== expected) return;
+      await serviceRequest('/api/buyer/cart/sync', {
+        method: 'POST',
+        body: JSON.stringify({ items, savedItems }),
+      });
     });
-  } catch { /* ignore — local is source of truth */ }
+    syncQueues.set(userId, q);
+  }
+  return q;
+}
+
+async function readDirty(k: CartKeys): Promise<CartDirtyState> {
+  const v = await safeGetItem(k.cartDirty).catch(() => null);
+  return v === '1' || v === '0' ? v : null;
+}
+
+/** Push the bag to the server; resolves true once the server has it. Guests never sync. */
+async function pushCart(cart: Cart, k: CartKeys): Promise<boolean> {
+  if (k.userId === 'anon') return true;
+  const seq = (pushSeq.get(k.userId) ?? 0) + 1;
+  pushSeq.set(k.userId, seq);
+  await safeSetItem(k.cartDirty, '1');
+  const ok = await syncQueueFor(k.userId).schedule({ items: cart.items, savedItems: cart.savedItems, userId: k.userId });
+  if (ok && pushSeq.get(k.userId) === seq && _cartUserId === k.userId) {
+    await safeSetItem(k.cartDirty, '0');
+  }
+  return ok;
+}
+
+/**
+ * Retry a push that failed earlier (offline edit). Cheap no-op when the bag
+ * is clean or signed out — safe to call on every app foreground.
+ */
+export async function flushDirtyCart(): Promise<void> {
+  const k = keys();
+  if (k.userId === 'anon') return;
+  if ((await readDirty(k)) !== '1') return;
+  try {
+    const raw = await safeGetItem(k.cart);
+    if (!raw) return;
+    await pushCart(normalizeCart(JSON.parse(raw) as Cart), k);
+  } catch { /* stays dirty — retried on the next load / foreground */ }
 }
 
 // ─── Cart storage ─────────────────────────────────────────────────────────────
 
-async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; remoteConfirmed: boolean }> {
-  let cart: Cart;
+async function readLocalCart(k: CartKeys): Promise<Cart> {
   try {
     const raw = await safeGetItem(k.cart);
-    if (raw) {
-      cart = normalizeCart(JSON.parse(raw) as Cart);
-    } else {
-      cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
-    }
-  } catch {
-    cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
-  }
+    if (raw) return normalizeCart(JSON.parse(raw) as Cart);
+  } catch { /* fall through to an empty bag */ }
+  return { id: uid(), items: [], savedItems: [], updatedAt: now() };
+}
+
+async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; remoteConfirmed: boolean }> {
+  if (k.userId !== 'anon') return loadSignedInCart(k);
+  const cart = await readLocalCart(k);
 
   // A guest (never signed in — k.userId === 'anon') has no server-side cart
   // to confirm against: /api/buyer/cart requires auth and would always fail
@@ -206,28 +260,31 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
   // cold load even though an empty local guest cart is completely normal.
   // The guest cart is local-only and self-sufficient until sign-in, so treat
   // it as confirmed without ever making the network call.
-  if (k.userId === 'anon') {
-    return { cart, remoteConfirmed: true };
-  }
+  return { cart, remoteConfirmed: true };
+}
 
-  // Signed-in: attempt to load from DB and merge if DB has data.
+async function loadSignedInCart(k: CartKeys): Promise<{ cart: Cart; remoteConfirmed: boolean }> {
+  // Signed-in: the server bag (with live price/stock per line) wins unless
+  // this device holds edits the server never got (see ./cartSync.ts).
   // Uses the already-captured k so the continuation can't pick up a changed userId.
-  let remoteConfirmed = false;
+  let server: { items: unknown; savedItems: unknown } | null = null;
   try {
-    const { items, savedItems } = await serviceRequest<{ items: any[]; savedItems: any[] }>('/api/buyer/cart', {});
-    remoteConfirmed = true;
-    if (items.length > 0 || savedItems.length > 0) {
-      // DB has data — use it and update local cache.
-      // Guard: skip cache write if account switched while the request was in-flight.
-      if (_cartUserId === k.userId) {
-        cart.items = items.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents));
-        cart.savedItems = savedItems.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents));
-        await safeSetItem(k.cart, JSON.stringify(cart));
-      }
-    }
-  } catch { /* remoteConfirmed stays false — see getCartForScreen() */ }
+    server = await serviceRequest<{ items: unknown; savedItems: unknown }>('/api/buyer/cart', {});
+  } catch { /* server stays null — the cached bag is shown, unconfirmed (see getCartForScreen()) */ }
 
-  return { cart, remoteConfirmed };
+  // Read the cache and dirty flag only after the response, so an edit made
+  // while the request was in flight is seen as dirty (and kept), never
+  // overwritten by the older server copy.
+  const cart = await readLocalCart(k);
+  const dirty = await readDirty(k);
+  const decision = reconcileCartLoad({ local: cart, dirty, server });
+  // Guard: skip cache writes if the account switched while the request was in-flight.
+  if (server && _cartUserId === k.userId) {
+    await safeSetItem(k.cart, JSON.stringify(decision.cart));
+    if (decision.push) void pushCart(decision.cart, k);
+    else if (dirty === null) await safeSetItem(k.cartDirty, '0');
+  }
+  return { cart: decision.cart, remoteConfirmed: decision.remoteConfirmed };
 }
 
 async function loadCart(k: CartKeys = keys()): Promise<Cart> {
@@ -264,8 +321,11 @@ async function saveCart(cart: Cart, k: CartKeys = keys()): Promise<void> {
   // (and everything that reads it back) always succeeds from the buyer's
   // perspective, even when the browser won't actually persist it.
   await safeSetItem(k.cart, JSON.stringify(cart));
-  // Pass k.userId so syncToDb can drop the request if the account switches before it fires.
-  void syncToDb(cart.items, cart.savedItems, k.userId);
+  // Mark dirty before returning so any load that starts after this edit keeps
+  // the local bag until the server has it.
+  if (k.userId !== 'anon') await safeSetItem(k.cartDirty, '1');
+  // pushCart carries k.userId so the queued request is dropped if the account switches before it fires.
+  void pushCart(cart, k);
 }
 
 // ─── Cart operations ──────────────────────────────────────────────────────────
@@ -503,23 +563,53 @@ export async function clearCart(): Promise<void> {
   await saveCart(empty, k);
 }
 
-// Merge guest cart into authenticated cart (no duplicates)
+// Merge guest cart into authenticated cart (no duplicates — see mergeGuestLines)
 export async function mergeGuestCart(guestCart: Cart): Promise<Cart> {
   const k = keys();
-  const cart = await loadCart(k);
-  for (const guestItem of guestCart.items) {
-    const existing = cart.items.findIndex(i => i.variantId === guestItem.variantId);
-    if (existing >= 0) {
-      // Keep higher quantity, don't double-count
-      if (guestItem.quantity > cart.items[existing].quantity) {
-        cart.items[existing].quantity = guestItem.quantity;
-      }
-    } else {
-      cart.items.push(guestItem);
-    }
-  }
+  const cart = mergeGuestLines(await loadCart(k), guestCart);
   await saveCart(cart, k);
   return cart;
+}
+
+const guestAdoptions = new Map<string, Promise<void>>();
+
+/**
+ * Sign-in hand-off: fold the signed-out bag (`bt:cart:anon:v1`) into the
+ * account's bag once, push it to the server, then clear the guest bag so it
+ * is never merged twice. Runs only after the server bag was read (so the
+ * merge never overwrites lines added on another device); if the server is
+ * unreachable the guest bag is left in place and the next call retries.
+ * Idempotent and safe to call on every sign-in / foreground.
+ */
+export function adoptGuestCart(userId: string): Promise<void> {
+  if (!userId || userId === 'anon') return Promise.resolve();
+  const running = guestAdoptions.get(userId);
+  if (running) return running;
+  const run = (async () => {
+    const guestKey = keys('anon').cart;
+    const raw = await safeGetItem(guestKey);
+    if (!raw) return;
+    let guest: Cart;
+    try {
+      guest = normalizeCart(JSON.parse(raw) as Cart);
+    } catch {
+      await safeRemoveItem(guestKey);
+      return;
+    }
+    if (guest.items.length === 0 && guest.savedItems.length === 0) {
+      await safeRemoveItem(guestKey);
+      return;
+    }
+    if (_cartUserId !== userId) return;
+    const k = keys(userId);
+    const { cart, remoteConfirmed } = await loadCartWithStatus(k);
+    if (!remoteConfirmed || _cartUserId !== userId) return;
+    await saveCart(mergeGuestLines(cart, guest), k);
+    await safeRemoveItem(guestKey);
+  })().catch(() => { /* guest bag kept — retried on the next call */ })
+    .finally(() => { guestAdoptions.delete(userId); });
+  guestAdoptions.set(userId, run);
+  return run;
 }
 
 // ─── Cart grouping ────────────────────────────────────────────────────────────
