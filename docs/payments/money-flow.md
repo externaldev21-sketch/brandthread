@@ -258,6 +258,7 @@ and `reserved` = amounts in flight. The tests check this after every scenario.
 | `checkout.session.completed` / `async_payment_succeeded` | Create the order + fee split + ledger + held deposit, atomically. Oversold → automatic refund. |
 | `charge.refunded` | Manufacturer card reversal as before. For buyer orders, records refunds made **outside** Brandthread (Stripe dashboard) so the books match Stripe. |
 | `charge.dispute.*` (created, updated, closed, funds_withdrawn, funds_reinstated) | Timeline row + seller alert for each; ledger withdrawal / reversal on funds_withdrawn / funds_reinstated (§2.5). |
+| `payout.*` on a connected account (created, updated, paid, failed, canceled) | Upserts `seller_payouts` (`lib/money/sellerPayouts.ts`), ignoring events older than the stored one; reconciles the matching `seller_cashout_attempts` row; `paid` → "Payout sent" alert, first `failed` → "Payout failed" alert. The finance routes read payout status from this table (backfilled once per account from `stripe.payouts.list`). |
 | `charge.refund.updated` (status `failed`) | A refund Stripe accepted then failed: reverse its ledger entry and restore the order's refunded total. |
 | `transfer.created/updated/reversed` | Manufacturer bulk payment from held funds (+ ledger). |
 | `review.opened` / `review.closed` | No money movement. Sets the seller-only risk flags on the order (`orders.risk_*`, see `radar-rules.md`). |
@@ -392,7 +393,10 @@ stranded; *Medium* = incorrect balances or missing safety; *Low* = hygiene.
 
 **Environment**: `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` (test mode in development). The webhook
 endpoint must subscribe to the events in `lib/ensureWebhookEvents.ts` (now including
-`charge.refund.updated`).
+`charge.refund.updated`). Seller payout events happen on connected accounts, which Stripe delivers only to a
+**Connect** endpoint: create one at the same URL plus `?connect=1`, listening to `payout.created`,
+`payout.updated`, `payout.paid`, `payout.failed`, `payout.canceled` (and `account.updated`), and put its
+signing secret in `STRIPE_CONNECT_WEBHOOK_SECRET`.
 
 **Endpoints**
 

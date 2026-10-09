@@ -43,6 +43,15 @@ const REQUIRED_EVENTS = [
   "charge.dispute.closed",
   "charge.dispute.funds_withdrawn",
   "charge.dispute.funds_reinstated",
+  // Seller payouts (lib/money/sellerPayouts.ts). Stripe sends these for
+  // connected accounts only to a Connect endpoint (see
+  // STRIPE_CONNECT_WEBHOOK_SECRET in routes/webhooks.ts); on this platform
+  // endpoint they cover the platform's own payouts, which are ignored.
+  "payout.created",
+  "payout.updated",
+  "payout.paid",
+  "payout.failed",
+  "payout.canceled",
 ] as const;
 
 const WEBHOOK_PATH = "/api-server/api/webhooks/stripe";
@@ -65,7 +74,11 @@ function isBrandthreadWebhook(endpoint: Stripe.WebhookEndpoint): boolean {
   }
 
   try {
-    const path = new URL(endpoint.url).pathname;
+    const url = new URL(endpoint.url);
+    // The Connect endpoint (…/webhooks/stripe?connect=1, connected-account
+    // events, own signing secret) is configured by hand and left alone.
+    if (url.searchParams.has("connect")) return false;
+    const path = url.pathname;
     return path.endsWith(WEBHOOK_PATH) || path.endsWith(LEGACY_WEBHOOK_PATH);
   } catch {
     return false;
