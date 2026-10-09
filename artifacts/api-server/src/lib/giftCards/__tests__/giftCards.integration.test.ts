@@ -61,7 +61,7 @@ import {
 } from "../service";
 import { saveGiftCardSettings } from "../settings";
 import { confirmGiftCardPurchase, createGiftCardPurchase, handleGiftCardPaymentSucceeded } from "../purchase";
-import { payoutSellerForOrder } from "../payout";
+import { payoutSellerForOrder, purchaseFeeShareCents, sweepGiftCardPayouts } from "../payout";
 
 let app: Awaited<ReturnType<typeof startApp>>;
 
@@ -94,6 +94,20 @@ async function issue(sellerId: string, amountCents: number, ownerId: string | nu
     sellerId, amountCents, ownerId, recipientEmail: "friend@test.local", actorId: sellerId,
   }));
   return { card, code };
+}
+
+/** A card a buyer paid for (liability booked), already in `ownerId`'s wallet. */
+async function purchased(sellerId: string, amountCents: number, ownerId: string) {
+  const pending = await createPendingCard(db, {
+    sellerId, amountCents, source: "purchase", purchaserId: ownerId, ownerId, stripePaymentIntentId: `pi_${uid("gcp").replace(/-/g, "_")}`,
+  });
+  return (await db.transaction((tx) => activateCard(tx, pending.id))).card;
+}
+
+/** The order is delivered and its payout buffer has passed (hold-until-delivered). */
+async function delivered(orderId: string) {
+  const past = new Date(Date.now() - 60_000);
+  await db.update(orders).set({ status: "delivered", deliveredAt: past, payoutReleaseAt: past }).where(eq(orders.id, orderId));
 }
 
 async function balanceOf(cardId: string): Promise<number> {
@@ -426,14 +440,14 @@ describe("buying a gift card", () => {
 });
 
 describe("at checkout", () => {
-  /** Two stores; the buyer holds a card for store A. */
-  async function seedCart(tag: string, cardCents: number) {
+  /** Two stores; the buyer holds a card for store A (bought by someone, unless the store issued it). */
+  async function seedCart(tag: string, cardCents: number, source: "purchase" | "seller_issued" = "purchase") {
     const sellerA = await seedSeller(`${tag}-a`);
     const sellerB = await seedSeller(`${tag}-b`);
     const buyer = await seedBuyer(tag);
     const productA = await seedProduct(sellerA, { priceCents: 5_000, stock: 5 });
     const productB = await seedProduct(sellerB, { priceCents: 2_500, stock: 5 });
-    const { card } = await issue(sellerA, cardCents, buyer);
+    const card = source === "purchase" ? await purchased(sellerA, cardCents, buyer) : (await issue(sellerA, cardCents, buyer)).card;
     const groups = (giftCard?: { cardId?: string; code?: string }, onB = false) => [
       { items: [{ variantId: productA.variantId, productId: productA.productId, quantity: 1 }], ...(giftCard && !onB ? { giftCard } : {}) },
       { items: [{ variantId: productB.variantId, productId: productB.productId, quantity: 1 }], ...(giftCard && onB ? { giftCard } : {}) },
@@ -457,7 +471,19 @@ describe("at checkout", () => {
     return { rows, made };
   }
 
-  it("covers part of its own store's group, charges the card only the rest, and pays the seller in full", async () => {
+  it("covers part of its own store's group, charges the card only the rest, and pays the seller after delivery", async () => {
+    // Production default (vitest.setup.ts runs the suite in immediate mode).
+    const previousMode = process.env.PAYOUT_MODE;
+    process.env.PAYOUT_MODE = "hold";
+    try {
+      await coversPartAndPaysAfterDelivery();
+    } finally {
+      if (previousMode === undefined) delete process.env.PAYOUT_MODE;
+      else process.env.PAYOUT_MODE = previousMode;
+    }
+  });
+
+  async function coversPartAndPaysAfterDelivery() {
     const cart = await seedCart("co", 3_000);
     const quote = await pay(cart.buyer, cart.groups({ cardId: cart.card.id }));
     expect(quote.status).toBe(200);
@@ -476,18 +502,27 @@ describe("at checkout", () => {
     expect(made).toHaveLength(2);
     const orderA = made.find((o) => o.ownerId === cart.sellerA)!;
     expect(orderA.grossChargedCents).toBe(a.totalCents);
+    // 5% on the full item + shipping, even though the card paid most of it (BT-075).
+    expect(orderA.platformFeeCents).toBe(Math.round((a.subtotalCents + a.shippingCents - a.discountCents) * 0.05));
 
-    // The seller's gift card part is paid by ONE supplemental transfer, not from the charge.
-    const giftTransfers = fake.state.transfers.filter((t) => t.metadata?.kind === "gift_card_seller_payout");
-    expect(giftTransfers).toHaveLength(1);
-    expect(giftTransfers[0]).toMatchObject({ amount: 3_000, transfer_group: orderA.id, idempotencyKey: `gift-card-payout/${orderA.id}` });
-    expect(giftTransfers[0].source_transaction).toBeUndefined();
+    // Nothing leaves before delivery: the gift card part waits for the same hold (BT-053).
+    const giftTransfers = () => fake.state.transfers.filter((t) => t.metadata?.kind === "gift_card_seller_payout");
+    expect(giftTransfers()).toHaveLength(0);
+    expect(await payoutSellerForOrder(fake.stripe as any, orderA.id)).toBe("not_ready");
+    await delivered(orderA.id);
+    expect(await sweepGiftCardPayouts(fake.stripe as any)).toBeGreaterThanOrEqual(1);
+    await sweepGiftCardPayouts(fake.stripe as any);
+
+    // ONE supplemental transfer, less the card purchase's processing fee (2.9% + 30c of $30 = 117c).
+    expect(giftTransfers()).toHaveLength(1);
+    expect(giftTransfers()[0]).toMatchObject({ amount: 3_000 - 117, transfer_group: orderA.id, idempotencyKey: `gift-card-payout/${orderA.id}` });
+    expect(giftTransfers()[0].source_transaction).toBeUndefined();
     expect(await orderLedger(orderA.id)).toMatchObject({ gift_card_liability: -3_000 });
 
     // Settled once, even after the redelivery.
     expect((await ledgerOf(cart.card.id)).filter((r) => r.type === "settle")).toHaveLength(1);
     expect(await balanceOf(cart.card.id)).toBe(0);
-  });
+  }
 
   it("refuses a card on another store's group and someone else's wallet card", async () => {
     const cart = await seedCart("wrong", 3_000);
@@ -546,9 +581,33 @@ describe("at checkout", () => {
       cancelOrder: { reason: "seller_cancelled", notes: null, restock: true }, stripe: fake.stripe as any,
     });
     expect(await balanceOf(cart.card.id)).toBe(3_000);
-    expect(fake.state.reversals.some((r) => r.amount === 3_000 && r.metadata?.orderId === orderA.id)).toBe(true);
+    // Reverses exactly what reached the seller; the kept-back fee returns to the liability.
+    expect(fake.state.reversals.some((r) => r.amount === 3_000 - 117 && r.metadata?.orderId === orderA.id)).toBe(true);
+    expect((await orderLedger(orderA.id)).gift_card_liability ?? 0).toBe(0);
     expect((await ledgerOf(cart.card.id)).filter((r) => r.type === "refund")).toHaveLength(1);
     expect(await payoutSellerForOrder(fake.stripe as any, orderA.id)).toBe("already");
+  });
+
+  it("a store-issued card is the seller's own discount: no platform money is paid out for it (BT-053)", async () => {
+    const cart = await seedCart("si", 3_000, "seller_issued");
+    const res = await pay(cart.buyer, cart.groups({ cardId: cart.card.id }));
+    expect(res.status).toBe(200);
+    const [a] = res.body.groups;
+    expect(a.giftCardCents).toBe(3_000);
+    const intent = paid(res.body.paymentIntentId);
+    await handleCartPaymentSucceeded(intent, `evt_${uid("pi")}`, new Date());
+    const { made } = await ordersOf(intent.id);
+    const orderA = made.find((o) => o.ownerId === cart.sellerA)!;
+    await delivered(orderA.id);
+
+    expect(await payoutSellerForOrder(fake.stripe as any, orderA.id)).toBe("none");
+    expect(await sweepGiftCardPayouts(fake.stripe as any)).toBe(0);
+    expect(fake.state.transfers.filter((t) => t.metadata?.kind === "gift_card_seller_payout" && t.metadata?.orderId === orderA.id)).toHaveLength(0);
+    // The seller's net comes from the card charge only, after 5% on the full order value.
+    const fullBase = a.subtotalCents + a.shippingCents - a.discountCents;
+    expect(orderA.platformFeeCents).toBe(Math.round(fullBase * 0.05));
+    expect(orderA.sellerNetCents).toBe(orderA.grossChargedCents! - orderA.platformFeeCents! - orderA.processingFeeCents!);
+    expect((await orderLedger(orderA.id)).gift_card_liability ?? 0).toBe(0);
   });
 
   it("a card that covers the whole group still leaves the fees and Stripe's minimum on the card payment", async () => {
@@ -559,5 +618,33 @@ describe("at checkout", () => {
     expect(a.totalCents).toBeGreaterThan(0);
     expect(res.body.amountCents).toBeGreaterThanOrEqual(50);
     expect(await balanceOf(cart.card.id)).toBe(100_000 - a.giftCardCents);
+  });
+});
+
+describe("gift card payout rules", () => {
+  it("passes the purchase's processing fee to the seller in proportion to what is redeemed (BT-075)", () => {
+    // $100 card: 2.9% + 30c = 320c.
+    expect(purchaseFeeShareCents({ redeemedCents: 10_000, cardInitialCents: 10_000 })).toBe(320);
+    expect(purchaseFeeShareCents({ redeemedCents: 2_500, cardInitialCents: 10_000 })).toBe(80);
+    expect(purchaseFeeShareCents({ redeemedCents: 0, cardInitialCents: 10_000 })).toBe(0);
+    const half = purchaseFeeShareCents({ redeemedCents: 5_000, cardInitialCents: 10_000 });
+    expect(half * 2).toBe(320);
+  });
+
+  it("limits how many cards a store can issue itself per day", async () => {
+    const seller = await seedSeller("limit");
+    const previous = process.env.GIFT_CARD_SELLER_ISSUE_DAILY_LIMIT;
+    process.env.GIFT_CARD_SELLER_ISSUE_DAILY_LIMIT = "2";
+    try {
+      const body = { amountCents: 1_000, recipientEmail: "friend@test.local" };
+      expect((await call(app.base, "POST", "/api/gift-cards/seller/issue", seller, body)).status).toBe(201);
+      expect((await call(app.base, "POST", "/api/gift-cards/seller/issue", seller, body)).status).toBe(201);
+      const third = await call(app.base, "POST", "/api/gift-cards/seller/issue", seller, body);
+      expect(third.status).toBe(429);
+      expect(third.body.code).toBe("GIFT_CARD_ISSUE_LIMIT");
+    } finally {
+      if (previous === undefined) delete process.env.GIFT_CARD_SELLER_ISSUE_DAILY_LIMIT;
+      else process.env.GIFT_CARD_SELLER_ISSUE_DAILY_LIMIT = previous;
+    }
   });
 });

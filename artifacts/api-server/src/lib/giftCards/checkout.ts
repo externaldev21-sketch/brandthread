@@ -94,7 +94,8 @@ export function trimGiftCardsForMinimumCharge<T extends { totalCents: number; gi
 
 /**
  * The paid webhook created this group's order. Settle the gift card (and pay
- * the seller its part), or — if the order was already cancelled/refunded for
+ * the seller the purchased-card part once the order's delivery hold allows it;
+ * otherwise the money sweep pays it later), or — if the order was already cancelled/refunded for
  * being oversold — give the card its money back instead. Idempotent.
  */
 export async function finalizeGiftCardsForGroup(
