@@ -139,7 +139,9 @@ function PayoutsScreenContent() {
   const load = useCallback(async () => {
     if (isPreview) {
       // Fresh: zero balance, no history. With demo=1: local illustration only.
-      const preview = buildPreviewPayouts(isPreviewDemoMode());
+      // demo=1 is read from the URL; the route param covers a client-side
+      // navigation that has not settled window.location yet.
+      const preview = buildPreviewPayouts(isPreviewDemoMode() || params.demo === '1');
       setBalance(preview);
       setPayouts(preview.payouts.map((p): PayoutRecord => ({
         id: p.id,
@@ -175,7 +177,7 @@ function PayoutsScreenContent() {
     }
     setLoading(false);
     void refreshConnectStatus();
-  }, [api, isPreview, refreshConnectStatus]);
+  }, [api, isPreview, params.demo, refreshConnectStatus]);
 
 
   function handleCashedOut(result: { threadCashCents: number; payoutCents: number; feeCents: number }) {
