@@ -32,7 +32,6 @@ import { type SearchResult } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
-import { AnimatedEntrance, EmptyState } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { FONT, GUTTER, GRID_MAX_WIDTH, RADIUS } from '@/lib/theme';
 import { ResponsiveContainer, useGridColumns } from '@/components/layout';
@@ -442,9 +441,9 @@ export default function BuyerSearchScreen() {
     <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
       <View style={styles.grid} onLayout={onGridLayout}>
         {items.map((item, index) => (
-          <AnimatedEntrance key={item.id} delay={Math.min(index, 6) * 30}>
+          <View key={item.id}>
             <ProductTile item={item} accent={primary} width={gridCardWidth} onPress={() => handleResultPress(item)} />
-          </AnimatedEntrance>
+          </View>
         ))}
       </View>
     </ResponsiveContainer>
@@ -454,9 +453,9 @@ export default function BuyerSearchScreen() {
     <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
       <View style={styles.videoGrid} onLayout={onGridLayout}>
         {items.map((item, index) => (
-          <AnimatedEntrance key={item.id} delay={Math.min(index, 6) * 30}>
+          <View key={item.id}>
             <VideoTile item={item} width={videoGridCardWidth} onPress={() => goToVideo(item)} />
-          </AnimatedEntrance>
+          </View>
         ))}
       </View>
     </ResponsiveContainer>
@@ -654,16 +653,16 @@ export default function BuyerSearchScreen() {
     return (
       <View>
         {topPeople.length > 0 && (
-          <AnimatedEntrance>
+          <View>
             <Text style={styles.sectionLabel}>People</Text>
             {personRows(topPeople)}
-          </AnimatedEntrance>
+          </View>
         )}
         {videoResults.length > 0 && (
-          <AnimatedEntrance delay={40}>
+          <View>
             <Text style={styles.sectionLabel}>Posts</Text>
             {videoGrid(videoResults)}
-          </AnimatedEntrance>
+          </View>
         )}
       </View>
     );
