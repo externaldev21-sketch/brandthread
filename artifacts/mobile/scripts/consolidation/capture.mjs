@@ -32,8 +32,8 @@ try {
     });
     try {
       // The app's own start-up redirect can win over the first push (same
-      // reason the other capture scripts retry): try up to three times.
-      for (let attempt = 1; attempt <= 3; attempt += 1) {
+      // reason the other capture scripts retry): try up to five times.
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
         await openScreen(page, activity, server.origin, shot.role, shot.target, { extraQuery: shot.demo ? '&demo=1' : '' });
         await waitForQuietNetwork(activity, 800, 15_000);
         await page.waitForTimeout(1500);

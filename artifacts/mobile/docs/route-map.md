@@ -16,8 +16,8 @@ Screens in `app/` now: **340** (route files, excluding layouts and tests).
 | `/buyer-account-control` | `/delete-account` | Was a re-export of Delete account. |
 | `/app-icon` | `/appearance` | App icon lives in Appearance. |
 | `/app-theme` | `/appearance` | App theme lives in Appearance. |
-| `/shipping-label` | `/fulfill-order?orderId=%3CorderId%3E&step=3` (without params: `/(tabs)/orders`) | Buying a label is step 3 of Fulfill order. |
-| `/buyer-refund-request` | `/buyer-return-request?orderId=%3CorderId%3E` (without params: `/(buyer)/orders`) | Unlinked duplicate of the Return / refund request. |
+| `/shipping-label` | `/fulfill-order?orderId=ORDER_ID&step=3` (without params: `/(tabs)/orders`) | Buying a label is step 3 of Fulfill order. |
+| `/buyer-refund-request` | `/buyer-return-request?orderId=ORDER_ID` (without params: `/(buyer)/orders`) | Unlinked duplicate of the Return / refund request. |
 | `/drafts` | `/(tabs)/products?filter=draft` | Drafts is a filter on the Products tab. |
 | `/automation` | `/(tabs)/marketing` | Unlinked "coming" placeholder; Marketing holds the real tools. |
 | `/mobile-app-builder` | `/store-builder` | Unlinked marketing placeholder with a dead CTA. |
