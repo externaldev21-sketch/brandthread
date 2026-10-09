@@ -18,6 +18,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resolveAccountKey } from '@/lib/accountStorage';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   AIMessage, AISession, AIScreenContext, AIChatRequest,
@@ -36,7 +37,9 @@ function nanoid(): string {
 
 // ─── AsyncStorage key scoping ─────────────────────────────────────────────────
 
+/** Legacy device-wide key; stored per account (first signed-in account claims it). */
 const SETTINGS_KEY = 'bt:ai:settings:v1';
+const settingsKey = () => resolveAccountKey(SETTINGS_KEY, 'claim');
 const MAX_STORED   = 50; // max messages kept in AsyncStorage
 
 /**
@@ -65,7 +68,7 @@ let _currentSession: AISession | null = null;
 
 export async function getAISettings(): Promise<AISettings> {
   try {
-    const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+    const raw = await AsyncStorage.getItem(await settingsKey());
     if (!raw) return { ...DEFAULT_AI_SETTINGS };
     return { ...DEFAULT_AI_SETTINGS, ...JSON.parse(raw) };
   } catch {
@@ -74,7 +77,7 @@ export async function getAISettings(): Promise<AISettings> {
 }
 
 export async function saveAISettings(settings: AISettings): Promise<void> {
-  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  await AsyncStorage.setItem(await settingsKey(), JSON.stringify(settings));
 }
 
 // ─── Session repair ───────────────────────────────────────────────────────────

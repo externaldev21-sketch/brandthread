@@ -3,6 +3,7 @@
 // Mock generation is separated into pure functions — never placed in UI code.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resolveAccountKey } from '@/lib/accountStorage';
 import { api, ShopifyImportJob } from '@/lib/api';
 import {
   Storefront, StoreSection, StoreSectionType, StoreSectionSettings,
@@ -18,8 +19,13 @@ import {
   THREAD_THEME_DARK_PALETTE,
 } from './storeTypes';
 
+// Legacy device-wide keys; stored per account via lib/accountStorage (the
+// first signed-in account claims any pre-scoping store draft).
 const STORE_KEY = 'bt:store:v1';
 const DRAFT_ANSWERS_KEY = 'bt:store:draft_answers:v1';
+/** AsyncStorage key holding the signed-in account's local storefront draft. */
+export const storefrontStorageKey = () => resolveAccountKey(STORE_KEY, 'claim');
+const draftAnswersKey = () => resolveAccountKey(DRAFT_ANSWERS_KEY, 'claim');
 
 export type { ShopifyImportJob };
 export const startShopifyImport = (url: string) => api.shopifyImports.start(url);
@@ -378,7 +384,8 @@ export async function getStorefront(options: {
 } = {}): Promise<Storefront> {
   try {
     // Load from AsyncStorage first (local truth for complex UI state)
-    const raw = await AsyncStorage.getItem(STORE_KEY);
+    const storeKey = await storefrontStorageKey();
+    const raw = await AsyncStorage.getItem(storeKey);
     const local: Storefront = raw ? JSON.parse(raw) as Storefront : defaultStorefront();
     let migratedToThread = false;
 
@@ -419,7 +426,7 @@ export async function getStorefront(options: {
       }
     } catch { /* no-op — API may not be reachable */ }
 
-    if (!raw || migratedToThread) await AsyncStorage.setItem(STORE_KEY, JSON.stringify(local));
+    if (!raw || migratedToThread) await AsyncStorage.setItem(storeKey, JSON.stringify(local));
     return local;
   } catch {
     return defaultStorefront();
@@ -428,7 +435,7 @@ export async function getStorefront(options: {
 
 async function saveStorefront(store: Storefront): Promise<Storefront> {
   store.lastEditedAt = new Date().toISOString();
-  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  await AsyncStorage.setItem(await storefrontStorageKey(), JSON.stringify(store));
 
   // Fire-and-forget sync to real API (best-effort, never blocks UI)
   api.store.save({
@@ -520,18 +527,18 @@ export async function updateSEO(seo: Partial<StoreSEO>): Promise<Storefront> {
 
 // ─── Draft generation answers ─────────────────────────────────────────────────
 export async function saveDraftAnswers(answers: Partial<StoreGenerationAnswers>): Promise<void> {
-  await AsyncStorage.setItem(DRAFT_ANSWERS_KEY, JSON.stringify(answers));
+  await AsyncStorage.setItem(await draftAnswersKey(), JSON.stringify(answers));
 }
 
 export async function loadDraftAnswers(): Promise<Partial<StoreGenerationAnswers> | null> {
   try {
-    const raw = await AsyncStorage.getItem(DRAFT_ANSWERS_KEY);
+    const raw = await AsyncStorage.getItem(await draftAnswersKey());
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
 
 export async function clearDraftAnswers(): Promise<void> {
-  await AsyncStorage.removeItem(DRAFT_ANSWERS_KEY);
+  await AsyncStorage.removeItem(await draftAnswersKey());
 }
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
@@ -885,7 +892,7 @@ export async function getVersions(): Promise<StoreVersion[]> {
       try {
         const store = await getStorefront();
         store.versions = mapped;
-        await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+        await AsyncStorage.setItem(await storefrontStorageKey(), JSON.stringify(store));
       } catch { /* cache failure is non-fatal */ }
 
       return mapped;
@@ -1284,7 +1291,7 @@ export async function applyGenerationResult(result: StoreGenerationResult): Prom
   } as any);
 
   // Commit local state only after the backend confirms success
-  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  await AsyncStorage.setItem(await storefrontStorageKey(), JSON.stringify(store));
   return store;
 }
 

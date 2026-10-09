@@ -25,11 +25,14 @@ import {
 } from './manufacturerTypes';
 import { mapPublicManufacturer } from './manufacturerDirectoryMapper';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { resolveAccountKey } from '@/lib/accountStorage';
 import { getPreviewManufacturer, getPreviewManufacturers } from '@/lib/previewManufacturers';
 
 export { mapPublicManufacturer } from './manufacturerDirectoryMapper';
 
+/** Legacy device-wide key; stored per account (first signed-in account claims it). */
 const DRAFTS_KEY = 'mfg:local-quote-drafts:v2';
+const draftsKey = () => resolveAccountKey(DRAFTS_KEY, 'claim');
 const previewFavoriteManufacturerIds = new Set<string>(['preview-mfg-porto-knit']);
 
 function now(): string {
@@ -55,7 +58,7 @@ function mapFreshPublicManufacturer(row: any): Manufacturer {
 
 async function readDrafts(): Promise<QuoteRequest[]> {
   try {
-    const value = await AsyncStorage.getItem(DRAFTS_KEY);
+    const value = await AsyncStorage.getItem(await draftsKey());
     if (!value) return [];
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed.filter((item) => item?.isDraft === true) : [];
@@ -66,7 +69,7 @@ async function readDrafts(): Promise<QuoteRequest[]> {
 
 async function writeDrafts(drafts: QuoteRequest[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+    await AsyncStorage.setItem(await draftsKey(), JSON.stringify(drafts));
   } catch {
     throw new Error('This draft could not be saved on your device.');
   }
