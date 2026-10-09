@@ -3,32 +3,32 @@
   "generated": "2026-10-09",
   "base": "origin/dev @ 409ddcdc",
   "totals_removable": {
-    "files": 129,
-    "lines": 21458,
-    "kb": 2828.6
+    "files": 122,
+    "lines": 20072,
+    "kb": 2763.7
   },
   "measurement": {
     "ios": {
       "before_bytes": 14444130,
-      "after_bytes": 14185219,
+      "after_bytes": 14240584,
       "before_gz": 3754929,
-      "after_gz": 3694830,
+      "after_gz": 3707599,
       "before_mb": 14.44,
-      "after_mb": 14.19,
-      "delta_kb": 253,
-      "delta_gz_kb": 59,
-      "pct": 1.8
+      "after_mb": 14.24,
+      "delta_kb": 199,
+      "delta_gz_kb": 46,
+      "pct": 1.4
     },
     "web": {
       "before_bytes": 13091315,
-      "after_bytes": 12835978,
+      "after_bytes": 12892724,
       "before_gz": 3457698,
-      "after_gz": 3398554,
+      "after_gz": 3411147,
       "before_mb": 13.09,
-      "after_mb": 12.84,
-      "delta_kb": 249,
-      "delta_gz_kb": 58,
-      "pct": 2.0
+      "after_mb": 12.89,
+      "delta_kb": 194,
+      "delta_gz_kb": 45,
+      "pct": 1.5
     },
     "deps": {
       "before": 237,
@@ -49,77 +49,6 @@
     "command": "expo export --platform ios --no-bytecode / --platform web, NODE_ENV=production, same env for both copies"
   },
   "features": [
-    {
-      "feature": "Old seller Analytics detail screens",
-      "verdict": "Delete candidate",
-      "summary": "Six analytics detail pages from before the Analytics tab rebuild. The Analytics tab now opens analytics-product-stats / -audience / -content / -goals / -export / -advanced; none of these six is linked any more.",
-      "files": 6,
-      "lines": 1348,
-      "kb": 63.4,
-      "items": [
-        {
-          "path": "artifacts/mobile/app/analytics-sales.tsx",
-          "kind": "screen",
-          "what": "Sales Analytics: revenue chart and order totals",
-          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-sales anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-clearance-sweep.spec.ts, header-sweep-batch1.spec.ts, notch-safe-area-screenshots.mjs",
-          "lines": 164,
-          "kb": 6.8,
-          "risk": "Low",
-          "url": "/analytics-sales"
-        },
-        {
-          "path": "artifacts/mobile/app/analytics-customers.tsx",
-          "kind": "screen",
-          "what": "Customer Analytics: new vs returning customers, top customers",
-          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-customers anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
-          "lines": 258,
-          "kb": 12.3,
-          "risk": "Low",
-          "url": "/analytics-customers"
-        },
-        {
-          "path": "artifacts/mobile/app/analytics-marketing.tsx",
-          "kind": "screen",
-          "what": "Marketing Analytics: channel cards (email, social, ads)",
-          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-marketing anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
-          "lines": 269,
-          "kb": 13.0,
-          "risk": "Low",
-          "url": "/analytics-marketing"
-        },
-        {
-          "path": "artifacts/mobile/app/analytics-production.tsx",
-          "kind": "screen",
-          "what": "Production Analytics: sample and manufacturing KPI tiles",
-          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-production anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
-          "lines": 225,
-          "kb": 11.2,
-          "risk": "Low",
-          "url": "/analytics-production"
-        },
-        {
-          "path": "artifacts/mobile/app/analytics-products.tsx",
-          "kind": "screen",
-          "what": "Product Analytics: per-listing stats and ranked list",
-          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-products anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
-          "lines": 201,
-          "kb": 8.5,
-          "risk": "Low",
-          "url": "/analytics-products"
-        },
-        {
-          "path": "artifacts/mobile/app/analytics-profit.tsx",
-          "kind": "screen",
-          "what": "Profit & Payout: earnings total and breakdown",
-          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-profit anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
-          "lines": 231,
-          "kb": 11.6,
-          "risk": "Low",
-          "url": "/analytics-profit"
-        }
-      ],
-      "coordinate": "Consolidate screens session (it is merging analytics screens). If it redirects any of these URLs, leave the file to that session."
-    },
     {
       "feature": "Old AI Studio hub and its four tool chats",
       "verdict": "Delete candidate (coordinate)",
@@ -337,10 +266,10 @@
     {
       "feature": "Duplicate and stub screens",
       "verdict": "Delete candidate",
-      "summary": "Screens that duplicate a live screen or are now empty stubs/redirects.",
-      "files": 6,
-      "lines": 1352,
-      "kb": 57.8,
+      "summary": "Screens that duplicate a live screen or are now stubs/redirects.",
+      "files": 5,
+      "lines": 1314,
+      "kb": 56.2,
       "items": [
         {
           "path": "artifacts/mobile/app/share-profile.tsx",
@@ -363,16 +292,6 @@
           "risk": "Low",
           "url": "/product-editor",
           "note": "Only purpose is catching old links; belongs in the Consolidate session's legacyRoutes table instead of a file"
-        },
-        {
-          "path": "artifacts/mobile/app/customer-events.tsx",
-          "kind": "screen",
-          "what": "\"Customer events\" page, now an honest \"not available yet\" stub (fake Klaviyo pixel removed earlier)",
-          "evidence": "only mentioned in lib/navigation/parentFallback.ts (a back-button table that is itself only used by tests); no navigation",
-          "lines": 38,
-          "kb": 1.6,
-          "risk": "Low",
-          "url": "/customer-events"
         },
         {
           "path": "artifacts/mobile/app/brand.tsx",
@@ -1437,7 +1356,7 @@
     },
     {
       "feature": "Brand Memory",
-      "status": "Live today via AI Settings \u2192 \"Manage Brand Memory\". The Consolidate screens session's commit deletes this screen and row (see coordination note).",
+      "status": "Live today via AI Settings \u2192 \"Manage Brand Memory\". externaldev21-sketch/brandthread#743 removes this screen and row (server and data kept) based on a different brief; that session is asking Dev which applies.",
       "unreachable": [],
       "still_live": [
         "artifacts/mobile/app/ai-brand-memory.tsx",
@@ -1460,25 +1379,46 @@
     }
   ],
   "consolidate_screens": {
-    "session": "\"Consolidate screens: 376 \u2192 lean app\" (branch not pushed yet when this audit ran)",
+    "session": "\"Consolidate screens: 376 \u2192 lean app\": externaldev21-sketch/brandthread#743 (core redirects), externaldev21-sketch/brandthread#748 (analytics), and a settings PR still to come (buyer-settings-menu, buyer-login-activity, customer-events). The full old \u2192 new table is artifacts/mobile/docs/route-map.md on those branches",
     "routes_excluded": [
       "/ai-assistant",
-      "/bg-removal",
-      "/buyer-account-control",
+      "/ai-brand-memory",
+      "/analytics-advanced",
+      "/analytics-audience",
+      "/analytics-cohorts",
+      "/analytics-content",
+      "/analytics-customers",
+      "/analytics-export",
+      "/analytics-goals",
+      "/analytics-inventory",
+      "/analytics-marketing",
+      "/analytics-product-stats",
+      "/analytics-production",
+      "/analytics-products",
+      "/analytics-profit",
+      "/analytics-sales",
+      "/analytics-store",
       "/app-icon",
       "/app-theme",
-      "/shipping-label",
       "/automation",
-      "/mobile-app-builder",
-      "/metafields",
-      "/drafts",
+      "/bg-removal",
+      "/buyer-account-control",
+      "/buyer-drops",
       "/buyer-refund-request",
-      "/ai-brand-memory",
+      "/customer-events",
+      "/discount-codes",
+      "/drafts",
+      "/inventory",
+      "/metafields",
+      "/mobile-app-builder",
+      "/seller-drop-create",
+      "/seller-drop-preview",
       "/seller-drops",
-      "/buyer-drops"
+      "/shipping-label",
+      "/shipping-rates"
     ],
-    "conflict": "Its commit deletes mobile-app-builder, ai-brand-memory, seller-drops and buyer-drops, which Dev asked to keep. That session was messaged about it.",
-    "rule": "Any route that session adds to lib/navigation/legacyRoutes comes off this list."
+    "conflict": "Its brief from Dev says Brand Memory and Drops stay \"hidden/unlinked, so delete the routes but keep the data/server\", so #743 removes ai-brand-memory and the drops screens and keeps the server and data. This audit's brief says keep those screens. That session is asking Dev to decide and will put the routes back if he says keep. It is restoring Mobile App Builder (\"paused, not cancelled\").",
+    "rule": "This list leaves out every old route in that table: the six old Analytics detail screens (analytics-sales, -customers, -marketing, -production, -products, -profit) and customer-events now get redirects there instead of a plain delete."
   },
   "open_pr_overlap": [
     {
@@ -1841,7 +1781,7 @@
         "group": "Old camera capture (HOLD: protected tab-bar guard)"
       }
     ],
-    "e2e_and_screenshot_scripts_listing_these_urls": 13,
+    "e2e_and_screenshot_scripts_listing_these_urls": 10,
     "baseline": "On origin/dev the mobile unit suite already has 72 failing files / 87 failing tests before any change; removing every listed file adds exactly 20 new failing files: the 12 to delete and the 8 to edit below (verified by running vitest on both copies)."
   },
   "dependencies": {

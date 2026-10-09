@@ -5,54 +5,38 @@ Scanned: `origin/dev @ 409ddcdc`, run 2026-10-09. Covers the mobile app, the API
 
 ## Summary
 
-- **129 files / 21,458 lines can go** if Dev approves every group below. That is 25 unreachable screens, 102 unused modules, the portal's unused UI kit and one 2 MB video.
-- **App bundle:** iOS 14.44 MB → 14.19 MB (−253 KB raw, −59 KB gzipped, 1.8%). Web 13.09 MB → 12.84 MB (−249 KB, 2.0%). Both measured with a real `expo export` on a copy of the repo with the files removed.
+- **122 files / 20,072 lines can go** if Dev approves every group below. That is 18 unreachable screens, 102 unused modules, the portal's unused UI kit and one 2 MB video.
+- **App bundle:** iOS 14.44 MB → 14.24 MB (−199 KB raw, −46 KB gzipped, 1.4%). Web 13.09 MB → 12.89 MB (−194 KB, 1.5%). Both measured with a real `expo export` on a copy of the repo with the files removed.
 - **Dependencies:** 237 → 201 declared packages (−36). Most are the portal's unused UI kit.
 - **Tests:** 12 test files (174 tests) exist only to test code on this list and would go with it. They take 0.3 s, so the mobile unit suite (487 files, about 53 s) gets no faster in practice. 8 other test files read a listed file by path and need a one-line edit. See *Tests affected*.
 - The portal UI-kit files are never imported, so Vite already leaves them out of the portal bundle: deleting them saves repo size and 27 packages, not download size. fashion_walk.mp4 is not in either export (nothing requires it), so it saves 2 MB of repo, not app size.
 - **Kept on Dev's say-so:** Drops, Collections, Brand Memory and Mobile App Builder are listed separately under *Hidden by Dev* and are not counted above.
 - **Found a real bug along the way:** Shipping → Package presets always 404s. The server router is imported but never mounted. See *Bugs found*.
-- The gain is small on the phone (about 2% of the bundle) but big for upkeep: about 21k lines nobody can reach, which every audit, refactor and type-check still walks through.
+- The gain is small on the phone (about 1.5% of the bundle) but big for upkeep: about 20k lines nobody can reach, which every audit, refactor and type-check still walks through.
 
 ### How to approve
-Reply on the PR with the group names you approve, e.g. "approve 1, 6, 7, 10, 11; keep 5". Groups marked **coordinate** wait for the named session or PR.
+Reply on the PR with the group names you approve, e.g. "approve 5, 6, 7, 8, 9, 10; keep 4". Groups marked **coordinate** wait for the named session or PR.
 
 ## Groups to approve
 
 | # | Group | Files | Lines | Size | Verdict | Risk |
 |---|---|---:|---:|---:|---|---|
-| 1 | Old seller Analytics detail screens | 6 | 1,348 | 63 KB | Delete candidate | Low |
-| 2 | Old AI Studio hub and its four tool chats | 5 | 2,227 | 93 KB | Delete candidate (coordinate) | Low–Medium |
-| 3 | Design Studio: legacy project-wizard screens | 5 | 2,298 | 82 KB | Delete candidate (coordinate) | Medium |
-| 4 | Old camera capture + video text-overlay editor | 4 | 1,942 | 74 KB | Hold (protected tab-bar test) | Low–Medium |
-| 5 | Freelancer marketplace: apply + profile screens | 2 | 923 | 38 KB | Dev decides (wire up or remove whole feature) | Medium |
-| 6 | Duplicate and stub screens | 6 | 1,352 | 58 KB | Delete candidate | Low–Medium |
-| 7 | Mobile components, hooks and libs nothing imports | 29 | 4,050 | 138 KB | Delete candidate | Low–Medium |
-| 8 | Production code that only tests use | 9 | 821 | 31 KB | Delete candidate (with its tests) | Low |
-| 9 | API server: unused modules | 3 | 146 | 5 KB | Delete candidate | Low |
-| 10 | Manufacturer portal: unused UI-kit components | 38 | 4,403 | 131 KB | Delete candidate | Low |
-| 11 | Shared libs: unused OpenAI integration templates | 21 | 1,948 | 56 KB | Delete candidate | Low–Medium |
-| 12 | Unused assets | 1 | 0 | 2,060 KB | Delete candidate | Low |
-| | **Total** | **129** | **21,458** | **2,829 KB** | | |
+| 1 | Old AI Studio hub and its four tool chats | 5 | 2,227 | 93 KB | Delete candidate (coordinate) | Low–Medium |
+| 2 | Design Studio: legacy project-wizard screens | 5 | 2,298 | 82 KB | Delete candidate (coordinate) | Medium |
+| 3 | Old camera capture + video text-overlay editor | 4 | 1,942 | 74 KB | Hold (protected tab-bar test) | Low–Medium |
+| 4 | Freelancer marketplace: apply + profile screens | 2 | 923 | 38 KB | Dev decides (wire up or remove whole feature) | Medium |
+| 5 | Duplicate and stub screens | 5 | 1,314 | 56 KB | Delete candidate | Low–Medium |
+| 6 | Mobile components, hooks and libs nothing imports | 29 | 4,050 | 138 KB | Delete candidate | Low–Medium |
+| 7 | Production code that only tests use | 9 | 821 | 31 KB | Delete candidate (with its tests) | Low |
+| 8 | API server: unused modules | 3 | 146 | 5 KB | Delete candidate | Low |
+| 9 | Manufacturer portal: unused UI-kit components | 38 | 4,403 | 131 KB | Delete candidate | Low |
+| 10 | Shared libs: unused OpenAI integration templates | 21 | 1,948 | 56 KB | Delete candidate | Low–Medium |
+| 11 | Unused assets | 1 | 0 | 2,060 KB | Delete candidate | Low |
+| | **Total** | **122** | **20,072** | **2,764 KB** | | |
 
 Risk: **Low**, nothing can reach it and nothing else uses it. **Medium**, unreachable but another session works nearby, old links might exist, or it is a feature Dev may want back. **High**, legal or data impact.
 
-### 1. Old seller Analytics detail screens: 6 files, 1,348 lines
-
-**Delete candidate.** Six analytics detail pages from before the Analytics tab rebuild. The Analytics tab now opens analytics-product-stats / -audience / -content / -goals / -export / -advanced; none of these six is linked any more.
-
-> **Coordinate:** Consolidate screens session (it is merging analytics screens). If it redirects any of these URLs, leave the file to that session.
-
-| Path | What the user saw | Evidence it is unused | Lines | Size | Risk |
-|---|---|---|---:|---:|---|
-| `mobile/app/analytics-sales.tsx` | Sales Analytics: revenue chart and order totals | no router.push/href/Link/redirect/push-payload string for /analytics-sales anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-clearance-sweep.spec.ts, header-sweep-batch1.spec.ts, notch-safe-area-screenshots.mjs | 164 | 6.8 KB | Low |
-| `mobile/app/analytics-customers.tsx` | Customer Analytics: new vs returning customers, top customers | no router.push/href/Link/redirect/push-payload string for /analytics-customers anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts | 258 | 12.3 KB | Low |
-| `mobile/app/analytics-marketing.tsx` | Marketing Analytics: channel cards (email, social, ads) | no router.push/href/Link/redirect/push-payload string for /analytics-marketing anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts | 269 | 13.0 KB | Low |
-| `mobile/app/analytics-production.tsx` | Production Analytics: sample and manufacturing KPI tiles | no router.push/href/Link/redirect/push-payload string for /analytics-production anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts | 225 | 11.2 KB | Low |
-| `mobile/app/analytics-products.tsx` | Product Analytics: per-listing stats and ranked list | no router.push/href/Link/redirect/push-payload string for /analytics-products anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts | 201 | 8.5 KB | Low |
-| `mobile/app/analytics-profit.tsx` | Profit & Payout: earnings total and breakdown | no router.push/href/Link/redirect/push-payload string for /analytics-profit anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts | 231 | 11.6 KB | Low |
-
-### 2. Old AI Studio hub and its four tool chats: 5 files, 2,227 lines
+### 1. Old AI Studio hub and its four tool chats: 5 files, 2,227 lines
 
 **Delete candidate (coordinate).** The original "Design Studio" AI hub (ai-studio) and the chat-style tools it opened. Nothing links to ai-studio, so its four children are unreachable too. Newer screens replace them: design-ai-photoshoot (AI Photoshoot), design-mockup-to-model, the Studio menu.
 
@@ -71,7 +55,7 @@ Server code that has no other caller once these screens are gone (not counted ab
 - artifacts/api-server/src/routes/techpack.ts (358 lines, POST /techpack/generate)
 - POST /photography/outfit-swap and /outfit-swap/retry in routes/photography.ts
 
-### 3. Design Studio: legacy project-wizard screens: 5 files, 2,298 lines
+### 2. Design Studio: legacy project-wizard screens: 5 files, 2,298 lines
 
 **Delete candidate (coordinate).** Five screens from the first Design Studio (6-step "New Project" wizard and its export, prompt-edit, sketch-upload and version-history pages). The current Design Studio (design-canvas, design-templates, design-text-to-design, design-garment and the other design-* tools) does not link them.
 
@@ -85,7 +69,7 @@ Server code that has no other caller once these screens are gone (not counted ab
 | `mobile/app/design-upload-sketch.tsx` | "Upload Sketch" → cleaned designs | no router.push/href/Link/redirect/push-payload string for /design-upload-sketch anywhere in mobile, server or portal code | 646 | 19.0 KB | Medium |
 | `mobile/app/design-versions.tsx` | "Version History" list | no router.push/href/Link/redirect/push-payload string for /design-versions anywhere in mobile, server or portal code | 205 | 7.3 KB | Medium |
 
-### 4. Old camera capture + video text-overlay editor: 4 files, 1,942 lines
+### 3. Old camera capture + video text-overlay editor: 4 files, 1,942 lines
 
 **Hold (protected tab-bar test).** The first full-screen camera (camera-capture) with a TikTok-style text-overlay editor. Nothing opens /camera-capture (create-post and buyer-story-create have their own camera). The camera-first Create screen (open PR #690) replaces this area.
 
@@ -98,7 +82,7 @@ Server code that has no other caller once these screens are gone (not counted ab
 | `mobile/lib/videoEditing.ts` | Text-overlay and slide helpers for camera-capture (Deleting also deletes 5 tests: videoEditing*.test.ts (3), lib/__tests__/cameraCaptureState.test.ts, photoSlideHelpers.test.ts) | only imported by camera-capture.tsx and TextOverlayEditor.tsx (both unreachable) plus 5 unit tests | 236 | 7.5 KB | Low |
 | `mobile/components/create-post/CaptureScreen.tsx` | Create-post step 1 camera (TikTok capture screen layout) | imported by no production file (import graph from every app entry point; tests and scripts excluded) | 188 | 10.2 KB | Low |
 
-### 5. Freelancer marketplace: apply + profile screens: 2 files, 923 lines
+### 4. Freelancer marketplace: apply + profile screens: 2 files, 923 lines
 
 **Dev decides (wire up or remove whole feature).** The "Freelancer jobs" screen is reachable (Settings → Hire a Brandthread Partner), but the screens to become a freelancer and to view or hire one are not linked from anywhere. Freelancers can never be created, so the marketplace is half-dead.
 
@@ -115,20 +99,19 @@ Server code that has no other caller once these screens are gone (not counted ab
 - POST /freelancer-jobs (create a hire) in routes/freelancer-jobs.ts
 - DB table freelancer_reviews (never read or written)
 
-### 6. Duplicate and stub screens: 6 files, 1,352 lines
+### 5. Duplicate and stub screens: 5 files, 1,314 lines
 
-**Delete candidate.** Screens that duplicate a live screen or are now empty stubs/redirects.
+**Delete candidate.** Screens that duplicate a live screen or are now stubs/redirects.
 
 | Path | What the user saw | Evidence it is unused | Lines | Size | Risk |
 |---|---|---|---:|---:|---|
 | `mobile/app/share-profile.tsx` | Full-page "Share Profile" (QR + link) (Duplicate of the live ShareProfileSheet bottom sheet used by both profiles) | no router.push/href/Link/redirect/push-payload string for /share-profile anywhere in mobile, server or portal code; only opened by test/screenshot scripts: ShareProfileSheet.structure.test.ts, crash-ipad-crawl.mjs, radius-before-after-screenshots.mjs | 452 | 15.9 KB | Low |
 | `mobile/app/product-editor.tsx` | Old second "create product" form, now only a redirect to add-product (Only purpose is catching old links; belongs in the Consolidate session's legacyRoutes table instead of a file) | URL /product-editor is only linked from navigation-isolation-probe.tsx, which is itself unreachable; also opened by tests: crash-ipad-crawl.mjs, navigation-scene-isolation.native.test.tsx | 32 | 1.3 KB | Low |
-| `mobile/app/customer-events.tsx` | "Customer events" page, now an honest "not available yet" stub (fake Klaviyo pixel removed earlier) | only mentioned in lib/navigation/parentFallback.ts (a back-button table that is itself only used by tests); no navigation | 38 | 1.6 KB | Low |
 | `mobile/app/brand.tsx` | "Brand Creation" page: AI logo generator + brand name/colours (old seller onboarding step) (Only caller of POST /api/logo/generate.) | no router.push/href/Link/redirect/push-payload string for /brand anywhere in mobile, server or portal code; only opened by test/screenshot scripts: radius-before-after-screenshots.mjs | 352 | 16.9 KB | Medium |
 | `mobile/app/product-size-chart.tsx` | Per-product "Size Chart" table editor (Replaced by Size chart templates (size-chart-templates / -template-edit / -template-apply), which are linked from Products) | no router.push/href/Link/redirect/push-payload string for /product-size-chart anywhere in mobile, server or portal code; only opened by test/screenshot scripts: size-chart-screenshots.mjs | 397 | 17.9 KB | Low |
 | `mobile/app/manufacturer-onboard.tsx` | "Manufacturer signup" hand-off page that forwards an invite token to the web portal (Header comment says OLD invite links pointed here. No current email or server code builds this link, but links in old emails could still open it. Safer as a legacyRoutes redirect.) | no router.push/href/Link/redirect/push-payload string for /manufacturer-onboard anywhere in mobile, server or portal code; only opened by test/screenshot scripts: rules.test.ts, header-sweep-mr-screenshots.mjs | 81 | 4.2 KB | Medium |
 
-### 7. Mobile components, hooks and libs nothing imports: 29 files, 4,050 lines
+### 6. Mobile components, hooks and libs nothing imports: 29 files, 4,050 lines
 
 **Delete candidate.** UI pieces and helpers left behind by redesigns. No production file imports them.
 
@@ -164,7 +147,7 @@ Server code that has no other caller once these screens are gone (not counted ab
 | `mobile/lib/color.ts` | Readable ink colour for a background (colorModel.ts is the one in use) | imported by no production file (import graph from every app entry point; tests and scripts excluded) | 10 | 0.4 KB | Low |
 | `mobile/services/feedEventsService.ts` | For You ranking event queue (POST /api/feed/events, DELETE /feed/not-interested) (For You ranking never receives client events; this may be a missing hook-up rather than dead code) | imported by no production file (import graph from every app entry point; tests and scripts excluded) | 78 | 2.7 KB | Medium |
 
-### 8. Production code that only tests use: 9 files, 821 lines
+### 7. Production code that only tests use: 9 files, 821 lines
 
 **Delete candidate (with its tests).** Code still covered by unit tests but imported by no screen, so the tests guard nothing the user can reach.
 
@@ -180,7 +163,7 @@ Server code that has no other caller once these screens are gone (not counted ab
 | `mobile/lib/previewFeed.ts` | Local feed engagement fixtures (Delete together with the test) | imported only by lib/__tests__/previewFeed.test.ts | 129 | 5.6 KB | Low |
 | `mobile/lib/uploadQueue.ts` | Generic upload retry state machine (Delete together with the test) | imported only by tests/upload-queue.test.ts | 139 | 5.0 KB | Low |
 
-### 9. API server: unused modules: 3 files, 146 lines
+### 8. API server: unused modules: 3 files, 146 lines
 
 **Delete candidate.** Server files no route, job or script imports.
 
@@ -190,7 +173,7 @@ Server code that has no other caller once these screens are gone (not counted ab
 | `api-server/src/lib/fulfillmentPartners/types.ts` | Fulfilment-partner adapter interface ("NOT wired into any route") | imported by no production file (import graph from every app entry point; tests and scripts excluded) | 58 | 1.9 KB | Low |
 | `api-server/src/lib/fulfillmentPartners/tapstitchAdapter.ts` | Placeholder Tapstitch adapter (Tapstitch has no public API) | imported by no production file (import graph from every app entry point; tests and scripts excluded) | 27 | 1.2 KB | Low |
 
-### 10. Manufacturer portal: unused UI-kit components: 38 files, 4,403 lines
+### 9. Manufacturer portal: unused UI-kit components: 38 files, 4,403 lines
 
 **Delete candidate.** shadcn/ui components copied in when the portal was scaffolded and never used (accordion, calendar, carousel, chart, sidebar, menubar...).
 
@@ -235,7 +218,7 @@ Server code that has no other caller once these screens are gone (not counted ab
 | `manufacturer-portal/src/components/ui/toggle.tsx` | UI kit component: toggle | imported by no production file (import graph from every app entry point; tests and scripts excluded) | 43 | 1.5 KB | Low |
 | `manufacturer-portal/src/hooks/use-mobile.tsx` | UI kit component: use-mobile | imported by no production file (import graph from every app entry point; tests and scripts excluded) | 22 | 0.6 KB | Low |
 
-### 11. Shared libs: unused OpenAI integration templates: 21 files, 1,948 lines
+### 10. Shared libs: unused OpenAI integration templates: 21 files, 1,948 lines
 
 **Delete candidate.** Replit OpenAI integration scaffolding: a loose copy in lib/integrations/openai_ai_integrations (not a package, imported by nothing), the whole @workspace/integrations-openai-ai-react package (no app depends on it), and the voice/audio part of the server package. The server package itself stays: api-server uses its chat/image clients.
 
@@ -263,7 +246,7 @@ Server code that has no other caller once these screens are gone (not counted ab
 | `lib/integrations/openai_ai_integrations/src/server/image/client.ts` | OpenAI integration template: server/image/client.ts | imported by no production file (import graph from every app entry point; tests and scripts excluded) | 59 | 1.4 KB | Low |
 | `lib/integrations/openai_ai_integrations/src/server/image/index.ts` | OpenAI integration template: server/image/index.ts | imported by no production file (import graph from every app entry point; tests and scripts excluded) | 3 | 0.1 KB | Low |
 
-### 12. Unused assets: 1 files, 0 lines
+### 11. Unused assets: 1 files, 0 lines
 
 **Delete candidate.** Media files no code or config references.
 
@@ -293,7 +276,7 @@ Still live: `mobile/app/buyer-collection.tsx`, `mobile/app/c/[collectionId].tsx`
 
 ### Brand Memory: 0 unreachable files, 0 lines
 
-Live today via AI Settings → "Manage Brand Memory". The Consolidate screens session's commit deletes this screen and row (see coordination note).
+Live today via AI Settings → "Manage Brand Memory". externaldev21-sketch/brandthread#743 removes this screen and row (server and data kept) based on a different brief; that session is asking Dev which applies.
 
 Still live: `mobile/app/ai-brand-memory.tsx`, `mobile/services/aiBrandMemory.ts`
 
@@ -305,11 +288,11 @@ Unreachable now (kept): `mobile/app/mobile-app-builder.tsx`
 
 ## Left to the "Consolidate screens" session
 
-"Consolidate screens: 376 → lean app" (branch not pushed yet when this audit ran). These routes are being redirected or removed there, so this audit does not flag them: `/ai-assistant`, `/bg-removal`, `/buyer-account-control`, `/app-icon`, `/app-theme`, `/shipping-label`, `/automation`, `/mobile-app-builder`, `/metafields`, `/drafts`, `/buyer-refund-request`, `/ai-brand-memory`, `/seller-drops`, `/buyer-drops`.
+"Consolidate screens: 376 → lean app": externaldev21-sketch/brandthread#743 (core redirects), externaldev21-sketch/brandthread#748 (analytics), and a settings PR still to come (buyer-settings-menu, buyer-login-activity, customer-events). The full old → new table is artifacts/mobile/docs/route-map.md on those branches. These routes are being redirected or removed there, so this audit does not flag them: `/ai-assistant`, `/ai-brand-memory`, `/analytics-advanced`, `/analytics-audience`, `/analytics-cohorts`, `/analytics-content`, `/analytics-customers`, `/analytics-export`, `/analytics-goals`, `/analytics-inventory`, `/analytics-marketing`, `/analytics-product-stats`, `/analytics-production`, `/analytics-products`, `/analytics-profit`, `/analytics-sales`, `/analytics-store`, `/app-icon`, `/app-theme`, `/automation`, `/bg-removal`, `/buyer-account-control`, `/buyer-drops`, `/buyer-refund-request`, `/customer-events`, `/discount-codes`, `/drafts`, `/inventory`, `/metafields`, `/mobile-app-builder`, `/seller-drop-create`, `/seller-drop-preview`, `/seller-drops`, `/shipping-label`, `/shipping-rates`.
 
-> **Conflict:** Its commit deletes mobile-app-builder, ai-brand-memory, seller-drops and buyer-drops, which Dev asked to keep. That session was messaged about it.
+> **Conflict:** Its brief from Dev says Brand Memory and Drops stay "hidden/unlinked, so delete the routes but keep the data/server", so #743 removes ai-brand-memory and the drops screens and keeps the server and data. This audit's brief says keep those screens. That session is asking Dev to decide and will put the routes back if he says keep. It is restoring Mobile App Builder ("paused, not cancelled").
 
-Any route that session adds to lib/navigation/legacyRoutes comes off this list.
+This list leaves out every old route in that table: the six old Analytics detail screens (analytics-sales, -customers, -marketing, -production, -products, -profit) and customer-events now get redirects there instead of a plain delete.
 
 ## Overlap with open PRs
 
@@ -423,7 +406,7 @@ Need a small edit (they read a listed file by path):
 | `tests/seller-dashboard-neutral-surfaces.test.ts` | `components/SellerQuickActionsGrid.tsx` | Production code that only tests use |
 | `tests/tab-bar-full-screen-slide.test.ts` | `app/camera-capture.tsx` | Old camera capture (HOLD: protected tab-bar guard) |
 
-Also 13 e2e specs and screenshot scripts list some of these URLs in their route lists; drop the entries in the same delete PR.
+Also 10 e2e specs and screenshot scripts list some of these URLs in their route lists; drop the entries in the same delete PR.
 
 ## Bugs found
 
