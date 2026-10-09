@@ -10,7 +10,8 @@
  */
 import React, { useMemo } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { formatCents } from '@/lib/money';
 import type { CheckoutDisplayTotals } from '@/lib/checkoutReadiness';
@@ -50,7 +51,7 @@ export function ReviewItems({ session }: { session: CheckoutSession }) {
           </View>
           {item.imageUri
             ? <Image source={{ uri: item.imageUri }} style={THUMB} resizeMode="contain" />
-            : <View style={[THUMB, s.thumbFallback]}><Feather name="image" size={18} color={ck.subtle} /></View>}
+            : <View style={[THUMB, s.thumbFallback]}><Icon name="image" size={17} color={ck.subtle} /></View>}
         </View>
       ))}
     </View>
@@ -134,7 +135,7 @@ export function ReviewRow({
         <View style={s.rowValue}>
           {typeof value === 'string' ? <Text style={s.rowValueText} numberOfLines={1}>{value}</Text> : value}
         </View>
-        <Feather name={expanded ? 'chevron-down' : 'chevron-right'} size={18} color={ck.text} />
+        <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size={17} color={ck.text} />
       </Pressable>
       {expanded && children ? <View style={s.rowBody}>{children}</View> : null}
     </View>
