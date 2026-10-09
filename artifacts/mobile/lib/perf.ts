@@ -65,9 +65,11 @@ export function recordNavigationStart(route: string, queryClient?: QueryClient):
 }
 
 function logIfDone(entry: RoutePerfEntry) {
-  if (entry.firstRenderMs === null) return;
-  // eslint-disable-next-line no-console
-  console.log(
+  if (entry.firstRenderMs === null || !__DEV__) return;
+  // Dev-only diagnostic (entries are only recorded under __DEV__). `info`,
+  // not `log`, per the app's no-console.log rule; not `warn`, which would
+  // raise a LogBox toast on every navigation.
+  console.info(
     `[perf] ${entry.route} firstRender=${entry.firstRenderMs}ms` +
       (entry.dataMs !== null ? ` data=${entry.dataMs}ms` : ' data=(no query cache activity)'),
   );
