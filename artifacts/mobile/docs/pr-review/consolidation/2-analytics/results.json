@@ -1,0 +1,100 @@
+[
+  {
+    "name": "analytics-fresh",
+    "target": "/(tabs)/analytics",
+    "landed": "/analytics?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "analytics-demo",
+    "target": "/(tabs)/analytics",
+    "landed": "/analytics?bt_preview=seller&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "report-product-stats-demo",
+    "target": "/analytics-reports?report=product-stats",
+    "landed": "/analytics-reports?report=product-stats&bt_preview=seller&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "report-content-fresh",
+    "target": "/analytics-reports?report=content",
+    "landed": "/analytics-reports?report=content&bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "report-goals-demo",
+    "target": "/analytics-reports?report=goals",
+    "landed": "/analytics-reports?report=goals&bt_preview=seller&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "report-advanced-demo",
+    "target": "/analytics-reports?report=advanced",
+    "landed": "/analytics-reports?report=advanced&bt_preview=seller&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "report-cohorts-demo",
+    "target": "/analytics-reports?report=cohorts",
+    "landed": "/analytics-reports?report=cohorts&bt_preview=seller&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "tap-revenue-opens-product-stats",
+    "target": "/(tabs)/analytics",
+    "landed": "/analytics-reports?report=product-stats",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "tap-report-row-goals",
+    "target": "/(tabs)/analytics",
+    "landed": "/analytics-reports?report=goals",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-analytics-goals",
+    "target": "/analytics-goals",
+    "landed": "/analytics-reports?bt_preview=seller&demo=1&report=goals",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-analytics-sales",
+    "target": "/analytics-sales",
+    "landed": "/analytics?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-analytics-profit",
+    "target": "/analytics-profit",
+    "landed": "/finance?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-analytics-store",
+    "target": "/analytics-store",
+    "landed": "/analytics?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "reports-no-param",
+    "target": "/analytics-reports",
+    "landed": "/analytics",
+    "ok": true,
+    "notFound": false
+  }
+]
