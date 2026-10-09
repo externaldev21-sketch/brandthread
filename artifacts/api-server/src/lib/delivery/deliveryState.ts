@@ -2,7 +2,8 @@
  * Delivery-guarantee state changes against the database:
  *
  *  - stampDeliveryDeadlines  when a payment is captured: per-item and
- *    per-order deliver_by (15 / 60 days), pre-order flag, promised ship date.
+ *    per-order deliver_by (15 days; a pre-order 15 days after its promised
+ *    ship date, max 180), pre-order flag, promised ship date.
  *  - recordDelivery          carrier says delivered, or the buyer confirms.
  *    The ONLY way an order becomes "delivered"; sellers cannot.
  *  - applyCarrierTracking    a tracking update (Shippo webhook or poll):
@@ -17,7 +18,7 @@ import { db, drops, orderItems, orderTrackingEvents, orders, productVariants, pr
 import type { DbExecutor } from "../money/ledger";
 import { orderStatusMachine } from "../money/stateMachines";
 import { logger } from "../logger";
-import { computeDeliverBy, computePayoutReleaseAt } from "./policy";
+import { computeDeliverBy, computePayoutReleaseAt, computePreorderDeliverBy } from "./policy";
 import {
   notifyBuyerDelivered, notifyBuyerOutForDelivery,
 } from "./notifications";
@@ -47,22 +48,31 @@ export async function stampDeliveryDeadlines(executor: DbExecutor, orderId: stri
     .where(eq(orderItems.orderId, orderId));
   if (items.length === 0) return;
 
-  const preorderIds: string[] = [];
+  // Pre-order items are due 15 days after their own promised ship date
+  // (capped), so one deadline per distinct date.
+  const preorderByDeadline = new Map<number, string[]>();
   const regularIds: string[] = [];
   let promisedShip: Date | null = null;
+  let earliest: Date | null = null;
   for (const item of items) {
+    let deliverBy: Date;
     if (item.productPreorder || item.dropType === "pre-order") {
-      preorderIds.push(item.id);
       const ship = item.productShipDate ?? item.dropShipDate;
       if (ship && (!promisedShip || ship > promisedShip)) promisedShip = ship;
+      deliverBy = computePreorderDeliverBy(paidAt, ship);
+      const ids = preorderByDeadline.get(deliverBy.valueOf()) ?? [];
+      ids.push(item.id);
+      preorderByDeadline.set(deliverBy.valueOf(), ids);
     } else {
       regularIds.push(item.id);
+      deliverBy = computeDeliverBy(paidAt, false);
     }
+    if (!earliest || deliverBy < earliest) earliest = deliverBy;
   }
-  if (preorderIds.length) {
+  for (const [deadline, ids] of preorderByDeadline) {
     await executor.update(orderItems)
-      .set({ isPreorder: true, deliverBy: computeDeliverBy(paidAt, true) })
-      .where(inArray(orderItems.id, preorderIds));
+      .set({ isPreorder: true, deliverBy: new Date(deadline) })
+      .where(inArray(orderItems.id, ids));
   }
   if (regularIds.length) {
     await executor.update(orderItems)
@@ -70,10 +80,10 @@ export async function stampDeliveryDeadlines(executor: DbExecutor, orderId: stri
       .where(inArray(orderItems.id, regularIds));
   }
   await executor.update(orders).set({
-    isPreorder: preorderIds.length > 0,
+    isPreorder: preorderByDeadline.size > 0,
     promisedShipDate: promisedShip,
     // Earliest item deadline; refreshed as items are delivered/refunded.
-    deliverBy: computeDeliverBy(paidAt, regularIds.length === 0),
+    deliverBy: earliest,
     updatedAt: new Date(),
   }).where(eq(orders.id, orderId));
 }

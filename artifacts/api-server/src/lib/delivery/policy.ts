@@ -3,7 +3,9 @@
  * of its own: every function takes `now`).
  *
  *  - A regular order must be DELIVERED within 15 days of purchase; a
- *    pre-order within 60. Purchase = the moment Stripe captured the payment
+ *    pre-order within 15 days of the ship date the seller promised (60 days
+ *    from purchase when no date is known), never later than 180 days after
+ *    purchase. Purchase = the moment Stripe captured the payment
  *    (orders.paid_at). Deadlines are absolute instants (paid_at + N × 24h),
  *    so daylight-saving changes and server/phone time zones can never move
  *    them. Only *display* is time-zone aware (see formatDeadline).
@@ -17,6 +19,10 @@
  *   PAYOUT_MODE                  "hold" (default) | "immediate"
  *   PAYOUT_RELEASE_BUFFER_DAYS   days after delivery before the seller is paid (default 3)
  *   AUTO_REFUND_ENABLED          "false" turns the refund sweep off (default on)
+ *   PREORDER_DELIVERY_GRACE_DAYS days after the promised ship date a pre-order
+ *                                has to arrive (default 15, 1–60)
+ *   PREORDER_MAX_DELIVERY_DAYS   latest pre-order deadline, days after purchase
+ *                                (default 180, 60–180)
  */
 
 export const REGULAR_DELIVERY_DAYS = 15;
@@ -50,6 +56,51 @@ export function deliveryWindowDays(isPreorder: boolean): number {
 
 export function computeDeliverBy(purchasedAt: Date, isPreorder: boolean): Date {
   return new Date(purchasedAt.valueOf() + deliveryWindowDays(isPreorder) * DAY_MS);
+}
+
+export const DEFAULT_PREORDER_GRACE_DAYS = 15;
+export const MAX_PREORDER_DELIVERY_DAYS = 180;
+
+export function preorderGraceDays(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env.PREORDER_DELIVERY_GRACE_DAYS);
+  return env.PREORDER_DELIVERY_GRACE_DAYS && Number.isInteger(raw) && raw >= 1 && raw <= 60 ? raw : DEFAULT_PREORDER_GRACE_DAYS;
+}
+
+export function preorderMaxDeliveryDays(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env.PREORDER_MAX_DELIVERY_DAYS);
+  return env.PREORDER_MAX_DELIVERY_DAYS && Number.isInteger(raw) && raw >= PREORDER_DELIVERY_DAYS && raw <= MAX_PREORDER_DELIVERY_DAYS
+    ? raw : MAX_PREORDER_DELIVERY_DAYS;
+}
+
+/**
+ * The latest promised ship date a pre-order may carry, counted from when it
+ * is listed: delivery (ship date + grace) must fit inside the longest
+ * pre-order deadline, so the money is never refunded before the seller's
+ * own promise is due. 165 days with the defaults.
+ */
+export function maxPreorderShipDays(env: NodeJS.ProcessEnv = process.env): number {
+  return preorderMaxDeliveryDays(env) - preorderGraceDays(env);
+}
+
+/**
+ * A pre-order's delivery deadline: the promised ship date + the grace days
+ * (a date already past counts from purchase), capped at the longest
+ * pre-order deadline. With no ship date, the fixed 60-day window.
+ */
+export function computePreorderDeliverBy(
+  purchasedAt: Date,
+  promisedShipDate: Date | null | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): Date {
+  if (!promisedShipDate || Number.isNaN(promisedShipDate.valueOf())) return computeDeliverBy(purchasedAt, true);
+  const from = Math.max(promisedShipDate.valueOf(), purchasedAt.valueOf());
+  const latest = purchasedAt.valueOf() + preorderMaxDeliveryDays(env) * DAY_MS;
+  return new Date(Math.min(from + preorderGraceDays(env) * DAY_MS, latest));
+}
+
+/** Whole days from purchase to a deadline (for "not delivered within N days" copy). */
+export function windowDaysBetween(purchasedAt: Date, deliverBy: Date): number {
+  return Math.max(1, Math.round((deliverBy.valueOf() - purchasedAt.valueOf()) / DAY_MS));
 }
 
 export function computePayoutReleaseAt(deliveredAt: Date, env: NodeJS.ProcessEnv = process.env): Date {
@@ -195,12 +246,18 @@ export function undeliveredRefundCents(input: {
 
 // ─── Listing a pre-order ──────────────────────────────────────────────────────
 
-export type PreorderListingError = { status: 400; code: "PREORDER_SHIP_DATE_REQUIRED" | "PREORDER_SHIP_DATE_INVALID"; error: string };
+export type PreorderListingError = {
+  status: 400;
+  code: "PREORDER_SHIP_DATE_REQUIRED" | "PREORDER_SHIP_DATE_INVALID" | "PREORDER_SHIP_DATE_TOO_FAR";
+  error: string;
+};
 
 /**
  * A pre-order product must carry the seller's promised ship date, and a newly
- * supplied date must be in the future. `effective*` are the values the
- * product will have after the write (the request's, else the stored ones).
+ * supplied date must be in the future and close enough that delivery fits
+ * the longest pre-order deadline (maxPreorderShipDays). `effective*` are the
+ * values the product will have after the write (the request's, else the
+ * stored ones).
  */
 export function validatePreorderListing(input: {
   effectiveIsPreorder: boolean;
@@ -217,11 +274,18 @@ export function validatePreorderListing(input: {
     if (supplied.valueOf() < (input.now ?? new Date()).valueOf() - DAY_MS) {
       return { status: 400, code: "PREORDER_SHIP_DATE_INVALID", error: "preOrderEstShipDate must be in the future" };
     }
+    const maxDays = maxPreorderShipDays();
+    if (supplied.valueOf() > (input.now ?? new Date()).valueOf() + maxDays * DAY_MS) {
+      return {
+        status: 400, code: "PREORDER_SHIP_DATE_TOO_FAR",
+        error: `A pre-order must ship within ${maxDays} days, so it can be delivered within ${preorderMaxDeliveryDays()} days of purchase.`,
+      };
+    }
   }
   if (!input.effectiveShipDate) {
     return {
       status: 400, code: "PREORDER_SHIP_DATE_REQUIRED",
-      error: "A pre-order needs a ship date. Buyers are promised it, and the order is refunded automatically if it isn't delivered within 60 days.",
+      error: `A pre-order needs a ship date. Buyers are promised it, and the order is refunded automatically if it isn't delivered within ${preorderGraceDays()} days of that date.`,
     };
   }
   return null;

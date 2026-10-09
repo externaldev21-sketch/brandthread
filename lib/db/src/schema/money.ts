@@ -59,6 +59,9 @@ export const orderReleases = pgTable('order_releases', {
   labelCents:        integer('label_cents').notNull().default(0),
   bulkShareCents:    integer('bulk_share_cents').notNull().default(0),
   reversedCents:     integer('reversed_cents').notNull().default(0),
+  // Kept back from this release to pay a seller recovery (what the seller
+  // owes); decided once before the transfer (migration 261). NULL = not decided yet.
+  recoveryNettedCents: integer('recovery_netted_cents'),
   // Increments only after Stripe definitively rejects a transfer, so an
   // ambiguous failure is always retried with the same idempotency key.
   attempt:           integer('attempt').notNull().default(1),

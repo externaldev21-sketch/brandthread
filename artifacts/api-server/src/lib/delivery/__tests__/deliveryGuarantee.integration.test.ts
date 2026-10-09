@@ -144,12 +144,12 @@ async function feed(userId: string, type: string) {
 }
 
 describe("deadlines are stamped at purchase", () => {
-  it("regular = 15 days, pre-order = 60 days, each item on its own clock", async () => {
+  it("regular = 15 days, pre-order = promised ship date + 15 days, each item on its own clock", async () => {
     const { order } = await place({ lines: [{ price: 3000 }, { price: 2000, preorder: true, shipDate: at(30) }] });
     const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
     const byPreorder = (flag: boolean) => items.find((i) => i.isPreorder === flag)!;
     expect(byPreorder(false).deliverBy!.toISOString()).toBe(at(15).toISOString());
-    expect(byPreorder(true).deliverBy!.toISOString()).toBe(at(60).toISOString());
+    expect(byPreorder(true).deliverBy!.toISOString()).toBe(at(45).toISOString());
     const fresh = await reloadOrder(order.id);
     expect(fresh.deliverBy!.toISOString()).toBe(at(15).toISOString()); // earliest open deadline
     expect(fresh.isPreorder).toBe(true);
@@ -286,7 +286,7 @@ describe("15-day automatic refund (regular order)", () => {
 
 describe("60-day automatic refund (pre-order)", () => {
   it("waits 60 days, then refunds", async () => {
-    const { order } = await place({ lines: [{ price: 8000, preorder: true, shipDate: at(40) }] });
+    const { order } = await place({ lines: [{ price: 8000, preorder: true, shipDate: at(45) }] });
     await ship(order.id);
     expect((await sweep(at(16))).checked).toBe(0);
     expect((await sweep(at(59, 23))).checked).toBe(0);
@@ -297,7 +297,7 @@ describe("60-day automatic refund (pre-order)", () => {
   });
 
   it("one order with both kinds refunds the regular item at 15 days and the pre-order item at 60", async () => {
-    const { order } = await place({ lines: [{ price: 3000 }, { price: 2000, preorder: true }], shippingCents: 500 });
+    const { order } = await place({ lines: [{ price: 3000 }, { price: 2000, preorder: true, shipDate: at(45) }], shippingCents: 500 });
     await ship(order.id);
     const day15 = await sweep(at(15, 1));
     expect(day15.partial).toBe(1);

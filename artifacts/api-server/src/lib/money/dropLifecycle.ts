@@ -18,6 +18,7 @@ import { sweepGiftCardPayouts } from "../giftCards/payout";
 import { stripe as giftCardStripe } from "../stripe";
 import { refundOrder, RefundError } from "./refunds";
 import { payoutHoldApplies } from "../delivery/payoutGate";
+import { maxPreorderShipDays, preorderMaxDeliveryDays } from "../delivery/policy";
 import { DROP_OPEN_STATES, orderStatusMachine, type OrderStatus } from "./stateMachines";
 
 /**
@@ -45,9 +46,18 @@ function rows<T>(result: unknown): T[] {
   return ((result as { rows?: T[] }).rows ?? []);
 }
 
+/**
+ * The latest a drop's fulfilment deadline may be: an order shipped on the
+ * deadline must still be deliverable within the longest pre-order delivery
+ * deadline (lib/delivery/policy.ts: 180 days − 15 grace = 165 days).
+ */
+export function maxFulfillmentDeadlineDays(env: NodeJS.ProcessEnv = process.env): number {
+  return Math.min(MAX_PREORDER_HOLD_DAYS, maxPreorderShipDays(env));
+}
+
 export function defaultFulfillmentDeadline(input: { estimatedShipDate?: Date | null; now?: Date }): Date {
   const now = input.now ?? new Date();
-  const max = new Date(now.valueOf() + MAX_PREORDER_HOLD_DAYS * 86_400_000);
+  const max = new Date(now.valueOf() + maxFulfillmentDeadlineDays() * 86_400_000);
   const fromShipDate = input.estimatedShipDate
     ? new Date(input.estimatedShipDate.valueOf() + DEFAULT_DEADLINE_GRACE_DAYS * 86_400_000)
     : max;
@@ -58,8 +68,19 @@ export function defaultFulfillmentDeadline(input: { estimatedShipDate?: Date | n
 export function validateFulfillmentDeadline(deadline: Date, now = new Date()): string | null {
   if (Number.isNaN(deadline.valueOf())) return "fulfillmentDeadlineAt must be a valid ISO date";
   if (deadline.valueOf() <= now.valueOf()) return "fulfillmentDeadlineAt must be in the future";
-  if (deadline.valueOf() > now.valueOf() + MAX_PREORDER_HOLD_DAYS * 86_400_000) {
-    return `fulfillmentDeadlineAt can be at most ${MAX_PREORDER_HOLD_DAYS} days away`;
+  const maxDays = maxFulfillmentDeadlineDays();
+  if (deadline.valueOf() > now.valueOf() + maxDays * 86_400_000) {
+    return `fulfillmentDeadlineAt can be at most ${maxDays} days away, so every order can still be delivered within ${preorderMaxDeliveryDays()} days`;
+  }
+  return null;
+}
+
+/** Validates a pre-order drop's estimated ship date. Returns an error message or null. */
+export function validatePreorderShipDate(shipDate: Date, now = new Date()): string | null {
+  if (Number.isNaN(shipDate.valueOf())) return "estimatedShipDate must be a valid ISO date";
+  const maxDays = maxPreorderShipDays();
+  if (shipDate.valueOf() > now.valueOf() + maxDays * 86_400_000) {
+    return `estimatedShipDate can be at most ${maxDays} days away, so orders can be delivered within ${preorderMaxDeliveryDays()} days of purchase`;
   }
   return null;
 }

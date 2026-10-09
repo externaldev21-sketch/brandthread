@@ -83,6 +83,10 @@ Buyer cancellation, seller cancellation, approved return, failed drop and overso
   proportionally (application-fee refund). Stripe keeps its processing fee, so the seller bears it.
 - Held orders: the refund comes out of that order's held money. If the order was already released, that
   release transfer is reversed. Anything that cannot be covered becomes a drop shortfall.
+- One-page checkout orders (`transfer`, no drop): before the payout, the order holds only the seller's net
+  (Stripe's fee and any label were already paid from it), so a full refund needs more than it holds. That
+  part (Stripe's fee, the label) is a seller debt in `seller_recoverable`, netted from the seller's next
+  payout (§2.6). It used to be an orphan seller-level `seller_held` row that nothing ever collected.
 - A full cancellation parks the order in `refund_pending` while Stripe works. On success it is cancelled
   and restocked; if Stripe refuses, it goes back to its previous status.
 - Repeating a refund with the same key returns the first refund and never pays twice.
@@ -97,11 +101,33 @@ movement; the money already left. `lib/money/disputes.ts` records it like a claw
   (and the drop wallet). Already released, or an in-stock order: `platform_funds_advanced` (seller) -amount,
   meaning the seller owes it to Brandthread. Posted once per Stripe event (`dispute-withdrawn/<dispute>/<event>`).
 - Reinstatement (won): the exact opposite of each withdrawal it reverses (`dispute-reinstated/<tx id>`).
-- **Not modelled:** Stripe's dispute fee. The amount is stored on the `dispute_events` row (`feeCents`) but
-  no ledger posting is made, because who bears it (seller, platform, or split) is an owner decision.
+- **Stripe's dispute fee — decision: the seller bears it**, won or lost, except when Stripe returns it. When
+  the dispute closes (`charge.dispute.closed`, and again on a later `funds_reinstated`), the final fee is read
+  from the dispute's balance transactions (net of any fee Stripe returned; Stripe's default
+  `STRIPE_DISPUTE_FEE_CENTS`, $15, when a lost dispute carries none) and the difference to what was already
+  booked is posted: `stripe_dispute_fees` +fee, `seller_recoverable` (seller) −fee
+  (`dispute-fee/<dispute>/<event>`). It is netted from the seller's next payout (§2.6). An open dispute is
+  never charged, so a won dispute with the fee returned costs the seller nothing.
+- **Lost chargeback — decision: recovered from the seller's next payouts.** When the dispute closes as lost,
+  the part of the withdrawal that the order's held money did not cover (`platform_funds_advanced`, or a
+  seller-level `seller_held` row) moves to `seller_recoverable` (`dispute-lost/<withdrawal tx>`), so the
+  next release nets it. A reinstatement after a loss reverses that move (`dispute-lost-reversed/<tx>`).
+  The seller bears the whole disputed amount, as before; Brandthread keeps its 5%.
 - The seller is notified (push + in-app, deep link to `/dispute-detail`) when a dispute opens, 48 hours before
   the evidence deadline (`jobs/disputeEvidenceReminder.ts`), and when it is won or lost. Every step is
   idempotent; replays change nothing. The timeline lives in `dispute_events` (migration 114).
+
+### 2.6 Collecting what a seller owes (`lib/money/sellerRecovery.ts`)
+
+`seller_recoverable` (party = seller; negative = owed) collects refund costs Brandthread fronted (§2.4), lost
+chargebacks and dispute fees (§2.5). Every order release (`executeOrderRelease`) and one-page-checkout
+transfer (`settleTransferOrder`) nets it first: `seller_held`(order) −n, `seller_recoverable` +n
+(`recovery-netting/order-release/<order>` or `…/order-transfer/<order>`), and the Stripe transfer is n
+smaller. The amount is decided once, before the first transfer attempt, and stored in
+`recovery_netted_cents` (orders / order_releases, migration 261), so a retry sends the same amount under the
+same idempotency key. `GET /api/finance/summary` counts it in `owed` and returns it as `recoveryOwedCents`.
+Drop shortfalls keep their own mechanism (later releases of the drop absorb them). Destination-charge
+payouts are not netted (the money goes straight to the seller).
 
 ## 3. Fees and rounding
 
@@ -323,10 +349,12 @@ from Stripe documentation excerpts, search results, and card-network rules; each
    Confirm the platform's liability when a seller's balance is insufficient, and whether account debits
    are enabled.
 8. **Disputes on held orders** land on the platform charge. Decide whether the disputed amount is deducted
-   from the drop or the order's release (today: the withdrawal is taken from the order's held money in the ledger, §2.5; the dispute fee is not posted).
+   from the drop or the order's release (today: the withdrawal is taken from the order's held money in the ledger; a lost remainder and the dispute fee are netted from the seller's next payouts, §2.5–2.6).
 9. **Collecting what sellers owe** (a failed drop's shortfall, unrecovered labels). It is recorded and shown
    to the seller, but not collected automatically. Decide the policy: deduct from future releases, account
    debits, or invoices.
+   Refund costs on one-page-checkout orders, lost chargebacks and dispute fees are now deducted from the
+   seller's future releases (§2.6); a seller with no future sales still needs account debits or an invoice.
 10. **Who bears Stripe's fee on a refund.** Today the seller does (Stripe keeps it). Confirm that policy,
     especially for failed drops.
 
@@ -380,7 +408,7 @@ stranded; *Medium* = incorrect balances or missing safety; *Low* = hygiene.
 |---|---|
 | A cart with one seller's preorder **and** in-stock items | The app groups checkout by seller. The server now refuses these with a clear `MIXED_PREORDER_CART` message. The app should split checkout groups by (seller, preorder drop). |
 | Collecting money sellers owe (drop shortfalls, unrecovered labels) | Recorded in the ledger and shown on the finance screen; collection policy is an owner decision (§8, item 9). |
-| Dispute fee | Stored on the dispute timeline, not posted to the ledger (§2.5, §8 item 8). |
+| Dispute fee | Charged to the seller when the dispute closes and netted from their next payout (§2.5, §2.6). |
 | A label voided **after** its order was released | The refund goes back into that order's held balance and needs a manual payout. Rare. |
 | Manual transfer reversals made in the Stripe dashboard on release transfers | Not reconciled automatically. |
 | Sample/bulk cards paid by the seller's card | Brandthread's 5% applies (existing); Stripe's fee on those charges is paid by Brandthread and not tracked in the ledger. Bulk payments from held funds carry no platform fee. Owner decision. |

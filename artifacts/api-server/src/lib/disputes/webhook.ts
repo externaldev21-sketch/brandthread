@@ -103,6 +103,12 @@ export interface DisputeDeps {
       amountCents: number; chargeId: string | null; occurredAt: Date;
     }): Promise<unknown>;
     reinstate(input: { stripeDisputeId: string; occurredAt: Date }): Promise<unknown>;
+    /**
+     * The dispute reached a final status (closed, or reinstated after it):
+     * book Stripe's final dispute fee and a lost chargeback as what the
+     * seller owes (lib/money/sellerRecovery.ts). Optional.
+     */
+    settle?(input: { dispute: any; orderId: string; stripeEventId: string }): Promise<unknown>;
   };
   notify(n: {
     userId: string; category: string; type: string; title: string; body: string;
@@ -231,6 +237,10 @@ export async function processDisputeEvent(event: StripeEventLike, deps: DisputeD
     }
   } else if (event.type === "charge.dispute.funds_reinstated") {
     await deps.ledger.reinstate({ stripeDisputeId: d.id, occurredAt });
+  }
+  if ((event.type === "charge.dispute.closed" || event.type === "charge.dispute.funds_reinstated")
+    && dispute.orderId && deps.ledger.settle) {
+    await deps.ledger.settle({ dispute: d, orderId: dispute.orderId, stripeEventId: event.id });
   }
 
   // 5. Notification, once. Unknown sellers have nobody to tell.

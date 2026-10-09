@@ -30,6 +30,7 @@ import {
 } from "./stateMachines";
 import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode, type ChargeDetails } from "./stripeMoney";
 import { payoutHoldApplies, payoutReleasableSql, payoutTimeReached, hasOpenReturn } from "../delivery/payoutGate";
+import { netRecoveriesFromRelease } from "./sellerRecovery";
 import type Stripe from "stripe";
 
 type StripeLike = Pick<Stripe, "transfers">;
@@ -340,9 +341,11 @@ export async function requestOrderRelease(
     // funds stay held until it is delivered + the buffer, even though it has
     // tracking. Drop orders without a deadline keep the old tracking release.
     if (payoutHoldApplies({ deliverBy: order.deliver_by })) {
+      // Raw rows carry timestamps as strings; the gate compares instants.
+      const asDate = (value: Date | string | null) => (value === null ? null : new Date(value));
       const reached = payoutTimeReached({
-        deliverBy: order.deliver_by, deliveredAt: order.delivered_at,
-        payoutReleaseAt: order.payout_release_at, disputePausedAt: order.dispute_paused_at,
+        deliverBy: asDate(order.deliver_by), deliveredAt: asDate(order.delivered_at),
+        payoutReleaseAt: asDate(order.payout_release_at), disputePausedAt: asDate(order.dispute_paused_at),
       }, now);
       if (!reached || await hasOpenReturn(tx, orderId)) return { status: "awaiting_delivery" } as const;
     }
@@ -430,6 +433,8 @@ export type ReleaseExecution = {
   amountCents: number;
   stripeTransferId: string | null;
   errorCode?: string | null;
+  /** Kept back from this release to pay what the seller owes (sellerRecovery.ts). */
+  recoveryNettedCents?: number;
 };
 
 /**
@@ -453,6 +458,7 @@ export async function executeOrderRelease(
     const [release] = rows<{
       id: string; order_id: string; drop_id: string | null; seller_id: string; state: string;
       amount_cents: number; attempt: number; stripe_transfer_id: string | null; updated_at: Date;
+      recovery_netted_cents: number | null;
     }>(await tx.execute(sql`SELECT * FROM order_releases WHERE id = ${releaseId}::uuid FOR UPDATE`));
     if (!release) throw new Error(`Release ${releaseId} not found`);
     const staleTransfer = release.state === "transferring" && options.reclaimStale
@@ -474,6 +480,23 @@ export async function executeOrderRelease(
       }).where(eq(orderReleases.id, releaseId));
       return { release: { ...release, state: release.state }, go: false as const, blocked: true };
     }
+    // A seller who owes Brandthread (refund costs, a lost chargeback, a
+    // dispute fee) has it netted from this release first. Decided once,
+    // before the first transfer attempt, so every retry sends the same
+    // amount under the same idempotency key.
+    let netted = release.recovery_netted_cents;
+    if (netted === null || netted === undefined) {
+      const net = await netRecoveriesFromRelease(tx, {
+        sellerId: release.seller_id,
+        orderId: release.order_id,
+        dropId: release.drop_id,
+        availableCents: release.amount_cents,
+        ledgerKey: `order-release/${release.order_id}`,
+        releaseRef: releaseId,
+      });
+      netted = net.nettedCents;
+      await tx.update(orderReleases).set({ recoveryNettedCents: netted }).where(eq(orderReleases.id, releaseId));
+    }
     if (!staleTransfer) {
       releaseMachine.assert(release.state as "pending" | "failed", "transferring");
       await tx.update(orderReleases).set({
@@ -489,6 +512,7 @@ export async function executeOrderRelease(
       go: true as const,
       destination: seller?.stripeAccountId ?? null,
       chargeId: order?.stripeChargeId ?? null,
+      netted,
     };
   });
 
@@ -504,11 +528,13 @@ export async function executeOrderRelease(
   }
 
   const release = claim.release;
+  const netted = Math.max(0, claim.netted ?? 0);
+  const transferAmount = release.amount_cents - netted;
   let transferId: string | null = null;
-  if (release.amount_cents > 0) {
+  if (transferAmount > 0) {
     try {
       const transfer = await stripeClient!.transfers.create({
-        amount: release.amount_cents,
+        amount: transferAmount,
         currency: "usd",
         destination: claim.destination!,
         ...(release.drop_id ? { transfer_group: `drop_${release.drop_id}` } : {}),
@@ -538,6 +564,7 @@ export async function executeOrderRelease(
         amountCents: release.amount_cents,
         stripeTransferId: null,
         errorCode: stripeErrorCode(error),
+        recoveryNettedCents: netted,
       };
     }
   }
@@ -554,7 +581,7 @@ export async function executeOrderRelease(
       .returning({ id: orderReleases.id });
     if (!settled) return;
     await moveOrderFunds(tx, release.order_id, "release_pending", "released");
-    if (release.amount_cents > 0) {
+    if (transferAmount > 0) {
       await postLedgerTransaction(tx, {
         idempotencyKey: `order-release/${release.order_id}`,
         kind: "order_released",
@@ -564,8 +591,8 @@ export async function executeOrderRelease(
         stripeObjectId: transferId,
         memo: "Held preorder funds released to the seller for one shipped order",
         postings: [
-          { account: "seller_held", partyId: release.seller_id, amountCents: -release.amount_cents },
-          { account: "seller_paid_out", partyId: release.seller_id, amountCents: release.amount_cents },
+          { account: "seller_held", partyId: release.seller_id, amountCents: -transferAmount },
+          { account: "seller_paid_out", partyId: release.seller_id, amountCents: transferAmount },
         ],
       });
     }
@@ -577,9 +604,11 @@ export async function executeOrderRelease(
         await tx.insert(dropWalletTransactions).values({
           walletId: wallet.id,
           type: "release",
-          amountCents: release.amount_cents,
+          amountCents: transferAmount,
           orderId: release.order_id,
-          description: "Released to seller on shipment",
+          description: netted > 0
+            ? `Released to seller on shipment ($${(netted / 100).toFixed(2)} kept for what the seller owes)`
+            : "Released to seller on shipment",
           stripeTransferId: transferId,
         });
       }
@@ -587,7 +616,7 @@ export async function executeOrderRelease(
     }
   });
 
-  return { releaseId, state: "paid", amountCents: release.amount_cents, stripeTransferId: transferId };
+  return { releaseId, state: "paid", amountCents: release.amount_cents, stripeTransferId: transferId, recoveryNettedCents: netted };
 }
 
 /**
