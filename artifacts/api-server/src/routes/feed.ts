@@ -13,6 +13,7 @@
  * watch_time, rewatch, shop taps, add-to-bag, skip, and not-interested.
  */
 import { attachQuoteData } from "../lib/quotedPosts";
+import { taggedProductVisibleTo } from "../lib/productVisibility";
 import { Router } from "express";
 import { db, posts, interactions, users, liveStreams, postTaggedProducts, products, productVariants } from "@workspace/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -27,7 +28,6 @@ import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { serveSponsoredSlots } from "../lib/promotions/sponsoredService";
 import { injectSponsored } from "../lib/promotions/sponsored";
-import { taggedProductVisibleTo } from "../lib/productVisibility";
 
 const router = Router();
 
