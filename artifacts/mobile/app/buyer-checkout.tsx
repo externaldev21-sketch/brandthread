@@ -77,6 +77,7 @@ import { ApiError } from '@/lib/networkNotice';
 import { CheckoutSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { StickyFooter } from '@/components/layout';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
+import { track } from '@/lib/analytics';
 import { Button, ErrorState, IconButton } from '@/components/ui';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { CheckoutSection, GUTTER, useCheckoutColors, type CheckoutColors } from '@/components/checkout/CheckoutPrimitives';
@@ -523,6 +524,7 @@ export default function BuyerCheckoutScreen() {
     }
     setVerifiedOrders(confirmed);
     setPendingSessionIds(status?.complete ? [] : [`${PI_PREFIX}${started.paymentIntentId}`]);
+    track('checkout_completed', { flow: 'one_page', item_count: base.deliveryGroups.reduce((n, group) => n + group.items.length, 0) });
     void trackAndRelayConversionEvent(
       'Purchase',
       { value: started.amountCents / 100, currency: base.summary.currency, content_ids: base.deliveryGroups.flatMap(group => group.items.map(item => item.productId)) },
@@ -809,6 +811,7 @@ export default function BuyerCheckoutScreen() {
           // Meta Pixel + Conversions API — fires exactly once per newly
           // verified order.
           const purchaseValueCents = verification.amountTotal ?? current.summary.totalCents;
+          track('checkout_completed', { flow: isSignedIn ? 'hosted' : 'guest', item_count: group.items.length });
           void trackAndRelayConversionEvent(
             'Purchase',
             { value: purchaseValueCents / 100, currency: current.summary.currency, content_ids: group.items.map(item => item.productId) },

@@ -103,6 +103,141 @@ export function fmtRelative(iso: string | Date): string {
   return fmtDate(d);
 }
 
+// ─── Locale-aware formatting (device locale + time zone) ─────────────────────
+//
+// New code should prefer these over the fixed en-US helpers above. They
+// follow the device's locale and time zone, so an en-US device sees exactly
+// what the helpers above print (e.g. "$12.50", "Aug 18, 2026") while other
+// regions get their own conventions. Formatters are cached per locale/options.
+
+type DateInput = string | number | Date;
+
+function toDate(value: DateInput): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+/** The device locale as the JS engine resolves it (e.g. "en-US"), falling back to "en-US". */
+export function getDeviceLocale(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().locale || 'en-US';
+  } catch {
+    return 'en-US';
+  }
+}
+
+/** The device IANA time zone (e.g. "America/New_York"), or undefined when unknown. */
+export function getDeviceTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const numberFormatCache = new Map<string, Intl.NumberFormat>();
+function currencyFormatter(currency: string, locale: string): Intl.NumberFormat {
+  const key = `${locale}|${currency}`;
+  let fmt = numberFormatCache.get(key);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, { style: 'currency', currency });
+    numberFormatCache.set(key, fmt);
+  }
+  return fmt;
+}
+
+/**
+ * Formats an amount in MINOR units (cents for USD, yen for JPY) in its currency.
+ * @example formatMoney(1250) → "$12.50" (en-US)   formatMoney(1250, 'EUR', 'de-DE') → "12,50 €"
+ */
+export function formatMoney(amountMinor: number, currency = 'USD', locale?: string): string {
+  const code = (currency || 'USD').toUpperCase();
+  try {
+    const fmt = currencyFormatter(code, locale ?? getDeviceLocale());
+    const digits = fmt.resolvedOptions().maximumFractionDigits ?? 2;
+    return fmt.format(amountMinor / 10 ** digits);
+  } catch {
+    // Unknown currency code or no Intl support: plain, unambiguous fallback.
+    const value = (amountMinor / 100).toFixed(2);
+    return code === 'USD' ? `$${value}` : `${code} ${value}`;
+  }
+}
+
+/** Formats an amount in MAJOR units (dollars, euros). Prefer formatMoney with integer minor units for money math. */
+export function formatMoneyMajor(amount: number, currency = 'USD', locale?: string): string {
+  const code = (currency || 'USD').toUpperCase();
+  try {
+    return currencyFormatter(code, locale ?? getDeviceLocale()).format(amount);
+  } catch {
+    return code === 'USD' ? `$${amount.toFixed(2)}` : `${code} ${amount.toFixed(2)}`;
+  }
+}
+
+const dateFormatCache = new Map<string, Intl.DateTimeFormat>();
+function dateFormatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let fmt = dateFormatCache.get(key);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, options);
+    dateFormatCache.set(key, fmt);
+  }
+  return fmt;
+}
+
+const SHORT_DATE: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+
+/**
+ * Formats a date in the device locale and time zone. Defaults to a short date
+ * ("Aug 18, 2026" on en-US); pass Intl options for other shapes. Returns ""
+ * for an invalid date.
+ */
+export function formatDate(value: DateInput, options: Intl.DateTimeFormatOptions = SHORT_DATE, locale?: string): string {
+  const d = toDate(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const timeZone = options.timeZone ?? getDeviceTimeZone();
+  try {
+    return dateFormatter(locale ?? getDeviceLocale(), timeZone ? { ...options, timeZone } : options).format(d);
+  } catch {
+    return d.toDateString();
+  }
+}
+
+/** Short date plus time ("Aug 18, 2026, 3:42 PM" on en-US) in the device locale and time zone. */
+export function formatDateTime(value: DateInput, locale?: string): string {
+  return formatDate(value, { ...SHORT_DATE, hour: 'numeric', minute: '2-digit' }, locale);
+}
+
+/**
+ * Compact relative time ("5m ago", "3h ago", "2d ago" on en-US), then a short
+ * date after a week. Uses Intl.RelativeTimeFormat when the engine has it.
+ */
+export function formatRelative(value: DateInput, now: number = Date.now(), locale?: string): string {
+  const d = toDate(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const diffMin = Math.floor((now - d.getTime()) / 60_000);
+  const loc = locale ?? getDeviceLocale();
+  const Rtf = typeof Intl !== 'undefined' ? Intl.RelativeTimeFormat : undefined;
+  const rel = (n: number, unit: Intl.RelativeTimeFormatUnit, fallback: string): string => {
+    try {
+      return Rtf ? new Rtf(loc, { style: 'narrow', numeric: 'always' }).format(-n, unit) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  if (diffMin < 1) {
+    try {
+      return Rtf ? new Rtf(loc, { numeric: 'auto' }).format(0, 'second') : 'just now';
+    } catch {
+      return 'just now';
+    }
+  }
+  if (diffMin < 60) return rel(diffMin, 'minute', `${diffMin}m ago`);
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return rel(diffH, 'hour', `${diffH}h ago`);
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 7) return rel(diffD, 'day', `${diffD}d ago`);
+  return formatDate(d, SHORT_DATE, loc);
+}
+
 // ─── Percentages ──────────────────────────────────────────────────────────────
 
 /**

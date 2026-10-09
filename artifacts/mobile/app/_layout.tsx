@@ -98,6 +98,7 @@ import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
+import ForceUpdateGate from '@/components/ForceUpdateGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 import { StatusBarMask, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
@@ -1351,6 +1352,7 @@ function RootLayoutNav() {
       <AnalyticsBridge />
       <LegalAcceptanceGate />
       <AppLockGate />
+      <ForceUpdateGate />
     </View>
   );
 }

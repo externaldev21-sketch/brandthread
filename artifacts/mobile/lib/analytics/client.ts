@@ -24,6 +24,8 @@ type Queued = { event: string; distinct_id: string; properties: Record<string, u
 
 export type AnalyticsClient = {
   enabled: boolean;
+  /** True when an event tracked now would actually be queued (key, consent, not suppressed). */
+  isSending(): boolean;
   track(event: AnalyticsEventName, props?: AnalyticsProps): void;
   identify(userId: string | null | undefined): void;
   setConsent(granted: boolean): void;
@@ -39,7 +41,7 @@ function anonymousId(): string {
 export function createAnalyticsClient(options: AnalyticsClientOptions = {}): AnalyticsClient {
   const key = resolveKey(options.key);
   if (!key) {
-    return { enabled: false, track() {}, identify() {}, setConsent() {}, setSuppressed() {}, setPlatform() {}, async flush() {} };
+    return { enabled: false, isSending: () => false, track() {}, identify() {}, setConsent() {}, setSuppressed() {}, setPlatform() {}, async flush() {} };
   }
   const endpoint = `${resolveHost(options.host)}/batch/`;
   const doFetch = options.fetchImpl ?? (typeof fetch === 'function' ? fetch.bind(globalThis) : undefined);
@@ -87,6 +89,7 @@ export function createAnalyticsClient(options: AnalyticsClientOptions = {}): Ana
 
   return {
     enabled: true,
+    isSending: () => consent && !suppressed,
     track(event, props) {
       try {
         if (!consent || suppressed) return;

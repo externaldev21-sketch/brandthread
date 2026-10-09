@@ -25,6 +25,7 @@ import { formatCents } from '@/lib/money';
 import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
+import { clearCheckoutTokens, restoreCheckoutSession, serializeCheckoutSession } from '@/lib/secureCheckoutTokens';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
@@ -624,14 +625,19 @@ export async function validateCart(items: CartItem[], discountCodes: string[] = 
 async function loadCheckout(k: CartKeys = keys()): Promise<CheckoutSession | null> {
   try {
     const raw = await AsyncStorage.getItem(k.checkout);
-    if (raw) return JSON.parse(raw) as CheckoutSession;
+    if (raw) {
+      // Guest checkout tokens live in secure storage on native (lib/secureCheckoutTokens.ts).
+      return await restoreCheckoutSession(JSON.parse(raw) as CheckoutSession, k.userId, async (stripped) => {
+        await AsyncStorage.setItem(k.checkout, JSON.stringify(stripped));
+      });
+    }
   } catch {}
   return null;
 }
 
 async function saveCheckout(session: CheckoutSession, k: CartKeys = keys()): Promise<void> {
   session.updatedAt = now();
-  await AsyncStorage.setItem(k.checkout, JSON.stringify(session));
+  await AsyncStorage.setItem(k.checkout, await serializeCheckoutSession(session, k.userId));
 }
 
 export async function createCheckoutSession(
@@ -747,7 +753,9 @@ export async function saveCheckoutProgress(session: CheckoutSession): Promise<Ch
 }
 
 export async function clearCheckoutSession(): Promise<void> {
-  await AsyncStorage.removeItem(keys().checkout);
+  const k = keys();
+  await AsyncStorage.removeItem(k.checkout);
+  await clearCheckoutTokens(k.userId);
 }
 
 // ─── Discounts ────────────────────────────────────────────────────────────────
@@ -1056,6 +1064,7 @@ export async function clearCartCache(userId?: string): Promise<void> {
     );
     if (toRemove.length > 0) await AsyncStorage.multiRemove(toRemove);
   } catch {}
+  await clearCheckoutTokens(u);
 }
 
 // ─── Cancellation ─────────────────────────────────────────────────────────────

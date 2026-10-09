@@ -58,13 +58,14 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { isReturnEligible, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
+import { formatDate } from '@/lib/format';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const GRAD_CARD_GLOW = ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)'] as const;
 
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatDate(iso, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 // Builds a real carrier tracking URL from the carrier name + tracking number.

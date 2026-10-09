@@ -16,6 +16,7 @@ import { useApi } from '@/lib/api';
 import { StatusBadge } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
+import { formatDate } from '@/lib/format';
 import { useUser } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -201,9 +202,7 @@ export default function CustomerOrdersScreen() {
                   <View style={s.orderLeft}>
                     <Text style={[s.orderNum, { color: colors.foreground }]}>#{order.orderNumber}</Text>
                     <Text style={[s.orderDate, { color: colors.mutedForeground }]}>
-                      {new Date(order.createdAt).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric',
-                      })}
+                      {formatDate(order.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </Text>
                     {order.trackingNumber ? (
                       <Text style={[s.trackingText, { color: colors.mutedForeground }]}>
