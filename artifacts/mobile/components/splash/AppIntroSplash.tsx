@@ -46,6 +46,7 @@ import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { DEFAULT_THEME, peekPersistedTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { consumeFirstLaunch } from '@/lib/introSplash';
 import { hapticLight } from '@/lib/haptics';
+import { FONT } from '@/lib/theme';
 
 const LOGO_BOX = 132;
 const SWEEP_WIDTH = LOGO_BOX * 0.9;
@@ -408,7 +409,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   wordmarkChar: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: FONT.semibold,
     fontSize: 13,
     letterSpacing: 4,
   },
