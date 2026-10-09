@@ -26,9 +26,9 @@ import { db, orders, users } from "@workspace/db";
 import { stripe as defaultStripe } from "../stripe";
 import { logger } from "../logger";
 import { orderHeldCents, postLedgerTransaction } from "./ledger";
+import { netRecoveriesFromRelease } from "./sellerRecovery";
 import { orderFundsMachine } from "./stateMachines";
 import { payoutMayRelease, payoutReleasableSql } from "../delivery/payoutGate";
-import { netRecoveriesFromRelease } from "./sellerRecovery";
 import { isDefinitiveStripeRejection, stripeErrorCode } from "./stripeMoney";
 import {
   expiredReservationCheckouts, releaseStockReservation,
