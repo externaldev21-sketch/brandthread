@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import crypto from "node:crypto";
-import { inArray } from "drizzle-orm";
-import { cartItems, db, notificationsFeed, users } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
+import { cartItems, db, notificationsFeed, products, users } from "@workspace/db";
 
 const sent = vi.hoisted(() => ({ pushes: [] as Array<{ userId: string; category?: string; body: string }>, emails: [] as string[] }));
 
@@ -26,7 +26,9 @@ const stale = `cart-stale-${suffix}`;        // 30h old → feed + email
 const optedOut = `cart-optout-${suffix}`;    // 30h old, email off
 const saved = `cart-saved-${suffix}`;        // saved for later → nothing
 const fresh = `cart-fresh-${suffix}`;        // 10 minutes old → nothing
-const ids = [recent, stale, optedOut, saved, fresh];
+const gone = `cart-gone-${suffix}`;          // 2h old, product deleted → nothing
+const ids = [recent, stale, optedOut, saved, fresh, gone];
+let goneProductId = "";
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3600_000);
 const line = (name: string) => ({ productName: name, variantTitle: "M / Black", quantity: 1, priceCents: 4200 });
 
@@ -35,7 +37,12 @@ beforeAll(async () => {
     clerkId, email: `${clerkId}@test.local`, name: clerkId, role: "buyer", accountType: "buyer",
     notificationPreferences: clerkId === optedOut ? { "email:cart_reminders": false } : undefined,
   })));
+  const [goneProduct] = await db.insert(products).values({
+    ownerId: `cart-seller-${suffix}`, name: `cart-gone-${suffix}`, status: "active", deletedAt: new Date(),
+  }).returning({ id: products.id });
+  goneProductId = goneProduct.id;
   await db.insert(cartItems).values([
+    { userId: gone, variantId: "v1", itemData: { ...line("Deleted Tee"), productId: goneProductId }, updatedAt: hoursAgo(2) },
     { userId: recent, variantId: "v1", itemData: line("Logo Tee"), updatedAt: hoursAgo(2) },
     { userId: recent, variantId: "v2", itemData: line("Cap"), updatedAt: hoursAgo(2) },
     { userId: stale, variantId: "v1", itemData: line("Hoodie"), updatedAt: hoursAgo(30) },
@@ -49,6 +56,7 @@ afterAll(async () => {
   await db.delete(notificationsFeed).where(inArray(notificationsFeed.userId, ids));
   await db.delete(cartItems).where(inArray(cartItems.userId, ids));
   await db.delete(users).where(inArray(users.clerkId, ids));
+  if (goneProductId) await db.delete(products).where(eq(products.id, goneProductId));
 });
 
 describe("runCartReminders", () => {
@@ -68,5 +76,6 @@ describe("runCartReminders", () => {
     expect(byUser[optedOut]).toBe("abandoned_cart");
     expect(byUser[saved]).toBeUndefined();
     expect(byUser[fresh]).toBeUndefined();
+    expect(byUser[gone]).toBeUndefined(); // never nudge about a deleted product
   });
 });

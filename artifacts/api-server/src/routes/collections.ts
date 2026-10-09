@@ -11,7 +11,7 @@ import { db, savedCollections, savedItems } from "@workspace/db";
 import { eq, and, asc, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
-import { adaptSavedRows } from "../lib/savedItemAdapter";
+import { adaptSavedRows, withoutDeletedProducts } from "../lib/savedItemAdapter";
 
 const router = Router();
 router.use(requireAuth);
@@ -19,7 +19,7 @@ router.use(requireAuth);
 async function withCovers(userId: string, rows: (typeof savedCollections.$inferSelect)[]) {
   if (rows.length === 0) return [];
   const collectionIds = rows.map((r) => r.id);
-  const items = await db.select({
+  const items = await withoutDeletedProducts(await db.select({
     id: savedItems.id,
     collectionId: savedItems.collectionId,
     itemType: savedItems.itemType,
@@ -28,7 +28,7 @@ async function withCovers(userId: string, rows: (typeof savedCollections.$inferS
     createdAt: savedItems.createdAt,
   })
     .from(savedItems)
-    .where(and(eq(savedItems.userId, userId), inArray(savedItems.collectionId, collectionIds)));
+    .where(and(eq(savedItems.userId, userId), inArray(savedItems.collectionId, collectionIds))));
 
   const productIds = items.filter((i) => i.itemType === "product").map((i) => i.targetId);
   const badgeInfo = await fetchProductBadgeInfo(productIds);
