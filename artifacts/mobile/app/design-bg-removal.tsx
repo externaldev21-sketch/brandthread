@@ -24,7 +24,6 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { captureRef } from 'react-native-view-shot';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -326,6 +325,8 @@ export default function DesignBgRemovalScreen() {
     try {
       let uri = cutout;
       if (backdrop !== 'transparent' && canvasRef.current) {
+        // Loaded on demand: keeps view-shot (html2canvas on web) out of the startup bundle.
+        const { captureRef } = await import('react-native-view-shot');
         const shot = await captureRef(canvasRef, { format: 'png', quality: 1, result: 'data-uri' });
         uri = shot.startsWith('data:') ? shot : `data:image/png;base64,${shot}`;
       }
