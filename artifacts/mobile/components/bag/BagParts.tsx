@@ -360,10 +360,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: theme.background,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border,
   },
-  barTotal: { flex: 1, minWidth: 0 },
+  barTotal: { flexShrink: 1, minWidth: 0 },
   barLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted },
   barAmount: { fontFamily: FONT.semibold, fontSize: FS.lg, color: theme.text, ...TABULAR_NUMS },
-  barButton: { flex: 1 },
+  barButton: { flex: 1, minWidth: 190 },
 
   emptyLine: { fontFamily: FONT.regular, fontSize: FS.base, color: theme.text, marginTop: SP.md },
   shopNow: { alignSelf: 'flex-start', marginTop: SP.md, minWidth: 180 },
