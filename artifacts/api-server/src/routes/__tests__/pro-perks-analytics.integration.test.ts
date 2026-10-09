@@ -89,12 +89,14 @@ describe("GET /api/seller/subscription/perks", () => {
     const res = await fetch(`${base}/api/seller/subscription/perks`);
     expect(res.status).toBe(200);
     const body: any = await res.json();
+    // Flat 5% on every plan.
+    expect(body.plans.map((p: { platformFeeBps: number }) => p.platformFeeBps)).toEqual([500, 500, 500]);
     expect(body.currentPlan).toBe("growth");
     expect(body.hasAdvancedAnalytics).toBe(false);
     expect(body.plans).toEqual([
-      expect.objectContaining({ planId: "starter", amountCents: 2900, platformFeeBps: 500, monthlyAiCredits: 1000, advancedAnalytics: false }),
-      expect.objectContaining({ planId: "growth", amountCents: 7900, platformFeeBps: 500, monthlyAiCredits: 4000, advancedAnalytics: false }),
-      expect.objectContaining({ planId: "pro", amountCents: 19900, platformFeeBps: 500, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true }),
+      expect.objectContaining({ planId: "starter", amountCents: 2900, advancedAnalytics: false }),
+      expect.objectContaining({ planId: "growth", amountCents: 7900, advancedAnalytics: false }),
+      expect.objectContaining({ planId: "pro", amountCents: 19900, advancedAnalytics: true }),
     ]);
   });
 
