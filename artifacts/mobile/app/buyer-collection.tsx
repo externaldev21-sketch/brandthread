@@ -243,7 +243,7 @@ export default function BuyerCollection() {
 
       <Modal transparent animationType="fade" visible={renameOpen} onRequestClose={() => setRenameOpen(false)}>
         <ModalSafeArea>
-          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setRenameOpen(false)} />
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={styles.backdrop} activeOpacity={1} onPress={() => setRenameOpen(false)} />
           <View style={styles.centerModal}>
             <View style={styles.renameCard}>
               <Text style={styles.renameTitle}>Rename collection</Text>

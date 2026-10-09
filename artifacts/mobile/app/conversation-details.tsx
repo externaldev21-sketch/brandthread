@@ -352,7 +352,7 @@ export default function ConversationDetailsScreen() {
       </ScrollView>
 
       <Modal visible={muteVisible} transparent animationType="fade" onRequestClose={() => setMuteVisible(false)}>
-        <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setMuteVisible(false)} />
+        <PressableScale accessibilityRole="button" accessibilityLabel="Close" rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setMuteVisible(false)} />
         <SheetRise style={[s.muteSheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
           <Text style={[s.muteSheetTitle, { color: theme.text }]}>Mute notifications</Text>

@@ -307,7 +307,7 @@ export function ThreadCashAttachButton({
         {/* The transfer is already sent by the time this confirmation shows
             — no backdrop-dismiss race that could skip posting the chat
             bubble (see the 'sent' step effect above, which owns closing). */}
-        <Pressable
+        <Pressable accessibilityRole="button" accessibilityLabel="Close"
           style={styles.backdrop}
           onPress={() => { if (step !== 'sent') setOpen(false); }}
           testID="thread-cash-backdrop"

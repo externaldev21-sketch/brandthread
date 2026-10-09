@@ -265,7 +265,7 @@ export default function StoreBuilderScreen() {
           end={{ x: 1, y: 1 }}
           style={[s.header, { paddingTop: topInset + SP.md }]}
         >
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back"
             onPress={leaveSetupDestination}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             activeOpacity={0.75}

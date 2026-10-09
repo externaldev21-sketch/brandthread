@@ -173,7 +173,7 @@ export default function ManufacturerProfileScreen() {
   if (!manufacturer) {
     return (
       <View style={[s.root, { paddingTop: headerTopInset }]}>
-        <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBackOr(router)} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="This profile is no longer listed, or it's a private manufacturer you aren't connected to." action={{ label: 'Back to directory', onPress: () => goBackOr(router) }} />
@@ -198,7 +198,7 @@ export default function ManufacturerProfileScreen() {
           style={[s.hero, { paddingTop: headerTopInset + SP.sm }]}
         >
           {/* Back button */}
-          <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtnHero} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBackOr(router)} style={s.backBtnHero} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Feather name="arrow-left" size={ICON.md} color={ON_DARK} />
           </TouchableOpacity>
 

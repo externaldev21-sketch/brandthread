@@ -359,10 +359,10 @@ export default function ProductStoreScreen() {
                 small
                 style={s.followBtn}
               />
-              <TouchableOpacity style={s.msgIconBtn} onPress={handleMessageSeller} activeOpacity={0.75}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Message seller" style={s.msgIconBtn} onPress={handleMessageSeller} activeOpacity={0.75}>
                 <Feather name="mail" size={ICON.sm} color={ACCENT_LIGHT} />
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="More options"
                 style={s.msgIconBtn}
                 onPress={() => Alert.alert(
                   sellerName,

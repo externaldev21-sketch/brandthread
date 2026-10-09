@@ -253,7 +253,7 @@ export default function StoreNavScreen() {
       <View key={item.id}>
         <View style={[styles.itemRow, { paddingLeft: SP.md + depth * 20 }]}>
           <Feather name="menu" size={ICON.sm} color={MUTED} style={styles.dragHandle} />
-          <TouchableOpacity onPress={() => handleToggleVisible(item.id)} style={styles.visibleToggle}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={item.visible ? 'Hide item' : 'Show item'} onPress={() => handleToggleVisible(item.id)} style={styles.visibleToggle}>
             <Feather
               name={item.visible ? 'eye' : 'eye-off'}
               size={ICON.sm}
@@ -267,21 +267,21 @@ export default function StoreNavScreen() {
             </Text>
           </View>
           <View style={styles.itemActions}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move up"
               style={styles.itemActionBtn}
               onPress={() => handleMoveItem(item.id, 'up', parentId)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <Feather name="chevron-up" size={ICON.xs} color={MUTED} />
             </TouchableOpacity>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move down"
               style={styles.itemActionBtn}
               onPress={() => handleMoveItem(item.id, 'down', parentId)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <Feather name="chevron-down" size={ICON.xs} color={MUTED} />
             </TouchableOpacity>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit item"
               style={styles.itemActionBtnPurple}
               onPress={() => openEditItem(item)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -289,7 +289,7 @@ export default function StoreNavScreen() {
               <Feather name="edit-2" size={ICON.xs} color={PURPLE} />
             </TouchableOpacity>
             {canAddChild && (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add sub-item"
                 style={styles.itemActionBtnPurple}
                 onPress={() => openNewItem(item.id)}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -297,7 +297,7 @@ export default function StoreNavScreen() {
                 <Feather name="plus" size={ICON.xs} color={CYAN} />
               </TouchableOpacity>
             )}
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove item"
               style={styles.itemActionBtnDanger}
               onPress={() => handleRemoveItem(item.id)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -389,7 +389,7 @@ export default function StoreNavScreen() {
           <SheetRise style={[styles.modalSheet, { paddingBottom: insets.bottom + SP.md }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Menu Item</Text>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
                 onPress={() => setModalVisible(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >

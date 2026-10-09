@@ -113,7 +113,7 @@ export default function SellerDropPreview() {
           <LinearGradient colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.92)']} style={StyleSheet.absoluteFill} />
 
           <View style={[styles.header, { paddingTop: headerTopInset + SP.sm }]}>
-            <TouchableOpacity style={styles.roundBtn} onPress={() => goBackOr(router)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" style={styles.roundBtn} onPress={() => goBackOr(router)}>
               <Feather name="arrow-left" size={20} color={ON_DARK} />
             </TouchableOpacity>
             <View style={styles.previewBadge}>

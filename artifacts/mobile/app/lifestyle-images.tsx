@@ -212,7 +212,7 @@ export default function LifestyleImagesScreen() {
         {photos.map((p) => (
           <View key={p.id} style={styles.trayThumbWrap}>
             <Image source={{ uri: p.uri }} style={styles.trayThumb} resizeMode="cover" />
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove photo"
               style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
               onPress={() => removePhoto(group, p.id)}
               activeOpacity={0.8}
@@ -222,7 +222,7 @@ export default function LifestyleImagesScreen() {
           </View>
         ))}
         {photos.length < MAX_PHOTOS && (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add photos"
             onPress={() => pickPhotos(group)}
             activeOpacity={0.8}
             style={[styles.addTile, { backgroundColor: colors.card, borderColor: colors.border }]}

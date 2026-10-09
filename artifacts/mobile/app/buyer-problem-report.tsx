@@ -168,7 +168,7 @@ export default function BuyerProblemReportScreen() {
               {evidencePhotos.map((uri, idx) => (
                 <View key={idx} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
                   <Image source={{ uri }} style={{ width: 72, height: 72 }} resizeMode="cover" />
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove photo"
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
                   >

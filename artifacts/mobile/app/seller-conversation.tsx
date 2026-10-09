@@ -1980,7 +1980,7 @@ export default function SellerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowMediaSheet(false)}
       >
-        <PressableScale style={s.modalOverlay} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
+        <PressableScale accessibilityRole="button" accessibilityLabel="Close" style={s.modalOverlay} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
         <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
           <Text style={s.sheetTitle}>Add to message</Text>
@@ -2009,7 +2009,7 @@ export default function SellerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowAttachPicker(false)}
       >
-        <PressableScale
+        <PressableScale accessibilityRole="button" accessibilityLabel="Close"
           style={s.modalOverlay}
           activeOpacity={1}
           onPress={() => setShowAttachPicker(false)}
@@ -2078,7 +2078,7 @@ export default function SellerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowQuickReplies(false)}
       >
-        <PressableScale
+        <PressableScale accessibilityRole="button" accessibilityLabel="Close"
           style={s.modalOverlay}
           activeOpacity={1}
           onPress={() => setShowQuickReplies(false)}
@@ -2137,7 +2137,7 @@ export default function SellerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowProductPicker(false)}
       >
-        <PressableScale
+        <PressableScale accessibilityRole="button" accessibilityLabel="Close"
           style={s.modalOverlay}
           activeOpacity={1}
           onPress={() => setShowProductPicker(false)}
