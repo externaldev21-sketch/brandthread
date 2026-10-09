@@ -21,6 +21,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure } from '@/lib/engagementRetryQueue';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -265,7 +266,14 @@ export default function BuyerOtherProfileScreen() {
       // Becoming (or ceasing to be) friends changes which posts are visible.
       void videos.reload();
       hapticLight();
-    } catch {
+    } catch (error) {
+      // Bad connection: keep what the buyer tapped and deliver it in the
+      // background (lib/engagementRetryQueue.ts). Only a real refusal rolls back.
+      if (isRetryableFailure(error)) {
+        void enqueueEngagementRetry({ kind: 'follow', targetId: canonicalUserId, payload: { value: wasFollowing ? 'unfollow' : undefined } });
+        ensureEngagementRetryPump();
+        return;
+      }
       setProfile(prev => prev ? (optimisticRequest ? { ...prev, followRequested: false } : {
         ...prev,
         isFollowing: wasFollowing,

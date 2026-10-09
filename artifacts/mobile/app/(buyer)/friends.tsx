@@ -29,6 +29,7 @@ import {
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure } from '@/lib/engagementRetryQueue';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_STORIES, PREVIEW_FOLLOWING, PREVIEW_FRIEND_ACTIVITY } from '@/lib/previewFriends';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -307,7 +308,17 @@ export default function FriendsScreen() {
     api.posts.interact(post.id, {
       type: 'like',
       value: post.likedByMe ? 'remove' : 'add',
-    }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === post.id ? post : p)); Alert.alert('Could not update like', 'Try again.'); });
+    }).catch((error) => {
+      // Bad connection: keep the like and deliver it in the background
+      // (lib/engagementRetryQueue.ts). Only a real refusal rolls back.
+      if (isRetryableFailure(error)) {
+        void enqueueEngagementRetry({ kind: 'like', targetId: post.id, payload: { value: post.likedByMe ? 'remove' : 'add' } });
+        ensureEngagementRetryPump();
+        return;
+      }
+      setFeedPosts(prev => prev.map(p => p.id === post.id ? post : p));
+      Alert.alert('Could not update like', 'Try again.');
+    });
   }
 
   function handleRepost(postId: string) {

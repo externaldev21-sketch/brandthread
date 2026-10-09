@@ -14,6 +14,7 @@ import { purgeAuthorFromFeedPostsCache } from '@/lib/feedPostsCache';
 import { queryClient } from '@/lib/queryClient';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
 import { OutboxAccountMismatchError, type OutboxEntry } from '@/lib/messageOutbox';
+import { setEngagementRetryFallback, setEngagementRetryOwnerResolver } from '@/lib/engagementRetryQueue';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
@@ -1011,6 +1012,24 @@ export async function setSellerFollowing(
   });
   return state;
 }
+
+// Background retries for follow taps that couldn't reach the server (see
+// lib/engagementRetryQueue.ts): queued actions belong to the account that
+// queued them, and a queued follow replays through setSellerFollowing even
+// when the feed (the queue's main executor) isn't mounted.
+setEngagementRetryOwnerResolver(() => _socialUserId);
+setEngagementRetryFallback('follow', async (action) => {
+  await setSellerFollowing(action.targetId, action.payload?.value !== 'unfollow');
+});
+// Same request the feed's executor sends (api.posts.interact), so a queued
+// like replays from any screen.
+setEngagementRetryFallback('like', async (action) => {
+  const value = typeof action.payload?.value === 'string' ? action.payload.value : undefined;
+  await serviceRequest(`/api/posts/${encodeURIComponent(action.targetId)}/interact`, {
+    method: 'POST',
+    body: JSON.stringify({ type: 'like', value }),
+  });
+});
 
 /** Backwards-compatible one-shot page loader for non-paginated callers. */
 export async function getThreadPosts(offset = 0, limit = 30): Promise<SellerThreadPost[]> {

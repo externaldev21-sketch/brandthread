@@ -21,6 +21,12 @@ export interface SavedProductsDeps {
   fetchSaved: () => Promise<Array<{ type: string; targetId: string }>>;
   save: (draft: SavedProductDraft) => Promise<unknown>;
   remove: (productId: string) => Promise<unknown>;
+  /**
+   * Called when save/remove fails. Return true if the change was queued for a
+   * background retry (a connectivity failure) — the heart then keeps the
+   * buyer's tap instead of rolling back. Omitted/false: roll back as before.
+   */
+  queueRetry?: (draft: SavedProductDraft, saved: boolean, error: unknown) => boolean;
 }
 
 export type ToggleResult =
@@ -115,7 +121,8 @@ export function createSavedProductsStore(deps: SavedProductsDeps) {
       try {
         if (wasSaved) await deps.remove(productId); else await deps.save(draft);
         return { ok: true, saved: !wasSaved };
-      } catch {
+      } catch (error) {
+        if (deps.queueRetry?.(draft, !wasSaved, error)) return { ok: true, saved: !wasSaved };
         if (gen === generation) {
           const back = new Set(ids);
           if (wasSaved) back.add(productId); else back.delete(productId);

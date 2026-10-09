@@ -13,10 +13,9 @@
  * connectivity actually returns without adding a new native module.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState } from 'react-native';
 import { classifyNetworkError } from './networkNotice';
 
-export type EngagementActionKind = 'like' | 'save' | 'repost' | 'follow' | 'not_interested';
+export type EngagementActionKind = 'like' | 'save' | 'repost' | 'follow' | 'not_interested' | 'save_product';
 
 export interface QueuedEngagementAction {
   /** Stable id for this queued action — used to de-dupe repeated taps on the same target+kind. */
@@ -26,6 +25,8 @@ export interface QueuedEngagementAction {
   payload?: Record<string, unknown>;
   attempts: number;
   createdAt: number;
+  /** Account that queued it — only ever replayed while that account is signed in. */
+  ownerId?: string;
 }
 
 const STORAGE_KEY = 'bt:engagement-retry-queue:v1';
@@ -36,6 +37,11 @@ let loaded = false;
 let loadPromise: Promise<void> | null = null;
 let executor: ((action: QueuedEngagementAction) => Promise<void>) | null = null;
 let processing = false;
+// Per-kind handlers used while no screen executor is registered (e.g. a
+// follow queued from a profile screen while the feed isn't mounted).
+const fallbacks = new Map<EngagementActionKind, (action: QueuedEngagementAction) => Promise<void>>();
+let ownerResolver: (() => string | null) | null = null;
+let globalPumpStarted = false;
 const listeners = new Set<(queue: QueuedEngagementAction[]) => void>();
 
 function emit() {
@@ -69,6 +75,27 @@ export function setEngagementRetryExecutor(fn: ((action: QueuedEngagementAction)
   executor = fn;
 }
 
+/** Replays `kind` when no screen executor is registered. */
+export function setEngagementRetryFallback(
+  kind: EngagementActionKind,
+  fn: ((action: QueuedEngagementAction) => Promise<void>) | null,
+): void {
+  if (fn) fallbacks.set(kind, fn);
+  else fallbacks.delete(kind);
+}
+
+/** Who is signed in right now. Queued actions are stamped with it and only
+ *  replayed for the same account, so one account's queued like/follow can
+ *  never be sent under another account's session on a shared device. */
+export function setEngagementRetryOwnerResolver(fn: (() => string | null) | null): void {
+  ownerResolver = fn;
+}
+
+function currentOwner(): string | null {
+  const owner = ownerResolver?.() ?? null;
+  return owner && owner !== 'anon' ? owner : null;
+}
+
 /** True for connectivity/server-outage failures — anything else (a real 4xx rejection) should roll back instead of queuing. */
 export function isRetryableFailure(error: unknown): boolean {
   return classifyNetworkError(error) !== null;
@@ -85,21 +112,34 @@ export async function enqueueEngagementRetry(action: Pick<QueuedEngagementAction
   // Last write wins per (kind, target) — a rapid like/unlike toggle while
   // offline should only replay the final intended state, not every step.
   queue = queue.filter((a) => a.id !== id);
-  queue.push({ id, ...action, attempts: 0, createdAt: Date.now() });
+  const ownerId = currentOwner();
+  queue.push({ id, ...action, attempts: 0, createdAt: Date.now(), ...(ownerId ? { ownerId } : {}) });
   await persist();
   void processEngagementRetryQueue();
 }
 
 export async function processEngagementRetryQueue(): Promise<void> {
   await load();
-  if (processing || !executor || queue.length === 0) return;
+  if (processing || queue.length === 0) return;
+  if (!executor && fallbacks.size === 0) return;
   processing = true;
   try {
     const active = executor;
+    const owner = currentOwner();
     const remaining: QueuedEngagementAction[] = [];
     for (const action of queue) {
+      // A kind with its own registered handler always uses it (the feed's
+      // executor only knows the feed's kinds); everything else goes through
+      // the screen executor.
+      const run = fallbacks.get(action.kind) ?? active;
+      // Not replayable right now (no handler, or another account is signed
+      // in): keep it for later, untouched.
+      if (!run || (action.ownerId && action.ownerId !== owner)) {
+        remaining.push(action);
+        continue;
+      }
       try {
-        await active(action);
+        await run(action);
       } catch (error) {
         if (isRetryableFailure(error) && action.attempts + 1 < MAX_ATTEMPTS) {
           remaining.push({ ...action, attempts: action.attempts + 1 });
@@ -118,6 +158,10 @@ export async function processEngagementRetryQueue(): Promise<void> {
 
 /** Call once per screen lifetime (e.g. the feed) to drain the queue on an interval and whenever the app returns to the foreground. Returns a cleanup function. */
 export function startEngagementRetryQueuePump(intervalMs = 20_000): () => void {
+  // Loaded lazily: services/socialService.ts registers retry handlers on this
+  // module at import time, and plain-node tests of that service never load
+  // react-native.
+  const { AppState } = require('react-native') as typeof import('react-native');
   const sub = AppState.addEventListener('change', (state) => {
     if (state === 'active') void processEngagementRetryQueue();
   });
@@ -127,6 +171,13 @@ export function startEngagementRetryQueuePump(intervalMs = 20_000): () => void {
     sub.remove();
     clearInterval(interval);
   };
+}
+
+/** Idempotent app-wide pump, for screens that queue actions outside the feed. */
+export function ensureEngagementRetryPump(): void {
+  if (globalPumpStarted) return;
+  globalPumpStarted = true;
+  startEngagementRetryQueuePump();
 }
 
 export function getQueuedEngagementActions(): QueuedEngagementAction[] {
@@ -140,4 +191,7 @@ export function __resetEngagementRetryQueueForTests(): void {
   loadPromise = null;
   executor = null;
   processing = false;
+  fallbacks.clear();
+  ownerResolver = null;
+  globalPumpStarted = false;
 }

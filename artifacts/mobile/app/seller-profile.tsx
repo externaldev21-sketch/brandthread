@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure } from '@/lib/engagementRetryQueue';
 import { useAuth } from '@clerk/expo';
 import { useSignInGate } from '@/hooks/useSignInGate';
 import { useApi } from '@/hooks/useApi';
@@ -370,7 +371,14 @@ export default function SellerProfileScreen() {
       const confirmed = await setSellerFollowing(canonicalSellerId, next);
       setIsFollowing(confirmed.isFollowing);
       if (confirmed.followersCount != null) setFollowers(confirmed.followersCount);
-    } catch {
+    } catch (error) {
+      // Bad connection: keep what the buyer tapped and deliver it in the
+      // background (lib/engagementRetryQueue.ts). Only a real refusal rolls back.
+      if (isRetryableFailure(error)) {
+        void enqueueEngagementRetry({ kind: 'follow', targetId: canonicalSellerId, payload: { value: next ? undefined : 'unfollow' } });
+        ensureEngagementRetryPump();
+        return;
+      }
       setIsFollowing(previous.isFollowing);
       setFollowers(previous.followers);
       Alert.alert('Couldn’t update follow', 'Check your connection and try again.');
