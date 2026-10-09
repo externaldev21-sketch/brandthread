@@ -33,9 +33,9 @@ const DEVICE = {
 /** name → target route, plus optional interaction after load. */
 const SCREENS = {
   bag: { target: '/(buyer)/cart' },
-  'bag-scrolled': { target: '/(buyer)/cart', after: async (page) => { await page.mouse.wheel(0, 900); } },
+  'bag-scrolled': { target: '/(buyer)/cart', after: async (page) => { await page.mouse.move(195, 420); await page.mouse.wheel(0, 900); } },
   product: { target: '/buyer-product-detail?productId=prod_nl_hoodie_ember' },
-  'product-scrolled': { target: '/buyer-product-detail?productId=prod_nl_hoodie_ember', after: async (page) => { await page.mouse.wheel(0, 700); } },
+  'product-scrolled': { target: '/buyer-product-detail?productId=prod_nl_hoodie_ember', after: async (page) => { await page.mouse.move(195, 420); await page.mouse.wheel(0, 900); } },
   'product-size-sheet': {
     target: '/buyer-product-detail?productId=prod_nl_hoodie_ember',
     after: async (page) => { await page.getByTestId('product-size-row').first().click(); },
