@@ -8,7 +8,7 @@
  */
 import React from 'react';
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { Button } from '@/components/ui/Button';
@@ -34,7 +34,7 @@ export function ErrorState({
   return (
     <View style={[styles.root, style]}>
       <View style={[styles.iconCircle, { borderColor: theme.accent + '40' }]}>
-        <Feather name="alert-triangle" size={26} color={palette.mutedForeground} />
+        <Icon name="alert-triangle" size={24} color={palette.mutedForeground} />
       </View>
       <Text style={[TYPE_SCALE.headline, { fontFamily: FONT.semibold, color: palette.foreground, textAlign: 'center' }]}>
         {message}
