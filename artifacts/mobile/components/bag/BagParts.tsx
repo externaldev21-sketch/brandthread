@@ -218,15 +218,17 @@ export function BagCheckoutBar({
         <Text style={s.barLabel}>Total estimate</Text>
         <Text style={s.barAmount} numberOfLines={1} adjustsFontSizeToFit>{fmt(totalCents)} USD</Text>
       </View>
-      <Button
-        label="Go to checkout"
-        onPress={onCheckout}
-        loading={busy}
-        disabled={disabled}
-        style={s.barButton}
-        accessibilityHint="Reviews shipping and payment"
-        testID="cart-go-to-checkout"
-      />
+      <View style={s.barButton}>
+        <Button
+          label="Go to checkout"
+          onPress={onCheckout}
+          loading={busy}
+          disabled={disabled}
+          fullWidth
+          accessibilityHint="Reviews shipping and payment"
+          testID="cart-go-to-checkout"
+        />
+      </View>
     </View>
   );
 }
