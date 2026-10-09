@@ -7,14 +7,14 @@
  */
 import React from 'react';
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { FONT, GUTTER } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { IconButton } from '@/components/ui/IconButton';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 export interface TabPageHeaderAction {
-  name: keyof typeof Feather.glyphMap;
+  name: IconName;
   onPress: () => void;
   accessibilityLabel: string;
   badge?: number;

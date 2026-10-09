@@ -9,16 +9,15 @@ import AIBrainFAB from '@/components/AIBrainFAB';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { usePreviewDemoMode } from '@/hooks/usePreviewDemoMode';
-import { EmptyState } from '@/components/layout';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { OptionSheet, SkeletonLine } from '@/components/ui';
-import { TYPE_SCALE } from '@/constants/typography';
+import { EmptyState, OptionSheet, SkeletonLine } from '@/components/ui';
+import { FILL_ELEVATED, TABULAR, TEXT } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 import { hapticLight } from '@/lib/haptics';
 import {
@@ -26,9 +25,6 @@ import {
   type CustomerSort, type SellerCustomer,
 } from '@/lib/sellerCustomers';
 import { buildPreviewCustomers } from '@/lib/previewCustomers';
-
-/** Inputs are solid #1C1C1E app-wide (no translucent fills). */
-const INPUT_BG = '#1C1C1E';
 
 export default function CustomersScreen() {
   const colors = useColors();
@@ -87,18 +83,7 @@ export default function CustomersScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customers"
-        rightElement={
-          <TouchableOpacity
-            onPress={() => router.navigate('/(tabs)/analytics' as never)}
-            hitSlop={10}
-            activeOpacity={0.7}
-            style={[styles.analyticsBtnHdr, { borderColor: colors.border, backgroundColor: colors.card }]}
-            accessibilityRole="button"
-            accessibilityLabel="View customer analytics"
-          >
-            <Feather name="bar-chart-2" size={18} color={colors.foreground} />
-          </TouchableOpacity>
-        }
+        actions={[{ icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View customer analytics' }]}
       />
       <ScrollView
         style={{ flex: 1 }}
@@ -108,10 +93,10 @@ export default function CustomersScreen() {
       >
         {/* Search + sort (Shopify: search field, sort button on its right) */}
         <View style={styles.searchRow}>
-          <View style={[styles.searchWrap, { backgroundColor: INPUT_BG }]}>
-            <Feather name="search" size={16} color={colors.mutedForeground} />
+          <View style={[styles.searchWrap, { backgroundColor: FILL_ELEVATED }]}>
+            <Icon name="search" size={17} color={colors.mutedForeground} />
             <TextInput
-              style={[styles.searchInput, TYPE_SCALE.body, { color: colors.foreground }, WEB_INPUT_RESET]}
+              style={[styles.searchInput, TEXT.body, { color: colors.foreground }, WEB_INPUT_RESET]}
               placeholder="Search"
               placeholderTextColor={colors.mutedForeground}
               value={search}
@@ -123,24 +108,23 @@ export default function CustomersScreen() {
             />
             {search ? (
               <TouchableOpacity onPress={() => setSearch('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
-                <Feather name="x-circle" size={16} color={colors.mutedForeground} />
+                <Icon name="x-circle" size={17} color={colors.mutedForeground} />
               </TouchableOpacity>
             ) : null}
           </View>
           <TouchableOpacity
             onPress={() => { hapticLight(); setSortOpen(true); }}
             activeOpacity={0.7}
-            style={[styles.sortBtn, { backgroundColor: INPUT_BG }]}
+            style={[styles.sortBtn, { backgroundColor: FILL_ELEVATED }]}
             accessibilityRole="button"
             accessibilityLabel={`Sort customers, ${CUSTOMER_SORT_OPTIONS.find((o) => o.id === sortBy)?.label}`}
             testID="customers-sort"
           >
-            <Feather name="sliders" size={16} color={colors.foreground} />
+            <Icon name="sliders" size={17} color={colors.foreground} />
           </TouchableOpacity>
         </View>
 
-        {/* The empty state renders flat, directly on the screen background,
-            with no grey box behind it (Dev's explicit "no grey boxes" call). */}
+        {/* Flat on black — no card behind the empty state or the rows. */}
         {loading ? (
           <View style={{ gap: 22, marginTop: 14 }}>
             {[0, 1, 2].map((i) => (
@@ -157,18 +141,12 @@ export default function CustomersScreen() {
             onRetry={() => { setLoading(true); void fetchCustomers(search); }}
           />
         ) : sortedCustomers.length === 0 ? (
+          // One line, and no action: Dev's call — there's nothing a seller
+          // can "do" from an empty customer list.
           <EmptyState
-            icon="users"
-            title={search.trim() ? 'No matching customers' : 'No customers yet'}
-            message={
-              search.trim()
-                ? 'Try a different name or email.'
-                : 'Once someone buys from your store, they will show up here.'
-            }
-            // Dev's explicit call: Customers gets no action button, ever —
-            // there's nothing a seller can "do" from an empty customer list.
-            // Shopify pattern: a title and one line (non-compact keeps the line).
+            title={search.trim() ? 'No customers match your search.' : 'No customers yet.'}
             style={{ marginTop: 48 }}
+            testID="customers-empty"
           />
         ) : (
           sortedCustomers.map((c, i) => {
@@ -184,21 +162,21 @@ export default function CustomersScreen() {
                 testID="customer-row"
               >
                 <View style={styles.nameLine}>
-                  <Text style={[TYPE_SCALE.headline, styles.custName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
+                  <Text style={[TEXT.headline, styles.custName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
                   {tag ? (
-                    <View style={[styles.tagChip, { borderColor: colors.border }]}>
-                      <Text style={[TYPE_SCALE.caption, { color: colors.mutedForeground }]} numberOfLines={1}>{tag}</Text>
+                    <View style={styles.tagChip}>
+                      <Text style={[TEXT.caption, { color: colors.mutedForeground }]} numberOfLines={1}>{tag}</Text>
                     </View>
                   ) : null}
                 </View>
                 {location ? (
-                  <Text style={[TYPE_SCALE.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>{location}</Text>
+                  <Text style={[TEXT.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>{location}</Text>
                 ) : null}
-                <Text style={[TYPE_SCALE.footnote, { color: colors.foreground }]} numberOfLines={1}>{customerSpendLine(c)}</Text>
+                <Text style={[TEXT.footnote, TABULAR, { color: colors.foreground }]} numberOfLines={1}>{customerSpendLine(c)}</Text>
                 {c.notes ? (
                   <View style={styles.noteLine}>
-                    <Feather name="file-text" size={12} color={colors.mutedForeground} />
-                    <Text style={[TYPE_SCALE.footnote, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>{c.notes}</Text>
+                    <Icon name="file-text" size={17} color={colors.mutedForeground} />
+                    <Text style={[TEXT.footnote, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>{c.notes}</Text>
                   </View>
                 ) : null}
               </TouchableOpacity>
@@ -222,9 +200,6 @@ export default function CustomersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  // 44x44: matches ScreenHeader's own actionBtn convention and the minimum
-  // comfortable touch target.
-  analyticsBtnHdr: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   searchWrap: { flex: 1, height: 44, flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1 },
@@ -232,6 +207,6 @@ const styles = StyleSheet.create({
   custRow: { paddingVertical: 14, gap: 3 },
   nameLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   custName: { flexShrink: 1 },
-  tagChip: { marginLeft: 'auto', borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 3, maxWidth: 120 },
+  tagChip: { marginLeft: 'auto', backgroundColor: FILL_ELEVATED, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 3, maxWidth: 120 },
   noteLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
 });
