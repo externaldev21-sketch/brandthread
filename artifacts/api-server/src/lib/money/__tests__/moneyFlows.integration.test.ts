@@ -86,22 +86,22 @@ describe("checkout → order money", () => {
       items: [{ ...product, quantity: 2 }], shippingCents: 500, taxCents: 800, stripeFeeCents: 358,
     });
 
-    expect(fee).toEqual({ platformFeeCents: 500, processingFeeEstimateCents: 335, applicationFeeCents: 835 });
+    expect(fee).toEqual({ platformFeeCents: 525, processingFeeEstimateCents: 335, applicationFeeCents: 860 });
     expect(order).toMatchObject({
       chargeModel: "destination",
       fundsState: "settled_direct",
       grossChargedCents: 11_300,
-      platformFeeCents: 500,
+      platformFeeCents: 525, // 5% of 10 000 items + 500 shipping
       processingFeeChargedCents: 335,
       processingFeeCents: 358,
-      sellerNetCents: 10_465,
+      sellerNetCents: 10_440,
       stripeChargeId: `ch_${order.stripePaymentIntentId}`,
       stripeTransferId: `tr_dest_${order.stripePaymentIntentId}`,
     });
     expect(await orderLedger(order.id)).toEqual({
       buyer_payments: -11_300,
-      seller_paid_out: 10_465,
-      platform_revenue: 500,
+      seller_paid_out: 10_440,
+      platform_revenue: 525,
       stripe_processing_fees: 358,
       processing_fee_variance: -23,
     });
@@ -380,11 +380,11 @@ describe("refunds", () => {
     const partial = await refundOrder({
       orderId: order.id, amountCents: 3_000, reason: "return_approved", initiatedBy: seller, idempotencyKey: `t-partial/${order.id}`,
     });
-    expect(partial).toMatchObject({ amountCents: 3_000, platformFeeRefundCents: 133, duplicate: false });
+    expect(partial).toMatchObject({ amountCents: 3_000, platformFeeRefundCents: 139, duplicate: false });
     expect(fake.state.refunds[0]).toMatchObject({
       payment_intent: order.stripePaymentIntentId, amount: 3_000, reverse_transfer: true, refund_application_fee: false,
     });
-    expect(fake.state.feeRefunds[0]).toMatchObject({ fee: order.stripeApplicationFeeId, amount: 133 });
+    expect(fake.state.feeRefunds[0]).toMatchObject({ fee: order.stripeApplicationFeeId, amount: 139 });
 
     await expect(refundOrder({
       orderId: order.id, amountCents: 9_000, reason: "return_approved", initiatedBy: seller, idempotencyKey: `t-over/${order.id}`,
@@ -400,9 +400,9 @@ describe("refunds", () => {
     const rest = await refundOrder({
       orderId: order.id, reason: "seller_cancelled", initiatedBy: seller, idempotencyKey: `t-rest/${order.id}`,
     });
-    expect(rest).toMatchObject({ amountCents: 8_300, platformFeeRefundCents: 367 });
+    expect(rest).toMatchObject({ amountCents: 8_300, platformFeeRefundCents: 386 });
     const after = await reloadOrder(order.id);
-    expect(after).toMatchObject({ refundedCents: 11_300, platformFeeRefundedCents: 500, fundsState: "refunded" });
+    expect(after).toMatchObject({ refundedCents: 11_300, platformFeeRefundedCents: 525, fundsState: "refunded" });
     // The buyer got everything back; the seller keeps nothing but bears the
     // processing estimate (Stripe does not return its fee).
     expect(await orderLedger(order.id)).toMatchObject({

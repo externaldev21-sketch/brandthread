@@ -80,9 +80,9 @@ describe("fee endpoints", () => {
     expect(q1.platformFeeCents).toBe(platform(1010));
     expect(q1.processingFeeCents).toBe(processing(1010));
     expect(q1.sellerNetCents).toBe(1010 - platform(1010) - processing(1010));
-    // Shipping is charged (processing) but not part of the platform-fee base.
+    // Shipping is part of both the platform-fee base and processing (BT-059).
     const q2 = ((await (await quote({ priceCents: 2500, quantity: 2, shippingCents: 500 })).json()) as any);
-    expect(q2).toMatchObject({ grossCents: 5500, merchandiseCents: 5000, platformFeeCents: platform(5000), processingFeeCents: processing(5500) });
+    expect(q2).toMatchObject({ grossCents: 5500, merchandiseCents: 5000, platformFeeCents: platform(5500), processingFeeCents: processing(5500) });
     expect(q2.grossCents - q2.platformFeeCents - q2.processingFeeCents).toBe(q2.sellerNetCents);
   });
 
