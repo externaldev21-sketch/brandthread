@@ -94,6 +94,7 @@ import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
+import ForceUpdateGate from '@/components/ForceUpdateGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import AiConsentSheet from '@/components/AiConsentSheet';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
@@ -1365,6 +1366,7 @@ function RootLayoutNav() {
       <AiConsentSheet />
       <AppLockGate />
       <AppAlertHost />
+      <ForceUpdateGate />
     </View>
   );
 }

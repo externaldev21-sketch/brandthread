@@ -5,6 +5,7 @@ export type { AnalyticsEventName } from './events';
 
 // No react-native import on purpose: lib/api.ts reaches this file and must stay loadable in Node tests.
 let client: AnalyticsClient | null = null;
+let currentUserId: string | null = null;
 
 function getClient(): AnalyticsClient {
   client ??= createAnalyticsClient({
@@ -24,6 +25,7 @@ export function track(event: AnalyticsEventName, props?: AnalyticsProps): void {
 }
 
 export function identifyAnalyticsUser(userId: string | null | undefined): void {
+  currentUserId = typeof userId === 'string' && userId ? userId : null;
   try {
     getClient().identify(userId);
   } catch {
@@ -60,5 +62,19 @@ export function setAnalyticsPlatform(platform: string): void {
     getClient().setPlatform(platform);
   } catch {
     // ignore
+  }
+}
+
+/** The signed-in account id last passed to identifyAnalyticsUser, or null. */
+export function getAnalyticsUserId(): string | null {
+  return currentUserId;
+}
+
+/** True when a `track()` call right now would be queued for sending. */
+export function isAnalyticsSending(): boolean {
+  try {
+    return getClient().isSending();
+  } catch {
+    return false;
   }
 }

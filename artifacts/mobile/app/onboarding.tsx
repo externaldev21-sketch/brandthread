@@ -1263,6 +1263,7 @@ function SharedAuthStep({
         }
         return;
       }
+      track('signup_started', { method: 'email' });
       await signUp.verifications.sendEmailCode();
       setPhase('verify');
     } catch (e: any) {
@@ -1289,6 +1290,7 @@ function SharedAuthStep({
         return;
       }
       if (signUp.status === 'complete') {
+        track('signup_completed', { method: 'email' });
         await signUp.finalize({
           navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
             const referralQuery = referralCode

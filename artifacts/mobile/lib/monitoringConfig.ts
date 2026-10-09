@@ -41,6 +41,29 @@ export function resolveDsn(raw: string | undefined): string | null {
   return dsn;
 }
 
+/**
+ * Whether crash reports may carry the opaque account id (Sentry `user.id`).
+ * Off unless the build sets EXPO_PUBLIC_SENTRY_LINK_USER=1, because the App
+ * Store privacy label currently declares crash data as not linked to the
+ * user (docs/app-store/privacy-labels.md). Turning it on needs that label
+ * updated first.
+ */
+export function resolveLinkUser(raw: string | undefined): boolean {
+  return raw?.trim() === '1';
+}
+
+/** The Sentry user to set: the opaque account id only (never name/email), or null. */
+export function monitoringUserFor(userId: string | null | undefined, linkUser: boolean): { id: string } | null {
+  if (!linkUser || typeof userId !== 'string') return null;
+  const id = userId.trim();
+  return /^[A-Za-z0-9_-]{1,64}$/.test(id) ? { id } : null;
+}
+
+/** Route pattern for a navigation breadcrumb: segments only, so no ids or usernames. */
+export function routeBreadcrumbPath(segments: readonly string[]): string {
+  return `/${segments.filter(Boolean).join('/')}`;
+}
+
 export function resolveTracesSampleRate(raw: string | undefined): number {
   if (raw === undefined || raw.trim() === '') return DEFAULT_TRACES_SAMPLE_RATE;
   const value = Number(raw);

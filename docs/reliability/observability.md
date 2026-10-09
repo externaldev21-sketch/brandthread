@@ -34,7 +34,8 @@ The API lists `SENTRY_DSN` and `POSTHOG_API_KEY` in the optional-variable warnin
 - The root layout is wrapped with `Sentry.wrap` (touch and navigation context) through `wrapRootComponent`, only when Sentry is on; with no DSN the component is returned untouched.
 - API responses with status 500 and above are reported from `lib/api.ts` (through the dependency-free `lib/monitoringHooks.ts`, so tests do not load the SDK). The report carries method, status and a normalised path (ids and query strings removed), never the response body.
 - Reports are tagged `account_role` (`buyer`, `seller` or `signed_out`) and `expo_update_id` (the running over-the-air bundle).
-- The app does **not** attach the Clerk id to crash reports. `docs/app-store/privacy-labels.md` declares crash data as not linked to the user, and adding an id would make that answer wrong. If Dev decides to link crash data, change that label first, then add `Sentry.setUser({ id })` in `components/AnalyticsBridge.tsx`.
+- By default the app does **not** attach the Clerk id to crash reports. `docs/app-store/privacy-labels.md` declares crash data as not linked to the user, and adding an id would make that answer wrong. `setMonitoringUser(userId)` (called from `components/AnalyticsBridge.tsx` on sign-in, sign-out and account switch) sets Sentry `user: { id }` (opaque id only, never name or email) **only** when the build sets `EXPO_PUBLIC_SENTRY_LINK_USER=1`. Update the privacy label first, then set that env var.
+- Each route change leaves a `navigation` breadcrumb with the route pattern only (for example `/(tabs)/profile/[username]`), never the id or username in the URL.
 
 ## PostHog: how it is built
 
@@ -70,13 +71,16 @@ Every event name and property key is in an allow-list (`lib/analytics/events.ts`
 | `seller_onboarding_completed` | Same call, seller accounts | `api.auth.completeOnboarding` | none |
 | `product_viewed` | Product detail loaded | `app/buyer-product-detail.tsx` | `surface` |
 | `add_to_cart` | An item is saved to the cart | `services/cartService.ts` | `quantity` |
-| `checkout_started` | A checkout session or payment intent is created | `api.buyer.checkout.createSession`, `...paymentIntent.create` | `flow`, `item_count` |
+| `checkout_started` | A checkout session or payment intent is created (signed in or guest) | `api.buyer.checkout.createSession`, `...paymentIntent.create`, `api.guest.checkout.createSession` | `flow`, `item_count` |
 | `post_viewed` | A post opens in the post viewer | `app/buyer-post-viewer.tsx` | `post_type` |
 | `video_watched` | About 2 seconds of real playback (`useMeaningfulVideoWatch`), when the watch is recorded | `api.posts.recordWatchedVideo` (feed and post viewer) | `surface` |
 | `follow` | The follow request succeeds | `api.social.follow` | `surface` |
 | `message_sent` | A direct message is accepted by the API | `api.conversations.send` | `surface`, `has_attachment` |
 | `live_joined` | Joining a live stream succeeds | `api.live.join` | `surface` |
 | `product_published` | The product create request succeeds | `api.products.create` | none |
+| `first_product_published` | The first successful product create for the account (de-duplicated per account on the device) | `api.products.create` via `lib/analytics/firstEvents.ts` | none |
+| `first_sale` | The seller's order list goes from empty (seen earlier on this device) to non-empty; never fires for a seller first seen with orders | `api.orders.list` via `lib/analytics/firstEvents.ts` | none |
+| `checkout_completed` | Payment confirmed in the app (one-page, hosted, guest, buy now, live). Named apart from the server's `purchase_completed` so the two never double count | `app/buyer-checkout.tsx`, `components/buy-now/BuyNowFlow.tsx`, `app/buyer-live.tsx` | `flow`, `item_count` |
 | `purchase_completed` | **Server-side.** Stripe confirms payment and the order row is created (not for oversold, auto-refunded orders, and only once per order) | `api-server/src/routes/webhooks.ts`, `handleCheckoutPaid` | `amount_bucket`, `currency`, `item_count`, `charge_model`, `is_guest` |
 
 Client events that hang off an API call fire only after it succeeds; a failure is left exactly as it was.
@@ -91,3 +95,9 @@ Client events that hang off an API call fire only after it succeeds; a failure i
 - App: `lib/analytics/analytics.test.ts` (allow-list, PII scrubbing, config, consent gate, no-key no-op, batching, failure swallow), `lib/monitoringApiPath.test.ts`.
 - API: `src/lib/__tests__/analytics.test.ts` (same, plus `NODE_ENV=test` no-op).
 - `scripts/observability-preview-check.mjs` builds the web preview and checks, at 393x852, for page errors and any PostHog or Sentry request, with no keys and with a dummy PostHog key and no consent.
+
+## Release controls
+
+- **Release flags** (`lib/featureFlags.ts`): a typed registry of flags (name, default, description). Each resolves from a remote override (`flags` in `GET /api/v1/app/config`, server env `APP_FLAGS`, cached in AsyncStorage), then the build env `EXPO_PUBLIC_FLAG_<NAME>`, then the default. Unfinished work defaults to off. Use `isFeatureEnabled(name)` or the `useFeatureFlag(name)` hook. These are separate from the operator kill switches in `contexts/FeatureFlagContext.tsx` (`/api/config/features`, signed-in only).
+- **Force update** (`components/ForceUpdateGate.tsx`, `lib/forceUpdate.ts`): `GET /api/v1/app/config` (public, env only, no database) returns `minSupportedVersion` per platform from `MIN_APP_VERSION_IOS` / `MIN_APP_VERSION_ANDROID`. When the running native version is older and a store URL is known (`APP_STORE_URL_IOS` / `APP_STORE_URL_ANDROID`, or `EXPO_PUBLIC_IOS_APP_STORE_ID` / the Android package), a blocking "Update Brandthread" screen opens the store. Never on web, in development, or when the endpoint fails. Kill switch: release flag `force_update_gate`.
+- **Critical OTA updates** (`lib/otaUpdates.ts`): an update whose id is in `OTA_CRITICAL_UPDATE_IDS` (or whose app config has `extra.critical: true`) is applied when the app returns from at least 5 minutes in the background, instead of waiting for the next cold start. Kill switch: release flag `critical_ota_reload`.

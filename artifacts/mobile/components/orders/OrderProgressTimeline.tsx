@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, StyleSheet, Text, TouchableOpacity, View }
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { formatDate } from '@/lib/format';
 import type { OrderStatus, TrackingStatus } from '@/services/orderTypes';
 import { radius } from '@/constants/radii';
 
@@ -60,7 +61,7 @@ export function fmtEstimate(value: string | undefined): string {
   const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   const d = ymd ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])) : new Date(value);
   if (Number.isNaN(d.getTime())) return '';
-  return `Est. ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  return `Est. ${formatDate(d, { month: 'short', day: 'numeric' })}`;
 }
 
 function fmtTimestamp(iso: string): string {

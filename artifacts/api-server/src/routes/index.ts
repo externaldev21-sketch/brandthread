@@ -158,6 +158,7 @@ import threadCashRouter from "./thread-cash";
 import giftCardsRouter from "./gift-cards";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
+import appConfigRouter from "./app-config";
 import accessRouter from "./access";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
@@ -186,6 +187,7 @@ router.use("/reviews", reviewTextModeration);
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/app",             appConfigRouter); // GET /config: min supported app version, release flags (no auth, no DB)
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)

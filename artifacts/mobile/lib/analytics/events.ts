@@ -20,6 +20,12 @@ export const ANALYTICS_EVENTS = {
   live_joined: ['surface'],
   seller_onboarding_completed: [],
   product_published: [],
+  first_product_published: [],
+  first_sale: [],
+  // Client-side "payment confirmed in the app". The authoritative paid-order
+  // event is the server's `purchase_completed` (webhooks.ts); this is named
+  // differently so the two never double count in one funnel.
+  checkout_completed: ['flow', 'item_count'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type AnalyticsEventName = keyof typeof ANALYTICS_EVENTS;
