@@ -238,7 +238,6 @@ vi.mock('@/lib/theme', () => ({
   BORDER_FOCUS: '#F7F7FA',
   FG: '#F4F4FF',
   MUTED: '#AAAABC',
-  GREEN_BRIGHT: '#39FF88',
   BLUE: '#3B82F6',
   BLUE_DIM: '#1E3A5F',
   SHADOW: { shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 },

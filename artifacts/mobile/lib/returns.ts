@@ -91,6 +91,16 @@ export function isReturnEligible(orderStatus: string | undefined): boolean {
   return orderStatus === 'delivered';
 }
 
+/**
+ * On its way but not delivered yet (not arrived, damaged in transit, seller
+ * gone quiet): the buyer can ask for a refund without returning anything.
+ * The server takes requests for shipped / fulfilled / delivered orders;
+ * delivered ones go through the return flow instead.
+ */
+export function isRefundEligible(orderStatus: string | undefined): boolean {
+  return orderStatus === 'shipped' || orderStatus === 'fulfilled';
+}
+
 /** An active request blocks a new one (the server answers 409); a declined one doesn't. */
 export function activeReturnFor<T extends { orderId?: string; status?: string }>(rows: T[], orderId: string): T | null {
   return rows.find(row => row.orderId === orderId && row.status !== 'denied') ?? null;

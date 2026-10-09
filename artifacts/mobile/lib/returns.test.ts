@@ -66,3 +66,15 @@ describe('lib/returns', () => {
     expect(returnSubmitError(new TypeError('Network request failed')).message).toMatch(/connection/);
   });
 });
+
+describe('isRefundEligible', () => {
+  it('offers a refund while the order is on its way, a return once delivered', async () => {
+    const { isRefundEligible, isReturnEligible } = await import('./returns');
+    expect(isRefundEligible('shipped')).toBe(true);
+    expect(isRefundEligible('fulfilled')).toBe(true);
+    expect(isRefundEligible('delivered')).toBe(false);
+    expect(isReturnEligible('delivered')).toBe(true);
+    expect(isRefundEligible('processing')).toBe(false);
+    expect(isRefundEligible(undefined)).toBe(false);
+  });
+});
