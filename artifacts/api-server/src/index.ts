@@ -30,6 +30,8 @@ import { startEmailCampaignJob } from "./jobs/emailCampaigns";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
+import { attachMessagesWebSocket } from "./ws/messagesHub";
+import { startOrderChangeListener, stopOrderChangeListener } from "./lib/orderChangeListener";
 import { startCommunityPushJob } from "./lib/communityPush";
 import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
 import { pool } from "@workspace/db";
@@ -65,6 +67,10 @@ const server = app.listen(port, (err) => {
   attachLiveWebSocket(server);
   // Community chat realtime channel (/ws/community), same HTTP server.
   attachCommunityWebSocket(server);
+  // Per-user messages / receipts / typing / orders / badges (/ws/messages).
+  attachMessagesWebSocket(server);
+  // Order inserts / status changes (migration 280 trigger) → the hub above.
+  startOrderChangeListener();
 
   // Ensure Stripe webhook endpoint includes all required event types
   // (especially customer.subscription.* for live seller subscription updates)
@@ -133,6 +139,7 @@ function shutdown(signal: NodeJS.Signals): void {
       logger.info({ signal }, "HTTP server closed; no longer accepting connections");
     }
 
+    await stopOrderChangeListener().catch(() => {});
     await closeRedis().catch(() => {});
     try {
       await pool.end();

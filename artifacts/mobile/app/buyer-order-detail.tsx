@@ -58,6 +58,7 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { isReturnEligible, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
+import { useRealtimeConnected, useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -611,6 +612,14 @@ export default function BuyerOrderDetailScreen() {
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const accountGenerationRef = useRef(0);
+  const fetchOrderRef = useRef<(() => void) | null>(null);
+  // Realtime: shipped / delivered / refunded and every other status change
+  // lands the moment it happens (api-server lib/orderChangeListener.ts). The
+  // 15s poll below only runs while the socket is down.
+  const realtimeConnected = useRealtimeConnected();
+  useRealtimeEvents((event) => {
+    if (event.type === 'order.updated' && event.orderId === id) fetchOrderRef.current?.();
+  }, !!id);
 
   useEffect(() => {
     accountGenerationRef.current += 1;
@@ -666,17 +675,19 @@ export default function BuyerOrderDetailScreen() {
         .catch(() => {});
     }
 
+    fetchOrderRef.current = fetchOrder;
     fetchOrder();
-    timerRef.current = setInterval(fetchOrder, 15_000);
+    if (!realtimeConnected) timerRef.current = setInterval(fetchOrder, 15_000);
     return () => {
       cancelled = true;
+      fetchOrderRef.current = null;
       setIsFetching(false);
       if (timerRef.current !== null) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
     };
-  }, [api, id, loadBuyerOrder, userId]));
+  }, [api, id, loadBuyerOrder, userId, realtimeConnected]));
 
   function handlePullRefresh() {
     if (!id || refreshing) return;
