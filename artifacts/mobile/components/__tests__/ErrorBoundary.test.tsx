@@ -40,15 +40,16 @@ function Button(props: { testID: string; onPress: () => void; children: string }
 // native modules that aren't relevant to the boundary's own catch/reset
 // logic under test here; stub it out with something we can assert against.
 vi.mock('@/components/ErrorFallback', () => ({
-  ErrorFallback: ({ error, resetError }: { error: Error; resetError: () => void }) => (
+  ErrorFallback: ({ error, resetError, scope }: { error: Error; resetError: () => void; scope?: string }) => (
     <>
       <Message testID="default-fallback-message">{`Something went wrong: ${error.message}`}</Message>
+      <Message testID="default-fallback-scope">{scope ?? 'app'}</Message>
       <Button testID="default-fallback-retry" onPress={resetError}>Try Again</Button>
     </>
   ),
 }));
 
-const { ErrorBoundary, TabScreenErrorFallback } = await import('../ErrorBoundary');
+const { ErrorBoundary, TabScreenErrorFallback, ScreenErrorFallback } = await import('../ErrorBoundary');
 
 function Bomb({ shouldThrow }: { shouldThrow: boolean }) {
   if (shouldThrow) {
@@ -173,6 +174,37 @@ describe('TabScreenErrorFallback', () => {
     expect(reportErrorMock.mock.calls[0][0]).toBe(error);
     expect(hostNodesByTestID(renderer, 'default-fallback-message')[0].props.children)
       .toBe('Something went wrong: tab crashed');
+
+    await act(async () => {
+      hostNodesByTestID(renderer, 'default-fallback-retry')[0].props.onPress();
+      await Promise.resolve();
+    });
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock.mock.calls[0][1]).toMatchObject({ tags: { source: 'tab-error-boundary' } });
+    expect(hostNodesByTestID(renderer, 'default-fallback-scope')[0].props.children).toBe('screen');
+    renderer.unmount();
+  });
+});
+
+describe('ScreenErrorFallback', () => {
+  beforeEach(() => {
+    reportErrorMock.mockReset();
+  });
+
+  it('renders the screen-scoped fallback, reports once, and forwards retry', async () => {
+    const retry = vi.fn().mockResolvedValue(undefined);
+    const error = new Error('screen crashed');
+    let renderer!: ReactTestRenderer;
+
+    await act(async () => {
+      renderer = create(<ScreenErrorFallback error={error} retry={retry} />);
+      await Promise.resolve();
+    });
+
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock.mock.calls[0][0]).toBe(error);
+    expect(reportErrorMock.mock.calls[0][1]).toMatchObject({ tags: { source: 'screen-error-boundary' } });
+    expect(hostNodesByTestID(renderer, 'default-fallback-scope')[0].props.children).toBe('screen');
 
     await act(async () => {
       hostNodesByTestID(renderer, 'default-fallback-retry')[0].props.onPress();
