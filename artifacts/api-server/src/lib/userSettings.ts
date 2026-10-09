@@ -23,9 +23,9 @@ export const MAX_STORED_BYTES = 16 * 1024;
 
 const audience = z.enum(["everyone", "friends", "nobody", "only_me", "friends_of_friends"]);
 
-/** Non-DM social privacy fields (socialService PrivacySettings). Replaced as a whole. */
+/** Social privacy fields (socialService PrivacySettings) other than DM privacy
+ *  and private-account, which live on /api/auth/privacy. Replaced as a whole. */
 export const socialPrivacySchema = z.object({
-  profileVisibility: z.enum(["public", "private"]).optional(),
   whoCanSendFriendRequests: audience.optional(),
   whoCanSeePosts: audience.optional(),
   whoCanSeeFriendsList: audience.optional(),

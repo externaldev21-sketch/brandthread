@@ -13,6 +13,9 @@ import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { purgeAuthorFromFeedPostsCache } from '@/lib/feedPostsCache';
 import { queryClient } from '@/lib/queryClient';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
+import {
+  fetchAccountSettings, isPermanentSettingsError, patchAccountSettings, withTimeout,
+} from '@/lib/accountSettings';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
@@ -167,6 +170,9 @@ export async function clearSocialCache(userId?: string): Promise<void> {
     );
     if (toRemove.length > 0) await AsyncStorage.multiRemove(toRemove);
   } catch {}
+  // The local copies are gone; the next read must re-hydrate from the server.
+  privacySyncedAt.delete(u);
+  blocksSyncedAt.delete(u);
   notify();
 }
 
@@ -1614,8 +1620,64 @@ export async function addNotification(n: Omit<Notification, 'id' | 'createdAt'>)
 
 // ─── Blocking & Muting ────────────────────────────────────────────────────────
 
+const SERVER_REFRESH_MS = 60_000;
+const blocksSyncedAt = new Map<string, number>();
+const blocksInflight = new Map<string, Promise<BlockRecord[]>>();
+
+interface ServerBlockRow {
+  userId: string; name?: string | null; handle?: string | null; initials?: string | null;
+  color?: string | null; blockedAt?: string | null;
+}
+
+/** GET /api/social/blocks row -> local BlockRecord. */
+export function blockRecordFromServer(row: ServerBlockRow): BlockRecord {
+  return {
+    id: `block_${row.userId}`,
+    blockedUserId: row.userId,
+    blockedUserName: row.name || 'Brandthread member',
+    blockedUserHandle: row.handle || '',
+    blockedUserInitials: row.initials || 'BM',
+    blockedUserColor: row.color || '#3F3F46',
+    createdAt: row.blockedAt ? new Date(row.blockedAt).toISOString() : iso(),
+  };
+}
+
+async function fetchServerBlocks(): Promise<BlockRecord[]> {
+  const out: BlockRecord[] = [];
+  const PAGE = 100;
+  for (let page = 0; page < 10; page++) {
+    const rows = await serviceRequest<ServerBlockRow[]>(
+      `/api/social/blocks?limit=${PAGE}&offset=${page * PAGE}`, {}, false,
+    );
+    if (!Array.isArray(rows)) break;
+    for (const row of rows) if (row && typeof row.userId === 'string') out.push(blockRecordFromServer(row));
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
+/**
+ * Accounts I blocked. Signed in, the server list is the source of truth (it
+ * enforces the block everywhere); it replaces the local copy at most once a
+ * minute. Offline or signed out, the local copy is returned.
+ */
 export async function getBlockedUsers(k: SocialKeys = K()): Promise<BlockRecord[]> {
-  return load<BlockRecord[]>(k.blocks, []);
+  const local = await load<BlockRecord[]>(k.blocks, []);
+  if (!canSyncSocialServer() || k.userId !== _socialUserId) return local;
+  if (Date.now() - (blocksSyncedAt.get(k.userId) ?? 0) < SERVER_REFRESH_MS) return local;
+  let p = blocksInflight.get(k.userId);
+  if (!p) {
+    p = fetchServerBlocks().then(async (remote) => {
+      if (k.userId !== _socialUserId) return local;
+      await save(k.blocks, remote);
+      blocksSyncedAt.set(k.userId, Date.now());
+      return remote;
+    });
+    blocksInflight.set(k.userId, p);
+    const settled = p;
+    settled.catch(() => {}).finally(() => { if (blocksInflight.get(k.userId) === settled) blocksInflight.delete(k.userId); });
+  }
+  try { return await p; } catch { return local; }
 }
 export async function isBlocked(userId: string): Promise<boolean> {
   const k = K();
@@ -1821,14 +1883,77 @@ export async function getPublicCollection(collectionId: string): Promise<{
 
 // ─── Privacy ──────────────────────────────────────────────────────────────────
 
+// Synced through /api/me/settings as `socialPrivacy`. whoCanMessageMe and
+// profileVisibility have their own server home (/api/auth/privacy).
+export const SYNCED_PRIVACY_KEYS = [
+  'whoCanSendFriendRequests', 'whoCanSeePosts', 'whoCanSeeFriendsList', 'whoCanReplyToStories',
+  'whoCanMention', 'activityStatusVisible', 'readReceiptsEnabled', 'searchable', 'contactDiscovery',
+] as const satisfies readonly (keyof PrivacySettings)[];
+
+const privacySyncedAt = new Map<string, number>();
+const privacyPendingKey = (k: SocialKeys) => `${k.privacy}:pending`;
+
+/** The `socialPrivacy` value sent to the server. */
+export function privacyToServer(p: PrivacySettings): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of SYNCED_PRIVACY_KEYS) out[key] = p[key];
+  return out;
+}
+
+/** Server copy wins for each synced field it holds with a valid type. */
+export function applyServerPrivacy(local: PrivacySettings, server: unknown): PrivacySettings {
+  if (!server || typeof server !== 'object' || Array.isArray(server)) return local;
+  const next: PrivacySettings = { ...local };
+  const src = server as Record<string, unknown>;
+  for (const key of SYNCED_PRIVACY_KEYS) {
+    const value = src[key];
+    if (value !== undefined && value !== null && typeof value === typeof DEFAULT_PRIVACY_SETTINGS[key]) {
+      (next as unknown as Record<string, unknown>)[key] = value;
+    }
+  }
+  return next;
+}
+
+async function pushPrivacy(k: SocialKeys, settings: PrivacySettings): Promise<void> {
+  try {
+    await patchAccountSettings({ socialPrivacy: privacyToServer(settings) });
+    await AsyncStorage.removeItem(privacyPendingKey(k));
+    privacySyncedAt.set(k.userId, Date.now());
+  } catch (error) {
+    // Kept locally either way; retried on the next load unless the server
+    // rejected the body outright.
+    if (isPermanentSettingsError(error)) await AsyncStorage.removeItem(privacyPendingKey(k)).catch(() => {});
+    else await AsyncStorage.setItem(privacyPendingKey(k), '1').catch(() => {});
+  }
+}
+
 export async function getPrivacySettings(k: SocialKeys = K()): Promise<PrivacySettings> {
-  return load<PrivacySettings>(k.privacy, DEFAULT_PRIVACY_SETTINGS);
+  const local = await load<PrivacySettings>(k.privacy, DEFAULT_PRIVACY_SETTINGS);
+  if (!canSyncSocialServer() || k.userId !== _socialUserId) return local;
+  if (Date.now() - (privacySyncedAt.get(k.userId) ?? 0) < SERVER_REFRESH_MS) return local;
+  try {
+    if ((await AsyncStorage.getItem(privacyPendingKey(k))) === '1') {
+      await pushPrivacy(k, local);
+      return local;
+    }
+    const remote = await withTimeout(fetchAccountSettings({ force: true }), 3_000);
+    if (k.userId !== _socialUserId) return local;
+    const merged = applyServerPrivacy(local, remote.settings.socialPrivacy);
+    privacySyncedAt.set(k.userId, Date.now());
+    if (JSON.stringify(merged) !== JSON.stringify(local)) await save(k.privacy, merged);
+    return merged;
+  } catch {
+    return local;
+  }
 }
 export async function updatePrivacySettings(updates: Partial<PrivacySettings>): Promise<PrivacySettings> {
   const k = K();
-  const current = await getPrivacySettings(k);
+  const current = await load<PrivacySettings>(k.privacy, DEFAULT_PRIVACY_SETTINGS);
   const next = { ...current, ...updates };
   await save(k.privacy, next); notify();
+  const touchesSynced = (Object.keys(updates) as (keyof PrivacySettings)[])
+    .some((key) => (SYNCED_PRIVACY_KEYS as readonly string[]).includes(key) && current[key] !== next[key]);
+  if (touchesSynced && canSyncSocialServer() && k.userId === _socialUserId) await pushPrivacy(k, next);
   return next;
 }
 

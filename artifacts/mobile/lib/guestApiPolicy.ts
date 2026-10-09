@@ -12,7 +12,7 @@ const SIGNED_IN_ONLY_PREFIXES = [
   'ai', 'logo', 'mockup', 'photography', 'bg-removal', 'lifestyle', 'techpack',
   'design-studio', 'store/ai', 'brandthread-agent', 'meta-ads', 'ad-campaigns', 'boosts',
   // Account-scoped buyer data
-  'conversations', 'notifications', 'notification-prefs', 'push',
+  'conversations', 'notifications', 'notification-prefs', 'push', 'me/settings',
   'buyer/notifications', 'buyer/payment-methods', 'buyer/saved', 'buyer/collections',
   'buyer/recently-viewed', 'buyer/cart', 'buyer/checkout/payment-intent',
   'feed/for-you', 'feed/events', 'loyalty', 'thread-cash',
