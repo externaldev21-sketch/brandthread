@@ -33,6 +33,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useScrollToEndOnContentChange } from '@/hooks/useScrollToEndOnContentChange';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
@@ -308,6 +309,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   }>();
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
+  const listScroll = useScrollToEndOnContentChange(flatListRef);
   // Per-message-id scroll refs for the quick-reply chip rows.
   const quickReplyScrollRefs = useRef<Record<string, ScrollView | null>>({});
   const api = useApi();
@@ -493,7 +495,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               await new Promise((resolve) => setTimeout(resolve, 700 + Math.random() * 500));
               setAgentTyping(false);
               setMessages((prev) => [...prev, seeded[i]]);
-              setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+              listScroll.requestScrollToEnd();
               await new Promise((resolve) => setTimeout(resolve, 250));
             }
             await markWelcomePlayed(loadedConv.id);
@@ -614,7 +616,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // still need to scroll to first (handled by the effect below).
   useEffect(() => {
     if (messages.length > 0 && (!unreadDividerId || hasScrolledToUnreadRef.current)) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
+      listScroll.requestScrollToEnd(false);
     }
   }, [messages.length, unreadDividerId]);
 
@@ -964,7 +966,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         setConv({ ...conv, disappearingEnabled: next });
         setMessages((prev) => [...prev, message]);
       }
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      listScroll.requestScrollToEnd();
     } catch (e) {
       Alert.alert('Couldn’t update disappearing messages', apiErrorMessage(e, 'Please try again.'));
     }
@@ -1155,7 +1157,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         ts: Date.now(),
         deletedForMe: false,
       }]);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      listScroll.requestScrollToEnd();
       return;
     }
     setIsSending(true);
@@ -1163,7 +1165,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       await sendMessage(conv.id, '', attachment);
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      listScroll.requestScrollToEnd();
     } catch (e) {
       Alert.alert('Voice message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));
     } finally {
@@ -1437,7 +1439,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     };
     setMessages((prev) => [...prev, optimistic]);
     setAgentTyping(true);
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    listScroll.requestScrollToEnd();
 
     if (isPreviewId(conv.id)) {
       // No backend reachable in preview — canned reply, paced like a real
@@ -1461,7 +1463,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         ts: Date.now(),
         deletedForMe: false,
       }]);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      listScroll.requestScrollToEnd();
       return;
     }
 
@@ -1493,7 +1495,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       }]);
     } finally {
       setAgentTyping(false);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      listScroll.requestScrollToEnd();
     }
   }
 
@@ -1574,7 +1576,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       };
       appendPreviewMessage(conv.id, localMsg);
       setMessages((prev) => [...prev, localMsg]);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      listScroll.requestScrollToEnd();
       // Preview-only: the other (simulated) side sends back exactly one
       // short reply so the thread reads as live during a demo — see
       // previewAutoReplyText's own doc comment in lib/previewInbox.ts.
@@ -1595,7 +1597,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         };
         appendPreviewMessage(convIdAtSend, reply);
         setMessages((prev) => [...prev, reply]);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+        listScroll.requestScrollToEnd();
       }, previewAutoReplyDelayMs());
       return;
     }
@@ -1605,7 +1607,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      listScroll.requestScrollToEnd();
     } catch (e) {
       // Seller side: the request was still pending server-side (e.g. a stale
       // load) — swap the composer for the request panel instead of letting
@@ -2545,12 +2547,13 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         onContentSizeChange={() => {
+          listScroll.onContentSizeChange();
           if (!unreadDividerId || hasScrolledToUnreadRef.current) {
             flatListRef.current?.scrollToEnd({ animated: false });
           }
         }}
         onScrollToIndexFailed={() => {
-          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
+          listScroll.requestScrollToEnd(false);
         }}
         // Windowing kept at RN defaults (10/21) — the history stays performant
         // without extra tuning since bubbles are lightweight rows.

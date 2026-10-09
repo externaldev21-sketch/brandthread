@@ -21,6 +21,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useStableCallback } from '@/hooks/useStableCallback';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
@@ -137,6 +138,8 @@ interface ViewRepliesRow {
   count: number;
   expanded: boolean;
 }
+
+const commentRowKey = (row: Row | ViewRepliesRow) => (isViewRepliesRow(row) ? `view-replies-${row.rootId}` : row.id);
 
 function isViewRepliesRow(row: Row | ViewRepliesRow): row is ViewRepliesRow {
   return '_viewReplies' in row;
@@ -1085,6 +1088,34 @@ export default function BuyerPostCommentsScreen() {
     }, 80);
   }, []);
 
+  // Typing in the composer re-renders this screen on every keystroke. Keep
+  // the list's props referentially stable so the visible comment rows (and
+  // the list header) don't re-render / remount with each character.
+  const onLikeStable = useStableCallback(handleLike);
+  const onReplyStable = useStableCallback(handleReply);
+  const onPressMentionStable = useStableCallback(handlePressMention);
+  const renderCommentRow = useCallback(({ item }: { item: Row | ViewRepliesRow }) => (
+    isViewRepliesRow(item) ? (
+      <ViewRepliesButton count={item.count} expanded={item.expanded} onToggle={() => toggleReplies(item.rootId)} />
+    ) : (
+      <CommentRow
+        comment={item}
+        highlighted={item.id === highlightId}
+        postAuthorId={postAuthorId}
+        onLike={onLikeStable}
+        onReply={onReplyStable}
+        onMore={setActionsFor}
+        onPressMention={onPressMentionStable}
+      />
+    )
+  ), [highlightId, postAuthorId, toggleReplies, onLikeStable, onReplyStable, onPressMentionStable]);
+  const listHeader = useMemo(() => (
+    <>
+      {loading && [0, 1, 2, 3].map(i => <CommentSkeletonRow key={i} />)}
+      {!loading && fetchError ? <InlineError message={fetchError} onRetry={load} /> : null}
+    </>
+  ), [loading, fetchError, load]);
+
   const composerLocked = meta.commentsDisabled || !meta.canComment;
 
   // Opened directly with no post (deep link / typed route): there is no
@@ -1181,34 +1212,15 @@ export default function BuyerPostCommentsScreen() {
             ref={listRef}
             data={loading ? [] : visibleRows}
             refreshControl={pull.refreshControl}
-            keyExtractor={row => (isViewRepliesRow(row) ? `view-replies-${row.rootId}` : row.id)}
+            keyExtractor={commentRowKey}
             extraData={highlightId}
             onScrollToIndexFailed={handleScrollToIndexFailed}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={s.listContent}
-          ListHeaderComponent={() => (
-            <>
-              {loading && [0, 1, 2, 3].map(i => <CommentSkeletonRow key={i} />)}
-              {!loading && fetchError ? <InlineError message={fetchError} onRetry={load} /> : null}
-            </>
-          )}
-          renderItem={({ item }) => (
-            isViewRepliesRow(item) ? (
-              <ViewRepliesButton count={item.count} expanded={item.expanded} onToggle={() => toggleReplies(item.rootId)} />
-            ) : (
-              <CommentRow
-                comment={item}
-                highlighted={item.id === highlightId}
-                postAuthorId={postAuthorId}
-                onLike={handleLike}
-                onReply={handleReply}
-                onMore={setActionsFor}
-                onPressMention={handlePressMention}
-              />
-            )
-          )}
+          ListHeaderComponent={listHeader}
+          renderItem={renderCommentRow}
           ListEmptyComponent={
             !loading && !fetchError
               ? (

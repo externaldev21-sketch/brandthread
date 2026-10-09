@@ -21,6 +21,7 @@ import { track } from '@/lib/analytics';
 import { useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useScrollToEndOnContentChange } from '@/hooks/useScrollToEndOnContentChange';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BG, BORDER, FG, MUTED, SUBTLE, RED,
@@ -120,6 +121,8 @@ function BuyerLiveNativeScreen() {
 
   const engineRef       = useRef<any>(null);
   const scrollRef       = useRef<ScrollView>(null);
+  // New comments scroll the list once they've laid out (no fixed delay).
+  const commentsScroll  = useScrollToEndOnContentChange(scrollRef);
   // Slow-polling fallback loop — only runs when the WebSocket genuinely
   // can't connect (see useLiveSocket's onFallback below). Not used while
   // the socket is up.
@@ -147,7 +150,7 @@ function BuyerLiveNativeScreen() {
     if (event.type === 'comment') {
       lastTs.current = event.comment.created_at;
       setComments(prev => [...prev, event.comment].slice(-80));
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      commentsScroll.requestScrollToEnd();
     } else if (event.type === 'products') {
       setProductTags(event.productTags);
       const highlighted = event.productTags.find(tag => tag.highlighted);
@@ -185,7 +188,7 @@ function BuyerLiveNativeScreen() {
       }].slice(-80));
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
-  }, [user?.id, mod.handleEvent]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, mod.handleEvent, commentsScroll.requestScrollToEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startFallbackPolling = React.useCallback((active: boolean) => {
     if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
@@ -291,7 +294,7 @@ function BuyerLiveNativeScreen() {
       if (fresh.length) {
         lastTs.current = fresh[fresh.length - 1].created_at;
         setComments(prev => [...prev, ...fresh].slice(-80));
-        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+        commentsScroll.requestScrollToEnd();
       }
       if (streamData.stream?.status !== 'live') setEnded(true);
       setViewerCount(streamData.stream?.viewer_count ?? 0);
@@ -324,7 +327,7 @@ function BuyerLiveNativeScreen() {
       created_at: new Date().toISOString(),
     };
     setComments(prev => [...prev, optimistic].slice(-80));
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    commentsScroll.requestScrollToEnd();
     try {
       await (api as any).live.comment(params.streamId, {
         message: msg,
@@ -625,6 +628,8 @@ function BuyerLiveNativeScreen() {
         <ScrollView
           ref={scrollRef}
           style={s.commentScroll}
+          onContentSizeChange={commentsScroll.onContentSizeChange}
+          onScrollBeginDrag={commentsScroll.cancelScrollToEnd}
           contentContainerStyle={s.commentContent}
           showsVerticalScrollIndicator={false}
           pointerEvents="box-none"

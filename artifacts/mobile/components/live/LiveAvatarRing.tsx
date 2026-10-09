@@ -49,6 +49,8 @@ export function LiveAvatarRing({
   // avatar never change size and the layout never moves. Starts at the
   // brighter end of the breathing range so a freshly-mounted ring doesn't
   // pop in dim.
+  // shadowOpacity is on the native driver's allowlist, so the endless
+  // breathing loop runs on the UI thread (web has no native driver).
   const glowOpacity = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
@@ -58,8 +60,8 @@ export function LiveAvatarRing({
     AccessibilityInfo.isReduceMotionEnabled?.().then(reduce => {
       if (cancelled || reduce) return;
       loop = Animated.loop(Animated.sequence([
-        Animated.timing(glowOpacity, { toValue: 0.45, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-        Animated.timing(glowOpacity, { toValue: 0.8, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        Animated.timing(glowOpacity, { toValue: 0.45, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(glowOpacity, { toValue: 0.8, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' }),
       ]));
       loop.start();
     }).catch(() => {});

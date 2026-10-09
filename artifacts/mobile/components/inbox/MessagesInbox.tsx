@@ -1015,8 +1015,6 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
 
   function openMessagesSearch() {
     setIsSearchBarOpen(true);
-    // Ref isn't attached until this render commits the search field in.
-    setTimeout(() => messagesSearchInputRef.current?.focus(), 0);
   }
 
   function cancelMessagesSearch() {
@@ -1638,6 +1636,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
               <Feather name="search" size={16} color={theme.muted} />
               <TextInput
                 ref={messagesSearchInputRef}
+                autoFocus
                 style={[s.searchInput, { color: theme.text }, WEB_INPUT_RESET]}
                 value={messagesSearchQuery}
                 onChangeText={setMessagesSearchQuery}

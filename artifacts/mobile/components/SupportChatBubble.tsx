@@ -161,8 +161,9 @@ export function SupportChatModal({ visible, onClose }: { visible: boolean; onClo
         content: "Sorry, I'm having trouble connecting right now. Please try again, or tap 'Escalate' to reach a human.",
       }]);
     } finally {
+      // The list's onContentSizeChange keeps it pinned to the newest reply
+      // once that reply has laid out — no timed scroll needed here.
       setLoading(false);
-      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [msgs, loading, api]);
 
@@ -188,7 +189,6 @@ export function SupportChatModal({ visible, onClose }: { visible: boolean; onClo
       }]);
     } finally {
       setEscalating(false);
-      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }
 

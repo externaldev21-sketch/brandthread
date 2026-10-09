@@ -864,7 +864,6 @@ function RenameSheet({ visible, project, onClose, onRenamed }: RenameSheetProps)
     prevVisRef.current = visible;
     if (visible && project) {
       setName(project.name);
-      setTimeout(() => inputRef.current?.focus(), 220);
     }
   }
 
@@ -885,7 +884,16 @@ function RenameSheet({ visible, project, onClose, onRenamed }: RenameSheetProps)
   const sheetBottom = insets.bottom;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="rename-sheet">
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      // Focus once the sheet is actually on screen (fires after the present
+      // animation) instead of after a guessed delay.
+      onShow={() => inputRef.current?.focus()}
+      testID="rename-sheet"
+    >
       <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Dismiss rename" />
       <View style={[rn.sheet, { paddingBottom: sheetBottom + SP.lg }]}>
         <View style={sh.handle} />

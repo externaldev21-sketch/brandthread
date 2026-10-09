@@ -23,6 +23,9 @@ export function useFeedVideoPreload(
 ): void {
   const managerRef = useRef<VideoPreloadManager | null>(null);
   const active = enabled && Platform.OS !== 'web';
+  // Latest plan inputs, so the manager can apply them the moment it exists.
+  const planInputsRef = useRef({ items, activeIndex });
+  planInputsRef.current = { items, activeIndex };
 
   useEffect(() => {
     if (!active) return undefined;
@@ -34,7 +37,7 @@ export function useFeedVideoPreload(
         // Rejects if a player already exists; the default cache size still applies then.
         void setVideoCacheSizeAsync(VIDEO_CACHE_BYTES).catch(() => {});
       }
-      managerRef.current = new VideoPreloadManager({
+      const manager = new VideoPreloadManager({
         isDataSaver: () => detectDataSaver(),
         createWarmPlayer: (uri) => {
           const player = createVideoPlayer({ uri, useCaching: true });
@@ -43,6 +46,11 @@ export function useFeedVideoPreload(
           return { release: () => player.release() };
         },
       });
+      managerRef.current = manager;
+      // Apply the current plan as soon as the manager is ready, however long
+      // the dynamic import took (replaces a fixed 400ms retry).
+      const { items: latestItems, activeIndex: latestIndex } = planInputsRef.current;
+      manager.update(planVideoPreload(latestItems, latestIndex));
     }).catch(() => {});
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') managerRef.current?.cancel();
@@ -56,12 +64,9 @@ export function useFeedVideoPreload(
   }, [active]);
 
   useEffect(() => {
-    if (!active) return undefined;
-    const apply = () => managerRef.current?.update(planVideoPreload(items, activeIndex));
-    apply();
-    if (managerRef.current) return undefined;
-    // The manager is created after the dynamic import resolves; try again shortly.
-    const timer = setTimeout(apply, 400);
-    return () => clearTimeout(timer);
+    if (!active) return;
+    // Before the dynamic import resolves there is no manager yet; the import
+    // callback above applies the latest plan itself once it creates one.
+    managerRef.current?.update(planVideoPreload(items, activeIndex));
   }, [active, items, activeIndex]);
 }

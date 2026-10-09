@@ -137,8 +137,6 @@ export function TextOverlayEditor({
       setAlign('center');
       setBgStyle('none');
     }
-    // Auto-focus input after a short delay so keyboard appears
-    setTimeout(() => inputRef.current?.focus(), 120);
   }, [visible, editingOverlay]);
 
   function handleDone() {
@@ -202,6 +200,9 @@ export function TextOverlayEditor({
       transparent
       statusBarTranslucent
       onRequestClose={onCancel}
+      // Bring the keyboard up once the editor is actually on screen (fires
+      // after the present animation) instead of after a guessed delay.
+      onShow={() => inputRef.current?.focus()}
     >
       <KeyboardAvoidingView
         style={StyleSheet.absoluteFill}

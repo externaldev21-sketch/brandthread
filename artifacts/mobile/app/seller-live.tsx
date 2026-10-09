@@ -18,6 +18,7 @@ import { formatCents } from '@/lib/money';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useScrollToEndOnContentChange } from '@/hooks/useScrollToEndOnContentChange';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import Composer from '@/components/ui/Composer';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
@@ -114,6 +115,8 @@ function SellerLiveNativeScreen() {
 
   const engineRef     = useRef<any>(null);
   const commentsRef   = useRef<ScrollView>(null);
+  // New comments scroll the list once they've laid out (no fixed delay).
+  const commentsScroll = useScrollToEndOnContentChange(commentsRef);
   // Slow-polling fallback loop — only runs when the WebSocket genuinely
   // can't connect (see useLiveSocket's onFallback below).
   const fallbackPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -198,7 +201,7 @@ function SellerLiveNativeScreen() {
     if (event.type === 'comment') {
       lastCommentTs.current = event.comment.created_at;
       setComments(prev => [...prev, event.comment].slice(-80));
-      setTimeout(() => commentsRef.current?.scrollToEnd({ animated: true }), 100);
+      commentsScroll.requestScrollToEnd();
     } else if (event.type === 'products') {
       setProductTags(event.productTags);
     } else if (event.type === 'viewerCount') {
@@ -227,7 +230,7 @@ function SellerLiveNativeScreen() {
     } else {
       mod.handleEvent(event);
     }
-  }, [mod.handleEvent]);
+  }, [mod.handleEvent, commentsScroll.requestScrollToEnd]);
 
   const startFallbackPolling = React.useCallback((active: boolean) => {
     if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
@@ -265,7 +268,7 @@ function SellerLiveNativeScreen() {
       if (newComments.length) {
         lastCommentTs.current = newComments[newComments.length - 1].created_at;
         setComments(prev => [...prev, ...newComments].slice(-80));
-        setTimeout(() => commentsRef.current?.scrollToEnd({ animated: true }), 100);
+        commentsScroll.requestScrollToEnd();
       }
       consecutiveFailuresRef.current = 0;
     } catch {
@@ -547,6 +550,8 @@ function SellerLiveNativeScreen() {
         <ScrollView
           ref={commentsRef}
           style={s.commentScroll}
+          onContentSizeChange={commentsScroll.onContentSizeChange}
+          onScrollBeginDrag={commentsScroll.cancelScrollToEnd}
           contentContainerStyle={s.commentContent}
           showsVerticalScrollIndicator={false}
         >
