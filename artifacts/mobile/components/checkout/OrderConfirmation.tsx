@@ -181,7 +181,7 @@ export function OrderConfirmation({
   useEffect(() => {
     // A completed purchase is a meaningful, server-backed moment — exactly
     // when contextualPushPermission.ts wants to ask, never on first launch.
-    if (firstVerified?.id) void requestContextualPushPermission(userId, api);
+    if (firstVerified?.id) void requestContextualPushPermission(userId, api, 'order');
   }, [firstVerified?.id, userId, api]);
 
   useEffect(() => {

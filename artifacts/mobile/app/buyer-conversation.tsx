@@ -36,6 +36,7 @@ import type {
   Conversation, Message, MessageAttachment, ConversationParticipant, ReactionType,
 } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import * as ImagePicker from 'expo-image-picker';
 import {
   useAudioPlayer,
@@ -1461,6 +1462,8 @@ export default function BuyerConversationScreen() {
     setIsSending(true);
     try {
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
+      // First message sent: the moment to offer reply notifications.
+      if (userId) void requestContextualPushPermission(userId, api, 'message');
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);

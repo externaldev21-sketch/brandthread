@@ -264,7 +264,7 @@ export default function SellerInboxScreen() {
       if (relevant.some((c) =>
         c.unreadCount > 0 && c.participants.some((p) => p.userId !== myId && p.accountType === 'buyer'),
       )) {
-        void requestContextualPushPermission(myId, api);
+        void requestContextualPushPermission(myId, api, 'message');
       }
       setLoadError(false);
       consecutiveFailuresRef.current = 0;
