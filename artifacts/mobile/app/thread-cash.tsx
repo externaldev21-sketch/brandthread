@@ -7,7 +7,8 @@
  * all come from the same `api.threadCash.get()` / `.history()` calls as
  * before — nothing about eligibility, amounts, or business logic changed.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -187,6 +188,8 @@ export default function ThreadCashScreen() {
   }, [api]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+  // A send, claim or gift landing while this screen is open shows right away.
+  useEffect(() => subscribeThreadCashChanged(() => { void load(); }), [load]);
 
   const streakBonusDays = status?.config.streakBonusDays ?? 7;
   const currentStreak = status?.streak.currentStreak ?? 0;

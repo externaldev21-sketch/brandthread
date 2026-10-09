@@ -78,6 +78,7 @@ import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/Pro
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
+import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -537,6 +538,17 @@ export default function ProfileScreen() {
 
     return () => { active = false; };
   }, [api, threadCashEnabled, user?.id]));
+
+  // Thread Cash received (or spent elsewhere) while the profile is open: the
+  // balance chip refetches instead of waiting for the next focus.
+  useEffect(() => {
+    if (!threadCashEnabled || !user?.id || isBuyerDevPreview()) return;
+    return subscribeThreadCashChanged(() => {
+      void api.threadCash.get()
+        .then(status => setThreadCashBalanceCents(Math.max(0, status?.balanceCents ?? 0)))
+        .catch(() => {});
+    });
+  }, [api, threadCashEnabled, user?.id]);
 
   useEffect(() => {
     const unsub = subscribeSocial(() => { loadData(); });
