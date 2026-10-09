@@ -455,10 +455,17 @@ function AddressCard({ title, addr }: { title: string; addr: { name: string; lin
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function OrderDetailScreen() {
+/**
+ * `orderId` + `embedded` let the seller Orders tab show this screen as the
+ * detail pane of its iPad split view (Shopify iPad: list left, order right).
+ * As a pushed route both are unset and it reads `?id=` as before.
+ */
+export default function OrderDetailScreen({ orderId, embedded = false }: { orderId?: string; embedded?: boolean } = {}) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
+  const params = useLocalSearchParams<{ id: string; tab?: string }>();
+  const id = orderId ?? params.id;
+  const tab = embedded ? undefined : params.tab;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
@@ -856,6 +863,7 @@ export default function OrderDetailScreen() {
         title={order.orderNumber}
         divider={false}
         variant="push"
+        showBack={!embedded}
         onBack={() => goBackOr(router, '/(tabs)/orders')}
         actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
       />
