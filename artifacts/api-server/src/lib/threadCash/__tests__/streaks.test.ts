@@ -117,3 +117,24 @@ describe("computeCheckIn", () => {
     expect(stillBroken.state.currentStreak).toBe(1);
   });
 });
+
+describe("computeCheckIn — timezone can't move the day backwards", () => {
+  it("treats an earlier local date than the last claim as already claimed (UTC+14 then UTC-12)", () => {
+    const now = new Date("2025-06-01T12:00:00Z");
+    const kiribati = computeCheckIn(EMPTY_STREAK_STATE, DEFAULT_THREAD_CASH_CONFIG, now, "Pacific/Kiritimati");
+    expect(kiribati.state.lastCheckInDate).toBe("2025-06-02");
+    const bakerIsland = computeCheckIn(kiribati.state, DEFAULT_THREAD_CASH_CONFIG, now, "Etc/GMT+12");
+    expect(bakerIsland.alreadyCheckedInToday).toBe(true);
+    expect(bakerIsland.earnedCents).toBe(0);
+    const utc = computeCheckIn(kiribati.state, DEFAULT_THREAD_CASH_CONFIG, now, "UTC");
+    expect(utc.alreadyCheckedInToday).toBe(true);
+  });
+
+  it("still pays the next real day after travelling west", () => {
+    const state = { currentStreak: 3, longestStreak: 3, lastCheckInDate: "2025-06-02" };
+    const nextDay = computeCheckIn(state, DEFAULT_THREAD_CASH_CONFIG, new Date("2025-06-03T20:00:00Z"), "America/Los_Angeles");
+    expect(nextDay.alreadyCheckedInToday).toBe(false);
+    expect(nextDay.state.lastCheckInDate).toBe("2025-06-03");
+    expect(nextDay.state.currentStreak).toBe(4);
+  });
+});

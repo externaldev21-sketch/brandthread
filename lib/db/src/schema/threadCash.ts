@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, boolean, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, boolean, primaryKey, bigserial, bigint, uniqueIndex, index } from 'drizzle-orm/pg-core';
 
 // ─── Thread Cash ────────────────────────────────────────────────────────────
 // A platform-funded, non-cash reward credit for buyers. It cannot be cashed
@@ -74,7 +74,7 @@ export const threadCashConfig = pgTable('thread_cash_config', {
   dailySendCapCents:      integer('daily_send_cap_cents').notNull().default(2000),
   dailyReceiveCapCents:   integer('daily_receive_cap_cents').notNull().default(5000),
   minAccountAgeHoursForSend: integer('min_account_age_hours_for_send').notNull().default(24),
-  maxCheckInsPerDevicePerDay: integer('max_check_ins_per_device_per_day').notNull().default(3),
+  maxCheckInsPerDevicePerDay: integer('max_check_ins_per_device_per_day').notNull().default(1),
   updatedBy:           text('updated_by'),
   updatedAt:           timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -116,3 +116,32 @@ export const threadCashTransfers = pgTable('thread_cash_transfers', {
   idempotencyKey: text('idempotency_key'),
   createdAt:      timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// Double-entry mirror of thread_cash_entries (migration 420). A database
+// trigger writes two postings per entry — the user's `wallet` and the
+// counter-account its source draws from — so every movement balances to zero.
+// Read-only from application code.
+export const threadCashJournal = pgTable('thread_cash_journal', {
+  id:          bigserial('id', { mode: 'number' }).primaryKey(),
+  entryId:     uuid('entry_id').notNull().references(() => threadCashEntries.id, { onDelete: 'cascade' }),
+  account:     text('account').notNull(),
+  partyId:     text('party_id'),
+  amountCents: bigint('amount_cents', { mode: 'number' }).notNull(),
+  createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  entryAccountUnique: uniqueIndex('thread_cash_journal_entry_account_unique').on(t.entryId, t.account),
+  accountPartyIdx: index('thread_cash_journal_account_party_idx').on(t.account, t.partyId),
+}));
+
+// One row per account paid a daily reward from a device on a buyer-local
+// date; the per-device cap counts these (migration 420).
+export const threadCashDeviceClaims = pgTable('thread_cash_device_claims', {
+  deviceId:  text('device_id').notNull(),
+  localDate: text('local_date').notNull(),
+  buyerId:   text('buyer_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.deviceId, t.localDate, t.buyerId] }),
+  buyerIdx: index('thread_cash_device_claims_buyer_idx').on(t.buyerId, t.localDate),
+}));
+
