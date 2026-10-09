@@ -8,7 +8,7 @@
  * exact same `(title, message, buttons, options)` signature and semantics:
  *
  *  - No buttons, or one plain "OK" button with no handler  -> toast
- *  - Anything else (a handler, Cancel/Confirm, an options menu) -> sheet
+ *  - 1–2 choices -> Instagram-style centred dialog, 3+ -> Instagram options menu
  *
  * The decision is a pure function (`classifyAlert`) so it is unit-tested
  * without rendering. `nativeAlert` keeps a handle on the platform alert for
@@ -24,14 +24,20 @@ export type AppAlertButton = {
 };
 
 export type AppAlertRequest =
-  | { kind: 'toast'; id: number; text: string }
+  /** `text` is the one-line form (screen readers, de-dupe); title/message are shown on two lines. */
+  | { kind: 'toast'; id: number; text: string; title?: string; message?: string }
   | {
       kind: 'sheet';
       id: number;
       title?: string;
       message?: string;
-      /** 1–2 buttons render side by side, 3+ render as a stacked options list. */
-      layout: 'pair' | 'list';
+      /**
+       * Instagram iOS patterns: 'dialog' = centred card with stacked text
+       * buttons (1–2 choices, e.g. "Log out of your account?"); 'menu' =
+       * floating options card with a separate Cancel card (3+ choices, e.g.
+       * the profile ⋯ menu). Cancel is always last in both.
+       */
+      layout: 'dialog' | 'menu';
       buttons: AppAlertButton[];
       /** Runs when the sheet is dismissed without a button (backdrop / Android back). Null = not dismissable. */
       onDismiss: (() => void) | null;
@@ -84,7 +90,7 @@ export function classifyAlert(
     (list.length === 1 && !list[0].onPress && list[0].style !== 'destructive' && OK_LABELS.has(list[0].text.toLowerCase()));
   const text = toastText(t, m);
   if (isPlainOk && text.length <= TOAST_MAX_CHARS) {
-    return { kind: 'toast', id: nextId++, text };
+    return { kind: 'toast', id: nextId++, text, title: t, message: m };
   }
 
   const sheetButtons: AppAlertButton[] = list.length ? list : [{ text: 'OK', style: 'default' }];
@@ -96,11 +102,11 @@ export function classifyAlert(
       sheetButtons[passive] = { ...sheetButtons[passive], style: 'cancel' };
     }
   }
-  // Cancel goes first in a pair (left, iOS order) and last in a list (bottom, action-sheet order).
+  // Instagram order: actions first, Cancel last (bottom) in both layouts.
   const cancel = sheetButtons.filter((b) => b.style === 'cancel');
   const rest = sheetButtons.filter((b) => b.style !== 'cancel');
-  const layout: 'pair' | 'list' = sheetButtons.length <= 2 ? 'pair' : 'list';
-  const ordered = layout === 'pair' ? [...cancel, ...rest] : [...rest, ...cancel];
+  const layout: 'dialog' | 'menu' = sheetButtons.length <= 2 ? 'dialog' : 'menu';
+  const ordered = [...rest, ...cancel];
 
   // Dismissing (backdrop, Android back) behaves like the Cancel button when
   // there is one. A lone OK info sheet can always be dismissed. Otherwise

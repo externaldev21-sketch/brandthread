@@ -31,7 +31,8 @@ async function flow(browser, images, origin, role, target, name, act, ready) {
     await page.waitForTimeout(800);
     await waitForImages(page, 6_000);
     await act(page);
-    await page.waitForTimeout(1000);
+    // Let the open animation finish (the fake clock can lag a little behind real time).
+    await page.waitForTimeout(1800);
     await page.screenshot({ path: path.join(OUT, `${name}${suffix}.png`) });
     console.log(`Captured ${name}${suffix}`);
   } catch (e) {

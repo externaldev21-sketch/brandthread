@@ -12,7 +12,7 @@ import {
 describe('classifyAlert', () => {
   it('shows a toast for a plain message with no buttons', () => {
     const r = classifyAlert('Saved', 'Your changes are live.');
-    expect(r).toMatchObject({ kind: 'toast', text: 'Saved. Your changes are live.' });
+    expect(r).toMatchObject({ kind: 'toast', text: 'Saved. Your changes are live.', title: 'Saved', message: 'Your changes are live.' });
   });
 
   it('shows a toast for a single OK button with no handler', () => {
@@ -30,7 +30,7 @@ describe('classifyAlert', () => {
     const r = classifyAlert('Request sent', 'We will email you.', [{ text: 'OK', onPress: goBack }]);
     expect(r?.kind).toBe('sheet');
     if (r?.kind !== 'sheet') return;
-    expect(r.layout).toBe('pair');
+    expect(r.layout).toBe('dialog');
     r.onDismiss?.();
     expect(goBack).toHaveBeenCalledTimes(1);
   });
@@ -40,7 +40,7 @@ describe('classifyAlert', () => {
     expect(classifyAlert('Note', long)?.kind).toBe('sheet');
   });
 
-  it('puts Cancel first in a pair and dismiss maps to Cancel', () => {
+  it('puts Cancel last in a dialog (Instagram order) and dismiss maps to Cancel', () => {
     const onCancel = vi.fn();
     const onDelete = vi.fn();
     const r = classifyAlert('Delete product?', 'This cannot be undone.', [
@@ -48,7 +48,7 @@ describe('classifyAlert', () => {
       { text: 'Cancel', style: 'cancel', onPress: onCancel },
     ]);
     if (r?.kind !== 'sheet') throw new Error('expected sheet');
-    expect(r.buttons.map((b) => b.text)).toEqual(['Cancel', 'Delete']);
+    expect(r.buttons.map((b) => b.text)).toEqual(['Delete', 'Cancel']);
     r.onDismiss?.();
     expect(onCancel).toHaveBeenCalled();
     expect(onDelete).not.toHaveBeenCalled();
@@ -61,7 +61,7 @@ describe('classifyAlert', () => {
     expect(r.onDismiss).toBeNull();
   });
 
-  it('stacks 3+ choices as a list with Cancel last', () => {
+  it('stacks 3+ choices as a menu with Cancel last', () => {
     const r = classifyAlert('Product', undefined, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Edit', onPress: () => {} },
@@ -69,7 +69,7 @@ describe('classifyAlert', () => {
       { text: 'Delete', style: 'destructive', onPress: () => {} },
     ]);
     if (r?.kind !== 'sheet') throw new Error('expected sheet');
-    expect(r.layout).toBe('list');
+    expect(r.layout).toBe('menu');
     expect(r.buttons.map((b) => b.text)).toEqual(['Edit', 'Duplicate', 'Delete', 'Cancel']);
   });
 
@@ -145,7 +145,7 @@ describe('passive buttons', () => {
       { text: 'OK' },
     ]);
     if (r?.kind !== 'sheet') throw new Error('expected sheet');
-    expect(r.buttons.map((b) => [b.text, b.style])).toEqual([['OK', 'cancel'], ['View copy', 'default']]);
+    expect(r.buttons.map((b) => [b.text, b.style])).toEqual([['View copy', 'default'], ['OK', 'cancel']]);
     r.onDismiss?.();
     expect(view).not.toHaveBeenCalled();
   });
