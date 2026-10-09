@@ -239,7 +239,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/seller-settings.tsx',
   'app/setup.tsx',
   'app/share-profile.tsx',
-  'app/share-store.tsx',
   'app/shipping.tsx',
   'app/shopping-preferences.tsx',
   'app/sign-in.tsx',
@@ -279,6 +278,8 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/SellerDashboardSections.tsx',
   'components/SellerHomeCommerceDashboard.tsx',
   'components/SellerStudioRadialMenu.tsx',
+  // QR tile: a QR code must stay physically dark-on-white to scan.
+  'components/StoreLinkCard.tsx',
   'components/StudioMenuHints.tsx',
   'components/SellerTutorialOverlay.tsx',
   'components/SetupCelebration.tsx',
