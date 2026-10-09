@@ -266,6 +266,9 @@ export interface Message {
   automated?: boolean;
   ts: number;              // Unix ms
   deletedForMe: boolean;
+  /** Sender-generated id echoed by the server — matches a message queued in
+   *  lib/messageOutbox.ts to its stored copy so it never shows twice. */
+  clientMessageId?: string;
 }
 
 export interface Conversation {

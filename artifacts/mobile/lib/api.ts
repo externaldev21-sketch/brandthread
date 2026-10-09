@@ -1938,7 +1938,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Chat details > Disappearing messages. */
       setDisappearing: (id: string, enabled: boolean) =>
         patch<{ ok: boolean; disappearingEnabled: boolean; message: any }>(`/api/conversations/${encodeURIComponent(id)}/disappearing`, { enabled }),
-      send:       (id: string, body: { text: string; attachment?: any; replyToId?: string }) =>
+      send:       (id: string, body: { text: string; attachment?: any; replyToId?: string; clientMessageId?: string }) =>
         trackAfter(post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body), [['message_sent', { surface: 'dm', has_attachment: Boolean(body.attachment) }]]),
       markRead:   (id: string) =>
         patch<{ ok: boolean }>(`/api/conversations/${encodeURIComponent(id)}/read`, {}),

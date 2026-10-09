@@ -76,6 +76,13 @@ import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuIt
 import { ReactionGlyph } from '@/components/chat/ReactionBar';
 import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/lib/reactionMutations';
 import type { MessageReaction, ReactionType } from '@/services/socialTypes';
+import {
+  clientIdFromOutboxMessageId, enqueueOutboxMessage, isOutboxMessageId, mergeOutboxIntoThread,
+  OutboxAccountMismatchError, outboxEntryToMessage, retryOutboxMessage, subscribeOutboxEvents,
+  type OutboxEntry,
+} from '@/lib/messageOutbox';
+import { useMessageOutbox } from '@/hooks/useMessageOutbox';
+import { getSocialUserId } from '@/services/socialService';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } from '@/components/thread-cash/ChatAttachThreadCash';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
@@ -129,6 +136,8 @@ interface Msg {
   deliveredAt?: string;
   /** True for the seller's own away auto-reply (server-marked). */
   automated?: boolean;
+  /** Echoed by the server for a send from lib/messageOutbox.ts. */
+  clientMessageId?: string;
   /** Swipe-to-reply — same shape as app/buyer-conversation.tsx's Message,
    *  resolved server-side (see api-server's adaptMessage/loadReplyPreviews)
    *  so both sides of a thread render the identical quoted context. */
@@ -299,6 +308,40 @@ export default function SellerConversationScreen() {
 
   // Attachment state
   const [pendingAttachment, setPendingAttachment] = useState<MsgAttachment | null>(null);
+
+  // Offline outbox (lib/messageOutbox.ts) — same as app/buyer-conversation.tsx:
+  // a sent message shows right away ("sending" clock) and is delivered in
+  // order, now or on reconnect/foreground.
+  const sendQueued = useCallback(async (entry: OutboxEntry) => {
+    if (!myId || getSocialUserId() !== myId) throw new OutboxAccountMismatchError();
+    return api.conversations.send(entry.conversationId, {
+      text: entry.text,
+      attachment: entry.attachment,
+      replyToId: entry.replyToId,
+      clientMessageId: entry.clientMessageId,
+    });
+  }, [api, myId]);
+  const outboxEnabled = !!myId && !!id && !isSellerPreviewConversationId(id);
+  const { entries: outboxEntries, flush: flushOutboxNow } = useMessageOutbox(myId, id, sendQueued, outboxEnabled);
+  useEffect(() => {
+    if (!myId || !id) return;
+    return subscribeOutboxEvents((event) => {
+      if (event.userId !== myId || event.entry.conversationId !== id) return;
+      if (event.type === 'sent') {
+        const stored = event.result as Msg | null;
+        if (stored?.id) setMessages((prev) => (prev.some((m) => m.id === stored.id) ? prev : [...prev, stored]));
+        return;
+      }
+      // Same handling as before the outbox (see the REQUEST_NOT_ACCEPTED note
+      // in handleSend): the server's reason, and the draft back in the composer.
+      if (apiErrorCode(event.error) === 'REQUEST_NOT_ACCEPTED') {
+        setConv((prev) => (prev ? { ...prev, isRequest: true } : prev));
+      }
+      Alert.alert('Not sent', apiErrorMessage(event.error, 'Message not sent. Tap to retry.'));
+      setText((current) => (current.trim().length > 0 ? current : event.entry.text));
+      setPendingAttachment((current) => current ?? ((event.entry.attachment as MsgAttachment | undefined) ?? null));
+    });
+  }, [myId, id]);
   const [showAttachPicker, setShowAttachPicker] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [products, setProducts] = useState<SellerProduct[]>([]);
@@ -1111,6 +1154,20 @@ export default function SellerConversationScreen() {
       return;
     }
 
+    if (myId) {
+      await enqueueOutboxMessage(myId, id, {
+        text: t,
+        attachment: att ?? undefined,
+        // A reply to a message that is itself still queued has no server id yet.
+        replyToId: replyingTo && !isOutboxMessageId(replyingTo.id) ? replyingTo.id : undefined,
+        replyPreview: replyingTo?.text,
+        replyToAuthorName: replyingTo?.fromName,
+      });
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      void flushOutboxNow();
+      return;
+    }
+
     setIsSending(true);
     try {
       const msg = await api.conversations.send(id, {
@@ -1171,6 +1228,8 @@ export default function SellerConversationScreen() {
    *  directly (this screen doesn't go through services/socialService). */
   async function handleReact(msg: Msg, type: ReactionType) {
     if (!id) return;
+    // Still queued: there is no server message to react to yet.
+    if (isOutboxMessageId(msg.id)) return;
     hapticSelection();
     const prevMessages = messages;
     const { next, isToggleOff } = applyOptimisticReaction(msg.reactions ?? [], myId, user?.fullName || user?.username || 'You', type);
@@ -1463,12 +1522,33 @@ export default function SellerConversationScreen() {
                   {formatTime(msg.ts)}
                 </Text>
                 {isOwn && msg.status !== 'failed' && (
-                  <View style={s.receiptChecks}>
-                    <Feather name="check" size={11} color={isRead ? ON_DARK : `${ON_DARK}B0`} />
-                    {isRead && <Feather name="check" size={11} color={ON_DARK} style={{ marginLeft: -7 }} />}
-                  </View>
+                  msg.status === 'sending' ? (
+                    <Feather name="clock" size={11} color={`${ON_DARK}B0`} style={s.receiptIcon} />
+                  ) : (
+                    <View style={s.receiptChecks}>
+                      <Feather name="check" size={11} color={isRead ? ON_DARK : `${ON_DARK}B0`} />
+                      {isRead && <Feather name="check" size={11} color={ON_DARK} style={{ marginLeft: -7 }} />}
+                    </View>
+                  )
                 )}
               </View>
+            )}
+
+            {/* Failed / retry — a queued message that stopped retrying on its
+                own; same affordance as app/buyer-conversation.tsx. */}
+            {isOwn && msg.status === 'failed' && (
+              <PressableScale rippleEnabled={false}
+                onPress={() => {
+                  const queuedId = clientIdFromOutboxMessageId(msg.id);
+                  if (!queuedId || !id || !myId) return;
+                  void retryOutboxMessage(myId, id, queuedId).then(() => flushOutboxNow());
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={s.retryRow}
+              >
+                <Feather name="alert-circle" size={11} color={RED} />
+                <Text style={[s.retryText, { color: RED }]}>Tap to retry</Text>
+              </PressableScale>
             )}
           </PressableScale>
           </SwipeToReplyBubble>
@@ -1763,7 +1843,12 @@ export default function SellerConversationScreen() {
       ) : (
         <FlatList
           ref={flatListRef}
-          data={groupByDate(messages, callLog)}
+          data={groupByDate(mergeOutboxIntoThread(
+            messages,
+            outboxEntries.map((entry) => outboxEntryToMessage(entry, {
+              fromId: effectiveMyId, fromName: 'You', fromInitials: 'Y', fromColor: PURPLE,
+            }) as unknown as Msg),
+          ), callLog)}
           keyExtractor={(item, i) => (
             item.type === 'date' ? `date-${item.date}-${i}`
               : item.type === 'call_log' ? `call-${item.entry.id}`
@@ -2593,6 +2678,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   bubbleTime: { fontSize: 10, fontFamily: FONT.regular },
   receiptChecks: { flexDirection: 'row', marginLeft: 2 },
+  receiptIcon: { marginLeft: 2 },
+  retryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, alignSelf: 'flex-end' },
+  retryText: { fontSize: FS.xs, fontFamily: FONT.regular },
   // Reaction pill row (item 68) — same treatment as buyer-conversation.tsx.
   reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   reactionChip: {

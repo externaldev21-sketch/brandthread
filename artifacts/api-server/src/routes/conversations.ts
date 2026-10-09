@@ -36,6 +36,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { isAgentUserId } from "../lib/brandthreadAgent";
 import { enrichProductAttachments } from "../lib/productAttachmentInfo";
 import { enrichOrderAttachments } from "../lib/orderAttachmentInfo";
+import { parseClientMessageId } from "../lib/clientMessageId";
 import {
   checkUpload, validateMediaAttachment, decideOrderShare, decidePostShare, decideProductShare,
 } from "../lib/dmAttachmentPolicy";
@@ -189,6 +190,9 @@ function adaptMessage(
     deletedAt:      m.deletedAt?.toISOString() ?? undefined,
     ts:             new Date(m.createdAt!).getTime(),
     deletedForMe:   false,
+    // Echoed back so the sender's offline outbox can match a queued send to
+    // its stored row (see lib/clientMessageId.ts).
+    clientMessageId: m.clientMessageId ?? undefined,
   };
 }
 
@@ -620,6 +624,7 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     attachments?: any[];
     replyToId?: string;
   };
+  const clientMessageId = parseClientMessageId((req.body as { clientMessageId?: unknown }).clientMessageId);
   if (attachments !== undefined && !Array.isArray(attachments)) {
     return res.status(400).json({ error: "attachments must be an array." });
   }
@@ -652,6 +657,13 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     .limit(1);
 
   if (!sender) return res.status(403).json({ error: "Not a participant" });
+
+  // ── Idempotent retry: this exact send was already stored (the response to
+  // an earlier attempt was lost), so return that row instead of a duplicate.
+  if (clientMessageId) {
+    const existing = await findMessageByClientId(id, userId, clientMessageId);
+    if (existing) return res.status(200).json(await adaptStoredMessage(existing));
+  }
 
   // ── Request gate: the recipient of a pending request can't reply until
   // they accept it (server-side — a hidden composer alone isn't enough).
@@ -828,7 +840,16 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     replyToId:      validReplyToId,
     status:         "sent",
     deliveredAt:    new Date(),
-  }).returning();
+    clientMessageId,
+  }).onConflictDoNothing().returning();
+
+  // Two attempts of the same send raced past the lookup above; the other one
+  // won the unique index, so answer with its row and skip the side effects.
+  if (!msg) {
+    const existing = clientMessageId ? await findMessageByClientId(id, userId, clientMessageId) : undefined;
+    if (existing) return res.status(200).json(await adaptStoredMessage(existing));
+    return res.status(500).json({ error: "Message not sent." });
+  }
 
   // Update conversation preview + increment other participants' unread
   await Promise.all([
@@ -886,14 +907,30 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     })();
   }
 
+  return res.status(201).json(await adaptStoredMessage(msg));
+});
+
+async function findMessageByClientId(conversationId: string, senderId: string, clientMessageId: string) {
+  const [row] = await db.select().from(messages)
+    .where(and(
+      eq(messages.conversationId, conversationId),
+      eq(messages.senderId, senderId),
+      eq(messages.clientMessageId, clientMessageId),
+    ))
+    .limit(1);
+  return row;
+}
+
+/** A just-sent (or idempotently replayed) message in the same response shape as GET /:id/messages. */
+async function adaptStoredMessage(msg: typeof messages.$inferSelect) {
   const replyPreview = msg.replyToId
     ? (await loadReplyPreviews([msg.replyToId])).get(msg.replyToId)
     : undefined;
   const adapted = adaptMessage(msg, [], replyPreview);
   await enrichProductAttachments([adapted]);
   await enrichOrderAttachments([adapted]);
-  return res.status(201).json(adapted);
-});
+  return adapted;
+}
 
 // ─── PUT /api/conversations/:id/messages/:messageId/reactions ────────────────
 // Upserts the caller's reaction on a message — a user has at most one active
