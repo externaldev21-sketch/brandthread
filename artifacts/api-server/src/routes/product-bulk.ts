@@ -17,7 +17,9 @@ import {
   db, products, productVariants, productSeo, productVariantCompareAt,
 } from "@workspace/db";
 import { and, eq, inArray, isNull, sql, desc, ilike, or } from "drizzle-orm";
+import { z } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { bodyObject, validateInput } from "../lib/commerceValidation";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
@@ -36,6 +38,24 @@ const TARGET_STATUSES = new Set(["active", "draft", "archived"]);
 const router = Router();
 router.use(requireAuth);
 router.use(teamContext());
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Shape/size guards only: parseIds/parseChange below keep the business checks
+// and their existing VALIDATION_ERROR / TOO_MANY_PRODUCTS answers.
+const productIdList = z.array(z.string().max(160)).max(1_000);
+const priceBody = bodyObject({
+  productIds: productIdList,
+  change: z.object({
+    mode: z.string().max(20).optional(),
+    direction: z.string().max(20).optional(),
+    value: z.number().finite().optional(),
+  }).passthrough(),
+  rounding: z.string().max(20).optional(),
+  compareAt: z.string().max(20).optional(),
+  preview: z.boolean().optional(),
+});
+const statusBody = bodyObject({ productIds: productIdList, status: z.string().max(20) });
+const duplicateBody = bodyObject({ productIds: productIdList, copyInventory: z.boolean().optional() });
 
 /** Thrown inside a transaction to roll everything back and answer with `body`. */
 class BulkRefusal extends Error {
@@ -154,7 +174,7 @@ router.get("/products", async (req, res) => {
 });
 
 // ─── POST /price ─────────────────────────────────────────────────────────────
-router.post("/price", requireRole("manager"), async (req, res): Promise<void> => {
+router.post("/price", requireRole("manager"), validateInput({ body: priceBody }), async (req, res): Promise<void> => {
   const ownerId = ownerOf(req);
   const parsed = parseIds(req.body);
   if ("status" in parsed) { res.status(parsed.status).json(parsed.body); return; }
@@ -269,7 +289,7 @@ router.post("/price", requireRole("manager"), async (req, res): Promise<void> =>
 });
 
 // ─── POST /status ────────────────────────────────────────────────────────────
-router.post("/status", requireRole("manager"), async (req, res): Promise<void> => {
+router.post("/status", requireRole("manager"), validateInput({ body: statusBody }), async (req, res): Promise<void> => {
   const ownerId = ownerOf(req);
   const parsed = parseIds(req.body);
   if ("status" in parsed) { res.status(parsed.status).json(parsed.body); return; }
@@ -339,7 +359,7 @@ router.post("/status", requireRole("manager"), async (req, res): Promise<void> =
 // ─── POST /duplicate ─────────────────────────────────────────────────────────
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
-router.post("/duplicate", requireRole("manager"), async (req, res): Promise<void> => {
+router.post("/duplicate", requireRole("manager"), validateInput({ body: duplicateBody }), async (req, res): Promise<void> => {
   const ownerId = ownerOf(req);
   const parsed = parseIds(req.body);
   if ("status" in parsed) { res.status(parsed.status).json(parsed.body); return; }

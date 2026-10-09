@@ -15,6 +15,8 @@ import crypto from "crypto";
 import { and, asc, eq } from "drizzle-orm";
 import { db, shippingZones, shippingZoneWeightTiers, users } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, cents, idParams, validateInput } from "../lib/commerceValidation";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 
@@ -82,6 +84,33 @@ router.get("/resolve", async (req, res) => {
 router.use(requireAuth);
 router.use(teamContext());
 
+// Type/size guards; the handlers keep the enum/ISO-country sanitising and the
+// non-negative-integer checks with their messages.
+const zoneIdParams = idParams("id");
+const zoneFields = {
+  name: z.string().max(200).nullish(),
+  zoneType: z.string().max(40).optional(),
+  countries: z.array(z.string().max(10)).max(300).nullish(),
+  pricingModel: z.string().max(40).nullish(),
+  flatRateCents: cents.optional(),
+  freeAboveCents: cents.nullish(),
+  processingDays: z.number().finite().max(365).nullish(),
+  carrierLabel: z.string().max(200).nullish(),
+  shipsInternationally: z.boolean().nullish(),
+  dutiesHandling: z.string().max(20).nullish(),
+  sortOrder: z.number().finite().max(1_000_000).nullish(),
+};
+const createZoneBody = bodyObject(zoneFields);
+const updateZoneBody = bodyObject({ ...zoneFields, active: z.boolean().nullish() });
+const zoneSettingsBody = bodyObject({ shipFromCountry: z.string().max(10).optional() });
+const weightTiersBody = bodyObject({
+  tiers: z.array(z.object({
+    minWeightGrams: z.number().finite().max(10_000_000).optional(),
+    maxWeightGrams: z.number().finite().max(10_000_000).nullish(),
+    rateCents: cents.optional(),
+  }).passthrough()).max(100),
+});
+
 // GET /api/shipping-zones/settings — the seller's ship-from country (used to resolve the "domestic" zone)
 router.get("/settings", requireRole("staff"), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
@@ -91,7 +120,7 @@ router.get("/settings", requireRole("staff"), async (req, res) => {
 });
 
 // PATCH /api/shipping-zones/settings — update the seller's ship-from country
-router.patch("/settings", requireRole("staff"), async (req, res) => {
+router.patch("/settings", requireRole("staff"), validateInput({ body: zoneSettingsBody }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const country = typeof req.body?.shipFromCountry === "string" ? req.body.shipFromCountry.trim().toUpperCase() : "";
   if (!/^[A-Z]{2}$/.test(country)) {
@@ -115,7 +144,7 @@ router.get("/", requireRole("staff"), async (req, res) => {
 });
 
 // POST /api/shipping-zones — create a new zone
-router.post("/", requireRole("staff"), async (req, res) => {
+router.post("/", requireRole("staff"), validateInput({ body: createZoneBody }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const {
     name, zoneType, countries, pricingModel, flatRateCents, freeAboveCents,
@@ -162,7 +191,7 @@ router.post("/", requireRole("staff"), async (req, res) => {
 });
 
 // PATCH /api/shipping-zones/:id — update a zone
-router.patch("/:id", requireRole("staff"), async (req, res) => {
+router.patch("/:id", requireRole("staff"), validateInput({ params: zoneIdParams, body: updateZoneBody }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { id } = req.params;
 
@@ -235,7 +264,7 @@ router.patch("/:id", requireRole("staff"), async (req, res) => {
 });
 
 // DELETE /api/shipping-zones/:id — delete a zone (and its weight tiers, via cascade)
-router.delete("/:id", requireRole("staff"), async (req, res) => {
+router.delete("/:id", requireRole("staff"), validateInput({ params: zoneIdParams }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { id } = req.params;
 
@@ -248,7 +277,7 @@ router.delete("/:id", requireRole("staff"), async (req, res) => {
 });
 
 // PUT /api/shipping-zones/:id/weight-tiers — replace all weight tiers for a zone
-router.put("/:id/weight-tiers", requireRole("staff"), async (req, res) => {
+router.put("/:id/weight-tiers", requireRole("staff"), validateInput({ params: zoneIdParams, body: weightTiersBody }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { id } = req.params;
 

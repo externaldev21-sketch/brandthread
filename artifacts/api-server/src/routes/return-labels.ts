@@ -10,6 +10,8 @@
  */
 import { Router } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { addressInput, bodyObject, idParams, parcelDimension, validateInput } from "../lib/commerceValidation";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { parcelInputError } from "../lib/parcelSuggestion";
 import { buyReturnLabel, ReturnLabelError } from "../lib/returnLabels";
@@ -26,7 +28,19 @@ function addressError(value: any): string | null {
   return null;
 }
 
-router.post("/:returnId", requireRole("staff"), async (req, res) => {
+// Shape/size guards; addressError / parcelInputError keep the required-field
+// and range rules (and their messages).
+const returnLabelBody = bodyObject({
+  returnAddress: addressInput.nullish(),
+  parcel: z.object({
+    length: parcelDimension.optional(),
+    width: parcelDimension.optional(),
+    height: parcelDimension.optional(),
+    weight: parcelDimension.optional(),
+  }).passthrough().nullish(),
+});
+
+router.post("/:returnId", requireRole("staff"), validateInput({ params: idParams("returnId"), body: returnLabelBody }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const addrProblem = addressError(req.body?.returnAddress);
   if (addrProblem) return void res.status(400).json({ error: addrProblem });

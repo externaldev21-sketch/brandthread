@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-import { db, products, productVariants } from "@workspace/db";
+import { db, products, productVariants, drops } from "@workspace/db";
 import { eq, desc, sql, and, isNull, gt, ne } from "drizzle-orm";
 import { validatePreorderListing } from "../lib/delivery/policy";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -16,6 +16,78 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { z } from "@workspace/api-zod";
+import { bodyObject, cents, dateLike, idParams, str, validateInput } from "../lib/commerceValidation";
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Type/size guards in front of the handlers' own business validation (which
+// keeps its specific error messages). Unknown keys pass through untouched.
+const productIdParams = idParams("id");
+const variantIdParams = idParams("id", "variantId");
+const stringList = (maxItems: number, maxLen: number) => z.array(z.string().max(maxLen)).max(maxItems);
+// Variant integers are validated (and reported) by the handlers; here they only
+// need to be JSON numbers within a sane range.
+const boundedNumber = z.number().finite().min(-1_000_000_000).max(1_000_000_000);
+const variantInput = z.object({
+  size: str(100).nullish(),
+  color: str(100).nullish(),
+  sku: z.string().max(200).optional(),
+  priceCents: boundedNumber.optional(),
+  compareAtPriceCents: boundedNumber.nullish(),
+  stock: boundedNumber.nullish(),
+  lowStockThreshold: boundedNumber.nullish(),
+}).passthrough();
+const productFields = {
+  name: z.string().max(300).optional(),
+  description: z.string().max(20_000).nullish(),
+  category: str(100).nullish(),
+  status: str(40).nullish(),
+  images: stringList(50, 4_096).nullish(),
+  tags: stringList(100, 200).nullish(),
+  styleTags: stringList(100, 200).nullish(),
+  isPreOrder: z.boolean().nullish(),
+  preOrderClosingDate: dateLike.nullish(),
+  preOrderEstShipDate: dateLike.nullish(),
+  dropId: str(160).nullish(),
+  sizeChartImageUrl: z.string().max(4_096).nullish(),
+};
+const createProductBody = bodyObject({
+  ...productFields,
+  variant: variantInput.nullish(),
+  variants: z.array(variantInput).max(500).optional(),
+});
+const updateProductBody = bodyObject({
+  ...productFields,
+  sizeChart: z.unknown().optional(),
+  compareAtPriceCents: boundedNumber.nullish(),
+});
+const addVariantBody = bodyObject({
+  size: str(100).nullish(),
+  color: str(100).nullish(),
+  sku: z.string().max(200).optional(),
+  priceCents: cents.optional(),
+  compareAtPriceCents: cents.nullish(),
+  stock: z.number().int().min(0).max(10_000_000).optional(),
+  lowStockThreshold: z.number().int().min(0).max(10_000_000).optional(),
+});
+const patchVariantBody = bodyObject({
+  stock: boundedNumber.optional(),
+  priceCents: cents.optional(),
+  lowStockThreshold: z.number().int().min(0).max(10_000_000).optional(),
+  compareAtPriceCents: boundedNumber.nullish(),
+});
+const importCell = z.union([z.string().max(20_000), z.number().finite(), z.boolean()]).nullish();
+const importProductsBody = bodyObject({
+  rows: z.array(z.object({
+    name: importCell,
+    description: importCell,
+    category: importCell,
+    price: importCell,
+    sku: importCell,
+    images: importCell,
+    tags: importCell,
+  }).passthrough()).max(1_000),
+});
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -51,6 +123,19 @@ async function getProductAccess(req: any, res: any) {
     sendPlanLookupUnavailable(req, res, error);
     return null;
   }
+}
+
+/**
+ * A listing may only be attached to one of the seller's own drops: public drop
+ * pages list products by dropId alone, so an unchecked id would let one seller
+ * place listings on another seller's drop.
+ */
+async function isOwnDrop(ownerId: string, dropId: unknown): Promise<boolean> {
+  if (dropId === undefined || dropId === null || dropId === "") return true;
+  if (typeof dropId !== "string") return false;
+  const [drop] = await db.select({ id: drops.id }).from(drops)
+    .where(and(eq(drops.id, dropId), eq(drops.ownerId, ownerId))).limit(1);
+  return !!drop;
 }
 
 async function hasProductCapacity(tx: any, ownerId: string, limit: number | null, requested: number): Promise<boolean> {
@@ -145,7 +230,7 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/products (manager+)
-router.post("/", requireRole("manager"), async (req, res) => {
+router.post("/", requireRole("manager"), validateInput({ body: createProductBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const {
     name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants,
@@ -165,6 +250,10 @@ router.post("/", requireRole("manager"), async (req, res) => {
       effectiveShipDate: preOrderEstShipDate ? new Date(preOrderEstShipDate) : null,
     });
     if (problem) { res.status(problem.status).json({ error: problem.error, code: problem.code }); return; }
+  }
+
+  if (!await isOwnDrop(ownerId, dropId)) {
+    res.status(404).json({ error: "Drop not found" }); return;
   }
 
   // Reject if `variants` is present but is not an array — silently treating it as
@@ -293,7 +382,7 @@ router.get("/:id/save-stats", async (req, res) => {
 });
 
 // PUT /api/products/:id (manager+)
-router.put("/:id", requireRole("manager"), async (req, res) => {
+router.put("/:id", requireRole("manager"), validateInput({ params: productIdParams, body: updateProductBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const {
     name, description, category, status, images, tags, styleTags,
@@ -331,6 +420,9 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
   // Product-level price/stock edits for existing variants (lib/productVariantEdits.ts).
   const variantEdits = parseProductLevelVariantEdits(req.body?.variants);
   if ("error" in variantEdits) { res.status(400).json({ error: variantEdits.error }); return; }
+  if (!await isOwnDrop(ownerId, dropId)) {
+    res.status(404).json({ error: "Drop not found" }); return;
+  }
 
   const updateValues = {
       ...(name         && { name }),
@@ -438,7 +530,7 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
 });
 
 // DELETE /api/products/:id — soft delete, immediately hidden from public views.
-router.delete("/:id", requireRole("manager"), async (req, res) => {
+router.delete("/:id", requireRole("manager"), validateInput({ params: productIdParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const now = new Date();
   const recoverableUntil = new Date(now.getTime() + PRODUCT_DELETE_RECOVERY_WINDOW_MS);
@@ -475,7 +567,7 @@ router.delete("/:id", requireRole("manager"), async (req, res) => {
 });
 
 // POST /api/products/:id/restore — owner-only, idempotent within recovery window.
-router.post("/:id/restore", requireRole("manager"), async (req, res) => {
+router.post("/:id/restore", requireRole("manager"), validateInput({ params: productIdParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const now = new Date();
   const access = await getProductAccess(req, res);
@@ -530,7 +622,7 @@ router.post("/:id/restore", requireRole("manager"), async (req, res) => {
 });
 
 // POST /api/products/:id/variants (manager+)
-router.post("/:id/variants", requireRole("manager"), async (req, res) => {
+router.post("/:id/variants", requireRole("manager"), validateInput({ params: productIdParams, body: addVariantBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   // Verify product ownership first
   const [product] = await db.select({ id: products.id }).from(products)
@@ -552,7 +644,7 @@ router.post("/:id/variants", requireRole("manager"), async (req, res) => {
 });
 
 // PATCH /api/products/:id/variants/:variantId — update stock / price (ownership via product join)
-router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res) => {
+router.patch("/:id/variants/:variantId", requireRole("manager"), validateInput({ params: variantIdParams, body: patchVariantBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   // Verify product ownership
   const [product] = await db.select({ id: products.id, name: products.name }).from(products)
@@ -617,7 +709,7 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
 // POST /api/products/import — CSV bulk product import
 // Body: { rows: Array<{ name: string, description?: string, category?: string, price: string, sku?: string, images?: string, tags?: string }> }
 // Limits: max 100 rows per call
-router.post("/import", requireRole("manager"), async (req, res) => {
+router.post("/import", requireRole("manager"), validateInput({ body: importProductsBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { rows } = req.body;
 

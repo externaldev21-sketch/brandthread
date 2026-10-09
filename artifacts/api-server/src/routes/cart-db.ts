@@ -10,10 +10,19 @@ import { Router } from "express";
 import { db, cartItems } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, looseRecord, validateInput } from "../lib/commerceValidation";
 import { newlyAddedVariantIds, recordAddToCartEvents } from "../lib/sellerProductEvents";
 
 const router = Router();
 router.use(requireAuth);
+
+// Cart lines are the client's own cached item objects (stored verbatim as a
+// backup), so each line is only required to be a bounded JSON object.
+const cartSyncBody = bodyObject({
+  items: z.array(looseRecord).max(500).optional(),
+  savedItems: z.array(looseRecord).max(500).optional(),
+});
 
 // GET /api/buyer/cart
 router.get("/", async (req, res) => {
@@ -27,7 +36,7 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/buyer/cart/sync — full replace
-router.post("/sync", async (req, res) => {
+router.post("/sync", validateInput({ body: cartSyncBody }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { items = [], savedItems: saved = [] } = req.body as {
     items?: any[];

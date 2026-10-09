@@ -13,6 +13,8 @@ import {
 import { eq, desc, and, notExists, isNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole } from "../middlewares/requireRole";
+import { z } from "@workspace/api-zod";
+import { bodyObject, idParams, validateInput } from "../lib/commerceValidation";
 import { deliverDropBroadcast } from "../lib/dropBroadcast";
 import {
   defaultFulfillmentDeadline, failDrop, validateFulfillmentDeadline,
@@ -21,6 +23,32 @@ import { maybeCompleteDrop } from "../lib/money/escrow";
 
 const router = Router();
 router.use(requireAuth);
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Type/size guards; the handlers keep the date parsing, enum, deadline and
+// broadcast-schedule rules and their messages. Dates may be ISO strings or
+// epoch numbers (both are handed to `new Date`).
+const dropIdParams = idParams("id");
+const dateInput = z.union([z.string().max(64), z.number().finite()]);
+const dropFieldsBody = {
+  name: z.string().max(300).optional(),
+  type: z.string().max(40).optional(),
+  status: z.string().max(40).nullish(),
+  estimatedShipDate: dateInput.nullish(),
+  estimatedPayoutDate: dateInput.nullish(),
+  fulfillmentDeadlineAt: dateInput.nullish(),
+  releaseAt: dateInput.nullish(),
+  endsAt: dateInput.nullish(),
+  scheduledBroadcastAt: dateInput.nullish(),
+  heroImageUrl: z.string().max(4_096).nullish(),
+  heroVideoUrl: z.string().max(4_096).nullish(),
+  launchTimezone: z.string().max(100).nullish(),
+  earlyAccessMinutes: z.number().finite().max(1_000_000).optional(),
+  mfgProgress: z.number().finite().optional(),
+};
+const createDropBody = bodyObject(dropFieldsBody);
+const updateDropBody = bodyObject(dropFieldsBody);
+const confirmBody = bodyObject({ confirm: z.boolean().optional() });
 
 const dropFields = {
   id: drops.id,
@@ -81,7 +109,7 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/drops
-router.post("/", requireRole("manager"), async (req, res) => {
+router.post("/", requireRole("manager"), validateInput({ body: createDropBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const {
     name, type, estimatedShipDate, estimatedPayoutDate, fulfillmentDeadlineAt,
@@ -189,7 +217,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // PATCH /api/drops/:id
-router.patch("/:id", requireRole("manager"), async (req, res) => {
+router.patch("/:id", requireRole("manager"), validateInput({ params: dropIdParams, body: updateDropBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
 
   // payoutStatus / stripePayoutId are derived from real money state and are
@@ -325,7 +353,7 @@ router.patch("/:id", requireRole("manager"), async (req, res) => {
 // The seller cancels a preorder drop: every buyer whose order has not
 // shipped is refunded in full, automatically. Orders already shipped keep
 // their release. Requires { confirm: true } because it cannot be undone.
-router.post("/:id/cancel-preorders", requireRole("manager"), async (req, res): Promise<void> => {
+router.post("/:id/cancel-preorders", requireRole("manager"), validateInput({ params: dropIdParams, body: confirmBody }), async (req, res): Promise<void> => {
   const sellerId = (req as any).clerkUserId as string;
   if (req.body?.confirm !== true) {
     res.status(400).json({ error: "Send { confirm: true } to refund every unshipped preorder", code: "CONFIRM_REQUIRED" });
@@ -354,7 +382,7 @@ router.post("/:id/cancel-preorders", requireRole("manager"), async (req, res): P
 // money already held route through the existing refund flow; everything else
 // (pre-made drops, or a preorder drop that hasn't collected a single order)
 // just closes the drop so it stops accepting purchases and drops off Discover.
-router.post("/:id/cancel", requireRole("manager"), async (req, res): Promise<void> => {
+router.post("/:id/cancel", requireRole("manager"), validateInput({ params: dropIdParams, body: confirmBody }), async (req, res): Promise<void> => {
   const sellerId = (req as any).clerkUserId as string;
   const [drop] = await db.select({
     id: drops.id, type: drops.type, status: drops.status, escrowState: drops.escrowState,
@@ -410,7 +438,7 @@ router.get("/:id/broadcast-preview", async (req, res): Promise<void> => {
 // ─── POST /api/drops/:id/broadcast ───────────────────────────────────────────
 // Send a push notification to all followers announcing a live/active drop.
 // Idempotent: each drop can only be broadcast once (unique drop_id constraint).
-router.post("/:id/broadcast", requireRole("manager"), async (req, res) => {
+router.post("/:id/broadcast", requireRole("manager"), validateInput({ params: dropIdParams }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
 
   // Verify the drop belongs to this seller

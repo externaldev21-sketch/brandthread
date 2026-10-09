@@ -24,6 +24,12 @@ import {
   QUESTIONS_PER_DAY, QUESTIONS_PER_PRODUCT_PER_DAY, canAnswerQuestion, checkAnswer, checkQuestion,
 } from "../lib/productQa";
 import { parsePagination } from "../lib/pagination";
+import { z } from "@workspace/api-zod";
+import { bodyObject, idParams, validateInput } from "../lib/commerceValidation";
+
+// checkQuestion/checkAnswer own the length rules and seller-facing messages;
+// this only rejects non-string or pathological bodies before they get there.
+const qaTextBody = bodyObject({ body: z.string().max(10_000).optional() });
 
 const router = Router();
 
@@ -77,7 +83,7 @@ router.get("/product/:productId", async (req, res) => {
 });
 
 // ─── Buyer: ask a question ───────────────────────────────────────────────────
-router.post("/product/:productId", requireAuth, rateLimit("comment"), async (req, res) => {
+router.post("/product/:productId", requireAuth, rateLimit("comment"), validateInput({ params: idParams("productId"), body: qaTextBody }), async (req, res) => {
   const askerId = (req as any).clerkUserId as string;
   const productId = req.params.productId as string;
   if (!UUID_RE.test(productId)) return res.status(404).json({ error: "Product not found" });
@@ -133,7 +139,7 @@ router.post("/product/:productId", requireAuth, rateLimit("comment"), async (req
 });
 
 // ─── Buyer: delete own question ──────────────────────────────────────────────
-router.delete("/questions/:id", requireAuth, async (req, res) => {
+router.delete("/questions/:id", requireAuth, validateInput({ params: idParams("id") }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const id = req.params.id as string;
   if (!UUID_RE.test(id)) return res.status(404).json({ error: "Question not found" });
@@ -177,7 +183,7 @@ router.get("/seller", requireAuth, async (req, res) => {
 });
 
 // ─── Seller: answer a question on their own product ──────────────────────────
-router.post("/questions/:id/answer", requireAuth, rateLimit("comment"), async (req, res) => {
+router.post("/questions/:id/answer", requireAuth, rateLimit("comment"), validateInput({ params: idParams("id"), body: qaTextBody }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const id = req.params.id as string;
   if (!UUID_RE.test(id)) return res.status(404).json({ error: "Question not found" });
