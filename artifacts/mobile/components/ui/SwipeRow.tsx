@@ -20,7 +20,8 @@
  */
 import React, { useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
+import { SPRING } from '@/constants/motion';
 import { FONT } from '@/lib/theme';
 import { haptics } from '@/lib/haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -49,7 +50,7 @@ function toneColors(theme: AppThemePreset, tone: SwipeTone): { bg: string; fg: s
 export interface SwipeRowAction {
   key: string;
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   tone?: SwipeTone;
   onPress: () => void | Promise<void>;
   accessibilityLabel?: string;
@@ -100,9 +101,7 @@ export default function SwipeRow({
 
   const settle = (to: number, done?: () => void) => {
     offset.current = to;
-    Animated.spring(translateX, {
-      toValue: to, useNativeDriver: nativeDriver, stiffness: 420, damping: 40, mass: 1,
-    }).start(() => done?.());
+    Animated.spring(translateX, { toValue: to, ...SPRING, useNativeDriver: nativeDriver }).start(() => done?.());
   };
 
   const close = () => settle(0);
@@ -181,7 +180,7 @@ export default function SwipeRow({
         accessibilityRole="button"
         accessibilityLabel={action.accessibilityLabel ?? action.label}
       >
-        <Feather name={action.icon} size={20} color={tone.fg} />
+        <Icon name={action.icon} size={20} color={tone.fg} />
         <Text style={[styles.actionText, { color: tone.fg }]} numberOfLines={1}>{action.label}</Text>
       </Pressable>
     );

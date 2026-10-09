@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS } from '@/lib/theme';
 import { getUnreadActivityCount, subscribeActivity, subscribeUnreadOverride, watchActivityRealtime } from '@/services/activityService';
+import { Icon } from '@/components/ui/Icon';
 
 /**
  * Unread Activity Center count. Refreshes when the host screen gains focus,
@@ -94,7 +94,7 @@ export default function ActivityBellButton({
       {/* The badge is anchored to the glyph, so it sits correctly whatever
           hit-area size the host header gives the button. */}
       <View>
-        <Feather name="bell" size={size} color={color ?? theme.text} />
+        <Icon name="bell" size={size} color={color ?? theme.text} />
         {unread > 0 && (
           <View
             style={[

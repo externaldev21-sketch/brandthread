@@ -6,7 +6,8 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Pressable: 'Pressable', StyleSheet: { create: (s: unknown) => s }, Text: 'Text', View: 'View',
 }));
-vi.mock('@expo/vector-icons', () => ({ Feather: 'Feather' }));
+vi.mock('@/components/ui/Icon', () => ({ Icon: 'Icon' }));
+vi.mock('@/constants/motion', () => ({ SPRING: {} }));
 vi.mock('@/lib/haptics', () => ({ haptics: { selection: vi.fn() } }));
 vi.mock('@/contexts/AppThemeContext', () => ({ useAppTheme: () => ({ theme: {} }) }));
 

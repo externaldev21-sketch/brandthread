@@ -15,10 +15,9 @@
  *
  * Pure module (no react-native import) so it is unit-tested directly.
  */
-import type { ComponentProps } from 'react';
-import type { Feather } from '@expo/vector-icons';
+import type { IconName } from '@/components/ui/Icon';
 
-export type MenuIcon = ComponentProps<typeof Feather>['name'];
+export type MenuIcon = IconName;
 
 export interface MenuItem {
   key?: string;

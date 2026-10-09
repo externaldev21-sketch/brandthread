@@ -7,19 +7,20 @@
 import { useCallback } from 'react';
 import { type TextStyle } from 'react-native';
 import { Easing, useReducedMotion } from 'react-native-reanimated';
+import { FONT } from '@/lib/theme';
 
 /** Brandthread type scale for the onboarding flow (Inter). */
 export const TYPE = {
   /** One-idea hero lines: Welcome, Success. */
-  display: { fontSize: 44, lineHeight: 48, fontFamily: 'Inter_700Bold', letterSpacing: -1.6 } satisfies TextStyle,
+  display: { fontSize: 44, lineHeight: 48, fontFamily: FONT.bold, letterSpacing: -1.6 } satisfies TextStyle,
   /** Step questions — display weight, sized so two short lines fit a 375pt phone. */
-  headline: { fontSize: 36, lineHeight: 40, fontFamily: 'Inter_700Bold', letterSpacing: -1.2 } satisfies TextStyle,
-  title1: { fontSize: 28, lineHeight: 34, fontFamily: 'Inter_700Bold', letterSpacing: -0.7 } satisfies TextStyle,
-  body: { fontSize: 15, lineHeight: 20, fontFamily: 'Inter_400Regular' } satisfies TextStyle,
-  bodyStrong: { fontSize: 15, lineHeight: 20, fontFamily: 'Inter_600SemiBold' } satisfies TextStyle,
-  label: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_500Medium' } satisfies TextStyle,
-  caption: { fontSize: 12, lineHeight: 16, fontFamily: 'Inter_400Regular' } satisfies TextStyle,
-  eyebrow: { fontSize: 11, lineHeight: 14, fontFamily: 'Inter_700Bold', letterSpacing: 2.4 } satisfies TextStyle,
+  headline: { fontSize: 36, lineHeight: 40, fontFamily: FONT.bold, letterSpacing: -1.2 } satisfies TextStyle,
+  title1: { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, letterSpacing: -0.7 } satisfies TextStyle,
+  body: { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular } satisfies TextStyle,
+  bodyStrong: { fontSize: 15, lineHeight: 20, fontFamily: FONT.semibold } satisfies TextStyle,
+  label: { fontSize: 13, lineHeight: 18, fontFamily: FONT.medium } satisfies TextStyle,
+  caption: { fontSize: 12, lineHeight: 16, fontFamily: FONT.regular } satisfies TextStyle,
+  eyebrow: { fontSize: 11, lineHeight: 14, fontFamily: FONT.bold, letterSpacing: 2.4 } satisfies TextStyle,
 } as const;
 
 /** 8pt grid. */

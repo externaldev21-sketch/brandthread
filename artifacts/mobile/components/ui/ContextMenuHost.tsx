@@ -16,7 +16,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
+import { springTo } from '@/constants/motion';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -89,10 +90,10 @@ function MenuRows({ items, onPick, compact }: { items: MenuItem[]; onPick: (item
             testID={`menu-item-${index}`}
           >
             {item.checked !== undefined ? (
-              <View style={styles.check}>{item.checked ? <Feather name="check" size={16} color={theme.text} /> : null}</View>
+              <View style={styles.check}>{item.checked ? <Icon name="check" size={16} color={theme.text} /> : null}</View>
             ) : null}
             <Text style={[styles.rowLabel, { color }]} numberOfLines={1}>{item.label}</Text>
-            {item.icon ? <Feather name={item.icon} size={18} color={color} style={styles.rowIcon} /> : null}
+            {item.icon ? <Icon name={item.icon} size={18} color={color} style={styles.rowIcon} /> : null}
           </Pressable>
         );
       })}
@@ -111,12 +112,8 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
 
   useEffect(() => {
     haptics.rigid();
-    Animated.spring(anim, {
-      toValue: 1,
-      // Near-critically damped: the card settles without a wobble.
-      stiffness: 420, damping: 38, mass: 1,
-      useNativeDriver: nativeDriver,
-    }).start();
+    // The design foundation's one spring (no overshoot).
+    springTo(anim, 1).start();
   }, [anim]);
 
   const { preview } = req;
@@ -180,7 +177,7 @@ function PullDown({ req }: { req: PullDownRequest }) {
   const close = useClosing(anim, closePullDownMenu);
 
   useEffect(() => {
-    Animated.spring(anim, { toValue: 1, stiffness: 520, damping: 42, mass: 1, useNativeDriver: nativeDriver }).start();
+    springTo(anim, 1).start();
   }, [anim]);
 
   const menuHeight = req.items.length * ROW_HEIGHT + (req.title ? 34 : 0);

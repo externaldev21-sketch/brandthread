@@ -2141,8 +2141,6 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: theme.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   descriptionText: {
     fontSize: FS.sm,

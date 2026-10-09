@@ -8,7 +8,7 @@
  */
 import React from 'react';
 import { Animated, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FONT } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
@@ -20,7 +20,7 @@ import { PRESS_DURATION_MS } from '@/constants/motion';
 import { BODY_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export interface ListRowProps {
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
   iconColor?: string;
   /** Renders a round Avatar (photo or initials) in place of `icon`, for people rows. */
   avatar?: { uri?: string | null; name?: string };
@@ -36,12 +36,14 @@ export interface ListRowProps {
   onPress?: () => void;
   disabled?: boolean;
   destructive?: boolean;
+  /** Inset hairline under the row (starts at the title), for stacked rows in a plain list. */
+  divider?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
 
 export function ListRow({
-  icon, iconColor, avatar, title, subtitle, subtitleNumberOfLines = 1, value, chevron, toggle, right, onPress, disabled, destructive, style, testID,
+  icon, iconColor, avatar, title, subtitle, subtitleNumberOfLines = 1, value, chevron, toggle, right, onPress, disabled, destructive, divider, style, testID,
 }: ListRowProps) {
   const palette = useColors();
   // Rows get a subtle background highlight instead of a scale — a whole row
@@ -58,7 +60,7 @@ export function ListRow({
       {avatar && <Avatar uri={avatar.uri} name={avatar.name} size={40} />}
       {icon && !avatar && (
         <View style={[styles.iconWrap, { backgroundColor: palette.card, borderRadius: RADII.chip }]}>
-          <Feather name={icon} size={18} color={iconColor ?? (destructive ? palette.destructive : palette.mutedForeground)} />
+          <Icon name={icon} size={17} color={iconColor ?? (destructive ? palette.destructive : palette.mutedForeground)} />
         </View>
       )}
       <View style={styles.body}>
@@ -68,7 +70,8 @@ export function ListRow({
       {right}
       {!right && value && <Text style={[TYPE_SCALE.body, { color: palette.mutedForeground, marginRight: SPACING.xs }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{value}</Text>}
       {!right && toggle && <HapticSwitch value={toggle.value} onValueChange={toggle.onChange} disabled={disabled} accessibilityLabel={title} />}
-      {!right && chevron && !toggle && <Feather name="chevron-right" size={18} color={palette.mutedForeground} />}
+      {!right && chevron && !toggle && <Icon name="chevron-right" size={17} color={palette.mutedForeground} />}
+      {divider && <View pointerEvents="none" style={[styles.divider, { left: avatar ? 48 : icon ? 40 : 0, backgroundColor: palette.border }]} />}
     </>
   );
 
@@ -107,4 +110,5 @@ const styles = StyleSheet.create({
   highlight: { borderRadius: RADII.chip },
   iconWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },
+  divider: { position: 'absolute', right: 0, bottom: 0, height: StyleSheet.hairlineWidth },
 });

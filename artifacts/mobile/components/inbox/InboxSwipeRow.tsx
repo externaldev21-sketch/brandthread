@@ -1,12 +1,12 @@
 import React from 'react';
-import { Feather } from '@expo/vector-icons';
+import type { IconName } from '@/components/ui/Icon';
 
 import SwipeRow, { type SwipeRowAction, type SwipeTone } from '@/components/ui/SwipeRow';
 
 export interface InboxSwipeAction {
   key: string;
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   /** Kept for existing callers; the shared swipe row uses the palette's
    *  neutral greys and the destructive red instead (see `tone`). */
   color?: string;

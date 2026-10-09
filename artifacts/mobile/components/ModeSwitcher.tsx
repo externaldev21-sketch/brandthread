@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { radius, nestedRadius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 type Mode = 'buyer' | 'seller';
 
@@ -106,7 +107,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   optionText: {
     fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: FONT.semibold,
     color: theme.muted,
   },
   optionTextActive: {

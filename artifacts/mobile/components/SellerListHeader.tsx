@@ -16,14 +16,14 @@
  */
 import React, { useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, PressableScale, SearchBar } from '@/components/BrandthreadUI';
 import { haptics } from '@/lib/haptics';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 export interface SellerListHeaderAction {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   onPress: () => void;
   accessibilityLabel: string;
 }
@@ -121,7 +121,7 @@ export function SellerListHeader({
               accessibilityRole="button"
             >
               <Text style={[s.titleText, { color: theme.text }]}>{title}</Text>
-              <Feather name="chevron-down" size={18} color={theme.muted} />
+              <Icon name="chevron-down" size={18} color={theme.muted} />
             </PressableScale>
           ) : (
             <View style={s.titleBtn}>
@@ -137,7 +137,7 @@ export function SellerListHeader({
               onPress={action.onPress}
               accessibilityLabel={action.accessibilityLabel}
             >
-              <Feather name={action.icon} size={ICON.md} color={theme.text} />
+              <Icon name={action.icon} size={ICON.md} color={theme.text} />
             </PressableScale>
           ))}
         </View>
@@ -178,7 +178,7 @@ export function SellerListHeader({
                   accessibilityLabel={option.label}
                 >
                   <Text style={[s.titleMenuLabel, { color: theme.text }]}>{option.label}</Text>
-                  {option.selected && <Feather name="check" size={16} color={theme.text} />}
+                  {option.selected && <Icon name="check" size={16} color={theme.text} />}
                 </PressableScale>
               ))}
             </View>
@@ -201,14 +201,14 @@ export function SellerListHeader({
           onPress={onFilterPress}
           accessibilityLabel={filterAccessibilityLabel}
         >
-          <Feather name="sliders" size={14} color={hasActiveFilter ? theme.accentLight : theme.muted} />
+          <Icon name="sliders" size={14} color={hasActiveFilter ? theme.accentLight : theme.muted} />
         </PressableScale>
         <PressableScale
           style={s.controlBtn}
           onPress={onSortPress}
           accessibilityLabel={sortAccessibilityLabel}
         >
-          <Feather name="chevrons-down" size={14} color={theme.muted} />
+          <Icon name="chevrons-down" size={14} color={theme.muted} />
         </PressableScale>
       </View>
 
