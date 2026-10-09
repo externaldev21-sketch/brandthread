@@ -10,7 +10,7 @@ import { it } from 'vitest';
 import { LEGACY_ROUTES } from '../lib/navigation/legacyRoutes';
 import { appRoutePatterns } from './helpers/appRoutes';
 
-const SAMPLE = { orderId: '<orderId>', id: '<id>', projectId: '<projectId>', productId: '<productId>' };
+const SAMPLE = { orderId: 'ORDER_ID', id: 'ID', projectId: 'PROJECT_ID', productId: 'PRODUCT_ID' };
 
 it('writes docs/route-map.md', () => {
   if (!process.env.ROUTE_MAP_WRITE) return;
