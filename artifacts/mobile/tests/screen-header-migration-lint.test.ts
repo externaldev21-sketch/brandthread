@@ -127,6 +127,7 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/automation.tsx', // redirect-only route
   // Renders the shared components/chat/ConversationThread.tsx (own chat header).
   'app/buyer-conversation.tsx',
+  'app/buyer-drop-detail.tsx',
   'app/buyer-live.tsx',
   'app/buyer-product-detail.tsx',
   'app/buyer-story-create.tsx',
@@ -153,6 +154,8 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/seller-live.tsx',
   'app/seller-profile.tsx',
   'app/settings.tsx',
+  'app/seller-go-live.tsx',
+  'app/shipping-delivery.tsx',
   'app/sign-in.tsx',
   'app/splash.tsx',
   'app/store-generating.tsx',

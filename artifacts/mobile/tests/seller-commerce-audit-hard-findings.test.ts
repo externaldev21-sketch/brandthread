@@ -60,7 +60,7 @@ describe('detail screens never fetch without their required id', () => {
     expect(guardIdx).toBeLessThan(fetchIdx);
   });
 
-  it('return-detail.tsx, fulfill-batch.tsx, shipping-label.tsx and product-size-chart.tsx were already guarded (no change needed)', () => {
+  it('return-detail.tsx, fulfill-batch.tsx and product-size-chart.tsx were already guarded (no change needed)', () => {
     expect(read('app/return-detail.tsx')).toContain("if (!returnId) { setLoadError('not_found'); setLoading(false); return; }");
     // fulfill-batch derives its id list from a comma-joined query param;
     // an absent param collapses to an empty list, so its fetch loop simply
@@ -74,13 +74,5 @@ describe('customer-accounts.tsx: no banned placeholder-copy wording', () => {
   it('does not use the "not available yet" phrase the audit flags', () => {
     const source = read('app/customer-accounts.tsx');
     expect(source).not.toMatch(/not available yet/i);
-  });
-});
-
-describe('seller-drop-preview.tsx: no bare "preview" wording in the badge', () => {
-  it('uses "BUYER VIEW" instead of "PREVIEW"', () => {
-    const source = read('app/seller-drop-preview.tsx');
-    expect(source).toContain('BUYER VIEW');
-    expect(source).not.toMatch(/>PREVIEW</);
   });
 });

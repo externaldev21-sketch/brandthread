@@ -67,7 +67,10 @@ describe('No remaining source file references a removed inventory route or servi
     ...collectSourceFiles(resolve(ROOT, 'components')),
     ...collectSourceFiles(resolve(ROOT, 'lib')),
     ...collectSourceFiles(resolve(ROOT, 'services')),
-  ];
+  ]
+    // The old-route redirect table names dead paths on purpose: it sends the
+    // AI assistant's '/inventory' help link to the Products tab.
+    .filter((f) => !f.includes('lib/navigation/legacyRoutes/'));
 
   it('scans a non-trivial number of files (sanity check)', () => {
     expect(files.length).toBeGreaterThan(50);

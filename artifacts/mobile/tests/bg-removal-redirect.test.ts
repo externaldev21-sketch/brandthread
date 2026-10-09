@@ -4,24 +4,20 @@
  * removal flow) and app/design-bg-removal.tsx (the current one, already
  * linked from more.tsx, (tabs)/studio.tsx, and lib/sellerControlCenter.ts).
  * ai-studio.tsx was still linking to the old route. Fixed ai-studio.tsx to
- * link to /design-bg-removal directly, and turned app/bg-removal.tsx into a
- * plain redirect (matching the established app/ai-assistant.tsx pattern)
- * for any stale deep link that still targets /bg-removal.
+ * link to /design-bg-removal directly. The old /bg-removal path now redirects
+ * through lib/navigation/legacyRoutes (the screen file is gone).
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { resolveLegacyRoute } from '../lib/navigation/legacyRoutes';
 
 const ROOT = resolve(__dirname, '..');
 
 describe('bg-removal route de-duplication', () => {
-  it('app/bg-removal.tsx is a plain Redirect to /design-bg-removal, not a second implementation', () => {
-    const src = readFileSync(resolve(ROOT, 'app/bg-removal.tsx'), 'utf8');
-    expect(src).toContain("import { Redirect } from 'expo-router';");
-    expect(src).toContain('<Redirect href="/design-bg-removal" />');
-    // Guards against this file quietly regrowing its own upload/removal
-    // flow again instead of staying a redirect.
-    expect(src).not.toContain('api.bgRemoval');
+  it('/bg-removal has no screen of its own and redirects to /design-bg-removal', () => {
+    expect(existsSync(resolve(ROOT, 'app/bg-removal.tsx'))).toBe(false);
+    expect(resolveLegacyRoute('/bg-removal')).toBe('/design-bg-removal');
   });
 
   it('ai-studio.tsx links Background Removal to /design-bg-removal, not the old /bg-removal route', () => {

@@ -1,0 +1,80 @@
+[
+  {
+    "name": "redirect-app-icon",
+    "target": "/app-icon",
+    "landed": "/appearance?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-ai-assistant",
+    "target": "/ai-assistant",
+    "landed": "/ai-brain?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-shipping-label",
+    "target": "/shipping-label?orderId=preview-order-01",
+    "landed": "/fulfill-order?orderId=preview-order-01&step=3",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-drafts",
+    "target": "/drafts",
+    "landed": "/products?bt_preview=seller&filter=draft",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-inventory",
+    "target": "/inventory",
+    "landed": "/products?bt_preview=seller&filter=low-stock",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-discount-codes",
+    "target": "/discount-codes",
+    "landed": "/discounts?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-ai-brand-memory",
+    "target": "/ai-brand-memory",
+    "landed": "/ai-settings?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-buyer-drops",
+    "target": "/buyer-drops",
+    "landed": "/discover?bt_preview=buyer",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-buyer-account-control",
+    "target": "/buyer-account-control",
+    "landed": "/delete-account?bt_preview=buyer",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "ai-settings-after",
+    "target": "/ai-settings",
+    "landed": "/ai-settings?bt_preview=seller&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "not-found-still-works",
+    "target": "/no-such-screen",
+    "landed": "/no-such-screen?bt_preview=buyer",
+    "ok": true,
+    "notFound": true,
+    "expectNotFound": true
+  }
+]
