@@ -95,6 +95,7 @@ import { ActionSheetHost } from '@/components/ui/ActionSheet';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
+import { RealtimeBridge } from '@/components/realtime/RealtimeBridge';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
@@ -1345,6 +1346,7 @@ function RootLayoutNav() {
       <SellerBarGate />
       <AuthGate />
       <ServiceConfigurer />
+      <RealtimeBridge />
       <PushRegistrar />
       <AffiliateRefCapture />
       <MarketingPixelTracker />

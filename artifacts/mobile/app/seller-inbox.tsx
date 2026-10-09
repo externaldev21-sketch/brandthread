@@ -28,6 +28,7 @@ import {
   isSellerPreviewConversationId, setPreviewConversationPinned,
 } from '@/lib/previewInbox';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRow';
 import { openInboxComposeMenu } from '@/components/community-inbox/InboxComposeMenu';
 import { mergeInboxRows, communityMatchesQuery, type InboxMergedRow } from '@/lib/communities/inboxModel';
@@ -317,6 +318,12 @@ export default function SellerInboxScreen() {
       }
     };
   }, [load, myId]));
+
+  // Realtime: new customer messages and reads reorder the inbox right away;
+  // the 30s poll above stays as the fallback.
+  useRealtimeEvents((event) => {
+    if (event.type === 'message.created' || event.type === 'message.read' || event.type === 'conversation.updated' || event.type === 'badges.changed') void load(generationRef.current, true);
+  }, !isSellerDevPreview());
 
   async function onRefresh() {
     setIsRefreshing(true);

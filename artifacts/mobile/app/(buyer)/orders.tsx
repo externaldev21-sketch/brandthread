@@ -31,6 +31,7 @@ import { useReorderFlow } from '@/components/orders/ReorderFlow';
 import { canReorderStatus } from '@/lib/reorderSummary';
 import { RetryRow } from '@/components/ui/RetryRow';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
+import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -400,6 +401,12 @@ export default function BuyerOrdersScreen() {
       }
     };
   }, [load]));
+
+  // Realtime: shipped / delivered / refunded land on the list immediately
+  // (api-server lib/orderChangeListener.ts); the 30s poll is the fallback.
+  useRealtimeEvents((event) => {
+    if (event.type === 'order.updated' && hasLoadedRef.current) load(generationRef.current);
+  });
 
   // Clerk can switch active sessions without unmounting this route. Guard the
   // render synchronously so the previous account's rows disappear before the

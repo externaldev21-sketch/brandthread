@@ -42,6 +42,8 @@ import { groupByLocalDate } from '@/lib/groupByLocalDate';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
+import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
+import { useIsFocused } from '@react-navigation/native';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -869,6 +871,18 @@ export default function OrdersScreen() {
     loadData(generation);
     timerRef.current = setInterval(() => loadData(generation), 30_000);
   }, [authLoaded, isSignedIn, loadData, userId]);
+
+  // Realtime: a new order or any status change (checkout, webhooks, jobs —
+  // api-server lib/orderChangeListener.ts) refreshes the list right away.
+  // The 30s poll above stays as the fallback. While Orders is on screen the
+  // new-order badge stays cleared.
+  const ordersFocused = useIsFocused();
+  useRealtimeEvents((event) => {
+    if (event.type !== 'order.created' && event.type !== 'order.updated') return;
+    if (!hasLoadedRef.current) return;
+    if (ordersFocused && userId && event.type === 'order.created') clearBadge(userId);
+    loadData(generationRef.current);
+  }, !isPreviewMode && !!isSignedIn && !!userId);
 
   // Hard backstop: whatever the cause — a real load that's taking unusually
   // long, an auth or network edge case neither guard above anticipated —

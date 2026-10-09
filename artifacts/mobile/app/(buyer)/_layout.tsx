@@ -13,6 +13,7 @@ import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCash
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewInbox';
 import { useCommunityBadgeCount } from '@/lib/communities/useCommunityInbox';
+import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 // Instagram/TikTok-style directional slide — shared with the seller tab
 // layout (app/(tabs)/_layout.tsx) so both sides use the same duration/
 // easing. `current.progress` (from React Navigation's bottom-tabs) is
@@ -89,6 +90,15 @@ function BuyerTabLayout() {
       // Badges are non-critical.
     }
   }, []);
+
+  // Realtime: unread counts move the moment a message lands or is read on
+  // another device (api-server ws/messagesHub.ts). The 30s poll below stays
+  // as the fallback.
+  useRealtimeEvents((event) => {
+    if (event.type === 'badges.changed' || event.type === 'message.created' || event.type === 'conversation.updated') {
+      void loadBadgeCount();
+    }
+  }, !isBuyerDevPreview());
 
   useEffect(() => {
     void loadBadgeCount();

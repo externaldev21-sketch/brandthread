@@ -46,6 +46,7 @@ import {
   subscribePreviewTyping, setPreviewConversationPinned,
 } from '@/lib/previewInbox';
 import { isBuyerDevPreview } from '@/lib/devPreview';
+import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 import {
   scheduleDeleteConversationRequest, undoDeleteConversationRequest, blockConversationRequestUser,
 } from '@/lib/requestActions';
@@ -582,6 +583,12 @@ export default function InboxScreen() {
     const unsub = subscribeSocial(() => { loadData(); loadSuggested(); loadStoryTray(); loadNotesTray(); });
     return unsub;
   }, [loadData, loadSuggested, loadStoryTray, loadNotesTray]);
+
+  // Realtime: a new message, a read on another device or a request change
+  // reorders the list and its unread dots immediately.
+  useRealtimeEvents((event) => {
+    if (event.type === 'message.created' || event.type === 'message.read' || event.type === 'conversation.updated' || event.type === 'badges.changed') loadData();
+  }, !!userId && !isBuyerDevPreview());
 
   // ── Filter logic ────────────────────────────────────────────────────────────
 

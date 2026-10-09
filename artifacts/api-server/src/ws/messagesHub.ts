@@ -15,7 +15,7 @@
  *   typing            { conversationId, userId, typing }
  *   conversation.updated { conversationId, reason }  — reaction / accepted / deleted / …
  *   order.created     { orderId }                    — to the seller
- *   order.updated     { orderId, status }            — to buyer and seller
+ *   order.updated     { orderId, status, trackingStatus } — to buyer and seller
  *   badges.changed    {}                              — unread counts moved; refetch them
  *
  * Multi-instance: when REDIS_URL is set every emit is also published on a
@@ -42,7 +42,7 @@ export type MessagesHubEvent =
   | { type: "typing"; conversationId: string; userId: string; typing: boolean }
   | { type: "conversation.updated"; conversationId: string; reason: string }
   | { type: "order.created"; orderId: string }
-  | { type: "order.updated"; orderId: string; status: string }
+  | { type: "order.updated"; orderId: string; status: string; trackingStatus?: string | null }
   | { type: "badges.changed" };
 
 type UserSocket = WebSocket & { userId?: string; isAlive?: boolean };
@@ -75,6 +75,20 @@ export function emitToUsers(userIds: Iterable<string | null | undefined>, event:
     }
   } catch (err) {
     logger.warn({ err }, "messages hub emit failed");
+  }
+}
+
+/**
+ * Delivers to this instance's sockets only. For events every instance already
+ * sees on its own (Postgres LISTEN/NOTIFY in lib/orderChangeListener.ts), so
+ * the Redis fan-out doesn't deliver them twice.
+ */
+export function emitToUsersLocal(userIds: Iterable<string | null | undefined>, event: MessagesHubEvent): void {
+  try {
+    const ids = [...new Set([...userIds].filter((id): id is string => typeof id === "string" && id.length > 0))];
+    if (ids.length > 0) deliverLocal(ids, event);
+  } catch (err) {
+    logger.warn({ err }, "messages hub local emit failed");
   }
 }
 
