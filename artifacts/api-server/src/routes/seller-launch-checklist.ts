@@ -6,7 +6,7 @@
  */
 import { Router } from "express";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { db, products, storefronts, users } from "@workspace/db";
+import { db, products, shippingRates, shippingZones, storefronts, users } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveLaunchChecklist } from "../lib/launchChecklist";
 
@@ -16,7 +16,7 @@ router.use(requireAuth);
 router.get("/", async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
 
-  const [[user], [store], [productRow]] = await Promise.all([
+  const [[user], [store], [productRow], [zoneRow], [rateRow]] = await Promise.all([
     db.select({
       brandName: users.brandName,
       username: users.username,
@@ -32,6 +32,10 @@ router.get("/", async (req, res): Promise<void> => {
       .where(eq(storefronts.ownerId, clerkId)).limit(1),
     db.select({ n: sql<number>`count(*)::int` }).from(products)
       .where(and(eq(products.ownerId, clerkId), isNull(products.deletedAt))),
+    db.select({ n: sql<number>`count(*)::int` }).from(shippingZones)
+      .where(eq(shippingZones.sellerId, clerkId)),
+    db.select({ n: sql<number>`count(*)::int` }).from(shippingRates)
+      .where(eq(shippingRates.sellerId, clerkId)),
   ]);
 
   if (!user) {
@@ -42,6 +46,7 @@ router.get("/", async (req, res): Promise<void> => {
   const checklist = deriveLaunchChecklist({
     ...user,
     productCount: Number(productRow?.n ?? 0),
+    shippingConfigured: Number(zoneRow?.n ?? 0) + Number(rateRow?.n ?? 0) > 0,
     storePublished: store?.status === "published",
   });
 

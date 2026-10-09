@@ -9,6 +9,7 @@ const empty: LaunchChecklistInput = {
   storeAccentColor: null,
   socialLinks: {},
   productCount: 0,
+  shippingConfigured: false,
   storePreviewedAt: null,
   storePublished: false,
   stripeAccountStatus: null,
@@ -18,10 +19,10 @@ const doneIds = (input: LaunchChecklistInput) =>
   deriveLaunchChecklist(input).steps.filter((s) => s.done).map((s) => s.id);
 
 describe("deriveLaunchChecklist", () => {
-  it("returns the eight steps in order, all open for a brand-new seller", () => {
+  it("returns the nine steps in order, all open for a brand-new seller", () => {
     const result = deriveLaunchChecklist(empty);
     expect(result.steps.map((s) => s.id)).toEqual([...LAUNCH_STEP_IDS]);
-    expect(result.total).toBe(8);
+    expect(result.total).toBe(9);
     expect(result.doneCount).toBe(0);
     expect(result.complete).toBe(false);
   });
@@ -52,6 +53,7 @@ describe("deriveLaunchChecklist", () => {
 
   it("tracks product, preview, publish and payouts from their own state", () => {
     expect(doneIds({ ...empty, productCount: 1 })).toEqual(["first_product"]);
+    expect(doneIds({ ...empty, shippingConfigured: true })).toEqual(["shipping"]);
     expect(doneIds({ ...empty, storePreviewedAt: new Date() })).toEqual(["preview"]);
     expect(doneIds({ ...empty, storePublished: true })).toEqual(["publish"]);
     expect(doneIds({ ...empty, stripeAccountStatus: "active" })).toEqual(["payouts"]);
@@ -68,13 +70,22 @@ describe("deriveLaunchChecklist", () => {
       storeAccentColor: "#111111",
       socialLinks: { instagram: "atelier" },
       productCount: 3,
+      shippingConfigured: true,
       storePreviewedAt: new Date(),
       storePublished: true,
       stripeAccountStatus: "active",
     };
     const result = deriveLaunchChecklist(full);
-    expect(result.doneCount).toBe(8);
+    expect(result.doneCount).toBe(9);
     expect(result.complete).toBe(true);
     expect(deriveLaunchChecklist({ ...full, storePublished: false }).complete).toBe(false);
+  });
+});
+
+describe("payouts come after the first product, never first", () => {
+  it("orders first product and shipping before payouts", () => {
+    const ids = [...LAUNCH_STEP_IDS];
+    expect(ids.indexOf("first_product")).toBeLessThan(ids.indexOf("payouts"));
+    expect(ids.indexOf("shipping")).toBeLessThan(ids.indexOf("payouts"));
   });
 });
