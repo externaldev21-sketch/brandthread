@@ -1,0 +1,1970 @@
+{
+  "title": "Dead code audit (list only, nothing deleted)",
+  "generated": "2026-10-09",
+  "base": "origin/dev @ 409ddcdc",
+  "totals_removable": {
+    "files": 129,
+    "lines": 21458,
+    "kb": 2828.6
+  },
+  "measurement": {
+    "ios": {
+      "before_bytes": 14444130,
+      "after_bytes": 14185219,
+      "before_gz": 3754929,
+      "after_gz": 3694830,
+      "before_mb": 14.44,
+      "after_mb": 14.19,
+      "delta_kb": 253,
+      "delta_gz_kb": 59,
+      "pct": 1.8
+    },
+    "web": {
+      "before_bytes": 13091315,
+      "after_bytes": 12835978,
+      "before_gz": 3457698,
+      "after_gz": 3398554,
+      "before_mb": 13.09,
+      "after_mb": 12.84,
+      "delta_kb": 249,
+      "delta_gz_kb": 58,
+      "pct": 2.0
+    },
+    "deps": {
+      "before": 237,
+      "after": 201,
+      "removed": 36,
+      "note": "declared dependencies + devDependencies in root, mobile, api-server, manufacturer-portal and lib/* package.json files; plus the whole @workspace/integrations-openai-ai-react package"
+    },
+    "tests": {
+      "files": 12,
+      "tests": 174,
+      "seconds": 0.3,
+      "suite_seconds": 53,
+      "suite_files": 487,
+      "pct": 1.3
+    },
+    "portal_note": "The portal UI-kit files are never imported, so Vite already leaves them out of the portal bundle: deleting them saves repo size and 27 packages, not download size.",
+    "asset_note": "fashion_walk.mp4 is not in either export (nothing requires it), so it saves 2 MB of repo, not app size.",
+    "command": "expo export --platform ios --no-bytecode / --platform web, NODE_ENV=production, same env for both copies"
+  },
+  "features": [
+    {
+      "feature": "Old seller Analytics detail screens",
+      "verdict": "Delete candidate",
+      "summary": "Six analytics detail pages from before the Analytics tab rebuild. The Analytics tab now opens analytics-product-stats / -audience / -content / -goals / -export / -advanced; none of these six is linked any more.",
+      "files": 6,
+      "lines": 1348,
+      "kb": 63.4,
+      "items": [
+        {
+          "path": "artifacts/mobile/app/analytics-sales.tsx",
+          "kind": "screen",
+          "what": "Sales Analytics: revenue chart and order totals",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-sales anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-clearance-sweep.spec.ts, header-sweep-batch1.spec.ts, notch-safe-area-screenshots.mjs",
+          "lines": 164,
+          "kb": 6.8,
+          "risk": "Low",
+          "url": "/analytics-sales"
+        },
+        {
+          "path": "artifacts/mobile/app/analytics-customers.tsx",
+          "kind": "screen",
+          "what": "Customer Analytics: new vs returning customers, top customers",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-customers anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
+          "lines": 258,
+          "kb": 12.3,
+          "risk": "Low",
+          "url": "/analytics-customers"
+        },
+        {
+          "path": "artifacts/mobile/app/analytics-marketing.tsx",
+          "kind": "screen",
+          "what": "Marketing Analytics: channel cards (email, social, ads)",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-marketing anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
+          "lines": 269,
+          "kb": 13.0,
+          "risk": "Low",
+          "url": "/analytics-marketing"
+        },
+        {
+          "path": "artifacts/mobile/app/analytics-production.tsx",
+          "kind": "screen",
+          "what": "Production Analytics: sample and manufacturing KPI tiles",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-production anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
+          "lines": 225,
+          "kb": 11.2,
+          "risk": "Low",
+          "url": "/analytics-production"
+        },
+        {
+          "path": "artifacts/mobile/app/analytics-products.tsx",
+          "kind": "screen",
+          "what": "Product Analytics: per-listing stats and ranked list",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-products anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
+          "lines": 201,
+          "kb": 8.5,
+          "risk": "Low",
+          "url": "/analytics-products"
+        },
+        {
+          "path": "artifacts/mobile/app/analytics-profit.tsx",
+          "kind": "screen",
+          "what": "Profit & Payout: earnings total and breakdown",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /analytics-profit anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch1.spec.ts",
+          "lines": 231,
+          "kb": 11.6,
+          "risk": "Low",
+          "url": "/analytics-profit"
+        }
+      ],
+      "coordinate": "Consolidate screens session (it is merging analytics screens). If it redirects any of these URLs, leave the file to that session."
+    },
+    {
+      "feature": "Old AI Studio hub and its four tool chats",
+      "verdict": "Delete candidate (coordinate)",
+      "summary": "The original \"Design Studio\" AI hub (ai-studio) and the chat-style tools it opened. Nothing links to ai-studio, so its four children are unreachable too. Newer screens replace them: design-ai-photoshoot (AI Photoshoot), design-mockup-to-model, the Studio menu.",
+      "files": 5,
+      "lines": 2227,
+      "kb": 93.3,
+      "items": [
+        {
+          "path": "artifacts/mobile/app/ai-studio.tsx",
+          "kind": "screen",
+          "what": "\"Design Studio\" hub page listing AI tools (mockups, photography, lifestyle, tech pack)",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /ai-studio anywhere in mobile, server or portal code; only opened by test/screenshot scripts: header-sweep-batch2.spec.ts, crash-ipad-crawl.mjs, first-run-tips-screenshots.mjs",
+          "lines": 352,
+          "kb": 17.2,
+          "risk": "Low",
+          "url": "/ai-studio"
+        },
+        {
+          "path": "artifacts/mobile/app/ai-photography-chat.tsx",
+          "kind": "screen",
+          "what": "\"AI Product Photography\" chat with an Outfit Swap mode; duplicate of design-ai-photoshoot",
+          "evidence": "URL /ai-photography-chat is only linked from ai-studio.tsx, which is itself unreachable",
+          "lines": 577,
+          "kb": 23.6,
+          "risk": "Medium",
+          "url": "/ai-photography-chat",
+          "note": "Has its own test (tests/ai-photography-chat.test.tsx) and is the only user of the outfitSwap flag and of /api/photography/outfit-swap. AI Photoshoot session owns this area."
+        },
+        {
+          "path": "artifacts/mobile/app/ai-mockup-chat.tsx",
+          "kind": "screen",
+          "what": "\"AI Clothing Mockups\" chat",
+          "evidence": "URL /ai-mockup-chat is only linked from ai-studio.tsx, which is itself unreachable",
+          "lines": 186,
+          "kb": 6.4,
+          "risk": "Low",
+          "url": "/ai-mockup-chat"
+        },
+        {
+          "path": "artifacts/mobile/app/lifestyle-images.tsx",
+          "kind": "screen",
+          "what": "\"Lifestyle Images\" generator (only caller of POST /api/lifestyle/generate)",
+          "evidence": "URL /lifestyle-images is only linked from ai-studio.tsx, which is itself unreachable",
+          "lines": 487,
+          "kb": 20.3,
+          "risk": "Low",
+          "url": "/lifestyle-images"
+        },
+        {
+          "path": "artifacts/mobile/app/tech-pack-generator.tsx",
+          "kind": "screen",
+          "what": "\"Tech Pack Generator\" (only caller of POST /api/techpack/generate)",
+          "evidence": "URL /tech-pack-generator is only linked from ai-studio.tsx, which is itself unreachable; also opened by tests: radius-before-after-screenshots.mjs",
+          "lines": 625,
+          "kb": 25.8,
+          "risk": "Low",
+          "url": "/tech-pack-generator"
+        }
+      ],
+      "coordinate": "AI Design and AI Photoshoot sessions are working in this area. Delete after their PRs land.",
+      "server_after_delete": [
+        "artifacts/api-server/src/routes/lifestyle.ts (149 lines, POST /lifestyle/generate)",
+        "artifacts/api-server/src/routes/techpack.ts (358 lines, POST /techpack/generate)",
+        "POST /photography/outfit-swap and /outfit-swap/retry in routes/photography.ts"
+      ]
+    },
+    {
+      "feature": "Design Studio: legacy project-wizard screens",
+      "verdict": "Delete candidate (coordinate)",
+      "summary": "Five screens from the first Design Studio (6-step \"New Project\" wizard and its export, prompt-edit, sketch-upload and version-history pages). The current Design Studio (design-canvas, design-templates, design-text-to-design, design-garment and the other design-* tools) does not link them.",
+      "files": 5,
+      "lines": 2298,
+      "kb": 81.5,
+      "items": [
+        {
+          "path": "artifacts/mobile/app/design-project.tsx",
+          "kind": "screen",
+          "what": "\"New Project\" 6-step creation wizard",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /design-project anywhere in mobile, server or portal code",
+          "lines": 865,
+          "kb": 30.3,
+          "risk": "Medium",
+          "url": "/design-project"
+        },
+        {
+          "path": "artifacts/mobile/app/design-export.tsx",
+          "kind": "screen",
+          "what": "Design \"Export\" modal",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /design-export anywhere in mobile, server or portal code",
+          "lines": 267,
+          "kb": 10.3,
+          "risk": "Medium",
+          "url": "/design-export"
+        },
+        {
+          "path": "artifacts/mobile/app/design-prompt-edit.tsx",
+          "kind": "screen",
+          "what": "\"Edit with Prompt\" (AI edit of a design)",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /design-prompt-edit anywhere in mobile, server or portal code",
+          "lines": 315,
+          "kb": 14.6,
+          "risk": "Medium",
+          "url": "/design-prompt-edit"
+        },
+        {
+          "path": "artifacts/mobile/app/design-upload-sketch.tsx",
+          "kind": "screen",
+          "what": "\"Upload Sketch\" \u2192 cleaned designs",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /design-upload-sketch anywhere in mobile, server or portal code",
+          "lines": 646,
+          "kb": 19.0,
+          "risk": "Medium",
+          "url": "/design-upload-sketch"
+        },
+        {
+          "path": "artifacts/mobile/app/design-versions.tsx",
+          "kind": "screen",
+          "what": "\"Version History\" list",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /design-versions anywhere in mobile, server or portal code",
+          "lines": 205,
+          "kb": 7.3,
+          "risk": "Medium",
+          "url": "/design-versions"
+        }
+      ],
+      "coordinate": "Design Studio mechanics session owns this area; open PRs #699/#704/#706/#716 edit these files (polish only, no new links). Ask that session before deleting."
+    },
+    {
+      "feature": "Old camera capture + video text-overlay editor",
+      "verdict": "Hold (protected tab-bar test)",
+      "summary": "The first full-screen camera (camera-capture) with a TikTok-style text-overlay editor. Nothing opens /camera-capture (create-post and buyer-story-create have their own camera). The camera-first Create screen (open PR #690) replaces this area.",
+      "files": 4,
+      "lines": 1942,
+      "kb": 73.6,
+      "items": [
+        {
+          "path": "artifacts/mobile/app/camera-capture.tsx",
+          "kind": "screen",
+          "what": "Full-screen camera: photo/video capture, slides, text overlays",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /camera-capture anywhere in mobile, server or portal code; only opened by test/screenshot scripts: crash-ipad-crawl.mjs",
+          "lines": 900,
+          "kb": 35.7,
+          "risk": "Medium",
+          "url": "/camera-capture"
+        },
+        {
+          "path": "artifacts/mobile/components/TextOverlayEditor.tsx",
+          "kind": "module",
+          "what": "TikTok-style text overlay editor for video posts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 618,
+          "kb": 20.1,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/lib/videoEditing.ts",
+          "kind": "module",
+          "what": "Text-overlay and slide helpers for camera-capture",
+          "evidence": "only imported by camera-capture.tsx and TextOverlayEditor.tsx (both unreachable) plus 5 unit tests",
+          "lines": 236,
+          "kb": 7.5,
+          "risk": "Low",
+          "note": "Deleting also deletes 5 tests: videoEditing*.test.ts (3), lib/__tests__/cameraCaptureState.test.ts, photoSlideHelpers.test.ts"
+        },
+        {
+          "path": "artifacts/mobile/components/create-post/CaptureScreen.tsx",
+          "kind": "module",
+          "what": "Create-post step 1 camera (TikTok capture screen layout)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 188,
+          "kb": 10.2,
+          "risk": "Low"
+        }
+      ],
+      "coordinate": "HOLD. tests/tab-bar-full-screen-slide.test.ts (the guard for the seller swipe/glow tab bar) reads app/camera-capture.tsx, so deleting this group means editing that test. Dev said never touch the tab-bar mechanism, so leave this group until Dev says otherwise. The create-flow session (PR #690) also works here."
+    },
+    {
+      "feature": "Freelancer marketplace: apply + profile screens",
+      "verdict": "Dev decides (wire up or remove whole feature)",
+      "summary": "The \"Freelancer jobs\" screen is reachable (Settings \u2192 Hire a Brandthread Partner), but the screens to become a freelancer and to view or hire one are not linked from anywhere. Freelancers can never be created, so the marketplace is half-dead.",
+      "files": 2,
+      "lines": 923,
+      "kb": 37.6,
+      "items": [
+        {
+          "path": "artifacts/mobile/app/freelancer-apply.tsx",
+          "kind": "screen",
+          "what": "3-step \"become a freelancer\" application (skills, rate, portfolio, Stripe payout setup)",
+          "evidence": "URL /freelancer-apply is only linked from freelancer-profile.tsx, which is itself unreachable",
+          "lines": 356,
+          "kb": 13.8,
+          "risk": "Medium",
+          "url": "/freelancer-apply"
+        },
+        {
+          "path": "artifacts/mobile/app/freelancer-profile.tsx",
+          "kind": "screen",
+          "what": "Freelancer profile page with \"Hire\" \u2192 Stripe escrow checkout",
+          "evidence": "URL /freelancer-profile is only linked from freelancer-apply.tsx, which is itself unreachable; also opened by tests: supply-side-hard-findings.mjs",
+          "lines": 567,
+          "kb": 23.8,
+          "risk": "Medium",
+          "url": "/freelancer-profile"
+        }
+      ],
+      "server_after_delete": [
+        "routes/freelancers.ts (264 lines): /freelancers, /me, /apply, /:id",
+        "routes/freelancer-connect.ts (187 lines): Stripe Connect onboarding for freelancers",
+        "POST /freelancer-jobs (create a hire) in routes/freelancer-jobs.ts",
+        "DB table freelancer_reviews (never read or written)"
+      ],
+      "note": "If Dev wants freelancers, the fix is one link (e.g. \"Become a partner\" row on the Freelancer jobs screen), not a delete."
+    },
+    {
+      "feature": "Duplicate and stub screens",
+      "verdict": "Delete candidate",
+      "summary": "Screens that duplicate a live screen or are now empty stubs/redirects.",
+      "files": 6,
+      "lines": 1352,
+      "kb": 57.8,
+      "items": [
+        {
+          "path": "artifacts/mobile/app/share-profile.tsx",
+          "kind": "screen",
+          "what": "Full-page \"Share Profile\" (QR + link)",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /share-profile anywhere in mobile, server or portal code; only opened by test/screenshot scripts: ShareProfileSheet.structure.test.ts, crash-ipad-crawl.mjs, radius-before-after-screenshots.mjs",
+          "lines": 452,
+          "kb": 15.9,
+          "risk": "Low",
+          "url": "/share-profile",
+          "note": "Duplicate of the live ShareProfileSheet bottom sheet used by both profiles"
+        },
+        {
+          "path": "artifacts/mobile/app/product-editor.tsx",
+          "kind": "screen",
+          "what": "Old second \"create product\" form, now only a redirect to add-product",
+          "evidence": "URL /product-editor is only linked from navigation-isolation-probe.tsx, which is itself unreachable; also opened by tests: crash-ipad-crawl.mjs, navigation-scene-isolation.native.test.tsx",
+          "lines": 32,
+          "kb": 1.3,
+          "risk": "Low",
+          "url": "/product-editor",
+          "note": "Only purpose is catching old links; belongs in the Consolidate session's legacyRoutes table instead of a file"
+        },
+        {
+          "path": "artifacts/mobile/app/customer-events.tsx",
+          "kind": "screen",
+          "what": "\"Customer events\" page, now an honest \"not available yet\" stub (fake Klaviyo pixel removed earlier)",
+          "evidence": "only mentioned in lib/navigation/parentFallback.ts (a back-button table that is itself only used by tests); no navigation",
+          "lines": 38,
+          "kb": 1.6,
+          "risk": "Low",
+          "url": "/customer-events"
+        },
+        {
+          "path": "artifacts/mobile/app/brand.tsx",
+          "kind": "screen",
+          "what": "\"Brand Creation\" page: AI logo generator + brand name/colours (old seller onboarding step)",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /brand anywhere in mobile, server or portal code; only opened by test/screenshot scripts: radius-before-after-screenshots.mjs",
+          "lines": 352,
+          "kb": 16.9,
+          "risk": "Medium",
+          "url": "/brand",
+          "note": "Only caller of POST /api/logo/generate."
+        },
+        {
+          "path": "artifacts/mobile/app/product-size-chart.tsx",
+          "kind": "screen",
+          "what": "Per-product \"Size Chart\" table editor",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /product-size-chart anywhere in mobile, server or portal code; only opened by test/screenshot scripts: size-chart-screenshots.mjs",
+          "lines": 397,
+          "kb": 17.9,
+          "risk": "Low",
+          "url": "/product-size-chart",
+          "note": "Replaced by Size chart templates (size-chart-templates / -template-edit / -template-apply), which are linked from Products"
+        },
+        {
+          "path": "artifacts/mobile/app/manufacturer-onboard.tsx",
+          "kind": "screen",
+          "what": "\"Manufacturer signup\" hand-off page that forwards an invite token to the web portal",
+          "evidence": "no router.push/href/Link/redirect/push-payload string for /manufacturer-onboard anywhere in mobile, server or portal code; only opened by test/screenshot scripts: rules.test.ts, header-sweep-mr-screenshots.mjs",
+          "lines": 81,
+          "kb": 4.2,
+          "risk": "Medium",
+          "url": "/manufacturer-onboard",
+          "note": "Header comment says OLD invite links pointed here. No current email or server code builds this link, but links in old emails could still open it. Safer as a legacyRoutes redirect."
+        }
+      ]
+    },
+    {
+      "feature": "Mobile components, hooks and libs nothing imports",
+      "verdict": "Delete candidate",
+      "summary": "UI pieces and helpers left behind by redesigns. No production file imports them.",
+      "files": 29,
+      "lines": 4050,
+      "kb": 138.2,
+      "items": [
+        {
+          "path": "artifacts/mobile/components/DateRangePicker.tsx",
+          "kind": "module",
+          "what": "Calendar date-range picker sheet",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 569,
+          "kb": 17.9,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/FeatureCard.tsx",
+          "kind": "module",
+          "what": "Icon + title feature card",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 77,
+          "kb": 2.2,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/ModeSwitcher.tsx",
+          "kind": "module",
+          "what": "Old buyer/seller mode switch pill (only shown in the app-tour slides)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 116,
+          "kb": 3.3,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/ProfileTabButton.tsx",
+          "kind": "module",
+          "what": "Old custom Profile tab-bar button",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 56,
+          "kb": 1.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/SellerTutorialOverlay.tsx",
+          "kind": "module",
+          "what": "First-time seller walkthrough overlay (Products/Orders/Analytics/Manufacturer Hub)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 175,
+          "kb": 4.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/StatCard.tsx",
+          "kind": "module",
+          "what": "Small KPI stat card",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 52,
+          "kb": 1.5,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/StyleTagsPicker.tsx",
+          "kind": "module",
+          "what": "Style-tag chip picker (emoji + label grid)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 143,
+          "kb": 4.4,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/ai/AuroraGlow.tsx",
+          "kind": "module",
+          "what": "Animated silver \"aurora\" background for the AI screen",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 143,
+          "kb": 4.2,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/ai-credits/AiCreditsChip.tsx",
+          "kind": "module",
+          "what": "AI credits balance chip for AI tool headers",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 47,
+          "kb": 2.0,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/ai-credits/AiCreditsInlineNote.tsx",
+          "kind": "module",
+          "what": "\"N credits left\" inline note for AI tools",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 60,
+          "kb": 2.5,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/branding/AnimatedGradientBackground.tsx",
+          "kind": "module",
+          "what": "Animated gradient app background",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 526,
+          "kb": 13.6,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/buyer-feed/FeedTopBar.tsx",
+          "kind": "module",
+          "what": "Old buyer feed top bar (LIVE \u00b7 Following / Threads)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 196,
+          "kb": 8.1,
+          "risk": "Medium",
+          "note": "Following-tab/feed area: other session is active; confirm first"
+        },
+        {
+          "path": "artifacts/mobile/components/chat/ConversationSettingsSheet.tsx",
+          "kind": "module",
+          "what": "Chat settings sheet (mute etc.)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 218,
+          "kb": 9.8,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/inbox/FollowerAvatarCard.tsx",
+          "kind": "module",
+          "what": "Big avatar card for an inbox \"new followers\" rail",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 94,
+          "kb": 2.8,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/manufacturer/RfqChatCards.tsx",
+          "kind": "module",
+          "what": "RFQ / quote-comparison chat cards",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 123,
+          "kb": 6.6,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/profile/BrandHero.tsx",
+          "kind": "module",
+          "what": "Shared \"brand world\" profile hero",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 246,
+          "kb": 9.8,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/search/BrandCard.tsx",
+          "kind": "module",
+          "what": "Horizontal \"trending brand\" card (Discover uses DiscoverBrandCard instead)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 67,
+          "kb": 2.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/share-cards/BuyerShareCard.tsx",
+          "kind": "module",
+          "what": "Buyer profile share card image",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 94,
+          "kb": 3.3,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/share-cards/SellerShareCard.tsx",
+          "kind": "module",
+          "what": "Seller profile share card image",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 97,
+          "kb": 3.5,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/share-cards/ShareCardFrame.tsx",
+          "kind": "module",
+          "what": "Frame used by the two share cards above",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 84,
+          "kb": 2.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/social/CreateButton.tsx",
+          "kind": "module",
+          "what": "Glass \"create post\" pill for profiles",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 69,
+          "kb": 2.2,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/social/LocationPicker.tsx",
+          "kind": "module",
+          "what": "Place search + tag picker for posts (only caller of /api/places/search and POST /api/places)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 222,
+          "kb": 10.0,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/social/PostGrid.tsx",
+          "kind": "module",
+          "what": "Square profile post grid",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 123,
+          "kb": 3.5,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/social/StoryTray.tsx",
+          "kind": "module",
+          "what": "Story ring tray",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 204,
+          "kb": 6.1,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/components/ui/ScrollContainers.tsx",
+          "kind": "module",
+          "what": "ScrollView/FlatList wrappers with indicators off",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 69,
+          "kb": 3.2,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/hooks/useNetworkNotice.ts",
+          "kind": "module",
+          "what": "Offline notice hook",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 13,
+          "kb": 0.3,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/lib/canvasPresets.ts",
+          "kind": "module",
+          "what": "Canvas preset helpers (data now lives in designTypes.ts)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 79,
+          "kb": 2.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/lib/color.ts",
+          "kind": "module",
+          "what": "Readable ink colour for a background (colorModel.ts is the one in use)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 10,
+          "kb": 0.4,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/mobile/services/feedEventsService.ts",
+          "kind": "module",
+          "what": "For You ranking event queue (POST /api/feed/events, DELETE /feed/not-interested)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 78,
+          "kb": 2.7,
+          "risk": "Medium",
+          "note": "For You ranking never receives client events; this may be a missing hook-up rather than dead code"
+        }
+      ]
+    },
+    {
+      "feature": "Production code that only tests use",
+      "verdict": "Delete candidate (with its tests)",
+      "summary": "Code still covered by unit tests but imported by no screen, so the tests guard nothing the user can reach.",
+      "files": 9,
+      "lines": 821,
+      "kb": 31.2,
+      "items": [
+        {
+          "path": "artifacts/mobile/components/SellerCreateFAB.tsx",
+          "kind": "module",
+          "what": "Old seller floating \"+\" create button",
+          "evidence": "imported only by tests/seller-dashboard-native-contract.test.ts",
+          "lines": 173,
+          "kb": 6.3,
+          "risk": "Low",
+          "note": "Delete together with the test"
+        },
+        {
+          "path": "artifacts/mobile/components/SellerQuickActionsGrid.tsx",
+          "kind": "module",
+          "what": "Old seller dashboard quick-actions grid",
+          "evidence": "imported only by tests/seller-quick-actions-layout.test.tsx",
+          "lines": 40,
+          "kb": 1.2,
+          "risk": "Low",
+          "note": "Delete together with the test"
+        },
+        {
+          "path": "artifacts/mobile/components/sellerCompactGridLayout.ts",
+          "kind": "module",
+          "what": "Layout maths for the grid above",
+          "evidence": "imported only by tests/seller-quick-actions-layout.test.tsx",
+          "lines": 17,
+          "kb": 0.4,
+          "risk": "Low",
+          "note": "Delete together with the test"
+        },
+        {
+          "path": "artifacts/mobile/hooks/useQueryResult.ts",
+          "kind": "module",
+          "what": "Three-state (loading/empty/unavailable) query hook",
+          "evidence": "imported only by hooks/useQueryResult.test.tsx",
+          "lines": 97,
+          "kb": 4.1,
+          "risk": "Low",
+          "note": "Delete together with the test"
+        },
+        {
+          "path": "artifacts/mobile/lib/backgroundPalette.ts",
+          "kind": "module",
+          "what": "Hex colour blend helper",
+          "evidence": "imported only by tests/app-background-theme.test.ts",
+          "lines": 69,
+          "kb": 2.4,
+          "risk": "Low",
+          "note": "Delete together with the test"
+        },
+        {
+          "path": "artifacts/mobile/lib/listingValidation.ts",
+          "kind": "module",
+          "what": "Step validation for an old fast-listing flow",
+          "evidence": "imported only by tests/listing-validation.test.ts",
+          "lines": 118,
+          "kb": 4.3,
+          "risk": "Low",
+          "note": "Delete together with the test"
+        },
+        {
+          "path": "artifacts/mobile/lib/navigation/parentFallback.ts",
+          "kind": "module",
+          "what": "Back-button parent table (screens now pass goBackOr fallbacks themselves)",
+          "evidence": "imported only by lib/navigation/parentFallback.test.ts",
+          "lines": 39,
+          "kb": 1.8,
+          "risk": "Low",
+          "note": "Delete together with the test"
+        },
+        {
+          "path": "artifacts/mobile/lib/previewFeed.ts",
+          "kind": "module",
+          "what": "Local feed engagement fixtures",
+          "evidence": "imported only by lib/__tests__/previewFeed.test.ts",
+          "lines": 129,
+          "kb": 5.6,
+          "risk": "Low",
+          "note": "Delete together with the test"
+        },
+        {
+          "path": "artifacts/mobile/lib/uploadQueue.ts",
+          "kind": "module",
+          "what": "Generic upload retry state machine",
+          "evidence": "imported only by tests/upload-queue.test.ts",
+          "lines": 139,
+          "kb": 5.0,
+          "risk": "Low",
+          "note": "Delete together with the test"
+        }
+      ]
+    },
+    {
+      "feature": "API server: unused modules",
+      "verdict": "Delete candidate",
+      "summary": "Server files no route, job or script imports.",
+      "files": 3,
+      "lines": 146,
+      "kb": 4.9,
+      "items": [
+        {
+          "path": "artifacts/api-server/src/lib/sendPush.ts",
+          "kind": "module",
+          "what": "Older Expo push sender",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 61,
+          "kb": 1.8,
+          "risk": "Low",
+          "note": "Duplicate: lib/push.ts (sendPushToUser) is the one every job and route uses"
+        },
+        {
+          "path": "artifacts/api-server/src/lib/fulfillmentPartners/types.ts",
+          "kind": "module",
+          "what": "Fulfilment-partner adapter interface (\"NOT wired into any route\")",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 58,
+          "kb": 1.9,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/api-server/src/lib/fulfillmentPartners/tapstitchAdapter.ts",
+          "kind": "module",
+          "what": "Placeholder Tapstitch adapter (Tapstitch has no public API)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 27,
+          "kb": 1.2,
+          "risk": "Low"
+        }
+      ]
+    },
+    {
+      "feature": "Manufacturer portal: unused UI-kit components",
+      "verdict": "Delete candidate",
+      "summary": "shadcn/ui components copied in when the portal was scaffolded and never used (accordion, calendar, carousel, chart, sidebar, menubar...).",
+      "files": 38,
+      "lines": 4403,
+      "kb": 130.7,
+      "items": [
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/accordion.tsx",
+          "kind": "module",
+          "what": "UI kit component: accordion",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 55,
+          "kb": 2.0,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/alert.tsx",
+          "kind": "module",
+          "what": "UI kit component: alert",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 59,
+          "kb": 1.6,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/aspect-ratio.tsx",
+          "kind": "module",
+          "what": "UI kit component: aspect-ratio",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 6,
+          "kb": 0.1,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/avatar.tsx",
+          "kind": "module",
+          "what": "UI kit component: avatar",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 50,
+          "kb": 1.4,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/breadcrumb.tsx",
+          "kind": "module",
+          "what": "UI kit component: breadcrumb",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 115,
+          "kb": 2.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/button-group.tsx",
+          "kind": "module",
+          "what": "UI kit component: button-group",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 83,
+          "kb": 2.2,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/calendar.tsx",
+          "kind": "module",
+          "what": "UI kit component: calendar",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 213,
+          "kb": 7.4,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/carousel.tsx",
+          "kind": "module",
+          "what": "UI kit component: carousel",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 260,
+          "kb": 6.1,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/chart.tsx",
+          "kind": "module",
+          "what": "UI kit component: chart",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 367,
+          "kb": 10.6,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/checkbox.tsx",
+          "kind": "module",
+          "what": "UI kit component: checkbox",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 28,
+          "kb": 1.0,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/collapsible.tsx",
+          "kind": "module",
+          "what": "UI kit component: collapsible",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 12,
+          "kb": 0.3,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/command.tsx",
+          "kind": "module",
+          "what": "UI kit component: command",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 153,
+          "kb": 4.8,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/context-menu.tsx",
+          "kind": "module",
+          "what": "UI kit component: context-menu",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 198,
+          "kb": 7.3,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/drawer.tsx",
+          "kind": "module",
+          "what": "UI kit component: drawer",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 116,
+          "kb": 3.0,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/dropdown-menu.tsx",
+          "kind": "module",
+          "what": "UI kit component: dropdown-menu",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 201,
+          "kb": 7.5,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/empty.tsx",
+          "kind": "module",
+          "what": "UI kit component: empty",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 104,
+          "kb": 2.4,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/field.tsx",
+          "kind": "module",
+          "what": "UI kit component: field",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 244,
+          "kb": 5.9,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/hover-card.tsx",
+          "kind": "module",
+          "what": "UI kit component: hover-card",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 27,
+          "kb": 1.2,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/input-group.tsx",
+          "kind": "module",
+          "what": "UI kit component: input-group",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 168,
+          "kb": 4.9,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/input-otp.tsx",
+          "kind": "module",
+          "what": "UI kit component: input-otp",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 69,
+          "kb": 2.1,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/item.tsx",
+          "kind": "module",
+          "what": "UI kit component: item",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 193,
+          "kb": 4.4,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/kbd.tsx",
+          "kind": "module",
+          "what": "UI kit component: kbd",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 29,
+          "kb": 0.8,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/menubar.tsx",
+          "kind": "module",
+          "what": "UI kit component: menubar",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 254,
+          "kb": 8.5,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/navigation-menu.tsx",
+          "kind": "module",
+          "what": "UI kit component: navigation-menu",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 128,
+          "kb": 5.0,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/pagination.tsx",
+          "kind": "module",
+          "what": "UI kit component: pagination",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 117,
+          "kb": 2.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/progress.tsx",
+          "kind": "module",
+          "what": "UI kit component: progress",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 28,
+          "kb": 0.8,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/radio-group.tsx",
+          "kind": "module",
+          "what": "UI kit component: radio-group",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 42,
+          "kb": 1.4,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/resizable.tsx",
+          "kind": "module",
+          "what": "UI kit component: resizable",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 45,
+          "kb": 1.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/scroll-area.tsx",
+          "kind": "module",
+          "what": "UI kit component: scroll-area",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 46,
+          "kb": 1.6,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/separator.tsx",
+          "kind": "module",
+          "what": "UI kit component: separator",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 29,
+          "kb": 0.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/sidebar.tsx",
+          "kind": "module",
+          "what": "UI kit component: sidebar",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 727,
+          "kb": 21.5,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/skeleton.tsx",
+          "kind": "module",
+          "what": "UI kit component: skeleton",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 16,
+          "kb": 0.3,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/slider.tsx",
+          "kind": "module",
+          "what": "UI kit component: slider",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 26,
+          "kb": 1.0,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/spinner.tsx",
+          "kind": "module",
+          "what": "UI kit component: spinner",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 16,
+          "kb": 0.3,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/tabs.tsx",
+          "kind": "module",
+          "what": "UI kit component: tabs",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 53,
+          "kb": 1.8,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/toggle-group.tsx",
+          "kind": "module",
+          "what": "UI kit component: toggle-group",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 61,
+          "kb": 1.7,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/components/ui/toggle.tsx",
+          "kind": "module",
+          "what": "UI kit component: toggle",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 43,
+          "kb": 1.5,
+          "risk": "Low"
+        },
+        {
+          "path": "artifacts/manufacturer-portal/src/hooks/use-mobile.tsx",
+          "kind": "module",
+          "what": "UI kit component: use-mobile",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 22,
+          "kb": 0.6,
+          "risk": "Low"
+        }
+      ]
+    },
+    {
+      "feature": "Shared libs: unused OpenAI integration templates",
+      "verdict": "Delete candidate",
+      "summary": "Replit OpenAI integration scaffolding: a loose copy in lib/integrations/openai_ai_integrations (not a package, imported by nothing), the whole @workspace/integrations-openai-ai-react package (no app depends on it), and the voice/audio part of the server package. The server package itself stays: api-server uses its chat/image clients.",
+      "files": 21,
+      "lines": 1948,
+      "kb": 56.4,
+      "items": [
+        {
+          "path": "lib/db/src/schema/messages.ts",
+          "kind": "db-schema",
+          "what": "Duplicate DB schema: messages + message_reports tables are also defined in schema/index.ts (the copy that is used)",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 59,
+          "kb": 2.8,
+          "risk": "Medium"
+        },
+        {
+          "path": "lib/integrations-openai-ai-react/src/audio/audio-playback-worklet.js",
+          "kind": "module",
+          "what": "OpenAI integration template: audio/audio-playback-worklet.js",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 112,
+          "kb": 3.0,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations-openai-ai-react/src/audio/audio-utils.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: audio/audio-utils.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 39,
+          "kb": 1.1,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations-openai-ai-react/src/audio/index.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: audio/index.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 46,
+          "kb": 1.4,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations-openai-ai-react/src/audio/useAudioPlayback.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: audio/useAudioPlayback.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 109,
+          "kb": 3.5,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations-openai-ai-react/src/audio/useVoiceRecorder.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: audio/useVoiceRecorder.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 73,
+          "kb": 2.0,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations-openai-ai-react/src/audio/useVoiceStream.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: audio/useVoiceStream.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 392,
+          "kb": 9.6,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations-openai-ai-react/src/index.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: index.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 5,
+          "kb": 0.3,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations-openai-ai-server/src/audio/client.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: audio/client.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 252,
+          "kb": 7.8,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations-openai-ai-server/src/audio/index.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: audio/index.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 14,
+          "kb": 0.2,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/client/audio/audio-playback-worklet.js",
+          "kind": "module",
+          "what": "OpenAI integration template: client/audio/audio-playback-worklet.js",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 113,
+          "kb": 3.0,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/client/audio/audio-utils.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: client/audio/audio-utils.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 37,
+          "kb": 1.1,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/client/audio/index.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: client/audio/index.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 46,
+          "kb": 1.3,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/client/audio/useAudioPlayback.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: client/audio/useAudioPlayback.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 106,
+          "kb": 3.4,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/client/audio/useVoiceRecorder.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: client/audio/useVoiceRecorder.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 53,
+          "kb": 1.5,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/server/audio/client.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: server/audio/client.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 240,
+          "kb": 7.4,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/server/audio/index.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: server/audio/index.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 15,
+          "kb": 0.3,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/server/batch/index.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: server/batch/index.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 7,
+          "kb": 0.1,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/server/batch/utils.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: server/batch/utils.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 168,
+          "kb": 5.0,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/server/image/client.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: server/image/client.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 59,
+          "kb": 1.4,
+          "risk": "Low"
+        },
+        {
+          "path": "lib/integrations/openai_ai_integrations/src/server/image/index.ts",
+          "kind": "module",
+          "what": "OpenAI integration template: server/image/index.ts",
+          "evidence": "imported by no production file (import graph from every app entry point; tests and scripts excluded)",
+          "lines": 3,
+          "kb": 0.1,
+          "risk": "Low"
+        }
+      ]
+    },
+    {
+      "feature": "Unused assets",
+      "verdict": "Delete candidate",
+      "summary": "Media files no code or config references.",
+      "files": 1,
+      "lines": 0,
+      "kb": 2060.1,
+      "items": [
+        {
+          "path": "artifacts/mobile/assets/videos/fashion_walk.mp4",
+          "kind": "asset",
+          "what": "Fashion walk sample video (2 MB)",
+          "evidence": "not required/imported anywhere; filename appears in no code, JSON or config file",
+          "lines": 0,
+          "kb": 2060.1,
+          "risk": "Low"
+        }
+      ]
+    }
+  ],
+  "hidden_by_dev_keep": [
+    {
+      "feature": "Drops",
+      "status": "Hidden: the screens to create and browse drops are unlinked. Drop detail, drop countdown cards and server drop jobs are still live.",
+      "unreachable": [
+        "artifacts/mobile/app/buyer-drops.tsx",
+        "artifacts/mobile/app/seller-drops.tsx",
+        "artifacts/mobile/app/seller-drop-create.tsx",
+        "artifacts/mobile/app/seller-drop-preview.tsx",
+        "artifacts/mobile/components/drops/DropsCalendar.tsx"
+      ],
+      "still_live": [
+        "artifacts/mobile/app/buyer-drop-detail.tsx",
+        "artifacts/mobile/app/drops/[dropId].tsx",
+        "artifacts/mobile/components/BrandDropsCard.tsx",
+        "artifacts/mobile/components/discover/DiscoverDropRow.tsx",
+        "artifacts/api-server/src/routes/drops.ts",
+        "artifacts/api-server/src/routes/drop-wallet.ts",
+        "artifacts/api-server/src/lib/money/dropLifecycle.ts",
+        "artifacts/api-server/src/jobs/scheduledDropBroadcasts.ts"
+      ],
+      "server_unused": [
+        "POST /api/drops/:id/cancel-preorders",
+        "api.drops.create/update/cancel (only seller-drop-create calls them)"
+      ],
+      "files": 5,
+      "lines": 1395,
+      "kb": 61.1
+    },
+    {
+      "feature": "Collections",
+      "status": "Fully live: buyer collections (Save to collection, /c/[collectionId]) and seller store collections are linked. Nothing to flag.",
+      "unreachable": [],
+      "still_live": [
+        "artifacts/mobile/app/buyer-collection.tsx",
+        "artifacts/mobile/app/c/[collectionId].tsx",
+        "artifacts/mobile/app/store-collections.tsx",
+        "artifacts/mobile/components/SaveToCollectionSheet.tsx",
+        "artifacts/api-server/src/routes/collections.ts"
+      ],
+      "files": 0,
+      "lines": 0,
+      "kb": 0.0
+    },
+    {
+      "feature": "Brand Memory",
+      "status": "Live today via AI Settings \u2192 \"Manage Brand Memory\". The Consolidate screens session's commit deletes this screen and row (see coordination note).",
+      "unreachable": [],
+      "still_live": [
+        "artifacts/mobile/app/ai-brand-memory.tsx",
+        "artifacts/mobile/services/aiBrandMemory.ts"
+      ],
+      "files": 0,
+      "lines": 0,
+      "kb": 0.0
+    },
+    {
+      "feature": "Mobile App Builder",
+      "status": "Paused: one placeholder screen, not linked. No server code or tables.",
+      "unreachable": [
+        "artifacts/mobile/app/mobile-app-builder.tsx"
+      ],
+      "still_live": [],
+      "files": 1,
+      "lines": 80,
+      "kb": 4.2
+    }
+  ],
+  "consolidate_screens": {
+    "session": "\"Consolidate screens: 376 \u2192 lean app\" (branch not pushed yet when this audit ran)",
+    "routes_excluded": [
+      "/ai-assistant",
+      "/bg-removal",
+      "/buyer-account-control",
+      "/app-icon",
+      "/app-theme",
+      "/shipping-label",
+      "/automation",
+      "/mobile-app-builder",
+      "/metafields",
+      "/drafts",
+      "/buyer-refund-request",
+      "/ai-brand-memory",
+      "/seller-drops",
+      "/buyer-drops"
+    ],
+    "conflict": "Its commit deletes mobile-app-builder, ai-brand-memory, seller-drops and buyer-drops, which Dev asked to keep. That session was messaged about it.",
+    "rule": "Any route that session adds to lib/navigation/legacyRoutes comes off this list."
+  },
+  "open_pr_overlap": [
+    {
+      "pr": 722,
+      "effect": "links /product-bundles (Bundles end to end), so product-bundles and product-bundle-edit are live once it merges; not listed"
+    },
+    {
+      "pr": 719,
+      "effect": "starts rendering SupportChatBubble; not listed"
+    },
+    {
+      "pr": 705,
+      "effect": "starts using hooks/useScreenBottomInset; not listed"
+    },
+    {
+      "pr": 690,
+      "effect": "camera-first Create screen; the old camera group waits for it"
+    }
+  ],
+  "test_fixtures_keep": [
+    {
+      "path": "artifacts/mobile/app/navigation-isolation-probe.tsx",
+      "what": "Hidden probe screen used by tests/navigation-scene-isolation.web.mjs and .device.mjs",
+      "recommendation": "Keep: the navigation test suite opens it directly"
+    }
+  ],
+  "server_endpoints_no_caller": [
+    {
+      "method": "GET",
+      "path": "/api/manufacturers/connect/onboard/return",
+      "file": "artifacts/api-server/src/routes/manufacturer-connect.ts",
+      "line": 255,
+      "what": "Stripe Connect return page for manufacturers",
+      "evidence": "Stripe return_url/refresh_url now point to /manufacturers/payment (routes/manufacturer-connect.ts:91-92); no other string builds this path",
+      "risk": "Low",
+      "recommendation": "Delete"
+    },
+    {
+      "method": "GET",
+      "path": "/api/manufacturers/connect/onboard/refresh",
+      "file": "artifacts/api-server/src/routes/manufacturer-connect.ts",
+      "line": 259,
+      "what": "Stripe Connect refresh page for manufacturers",
+      "evidence": "same as above",
+      "risk": "Low",
+      "recommendation": "Delete"
+    },
+    {
+      "method": "POST",
+      "path": "/api/seller/connect/resume",
+      "file": "artifacts/api-server/src/routes/connect.ts",
+      "line": 201,
+      "what": "POST alias of GET /seller/connect/link (resume Stripe onboarding)",
+      "evidence": "app calls GET /seller/connect/link only",
+      "risk": "Low",
+      "recommendation": "Delete the alias line"
+    },
+    {
+      "method": "POST",
+      "path": "/api/team/accept/:token",
+      "file": "artifacts/api-server/src/routes/team.ts",
+      "line": 474,
+      "what": "\"legacy alias\" for accepting a team invite",
+      "evidence": "app uses /team/invite/accept/:token; old app builds might still call the alias",
+      "risk": "Medium",
+      "recommendation": "Keep until no app build older than the invite-accept change is in use"
+    },
+    {
+      "method": "GET",
+      "path": "/api/product-seo/public/:storeSlug/sitemap",
+      "file": "artifacts/api-server/src/routes/product-seo.ts",
+      "line": 58,
+      "what": "Per-store XML sitemap for search engines",
+      "evidence": "no app, portal, landing page or robots.txt links to it",
+      "risk": "Medium",
+      "recommendation": "Dev decides: wire into robots.txt/landing for SEO, or delete"
+    },
+    {
+      "method": "GET",
+      "path": "/api/product-seo/public/:storeSlug/:handle",
+      "file": "artifacts/api-server/src/routes/product-seo.ts",
+      "line": 86,
+      "what": "Public SEO product page data by handle",
+      "evidence": "no caller",
+      "risk": "Medium",
+      "recommendation": "Same decision as the sitemap"
+    },
+    {
+      "method": "GET",
+      "path": "/api/store/public/:slug",
+      "file": "artifacts/api-server/src/routes/store.ts",
+      "line": 1181,
+      "what": "Public storefront JSON by slug",
+      "evidence": "no app, portal, landing or server code builds this path",
+      "risk": "Low",
+      "recommendation": "Delete after confirming no web storefront build uses it"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/feed/not-interested/:postId",
+      "file": "artifacts/api-server/src/routes/feed.ts",
+      "line": 272,
+      "what": "Undo \"not interested\" on a For You post",
+      "evidence": "only caller is services/feedEventsService.ts, which nothing imports",
+      "risk": "Low",
+      "recommendation": "Decide together with feedEventsService"
+    },
+    {
+      "method": "GET",
+      "path": "/api/moderation/held/counts",
+      "file": "artifacts/api-server/src/routes/moderationHeld.ts",
+      "line": 170,
+      "what": "Counts for the held-by-filter moderation queue",
+      "evidence": "admin portal moderation page uses the reports queue; nothing calls /moderation/held/*",
+      "risk": "Medium",
+      "recommendation": "Dev decides: add a \"Held\" tab to the admin moderation page, or delete"
+    },
+    {
+      "method": "POST",
+      "path": "/api/moderation/held/:type/:id/approve",
+      "file": "artifacts/api-server/src/routes/moderationHeld.ts",
+      "line": 239,
+      "what": "Approve held content",
+      "evidence": "same",
+      "risk": "Medium",
+      "recommendation": "same"
+    },
+    {
+      "method": "POST",
+      "path": "/api/moderation/held/:type/:id/remove",
+      "file": "artifacts/api-server/src/routes/moderationHeld.ts",
+      "line": 240,
+      "what": "Remove held content",
+      "evidence": "same",
+      "risk": "Medium",
+      "recommendation": "same"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ip-cases/seller/:reference/counter-notice",
+      "file": "artifacts/api-server/src/routes/ip-cases.ts",
+      "line": 152,
+      "what": "Seller files a DMCA counter-notice in-app",
+      "evidence": "sellers are told to reply by email instead (lib/brandthreadEmail.ts:533); nothing calls it",
+      "risk": "High",
+      "recommendation": "Keep (legal process); optionally wire to the seller IP notice"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ip-cases/:id/counter-notice",
+      "file": "artifacts/api-server/src/routes/ip-cases.ts",
+      "line": 237,
+      "what": "Admin records a counter-notice",
+      "evidence": "portal only calls /counter-notice/resolve",
+      "risk": "High",
+      "recommendation": "Keep (legal process)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ip-cases/repeat-infringers/:userId/clear",
+      "file": "artifacts/api-server/src/routes/ip-cases.ts",
+      "line": 210,
+      "what": "Admin clears a repeat-infringer flag",
+      "evidence": "portal shows a \"repeat infringer\" label but nothing calls the clear endpoint",
+      "risk": "Medium",
+      "recommendation": "Keep; suggest a button in the portal"
+    },
+    {
+      "method": "POST",
+      "path": "/api/sample-orders/:id/images/request-upload",
+      "file": "artifacts/api-server/src/routes/sample-orders.ts",
+      "line": 953,
+      "what": "Signed upload URL for sample-order photos",
+      "evidence": "no app, portal or server code builds this path",
+      "risk": "Low",
+      "recommendation": "Delete"
+    }
+  ],
+  "server_dead_after_screen_delete": [
+    {
+      "endpoint": "POST /api/lifestyle/generate",
+      "file": "artifacts/api-server/src/routes/lifestyle.ts",
+      "lines": 149,
+      "only_caller": "app/lifestyle-images.tsx"
+    },
+    {
+      "endpoint": "POST /api/techpack/generate",
+      "file": "artifacts/api-server/src/routes/techpack.ts",
+      "lines": 358,
+      "only_caller": "app/tech-pack-generator.tsx"
+    },
+    {
+      "endpoint": "POST /api/photography/outfit-swap (+ /retry)",
+      "file": "artifacts/api-server/src/routes/photography.ts",
+      "lines": null,
+      "only_caller": "app/ai-photography-chat.tsx"
+    },
+    {
+      "endpoint": "POST /api/logo/generate",
+      "file": "artifacts/api-server/src/routes/logo.ts",
+      "lines": null,
+      "only_caller": "app/brand.tsx"
+    },
+    {
+      "endpoint": "POST /api/places/search, POST /api/places",
+      "file": "artifacts/api-server/src/routes/places.ts",
+      "lines": null,
+      "only_caller": "components/social/LocationPicker.tsx (GET /places/:id stays: location pages use it)"
+    },
+    {
+      "endpoint": "/api/freelancers/*, /api/freelancers/connect/*, POST /api/freelancer-jobs",
+      "file": "artifacts/api-server/src/routes/freelancers.ts, freelancer-connect.ts, freelancer-jobs.ts",
+      "lines": 451,
+      "only_caller": "app/freelancer-apply.tsx, app/freelancer-profile.tsx"
+    }
+  ],
+  "database": {
+    "unused_tables": [
+      {
+        "table": "freelancer_reviews",
+        "schema": "lib/db/src/schema/freelancers.ts:57",
+        "evidence": "no code reads or writes it (Drizzle export or raw SQL); part of the half-unlinked Freelancer feature",
+        "risk": "High (dropping a table loses data; it is probably empty)",
+        "recommendation": "Decide together with the Freelancer feature; if removing, write a new migration (never edit old ones)"
+      }
+    ],
+    "duplicate_definitions": [
+      {
+        "what": "messages + message_reports tables defined twice",
+        "where": "lib/db/src/schema/messages.ts (unused copy) and lib/db/src/schema/index.ts:1075/1110 (used)",
+        "risk": "Medium",
+        "recommendation": "Delete schema/messages.ts (counted above under Shared libs)"
+      },
+      {
+        "what": "conversations table defined twice",
+        "where": "lib/db/src/schema/conversations.ts (imported only by sellerMessaging.ts for a foreign key) and lib/db/src/schema/index.ts:989",
+        "risk": "Medium",
+        "recommendation": "Point sellerMessaging.ts at the index.ts definition, then delete conversations.ts. Not counted above because a one-line import change is needed first."
+      }
+    ],
+    "columns_nothing_reads": [
+      {
+        "table": "push_tokens",
+        "column": "last_seen_at",
+        "note": "never read or written by code"
+      },
+      {
+        "table": "conversations",
+        "column": "retention_until",
+        "note": "added by migration 037, never used"
+      },
+      {
+        "table": "messages",
+        "column": "retention_until",
+        "note": "added by migration 037, never used"
+      },
+      {
+        "table": "saved_items",
+        "column": "was_out_of_stock",
+        "note": "never read or written"
+      },
+      {
+        "table": "first_run_tips_seen",
+        "column": "seen_at",
+        "note": "filled by DB default, never read"
+      },
+      {
+        "table": "notification_deliveries",
+        "column": "queued_at",
+        "note": "filled by DB default, never read"
+      },
+      {
+        "table": "search_log",
+        "column": "result_count",
+        "note": "never written"
+      },
+      {
+        "table": "seller_tax_config",
+        "column": "stripe_tax_settings",
+        "note": "never read or written"
+      },
+      {
+        "table": "stripe_trial_warning_events",
+        "column": "recorded_at",
+        "note": "filled by DB default, never read"
+      },
+      {
+        "table": "thread_cash_streaks",
+        "column": "frozen_at, frozen_by",
+        "note": "never written (no freeze action exists)"
+      },
+      {
+        "table": "manufacturer_orders",
+        "column": "colorway",
+        "note": "never read or written"
+      },
+      {
+        "table": "sample_orders",
+        "column": "payout_released",
+        "note": "never read or written"
+      }
+    ],
+    "columns_recommendation": "Leave columns alone: dropping them shrinks no bundle and risks data. Listed so Dev knows they exist.",
+    "note": "Tables that look unused through Drizzle but are used through raw SQL (live_comments, live_viewers, live moderation, AI credits, seller_goals, rate_limit_buckets, stripe_webhook_events, email_campaign_sends) were checked and are LIVE."
+  },
+  "test_impact": {
+    "delete_with_code": [
+      "hooks/useQueryResult.test.tsx",
+      "lib/__tests__/cameraCaptureState.test.ts",
+      "lib/__tests__/photoSlideHelpers.test.ts",
+      "lib/__tests__/previewFeed.test.ts",
+      "lib/navigation/parentFallback.test.ts",
+      "lib/videoEditing.moveSlide.test.ts",
+      "lib/videoEditing.test.ts",
+      "lib/videoEditing.textOverlay.test.ts",
+      "tests/ai-photography-chat.test.tsx",
+      "tests/listing-validation.test.ts",
+      "tests/seller-quick-actions-layout.test.tsx",
+      "tests/upload-queue.test.ts"
+    ],
+    "need_small_edit": [
+      {
+        "test": "tests/bg-removal-redirect.test.ts",
+        "reads": "app/ai-studio.tsx",
+        "group": "Old AI Studio hub"
+      },
+      {
+        "test": "tests/app-background-theme.test.ts",
+        "reads": "lib/backgroundPalette.ts",
+        "group": "Production code that only tests use"
+      },
+      {
+        "test": "tests/buyer-shopping-no-nested-pressables.test.ts",
+        "reads": "components/search/BrandCard.tsx",
+        "group": "Mobile components nothing imports"
+      },
+      {
+        "test": "tests/social-messaging-routes.test.ts",
+        "reads": "components/social/StoryTray.tsx",
+        "group": "Mobile components nothing imports"
+      },
+      {
+        "test": "tests/seller-commerce-audit-hard-findings.test.ts",
+        "reads": "app/product-size-chart.tsx",
+        "group": "Duplicate and stub screens"
+      },
+      {
+        "test": "tests/seller-dashboard-native-contract.test.ts",
+        "reads": "components/SellerCreateFAB.tsx",
+        "group": "Production code that only tests use"
+      },
+      {
+        "test": "tests/seller-dashboard-neutral-surfaces.test.ts",
+        "reads": "components/SellerQuickActionsGrid.tsx",
+        "group": "Production code that only tests use"
+      },
+      {
+        "test": "tests/tab-bar-full-screen-slide.test.ts",
+        "reads": "app/camera-capture.tsx",
+        "group": "Old camera capture (HOLD: protected tab-bar guard)"
+      }
+    ],
+    "e2e_and_screenshot_scripts_listing_these_urls": 13,
+    "baseline": "On origin/dev the mobile unit suite already has 72 failing files / 87 failing tests before any change; removing every listed file adds exactly 20 new failing files: the 12 to delete and the 8 to edit below (verified by running vitest on both copies)."
+  },
+  "dependencies": {
+    "removable": [
+      {
+        "package": "@replit/revenuecat-sdk",
+        "where": "package.json (root)",
+        "evidence": "imported nowhere"
+      },
+      {
+        "package": "@replit/connectors-sdk",
+        "where": "package.json (root)",
+        "evidence": "only api-server imports it, and api-server lists it itself; root copy is redundant"
+      },
+      {
+        "package": "cookie-parser, @types/cookie-parser",
+        "where": "artifacts/api-server",
+        "evidence": "imported nowhere"
+      },
+      {
+        "package": "google-auth-library",
+        "where": "artifacts/api-server",
+        "evidence": "imported nowhere"
+      },
+      {
+        "package": "zod, zod-validation-error",
+        "where": "artifacts/mobile (devDependencies)",
+        "evidence": "mobile never imports zod (it uses api-zod types via the server)"
+      },
+      {
+        "package": "@stardazed/streams-text-encoding, @ungap/structured-clone",
+        "where": "artifacts/mobile (devDependencies)",
+        "evidence": "polyfills never imported or registered"
+      },
+      {
+        "package": "27 UI-kit packages (@radix-ui/react-accordion, -aspect-ratio, -avatar, -checkbox, -collapsible, -context-menu, -dropdown-menu, -hover-card, -menubar, -navigation-menu, -progress, -radio-group, -scroll-area, -separator, -slider, -tabs, -toggle, -toggle-group, cmdk, embla-carousel-react, framer-motion, input-otp, react-day-picker, react-icons, react-resizable-panels, recharts, vaul)",
+        "where": "artifacts/manufacturer-portal (devDependencies)",
+        "evidence": "only the unused UI-kit files import them"
+      },
+      {
+        "package": "@workspace/integrations-openai-ai-react (whole package)",
+        "where": "lib/integrations-openai-ai-react",
+        "evidence": "no workspace package depends on it"
+      }
+    ],
+    "false_positives_checked": [
+      "@stripe/react-stripe-js, @stripe/stripe-js (used by StripePayment.web.tsx)",
+      "react-native-purchases (lib/revenueCat.native.tsx)",
+      "upload-live-activity (local native module, plugins/with-upload-live-activity.js)",
+      "babel-plugin-react-compiler (app.json experiments.reactCompiler)",
+      "babel-plugin-transform-remove-console (babel.config.js)",
+      "expo-symbols (required by expo-router)",
+      "create-launch, pngjs (dev scripts)",
+      "@expo/ngrok (expo start --tunnel)",
+      "prettier (formatting)"
+    ],
+    "not_in_scope": "brandthread-woven (40 packages) and mockup-sandbox (45 packages) are Replit design/canvas tools with their own UI kits; not part of the shipped app, so not listed."
+  },
+  "feature_flags": {
+    "permanently_off": [
+      {
+        "flag": "ONE_TIME_OFFER_ENABLED = false",
+        "where": "artifacts/mobile/lib/paywallRetentionConfig.ts:16",
+        "gates": "components/paywall/SellerPaywallOneTimeOffer.tsx (124 lines) + the offer branch in app/plans.tsx",
+        "why_off": "needs a real discounted Stripe/RevenueCat product first (ONE_TIME_OFFER_PROMO_PRODUCT_ID is null)",
+        "recommendation": "Keep: it is a paywall feature waiting on a product, not dead code"
+      },
+      {
+        "flag": "outfitSwap (DB flag, on)",
+        "where": "feature_flags table",
+        "gates": "the Outfit Swap mode of app/ai-photography-chat.tsx, the only code that reads it",
+        "why_off": "not off, but its only screen is unreachable",
+        "recommendation": "Goes away with the old AI Studio screens"
+      }
+    ],
+    "off_by_default_but_switchable": [
+      {
+        "flag": "live_tips",
+        "source": "migration 130"
+      },
+      {
+        "flag": "autoCaptions",
+        "source": "migration 136"
+      },
+      {
+        "flag": "threadCashCheckoutDiscount",
+        "source": "migration 085"
+      },
+      {
+        "flag": "hostedCheckoutFallback",
+        "source": "migration 107"
+      },
+      {
+        "flag": "inviteOnlySignup",
+        "source": "migration 241"
+      },
+      {
+        "flag": "CONTACT_SYNC_ENABLED",
+        "source": "env var, server + EXPO_PUBLIC_ in app"
+      }
+    ],
+    "off_note": "Admins can switch these on (admin flags API or env var), so they are not dead. Each is read by live code."
+  },
+  "found_bugs": [
+    {
+      "title": "Shipping \u2192 Package presets never load or save",
+      "detail": "app/shipping.tsx calls api.packagePresets.list/create/update/remove \u2192 /api/package-presets. routes/index.ts imports packagePresetsRouter (line 153) but never calls router.use() with it, so every call 404s and the screen silently shows no presets.",
+      "fix": "One line in artifacts/api-server/src/routes/index.ts: router.use(\"/package-presets\", requireAuth, packagePresetsRouter) (check the auth middleware the file expects). Not done here: this PR changes no code.",
+      "severity": "Medium"
+    }
+  ],
+  "unused_exports": {
+    "exports": 928,
+    "types": 864,
+    "note": "Exported functions/constants and types that no other file imports (from knip). Mostly harmless leftovers inside files that are otherwise used."
+  },
+  "out_of_scope": {
+    "brandthread_woven": {
+      "files": 112,
+      "lines": 7971,
+      "kb": 231.3
+    },
+    "mockup_sandbox": "Canvas tool; its components are loaded by a file glob at runtime, so \"unused\" results there are not reliable",
+    "repo_weight": "attached_assets/ (186 MB), docs/ (169 MB, mostly screenshots), brandthread-mobile.zip (3.8 MB): not app code, not bundled; worth a separate cleanup decision"
+  }
+}
