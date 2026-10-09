@@ -1,25 +1,27 @@
 /**
- * What each seller plan includes beyond its limits: the platform commission,
- * monthly AI credits and advanced analytics. One config so a product decision
- * is a one-line change here. Prices come from planCatalogue and credits from
- * aiCredits/catalogue, so nothing is stated twice.
+ * What each seller plan includes beyond its limits: monthly AI credits and
+ * advanced analytics. One config so a product decision is a one-line change
+ * here. Prices come from planCatalogue, credits from aiCredits/catalogue and
+ * the commission from money/fees (PLATFORM_FEE_BPS), so nothing is stated
+ * twice.
+ *
+ * Owner's rule: the commission is a flat 5% on every plan and every
+ * subscription status (trial, past due, grace). No plan buys a lower rate.
  */
-import { getEffectiveEntitlement } from "./nativeEntitlements";
 import { creditPolicyForPlan } from "./aiCredits/catalogue";
 import { PLATFORM_FEE_BPS } from "./money/fees";
 import { PLAN_CATALOGUE, PLAN_IDS, isSellerPlanId, type SellerPlanId } from "./planCatalogue";
 
 export type PlanPerkConfig = {
-  /** Brandthread commission on merchandise, in basis points (1 bp = 0.01%). */
+  /** Brandthread commission on item + shipping, in basis points. Always PLATFORM_FEE_BPS. */
   platformFeeBps: number;
   advancedAnalytics: boolean;
 };
 
 export const PLAN_PERKS: Record<SellerPlanId, PlanPerkConfig> = {
-  // Starter keeps the standard rate every seller had before plan-based fees.
   starter: { platformFeeBps: PLATFORM_FEE_BPS, advancedAnalytics: false },
-  growth: { platformFeeBps: 400, advancedAnalytics: false },
-  pro: { platformFeeBps: 300, advancedAnalytics: true },
+  growth: { platformFeeBps: PLATFORM_FEE_BPS, advancedAnalytics: false },
+  pro: { platformFeeBps: PLATFORM_FEE_BPS, advancedAnalytics: true },
 };
 
 /** Rate used whenever the plan is unknown or cannot be looked up. */
@@ -34,17 +36,12 @@ export function hasAdvancedAnalytics(planId: string | null | undefined): boolean
 }
 
 /**
- * The commission rate for a seller's next checkout, from their server-verified
- * plan. Fails safe: any lookup error charges the standard rate, it never
- * blocks a sale.
+ * The commission rate for a seller's next checkout. Flat on every plan, so
+ * there is nothing to look up; it keeps the seller id so every checkout path
+ * still has one call site if the rule ever changes.
  */
-export async function resolveSellerPlatformFeeBps(sellerId: string): Promise<number> {
-  try {
-    const entitlement = await getEffectiveEntitlement(sellerId);
-    return platformFeeBpsForPlan(entitlement.planId);
-  } catch {
-    return DEFAULT_PLATFORM_FEE_BPS;
-  }
+export async function resolveSellerPlatformFeeBps(_sellerId: string): Promise<number> {
+  return PLATFORM_FEE_BPS;
 }
 
 /** Monthly AI credits for a plan from the credit policy; `null` means unlimited (never show a count). */

@@ -1,7 +1,28 @@
 /** A store's gift card setting: whether it sells gift cards, at which amounts, and how long they last. */
-import { eq } from "drizzle-orm";
-import { db, giftCardSettings } from "@workspace/db";
+import { and, eq, gt, sql } from "drizzle-orm";
+import { db, giftCards, giftCardSettings } from "@workspace/db";
 import { GiftCardError, MAX_GIFT_CARD_CENTS, MIN_GIFT_CARD_CENTS } from "./service";
+
+/**
+ * How many gift cards a store may issue itself per rolling 24 hours
+ * (GIFT_CARD_SELLER_ISSUE_DAILY_LIMIT, default 20). Seller-issued cards are
+ * funded by the store (payout.ts), so this only limits spam and mistakes.
+ */
+export function sellerIssueDailyLimit(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env.GIFT_CARD_SELLER_ISSUE_DAILY_LIMIT);
+  return Number.isSafeInteger(raw) && raw >= 0 ? raw : 20;
+}
+
+/** Throws once the store has issued its daily allowance of its own gift cards. */
+export async function assertSellerMayIssue(sellerId: string, now = new Date()): Promise<void> {
+  const since = new Date(now.getTime() - 24 * 60 * 60_000);
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(giftCards).where(and(
+    eq(giftCards.sellerId, sellerId), eq(giftCards.source, "seller_issued"), gt(giftCards.createdAt, since),
+  ));
+  if ((row?.n ?? 0) >= sellerIssueDailyLimit()) {
+    throw new GiftCardError(429, "GIFT_CARD_ISSUE_LIMIT", "You've issued the most gift cards allowed today. Try again tomorrow.");
+  }
+}
 
 export const DEFAULT_DENOMINATIONS = [2500, 5000, 10000];
 export const MAX_DENOMINATIONS = 6;

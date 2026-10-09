@@ -24,7 +24,7 @@ describe('feeSchedule', () => {
   it('quotes like the server', () => {
     expect(quoteFromSchedule(S, 10_000)).toEqual({ grossCents: 10_000, platformFeeCents: 500, processingFeeCents: 320, sellerNetCents: 9180 });
     expect(quoteFromSchedule(S, 1010)).toMatchObject({ platformFeeCents: 51, processingFeeCents: 59, sellerNetCents: 900 });
-    expect(quoteFromSchedule(S, 2500, { quantity: 2, shippingCents: 500 })).toMatchObject({ grossCents: 5500, platformFeeCents: 250, processingFeeCents: 190 });
+    expect(quoteFromSchedule(S, 2500, { quantity: 2, shippingCents: 500 })).toMatchObject({ grossCents: 5500, platformFeeCents: 275, processingFeeCents: 190 });
   });
 
   it('never produces a negative net and always adds up', () => {

@@ -43,7 +43,10 @@ import {
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { fake } from "../../money/__tests__/fakeStripe";
-import { call, pay, seedBuyer, seedProduct, seedSeller, startApp, uid } from "../../money/__tests__/moneyHarness";
+import {
+  call, expectLedgerBalanced, orderLedger, pay, seedBuyer, seedProduct, seedSeller, startApp, uid,
+} from "../../money/__tests__/moneyHarness";
+import { accountBalanceCents } from "../../money/ledger";
 import { refundOrder } from "../../money/refunds";
 import sellerAffiliateRouter from "../../../routes/seller-affiliate";
 import affiliateCreatorRouter from "../../../routes/affiliate-creator";
@@ -392,6 +395,100 @@ describe("payouts (mocked Stripe)", () => {
     expect(sent[1].amount).toBe(500);
     expect(await commissionFor(a.id)).toMatchObject({ paidCents: 500 });
     expect(await commissionFor(b.id)).toMatchObject({ paidCents: 1000, status: "paid" });
+  });
+});
+
+describe("the seller funds the commission, never Brandthread (BT-310)", () => {
+  async function setup(tag: string, opts: { program?: Record<string, unknown>; chargeModel?: "destination" | "transfer" } = {}) {
+    const seller = await seedSeller(tag);
+    const buyer = await seedBuyer(tag);
+    const creator = await seedCreator(tag);
+    const aff = await setupProgram(seller, creator, opts.program);
+    await call(app.base, "POST", "/api/affiliate/attach", buyer, { code: aff.code });
+    const product = await seedProduct(seller, { priceCents: 20_000 });
+    const { order } = await pay({ sellerId: seller, buyerId: buyer, chargeModel: opts.chargeModel ?? "destination", items: [{ ...product, quantity: 1 }] });
+    await db.update(orders).set({ status: "delivered", deliveredAt: new Date(Date.now() - 40 * 86_400_000) }).where(eq(orders.id, order.id));
+    return { seller, buyer, creator, order };
+  }
+  const run = () => runAffiliatePayouts({ stripe: okStripe(), enabled: true });
+  const creatorTransfers = (creatorId: string) => fake.state.transfers.filter((t) => t.metadata?.creatorId === creatorId);
+  const reserve = (sellerId: string) => accountBalanceCents(db, { account: "affiliate_commission_reserve", partyId: sellerId });
+
+  it("takes the commission back from the order's seller transfer before paying the creator; the ledger balances", async () => {
+    const { seller, creator, order } = await setup("fund");
+    const paidOutBefore = (await orderLedger(order.id)).seller_paid_out;
+    await run();
+
+    const funding = fake.state.reversals.filter((r) => r.metadata?.kind === "affiliate_commission_funding");
+    expect(funding).toHaveLength(1);
+    expect(funding[0]).toMatchObject({ amount: 2_000, transfer: order.stripeTransferId });
+    expect(creatorTransfers(creator.id)).toHaveLength(1);
+    expect(creatorTransfers(creator.id)[0].amount).toBe(2_000);
+
+    const ledger = await orderLedger(order.id);
+    expect(ledger.seller_paid_out).toBe(paidOutBefore - 2_000);
+    expect(ledger.affiliate_commission_reserve ?? 0).toBe(0); // funded in, paid out
+    expect(await reserve(seller)).toBe(0);
+    expect(await accountBalanceCents(db, { account: "affiliate_paid_out", partyId: creator.id })).toBe(2_000);
+    expect(await commissionFor(order.id)).toMatchObject({ sellerFundedCents: 2_000, paidCents: 2_000, status: "paid" });
+    await expectLedgerBalanced();
+
+    // Re-runs never take it from the seller twice.
+    await run(); await run();
+    expect(fake.state.reversals.filter((r) => r.metadata?.kind === "affiliate_commission_funding")).toHaveLength(1);
+    expect(creatorTransfers(creator.id)).toHaveLength(1);
+  });
+
+  it("does not pay the creator while the seller can't fund it, then pays once they can", async () => {
+    const { creator, order } = await setup("short");
+    fake.state.failNextReversal = "definitive";
+    await run();
+    expect(creatorTransfers(creator.id)).toHaveLength(0);
+    expect(await commissionFor(order.id)).toMatchObject({ status: "payable", sellerFundedCents: 0, paidCents: 0 });
+
+    await run();
+    expect(creatorTransfers(creator.id)).toHaveLength(1);
+    expect(await commissionFor(order.id)).toMatchObject({ status: "paid", sellerFundedCents: 2_000 });
+  });
+
+  it("an order whose money Brandthread still holds is not paid out to the creator yet", async () => {
+    // Hold-until-delivered (the production default): the seller's transfer has not gone out.
+    const previousMode = process.env.PAYOUT_MODE;
+    process.env.PAYOUT_MODE = "hold";
+    let setupResult: Awaited<ReturnType<typeof setup>>;
+    try {
+      setupResult = await setup("held", { chargeModel: "transfer" });
+    } finally {
+      if (previousMode === undefined) delete process.env.PAYOUT_MODE;
+      else process.env.PAYOUT_MODE = previousMode;
+    }
+    const { creator, order } = setupResult;
+    expect((await db.select({ t: orders.stripeTransferId }).from(orders).where(eq(orders.id, order.id)))[0].t).toBeNull();
+    await run();
+    expect(creatorTransfers(creator.id)).toHaveLength(0);
+    expect(fake.state.reversals.filter((r) => r.metadata?.orderId === order.id)).toHaveLength(0);
+    expect((await commissionFor(order.id)).sellerFundedCents).toBe(0);
+  });
+
+  it("gives the seller back funding a refund made unnecessary", async () => {
+    // Funded, but held below the creator's minimum payout.
+    const { seller, creator, order } = await setup("return", { program: { minPayoutCents: 5_000 } });
+    await run();
+    expect(creatorTransfers(creator.id)).toHaveLength(0);
+    expect(await commissionFor(order.id)).toMatchObject({ sellerFundedCents: 2_000, status: "payable" });
+    expect(await reserve(seller)).toBe(2_000);
+
+    await refundOrder({ orderId: order.id, reason: "seller_cancelled", initiatedBy: seller, idempotencyKey: `fund-ret/${order.id}` });
+    expect((await commissionFor(order.id)).status).toBe("reversed");
+    await run();
+    const back = fake.state.transfers.filter((t) => t.metadata?.kind === "affiliate_commission_funding_return");
+    expect(back).toHaveLength(1);
+    expect(back[0]).toMatchObject({ amount: 2_000, transfer_group: order.id });
+    expect(await commissionFor(order.id)).toMatchObject({ sellerFundedCents: 0 });
+    expect(await reserve(seller)).toBe(0);
+    await run();
+    expect(fake.state.transfers.filter((t) => t.metadata?.kind === "affiliate_commission_funding_return")).toHaveLength(1);
+    await expectLedgerBalanced();
   });
 });
 

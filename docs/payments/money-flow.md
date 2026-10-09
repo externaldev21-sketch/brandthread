@@ -24,6 +24,9 @@ wrong before this change. Amounts are always **integer cents** (see
 | Rule | Where it is enforced |
 |---|---|
 | Brandthread takes 5% of each sale plus standard Stripe processing, via Stripe Connect. | `fees.ts`, `checkoutPlan.ts`, `escrow.recordOrderPaid` |
+| The 5% is flat on every plan (Starter, Growth, Pro, trial included) and is charged on the item price after discounts **plus shipping**, on every checkout path. Thread Cash and gift cards are ways to pay, so they never lower it. | `fees.ts` (`PLATFORM_FEE_BPS`, `commissionBaseCents`), `planPerks.resolveSellerPlatformFeeBps` |
+| Gift cards: only cards a buyer paid for are paid out to the seller when redeemed, after the order's delivery hold, less that redemption's share of Stripe's fee on the card purchase. A store-issued card is the seller's own discount and is never paid from Brandthread's balance. | `giftCards/payout.ts` |
+| Affiliate commissions are funded by the seller: before a creator is paid, the commission is reversed from that order's seller transfer into `affiliate_commission_reserve`; the creator is paid only from it. | `affiliate/funding.ts`, `affiliate/payouts.ts` |
 | In-stock orders pay out normally. | Destination charge straight to the seller's Stripe account (`checkoutPlan.ts`). |
 | Preorder drop money is **held** by Brandthread, even after Stripe confirms the payment. | Separate charge on the platform, `funds_state = held` (`escrow.recordOrderPaid`). |
 | From held funds the seller pays the manufacturer's bulk card and buys shipping labels in-app. | `sample-orders.ts` pay-from-wallet → `recordBulkPaidFromHeld`; `shipping-labels.ts` → `recordLabelPurchased`. |
@@ -38,7 +41,7 @@ wrong before this change. Amounts are always **integer cents** (see
 
 1. The buyer checks out. The server looks at the products: none belong to a preorder drop, so this is a **destination charge**.
 2. Stripe charges the buyer and immediately moves the money to the seller's Stripe account, minus an
-   *application fee* = 5% of merchandise + an estimate of Stripe's fee (2.9% + 30¢ of the pre-tax total).
+   *application fee* = 5% of merchandise + shipping + an estimate of Stripe's fee (2.9% + 30¢ of the pre-tax total).
 3. The webhook creates the order, records the split, and posts the ledger entry `order_paid_direct`
    (`funds_state = settled_direct`).
 4. If the seller buys a label in-app, Brandthread pays the carrier and recovers the cost by reversing that
@@ -109,7 +112,7 @@ All in `fees.ts`, integer arithmetic only (basis points, `BigInt` for safety):
 
 | Quantity | Rule |
 |---|---|
-| Platform fee | 5% of merchandise after discounts (not tax, not shipping), rounded **half-up** to the cent. `$10.10 → 51¢`, `9¢ → 0¢`, `10¢ → 1¢`. |
+| Platform fee | 5% of merchandise after discounts plus shipping (never tax), rounded **half-up** to the cent. `$10.10 → 51¢`, `9¢ → 0¢`, `10¢ → 1¢`. |
 | Processing, in-stock | Estimated at session creation: 2.9% of the pre-tax total, half-up, + 30¢. The ledger records the difference from Stripe's actual fee as `processing_fee_variance`. |
 | Processing, held | Stripe's exact fee from the charge's balance transaction. |
 | Caps | Fees can never exceed the charge; the seller's net is never negative. |
@@ -233,6 +236,9 @@ A preorder cannot be marked `shipped` without a tracking number.
 | `shipping_carrier` | Paid for labels. |
 | `seller_card_payments` | A seller's own card paying a sample or bulk card. |
 | `legacy_opening` | Opening balances for money held before the ledger existed. |
+| `gift_card_liability` | Gift card purchase money held for a store until the card is redeemed there. |
+| `affiliate_commission_reserve` | Commission the seller funded (reversed from the order's transfer), held until paid to the creator. |
+| `affiliate_paid_out` | Commission transferred to a creator. |
 
 `drop_wallets` is kept as a friendly, cached view: `balance − released = ledger seller_held for the drop`,
 and `reserved` = amounts in flight. The tests check this after every scenario.

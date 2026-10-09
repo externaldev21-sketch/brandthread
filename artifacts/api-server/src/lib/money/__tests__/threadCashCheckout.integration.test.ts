@@ -51,7 +51,7 @@ async function payWithThreadCash(input: {
   const redemption = await redeemThreadCash(input.buyerId, input.threadCashDiscountCents, uid("redeem"));
 
   // Fee basis is computed on the FULL price — Thread Cash never reduces it.
-  const fee = destinationApplicationFeeCents({ merchandiseCents: subtotal, preTaxTotalCents: subtotal });
+  const fee = destinationApplicationFeeCents({ merchandiseCents: subtotal, shippingCents: 0, preTaxTotalCents: subtotal });
 
   // Mirrors routes/buyer.ts: reserve the token to this checkout attempt
   // BEFORE the checkout row is created, then bind it to the row's id, so
