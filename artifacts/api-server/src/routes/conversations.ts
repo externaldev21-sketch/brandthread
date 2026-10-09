@@ -44,12 +44,19 @@ import { IMMUTABLE_PUBLIC_CACHE_CONTROL, normalizeUploadedImage } from "../lib/p
 
 const router = Router();
 
-/** Everyone in the conversation (for realtime fan-out after a committed write). */
+/**
+ * Everyone in the conversation (for realtime fan-out after a committed write).
+ * Best-effort: a failure here returns [] — realtime must never fail the write.
+ */
 async function conversationMemberIds(conversationId: string): Promise<string[]> {
-  const rows = await db.select({ userId: conversationParticipants.userId })
-    .from(conversationParticipants)
-    .where(eq(conversationParticipants.conversationId, conversationId));
-  return rows.map((r) => r.userId);
+  try {
+    const rows = await db.select({ userId: conversationParticipants.userId })
+      .from(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId));
+    return Array.isArray(rows) ? rows.map((r) => r.userId) : [];
+  } catch {
+    return [];
+  }
 }
 router.use(requireAuth);
 
