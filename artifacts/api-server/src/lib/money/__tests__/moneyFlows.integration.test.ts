@@ -34,6 +34,8 @@ vi.mock("../../../middlewares/requireRole", async (importOriginal) => {
     ...actual,
     teamContext: () => (_req: unknown, _res: unknown, next: () => void) => next(),
     requireRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+    requirePermission: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+    requirePayoutsRead: () => (_req: unknown, _res: unknown, next: () => void) => next(),
   };
 });
 

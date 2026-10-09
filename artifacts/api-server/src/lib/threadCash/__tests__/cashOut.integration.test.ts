@@ -35,8 +35,8 @@ afterEach(async () => {
   while (testUserIds.length > 0) {
     const id = testUserIds.pop()!;
     await db.delete(threadCashEntries).where(eq(threadCashEntries.buyerId, id));
-    await db.delete(ledgerPostings).where(eq(ledgerPostings.partyId, id));
-    await db.delete(ledgerTransactions).where(eq(ledgerTransactions.sellerId, id));
+    // ledger_postings / ledger_transactions are append-only (immutability
+    // triggers reject DELETE); the rows are keyed to this random test id.
     await db.delete(users).where(eq(users.clerkId, id));
   }
 });

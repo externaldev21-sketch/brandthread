@@ -18,6 +18,7 @@ import { sql } from "drizzle-orm";
 const state = vi.hoisted(() => ({
   event: null as any,
   pushCalls: 0,
+  pushRecipients: [] as string[],
 }));
 
 vi.mock("../../lib/stripe", () => ({
@@ -31,8 +32,9 @@ vi.mock("../../lib/stripe", () => ({
 
 vi.mock("../../lib/push", () => ({
   normalizePushEventCategory: vi.fn(() => "orders"),
-  sendPushToUser: vi.fn(async () => {
+  sendPushToUser: vi.fn(async (userId: string) => {
     state.pushCalls += 1;
+    state.pushRecipients.push(userId);
   }),
 }));
 
@@ -202,6 +204,10 @@ describe("paid checkout webhook seller notification", () => {
       targetId: persistedOrders[0].id,
       targetType: "order",
     });
-    expect(state.pushCalls).toBe(1);
+    // One push to the seller (new order) and one to the buyer (order
+    // confirmed); the retried event must not push either of them again.
+    expect(state.pushRecipients.filter((id) => id === sellerId)).toHaveLength(1);
+    expect(state.pushRecipients.filter((id) => id === buyerId)).toHaveLength(1);
+    expect(state.pushCalls).toBe(2);
   });
 });

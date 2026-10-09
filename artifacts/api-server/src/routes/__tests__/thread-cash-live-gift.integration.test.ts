@@ -5,7 +5,7 @@
  * credit in one transaction, using the `live_gift` source cashOut.ts expects.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { blocks, db, follows, liveStreams, threadCashConfig, threadCashEntries, users } from "@workspace/db";
 import { getBalanceCents, sendLiveGift } from "../../lib/threadCash/wallet";
 
@@ -79,8 +79,9 @@ describe("sendLiveGift", () => {
 
     await sendLiveGift(buyer, seller, stream, 150, crypto.randomUUID());
 
+    // The buyer also holds the daily_checkin grant row, so select by source.
     const [debit] = await db.select().from(threadCashEntries)
-      .where(eq(threadCashEntries.buyerId, buyer)).limit(1);
+      .where(and(eq(threadCashEntries.buyerId, buyer), eq(threadCashEntries.source, "live_gift_sent"))).limit(1);
     expect(debit).toMatchObject({ amountCents: -150, source: "live_gift_sent", referenceId: stream });
 
     const [credit] = await db.select().from(threadCashEntries)
@@ -166,16 +167,26 @@ describe("sendLiveGift", () => {
   });
 
   it("enforces the daily receive cap on the seller", async () => {
-    const buyer = await makeUser();
+    // Several senders: the receive cap must trip on the seller even when no
+    // single buyer has hit their own (lower) daily send cap.
     const seller = await makeUser();
     const stream = await makeStream(seller);
     const [config] = await db.select().from(threadCashConfig).limit(1);
     const cap = config?.dailyReceiveCapCents ?? 5000;
-    await grant(buyer, cap * 3);
+    const sendCap = config?.dailySendCapCents ?? cap;
 
-    await sendLiveGift(buyer, seller, stream, cap, crypto.randomUUID());
+    let received = 0;
+    while (received < cap) {
+      const sender = await makeUser();
+      const chunk = Math.min(sendCap, cap - received);
+      await grant(sender, chunk);
+      await sendLiveGift(sender, seller, stream, chunk, crypto.randomUUID());
+      received += chunk;
+    }
+    const third = await makeUser();
+    await grant(third, 100);
     await expect(
-      sendLiveGift(buyer, seller, stream, 1, crypto.randomUUID()),
+      sendLiveGift(third, seller, stream, 1, crypto.randomUUID()),
     ).rejects.toMatchObject({ code: "THREAD_CASH_DAILY_RECEIVE_CAP" });
   });
 });

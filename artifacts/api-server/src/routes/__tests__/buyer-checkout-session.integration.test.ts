@@ -378,6 +378,8 @@ describe("POST /api/buyer/checkout/session", () => {
       ownerId: SELLER_ID,
       name: "Checkout preorder drop",
       type: "pre-order",
+      // Launch-time enforcement only lets active drops be bought.
+      status: "active",
       escrowState: "collecting",
       fulfillmentDeadlineAt: new Date(Date.now() + 30 * 86_400_000),
     }).returning({ id: drops.id });
