@@ -692,7 +692,7 @@ function AuthGate() {
       // device-scoped, not per-account, so a half-finished attempt from the
       // account that just signed out must not leak into the next sign-up on
       // this device (e.g. a different friend using the same phone/Expo Go).
-      AsyncStorage.multiRemove(['onboarding_pending_flow', 'onboarding_pending_username']).catch(() => {});
+      AsyncStorage.multiRemove(['onboarding_pending_flow', 'onboarding_pending_username', 'onboarding_pending_draft']).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, isLoaded]);
@@ -732,7 +732,7 @@ function AuthGate() {
       try { if (isSignedIn) await signOut(); } catch {}
       await AsyncStorage.multiRemove([
         ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', 'splash_seen',
-        'onboarding_draft', 'onboarding_pending_flow',
+        'onboarding_draft', 'onboarding_pending_flow', 'onboarding_pending_draft',
         'onboarding_first_name', 'onboarding_brand_name',
         'onboarding_brand_stage', 'onboarding_goals',
         'onboarding_style_interests', 'onboarding_selected_plan',

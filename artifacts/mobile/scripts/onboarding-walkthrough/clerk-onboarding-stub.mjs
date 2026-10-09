@@ -42,6 +42,7 @@ export function clerkOnboardingStubScript() {
       createdUserId: null,
       pendingCode: null,
       pendingProfile: null,
+      emailVerified: false,
     };
   }
   let signUpState = freshSignUpState();
@@ -146,6 +147,18 @@ export function clerkOnboardingStubScript() {
     return s;
   }
 
+  function maybeComplete() {
+    if (!signUpState.emailVerified || !signUpState.hasPassword) return;
+    signUpState.status = 'complete';
+    signUpState.pendingProfile = {
+      id: genId('user'),
+      firstName: signUpState.firstName || '',
+      lastName: signUpState.lastName || '',
+      username: signUpState.username || '',
+      email: signUpState.emailAddress,
+    };
+  }
+
   // ── SignUpFutureResource-shaped object (see @clerk/shared/types state.d.ts) ─
   const signUpResource = {
     get id() { return signUpState.id; },
@@ -172,7 +185,19 @@ export function clerkOnboardingStubScript() {
     protectCheck: null,
     canBeDiscarded: false,
 
-    async create(params) { return signUpResource.password(params); },
+    // Mirrors real Clerk: create() starts a sign-up with just an email;
+    // password() on an existing sign-up PATCHes the password in. The sign-up
+    // is complete once the email is verified AND a password is set — the
+    // order the onboarding uses (email → code → password, Instagram-style).
+    async create(params) {
+      const emailAddress = (params?.emailAddress || '').trim().toLowerCase();
+      if (usedEmails.has(emailAddress)) {
+        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.') };
+      }
+      signUpState = { ...freshSignUpState(), id: genId('su'), emailAddress };
+      notifySignUp();
+      return { error: null };
+    },
     async update(params) {
       if (params?.username != null) signUpState.username = params.username;
       if (params?.firstName != null) signUpState.firstName = params.firstName;
@@ -181,12 +206,19 @@ export function clerkOnboardingStubScript() {
       return { error: null };
     },
     async password(params) {
+      if (signUpState.id && !params?.emailAddress) {
+        signUpState.hasPassword = true;
+        maybeComplete();
+        notifySignUp();
+        return { error: null };
+      }
       const emailAddress = (params?.emailAddress || '').trim().toLowerCase();
       if (usedEmails.has(emailAddress)) {
         return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.') };
       }
       signUpState = {
         ...freshSignUpState(),
+        id: genId('su'),
         emailAddress,
         hasPassword: true,
         username: params?.username ?? signUpState.username,
@@ -197,7 +229,7 @@ export function clerkOnboardingStubScript() {
       return { error: null };
     },
     verifications: {
-      get emailAddress() { return { status: signUpState.status === 'complete' ? 'verified' : 'unverified' }; },
+      get emailAddress() { return { status: signUpState.emailVerified ? 'verified' : 'unverified' }; },
       phoneNumber: { status: 'unverified' },
       web3Wallet: { status: 'unverified' },
       externalAccount: { status: 'unverified' },
@@ -216,14 +248,8 @@ export function clerkOnboardingStubScript() {
           return { error: fakeError('form_code_incorrect', 'Invalid code. Please check and try again.') };
         }
         signUpState.id = signUpState.id || genId('su');
-        signUpState.status = 'complete';
-        signUpState.pendingProfile = {
-          id: genId('user'),
-          firstName: signUpState.firstName || '',
-          lastName: signUpState.lastName || '',
-          username: signUpState.username || '',
-          email: signUpState.emailAddress,
-        };
+        signUpState.emailVerified = true;
+        maybeComplete();
         notifySignUp();
         return { error: null };
       },

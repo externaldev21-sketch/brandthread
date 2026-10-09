@@ -116,8 +116,8 @@ export function WelcomeStep({
           />
           <PillButton
             testID="onboarding-welcome-sign-in"
-            accessibilityLabel="I already have an account"
-            label="I already have an account"
+            accessibilityLabel="Log in"
+            label="Log in"
             variant="secondary"
             haptic={false}
             onPress={() => { Haptics.selectionAsync(); onSignIn(); }}

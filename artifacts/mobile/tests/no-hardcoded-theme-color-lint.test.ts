@@ -216,7 +216,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/manufacturer-profile.tsx',
   'app/meta-ads-manage.tsx',
   'app/navigation-isolation-probe.tsx',
-  'app/onboarding.tsx',
   'app/order-detail.tsx',
   'app/plans.tsx',
   'app/product-bundle-edit.tsx',
