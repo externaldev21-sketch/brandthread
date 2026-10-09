@@ -501,11 +501,9 @@ export default function SellerConversationScreen() {
     setShowQuickReplies(false);
   }
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
-    }
-  }, [messages.length]);
+  // Pinning to the newest message is done by the FlatList's own
+  // onContentSizeChange (below), which fires once new rows have laid out —
+  // no timed scrollToEnd after message updates.
 
   useEffect(() => {
     if (voicePlayerStatus.didJustFinish) setPlayingVoiceUri(null);
@@ -774,7 +772,6 @@ export default function SellerConversationScreen() {
       const result = await api.conversations.setDisappearing(id, next);
       setConv((prev) => prev ? { ...prev, disappearingEnabled: next } : prev);
       setMessages((prev) => [...prev, result.message]);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     } catch {
       Alert.alert('Couldn’t update disappearing messages', 'Please try again.');
     }
@@ -880,7 +877,6 @@ export default function SellerConversationScreen() {
     try {
       const msg = await api.conversations.send(id, { text: '', attachment });
       setMessages((prev) => [...prev, msg as Msg]);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     } catch {
       Alert.alert('Voice message not sent', 'Please check your connection and try again.');
     } finally {
@@ -1091,7 +1087,6 @@ export default function SellerConversationScreen() {
         ts: Date.now(),
       };
       setMessages((prev) => [...prev, localMsg]);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
       setTimeout(() => {
         const reply: Msg = {
           id: `local-reply-${Date.now()}`,
@@ -1106,7 +1101,6 @@ export default function SellerConversationScreen() {
           ts: Date.now(),
         };
         setMessages((prev) => [...prev, reply]);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
       }, previewAutoReplyDelayMs());
       return;
     }
@@ -1119,7 +1113,6 @@ export default function SellerConversationScreen() {
         replyToId: replyingTo?.id,
       });
       setMessages((prev) => [...prev, msg as Msg]);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     } catch (e) {
       // REQUEST_NOT_ACCEPTED (403): the buyer's request was actually still
       // pending server-side even though this screen's own `conv.isRequest`
@@ -1955,13 +1948,11 @@ export default function SellerConversationScreen() {
                   status: 'sent',
                   ts: Date.now(),
                 }]);
-                setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
                 return;
               }
               try {
                 const msg = await api.conversations.send(id, { text: '', attachment });
                 setMessages((prev) => [...prev, msg as Msg]);
-                setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
               } catch (e: any) {
                 Alert.alert('Sent, but the chat message failed', e?.message ?? 'The Thread Cash send went through — refresh to see it in chat.');
               }
