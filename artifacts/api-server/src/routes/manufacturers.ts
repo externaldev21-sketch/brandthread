@@ -18,6 +18,7 @@ import {
   users,
 } from "@workspace/db";
 import { eq, desc, and, sql, inArray, isNull } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import crypto from "crypto";
 import {
   RegisterManufacturerBody,
@@ -496,10 +497,14 @@ router.get("/me/relationships", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
-  const rows = await db.select().from(manufacturerRelationships)
+  // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+  const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
+  const fetched = await db.select().from(manufacturerRelationships)
     .where(eq(manufacturerRelationships.manufacturerId, mfr.id))
-    .orderBy(desc(manufacturerRelationships.updatedAt));
-  return res.json(rows.map(serializeRelationship));
+    .orderBy(desc(manufacturerRelationships.updatedAt), desc(manufacturerRelationships.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  return res.json(finishListPage(res, page, fetched).map(serializeRelationship));
 });
 
 // Manufacturer-scoped quote inbox and responses. These endpoints operate on
@@ -826,12 +831,17 @@ router.post("/invite-tokens", ...requireGrowthSeller, async (req, res) => {
 // GET /api/manufacturers/invite-tokens — seller lists their tokens
 router.get("/invite-tokens", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const rows = await db
+  // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+  const page = parseListPage(req.query, { defaultLimit: 200, maxLimit: 200 });
+  const fetched = await db
     .select({ invite: manufacturerInviteTokens, manufacturerName: manufacturers.businessName })
     .from(manufacturerInviteTokens)
     .leftJoin(manufacturers, eq(manufacturerInviteTokens.manufacturerId, manufacturers.id))
     .where(eq(manufacturerInviteTokens.sellerId, sellerId))
-    .orderBy(desc(manufacturerInviteTokens.createdAt));
+    .orderBy(desc(manufacturerInviteTokens.createdAt), desc(manufacturerInviteTokens.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  const rows = finishListPage(res, page, fetched);
 
   res.json(rows.map(({ invite, manufacturerName }) => ({ ...serializeInvite(invite), manufacturerName })));
 });
@@ -1510,11 +1520,16 @@ router.get("/me/threads", async (req, res) => {
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
 
-  const threads = await db
+  // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+  const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
+  const fetched = await db
     .select()
     .from(manufacturerThreads)
     .where(eq(manufacturerThreads.manufacturerId, mfr.id))
-    .orderBy(desc(manufacturerThreads.lastMessageAt));
+    .orderBy(desc(manufacturerThreads.lastMessageAt), desc(manufacturerThreads.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  const threads = finishListPage(res, page, fetched);
 
   return res.json(threads.map(t => ({
     ...t,
@@ -1691,10 +1706,14 @@ router.get("/me/sample-orders", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
-  const rows = await db.select().from(sampleOrders)
+  // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+  const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
+  const fetched = await db.select().from(sampleOrders)
     .where(eq(sampleOrders.manufacturerId, mfr.id))
-    .orderBy(desc(sampleOrders.updatedAt));
-  return res.json(await withSellerNames(rows.map(serializeSampleOrder)));
+    .orderBy(desc(sampleOrders.updatedAt), desc(sampleOrders.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  return res.json(await withSellerNames(finishListPage(res, page, fetched).map(serializeSampleOrder)));
 });
 
 router.get("/me/sample-orders/:orderId", async (req, res) => {

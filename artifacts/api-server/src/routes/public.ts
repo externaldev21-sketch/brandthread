@@ -1158,26 +1158,30 @@ router.get("/search/categories", async (req, res) => {
       return PALETTE[Math.abs(h) % PALETTE.length];
     };
 
-    const categories = await Promise.all(topCategories.map(async (c) => {
-      const [product] = await db
-        .select({ id: products.id, images: products.images, ownerId: products.ownerId })
-        .from(products)
-        .where(and(
-          eq(products.category, c.category),
-          eq(products.status, "active"),
-          isNull(products.deletedAt),
-          notBlockedWith(viewerId, products.ownerId),
-          sql`jsonb_array_length(to_jsonb(${products.images})) > 0`,
-        ))
-        .orderBy(desc(products.createdAt))
-        .limit(1);
+    // One DISTINCT ON query (newest imaged product per category) instead of
+    // one query per category.
+    const coverRows = topCategories.length === 0 ? [] : await db
+      .selectDistinctOn([products.category], { category: products.category, images: products.images })
+      .from(products)
+      .where(and(
+        inArray(products.category, topCategories.map((c) => c.category)),
+        eq(products.status, "active"),
+        isNull(products.deletedAt),
+        notBlockedWith(viewerId, products.ownerId),
+        sql`jsonb_array_length(to_jsonb(${products.images})) > 0`,
+      ))
+      .orderBy(products.category, desc(products.createdAt));
+    const coverByCategory = new Map(coverRows.map((r) => [r.category, r]));
+
+    const categories = topCategories.map((c) => {
+      const product = coverByCategory.get(c.category);
       return {
         category: c.category,
         productCount: Number(c.count ?? 0),
         imageUri: Array.isArray(product?.images) ? (product.images.find((i): i is string => typeof i === "string") ?? null) : null,
         color: hashColor(c.category),
       };
-    }));
+    });
 
     res.json({ categories });
   } catch (err) {

@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import {
   db,
   designStudioAssets,
@@ -197,13 +198,20 @@ async function hydrateSnapshot(
 
 router.get("/projects", async (req, res) => {
   const owner = ownerId(req);
-  const rows = await db.select({
+  // Opt-in ?limit=&offset=. The app's sync treats a project missing from
+  // this list as deleted remotely, so the no-params cap is far above any
+  // real owner's project count; it only bounds a pathological account.
+  const page = parseListPage(req.query, { defaultLimit: 1000, maxLimit: 1000 });
+  const fetched = await db.select({
     snapshot: designStudioProjects.snapshot,
     revision: designStudioProjects.revision,
   })
     .from(designStudioProjects)
     .where(eq(designStudioProjects.ownerId, owner))
-    .orderBy(desc(designStudioProjects.updatedAt));
+    .orderBy(desc(designStudioProjects.updatedAt), desc(designStudioProjects.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  const rows = finishListPage(res, page, fetched);
   const assets = await db.select({
     objectPath: designStudioAssets.objectPath,
     kind: designStudioAssets.kind,

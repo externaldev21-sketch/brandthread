@@ -8,6 +8,7 @@ import {
   drops, shippingZones, shippingZoneWeightTiers,
 } from "@workspace/db";
 import { eq, and, or, desc, sql, isNull, inArray } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   requireStripe,
@@ -1360,7 +1361,10 @@ router.get("/checkout/session/:sessionId", async (req, res) => {
 router.get("/orders", async (req, res) => {
   try {
     const buyerId = (req as any).clerkUserId as string;
-    const rows = await db
+    // Opt-in ?limit=&offset=; without params the app keeps getting a bare
+    // array of the buyer's orders, newest first, capped generously.
+    const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
+    const fetched = await db
       .select({
         id:                      orders.id,
         orderNumber:             orders.orderNumber,
@@ -1388,7 +1392,10 @@ router.get("/orders", async (req, res) => {
       .from(orders)
       .leftJoin(users, eq(users.clerkId, orders.ownerId))
       .where(eq(orders.buyerId, buyerId))
-      .orderBy(desc(orders.createdAt));
+      .orderBy(desc(orders.createdAt), desc(orders.id))
+      .limit(page.limit + 1)
+      .offset(page.offset);
+    const rows = finishListPage(res, page, fetched);
     // The list carries the timeline and guarantee but not the scan history
     // (events are loaded with the order detail).
     res.json(rows.map((row) => ({ ...row, delivery: buildBuyerDelivery(row) })));

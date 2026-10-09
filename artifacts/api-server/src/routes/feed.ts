@@ -21,7 +21,7 @@ import { requireAuth, requireModerator } from "../middlewares/requireAuth";
 import { validateRequest } from "../middlewares/validateRequest";
 import { rateLimit } from "../middlewares/rateLimit";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
-import { getForYouFeed, applyEventToProfile, type ForYouResultItem } from "../lib/ranking/forYou";
+import { getForYouFeed, applyEventsToProfile, type ForYouResultItem } from "../lib/ranking/forYou";
 import { getRankingConfig, saveRankingConfig, DEFAULT_RANKING_CONFIG } from "../lib/ranking/config";
 import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
@@ -61,45 +61,57 @@ router.post(
         .where(inArray(posts.id, postIds));
       const postById = new Map(postRows.map((p) => [p.id, p]));
 
-      // Insert every event idempotently (client_event_id is unique per user);
-      // RETURNING tells us which ones were newly inserted vs. duplicates, so
-      // we only update the taste profile once per real event.
+      // Insert every event idempotently (client_event_id is unique per user)
+      // in ONE statement; RETURNING tells us which ones were newly inserted
+      // vs. duplicates (already stored, or repeated within this batch), so we
+      // only update the taste profile once per real event.
+      const known = events.filter((event) => postById.has(event.postId)); // unknown/deleted posts are skipped, not an error
+      const returned = known.length === 0 ? [] : await db
+        .insert(interactions)
+        .values(known.map((event) => ({
+          userId,
+          postId: event.postId,
+          type: event.type,
+          value: event.value ?? null,
+          clientEventId: event.clientEventId,
+        })))
+        .onConflictDoNothing({
+          target: [interactions.userId, interactions.clientEventId],
+          where: sql`${interactions.clientEventId} IS NOT NULL`,
+        })
+        .returning({
+          postId: interactions.postId,
+          type: interactions.type,
+          value: interactions.value,
+          clientEventId: interactions.clientEventId,
+        });
+      // Restore client order (RETURNING order is not guaranteed) so profile
+      // updates fold in exactly the order the per-event path applied them.
+      const byClientEventId = new Map(returned.map((row) => [row.clientEventId, row]));
       const inserted: { postId: string; type: string; value: string | null }[] = [];
-      for (const event of events) {
-        const post = postById.get(event.postId);
-        if (!post) continue; // silently skip unknown/deleted posts — not an ingestion error
-        const [row] = await db
-          .insert(interactions)
-          .values({
-            userId,
-            postId: event.postId,
-            type: event.type,
-            value: event.value ?? null,
-            clientEventId: event.clientEventId,
-          })
-          .onConflictDoNothing({
-            target: [interactions.userId, interactions.clientEventId],
-            where: sql`${interactions.clientEventId} IS NOT NULL`,
-          })
-          .returning({ postId: interactions.postId, type: interactions.type, value: interactions.value });
-        if (row) inserted.push({ postId: row.postId as string, type: row.type, value: row.value });
+      for (const event of known) {
+        const row = byClientEventId.get(event.clientEventId);
+        if (!row) continue;
+        byClientEventId.delete(event.clientEventId);
+        inserted.push({ postId: row.postId as string, type: row.type, value: row.value });
       }
 
       for (const row of inserted) {
-        const post = postById.get(row.postId);
-        if (!post) continue;
-        if (row.type === "not_interested") {
-          // Persist the hide too (same as POST /posts/:id/interact) so the post leaves For You.
-          await hidePostFromForYou(userId, { id: row.postId, sellerId: post.userId })
-            .catch((err) => req.log.error({ err, userId }, "Failed to persist not-interested hide"));
-        }
-        await applyEventToProfile(userId, {
+        if (row.type !== "not_interested") continue;
+        const post = postById.get(row.postId)!;
+        // Persist the hide too (same as POST /posts/:id/interact) so the post leaves For You.
+        await hidePostFromForYou(userId, { id: row.postId, sellerId: post.userId })
+          .catch((err) => req.log.error({ err, userId }, "Failed to persist not-interested hide"));
+      }
+      await applyEventsToProfile(userId, inserted.map((row) => {
+        const post = postById.get(row.postId)!;
+        return {
           type: row.type,
           value: row.value,
           styleTags: Array.isArray(post.styleTags) ? (post.styleTags as string[]) : [],
           sellerId: post.userId,
-        }).catch((err) => req.log.error({ err, userId }, "Failed to apply feed event to taste profile"));
-      }
+        };
+      })).catch((err) => req.log.error({ err, userId }, "Failed to apply feed events to taste profile"));
 
       res.status(202).json({ accepted: inserted.length, deduped: events.length - inserted.length });
     } catch (err) {

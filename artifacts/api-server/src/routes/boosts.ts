@@ -844,10 +844,16 @@ router.get("/summary", async (req, res) => {
 
 // ─── GET /api/boosts/active-post-ids ─────────────────────────────────────────
 
+const MAX_ACTIVE_POST_ID_LOOKUP = 500;
+
 router.get("/active-post-ids", async (req, res) => {
   const raw = req.query.ids;
   if (!raw) return res.json([]);
-  const ids = (Array.isArray(raw) ? raw : [raw]) as string[];
+  // Bounded: this is a lookup over the post ids the client has on screen,
+  // never a reason to build an arbitrarily large IN list.
+  const ids = [...new Set((Array.isArray(raw) ? raw : [raw])
+    .filter((id): id is string => typeof id === "string" && id.length > 0 && id.length <= 200))]
+    .slice(0, MAX_ACTIVE_POST_ID_LOOKUP);
   if (ids.length === 0) return res.json([]);
 
   const now = new Date();

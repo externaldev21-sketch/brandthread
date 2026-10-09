@@ -19,6 +19,7 @@
  */
 import { Router } from "express";
 import { and, asc, desc, eq, gt, inArray, ne, sql } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import {
   db, users, stories, storyArchive, storyHighlights, storyHighlightItems,
 } from "@workspace/db";
@@ -142,9 +143,15 @@ async function ownHighlight(myId: string, id: string) {
 // ─── Reads ────────────────────────────────────────────────────────────────────
 router.get("/highlights/me", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const rows = await db.select().from(storyHighlights)
+  // Opt-in ?limit=&offset=; the no-params cap is above MAX_HIGHLIGHTS so
+  // nobody's current list is cut.
+  const page = parseListPage(req.query, { defaultLimit: 100, maxLimit: 100 });
+  const fetched = await db.select().from(storyHighlights)
     .where(eq(storyHighlights.userId, myId))
-    .orderBy(asc(storyHighlights.position), desc(storyHighlights.createdAt));
+    .orderBy(asc(storyHighlights.position), desc(storyHighlights.createdAt), asc(storyHighlights.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  const rows = finishListPage(res, page, fetched);
   const items = await itemsByHighlight(rows.map((r) => r.id));
   res.json(rows.map((r) => highlightView(r, items.get(r.id) ?? [])));
 });

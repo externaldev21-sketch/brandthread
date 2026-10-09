@@ -54,6 +54,7 @@ vi.mock("@workspace/db", () => {
   return {
     db: {
       select: () => chainable(state.selectQueue.shift() ?? []),
+      selectDistinctOn: () => chainable(state.selectQueue.shift() ?? []),
     },
     products:              table("products"),
     productVariants:       table("productVariants"),
@@ -163,8 +164,9 @@ describe("search empty-state endpoints", () => {
   it("returns one representative-image category tile per top category", async () => {
     state.selectQueue = [
       [{ category: "apparel", count: 12 }, { category: "accessories", count: 4 }], // topCategories
-      [{ id: "product-1", images: ["apparel.jpg"], ownerId: "seller-1" }], // representative product for "apparel"
-      [], // no active/imaged product yet for "accessories"
+      // One DISTINCT ON query for every category's newest imaged product;
+      // "accessories" has no active/imaged product yet, so it has no row.
+      [{ category: "apparel", images: ["apparel.jpg"] }],
     ];
 
     const response = await fetch(`${base}/api/public/search/categories?limit=8`);

@@ -15,7 +15,7 @@ import { db, users, follows, followRequests, closeFriends, blocks, notifications
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
-import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { finishListPage, parseListPage, parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { actorFieldsFromProfile } from "../lib/activityEvents";
 import { profilesById } from "../lib/safety";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
@@ -133,7 +133,10 @@ router.post("/follow-requests/:userId/decline", rateLimit("follow"), (req, res) 
 // ─── Close friends ───────────────────────────────────────────────────────────
 router.get("/close-friends", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const rows = await db
+  // Opt-in ?limit=&offset=. PUT is a full replace built from this list, so
+  // the no-params cap must cover the whole list (CLOSE_FRIENDS_MAX).
+  const page = parseListPage(req.query, { defaultLimit: CLOSE_FRIENDS_MAX, maxLimit: CLOSE_FRIENDS_MAX });
+  const fetched = await db
     .select({ ...personColumns, addedAt: closeFriends.createdAt })
     .from(closeFriends)
     .innerJoin(users, eq(users.clerkId, closeFriends.friendId))
@@ -146,7 +149,10 @@ router.get("/close-friends", async (req, res) => {
            OR (b.blocker_id = ${closeFriends.friendId} AND b.blocked_id = ${myId})
       )`,
     ))
-    .orderBy(asc(closeFriends.createdAt));
+    .orderBy(asc(closeFriends.createdAt), asc(closeFriends.friendId))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  const rows = finishListPage(res, page, fetched);
   const friends = rows.map((r) => ({ ...personFields(r), addedAt: r.addedAt }));
   res.json({ friendIds: friends.map((f) => f.userId), friends });
 });
