@@ -9,7 +9,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { db, threadCashEntries, threadCashHeartbeats, threadCashStreaks } from "@workspace/db";
+import { db, threadCashDeviceClaims, threadCashEntries, threadCashHeartbeats, threadCashStreaks } from "@workspace/db";
 import {
   MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
   MIN_HEARTBEATS_FOR_DAILY_CLAIM,
@@ -28,6 +28,7 @@ afterEach(async () => {
     await db.delete(threadCashEntries).where(eq(threadCashEntries.buyerId, buyerId));
     await db.delete(threadCashStreaks).where(eq(threadCashStreaks.buyerId, buyerId));
     await db.delete(threadCashHeartbeats).where(eq(threadCashHeartbeats.buyerId, buyerId));
+    await db.delete(threadCashDeviceClaims).where(eq(threadCashDeviceClaims.buyerId, buyerId));
   }
 });
 
@@ -68,7 +69,7 @@ describe("awardDailyActiveTimeClaimOnce — abuse gates", () => {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
     await expect(awardDailyActiveTimeClaimOnce({
-      buyerId, localDate, earnedCents: 10, streakBonusCents: 0,
+      buyerId, deviceId: `device-${buyerId}`, localDate, earnedCents: 10, streakBonusCents: 0,
       activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM - 1,
     })).rejects.toBeInstanceOf(ThreadCashError);
     expect(await getBalanceCents(db, buyerId)).toBe(0);
@@ -81,7 +82,7 @@ describe("awardDailyActiveTimeClaimOnce — abuse gates", () => {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
     await expect(awardDailyActiveTimeClaimOnce({
-      buyerId, localDate, earnedCents: 10, streakBonusCents: 0,
+      buyerId, deviceId: `device-${buyerId}`, localDate, earnedCents: 10, streakBonusCents: 0,
       activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
     })).rejects.toBeInstanceOf(ThreadCashError);
     expect(await getBalanceCents(db, buyerId)).toBe(0);
@@ -94,7 +95,7 @@ describe("awardDailyActiveTimeClaimOnce — abuse gates", () => {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
     const { created } = await awardDailyActiveTimeClaimOnce({
-      buyerId, localDate, earnedCents: 10, streakBonusCents: 0,
+      buyerId, deviceId: `device-${buyerId}`, localDate, earnedCents: 10, streakBonusCents: 0,
       activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
     });
     expect(created).toBe(true);
@@ -111,7 +112,7 @@ describe("awardDailyActiveTimeClaimOnce — idempotency", () => {
     }
     const results = await Promise.all(
       Array.from({ length: 5 }, () => awardDailyActiveTimeClaimOnce({
-        buyerId, localDate, earnedCents: 10, streakBonusCents: 0,
+        buyerId, deviceId: `device-${buyerId}`, localDate, earnedCents: 10, streakBonusCents: 0,
         activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
       })),
     );
@@ -126,10 +127,10 @@ describe("awardDailyActiveTimeClaimOnce — idempotency", () => {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
     const first = await awardDailyActiveTimeClaimOnce({
-      buyerId, localDate, earnedCents: 10, streakBonusCents: 0, activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
+      buyerId, deviceId: `device-${buyerId}`, localDate, earnedCents: 10, streakBonusCents: 0, activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
     });
     const second = await awardDailyActiveTimeClaimOnce({
-      buyerId, localDate, earnedCents: 10, streakBonusCents: 0, activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
+      buyerId, deviceId: `device-${buyerId}`, localDate, earnedCents: 10, streakBonusCents: 0, activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
     });
     expect(first.created).toBe(true);
     expect(second.created).toBe(false);
@@ -148,6 +149,7 @@ describe("streak reset and week rollover through the active-time path", () => {
     const result = computeCheckIn(state, config, new Date(`${dateIso}T12:00:00Z`), "UTC");
     await awardDailyActiveTimeClaimOnce({
       buyerId,
+      deviceId: `device-${buyerId}`,
       localDate: result.state.lastCheckInDate!,
       earnedCents: result.earnedCents,
       streakBonusCents: result.streakBonusCents,
