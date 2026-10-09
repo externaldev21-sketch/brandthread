@@ -648,22 +648,8 @@ export default function ProfileScreen() {
         topLeft={accountSwitcher}
         topRight={(
           <ProfileTopBarIconRow>
-            <ProfileTopBarIcon name="bell"
-              onPress={() => nav('/seller-activity')}
-              accessibilityLabel={hasUnreadActivity ? 'Activity, new activity' : 'Activity'}
-              badge={hasUnreadActivity}
-              testID="seller-activity-bell"
-            />
-            <ProfileTopBarIcon
-              name="share-2"
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShareSheetVisible(true);
-              }}
-              accessibilityLabel="Share profile"
-              accessibilityHint="Opens a shareable profile card, QR code, and link"
-              testID="seller-share-profile-btn"
-            />
+            {/* Instagram business profile: two icons (⋯ and settings). Activity
+                and Share live in the ⋯ sheet; the Dashboard header keeps its bell. */}
             <ProfileTopBarIcon
               name="more-horizontal"
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMenuOpen(true); }}
@@ -765,6 +751,7 @@ export default function ProfileScreen() {
         title={brandTitle}
         onClose={() => setMenuOpen(false)}
         items={[
+          { key: 'activity', icon: 'bell', label: hasUnreadActivity ? 'Activity, new' : 'Activity', onPress: () => nav('/seller-activity') },
           caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: () => setShareSheetVisible(true) },
           caps.showViewAsVisitor && userId && {
             key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',

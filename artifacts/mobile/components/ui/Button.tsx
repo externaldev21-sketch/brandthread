@@ -21,12 +21,13 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight, hapticWarning } from '@/lib/haptics';
-import { COMP, FONT, RED } from '@/lib/theme';
+import { COMP, FILL_ELEVATED, FONT, RED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { splitButtonStyle } from '@/lib/buttonStyle';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
 /**
@@ -89,6 +90,8 @@ export function Button({
   const palette = useColors();
   const { scale, pressed, onPressIn, onPressOut } = usePressScale();
   const isDisabled = disabled || loading;
+  const { outerStyle, innerStyle } = splitButtonStyle(style);
+  const disabledFill = theme.id === 'monochrome' ? FILL_ELEVATED : palette.elevated;
   const height = size === 'compact' ? 36 : size === 'small' ? COMP.buttonHSm : COMP.buttonH;
   // Label size scales with the button size — it used to stay fixed at
   // TYPE_SCALE.headline (17px) for every size, which read oversized on a
@@ -109,10 +112,12 @@ export function Button({
 
   const variantStyle = ((): { bg: string; fg: string; border?: string } => {
     switch (variant) {
-      case 'primary': return { bg: isDisabled ? palette.elevated : theme.accent, fg: isDisabled ? palette.mutedForeground : theme.onAccent };
+      // Disabled fill: the one elevated grey (BRANDTHREAD_DESIGN.md addendum) on
+      // Monochrome, where cardElevated is pure black and the button vanished.
+      case 'primary': return { bg: isDisabled ? disabledFill : theme.accent, fg: isDisabled ? palette.mutedForeground : theme.onAccent };
       case 'secondary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : palette.foreground, border: isDisabled ? palette.border : palette.foreground };
       case 'tertiary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : theme.accentLight };
-      case 'destructive': return { bg: isDisabled ? palette.elevated : RED, fg: isDisabled ? palette.mutedForeground : palette.background };
+      case 'destructive': return { bg: isDisabled ? disabledFill : RED, fg: isDisabled ? palette.mutedForeground : palette.background };
     }
   })();
 
@@ -135,7 +140,7 @@ export function Button({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       testID={testID}
-      style={[fullWidth && styles.fullWidth]}
+      style={[fullWidth && styles.fullWidth, outerStyle]}
       android_ripple={{ color: isFilled ? '#00000026' : `${theme.accent}2E`, borderless: false }}
     >
       <Animated.View
@@ -146,7 +151,7 @@ export function Button({
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
           fullWidth && styles.fullWidth,
           isDisabled && !isFilled && { opacity: 0.5 },
-          style,
+          innerStyle,
         ]}
       >
         <View style={[StyleSheet.absoluteFill, { borderRadius: radius.md, overflow: 'hidden' }]} pointerEvents="none">

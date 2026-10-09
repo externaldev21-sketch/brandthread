@@ -827,7 +827,6 @@ export default function ProfileScreen() {
             theme={theme}
           />
         ) : null}
-        <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
         <ProfileTopBarIcon
           name="more-horizontal"
           onPress={() => { hapticLight(); setMenuOpen(true); }}
@@ -1003,6 +1002,8 @@ export default function ProfileScreen() {
         title={displayName}
         onClose={() => setMenuOpen(false)}
         items={[
+          // Instagram's own-profile header keeps two icons; Notifications lives here (the tab bar bell is Activity).
+          { key: 'notifications', icon: 'bell', label: 'Notifications', onPress: () => router.push('/buyer-notifications' as any) },
           caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShareProfile },
           caps.showViewAsVisitor && user?.id && {
             key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
