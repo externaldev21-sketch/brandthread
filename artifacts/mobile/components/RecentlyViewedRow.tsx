@@ -12,6 +12,7 @@ import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { formatCents } from '@/lib/money';
+import { prefetchProductOnPressIn } from '@/lib/productPrefetch';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 interface RecentlyViewedItem {
@@ -61,6 +62,7 @@ export function RecentlyViewedRow({ style }: { style?: object }) {
             activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel={`${item.name}, ${item.brand}${item.priceCents != null ? `, ${formatCents(item.priceCents)}` : ''}`}
+            onPressIn={() => prefetchProductOnPressIn(item.productId, item.image)}
             onPress={() => {
               router.push(`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}` as never);
             }}

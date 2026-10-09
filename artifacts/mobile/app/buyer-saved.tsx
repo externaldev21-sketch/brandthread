@@ -7,6 +7,7 @@ import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { prefetchProductOnPressIn } from '@/lib/productPrefetch';
 import {
   OVERLAY,
   FONT, ICON, SHADOW_SM,
@@ -48,8 +49,10 @@ const MAIN_TABS: { id: MainTab; label: string }[] = [
 /** Local press-feel wrapper matching Card's motion, extended with onLongPress
  * (used by the "post"/"store" save tiles, whose long-press is the only way to
  * remove them — Card itself doesn't expose onLongPress). */
-function TilePressable({ onPress, onLongPress, accessibilityLabel, children, style }: {
+function TilePressable({ onPress, onPressIn, onLongPress, accessibilityLabel, children, style }: {
   onPress: () => void;
+  /** Extra press-in work (e.g. prefetching the destination) on top of the scale. */
+  onPressIn?: () => void;
   onLongPress?: () => void;
   accessibilityLabel?: string;
   children: React.ReactNode;
@@ -62,7 +65,7 @@ function TilePressable({ onPress, onLongPress, accessibilityLabel, children, sty
       accessibilityLabel={accessibilityLabel}
       onPress={() => { hapticLight(); onPress(); }}
       onLongPress={onLongPress}
-      onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+      onPressIn={() => { pressScaleAnim(scale, PRESS_SCALE).start(); onPressIn?.(); }}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
     >
       <Animated.View style={[{ transform: [{ scale }] }, style]}>{children}</Animated.View>
@@ -234,6 +237,7 @@ export default function BuyerSaved() {
         style={styles.tile}
         accessibilityLabel={item.title}
         onPress={() => openItem(item)}
+        onPressIn={item.type === 'product' ? () => prefetchProductOnPressIn(item.targetId, item.image) : undefined}
         onLongPress={() => (isProduct ? setActionsFor(item) : removeSaved(item))}
       >
         <View style={styles.tileImageWrap}>

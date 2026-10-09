@@ -9,6 +9,7 @@ import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { warmSellerThreadOnPressIn } from '@/lib/conversationPrefetch';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -546,6 +547,7 @@ export default function SellerInboxScreen() {
           style={[s.row, { backgroundColor: theme.background }]}
           activeOpacity={0.7}
           onPress={() => openConversation(item.id)}
+          onPressIn={() => warmSellerThreadOnPressIn(item.id)}
           onLongPress={() => longPressConversation(item)}
           accessibilityRole="button"
           accessibilityLabel={`Open conversation with ${other.name || other.handle || 'buyer'}`}

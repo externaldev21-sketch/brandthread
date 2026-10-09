@@ -16,6 +16,7 @@ import { FONT, FS, GUTTER } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { hapticLight } from '@/lib/haptics';
+import { prefetchProductOnPressIn } from '@/lib/productPrefetch';
 import { formatTimeRemaining } from '@/lib/countdown';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -49,6 +50,7 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
         hapticLight();
         push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}&src=feed`) as never);
       }}
+      onPressIn={() => prefetchProductOnPressIn(item.productId, item.imageUri)}
       accessibilityRole="button"
       accessibilityLabel={`${item.name} by ${item.brand}${item.priceCents != null ? `, ${formatCents(item.priceCents)}` : ''}`}
       style={{ width: TILE_WIDTH }}

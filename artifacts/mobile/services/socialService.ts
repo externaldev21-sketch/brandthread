@@ -1334,6 +1334,12 @@ export async function getCachedMessages(conversationId: string, k: SocialKeys = 
   return Array.isArray(cached) ? cached : [];
 }
 
+/** Cached copy of one conversation from the last inbox/thread load (null if none). */
+export async function getCachedConversation(conversationId: string, k: SocialKeys = K()): Promise<Conversation | null> {
+  const conversations = await load<Conversation[]>(k.conversations, []);
+  return Array.isArray(conversations) ? conversations.find((c) => c?.id === conversationId) ?? null : null;
+}
+
 export async function retryMessage(conversationId: string, messageId: string): Promise<void> {
   const k = K();
   const msgKey = k.messages(conversationId);

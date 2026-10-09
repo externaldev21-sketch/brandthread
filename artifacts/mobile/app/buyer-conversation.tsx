@@ -26,7 +26,7 @@ import {
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
   markConversationRead, subscribeSocial,
   setConversationTheme, setConversationDisappearing,
-  sendQueuedMessage,
+  sendQueuedMessage, getCachedConversation, getCachedMessages,
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
 import {
@@ -35,6 +35,7 @@ import {
   type OutboxEntry,
 } from '@/lib/messageOutbox';
 import { useMessageOutbox } from '@/hooks/useMessageOutbox';
+import { peekWarmThread } from '@/lib/conversationPrefetch';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
@@ -292,9 +293,13 @@ export default function BuyerConversationScreen() {
   const myId = userId ?? MY_USER_ID;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
-  const [conv, setConv] = useState<Conversation | null>(null);
+  // Cache-first: the inbox row's press-in loaded this thread's last-known
+  // copy into memory (lib/conversationPrefetch.ts), so the first frame shows
+  // it instead of an empty thread; loadData below refreshes it.
+  const warmThread = params.id && !isPreviewConversationId(params.id) ? peekWarmThread(userId, params.id) : undefined;
+  const [conv, setConv] = useState<Conversation | null>(() => warmThread?.conversation ?? null);
   const callLog = useCallLog(conv?.id ?? params.id ?? '');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => warmThread?.messages ?? []);
   const [text, setText] = useState('');
   const { showUndo } = useUndoToast();
   const textInputRef = useRef<TextInput>(null);
@@ -478,6 +483,14 @@ export default function BuyerConversationScreen() {
       }
 
       if (params.id) {
+        // Nothing on screen yet (opened without an inbox press-in, e.g. from a
+        // notification): paint the on-device copy before the network answers.
+        const [cachedConv, cachedMsgs] = await Promise.all([
+          getCachedConversation(params.id).catch(() => null),
+          getCachedMessages(params.id).catch(() => [] as Message[]),
+        ]);
+        if (cachedConv) setConv((prev) => prev ?? cachedConv);
+        if (cachedMsgs.length > 0) setMessages((prev) => (prev.length > 0 ? prev : cachedMsgs));
         loadedConv = await getConversation(params.id);
         if (loadedConv) {
           unreadBeforeRead = loadedConv.unreadCount ?? 0;

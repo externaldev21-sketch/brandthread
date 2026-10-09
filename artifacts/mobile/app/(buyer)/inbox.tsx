@@ -15,6 +15,7 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth, useUser } from '@clerk/expo';
+import { warmThreadOnPressIn } from '@/lib/conversationPrefetch';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -1143,6 +1144,7 @@ export default function InboxScreen() {
           <PressableScale
             style={[s.convRow, { backgroundColor: theme.background }]}
             onPress={() => openConversation(conv)}
+            onPressIn={conv.isRequest ? undefined : () => warmThreadOnPressIn(userId, conv.id)}
             onLongPress={() => longPressConversation(conv)}
             activeOpacity={0.75}
             rippleEnabled={NO_RIPPLE}

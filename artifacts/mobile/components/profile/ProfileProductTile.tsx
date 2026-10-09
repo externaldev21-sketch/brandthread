@@ -14,6 +14,7 @@ import { SaveHeart } from '@/components/SaveHeart';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
+import { prefetchProductOnPressIn } from '@/lib/productPrefetch';
 import type { ShopProduct } from '@/services/profileService';
 import { InteractionLayer } from './ProfileControls';
 import { PROFILE_GRID_GAP } from './profileLayout';
@@ -30,12 +31,17 @@ export const ProfileProductTile = React.memo(function ProfileProductTile({
 }) {
   const { theme } = useAppTheme();
   const handlePress = useCallback(() => onPress(product), [onPress, product]);
+  // A visitor's tile opens the buyer product page: warm it on press-in.
+  const handlePressIn = useCallback(() => {
+    if (!owner) prefetchProductOnPressIn(product.id, product.imageUri);
+  }, [owner, product.id, product.imageUri]);
   const soldOut = !product.inStock;
   const price = product.priceCents > 0 ? formatCents(product.priceCents) : null;
   return (
     <View style={{ width, height, marginBottom: PROFILE_GRID_GAP }}>
       <PressableScale
         onPress={handlePress}
+        onPressIn={handlePressIn}
         activeScale={0.97}
         accessibilityRole="button"
         accessibilityLabel={`${owner ? 'Edit ' : ''}${product.name}${price ? `, ${price}` : ''}${soldOut ? ', sold out' : ''}`}
