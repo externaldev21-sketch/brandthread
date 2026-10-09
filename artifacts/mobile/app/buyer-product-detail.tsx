@@ -71,6 +71,7 @@ import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
 import { ProductSellerRow } from '@/components/products/ProductSellerRow';
 import { SizeSheet } from '@/components/products/SizeSheet';
+import { Icon } from '@/components/ui/Icon';
 import { primaryOption, sizeCells } from '@/lib/sizeSheet';
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import { productTransitionKey } from '@/lib/tileTransition';
@@ -1229,7 +1230,7 @@ export default function BuyerProductDetailScreen() {
           {/* The delivery guarantee (docs/payments/delivery-guarantee.md):
               not delivered in time → refunded automatically. */}
           <View style={s.promiseRow} testID="product-delivery-promise">
-            <Feather name="truck" size={ICON.sm} color={FG} />
+            <Icon name="truck" size={17} color={FG} />
             <Text style={s.promiseText}>{deliveryPromiseLine(!!product.isPreOrder)}</Text>
           </View>
 
@@ -1253,7 +1254,7 @@ export default function BuyerProductDetailScreen() {
                     <Text style={[s.sizeRowValue, !selections[option.id] && { color: MUTED }]}>
                       {option.values.find(v => v.id === selections[option.id])?.label ?? 'Select'}
                     </Text>
-                    <Feather name="chevron-right" size={16} color={MUTED} />
+                    <Icon name="chevron-right" size={17} color={MUTED} />
                   </Pressable>
                 ) : (
                 <OptionPicker
@@ -1549,7 +1550,6 @@ export default function BuyerProductDetailScreen() {
         {product.isPreOrder ? (
           <Button
             label={reserved ? 'Reserved' : 'Reserve (no charge)'}
-            icon={reserved ? 'check' : undefined}
             onPress={handleReserve}
             variant="secondary"
             loading={reserveLoading}
@@ -1573,7 +1573,6 @@ export default function BuyerProductDetailScreen() {
         {addedToCart ? (
           <Button
             label="In your bag"
-            icon="check"
             onPress={() => router.push('/(buyer)/cart' as never)}
             accessibilityLabel="In your bag. View bag"
             fullWidth

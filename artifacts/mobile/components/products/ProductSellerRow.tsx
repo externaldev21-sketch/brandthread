@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';
 import { Avatar } from '@/components/ui/Avatar';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
@@ -96,11 +96,10 @@ export function ProductSellerRow({
           <View style={styles.metaRow}>
             {ratingLabel ? (
               <>
-                <Feather name="star" size={12} color={theme.text} />
+                <Icon name="star" size={17} color={theme.text} />
                 <Text style={[styles.meta, { color: theme.text }]} testID="product-seller-rating">{ratingLabel}</Text>
               </>
             ) : null}
-            {ratingLabel && handle ? <Text style={[styles.meta, { color: theme.muted }]}>·</Text> : null}
             {handle ? <Text style={[styles.meta, { color: theme.muted }]} numberOfLines={1}>{handle}</Text> : null}
           </View>
         </View>
@@ -124,6 +123,6 @@ const styles = StyleSheet.create({
   identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 44 },
   copy: { flex: 1, minWidth: 0, gap: 2 },
   name: { fontFamily: FONT.semibold, fontSize: FS.base },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
   meta: { fontFamily: FONT.medium, fontSize: FS.xs, flexShrink: 1 },
 });
