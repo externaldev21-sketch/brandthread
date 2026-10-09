@@ -50,6 +50,7 @@ import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
 import { computeMetricChange } from '@/lib/sellerMetricChange';
 import { useCountUp } from '@/lib/useCountUp';
+import { optionalList } from '@/lib/optionalList';
 import {
   countOrderReturns,
   deriveHubStats,
@@ -387,10 +388,12 @@ export default function SellerHomeCommerceDashboard({
       const [ordersRaw, inventoryRaw, [quotes, samples, threads], productAnalytics, catalog] = await Promise.all([
         api.orders.list() as Promise<any[]>,
         api.inventory.list() as Promise<any[]>,
+        // Manufacturer hub tiles are optional: threads are Growth-only, and a
+        // 403 there must not blank the orders and inventory tiles (BT-398).
         Promise.all([
-          api.sellerHub.quoteRequests.list(),
-          api.manufacturers.sampleOrders.list(),
-          api.manufacturers.threads.list(),
+          optionalList(() => api.sellerHub.quoteRequests.list()),
+          optionalList(() => api.manufacturers.sampleOrders.list()),
+          optionalList(() => api.manufacturers.threads.list()),
         ]) as Promise<[any[], any[], any[]]>,
         api.analytics.products() as Promise<any[]>,
         api.products.list() as Promise<any[]>,
