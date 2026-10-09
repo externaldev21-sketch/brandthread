@@ -8,7 +8,8 @@ import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { manufacturerActivityEvents, manufacturers, sampleOrders } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireStripe } from "../lib/stripe";
 import { getWebOrigin } from "../lib/webOrigin";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
@@ -235,15 +236,25 @@ router.get("/payments", async (req, res) => {
     if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
     const mfr = await resolveManufacturer(userId);
     if (!mfr) { res.status(404).json({ error: "Manufacturer profile not found" }); return; }
-    const rows = await db.select({
+    // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+    // The payment/payout filter runs in SQL (it used to load every activity
+    // event and filter in memory) so the page limit applies to real rows.
+    const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
+    const fetched = await db.select({
       event: manufacturerActivityEvents,
       orderTitle: sampleOrders.title,
       orderType: sampleOrders.orderType,
     }).from(manufacturerActivityEvents)
       .leftJoin(sampleOrders, eq(manufacturerActivityEvents.sampleOrderId, sampleOrders.id))
-      .where(eq(manufacturerActivityEvents.manufacturerId, mfr.id))
-      .orderBy(desc(manufacturerActivityEvents.createdAt));
-    res.json(rows.filter(({ event }) => event.category === "payment" || event.category === "payout").map(({ event, ...rest }) => ({
+      .where(and(
+        eq(manufacturerActivityEvents.manufacturerId, mfr.id),
+        inArray(manufacturerActivityEvents.category, ["payment", "payout"]),
+      ))
+      .orderBy(desc(manufacturerActivityEvents.createdAt), desc(manufacturerActivityEvents.id))
+      .limit(page.limit + 1)
+      .offset(page.offset);
+    const rows = finishListPage(res, page, fetched);
+    res.json(rows.map(({ event, ...rest }) => ({
       ...event, ...rest, createdAt: event.createdAt.toISOString(),
     })));
   } catch (err) {

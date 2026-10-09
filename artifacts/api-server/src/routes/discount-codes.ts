@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db, discountCodes, discountCodeUses, liveStreams, products, shopifyImportCollections } from "@workspace/db";
 import { broadcastToRoom } from "../ws/liveHub";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireAuth } from "../middlewares/requireAuth";
 import { z } from "@workspace/api-zod";
 import { bodyObject, cents, dateLike, idParams, validateInput } from "../lib/commerceValidation";
@@ -124,11 +125,18 @@ function decorate(code: typeof discountCodes.$inferSelect) {
 router.get("/", async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
-    const codes = await db
+    // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+    // Newest first, so a cap can only ever hide the oldest codes (the query
+    // previously had no ORDER BY at all).
+    const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
+    const fetched = await db
       .select()
       .from(discountCodes)
-      .where(eq(discountCodes.sellerId, sellerId));
-    res.json(codes.map(decorate));
+      .where(eq(discountCodes.sellerId, sellerId))
+      .orderBy(desc(discountCodes.createdAt), desc(discountCodes.id))
+      .limit(page.limit + 1)
+      .offset(page.offset);
+    res.json(finishListPage(res, page, fetched).map(decorate));
   } catch (err) {
     req.log.error({ err }, "Failed to list discount codes");
     res.status(500).json({ error: "Internal server error" });

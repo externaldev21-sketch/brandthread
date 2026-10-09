@@ -645,41 +645,55 @@ export async function getForYouFeed(userId: string): Promise<ForYouResultItem[]>
   return results;
 }
 
+export type ProfileEvent = {
+  type: string;
+  value?: string | null;
+  styleTags?: string[];
+  category?: string | null;
+  sellerId?: string | null;
+};
+
 /** Applies one ingested behavioral event to the buyer's taste profile. */
-export async function applyEventToProfile(
-  userId: string,
-  event: { type: string; value?: string | null; styleTags?: string[]; category?: string | null; sellerId?: string | null },
-): Promise<void> {
+export async function applyEventToProfile(userId: string, event: ProfileEvent): Promise<void> {
+  await applyEventsToProfile(userId, [event]);
+}
+
+/**
+ * Applies a batch of ingested events to the buyer's taste profile with ONE
+ * read and ONE upsert. The result is identical to calling
+ * applyEventToProfile once per event in order: the same per-event weight,
+ * decay and affinity updates are folded in sequence, zero-weight events are
+ * skipped, and event_count grows by the number of applied events.
+ */
+export async function applyEventsToProfile(userId: string, events: ProfileEvent[]): Promise<void> {
+  if (events.length === 0) return;
   const cfg = await getRankingConfig();
-  const weight = eventWeight(event.type, event.value, cfg.eventWeights);
-  if (weight === 0) return;
+  const weighted = events
+    .map((event) => ({ event, weight: eventWeight(event.type, event.value, cfg.eventWeights) }))
+    .filter(({ weight }) => weight !== 0);
+  if (weighted.length === 0) return;
 
   const [existing] = await db.select().from(buyerTasteProfiles).where(eq(buyerTasteProfiles.userId, userId)).limit(1);
-  const current = existing ?? {
-    userId, categoryAffinity: {}, styleTagAffinity: {}, sellerAffinity: {}, eventCount: 0,
-  };
+  let styleTagAffinity = ((existing?.styleTagAffinity as AffinityMap) ?? {});
+  let categoryAffinity = ((existing?.categoryAffinity as AffinityMap) ?? {});
+  let sellerAffinity = ((existing?.sellerAffinity as AffinityMap) ?? {});
 
-  const styleTagAffinity = updateAffinityForKeys(
-    (current.styleTagAffinity as AffinityMap) ?? {},
-    event.styleTags ?? [],
-    weight,
-  );
-  const categoryAffinity = event.category
-    ? updateAffinity((current.categoryAffinity as AffinityMap) ?? {}, event.category, weight)
-    : ((current.categoryAffinity as AffinityMap) ?? {});
-  const sellerAffinity = event.sellerId
-    ? updateAffinity((current.sellerAffinity as AffinityMap) ?? {}, event.sellerId, weight * 0.5)
-    : ((current.sellerAffinity as AffinityMap) ?? {});
+  for (const { event, weight } of weighted) {
+    styleTagAffinity = updateAffinityForKeys(styleTagAffinity, event.styleTags ?? [], weight);
+    if (event.category) categoryAffinity = updateAffinity(categoryAffinity, event.category, weight);
+    if (event.sellerId) sellerAffinity = updateAffinity(sellerAffinity, event.sellerId, weight * 0.5);
+  }
 
+  const applied = weighted.length;
   await db.insert(buyerTasteProfiles).values({
-    userId, categoryAffinity, styleTagAffinity, sellerAffinity, eventCount: 1,
+    userId, categoryAffinity, styleTagAffinity, sellerAffinity, eventCount: applied,
   }).onConflictDoUpdate({
     target: buyerTasteProfiles.userId,
     set: {
       categoryAffinity,
       styleTagAffinity,
       sellerAffinity,
-      eventCount: sql`${buyerTasteProfiles.eventCount} + 1`,
+      eventCount: sql`${buyerTasteProfiles.eventCount} + ${applied}`,
       updatedAt: sql`now()`,
     },
   });

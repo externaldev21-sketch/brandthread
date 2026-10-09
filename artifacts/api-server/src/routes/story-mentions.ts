@@ -17,6 +17,7 @@ import {
   conversations, conversationParticipants, messages,
 } from "@workspace/db";
 import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql, notInArray } from "drizzle-orm";
+import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireAuth } from "../middlewares/requireAuth";
 import { moderateMessage } from "../lib/contentModerator";
 import { publishNotification } from "./notifications-feed";
@@ -136,7 +137,10 @@ router.get("/mention-search", async (req, res) => {
 // ─── Activity rail ────────────────────────────────────────────────────────────
 router.get("/stories/mentions", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const rows = await db
+  // Opt-in ?limit=&offset= over the raw (pre-visibility-filter) mention rows;
+  // no params = same { items, unseenCount } shape, capped generously.
+  const page = parseListPage(req.query, { defaultLimit: 200, maxLimit: 200 });
+  const fetched = await db
     .select({ story: stories, mention: storyMentions })
     .from(storyMentions)
     .innerJoin(stories, eq(stories.id, storyMentions.storyId))
@@ -146,7 +150,10 @@ router.get("/stories/mentions", async (req, res) => {
       gt(stories.expiresAt, new Date()),
       storyListedFor(myId),
     ))
-    .orderBy(desc(stories.createdAt));
+    .orderBy(desc(stories.createdAt), desc(storyMentions.storyId))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  const rows = finishListPage(res, page, fetched);
 
   const blocked = await blockedUserIds(myId);
   // A Close Friends story is only for the author's list: a tag alone does not open it.

@@ -52,3 +52,47 @@ export function paginationMetadata(
       : pagination.offset + returned < total,
   };
 }
+/**
+ * Opt-in pagination for legacy list endpoints that historically returned every
+ * row. Callers that send no params (the shipped mobile app) keep getting the
+ * same response shape with a generous default cap, and can page with
+ * ?limit=&offset=. Unlike parsePagination this never rejects a request: a
+ * garbage value falls back to the default, an oversized limit is clamped, so
+ * no existing client can start getting 400s.
+ */
+export type ListPageOptions = { defaultLimit?: number; maxLimit?: number };
+
+export const DEFAULT_LIST_LIMIT = 100;
+export const MAX_LIST_LIMIT = 200;
+
+function firstQueryValue(value: unknown): unknown {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export function parseListPage(query: unknown, options: ListPageOptions = {}): Pagination {
+  const maxLimit = options.maxLimit ?? MAX_LIST_LIMIT;
+  const defaultLimit = Math.min(options.defaultLimit ?? DEFAULT_LIST_LIMIT, maxLimit);
+  const q = (typeof query === "object" && query !== null ? query : {}) as Record<string, unknown>;
+  const rawLimit = Number(firstQueryValue(q.limit));
+  const rawOffset = Number(firstQueryValue(q.offset));
+  const limit = q.limit !== undefined && q.limit !== "" && Number.isFinite(rawLimit) && rawLimit >= 1
+    ? Math.min(Math.floor(rawLimit), maxLimit)
+    : defaultLimit;
+  const offset = q.offset !== undefined && q.offset !== "" && Number.isFinite(rawOffset) && rawOffset >= 0
+    ? Math.floor(rawOffset)
+    : 0;
+  return { limit, offset };
+}
+
+/**
+ * Finishes a page that was fetched with `.limit(page.limit + 1)`: drops the
+ * probe row, sets the X-Pagination-* headers (plus X-Pagination-Has-More) and
+ * returns the rows to send.
+ */
+export function finishListPage<T>(res: Response, page: Pagination, rows: T[]): T[] {
+  const hasMore = rows.length > page.limit;
+  const items = hasMore ? rows.slice(0, page.limit) : rows;
+  setPaginationHeaders(res, page, items.length);
+  res.setHeader("X-Pagination-Has-More", hasMore ? "true" : "false");
+  return items;
+}

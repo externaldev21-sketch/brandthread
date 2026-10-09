@@ -39,7 +39,7 @@ import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } fro
 import { storyListedFor } from "../lib/storyVisibility";
 import { authorsHidingStoriesFrom, storyHiddenFrom } from "../lib/interactionSettings";
 import { sanitizeStoryMentions, recordStoryMentions, withOriginalInfo } from "../lib/storyMentions";
-import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { finishListPage, parseListPage, parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { viewerPostStates } from "../lib/viewerPostState";
 import { followingSortDirection } from "../lib/followingSort";
@@ -1685,22 +1685,25 @@ router.get("/notes/following", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const now  = new Date();
 
-  const followingRows = await db.select({ followingId: follows.followingId })
-    .from(follows).where(eq(follows.followerId, myId));
-  const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId)]));
-
-  const rows = await db.select().from(notes)
-    .where(and(inArray(notes.authorId, authorIds), gt(notes.expiresAt, now)));
-  if (!rows.length) { res.json([]); return; }
-
-  const blockedIds = new Set(
-    (await db.select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId }).from(blocks)
-      .where(or(eq(blocks.blockerId, myId), eq(blocks.blockedId, myId))))
-      .flatMap((b) => [b.blockerId === myId ? b.blockedId : b.blockerId]),
-  );
-
-  const visibleRows = rows.filter((r) => r.authorId === myId || !blockedIds.has(r.authorId));
-  res.json(visibleRows.map(buildNoteView));
+  // Opt-in ?limit=&offset=; no params = same bare array, capped generously.
+  // Follow graph + block filter run in SQL (instead of materialising every
+  // followed id into an IN list); my own note always sorts first.
+  const page = parseListPage(req.query, { defaultLimit: 200, maxLimit: 200 });
+  const fetched = await db.select().from(notes)
+    .where(and(
+      gt(notes.expiresAt, now),
+      or(
+        eq(notes.authorId, myId),
+        and(
+          inArray(notes.authorId, db.select({ id: follows.followingId }).from(follows).where(eq(follows.followerId, myId))),
+          sql`NOT EXISTS (SELECT 1 FROM ${blocks} WHERE (${blocks.blockerId} = ${myId} AND ${blocks.blockedId} = ${notes.authorId}) OR (${blocks.blockedId} = ${myId} AND ${blocks.blockerId} = ${notes.authorId}))`,
+        ),
+      ),
+    ))
+    .orderBy(sql`(${notes.authorId} = ${myId}) DESC`, desc(notes.createdAt), desc(notes.id))
+    .limit(page.limit + 1)
+    .offset(page.offset);
+  res.json(finishListPage(res, page, fetched).map(buildNoteView));
 });
 
 // ─── Block CRUD ───────────────────────────────────────────────────────────────
