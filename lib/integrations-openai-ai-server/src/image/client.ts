@@ -2,6 +2,7 @@ import fs from "node:fs";
 import OpenAI, { toFile } from "openai";
 import { Buffer } from "node:buffer";
 import path from "node:path";
+import { withImageModelFallback } from "./model";
 
 if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
   throw new Error(
@@ -51,17 +52,24 @@ async function detectImageMime(file: string): Promise<{ mime: "image/png" | "ima
   }
 }
 
+function logImageModelFallback(from: string, to: string): void {
+  // A retired primary model is an operational alert, not a user error.
+  console.warn(`[openai-image] model ${from} unavailable, falling back to ${to}`);
+}
+
 export async function generateImageBuffer(
   prompt: string,
   size: "1024x1024" | "512x512" | "256x256" = "1024x1024",
   options?: ImageGenerationOptions,
 ): Promise<Buffer> {
-  const response = await openai.images.generate({
-    model: "gpt-image-1",
+  // Model from OPENAI_IMAGE_MODEL, falling back down OPENAI_IMAGE_MODEL_FALLBACKS
+  // when the provider reports it unknown or retired (see ./model.ts).
+  const response = await withImageModelFallback((model) => openai.images.generate({
+    model,
     prompt,
     size,
     quality: options?.quality ?? "high",
-  });
+  }), { onFallback: logImageModelFallback });
   const base64 = response.data?.[0]?.b64_json ?? "";
   return Buffer.from(base64, "base64");
 }
@@ -84,13 +92,13 @@ export async function editImages(
     })
   );
 
-  const response = await openai.images.edit({
-    model: "gpt-image-1",
+  const response = await withImageModelFallback((model) => openai.images.edit({
+    model,
     image: images,
     prompt,
     quality: options?.quality ?? "high",
     ...(options?.background ? { background: options.background } : {}),
-  });
+  }), { onFallback: logImageModelFallback });
 
   const imageBase64 = response.data?.[0]?.b64_json ?? "";
   const imageBytes = Buffer.from(imageBase64, "base64");

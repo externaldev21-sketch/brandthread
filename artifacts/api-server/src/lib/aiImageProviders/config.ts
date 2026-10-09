@@ -12,6 +12,7 @@
  * (openai / single-stage) so importing this module changes nothing until a
  * route explicitly opts in after a real benchmark picks a winner.
  */
+import { getImageModelChain } from "@workspace/integrations-openai-ai-server/image-model";
 import type { PipelineId, ProviderId } from "./types";
 
 export type AiTool = "mockup-to-model" | "ai-photoshoot";
@@ -69,12 +70,11 @@ export function getToolProviderConfig(tool: AiTool): ToolProviderConfig {
   return { pipeline, provider, sceneProvider };
 }
 
-/** The OpenAI image-edit model to use going forward. gpt-image-1 is retired Oct 23, 2026;
- *  OpenAI's own successor line is gpt-image-2.5 (two variants: "flare" = faster, "sunburst" =
- *  more detailed). Configurable so this doesn't need another code change if OpenAI renames
- *  the line again before we cut over the real production route. */
+/** The OpenAI image model every image call uses. gpt-image-1 shuts down Oct 23, 2026; the
+ *  shared client (lib/integrations-openai-ai-server/src/image) reads OPENAI_IMAGE_MODEL and
+ *  falls back down OPENAI_IMAGE_MODEL_FALLBACKS, so this returns the same primary model. */
 export function getOpenAiImageModel(): string {
-  return process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare";
+  return getImageModelChain()[0]!;
 }
 
 export function getFashnApiKey(): string | undefined {
