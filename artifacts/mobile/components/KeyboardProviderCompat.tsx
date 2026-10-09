@@ -13,6 +13,7 @@ type KeyboardControllerModule = {
   KeyboardProvider?: React.ComponentType<any>;
   KeyboardAvoidingView?: React.ComponentType<any>;
   KeyboardGestureArea?: React.ComponentType<any>;
+  KeyboardAwareScrollView?: React.ComponentType<any>;
   useReanimatedKeyboardAnimation?: () => { progress: { value: number } };
 };
 
@@ -43,6 +44,14 @@ export function KeyboardProvider({ children, ...props }: React.PropsWithChildren
 
 export const KeyboardAvoidingView: React.ComponentType<KeyboardAvoidingViewProps> =
   keyboardController?.KeyboardAvoidingView ?? RNKeyboardAvoidingView;
+
+/**
+ * keyboard-controller's scroll view that scrolls the focused input above the
+ * keyboard, or null when the native module isn't registered (Expo Go without
+ * it) or on web, where the browser already does this.
+ */
+export const NativeKeyboardAwareScrollView: React.ComponentType<any> | null =
+  Platform.OS === 'web' ? null : keyboardController?.KeyboardAwareScrollView ?? null;
 
 export function KeyboardGestureArea({
   children,

@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Header } from '@/components/layout';
-import { SkeletonBlock, SkeletonLine } from '@/components/ui';
+import { EmptyState, SkeletonBlock, SkeletonLine, ThemedRefreshControl } from '@/components/ui';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -197,9 +197,12 @@ export default function FollowingScreen() {
 
   const [drops, setDrops] = useState<DropItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  const loadDrops = useCallback(() => {
-    setLoading(true);
+  const loadDrops = useCallback((mode: 'initial' | 'refresh' = 'initial') => {
+    if (mode === 'refresh') setRefreshing(true);
+    else setLoading(true);
     api.publicDrops.list()
       .then((raw: any) => {
         const list: any[] = Array.isArray(raw) ? raw : raw?.drops ?? [];
@@ -225,16 +228,20 @@ export default function FollowingScreen() {
           };
         });
         setDrops(mapped);
+        setLoadError(false);
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      // Keep whatever was already loaded; an error is never shown as empty.
+      .catch(() => setLoadError(true))
+      .finally(() => { setLoading(false); setRefreshing(false); });
   }, [api]);
+  const refresh = useCallback(() => loadDrops('refresh'), [loadDrops]);
 
   useEffect(() => { loadDrops(); }, [loadDrops]);
 
   const liveCount = drops.filter(d => !d.releaseAt || new Date(d.releaseAt).getTime() <= Date.now()).length;
   const upcomingCount = drops.filter(d => d.releaseAt && new Date(d.releaseAt).getTime() > Date.now()).length;
   const subtitle = loading ? 'Loading drops…'
+    : drops.length === 0 && loadError ? ''
     : drops.length === 0 ? 'No drops yet'
     : upcomingCount > 0 ? `${upcomingCount} upcoming, ${liveCount} live`
     : `${liveCount} active drop${liveCount === 1 ? '' : 's'}`;
@@ -293,13 +300,20 @@ export default function FollowingScreen() {
           <DropCardSkeleton />
         </View>
       ) : drops.length === 0 ? (
-        <View style={s.centeredWrap}>
-          <Feather name="heart" size={36} color={palette.mutedForeground} style={{ marginBottom: SPACING.sm }} />
-          <Text style={[TYPE_SCALE.headline, s.emptyTitle, { color: palette.foreground }]}>No drops yet</Text>
-          <Text style={[TYPE_SCALE.body, s.emptyBody, { color: palette.mutedForeground }]}>
-            Follow sellers to see their latest drops here.{'\n'}New drops from sellers you follow will appear when they go live.
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={[s.centeredWrap, { paddingBottom: Math.max(120, barInset + SPACING.md) }]}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />}
+        >
+          {loadError ? (
+            <EmptyState title="Couldn't load drops." action={{ label: 'Retry', onPress: () => loadDrops() }} testID="following-error" />
+          ) : (
+            <EmptyState
+              title="Drops from brands you follow show up here."
+              action={{ label: 'Discover brands', onPress: () => router.navigate('/(buyer)/discover' as never) }}
+              testID="following-empty"
+            />
+          )}
+        </ScrollView>
       ) : (
         <FlatList
           ref={scrollResetRef}
@@ -307,6 +321,7 @@ export default function FollowingScreen() {
           keyExtractor={d => d.id}
           contentContainerStyle={{ padding: SPACING.md, paddingBottom: Math.max(120, barInset + SPACING.md) }}
           showsVerticalScrollIndicator={false}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />}
           renderItem={({ item }) => (
             <DropCard
               drop={item}
@@ -339,9 +354,7 @@ const s = StyleSheet.create({
   avatarLabel:   { textAlign: 'center' },
 
   loadingWrap:  { flex: 1, padding: SPACING.md, gap: SPACING.md },
-  centeredWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xxl },
+  centeredWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xxl },
 
   // Empty state
-  emptyTitle: { marginBottom: SPACING.xs, textAlign: 'center' },
-  emptyBody:  { textAlign: 'center', lineHeight: 20 },
 });
