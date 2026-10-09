@@ -30,6 +30,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { acceptUploadSession } from "../lib/uploadSessions";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
 
 const router = Router();
@@ -283,7 +284,15 @@ router.delete("/:id", requirePermission("marketing"), async (req, res) => {
 
 // ─── POST /api/ad-campaigns/:id/media — upload one file ───────────────────────
 
-router.post("/:id/media", requirePermission("marketing"), async (req, res) => {
+// Direct bodies are capped at the photo limit; larger files (videos) arrive as
+// a completed resumable upload session (X-Upload-Id, lib/uploadSessions.ts).
+const AD_MEDIA_TYPES = [...ALLOWED_IMAGE_MIMES, ...ALLOWED_VIDEO_MIMES];
+router.post(
+  "/:id/media",
+  requirePermission("marketing"),
+  acceptUploadSession({ allowedTypes: AD_MEDIA_TYPES, maxBytes: MAX_VIDEO_BYTES }),
+  express.raw({ type: AD_MEDIA_TYPES, limit: MAX_IMAGE_BYTES }),
+  async (req, res) => {
   const owner = sellerId(req);
   const campaign = await findOwnedCampaign(req.params.id, owner);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });

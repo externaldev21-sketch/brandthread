@@ -28,6 +28,7 @@ import {
 } from "../lib/slideValidation";
 import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MAX_SLIDES_BY_SURFACE, isPostSurface } from "../lib/postLimits";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const router = Router();
 const storage = new ObjectStorageService();
@@ -151,6 +152,7 @@ function buildImageDrawtext(
 router.post(
   "/photo-slides",
   requireAuth,
+  acceptUploadSession({ allowedTypes: [...IMAGE_TYPES], maxBytes: MAX_SLIDE_BYTES }),
   express.raw({ type: [...IMAGE_TYPES], limit: MAX_SLIDE_BYTES }),
   async (req, res) => {
     const clerkId = (req as any).clerkUserId as string;

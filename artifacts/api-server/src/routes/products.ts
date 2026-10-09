@@ -14,6 +14,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -72,6 +73,7 @@ async function hasProductCapacity(tx: any, ownerId: string, limit: number | null
 router.post(
   "/images",
   requireRole("manager"),
+  acceptUploadSession({ allowedTypes: ["image/*"], maxBytes: MAX_PRODUCT_IMAGE_BYTES }),
   express.raw({ type: "image/*", limit: MAX_PRODUCT_IMAGE_BYTES }),
   async (req, res): Promise<void> => {
     const ownerId = (req as any).clerkUserId as string;

@@ -23,6 +23,7 @@ import {
 } from "../lib/disputes/evidence";
 import { processEvidenceUpload, type UploadDeps } from "../lib/disputes/upload";
 import { buildTimelineSteps, sortTimelineEvents } from "../lib/disputes/timeline";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const router = Router();
 router.use(requireAuth);
@@ -387,6 +388,7 @@ function uploadDeps(log: any): UploadDeps {
 router.post(
   "/:id/evidence/upload",
   rateLimit("asset-upload"),
+  acceptUploadSession({ allowedTypes: [...EVIDENCE_FILE_MIME_TYPES], maxBytes: MAX_EVIDENCE_FILE_BYTES }),
   express.raw({ type: [...EVIDENCE_FILE_MIME_TYPES], limit: MAX_EVIDENCE_FILE_BYTES }),
   async (req, res) => {
     const sellerId = getSellerId(req);

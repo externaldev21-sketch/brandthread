@@ -12,6 +12,7 @@ import { publishNotification } from "./notifications-feed";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { notifySellerReturnRequested } from "../lib/orderNotifications";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -51,6 +52,7 @@ async function signEvidence<T extends { evidenceUrls: unknown }>(row: T): Promis
 
 router.post(
   "/evidence",
+  acceptUploadSession({ allowedTypes: ["image/*"], maxBytes: MAX_EVIDENCE_BYTES }),
   express.raw({ type: "image/*", limit: MAX_EVIDENCE_BYTES }),
   async (req, res): Promise<void> => {
     const buyerId = (req as any).clerkUserId as string;

@@ -44,6 +44,7 @@ import {
   parseTrim,
   type TrimRequest,
 } from "../lib/profileCover";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
 
@@ -150,6 +151,7 @@ export function createProfileCoverRouter({
   router.post(
     "/cover-video",
     requireAuth,
+    acceptUploadSession({ allowedTypes: [...VIDEO_TYPES], maxBytes: COVER_MAX_UPLOAD_BYTES }),
     express.raw({ type: [...VIDEO_TYPES], limit: COVER_MAX_UPLOAD_BYTES }),
     async (req, res) => {
       const clerkId = (req as any).clerkUserId as string;
