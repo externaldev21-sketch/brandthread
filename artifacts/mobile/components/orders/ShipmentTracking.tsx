@@ -25,6 +25,7 @@ import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { formatDate } from '@/lib/format';
 import type { OrderStatus, TrackingStatus } from '@/services/orderTypes';
 
 export interface ShipmentInfo {
@@ -81,7 +82,7 @@ export function trackingHeadline(info: ShipmentInfo, now: Date = new Date()): { 
     const subtitle = ts === 'label_created' ? withCarrier('Label created, waiting for pickup') : withCarrier('In transit');
     if (!eta) return { title: 'On its way', subtitle };
     const diffDays = Math.round((eta.getTime() - today.getTime()) / 86_400_000);
-    const day = eta.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const day = formatDate(eta, { weekday: 'short', month: 'short', day: 'numeric' });
     if (diffDays === 0) return { title: 'Arriving today', subtitle };
     if (diffDays === 1) return { title: 'Arriving tomorrow', subtitle };
     if (diffDays < 0) return { title: `Expected ${day}`, subtitle };

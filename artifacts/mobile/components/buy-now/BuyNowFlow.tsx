@@ -41,6 +41,7 @@ import {
 import type { BuyerProduct, BuyerProductVariant } from '@/services/cartTypes';
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
 import { OrderSuccessSheet, type OrderSuccessData } from '@/components/buy-now/OrderSuccessSheet';
+import { track } from '@/lib/analytics';
 
 type FlowPhase = 'loading' | 'error' | 'variant' | 'review' | 'paying' | 'success';
 
@@ -166,6 +167,7 @@ export function BuyNowFlow({
         return;
       }
 
+      track('checkout_completed', { flow: 'buy_now', item_count: 1 });
       const addressLine = [defaultAddress.city, defaultAddress.state].filter(Boolean).join(', ');
       const fullAddress = [
         defaultAddress.street ?? defaultAddress.line1,

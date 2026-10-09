@@ -26,7 +26,7 @@ import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RET
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { getInitials } from '@/lib/format';
+import { formatDate, getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
 import { getGeneratedSellerOrder, isGeneratedSellerOrderId } from '@/lib/previewSellerOrders';
 import { useQueryClient } from '@tanstack/react-query';
@@ -347,13 +347,13 @@ const TABS: { key: Tab; label: string }[] = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmt(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatDate(iso, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 function fmtShort(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDate(iso, { month: 'short', day: 'numeric' });
 }
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return formatDate(iso, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 function usd(cents: number) {
   return formatCents(cents);

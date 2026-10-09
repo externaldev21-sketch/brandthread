@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { useApi } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -427,6 +428,7 @@ function BuyerLiveNativeScreen() {
         setCheckoutError(verification?.declineReason ?? 'Payment is still pending. Please check your orders shortly.');
         return;
       }
+      track('checkout_completed', { flow: 'live', item_count: 1 });
       hapticSuccessAction();
       setOrderSnackbar(verification.orderNumber
         ? `Order ${verification.orderNumber} confirmed`

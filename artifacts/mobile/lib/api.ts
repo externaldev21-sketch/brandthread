@@ -21,6 +21,7 @@ import {
 } from '@/lib/networkNotice';
 import { reportServerError } from '@/lib/monitoringHooks';
 import { trackAfter } from '@/lib/analytics/trackAfter';
+import { observeSellerOrderRows, trackFirstProductAfter } from '@/lib/analytics/firstEvents';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import type { FinanceSummary } from '@/lib/financeSummary';
@@ -1290,7 +1291,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       publicList:     (ownerId?: string)       =>
         get<any[]>(`/api/public/products${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get:            (id: string)             => get(`/api/products/${id}`),
-      create:         (body: unknown)          => trackAfter(post('/api/products', body), [['product_published']]),
+      create:         (body: unknown)          => trackFirstProductAfter(trackAfter(post('/api/products', body), [['product_published']])),
       update:         (id: string, body: unknown) => put(`/api/products/${id}`, body),
       archive:        (id: string)             => del(`/api/products/${id}`),
       restore:        (id: string)             => post(`/api/products/${id}/restore`, {}),
@@ -1330,7 +1331,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{ caseReference: string; status: string }>(`/api/ip-cases/${encodeURIComponent(caseReference)}/status?token=${encodeURIComponent(token)}`),
     },
     orders: {
-      list:           ()                       => quietGet('/api/orders'),
+      list:           ()                       => quietGet('/api/orders').then(observeSellerOrderRows(getStoreContext())),
       /** Item 144 (seller chat buyer context panel): this buyer's order
        * history with the current seller — server scopes it to the caller's
        * own orders (see api-server's GET /api/orders `buyerId` filter), so
@@ -1886,12 +1887,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             };
             clientIdempotencyKey?: string;
           },
-        ) => post<{ sessionId: string; url: string; guestAccessToken: string }>('/api/guest/checkout/session', {
+        ) => trackAfter(post<{ sessionId: string; url: string; guestAccessToken: string }>('/api/guest/checkout/session', {
           items,
           successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',
           cancelUrl:  'mobile://checkout/cancel',
           ...opts,
-        }),
+        }), [['checkout_started', { flow: 'guest', item_count: items.length }]]),
         verifySession: (sessionId: string, guestAccessToken: string) =>
           post<{
             status: string;

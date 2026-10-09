@@ -5,8 +5,10 @@ import type * as SentryModule from '@sentry/react-native';
 import { isExpoGo } from '@/lib/expoGoRuntime';
 import { registerServerErrorReporter } from '@/lib/monitoringHooks';
 import {
+  monitoringUserFor,
   resolveDsn,
   resolveEnvironment,
+  resolveLinkUser,
   resolveTracesSampleRate,
   normalizeApiPath,
   scrubBreadcrumb,
@@ -135,6 +137,23 @@ export function setMonitoringRole(role: string | null | undefined): void {
     const Sentry = getSentry();
     if (!Sentry) return;
     Sentry.setTag('account_role', role === 'buyer' || role === 'seller' ? role : 'signed_out');
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Links crash reports to the signed-in account by its opaque id ONLY when the
+ * build opts in with EXPO_PUBLIC_SENTRY_LINK_USER=1 (default off; see
+ * resolveLinkUser). Otherwise reports stay role-tagged only and any user is
+ * cleared. Pass null on sign-out.
+ */
+export function setMonitoringUser(userId: string | null | undefined): void {
+  if (!initialized) return;
+  try {
+    const Sentry = getSentry();
+    if (!Sentry) return;
+    Sentry.setUser(monitoringUserFor(userId, resolveLinkUser(process.env.EXPO_PUBLIC_SENTRY_LINK_USER)));
   } catch {
     // ignore
   }

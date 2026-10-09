@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
+import { useSegments } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useCanUseAnalytics } from '@/contexts/CookieConsentContext';
 import { useRole } from '@/contexts/RoleContext';
@@ -7,12 +8,16 @@ import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { analyticsAllowed } from '@/lib/analytics/gate';
 import { identifyAnalyticsUser, isAnalyticsEnabled, setAnalyticsConsent, setAnalyticsPlatform, setAnalyticsSuppressed, track } from '@/lib/analytics';
-import { setMonitoringRole } from '@/lib/monitoring';
+import { addMonitoringBreadcrumb, isMonitoringEnabled, setMonitoringRole, setMonitoringUser } from '@/lib/monitoring';
+import { routeBreadcrumbPath } from '@/lib/monitoringConfig';
 
 /**
  * Renders nothing. Keeps analytics in step with consent, the signed-in
  * account (opaque id only) and preview sessions, fires `app_opened` once per
- * launch, and tags crash reports with the account role (no id, name or email).
+ * launch, and tags crash reports with the account role (no name or email; the
+ * opaque account id only when EXPO_PUBLIC_SENTRY_LINK_USER=1). Also leaves a
+ * crash-report breadcrumb for each route change (route pattern only, e.g.
+ * "/(tabs)/profile/[username]", never the id or username itself).
  * Mounted once inside RootLayoutNav.
  */
 export default function AnalyticsBridge() {
@@ -43,6 +48,16 @@ export default function AnalyticsBridge() {
   useEffect(() => {
     setMonitoringRole(isSignedIn ? role : null);
   }, [isSignedIn, role]);
+
+  useEffect(() => {
+    setMonitoringUser(isSignedIn && userId ? userId : null);
+  }, [isSignedIn, userId]);
+
+  const segments = useSegments();
+  const route = routeBreadcrumbPath(segments);
+  useEffect(() => {
+    if (isMonitoringEnabled()) addMonitoringBreadcrumb('navigation', `Route ${route}`, { to: route });
+  }, [route]);
 
   return null;
 }
