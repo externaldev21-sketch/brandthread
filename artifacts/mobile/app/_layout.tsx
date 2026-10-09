@@ -106,6 +106,7 @@ import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
+import { emitThreadCashChanged, isThreadCashNotification } from '@/lib/threadCashEvents';
 
 // Generated API hooks share this guard with the app-local API clients so
 // signed-out seller preview never reaches the backend through an alternate
@@ -1267,6 +1268,9 @@ function RootLayoutNav() {
             data,
           });
         }
+
+        // Thread Cash sent to me: every balance on screen refetches now.
+        if (isThreadCashNotification(data)) emitThreadCashChanged();
 
         // Refresh the in-app feed so the unread badge count picks up this
         // notification immediately rather than waiting for the feed screen

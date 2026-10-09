@@ -23,6 +23,7 @@ import { reportServerError } from '@/lib/monitoringHooks';
 import { trackAfter } from '@/lib/analytics/trackAfter';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { afterThreadCashWrite } from '@/lib/threadCashEvents';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type { StatementDetail, StatementFormat, StatementList } from '@/lib/statements';
 import type { PayoutDetail, PayoutScheduleInfo, WeeklyAnchor } from '@/lib/payoutScheduleView';
@@ -4002,22 +4003,22 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       dailyHeartbeat: (body: { timezone: string; activeSeconds: number }) =>
         post<{ ok: boolean; heartbeatCount: number }>('/api/thread-cash/daily/heartbeat', body),
       dailyClaim: (body: { timezone: string; deviceId?: string; activeSeconds: number }) =>
-        post<ThreadCashCheckInResult>('/api/thread-cash/daily/claim', body),
+        afterThreadCashWrite(post<ThreadCashCheckInResult>('/api/thread-cash/daily/claim', body)),
       history: (limit = 50) =>
         get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
       ledger: (opts: { kind?: ThreadCashLedgerKind; offset?: number; limit?: number } = {}) =>
         get<ThreadCashLedger>(`/api/thread-cash/ledger?limit=${opts.limit ?? 50}&offset=${opts.offset ?? 0}${opts.kind ? `&kind=${opts.kind}` : ''}`),
       redeem: (body: { amountCents: number; idempotencyKey: string }) =>
-        post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
+        afterThreadCashWrite(post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body)),
       /** Return an unused, unattached redemption's amount to the balance (idempotent). */
       cancelRedemption: (token: string) =>
-        post<{ ok: boolean; returnedCents: number; balanceCents: number }>(`/api/thread-cash/redeem/${encodeURIComponent(token)}/cancel`, {}),
+        afterThreadCashWrite(post<{ ok: boolean; returnedCents: number; balanceCents: number }>(`/api/thread-cash/redeem/${encodeURIComponent(token)}/cancel`, {})),
       send: (body: { recipientId: string; conversationId?: string; note?: string; amountCents: number; idempotencyKey: string }) =>
-        post<{ ok: boolean; transferId: string }>('/api/thread-cash/send', body),
+        afterThreadCashWrite(post<{ ok: boolean; transferId: string }>('/api/thread-cash/send', body)),
       claim: (body: { transferId: string }) =>
-        post<{ ok: boolean; amountCents: number }>('/api/thread-cash/claim', body),
+        afterThreadCashWrite(post<{ ok: boolean; amountCents: number }>('/api/thread-cash/claim', body)),
       cancel: (body: { transferId: string }) =>
-        post<{ ok: boolean }>('/api/thread-cash/cancel', body),
+        afterThreadCashWrite(post<{ ok: boolean }>('/api/thread-cash/cancel', body)),
       /**
        * Gift a live stream's host. Unlike `send`, this is never gated on
        * mutual follow and lands on the seller's balance instantly — no
@@ -4025,13 +4026,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        * host they're watching.
        */
       liveGift: (body: { streamId: string; amountCents: number; idempotencyKey: string }) =>
-        post<{ ok: boolean; giftId: string }>('/api/thread-cash/live-gift', body),
+        afterThreadCashWrite(post<{ ok: boolean; giftId: string }>('/api/thread-cash/live-gift', body)),
       /** Preview the payout (after any fee) for cashing out a Thread Cash amount, at the live rate. */
       cashOutQuote: (threadCashCents: number) =>
         get<{ threadCashCents: number; payoutCents: number; feeCents: number }>(`/api/thread-cash/quote?threadCashCents=${threadCashCents}`),
       /** Seller-only: converts earned Thread Cash into a real Stripe transfer to the payout balance. */
       cashOut: (body: { threadCashCents: number; idempotencyKey: string }) =>
-        post<{ ok: boolean; threadCashCents: number; payoutCents: number; feeCents: number; transferId: string }>('/api/thread-cash/cash-out', body),
+        afterThreadCashWrite(post<{ ok: boolean; threadCashCents: number; payoutCents: number; feeCents: number; transferId: string }>('/api/thread-cash/cash-out', body)),
     },
     /** Public trending feed — no auth required. */
     publicTrending: {
