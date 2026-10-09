@@ -39,6 +39,14 @@ vi.mock("../../middlewares/requireRole", () => ({
 
 vi.mock("../notifications-feed", () => ({ publishNotification: async () => undefined }));
 
+// seller_payouts reads are covered against a real database in
+// lib/money/__tests__/sellerPayouts.integration.test.ts.
+vi.mock("../../lib/money/sellerPayouts", () => ({
+  listSellerPayouts: async () => ({ data: [], has_more: false, source: "table" }),
+  paidToBankCents: async () => 0,
+  upsertPayoutFromApi: async () => null,
+}));
+
 vi.mock("drizzle-orm", () => {
   const fn = (...args: unknown[]) => args;
   const sql = Object.assign((..._a: unknown[]) => ({}), {});

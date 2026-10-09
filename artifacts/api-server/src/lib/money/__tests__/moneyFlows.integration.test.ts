@@ -43,7 +43,7 @@ import { fake } from "./fakeStripe";
 import {
   buyLabel, call, expectLedgerBalanced, expectWalletMatchesLedger, held, ledgerKinds, orderLedger, paidOut, pay,
   reloadOrder, seedBulkOrder, seedBuyer, seedDrop, seedManufacturer, seedProduct, seedSeller, setTracking,
-  startApp, waitFor, walletFor,
+  startApp, uid, waitFor, walletFor,
 } from "./moneyHarness";
 import { executeOrderRelease, releaseOrderFunds, RELEASE_LEASE_MS, sweepOrderReleases } from "../escrow";
 import { refundOrder, RefundError } from "../refunds";
@@ -689,7 +689,10 @@ describe("finance summary", () => {
     await releaseOrderFunds(shipped.id, "tracking");
     fake.state.balanceAvailable = 4_321;
     fake.state.balancePending = 99;
-    fake.state.payouts.push({ status: "paid", currency: "usd", amount: 1_000 });
+    fake.state.payouts.push({
+      id: `po_${uid("summary").replace(/-/g, "_")}`, object: "payout", status: "paid", currency: "usd", amount: 1_000,
+      arrival_date: Math.floor(Date.now() / 1000), created: Math.floor(Date.now() / 1000),
+    });
 
     const summary = await call(app.base, "GET", "/api/finance/summary", seller);
     expect(summary.status).toBe(200);

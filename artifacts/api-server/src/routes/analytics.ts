@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { db, orders, customers, productVariants, drops, products, orderItems, users, storefrontVisits, storeVisits, notificationDeliveries, notificationEvents, threadCashEntries } from "@workspace/db";
+import { db, orders, customers, productVariants, products, orderItems, users, storefrontVisits, storeVisits, notificationDeliveries, notificationEvents, threadCashEntries } from "@workspace/db";
 import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
+import { inFlightPayoutCents } from "../lib/money/sellerPayouts";
 import { buildAdvancedAnalyticsResponse, ADVANCED_MONTHS } from "./analyticsAdvanced";
 import {
   DAY_MS,
@@ -80,10 +81,19 @@ router.get("/dashboard", async (req, res) => {
       .innerJoin(products, and(eq(productVariants.productId, products.id), eq(products.ownerId, ownerId)))
       .where(sql`${productVariants.stock} <= ${productVariants.lowStockThreshold}`)
       .limit(10),
-    db.select({ total: sql<number>`coalesce(sum(total_collected_cents),0)::int` }).from(drops)
-      .where(and(eq(drops.ownerId, ownerId), eq(drops.type, "pre-order"), sql`payout_status = 'held'`)),
-    db.select({ total: sql<number>`coalesce(sum(total_collected_cents),0)::int` }).from(drops)
-      .where(and(eq(drops.ownerId, ownerId), eq(drops.type, "pre-made"), sql`payout_status = 'processing'`)),
+    // Preorder money Brandthread is holding until each order ships: the money
+    // ledger's seller_held balance, per drop (same figure as
+    // /api/finance/summary "held"). drops.payout_status is never updated.
+    db.execute(sql`
+      SELECT COALESCE(SUM(GREATEST(x.total, 0)), 0)::bigint AS total FROM (
+        SELECT drop_id, SUM(amount_cents) AS total FROM ledger_postings
+        WHERE account = 'seller_held' AND party_id = ${ownerId}
+        GROUP BY drop_id
+      ) x
+    `).then((result) => [{ total: Number((result.rows[0] as { total?: string } | undefined)?.total ?? 0) }]),
+    // Payouts on their way to the seller's bank (pending + in_transit), from
+    // the webhook-fed seller_payouts table.
+    inFlightPayoutCents(ownerId).then((total) => [{ total }]),
     // Storefront visit counter — denominator for real conversion rate
     db.select({ visits: users.storefrontVisitCount }).from(users)
       .where(eq(users.clerkId, ownerId))

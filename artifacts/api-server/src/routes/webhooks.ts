@@ -90,6 +90,7 @@ import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
+import { recordSellerPayoutEvent } from "../lib/money/sellerPayouts";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -183,7 +184,15 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
   let event: any;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+    } catch (platformErr) {
+      // Events on connected accounts (e.g. payout.* for seller payouts) are
+      // delivered only to a Connect endpoint, which has its own secret.
+      const connectSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+      if (!connectSecret) throw platformErr;
+      event = stripe.webhooks.constructEvent(req.body, sig, connectSecret);
+    }
   } catch (err: any) {
     req.log.error({ err }, "Stripe webhook signature verification failed");
     res.status(400).json({ error: `Webhook error: ${err.message}` });
@@ -359,8 +368,22 @@ router.post("/stripe", async (req: Request, res: Response) => {
         break;
       // Connect payouts land on the seller's bank account. Only connected-
       // account events (event.account set) belong to a seller.
-      case "payout.paid":
-        await handleSellerPayoutPaid(event.data.object, event.account);
+      // Every payout.* event is stored in seller_payouts (lib/money/
+      // sellerPayouts.ts), which is what the finance routes read. A late
+      // payout.paid that an already-stored newer status supersedes (e.g. a
+      // failure) does not tell the seller the money arrived.
+      case "payout.paid": {
+        const recorded = await recordSellerPayoutEvent(event);
+        if (!recorded || recorded.row.status === "paid") {
+          await handleSellerPayoutPaid(event.data.object, event.account);
+        }
+        break;
+      }
+      case "payout.created":
+      case "payout.updated":
+      case "payout.failed":
+      case "payout.canceled":
+        await recordSellerPayoutEvent(event);
         break;
       case "transfer.created":
       case "transfer.updated":
