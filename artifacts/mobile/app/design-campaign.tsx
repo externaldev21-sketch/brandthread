@@ -56,7 +56,7 @@ import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/hooks/useApi';
 import { useRevenueCat } from '@/lib/revenueCat';
 import {
-  confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled,
+  applyStoreCredit, confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled,
   nearestPromoTierCents, promoProductId,
 } from '@/lib/iapPromotions';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -616,7 +616,8 @@ export default function CreateAdScreen() {
     if (nativeRail) {
       setPaying(true);
       try {
-        const { transactionId } = await purchaseConsumable(promoProductId('ad_campaign', chargeCents));
+        const credit = await applyStoreCredit(() => api.adCampaigns.iapApplyCredit(campaign.id));
+        const { transactionId } = credit ? { transactionId: credit } : await purchaseConsumable(promoProductId('ad_campaign', chargeCents));
         await verifyPayment(campaign.id, transactionId);
       } catch (e: any) {
         if (!isPurchaseCancelled(e)) {

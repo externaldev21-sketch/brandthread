@@ -1,5 +1,5 @@
 /**
- * Native (iOS / Android) rail for Boost and Create-ad (App Store 3.1.1).
+ * Native (iOS / Android) rail for Boost, Create-ad and Featured (App Store 3.1.1).
  *
  * On a native build, paid promotion is bought as a RevenueCat consumable
  * through the store's own purchase sheet; Stripe Checkout stays on web. This
@@ -41,8 +41,24 @@ export function nearestPromoTierCents(cents: number): number {
 }
 
 /** iOS and Android always buy promotions through the store; web uses Stripe. */
-export function nativePromotionsEnabled(os: string = Platform.OS): boolean {
+export function nativePromotionsEnabled(os: string = Platform.OS, _flag?: string): boolean {
   return os === 'ios' || os === 'android';
+}
+
+/**
+ * Pays with an unspent store purchase of the same amount (a promotion that was
+ * rejected, withdrawn or could not be applied) before charging again. Returns
+ * that purchase's transaction id, or null when there is no credit. Never throws.
+ */
+export async function applyStoreCredit(
+  apply: () => Promise<{ status: string; transactionId?: string }>,
+): Promise<string | null> {
+  try {
+    const result = await apply();
+    return result.status === 'granted' && result.transactionId ? result.transactionId : null;
+  } catch {
+    return null;
+  }
 }
 
 /** True when the store purchase sheet was dismissed by the user (not an error). */

@@ -73,7 +73,7 @@ Submit either kind with `eas submit --platform ios --profile production --latest
 | Feedback email | `support@brandthread.app` |
 | What to test | Paste the "What to test" list in section 6. |
 | Sign-in required | Yes. Enter the demo buyer and demo seller credentials (create them as described in `app-store-metadata.md`, "Demo buyer + seller accounts"). |
-| Notes | Seller subscriptions use in-app purchase (sandbox in TestFlight). Physical goods use Stripe. Boost and Create ad currently use Stripe, see `app-store-readiness.md` row 10. |
+| Notes | Seller subscriptions, Boost, Create ad, Featured on Discover and AI credit packs use in-app purchase (sandbox in TestFlight). Physical goods use Stripe. |
 
 ## 6. What to test
 

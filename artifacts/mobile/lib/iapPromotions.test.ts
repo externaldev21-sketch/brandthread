@@ -4,6 +4,7 @@ vi.mock('react-native', () => ({ Platform: { OS: 'web' } }));
 
 import {
   IAP_PROMO_TIERS_CENTS,
+  applyStoreCredit,
   confirmNativePromotion,
   featuredProductId,
   nativePromotionsEnabled,
@@ -22,6 +23,17 @@ describe('native promotion rail', () => {
   it('maps Featured lengths to their store products', () => {
     expect(featuredProductId(3)).toBe('brandthread_featured_3d');
     expect(featuredProductId(14)).toBe('brandthread_featured_14d');
+  });
+
+  it('does not allow a native build flag to switch to Stripe', () => {
+    expect(nativePromotionsEnabled('ios', '0')).toBe(true);
+    expect(nativePromotionsEnabled('web', '1')).toBe(false);
+  });
+
+  it('uses store credit only when the server granted it', async () => {
+    expect(await applyStoreCredit(async () => ({ status: 'granted', transactionId: 'tx_1' }))).toBe('tx_1');
+    expect(await applyStoreCredit(async () => ({ status: 'already_active', transactionId: 'tx_1' }))).toBeNull();
+    expect(await applyStoreCredit(async () => { throw new Error('404 no_credit'); })).toBeNull();
   });
 
   it('maps budgets to the product ids Dev creates in the stores', () => {
