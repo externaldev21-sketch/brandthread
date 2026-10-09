@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   allPromoProductIds,
+  applyPromotionCredit,
+  featuredProductId,
   findPurchaseInPayload,
   grantPromotionPurchase,
   iapPromotionsEnabled,
+  isUndelivered,
   parsePromoProductId,
   promoProductId,
   promotionPurchaseFromWebhookEvent,
@@ -41,17 +44,38 @@ function memoryStore(opts: {
       p.targetId = targetId;
       p.grantedAt = at;
     },
+    async claimCredit(appUserId, kind, amountCents, targetId, at) {
+      const p = [...purchases.values()].find((x) =>
+        x.appUserId === appUserId && x.kind === kind && x.amountCents === amountCents && !x.grantedAt);
+      if (!p) return null;
+      p.targetId = targetId;
+      p.grantedAt = at;
+      return p.transactionId;
+    },
+    async releaseCredit(tx) {
+      const p = purchases.get(tx)!;
+      p.targetId = null;
+      p.grantedAt = null;
+    },
   };
   return { store, purchases, activated };
 }
 
 describe("promotion product ids", () => {
-  it("round-trips every tier for both kinds", () => {
+  it("round-trips every budget tier and Featured length", () => {
     for (const id of allPromoProductIds()) {
       const parsed = parsePromoProductId(id)!;
-      expect(promoProductId(parsed.kind, parsed.amountCents / 100)).toBe(id);
+      expect(parsed).not.toBeNull();
+      if (parsed.kind !== "featured_slot") expect(promoProductId(parsed.kind, parsed.amountCents / 100)).toBe(id);
     }
-    expect(allPromoProductIds()).toHaveLength(14);
+    expect(allPromoProductIds()).toHaveLength(17);
+  });
+
+  it("prices Featured products from the server price list", () => {
+    expect(featuredProductId(7)).toBe("brandthread_featured_7d");
+    expect(parsePromoProductId("brandthread_featured_7d")).toEqual({ kind: "featured_slot", amountCents: 5900 });
+    expect(parsePromoProductId("brandthread_featured_5d")).toBeNull();
+    expect(parsePromoProductId("brandthread_featured_7")).toBeNull();
   });
 
   it("rejects unknown tiers, other products and non-strings", () => {
@@ -61,10 +85,10 @@ describe("promotion product ids", () => {
     expect(parsePromoProductId("brandthread_ad_25:base")).toEqual({ kind: "ad_campaign", amountCents: 2500 });
   });
 
-  it("is off unless IAP_PROMOTIONS_ENABLED is exactly true", () => {
-    expect(iapPromotionsEnabled({})).toBe(false);
-    expect(iapPromotionsEnabled({ IAP_PROMOTIONS_ENABLED: "1" })).toBe(false);
+  it("is on by default; only a literal false pauses it", () => {
+    expect(iapPromotionsEnabled({})).toBe(true);
     expect(iapPromotionsEnabled({ IAP_PROMOTIONS_ENABLED: "true" })).toBe(true);
+    expect(iapPromotionsEnabled({ IAP_PROMOTIONS_ENABLED: "false" })).toBe(false);
   });
 });
 
@@ -148,6 +172,67 @@ describe("grantPromotionPurchase", () => {
     });
     expect((await grantPromotionPurchase(store, base)).status).toBe("ineligible");
     expect(purchases.get("tx_1")?.grantedAt).toBeNull();
+  });
+});
+
+describe("store credit for undelivered purchases", () => {
+  const base = { appUserId: "user_1", transactionId: "tx_1", productId: "brandthread_boost_25", source: "webhook" as const };
+
+  it("flags every result that left a store charge undelivered", async () => {
+    const { store } = memoryStore();
+    const unmatched = await grantPromotionPurchase(store, base);
+    expect(isUndelivered(unmatched)).toBe(true);
+    expect(isUndelivered({ status: "granted", kind: "boost", targetId: "b1" })).toBe(false);
+  });
+
+  it("applies an unmatched purchase to the next promotion of the same amount, once", async () => {
+    const { store, purchases, activated } = memoryStore({
+      targets: [
+        { kind: "boost", id: "b1", ownerId: "user_1", budgetCents: 2500 },
+        { kind: "boost", id: "b2", ownerId: "user_1", budgetCents: 2500 },
+      ],
+    });
+    await store.claimPurchase({ ...base, kind: "boost", amountCents: 2500 });
+    const first = await applyPromotionCredit(store, { appUserId: "user_1", kind: "boost", targetId: "b1" });
+    expect(first).toMatchObject({ status: "granted", targetId: "b1", transactionId: "tx_1" });
+    expect(purchases.get("tx_1")?.targetId).toBe("b1");
+    const second = await applyPromotionCredit(store, { appUserId: "user_1", kind: "boost", targetId: "b2" });
+    expect(second.status).toBe("no_credit");
+    expect(activated).toEqual(["b1"]);
+  });
+
+  it("never applies credit of a different amount, kind or owner", async () => {
+    const { store } = memoryStore({
+      targets: [
+        { kind: "boost", id: "b1", ownerId: "user_1", budgetCents: 5000 },
+        { kind: "ad_campaign", id: "c1", ownerId: "user_1", budgetCents: 2500 },
+        { kind: "boost", id: "b9", ownerId: "user_2", budgetCents: 2500 },
+      ],
+    });
+    await store.claimPurchase({ ...base, kind: "boost", amountCents: 2500 });
+    expect((await applyPromotionCredit(store, { appUserId: "user_1", kind: "boost", targetId: "b1" })).status).toBe("no_credit");
+    expect((await applyPromotionCredit(store, { appUserId: "user_1", kind: "ad_campaign", targetId: "c1" })).status).toBe("no_credit");
+    expect((await applyPromotionCredit(store, { appUserId: "user_2", kind: "boost", targetId: "b9" })).status).toBe("no_credit");
+  });
+
+  it("returns the credit when the target cannot run", async () => {
+    const { store, purchases } = memoryStore({
+      targets: [{ kind: "boost", id: "b1", ownerId: "user_1", budgetCents: 2500 }],
+      activate: "ineligible",
+    });
+    await store.claimPurchase({ ...base, kind: "boost", amountCents: 2500 });
+    expect((await applyPromotionCredit(store, { appUserId: "user_1", kind: "boost", targetId: "b1" })).status).toBe("ineligible");
+    expect(purchases.get("tx_1")?.grantedAt).toBeNull();
+  });
+
+  it("grants a Featured purchase to the seller's pending slot at the list price", async () => {
+    const { store } = memoryStore({
+      targets: [{ kind: "featured_slot", id: "f1", ownerId: "user_1", budgetCents: 5900 }],
+    });
+    const result = await grantPromotionPurchase(store, {
+      ...base, productId: "brandthread_featured_7d", source: "client_verify", explicitTargetId: "f1", expectedKind: "featured_slot",
+    });
+    expect(result).toEqual({ status: "granted", kind: "featured_slot", targetId: "f1" });
   });
 });
 

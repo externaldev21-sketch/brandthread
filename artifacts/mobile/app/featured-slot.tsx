@@ -4,10 +4,12 @@
  *        /featured-slot?id=<uuid>&paymentReturn=1   (Stripe Checkout return)
  *
  * Same shape as the Boost flow it is reached from: pick a length, see the
- * window and total, pay through Stripe Checkout, then track the state
+ * window and total, pay (store purchase sheet on iOS / Android, Stripe
+ * Checkout on web), then track the state
  * (In review / Scheduled / Live / Rejected / Ended). Nothing goes live on the
  * client's say-so: the server confirms payment, an admin approves, and a
- * rejected or withdrawn slot is refunded in full.
+ * rejected or withdrawn slot is refunded in full (store purchases come back
+ * as credit for the next slot; Apple / Google own store refunds).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -26,6 +28,10 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { buildFeaturedReturnUrl, featuredStateLabel } from '@/services/featuredSlotService';
 import type { FeaturedAvailability, FeaturedSlot } from '@/lib/api';
+import { useRevenueCat } from '@/lib/revenueCat';
+import {
+  applyStoreCredit, confirmNativePromotion, featuredProductId, isPurchaseCancelled, nativePromotionsEnabled,
+} from '@/lib/iapPromotions';
 
 const DAY = 86_400_000;
 type Styles = ReturnType<typeof makeStyles>;
@@ -59,6 +65,9 @@ export default function FeaturedSlotScreen() {
   const api = useApi();
   const { isSignedIn } = useAuth();
   const params = useLocalSearchParams<{ id?: string; paymentReturn?: string }>();
+  const { purchaseConsumable } = useRevenueCat();
+  // Native iOS/Android buys the slot through the store (Guideline 3.1.1); web keeps Stripe Checkout.
+  const nativeRail = nativePromotionsEnabled();
 
   // Signed-out web preview must not call protected APIs: it renders only with &demo=1.
   const demo = isSellerDevPreview() && isPreviewDemoMode() && !isSignedIn;
@@ -127,6 +136,23 @@ export default function FeaturedSlotScreen() {
     setBusy(true);
     try {
       const slot = await api.featuredSlots.reserve(option.durationDays);
+      if (nativeRail) {
+        try {
+          const credit = await applyStoreCredit(() => api.featuredSlots.iapApplyCredit(slot.id));
+          const { transactionId } = credit ? { transactionId: credit } : await purchaseConsumable(featuredProductId(option.durationDays));
+          const confirmed = await confirmNativePromotion(() => api.featuredSlots.iapVerify(slot.id, transactionId));
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert(
+            confirmed ? 'In review' : 'Payment pending',
+            confirmed
+              ? "Payment confirmed. We'll review your brand before it goes live."
+              : "Your payment is being processed. Your slot moves to review automatically once confirmed.",
+          );
+        } catch (e) {
+          if (!isPurchaseCancelled(e)) Alert.alert('Payment failed', 'Could not complete the purchase. Please try again.');
+        }
+        return;
+      }
       const returnUrl = buildFeaturedReturnUrl(slot.id);
       const { url, paymentStatus } = await api.featuredSlots.pay(slot.id, returnUrl);
       if (paymentStatus === 'paid' || paymentStatus === 'no_payment_required') { await verify(slot.id); return; }
@@ -259,13 +285,18 @@ function SlotState({ slot, s }: { slot: FeaturedSlot; s: Styles }) {
     <View style={{ marginBottom: SP.xs }}>
       <View style={s.badge}><Text style={s.badgeText}>{featuredStateLabel(slot.displayState)}</Text></View>
       {slot.displayState === 'rejected' && (
-        <Text style={s.meta}>{slot.rejectionReason ? `${slot.rejectionReason}. ` : ''}Your payment was refunded.</Text>
+        <Text style={s.meta}>{slot.rejectionReason ? `${slot.rejectionReason}. ` : ''}{refundLine(slot.refundStatus)}</Text>
       )}
-      {slot.displayState === 'cancelled' && slot.refundStatus === 'refunded' && (
-        <Text style={s.meta}>Your payment was refunded.</Text>
+      {slot.displayState === 'cancelled' && (slot.refundStatus === 'refunded' || slot.refundStatus === 'credited') && (
+        <Text style={s.meta}>{refundLine(slot.refundStatus)}</Text>
       )}
     </View>
   );
+}
+
+/** Store purchases come back as credit for the next slot (Apple / Google own store refunds). */
+function refundLine(refundStatus: string): string {
+  return refundStatus === 'credited' ? 'Your payment was returned as credit for your next slot.' : 'Your payment was refunded.';
 }
 
 function makeStyles(theme: ReturnType<typeof useAppTheme>['theme']) {

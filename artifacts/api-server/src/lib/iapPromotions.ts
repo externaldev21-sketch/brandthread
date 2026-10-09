@@ -1,5 +1,6 @@
 /**
- * Native in-app purchases for Boost and Create-ad (App Store Guideline 3.1.1).
+ * Native in-app purchases for Boost, Create-ad and Featured on Discover
+ * (App Store Guideline 3.1.1).
  *
  * Paid promotion bought inside the iOS / Android app is a digital good, so the
  * native apps sell it as RevenueCat CONSUMABLE products, one product per fixed
@@ -17,7 +18,10 @@
  * without a database; iapPromotionsStore.ts holds the Drizzle implementation.
  */
 
-export type PromoKind = "boost" | "ad_campaign";
+import { FEATURED_DURATIONS, FEATURED_PRICE_LIST } from "./promotions/featured";
+
+export type PromoKind = "boost" | "ad_campaign" | "featured_slot";
+type BudgetKind = Exclude<PromoKind, "featured_slot">;
 
 /** Whole-dollar budgets sold natively. Every tier is a valid existing budget step. */
 export const IAP_PROMO_TIER_DOLLARS = [5, 10, 25, 50, 100, 250, 500] as const;
@@ -25,25 +29,40 @@ export const IAP_PROMO_TIER_DOLLARS = [5, 10, 25, 50, 100, 250, 500] as const;
 const PRODUCT_PREFIX: Record<PromoKind, string> = {
   boost: "brandthread_boost_",
   ad_campaign: "brandthread_ad_",
+  featured_slot: "brandthread_featured_",
 };
 
-export function promoProductId(kind: PromoKind, dollars: number): string {
+export function promoProductId(kind: BudgetKind, dollars: number): string {
   return `${PRODUCT_PREFIX[kind]}${dollars}`;
 }
 
-/** Every product id Dev must create in App Store Connect / Play / RevenueCat. */
-export function allPromoProductIds(): string[] {
-  return (Object.keys(PRODUCT_PREFIX) as PromoKind[]).flatMap((kind) =>
-    IAP_PROMO_TIER_DOLLARS.map((d) => promoProductId(kind, d)),
-  );
+/** Featured slots are sold per length ("brandthread_featured_7d"); the price is the server price list. */
+export function featuredProductId(durationDays: number): string {
+  return `${PRODUCT_PREFIX.featured_slot}${durationDays}d`;
 }
 
-/** Returns the kind + budget a product id sells, or null when it is not a promotion product. */
+/** Every promotion product id Dev must create in App Store Connect / Play / RevenueCat. */
+export function allPromoProductIds(): string[] {
+  return [
+    ...(["boost", "ad_campaign"] as const).flatMap((kind) =>
+      IAP_PROMO_TIER_DOLLARS.map((d) => promoProductId(kind, d))),
+    ...FEATURED_DURATIONS.map(featuredProductId),
+  ];
+}
+
+/** Returns the kind + amount a product id sells, or null when it is not a promotion product. */
 export function parsePromoProductId(raw: unknown): { kind: PromoKind; amountCents: number } | null {
   if (typeof raw !== "string") return null;
   // Play Billing may report "product:base-plan"; consumables have none, tolerate it anyway.
   const id = raw.split(":")[0];
-  for (const kind of Object.keys(PRODUCT_PREFIX) as PromoKind[]) {
+  if (id.startsWith(PRODUCT_PREFIX.featured_slot)) {
+    const m = /^(\d+)d$/.exec(id.slice(PRODUCT_PREFIX.featured_slot.length));
+    const days = m ? Number(m[1]) : NaN;
+    return FEATURED_DURATIONS.includes(days)
+      ? { kind: "featured_slot", amountCents: FEATURED_PRICE_LIST[days] }
+      : null;
+  }
+  for (const kind of ["boost", "ad_campaign"] as const) {
     const prefix = PRODUCT_PREFIX[kind];
     if (!id.startsWith(prefix)) continue;
     const dollars = Number(id.slice(prefix.length));
@@ -54,9 +73,13 @@ export function parsePromoProductId(raw: unknown): { kind: PromoKind; amountCent
   return null;
 }
 
-/** Feature flag. Off unless Dev has created the store products and flips it. */
+/**
+ * Feature flag. ON by default: the native apps sell promotions only through the
+ * store (3.1.1). A literal "false" pauses server-side grants; the RevenueCat
+ * webhook then answers 503 so each purchase is retried once it is back on.
+ */
 export function iapPromotionsEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return env.IAP_PROMOTIONS_ENABLED === "true";
+  return env.IAP_PROMOTIONS_ENABLED !== "false";
 }
 
 export type PurchaseRow = {
@@ -83,6 +106,13 @@ export interface PromoStore {
   findTarget(kind: PromoKind, ownerId: string, explicitId?: string): Promise<PromoTarget | null>;
   activate(kind: PromoKind, targetId: string, paidAt: Date): Promise<ActivateResult>;
   markGranted(transactionId: string, targetId: string, at: Date): Promise<void>;
+  /**
+   * Atomically reserves one unspent purchase (credit) of this kind and amount
+   * for targetId. Returns its transaction id, or null when there is none.
+   */
+  claimCredit(appUserId: string, kind: PromoKind, amountCents: number, targetId: string, at: Date): Promise<string | null>;
+  /** Returns a reserved or granted purchase to the unspent pool (target never ran). */
+  releaseCredit(transactionId: string): Promise<void>;
 }
 
 export type GrantResult =
@@ -135,6 +165,46 @@ export async function grantPromotionPurchase(
   if (result === "ineligible") return { status: "ineligible", kind: parsed.kind, targetId: target.id };
   await store.markGranted(input.transactionId, target.id, now);
   return { status: "granted", kind: parsed.kind, targetId: target.id };
+}
+
+// ─── Store credit (BT-022) ────────────────────────────────────────────────────
+//
+// A store purchase that could not be applied (nothing pending, budget changed,
+// post no longer eligible, promotion rejected or withdrawn before it ran) is
+// never dropped: its row stays ungranted, and the seller's next promotion of
+// the same kind and amount uses it instead of charging again. Apple and Google
+// own refunds for store purchases, so this credit is what keeps every charge
+// delivered.
+
+export type ApplyCreditResult =
+  | { status: "granted" | "already_active"; kind: PromoKind; targetId: string; transactionId: string }
+  | { status: "no_credit" | "unmatched" | "ineligible"; kind: PromoKind };
+
+export async function applyPromotionCredit(
+  store: PromoStore,
+  input: { appUserId: string; ownerId?: string; kind: PromoKind; targetId: string; now?: Date },
+): Promise<ApplyCreditResult> {
+  const now = input.now ?? new Date();
+  const target = await store.findTarget(input.kind, input.ownerId ?? input.appUserId, input.targetId);
+  if (!target) return { status: "unmatched", kind: input.kind };
+  const transactionId = await store.claimCredit(input.appUserId, input.kind, target.budgetCents, target.id, now);
+  if (!transactionId) return { status: "no_credit", kind: input.kind };
+  const result = await store.activate(input.kind, target.id, now);
+  if (result === "ineligible") {
+    await store.releaseCredit(transactionId);
+    return { status: "ineligible", kind: input.kind };
+  }
+  if (result === "already_active") {
+    // Paid some other way meanwhile: keep the credit for next time.
+    await store.releaseCredit(transactionId);
+    return { status: "already_active", kind: input.kind, targetId: target.id, transactionId };
+  }
+  return { status: "granted", kind: input.kind, targetId: target.id, transactionId };
+}
+
+/** Whether a grant result left the store charge undelivered (kept as credit; worth an alert). */
+export function isUndelivered(result: GrantResult): boolean {
+  return result.status === "unmatched" || result.status === "amount_mismatch" || result.status === "ineligible";
 }
 
 // ─── RevenueCat purchase lookup (client verify path) ─────────────────────────

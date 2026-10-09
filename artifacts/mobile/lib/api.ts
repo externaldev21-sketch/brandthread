@@ -3765,6 +3765,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Native store purchase (RevenueCat consumable): server re-reads it and grants the boost. */
       iapVerify: (id: string, transactionId: string) =>
         post<{ status: string }>(`/api/iap-promotions/boost/${encodeURIComponent(id)}/verify`, { transactionId }),
+      /** Pays with an unspent store purchase of the same amount (404 when there is none). */
+      iapApplyCredit: (id: string) =>
+        post<{ status: string; transactionId?: string }>(`/api/iap-promotions/boost/${encodeURIComponent(id)}/apply-credit`, {}),
       update: (id: string, body: { status: 'paused' | 'cancelled' }) =>
         patch<any>(`/api/boosts/${encodeURIComponent(id)}`, body),
       summary: () =>
@@ -3781,6 +3784,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/featured-slots/${encodeURIComponent(id)}/pay`, { returnUrl }),
       verify: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/pay/verify`, {}),
       cancel: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/cancel`, {}),
+      /** Native store purchase (RevenueCat consumable): server re-reads it and moves the slot to review. */
+      iapVerify: (id: string, transactionId: string) =>
+        post<{ status: string }>(`/api/iap-promotions/featured/${encodeURIComponent(id)}/verify`, { transactionId }),
+      iapApplyCredit: (id: string) =>
+        post<{ status: string; transactionId?: string }>(`/api/iap-promotions/featured/${encodeURIComponent(id)}/apply-credit`, {}),
     },
     /** Sponsored placement in For You: slots to splice in + impression confirmation. */
     promotions: {
@@ -3876,6 +3884,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Native store purchase (RevenueCat consumable): server re-reads it and grants the campaign. */
       iapVerify: (id: string, transactionId: string) =>
         post<{ status: string }>(`/api/iap-promotions/campaign/${encodeURIComponent(id)}/verify`, { transactionId }),
+      iapApplyCredit: (id: string) =>
+        post<{ status: string; transactionId?: string }>(`/api/iap-promotions/campaign/${encodeURIComponent(id)}/apply-credit`, {}),
     },
     /**
      * Meta (Facebook & Instagram) Ads — OAuth connection, campaign builder,

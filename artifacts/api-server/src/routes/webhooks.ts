@@ -28,7 +28,7 @@ import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
 import { reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
-import { grantPromotionPurchase, iapPromotionsEnabled, promotionPurchaseFromWebhookEvent } from "../lib/iapPromotions";
+import { grantPromotionPurchase, iapPromotionsEnabled, isUndelivered, promotionPurchaseFromWebhookEvent } from "../lib/iapPromotions";
 import { drizzlePromoStore } from "../lib/iapPromotionsStore";
 import {
   awardLoyaltyPointsOnce,
@@ -531,12 +531,20 @@ router.post("/revenuecat", async (req: Request, res: Response): Promise<void> =>
     const promo = promotionPurchaseFromWebhookEvent(event);
     if (promo) {
       if (!iapPromotionsEnabled()) {
-        req.log.warn({ eventId }, "RevenueCat promotion purchase received while IAP_PROMOTIONS_ENABLED is off");
-        res.json({ received: true, ignored: true });
+        // Never acknowledge a paid purchase we did not process: release the
+        // event and answer 503 so RevenueCat retries once the flag is back on.
+        await db.delete(revenueCatWebhookEvents).where(eq(revenueCatWebhookEvents.eventId, eventId));
+        req.log.error({ eventId }, "RevenueCat promotion purchase deferred: IAP_PROMOTIONS_ENABLED=false");
+        res.status(503).json({ error: "Promotion purchases are paused; retry later" });
         return;
       }
       const result = await grantPromotionPurchase(drizzlePromoStore, { ...promo, source: "webhook" });
-      req.log.info({ eventId, result }, "RevenueCat promotion purchase processed");
+      if (isUndelivered(result)) {
+        // Kept as the seller's credit (applied to their next promotion), but worth a look.
+        req.log.error({ eventId, appUserId, result }, "RevenueCat promotion purchase not applied; kept as credit");
+      } else {
+        req.log.info({ eventId, result }, "RevenueCat promotion purchase processed");
+      }
       res.json({ received: true, promotion: result.status });
       return;
     }

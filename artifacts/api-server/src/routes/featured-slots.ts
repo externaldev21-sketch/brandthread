@@ -24,6 +24,7 @@ import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls"
 import { authorInGoodStanding } from "../lib/safety";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { refundPromotionPayment } from "../lib/promotions/refund";
+import { releasePromotionCreditForTarget } from "../lib/iapPromotionsStore";
 import {
   FEATURED_DURATIONS, FEATURED_PLACEMENT_DISCOVER, FEATURED_PRICE_LIST, earliestStart, featuredCapacity,
   featuredPriceCents, hasCapacity, occupiesCapacity, slotDisplayState, type Window,
@@ -251,15 +252,34 @@ export async function confirmFeaturedSlotPaid(checkoutSessionId: string, paidAt:
         .where(and(eq(featuredSlots.id, slot.id), sql`${featuredSlots.paidAt} IS NULL`)).returning();
       return late ?? slot;
     }
-    if (slot.status !== "pending_payment") return slot; // idempotent / wrong state
-    await lockPlacement(tx, slot.placement);
-    const w = await settleSlotWindow(tx, slot, paidAt);
-    const [updated] = await tx.update(featuredSlots)
-      .set({ status: "in_review", paidAt, startsAt: w.startsAt, endsAt: w.endsAt })
-      .where(and(eq(featuredSlots.id, slot.id), eq(featuredSlots.status, "pending_payment")))
-      .returning();
-    return updated ?? slot;
+    return (await moveSlotToReview(tx, slot, paidAt)).slot;
   });
+}
+
+/**
+ * Store (IAP) rail: same transition, keyed by slot id. A withdrawn slot is left
+ * untouched; the caller keeps the store charge as the seller's credit.
+ */
+export async function confirmFeaturedSlotPaidById(
+  slotId: string,
+  paidAt: Date,
+): Promise<{ slot: SlotRow; transitioned: boolean } | null> {
+  return db.transaction(async (tx) => {
+    const [slot] = await tx.select().from(featuredSlots).where(eq(featuredSlots.id, slotId)).limit(1);
+    if (!slot) return null;
+    return moveSlotToReview(tx, slot, paidAt);
+  });
+}
+
+async function moveSlotToReview(tx: Tx, slot: SlotRow, paidAt: Date): Promise<{ slot: SlotRow; transitioned: boolean }> {
+  if (slot.status !== "pending_payment") return { slot, transitioned: false }; // idempotent / wrong state
+  await lockPlacement(tx, slot.placement);
+  const w = await settleSlotWindow(tx, slot, paidAt);
+  const [updated] = await tx.update(featuredSlots)
+    .set({ status: "in_review", paidAt, startsAt: w.startsAt, endsAt: w.endsAt })
+    .where(and(eq(featuredSlots.id, slot.id), eq(featuredSlots.status, "pending_payment")))
+    .returning();
+  return { slot: updated ?? slot, transitioned: !!updated };
 }
 
 router.post("/:id/pay", express.json({ limit: "4kb" }), async (req, res) => {
@@ -360,8 +380,15 @@ router.post("/:id/pay/verify", express.json({ limit: "4kb" }), async (req, res) 
 
 /** Refund a slot that has already been moved to a terminal state. Re-callable when refund_status='failed'. */
 export async function refundSlotRecord(slot: SlotRow, context: string): Promise<SlotRow> {
-  if (slot.refundStatus === "refunded" || !slot.paidAt) return slot;
+  if (slot.refundStatus === "refunded" || slot.refundStatus === "credited" || !slot.paidAt) return slot;
   try {
+    // Paid through the App Store / Play: returned to the seller as credit (the store owns refunds).
+    if (!slot.stripeCheckoutSessionId && await releasePromotionCreditForTarget("featured_slot", slot.id)) {
+      const [c] = await db.update(featuredSlots)
+        .set({ refundStatus: "credited", refundedAt: new Date() })
+        .where(eq(featuredSlots.id, slot.id)).returning();
+      return c ?? slot;
+    }
     const result = await refundPromotionPayment(requireStripe(), {
       kind: "featured_slot", targetId: slot.id, checkoutSessionId: slot.stripeCheckoutSessionId, context,
     });

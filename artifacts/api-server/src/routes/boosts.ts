@@ -41,6 +41,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
 import { promotionReviewRequired, refundPromotionPayment } from "../lib/promotions/refund";
+import { releasePromotionCreditForTarget } from "../lib/iapPromotionsStore";
 
 const router = Router();
 router.use(requireAuth);
@@ -230,8 +231,16 @@ export async function refundBoostRecord(
   boost: typeof boosts.$inferSelect,
   context: string,
 ): Promise<typeof boosts.$inferSelect> {
-  if (boost.refundStatus === "refunded") return boost;
+  if (boost.refundStatus === "refunded" || boost.refundStatus === "credited") return boost;
   try {
+    // Paid through the App Store / Play: the store owns refunds, so the charge
+    // goes back to the seller as credit for their next boost.
+    if (!boost.stripeCheckoutSessionId && await releasePromotionCreditForTarget("boost", boost.id)) {
+      const [credited] = await db.update(boosts)
+        .set({ refundStatus: "credited", refundedAt: new Date() })
+        .where(eq(boosts.id, boost.id)).returning();
+      return credited ?? boost;
+    }
     const result = await refundPromotionPayment(requireStripe(), {
       kind: "boost", targetId: boost.id, checkoutSessionId: boost.stripeCheckoutSessionId, context,
     });

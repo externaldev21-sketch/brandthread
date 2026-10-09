@@ -37,7 +37,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useApi } from '@/hooks/useApi';
 import { useRevenueCat } from '@/lib/revenueCat';
 import {
-  confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled,
+  applyStoreCredit, confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled,
   nearestPromoTierCents, promoProductId,
 } from '@/lib/iapPromotions';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -454,7 +454,7 @@ export default function BoostScreen() {
   const api     = useApi();
   const { purchaseConsumable } = useRevenueCat();
   // Native iOS/Android buys the boost through the store (Guideline 3.1.1);
-  // web keeps Stripe Checkout. Off unless EXPO_PUBLIC_IAP_PROMOTIONS=1.
+  // web keeps Stripe Checkout. On for every native build.
   const nativeRail = nativePromotionsEnabled();
   const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string }>();
 
@@ -755,7 +755,8 @@ export default function BoostScreen() {
     if (nativeRail) {
       setPaying(true);
       try {
-        const { transactionId } = await purchaseConsumable(promoProductId('boost', boostRecord.budgetCents));
+        const credit = await applyStoreCredit(() => boostsRef.current.iapApplyCredit(boostRecord!.id));
+        const { transactionId } = credit ? { transactionId: credit } : await purchaseConsumable(promoProductId('boost', boostRecord.budgetCents));
         await verifyPayment(boostRecord.id, transactionId);
       } catch (e: any) {
         if (!isPurchaseCancelled(e)) {
@@ -824,7 +825,9 @@ export default function BoostScreen() {
     const message   = isActive
       ? 'Pause this boost? You can reactivate it later by contacting support.'
       : boost.status === 'in_review'
-        ? 'Cancel this boost? Your payment will be refunded in full.'
+        ? (nativeRail
+          ? 'Cancel this boost? Your payment will be returned as credit for your next boost.'
+          : 'Cancel this boost? Your payment will be refunded in full.')
         : 'Are you sure you want to cancel this boost? This cannot be undone.';
 
     Alert.alert(title, message, [
@@ -971,7 +974,7 @@ export default function BoostScreen() {
 
             {b.status === 'rejected' && (
               <Text style={s.historyMetaSmall}>
-                {b.rejectionReason ? `${b.rejectionReason}. ` : ''}Your payment was refunded.
+                {b.rejectionReason ? `${b.rejectionReason}. ` : ''}{b.refundStatus === 'credited' ? 'Your payment was returned as credit for your next boost.' : 'Your payment was refunded.'}
               </Text>
             )}
 
