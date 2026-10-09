@@ -181,7 +181,7 @@ export function OrderConfirmation({
   useEffect(() => {
     // A completed purchase is a meaningful, server-backed moment — exactly
     // when contextualPushPermission.ts wants to ask, never on first launch.
-    if (firstVerified?.id) void requestContextualPushPermission(userId, api);
+    if (firstVerified?.id) void requestContextualPushPermission(userId, api, 'order');
   }, [firstVerified?.id, userId, api]);
 
   useEffect(() => {
@@ -458,14 +458,14 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingTop: SP.sm, paddingBottom: SP.md },
   pending: { width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   titleBlock: { paddingBottom: SP.md },
-  eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.2, textTransform: 'uppercase' },
+  eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, },
   orderNumbers: { marginTop: 4, gap: 2 },
   orderNumber: { fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.6 },
   orderNumberPending: { fontFamily: FONT.medium, fontSize: FS.base, marginTop: 4 },
   body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 21, marginTop: 6 },
 
   section: { marginBottom: SP.md },
-  sectionHeading: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: SP.sm },
+  sectionHeading: { fontFamily: FONT.semibold, fontSize: FS.xs, marginBottom: SP.sm },
 
   row: { flexDirection: 'row', gap: SP.md, paddingVertical: SP.sm + 2 },
   rowLabel: { width: 118, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
