@@ -94,9 +94,9 @@ describe("v7 step order: Welcome opener, then AccountType, then path-specific au
     expect(source).toContain("chooseHeadline");
   });
 
-  it("buyer success routes to thread-explainer, seller to the paywall (BT-001)", () => {
+  it("buyer success routes to thread-explainer, seller to tabs", () => {
     expect(source).toContain("router.replace('/thread-explainer'");
-    expect(source).toContain("router.replace('/plans?fromOnboarding=true'");
+    expect(source).toContain("router.replace('/(tabs)/'");
   });
 
   it("style interests carry emoji and solid-fill selected chip with checkmark", () => {

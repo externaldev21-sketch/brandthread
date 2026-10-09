@@ -13,13 +13,6 @@ export interface SellerPlanDefinition {
   highlight?: boolean;
 }
 
-/**
- * Free trial length on every rail (Stripe web, App Store, Google Play).
- * Mirrors SELLER_TRIAL_DAYS in api-server/src/lib/planCatalogue.ts; the
- * store intro offers in App Store Connect / Play Console must match it.
- */
-export const SELLER_TRIAL_DAYS = 7;
-
 export const SELLER_PLANS: SellerPlanDefinition[] = [
   {
     id: 'starter',

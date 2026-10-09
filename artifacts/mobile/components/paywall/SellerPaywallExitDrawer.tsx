@@ -17,7 +17,7 @@ import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { weeklyEquivalentFor, dailyEquivalentFor } from '@/lib/sellerPlansDisplay';
-import { SELLER_TRIAL_DAYS, type SellerPlanDefinition } from '@/lib/sellerPlans';
+import type { SellerPlanDefinition } from '@/lib/sellerPlans';
 import { SellerPlanSelector, type PlanPricing } from './SellerPlanSelector';
 import { SellerPaywallCTA } from './SellerPaywallCTA';
 import type { useAppTheme } from '@/contexts/AppThemeContext';
@@ -121,7 +121,7 @@ export function SellerPaywallExitDrawer({
             <View style={{ marginTop: SP.lg }}>
               <SellerPaywallCTA
                 theme={theme}
-                label={hasRealTrialOffer ? `Start my ${SELLER_TRIAL_DAYS}-day free trial` : `Choose ${selectedPlan.name}`}
+                label={hasRealTrialOffer ? 'Start my 5-day free trial' : `Choose ${selectedPlan.name}`}
                 onPress={onStartTrial}
                 icon={hasRealTrialOffer ? 'chevron-right' : undefined}
                 loading={loading}

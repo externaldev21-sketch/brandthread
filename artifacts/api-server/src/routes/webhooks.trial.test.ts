@@ -157,7 +157,7 @@ describe("customer.subscription.trial_will_end webhook", () => {
 
     expect(sendPushToUser).toHaveBeenCalledWith("clerk_seller_123", {
       title: "Your free trial ends soon",
-      body: "Your 7-day trial ends in 3 days — you'll be charged $29.99 on Sep 14, 2026 unless you cancel.",
+      body: "Your free trial ends in 3 days — you'll be charged $29.99 on Sep 14, 2026 unless you cancel.",
       data: {
         notificationId: "stable:subscription-trial-ending:sub_trial_123:clerk_seller_123",
         type: "subscription_trial_will_end",

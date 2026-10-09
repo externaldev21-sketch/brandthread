@@ -75,22 +75,3 @@ export async function requestContextualPushPermission(
     // Permission and registration are intentionally non-blocking.
   }
 }
-/**
- * Onboarding's notifications soft-ask (BT-268): the person tapped Continue,
- * so the OS dialog shows now. The token is registered once onboarding is
- * complete (registerGrantedPushToken). The per-user marker is set so the
- * contextual prompt above never asks a second time.
- */
-export async function requestOnboardingPushPermission(userId: string | null | undefined): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
-  try {
-    const permission = await Notifications.getPermissionsAsync();
-    if (permission.status === 'granted') return true;
-    if (userId) await AsyncStorage.setItem(requestedKey(userId), 'true');
-    if (permission.canAskAgain === false) return false;
-    return (await Notifications.requestPermissionsAsync()).status === 'granted';
-  } catch {
-    // Push is optional; onboarding carries on either way.
-    return false;
-  }
-}
