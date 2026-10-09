@@ -36,6 +36,8 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterCh
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
 import { useApi } from '@/hooks/useApi';
+import { confirmPublishWithoutPayouts } from '@/lib/payoutReadinessPrompt';
+import { getEntitlementRejection } from '@/lib/entitlementError';
 
 import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType, ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection } from '@/services/productTypes';
 
@@ -703,6 +705,13 @@ export default function AddProductScreen() {
     // always runs this same flow, just with a different final status.
     const finalStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
 
+    // A new live listing from a seller without payouts can't be bought yet:
+    // say so first, and let them set up payouts or publish anyway (BT-206).
+    if (finalStatus === 'active' && !isEditMode && !(await confirmPublishWithoutPayouts(api, router))) {
+      setPublishing(false);
+      return;
+    }
+
     const productPayload: Partial<Product> = {
       ...draftData,
       pricing,
@@ -755,6 +764,15 @@ export default function AddProductScreen() {
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
       variants:    productVariantsForServer,
+      // No size/colour options: the server makes one default variant from
+      // these so the listing can be bought (BT-205).
+      ...(productVariantsForServer.length === 0 && (productPayload.pricing?.priceCents ?? 0) > 0
+        ? {
+            priceCents: productPayload.pricing!.priceCents,
+            stock: parseInt(stockStr, 10) || 0,
+            ...(productPayload.pricing?.compareAtPriceCents ? { compareAtPriceCents: productPayload.pricing.compareAtPriceCents } : {}),
+          }
+        : {}),
       sizeChartImageUrl: productPayload.sizeChartImageUrl ?? undefined,
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
@@ -771,6 +789,11 @@ export default function AddProductScreen() {
       styleTags:   productPayload.styleTags ?? [],
       sizeChartImageUrl: productPayload.sizeChartImageUrl ?? null,
       compareAtPriceCents: productPayload.pricing?.compareAtPriceCents ?? null,
+      // A simple product saved before it had a variant gets one now (BT-205);
+      // the server ignores these once the product has variants.
+      ...(productVariantsForServer.length === 0 && (productPayload.pricing?.priceCents ?? 0) > 0
+        ? { priceCents: productPayload.pricing!.priceCents, stock: parseInt(stockStr, 10) || 0 }
+        : {}),
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
@@ -791,6 +814,18 @@ export default function AddProductScreen() {
         setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
     } catch (err: any) {
+      // Over the plan's product limit (the free limits when unsubscribed, BT-002).
+      const planLimit = getEntitlementRejection(err);
+      if (planLimit) {
+        setPublishError(planLimit.message);
+        if (Platform.OS !== 'web') {
+          Alert.alert('Plan limit reached', planLimit.message, [
+            { text: 'Not Now', style: 'cancel' },
+            { text: 'See Plans', onPress: () => router.push(`/plans?highlight=${planLimit.requiredPlan}&source=product_limit` as never) },
+          ]);
+        }
+        return;
+      }
       const needsShipDate = err?.code === 'PREORDER_SHIP_DATE_REQUIRED';
       showPublishError(
         needsShipDate ? 'Add a ship date' : 'Error',

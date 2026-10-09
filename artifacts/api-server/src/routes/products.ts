@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
 import { eq, desc, sql, and, isNull, gt, ne } from "drizzle-orm";
 import { validatePreorderListing } from "../lib/delivery/policy";
+import { buildDefaultVariant, defaultVariantSku } from "../lib/products/defaultVariant";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
@@ -151,6 +152,8 @@ router.post("/", requireRole("manager"), async (req, res) => {
     isPreOrder, preOrderClosingDate, preOrderEstShipDate, dropId,
     // A photo of the seller's own size chart.
     sizeChartImageUrl,
+    // Simple product (no options): price/stock for its single default variant.
+    priceCents, stock, compareAtPriceCents,
   } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
@@ -212,6 +215,16 @@ router.post("/", requireRole("manager"), async (req, res) => {
       stock,
       lowStockThreshold: threshold,
     });
+  }
+
+  // A product without size/colour options is still sold through one variant
+  // (BT-205): build it from the product-level price.
+  if (validatedVariants.length === 0) {
+    const fallback = buildDefaultVariant({ name, priceCents, stock, compareAtPriceCents });
+    if (fallback && "error" in fallback) {
+      res.status(400).json({ error: fallback.error }); return;
+    }
+    if (fallback) validatedVariants.push(fallback);
   }
 
   const access = await getProductAccess(req, res);
@@ -291,10 +304,17 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
     // Product-level strike-through price applied to every variant that costs
     // less than it (null clears). Per-variant control: PATCH /:id/variants/:variantId.
     compareAtPriceCents,
+    // Simple product saved before it had any variant: price/stock for its
+    // default variant (BT-205). Ignored once the product has variants.
+    priceCents, stock,
   } = req.body;
   if (compareAtPriceCents !== undefined && compareAtPriceCents !== null &&
       (!Number.isInteger(compareAtPriceCents) || compareAtPriceCents <= 0)) {
     res.status(400).json({ error: "compareAtPriceCents must be a positive integer or null" }); return;
+  }
+  const defaultVariant = buildDefaultVariant({ name: typeof name === "string" ? name : "", priceCents, stock, compareAtPriceCents });
+  if (defaultVariant && "error" in defaultVariant) {
+    res.status(400).json({ error: defaultVariant.error }); return;
   }
 
   {
@@ -369,6 +389,18 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
           ? null
           : sql`CASE WHEN ${compareAtPriceCents}::int > ${productVariants.priceCents} THEN ${compareAtPriceCents}::int ELSE NULL END` })
         .where(eq(productVariants.productId, updated.id));
+    }
+    if (updated && defaultVariant) {
+      const [{ count }] = await tx.select({ count: sql<number>`count(*)::int` })
+        .from(productVariants).where(eq(productVariants.productId, updated.id));
+      if (count === 0) {
+        await tx.insert(productVariants).values({
+          productId: updated.id,
+          ...defaultVariant,
+          // The stored name, when this update didn't rename the product.
+          sku: name ? defaultVariant.sku : defaultVariantSku(updated.name),
+        });
+      }
     }
     return {
       updated,
