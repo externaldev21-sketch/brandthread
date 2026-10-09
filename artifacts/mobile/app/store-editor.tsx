@@ -436,7 +436,7 @@ export default function StoreEditor() {
       <View ref={sectionPanelRef} style={panelStyles.root}>
         <View style={panelStyles.header}>
           <Text style={panelStyles.title}>{s.label} Settings</Text>
-          <TouchableOpacity onPress={() => setActiveSection(null)} style={panelStyles.closeBtn}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setActiveSection(null)} style={panelStyles.closeBtn}>
             <Feather name="x" size={ICON.md} color={MUTED} />
           </TouchableOpacity>
         </View>
@@ -1150,14 +1150,14 @@ export default function StoreEditor() {
         onBack={() => goBackOr(router)}
         rightElement={
           <View style={styles.headerRight}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Undo"
               onPress={handleUndo}
               disabled={!undoAvailable}
               style={[styles.undoBtn, !undoAvailable && styles.undoBtnDisabled]}
             >
               <Feather name="corner-up-left" size={ICON.sm} color={undoAvailable ? FG : SUBTLE} />
             </TouchableOpacity>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Redo"
               onPress={handleRedo}
               disabled={!redoAvailable}
               style={[styles.undoBtn, !redoAvailable && styles.undoBtnDisabled]}

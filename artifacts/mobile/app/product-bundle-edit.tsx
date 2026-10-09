@@ -290,7 +290,7 @@ export default function ProductBundleEditScreen() {
               )}
               <Text style={s.itemPrice}>{formatCents(item.priceCents ?? 0)}</Text>
             </View>
-            <TouchableOpacity onPress={() => removeItem(item.id)} style={s.removeBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove item" onPress={() => removeItem(item.id)} style={s.removeBtn}>
               <Feather name="trash-2" size={14} color={RED} />
             </TouchableOpacity>
           </View>

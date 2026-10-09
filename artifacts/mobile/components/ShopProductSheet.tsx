@@ -951,7 +951,7 @@ export function ShopProductSheet({
           timeline/duration as the sheet's own slide (see useSheetTransition),
           instead of popping instantly. */}
       <ReanimatedAnimated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
-        <TouchableWithoutFeedback onPress={handleClose}>
+        <TouchableWithoutFeedback accessibilityRole="button" accessibilityLabel="Close" onPress={handleClose}>
           <View style={ss.backdrop} />
         </TouchableWithoutFeedback>
       </ReanimatedAnimated.View>

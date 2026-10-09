@@ -222,7 +222,7 @@ export default function StoreFromSocialScreen() {
               {screenshots.map((uri, idx) => (
                 <View key={uri + idx} style={ss.gridWrap}>
                   <Image source={{ uri }} style={ss.gridImg} resizeMode="cover" />
-                  <TouchableOpacity style={ss.removeBtn} onPress={() => removeScreenshot(idx)}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove screenshot" style={ss.removeBtn} onPress={() => removeScreenshot(idx)}>
                     <Feather name="x" size={10} color={FG} />
                   </TouchableOpacity>
                 </View>

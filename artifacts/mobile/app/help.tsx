@@ -287,7 +287,7 @@ export default function HelpScreen() {
         onRequestClose={() => setArticle(null)}
       >
         <View style={s.sheetBackdrop}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setArticle(null)} />
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setArticle(null)} />
           <View style={s.sheetCard}>
             <SheetHandle />
             {article && (

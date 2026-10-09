@@ -128,7 +128,7 @@ export function VariantPickerSheet({
 
   return (
     <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
+      <TouchableWithoutFeedback accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>
         <View style={s.backdrop} />
       </TouchableWithoutFeedback>
       <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>

@@ -483,7 +483,7 @@ export default function StoreCollectionsScreen() {
                     placeholderTextColor={SUBTLE}
                   />
                 </View>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove condition"
                   onPress={() => removeCondition(idx)}
                   style={styles.removeBtn}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

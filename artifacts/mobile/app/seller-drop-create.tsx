@@ -469,7 +469,7 @@ export default function SellerDropCreate() {
                     <Text style={{ color: theme.muted, fontSize: FS.xs, marginTop: 6 }}>Video selected</Text>
                   </View>
                 )}
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove media"
                   style={[styles.heroRemoveBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
                   onPress={() => { setHeroImageUrl(null); setHeroVideoUrl(null); }}
                 >
@@ -640,7 +640,7 @@ export default function SellerDropCreate() {
         <View style={[styles.root, { backgroundColor: theme.background, paddingTop: topInset }]}>
           <View style={styles.tzHeader}>
             <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg }}>Choose timezone</Text>
-            <TouchableOpacity onPress={() => setTzPickerOpen(false)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setTzPickerOpen(false)}>
               <Feather name="x" size={22} color={theme.text} />
             </TouchableOpacity>
           </View>

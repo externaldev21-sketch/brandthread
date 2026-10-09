@@ -3535,7 +3535,7 @@ export default function FeedScreen({
         onRequestClose={() => setShowRepostEducation(false)}
       >
         <View style={styles.repostEducationBackdrop}>
-          <TouchableWithoutFeedback onPress={() => setShowRepostEducation(false)}>
+          <TouchableWithoutFeedback accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowRepostEducation(false)}>
             <View style={StyleSheet.absoluteFill} />
           </TouchableWithoutFeedback>
           <SheetRise style={[styles.repostEducationSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>

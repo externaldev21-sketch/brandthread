@@ -96,7 +96,7 @@ export default function PlanUpsellModal({
             style={s.header}
           >
             {/* Close button */}
-            <TouchableOpacity style={s.closeBtn} onPress={handleClose} hitSlop={8}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={s.closeBtn} onPress={handleClose} hitSlop={8}>
               <Feather name="x" size={18} color={theme.onAccent} style={{ opacity: 0.8 }} />
             </TouchableOpacity>
 

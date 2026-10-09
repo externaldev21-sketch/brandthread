@@ -921,7 +921,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
         <View style={fm.handle} />
         <View style={fm.header}>
           <Text style={fm.title}>Filter Manufacturers</Text>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close filters" onPress={onClose}>
             <Feather name="x" size={ICON.md} color={theme.muted} />
           </TouchableOpacity>
         </View>

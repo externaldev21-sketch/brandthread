@@ -104,7 +104,7 @@ export function SettingsSearchBar({
         onBlur={() => setFocused(false)}
       />
       {value.length > 0 && (
-        <TouchableOpacity onPress={() => onChangeText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear text" onPress={() => onChangeText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="x-circle" size={15} color={colors.mutedForeground} />
         </TouchableOpacity>
       )}
@@ -283,7 +283,7 @@ export function ConfirmSheet({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={s.sheetBackdrop}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onCancel} />
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cancel" style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onCancel} />
         <Animated.View style={[s.sheetCard, { opacity: fade, transform: [{ translateY }] }]}>
           <SheetHandle />
           <Text style={s.sheetTitle}>{title}</Text>

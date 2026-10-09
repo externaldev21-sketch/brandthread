@@ -681,13 +681,13 @@ export default function BuyerStoryViewer() {
             (matching the old activeOpacity=1), so the hold-to-pause timing is
             never touched. */}
         <View style={styles.tapZoneRow}>
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Previous"
             style={styles.tapLeft}
             onPress={retreatSlide}
             onLongPress={() => { setIsLongPressing(true); setIsPaused(true); }}
             onPressOut={() => { if (isLongPressing) { setIsPaused(false); setIsLongPressing(false); } }}
           />
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Next"
             style={styles.tapRight}
             onPress={advanceSlide}
             onLongPress={() => { setIsLongPressing(true); setIsPaused(true); }}

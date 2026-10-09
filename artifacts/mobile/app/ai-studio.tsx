@@ -137,7 +137,7 @@ export default function AIStudioScreen() {
                 <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Photo</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="New canvas"
               style={[styles.newCanvasBtn, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setNewCanvasVisible(true); }}

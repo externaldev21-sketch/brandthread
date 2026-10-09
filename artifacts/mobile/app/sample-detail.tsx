@@ -141,7 +141,7 @@ function StarRow({
   return (
     <View style={sr.row}>
       {[1, 2, 3, 4, 5].map(i => (
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Rate ${i} star${i === 1 ? '' : 's'}`}
           key={i}
           onPress={() => !readonly && onRate?.(i)}
           disabled={readonly}

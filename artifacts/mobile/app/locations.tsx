@@ -211,10 +211,10 @@ export default function LocationsScreen() {
                           {loc.is_active ? 'Active' : 'Inactive'}
                         </Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => openEdit(loc)} style={s.iconAction} activeOpacity={0.7}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit location" onPress={() => openEdit(loc)} style={s.iconAction} activeOpacity={0.7}>
                         <Feather name="edit-2" size={15} color={colors.mutedForeground} />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDelete(loc)} style={s.iconAction} activeOpacity={0.7}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete location" onPress={() => handleDelete(loc)} style={s.iconAction} activeOpacity={0.7}>
                         <Feather name="trash-2" size={15} color={colors.mutedForeground} />
                       </TouchableOpacity>
                     </View>

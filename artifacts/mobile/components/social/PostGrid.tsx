@@ -76,7 +76,7 @@ function GridCell({
   }
 
   return (
-    <Pressable
+    <Pressable accessibilityRole="button" accessibilityLabel="Open post"
       ref={cellRef}
       testID={`post-grid-cell-${item.id}`}
       onPress={handlePress}

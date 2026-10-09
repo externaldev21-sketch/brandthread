@@ -317,7 +317,7 @@ export default function StoreFromMoodboardScreen() {
           {imageUris.map((uri, idx) => (
             <View key={uri + idx} style={mb.imageWrap}>
               <Image source={{ uri }} style={mb.gridImage} resizeMode="cover" />
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove image"
                 style={mb.removeBtn}
                 onPress={() => removeImage(idx)}
                 disabled={preparingImages}

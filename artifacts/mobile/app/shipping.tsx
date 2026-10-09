@@ -555,7 +555,7 @@ export default function ShippingScreen() {
                 placeholderTextColor={colors.mutedForeground}
                 style={[styles.countryInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
               />
-              <TouchableOpacity onPress={saveShipFrom} disabled={savingShipFrom} style={[styles.smallBtn, { backgroundColor: colors.primary }]}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save" onPress={saveShipFrom} disabled={savingShipFrom} style={[styles.smallBtn, { backgroundColor: colors.primary }]}>
                 {savingShipFrom ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="check" size={14} color={colors.primaryForeground} />}
               </TouchableOpacity>
             </View>
@@ -728,10 +728,10 @@ export default function ShippingScreen() {
                   {preset.lengthIn}″ × {preset.widthIn}″ × {preset.heightIn}″ · {preset.weightOz} oz
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => openEditPreset(preset)} style={styles.presetIconBtn}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit package" onPress={() => openEditPreset(preset)} style={styles.presetIconBtn}>
                 <Feather name="edit-2" size={14} color={colors.mutedForeground} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDeletePreset(preset)} style={styles.presetIconBtn}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete package" onPress={() => handleDeletePreset(preset)} style={styles.presetIconBtn}>
                 <Feather name="trash-2" size={14} color={colors.destructive} />
               </TouchableOpacity>
             </View>
@@ -743,7 +743,7 @@ export default function ShippingScreen() {
     {/* ── Zone editor sheet ────────────────────────────────────────────────── */}
     {zoneSheetVisible && (
       <View style={styles.sheetBackdrop}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setZoneSheetVisible(false)} />
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setZoneSheetVisible(false)} />
         <ScrollView
           style={[styles.sheetScroll, { backgroundColor: colors.card, borderColor: colors.border }]}
           contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 20 }}
@@ -851,7 +851,7 @@ export default function ShippingScreen() {
                       style={[styles.tierInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
                     />
                   </View>
-                  <TouchableOpacity onPress={() => removeTier(i)} disabled={zoneForm.weightTiers.length <= 1} style={styles.tierRemoveBtn}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove tier" onPress={() => removeTier(i)} disabled={zoneForm.weightTiers.length <= 1} style={styles.tierRemoveBtn}>
                     <Feather name="x" size={16} color={zoneForm.weightTiers.length <= 1 ? colors.border : colors.destructive} />
                   </TouchableOpacity>
                 </View>
@@ -959,7 +959,7 @@ export default function ShippingScreen() {
     {/* ── Packaging preset sheet ───────────────────────────────────────────── */}
     {presetSheetVisible && (
       <View style={styles.sheetBackdrop}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPresetSheetVisible(false)} />
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPresetSheetVisible(false)} />
         <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: insets.bottom + 20 }]}>
           <Text style={[styles.sheetTitle, { color: colors.foreground }]}>{presetForm.id ? 'Edit package' : 'Add package preset'}</Text>
           <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Name</Text>

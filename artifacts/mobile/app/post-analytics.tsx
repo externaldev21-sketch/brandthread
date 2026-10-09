@@ -294,7 +294,7 @@ export default function PostAnalyticsScreen() {
     <View style={styles.root}>
       {/* ─── Fixed Header ──────────────────────────────────────────────────── * /}
       <View style={[styles.header, { paddingTop: headerTopInset }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" style={styles.backBtn} onPress={() => goBackOr(router)}>
           <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Post Analytics</Text>

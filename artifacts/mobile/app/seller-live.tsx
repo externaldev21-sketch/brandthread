@@ -391,7 +391,7 @@ function SellerLiveNativeScreen() {
           <Feather name="tag" size={21} color="#fff" />
         </TouchableOpacity>
         {/* Switch camera */}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Switch camera"
           style={s.railBtn}
           activeOpacity={0.7}
           onPress={() => engineRef.current?.switchCamera?.()}
@@ -505,7 +505,7 @@ function SellerLiveNativeScreen() {
           <View style={[s.pickerSheet, { paddingBottom: insets.bottom + 12 }]}>
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>Tag products</Text>
-              <TouchableOpacity onPress={() => setShowProductPicker(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowProductPicker(false)}>
                 <Feather name="x" size={22} color={FG} />
               </TouchableOpacity>
             </View>
