@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.sm,
     maxWidth: '86%', overflow: 'hidden',
   },
-  thumb: { width: 28, height: 28, borderRadius: 6 },
+  thumb: { width: 28, height: 28, borderRadius: 8 },
   thumbFallback: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   textCol: { flexShrink: 1, minWidth: 80 },
   title: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.xs },

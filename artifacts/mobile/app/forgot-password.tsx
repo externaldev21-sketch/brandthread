@@ -373,18 +373,18 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
 
   errorBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: `${theme.error}14`, borderRadius: 10,
+    backgroundColor: `${theme.error}14`, borderRadius: 8,
     borderWidth: 1, borderColor: `${theme.error}40`,
     paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16,
   },
   errorText: { fontSize: 13, fontFamily: FONT.regular, color: theme.error, flex: 1 },
 
   primaryWrap: { marginBottom: 10 },
-  primaryBtn:  { borderRadius: 14, paddingVertical: 17, alignItems: 'center' },
+  primaryBtn:  { borderRadius: 12, paddingVertical: 17, alignItems: 'center' },
   primaryBtnText: { fontSize: 15, fontFamily: FONT.bold, color: theme.onAccent },
 
   secondaryBtn: {
-    borderRadius: 14, paddingVertical: 16, alignItems: 'center',
+    borderRadius: 12, paddingVertical: 16, alignItems: 'center',
     borderWidth: 1, borderColor: theme.border,
   },
   secondaryBtnText: { fontSize: 15, fontFamily: FONT.bold, color: theme.text },
@@ -394,13 +394,13 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
 
   // Success card
   successCard: {
-    borderRadius: 20, borderWidth: 1,
+    borderRadius: 16, borderWidth: 1,
     borderColor: `${theme.success}40`, overflow: 'hidden', marginBottom: 28,
   },
   successGrad: { padding: 28, alignItems: 'center' },
   successIconWrap: { marginBottom: 20 },
   successIconGrad: {
-    width: 64, height: 64, borderRadius: 20,
+    width: 64, height: 64, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
      shadowColor: theme.success, shadowOpacity: 0.5,
     shadowRadius: 16, shadowOffset: { width: 0, height: 0 },

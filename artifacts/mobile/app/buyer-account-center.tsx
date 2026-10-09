@@ -78,7 +78,7 @@ export default function BuyerAccountCenter() {
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
   hero: { flexDirection: 'row', gap: 14, alignItems: 'center', borderRadius: RADII.card, borderWidth: 1, padding: 16, marginBottom: 16 },
-  logo: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  logo: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   logoText: { fontFamily: FONT.bold, fontSize: FS.xl },
   heroTitle: { fontFamily: FONT.bold, fontSize: 15 },
   heroSub: { fontFamily: FONT.regular, fontSize: 11.5, lineHeight: 16, marginTop: 3 },

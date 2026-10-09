@@ -190,13 +190,16 @@ export const SP = {
 } as const;
 
 // ─── Border Radii ─────────────────────────────────────────────────────────────
+// Four radii app-wide (constants/radii.ts `radius`): 8 small controls,
+// 12 buttons/cards, 16 sheets/large surfaces, full for pills and circles.
+// The legacy keys stay so existing call sites keep compiling.
 export const RADIUS = {
-  xs:   6,
-  sm:   10,
-  md:   14,
-  lg:   18,
-  xl:   24,
-  xxl:  32,
+  xs:   8,
+  sm:   8,
+  md:   12,
+  lg:   16,
+  xl:   16,
+  xxl:  16,
   pill: 999,
 } as const;
 

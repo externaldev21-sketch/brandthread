@@ -88,7 +88,7 @@ function makeStyles(ck: CheckoutColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4 },
     icon: {
-      width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: ck.fieldBorder,
+      width: 36, height: 36, borderRadius: 8, borderWidth: 1, borderColor: ck.fieldBorder,
       alignItems: 'center', justifyContent: 'center',
     },
     copy: { flex: 1, minWidth: 0 },

@@ -686,7 +686,7 @@ const s = StyleSheet.create({
   progressTrack: {
     position: 'absolute', left: SP.md, right: SP.md, zIndex: 12,
     height: 3, flexDirection: 'row', gap: 2, overflow: 'hidden',
-    borderRadius: RADIUS.xs,
+    borderRadius: 6,
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
   progressSegment: { height: 3, minWidth: 3, borderRadius: 1 },
@@ -862,7 +862,7 @@ const s = StyleSheet.create({
   },
   shutterRecording: { borderColor: ERROR },
   shutterInner: { width: 62, height: 62, borderRadius: 31 },
-  stopIcon: { width: 24, height: 24, borderRadius: 5, backgroundColor: ERROR },
+  stopIcon: { width: 24, height: 24, borderRadius: 8, backgroundColor: ERROR },
 
   // ── Thread / Story mode-switcher row ──
   modeSwitchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.lg },

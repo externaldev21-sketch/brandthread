@@ -192,7 +192,7 @@ function styles(theme: ReturnType<typeof useAppTheme>['theme']) {
     searchWrap: { paddingHorizontal: SIDE_INSET, paddingBottom: SP.sm },
     searchField: {
       flexDirection: 'row', alignItems: 'center', gap: SP.xs,
-      height: 38, borderRadius: 10, paddingHorizontal: SP.sm,
+      height: 38, borderRadius: 8, paddingHorizontal: SP.sm,
     },
     searchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, paddingVertical: 0 },
     scrollContent: { paddingBottom: SP.xl },

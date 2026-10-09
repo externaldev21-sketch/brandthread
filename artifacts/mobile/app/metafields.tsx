@@ -130,7 +130,7 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
   rowIcon: { marginRight: 12 },
   rowLabel: { fontSize: 14, fontFamily: FONT.semibold },
-  countBadge: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3 },
+  countBadge: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3 },
   countBadgeText: { fontSize: 11, fontFamily: FONT.semibold },
   countText: { fontSize: 13, fontFamily: FONT.regular },
   addMetaBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 12, alignSelf: 'flex-start' },

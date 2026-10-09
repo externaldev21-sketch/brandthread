@@ -3683,7 +3683,7 @@ const styles = StyleSheet.create({
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 7,
+    backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 8,
     paddingHorizontal: 7, paddingVertical: 5,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
@@ -3808,7 +3808,7 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
   repostEducationBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.56)', justifyContent: 'flex-end' },
   repostEducationSheet: {
-    backgroundColor: CARD, borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    backgroundColor: CARD, borderTopLeftRadius: 16, borderTopRightRadius: 16,
     paddingHorizontal: 24, paddingTop: 22,
     borderWidth: 1, borderBottomWidth: 0, borderColor: BORDER,
   },
@@ -3818,7 +3818,7 @@ const styles = StyleSheet.create({
   },
   repostEducationPreview: { alignItems: 'center', marginBottom: 20 },
   repostEducationPreviewMedia: {
-    width: 220, height: 150, borderRadius: 18, backgroundColor: '#313136',
+    width: 220, height: 150, borderRadius: 16, backgroundColor: '#313136',
     overflow: 'hidden', padding: 14, justifyContent: 'flex-end',
   },
   repostEducationPreviewBadge: {
@@ -3854,7 +3854,7 @@ const styles = StyleSheet.create({
   },
   repostEducationOkayText: { fontFamily: FONT.bold, fontSize: FS.base },
   commentsSheet: {
-    backgroundColor: SURFACE, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    backgroundColor: SURFACE, borderTopLeftRadius: 16, borderTopRightRadius: 16,
     paddingTop: 10, paddingHorizontal: 18,
   },
   commentsHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 14 },

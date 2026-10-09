@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderTopWidth: 1 },
   listRowLabel: { fontSize: 13, fontFamily: FONT.medium },
   chipRow: { flexDirection: 'row', gap: 4 },
-  chip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
+  chip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
   chipText: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.3 },
 
   payoutInfo: { flex: 1 },
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   sectionCount: { fontSize: 13, fontFamily: FONT.regular },
 
   // Note banners
-  preOrderNote: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 12 },
+  preOrderNote: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 12 },
   preOrderNoteText: { fontSize: 12, fontFamily: FONT.medium, flex: 1 },
 
   // Drop card
@@ -664,13 +664,13 @@ const styles = StyleSheet.create({
   zeroAudienceText: { fontSize: 12, fontFamily: FONT.medium },
   broadcastBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 7, borderRadius: 10, borderWidth: 1,
+    gap: 7, borderRadius: 8, borderWidth: 1,
     paddingVertical: 10, paddingHorizontal: 14,
   },
   broadcastBtnText: { fontSize: 13, fontFamily: FONT.semibold },
-  scheduledNotice: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 10, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14 },
+  scheduledNotice: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 8, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14 },
   scheduledNoticeText: { fontSize: 13, fontFamily: FONT.semibold },
 
   // Shared card container
-  section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
+  section: { borderRadius: 12, borderWidth: 1, marginBottom: 24 },
 });

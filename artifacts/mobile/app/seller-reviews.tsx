@@ -296,7 +296,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   dateText:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   reviewBody: { fontSize: 13, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
 
-  replyBox:   { backgroundColor: PURPLE_DIM, borderRadius: 10, padding: 12, gap: 6 },
+  replyBox:   { backgroundColor: PURPLE_DIM, borderRadius: 8, padding: 12, gap: 6 },
   replyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   replyLabel: { fontSize: 11, fontFamily: FONT.semibold, color: PURPLE_LIGHT, textTransform: 'uppercase', letterSpacing: 0.5 },
   replyText:  { fontSize: 13, fontFamily: FONT.regular, color: FG, lineHeight: 19 },
@@ -305,7 +305,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   replyBtnText: { fontSize: 12, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
 
   replyForm:  { gap: 10 },
-  replyInput: { backgroundColor: SURFACE, borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, fontSize: 13, fontFamily: FONT.regular, color: FG, minHeight: 80, textAlignVertical: 'top' },
+  replyInput: { backgroundColor: SURFACE, borderRadius: 8, borderWidth: 1, borderColor: BORDER, padding: 12, fontSize: 13, fontFamily: FONT.regular, color: FG, minHeight: 80, textAlignVertical: 'top' },
   replyActions: { flexDirection: 'row', gap: 8, justifyContent: 'flex-end' },
   cancelBtn:  { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: BORDER },
   cancelText: { fontSize: 13, fontFamily: FONT.semibold, color: MUTED },

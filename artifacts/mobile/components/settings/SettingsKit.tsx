@@ -348,7 +348,7 @@ function makeCardStyles(colors: Colors) {
     // Row
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14, minHeight: 52 },
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    rowIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    rowIcon: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
     rowCopy: { flex: 1, minWidth: 0 },
     rowLabel: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.medium },
     rowSubtitle: { fontSize: 12, lineHeight: 16, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
@@ -360,7 +360,7 @@ function makeCardStyles(colors: Colors) {
 
     // Confirm sheet
     sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)' },
-    sheetCard: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.border, borderBottomWidth: 0, paddingHorizontal: 22, paddingBottom: 36, paddingTop: 2 },
+    sheetCard: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderWidth: 1, borderColor: colors.border, borderBottomWidth: 0, paddingHorizontal: 22, paddingBottom: 36, paddingTop: 2 },
     sheetTitle: { fontSize: 19, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center', marginTop: 10 },
     sheetMessage: { fontSize: 14, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 8, marginBottom: 22, lineHeight: 19, paddingHorizontal: 8 },
     sheetConfirmBtn: { borderRadius: RADIUS.md, paddingVertical: 15, alignItems: 'center', marginBottom: 10 },

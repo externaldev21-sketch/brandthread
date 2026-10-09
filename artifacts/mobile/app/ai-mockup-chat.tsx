@@ -170,11 +170,11 @@ export default function AIMockupChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  bubble: { maxWidth: '85%', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1 },
+  bubble: { maxWidth: '85%', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1 },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
-  mockupImage: { width: 240, height: 240, borderRadius: 10, marginTop: 10 },
+  mockupImage: { width: 240, height: 240, borderRadius: 8, marginTop: 10 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },

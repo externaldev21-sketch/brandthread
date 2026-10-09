@@ -531,7 +531,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '88%',
-    backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    backgroundColor: theme.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16,
     borderWidth: 1, borderBottomWidth: 0, borderColor: theme.border, paddingHorizontal: SP.md,
   },
   sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, marginTop: SP.sm, marginBottom: SP.md },

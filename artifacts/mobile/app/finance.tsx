@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   overviewVal: { fontSize: 16, fontFamily: FONT.bold },
   overviewLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
-  section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
+  section: { borderRadius: 12, borderWidth: 1, marginBottom: 24 },
   plRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   plLabel: { fontSize: 14 },
   plValue: { fontSize: 14 },
@@ -358,12 +358,12 @@ const styles = StyleSheet.create({
   expDate: { fontSize: 11, fontFamily: FONT.regular },
   expAmount: { fontSize: 14, fontFamily: FONT.semibold },
   docRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  docIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  docIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   docLabel: { flex: 1, fontSize: 14, fontFamily: FONT.regular },
 
   // Subscription card
   subCard: {
-    flexDirection: 'row', alignItems: 'center', borderRadius: 14,
+    flexDirection: 'row', alignItems: 'center', borderRadius: 12,
     borderWidth: 1, padding: 14, marginBottom: 20, gap: 12,
   },
   subCardLeft:    { flex: 1, gap: 3 },
@@ -371,6 +371,6 @@ const styles = StyleSheet.create({
   subCardPlan:    { fontSize: 16, fontFamily: FONT.semibold },
   subCardMeta:    { fontSize: 12, fontFamily: FONT.regular },
   subCardRight:   { alignItems: 'flex-end' },
-  subStatusPill:  { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  subStatusPill:  { borderRadius: 16, paddingHorizontal: 8, paddingVertical: 3 },
   subStatusText:  { fontSize: 11, fontFamily: FONT.semibold },
 });

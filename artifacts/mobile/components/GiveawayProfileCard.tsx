@@ -42,7 +42,7 @@ export function GiveawayProfileCard({ sellerId, enabled = true }: { sellerId: st
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 8 },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 12, padding: 14, marginTop: 8 },
   title: { fontSize: FS.sm, fontFamily: FONT.semibold },
   sub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
 });

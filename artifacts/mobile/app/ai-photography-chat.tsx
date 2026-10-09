@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   // Narrow enough that the badge never eats into the title's available
   // width — a wider badge here previously clipped "AI Product Photography"
   // (251px of text in a 246px box) once the header row split the space.
-  bubble: { maxWidth: '85%', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1 },
+  bubble: { maxWidth: '85%', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1 },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
   attachedItem: { alignItems: 'center', gap: 3 },
   attachedThumb: { width: 48, height: 48, borderRadius: 8 },
   attachedLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
-  resultImage: { width: 240, height: 240, borderRadius: 10, marginTop: 10 },
+  resultImage: { width: 240, height: 240, borderRadius: 8, marginTop: 10 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
   retryLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   retrySpinner: { width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
   trayThumbWrap: { position: 'relative' },
-  trayThumb: { width: 56, height: 56, borderRadius: 10 },
+  trayThumb: { width: 56, height: 56, borderRadius: 8 },
   lockedHeroTray: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, padding: 8, borderRadius: 12, borderWidth: 1 },
   lockedHeroCopy: { flex: 1, marginLeft: 10 },
   lockedHeroTitle: { fontSize: 12, fontFamily: FONT.semibold },

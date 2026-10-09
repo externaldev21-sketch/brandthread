@@ -877,7 +877,7 @@ export function BrandedLoader({ label = 'Stitching things together…', style }:
 
 const brLoaderS = StyleSheet.create({
   root: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, padding: SP.xl },
-  mark: { width: 76, height: 76, borderRadius: 26, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  mark: { width: 76, height: 76, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   thread: { position: 'absolute', width: 45, height: 45, borderRadius: 23, borderWidth: 1, borderStyle: 'dashed' },
   label: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center' },
 });

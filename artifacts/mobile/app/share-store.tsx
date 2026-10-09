@@ -139,7 +139,7 @@ const s = StyleSheet.create({
 
   body:        { flex: 1, alignItems: 'center', paddingHorizontal: 24, paddingTop: 36 },
 
-  qrCard:      { width: '100%', borderRadius: 24, borderWidth: 1, alignItems: 'center', padding: 28, marginBottom: 20 },
+  qrCard:      { width: '100%', borderRadius: 16, borderWidth: 1, alignItems: 'center', padding: 28, marginBottom: 20 },
   storeBadge:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28, alignSelf: 'flex-start' },
   storeLogoBox:{ width: 42, height: 42, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   storeName:   { fontSize: 15, fontFamily: FONT.bold, maxWidth: 180 },

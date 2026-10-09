@@ -190,7 +190,7 @@ const s = StyleSheet.create({
   card: { paddingVertical: SP.md, borderTopWidth: 1, gap: 6 },
   q: { fontSize: FS.base, fontFamily: FONT.bold, lineHeight: 22 },
   a: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 20 },
-  answer: { borderRadius: 10, padding: 12, gap: 4 },
+  answer: { borderRadius: 8, padding: 12, gap: 4 },
   meta: { fontSize: FS.meta, fontFamily: FONT.medium },
   deleteRow: { alignSelf: 'flex-start' },
   deleteText: { fontSize: FS.meta, fontFamily: FONT.semibold },

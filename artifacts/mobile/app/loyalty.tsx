@@ -264,7 +264,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   heroLabel:      { fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 2, textTransform: 'uppercase', marginBottom: SP.xs },
   heroBalance:    { fontSize: FS.h1, fontFamily: FONT.bold, color: FG, lineHeight: 42 },
   heroUnit:       { fontSize: FS.base, fontFamily: FONT.medium, marginBottom: SP.sm },
-  heroValuePill:  { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, marginTop: SP.xs },
+  heroValuePill:  { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6, marginTop: SP.xs },
   heroValueText:  { fontSize: FS.sm, fontFamily: FONT.semibold },
   heroEmpty:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 },
 

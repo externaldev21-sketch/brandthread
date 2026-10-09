@@ -572,7 +572,7 @@ const createStyles = (theme: AppThemePreset) => {
   payoutDate:   { color: text, fontSize: FS.base, fontFamily: FONT.medium },
   payoutSub:    { color: muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   payoutAmount: { color: text, fontSize: FS.base, fontFamily: FONT.semibold },
-  statusPill:   { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
+  statusPill:   { borderRadius: 16, paddingHorizontal: 8, paddingVertical: 2 },
   statusText:   { fontSize: FS.xs, fontFamily: FONT.medium },
   totalRow:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: SP.lg, paddingTop: SP.md, borderTopWidth: 1, borderTopColor: border },
   totalLabel:   { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },

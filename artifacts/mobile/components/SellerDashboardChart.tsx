@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     minWidth: 64,
     paddingHorizontal: SP.sm,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ translateX: -32 }],

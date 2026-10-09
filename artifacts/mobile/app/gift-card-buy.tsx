@@ -263,7 +263,7 @@ function makeStyles(ck: CheckoutColors) {
     errorRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.md },
     error: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 19, color: ck.text },
     doneTitle: { fontFamily: FONT.bold, fontSize: FS.xl, color: ck.text, marginTop: SP.lg },
-    codeBox: { marginTop: SP.lg, gap: SP.sm, padding: SP.md, borderRadius: 14, borderWidth: 1, borderColor: ck.fieldBorder },
+    codeBox: { marginTop: SP.lg, gap: SP.sm, padding: SP.md, borderRadius: 12, borderWidth: 1, borderColor: ck.fieldBorder },
     codeLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, textTransform: 'uppercase', color: ck.muted },
     code: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: 2, color: ck.text, marginBottom: SP.xs },
   });

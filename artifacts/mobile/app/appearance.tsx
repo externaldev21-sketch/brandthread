@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: SP.md, paddingTop: SP.md },
 
   hero: { alignItems: 'center', paddingVertical: SP.xl, borderRadius: RADIUS.lg, overflow: 'hidden' },
-  heroIcon: { width: 120, height: 120, borderRadius: 28 },
+  heroIcon: { width: 120, height: 120, borderRadius: 16 },
   heroName: { fontFamily: FONT.bold, fontSize: FS.xxl, marginTop: SP.md },
   heroSubtitle: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4 },
 
@@ -180,8 +180,8 @@ const styles = StyleSheet.create({
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: SP.lg },
   item: { width: '23%', alignItems: 'center' },
-  iconRing: { width: '100%', aspectRatio: 1, borderRadius: 22, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  icon: { width: '100%', height: '100%', borderRadius: 18 },
+  iconRing: { width: '100%', aspectRatio: 1, borderRadius: 16, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  icon: { width: '100%', height: '100%', borderRadius: 16 },
   selectedBadge: { position: 'absolute', right: -2, top: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
   label: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 6, textAlign: 'center' },
 });

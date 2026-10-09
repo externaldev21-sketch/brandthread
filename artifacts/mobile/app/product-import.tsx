@@ -389,7 +389,7 @@ export default function ProductImportScreen() {
             <Text style={{ fontSize: 18, fontFamily: FONT.bold, color: FG }}>Paste CSV Data</Text>
             <TouchableOpacity
               onPress={() => setShowCsvModal(false)}
-              style={{ width: 44, height: 44, backgroundColor: SURFACE, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 44, height: 44, backgroundColor: SURFACE, borderRadius: 8, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' }}
               accessibilityRole="button"
               accessibilityLabel="Close paste CSV data"
             >

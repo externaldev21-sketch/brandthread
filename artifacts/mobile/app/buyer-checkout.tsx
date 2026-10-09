@@ -1252,7 +1252,7 @@ function makeStyles(ck: CheckoutColors) {
     errorTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
     errorText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 3, color: ck.muted },
     ack: { flexDirection: 'row', gap: SP.sm + 4, alignItems: 'flex-start', paddingVertical: SP.xs },
-    checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+    checkbox: { width: 20, height: 20, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
     ackText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, color: ck.muted },
     trust: { paddingVertical: SP.md, paddingHorizontal: 0, borderTopWidth: 1, borderTopColor: ck.divider },
     hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: SP.sm },

@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderRadius: 14, paddingVertical: 15,
+    borderRadius: 12, paddingVertical: 15,
   },
   primaryBtnText: { fontSize: 14, fontFamily: FONT.semibold },
   secondaryBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 16 },
@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
   valueInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: FONT.regular, width: '100%' },
   addRowBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
-    borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, marginTop: 12,
+    borderWidth: 1, borderStyle: 'dashed', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, marginTop: 12,
   },
   resultCard: {
     borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center',

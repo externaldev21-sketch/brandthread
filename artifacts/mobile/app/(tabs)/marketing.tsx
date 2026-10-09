@@ -287,7 +287,7 @@ export default function MarketingScreen() {
 
       {/* Growth: tracked links, link in bio, store pixels */}
       <SectionHeader title="Growth" />
-      <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
+      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
         <ListRow icon="link" title="Links" subtitle="Trackable links with clicks and sales" chevron onPress={() => router.push('/growth-links' as never)} />
         <ListRow icon="user" title="Link in bio" subtitle="Your shareable page" chevron onPress={() => router.push('/link-in-bio' as never)} />
         <ListRow icon="activity" title="Pixels" subtitle="Meta and TikTok" chevron onPress={() => router.push('/store-pixels' as never)} />
@@ -356,18 +356,18 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   klaviyoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 14, marginBottom: 24, minHeight: COMP.buttonH },
   klaviyoText: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'center' },
-  section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
+  section: { borderRadius: 12, borderWidth: 1, marginBottom: 24 },
   emptyFlat: { marginBottom: 24 },
   emptyText: { fontSize: FS.sm, fontFamily: FONT.regular },
   campaignRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, minHeight: COMP.minTouchTarget },
-  campaignIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  campaignIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   campaignInfo: { flex: 1, gap: 4 },
   campaignName: { fontSize: FS.sm, fontFamily: FONT.semibold },
   campaignMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   campaignStat: { fontSize: FS.xs, fontFamily: FONT.regular },
   campaignRevenue: { fontSize: FS.sm, fontFamily: FONT.bold },
   discountRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  codeWrap: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
+  codeWrap: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   code: { fontSize: FS.meta, fontFamily: FONT.bold, letterSpacing: 1 },
   discountInfo: { flex: 1 },
   discountType: { fontSize: FS.sm, fontFamily: FONT.semibold },
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   autoInfo: { flex: 1 },
   autoName: { fontSize: FS.sm, fontFamily: FONT.semibold },
   autoTrigger: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  referralCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 16, borderWidth: 1, gap: 14, marginBottom: 24 },
+  referralCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 16, borderWidth: 1, gap: 14, marginBottom: 24 },
   referralTitle: { fontSize: FS.sm, fontFamily: FONT.semibold },
   referralSub: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
 });

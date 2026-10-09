@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   badge: {
     flexShrink: 0,
     backgroundColor: RED,
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 5,
     paddingVertical: 1,
   },

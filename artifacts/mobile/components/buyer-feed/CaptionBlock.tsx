@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 7,
+    backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 8,
     paddingHorizontal: 7, paddingVertical: 5,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },

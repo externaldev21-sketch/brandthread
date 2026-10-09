@@ -773,7 +773,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   toast: {
     position: 'absolute', top: 56, alignSelf: 'center', zIndex: 99,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: theme.success, borderRadius: 24,
+    backgroundColor: theme.success, borderRadius: 16,
     paddingHorizontal: 16, paddingVertical: 9,
   },
   toastText: { fontSize: 13, fontFamily: FONT.semibold, color: theme.onAccent },

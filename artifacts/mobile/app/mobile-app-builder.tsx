@@ -63,7 +63,7 @@ export default function MobileAppBuilderScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  heroCard: { borderRadius: 18, borderWidth: 1, padding: 20, marginBottom: 28, gap: 10 },
+  heroCard: { borderRadius: 16, borderWidth: 1, padding: 20, marginBottom: 28, gap: 10 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   heroTitle: { fontSize: 20, fontFamily: FONT.bold, marginTop: 4 },
@@ -71,9 +71,9 @@ const styles = StyleSheet.create({
   ctaBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 13, marginTop: 6 },
   ctaText: { fontSize: 14, fontFamily: FONT.semibold },
   sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
-  section: { borderRadius: 14, borderWidth: 1 },
+  section: { borderRadius: 12, borderWidth: 1 },
   featureRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  featureIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  featureIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   featureTitle: { fontSize: 14, fontFamily: FONT.semibold },
   featureDesc: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
 });

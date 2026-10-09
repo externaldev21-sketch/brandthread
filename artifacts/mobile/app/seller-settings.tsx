@@ -464,13 +464,13 @@ function makeListStyles(colors: ReturnType<typeof useColors>) {
 function makeScopeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)' },
-    card: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 20, paddingTop: 18 },
+    card: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 20, paddingTop: 18 },
     headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 18 },
     title: { fontSize: 20, fontFamily: FONT.bold, color: colors.foreground },
     subtitle: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 4 },
     saveNotice: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center' },
     close: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-    option: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
+    option: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
     optionIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.secondary },
     optionTitle: { fontSize: 15, fontFamily: FONT.semibold, color: colors.foreground },
     optionDescription: { fontSize: 12, lineHeight: 17, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },

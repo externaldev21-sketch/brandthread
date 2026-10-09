@@ -165,7 +165,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   list: { paddingHorizontal: SP.md },
   intro: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, paddingVertical: SP.lg },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
-  poster: { width: 68, height: 92, backgroundColor: theme.surface, overflow: 'hidden', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  poster: { width: 68, height: 92, backgroundColor: theme.surface, overflow: 'hidden', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   play: { position: 'absolute', textShadowColor: theme.background, textShadowRadius: 6 },
   details: { flex: 1, gap: 4 },
   caption: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },

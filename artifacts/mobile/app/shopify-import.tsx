@@ -277,8 +277,8 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 17, fontFamily: FONT.bold, textAlign: 'center' },
   heroSub: { fontSize: 13, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 19 },
   label: { fontSize: 12, fontFamily: FONT.medium, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: FONT.regular, marginBottom: 14 },
-  connectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 14 },
+  input: { borderRadius: 8, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: FONT.regular, marginBottom: 14 },
+  connectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, paddingVertical: 14 },
   connectBtnText: { fontSize: 14, fontFamily: FONT.semibold },
   infoText: { fontSize: 11, fontFamily: FONT.regular, lineHeight: 16, marginTop: 14, textAlign: 'center' },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
@@ -293,6 +293,6 @@ const styles = StyleSheet.create({
   summaryText: { fontSize: 13, fontFamily: FONT.semibold },
   summarySkipped: { fontSize: 11, fontFamily: FONT.regular, marginTop: 4 },
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 16 },
-  importBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 14 },
+  importBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, paddingVertical: 14 },
   importBtnText: { fontSize: 14, fontFamily: FONT.semibold },
 });

@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderRadius: 14, paddingVertical: 15,
+    borderRadius: 12, paddingVertical: 15,
   },
   primaryBtnText: { fontSize: 14, fontFamily: FONT.semibold },
   secondaryBtn: { alignItems: 'center', paddingVertical: 10 },

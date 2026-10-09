@@ -172,7 +172,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SPACE.xs },
   cardWrap: { width: '31%' },
   card: {
-    backgroundColor: theme.card, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: theme.card, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border, padding: 10, gap: 8,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

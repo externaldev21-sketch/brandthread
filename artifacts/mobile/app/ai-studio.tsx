@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
 
   modeRow: { paddingHorizontal: 20, marginBottom: 16 },
   modeSwitch: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 4 },
-  modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 9 },
+  modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 8 },
   modeBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
 
   manualTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
@@ -320,20 +320,20 @@ const styles = StyleSheet.create({
 
   canvasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: '3%', rowGap: 20 },
   canvasCell: { width: '31.333%' },
-  canvasTile: { width: '100%', height: 110, borderRadius: 10, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  canvasTile: { width: '100%', height: 110, borderRadius: 8, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   canvasShape: { borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   canvasLabel: { fontSize: FS.xs, fontFamily: FONT.semibold },
   canvasDims: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   toolRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 8, gap: 12 },
-  toolIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  toolIcon: { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   toolInfo: { flex: 1 },
   toolLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
   toolDesc: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  toolBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  toolBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   toolBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
 
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start' },
-  sheetCard: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  sheetCard: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   sheetCancel: { position: 'absolute', top: 16, right: 20 },
   sheetCancelText: { fontSize: FS.md, fontFamily: FONT.regular },
   sheetTitle: { fontSize: FS.h2, fontFamily: FONT.bold, marginBottom: 8 },
