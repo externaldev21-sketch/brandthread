@@ -88,3 +88,24 @@ export async function saveBuyerProfileForUser(userId: string, fields: BuyerProfi
     return false;
   }
 }
+
+/**
+ * Fields that follow the account through /api/me/settings (server keys
+ * pronouns, gender, aiCreator; limits mirror the server allowlist).
+ */
+export type BuyerProfileExtras = Pick<BuyerProfileFields, 'pronouns' | 'gender' | 'aiCreator'>;
+
+export function profileExtrasToSettings(fields: BuyerProfileExtras): Record<string, unknown> {
+  const text = (v: string) => (v.trim() ? v.trim().slice(0, 40) : null);
+  return { pronouns: text(fields.pronouns), gender: text(fields.gender), aiCreator: fields.aiCreator };
+}
+
+/** Only the extras the server actually holds (missing keys keep the local value). */
+export function profileExtrasFromSettings(settings: Record<string, unknown> | null | undefined): Partial<BuyerProfileExtras> {
+  if (!settings) return {};
+  const out: Partial<BuyerProfileExtras> = {};
+  if (typeof settings.pronouns === 'string') out.pronouns = settings.pronouns;
+  if (typeof settings.gender === 'string') out.gender = settings.gender;
+  if (typeof settings.aiCreator === 'boolean') out.aiCreator = settings.aiCreator;
+  return out;
+}

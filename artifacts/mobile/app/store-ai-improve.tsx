@@ -17,7 +17,7 @@ import {
   FilterChip, StatusBadge, EmptyState,
 } from '@/components/BrandthreadUI';
 import {
-  getStorefront, generateAISuggestions, applyAISuggestion, dismissAISuggestion,
+  getStorefront, generateAISuggestions, applyAISuggestion, dismissAISuggestion, storefrontStorageKey,
 } from '@/services/storeService';
 import { Storefront, StoreAISuggestion } from '@/services/storeTypes';
 
@@ -114,7 +114,7 @@ export default function StoreAiImproveScreen() {
     if (found) {
       found.dismissed = false;
       const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
-      await AsyncStorage.setItem('bt:store:v1', JSON.stringify(s));
+      await AsyncStorage.setItem(await storefrontStorageKey(), JSON.stringify(s));
     }
     await load();
   };

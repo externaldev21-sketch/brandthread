@@ -15,6 +15,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { classifyNetworkError } from './networkNotice';
+import { accountStorageKey, adoptLegacyKey, getAccountStorageScope } from './accountStorage';
 
 export type EngagementActionKind = 'like' | 'save' | 'repost' | 'follow' | 'not_interested';
 
@@ -28,12 +29,16 @@ export interface QueuedEngagementAction {
   createdAt: number;
 }
 
-const STORAGE_KEY = 'bt:engagement-retry-queue:v1';
+/** Pre-scoping device-wide key. Dropped, never claimed: replaying actions
+ *  queued by one account would like/follow as whichever account is signed in. */
+const LEGACY_STORAGE_KEY = 'bt:engagement-retry-queue:v1';
 const MAX_ATTEMPTS = 8;
 
 let queue: QueuedEngagementAction[] = [];
 let loaded = false;
 let loadPromise: Promise<void> | null = null;
+/** Account whose queue is in memory; a different signed-in account reloads its own. */
+let loadedScope: string | null = null;
 let executor: ((action: QueuedEngagementAction) => Promise<void>) | null = null;
 let processing = false;
 const listeners = new Set<(queue: QueuedEngagementAction[]) => void>();
@@ -43,19 +48,30 @@ function emit() {
 }
 
 function load(): Promise<void> {
+  const scope = getAccountStorageScope();
+  if (loadedScope !== scope) {
+    // Account switch: forget the previous account's in-memory queue (it stays
+    // persisted under that account's key and resumes when it signs back in).
+    queue = [];
+    loaded = false;
+    loadPromise = null;
+    loadedScope = scope;
+  }
   if (loaded) return Promise.resolve();
   if (!loadPromise) {
-    loadPromise = AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => { queue = raw ? JSON.parse(raw) : []; })
-      .catch(() => { queue = []; })
-      .finally(() => { loaded = true; });
+    loadPromise = adoptLegacyKey(LEGACY_STORAGE_KEY, 'drop')
+      .then(() => AsyncStorage.getItem(accountStorageKey(LEGACY_STORAGE_KEY, scope)))
+      .then((raw) => { if (loadedScope === scope) queue = raw ? JSON.parse(raw) : []; })
+      .catch(() => { if (loadedScope === scope) queue = []; })
+      .finally(() => { if (loadedScope === scope) loaded = true; });
   }
   return loadPromise;
 }
 
-async function persist(): Promise<void> {
+async function persist(scope: string | null = loadedScope): Promise<void> {
+  if (scope === null || scope !== loadedScope) return;
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+    await AsyncStorage.setItem(accountStorageKey(LEGACY_STORAGE_KEY, scope), JSON.stringify(queue));
   } catch {
     // Best-effort — a failed persist just means a cold-start won't recover
     // this particular pending action; the in-memory queue still retries it
@@ -94,10 +110,13 @@ export async function processEngagementRetryQueue(): Promise<void> {
   await load();
   if (processing || !executor || queue.length === 0) return;
   processing = true;
+  const scope = loadedScope;
   try {
     const active = executor;
     const remaining: QueuedEngagementAction[] = [];
     for (const action of queue) {
+      // Never replay one account's queued actions after switching to another.
+      if (getAccountStorageScope() !== scope) return;
       try {
         await active(action);
       } catch (error) {
@@ -109,8 +128,9 @@ export async function processEngagementRetryQueue(): Promise<void> {
         // buyer with a rollback long after they moved on.
       }
     }
+    if (getAccountStorageScope() !== scope || loadedScope !== scope) return;
     queue = remaining;
-    await persist();
+    await persist(scope);
   } finally {
     processing = false;
   }
@@ -138,6 +158,7 @@ export function __resetEngagementRetryQueueForTests(): void {
   queue = [];
   loaded = false;
   loadPromise = null;
+  loadedScope = null;
   executor = null;
   processing = false;
 }

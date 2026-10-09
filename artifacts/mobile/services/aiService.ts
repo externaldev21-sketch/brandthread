@@ -18,6 +18,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resolveAccountKey } from '@/lib/accountStorage';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   AIMessage, AISession, AIScreenContext, AIChatRequest,
@@ -42,9 +43,12 @@ function nanoid(): string {
 
 // ─── AsyncStorage key scoping ─────────────────────────────────────────────────
 
+/** Legacy device-wide key; stored per account (first signed-in account claims it). */
 const SETTINGS_KEY = 'bt:ai:settings:v1';
 /** Set while a settings change has not yet been accepted by the server. */
 const SETTINGS_PENDING_KEY = 'bt:ai:settings:pending:v1';
+const settingsKey = () => resolveAccountKey(SETTINGS_KEY, 'claim');
+const pendingSettingsKey = () => resolveAccountKey(SETTINGS_PENDING_KEY, 'claim');
 const MAX_STORED   = 50; // max messages kept in AsyncStorage
 
 /**
@@ -79,7 +83,7 @@ let _currentSession: AISession | null = null;
  */
 export async function getAISettings(): Promise<AISettings> {
   try {
-    const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+    const raw = await AsyncStorage.getItem(await settingsKey());
     if (!raw) return normalizeAISettings(undefined);
     return normalizeAISettings(JSON.parse(raw));
   } catch {
@@ -89,7 +93,7 @@ export async function getAISettings(): Promise<AISettings> {
 
 /** Writes the device cache only. Use pushAISettings() to sync to the account. */
 export async function saveAISettings(settings: AISettings): Promise<void> {
-  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(normalizeAISettings(settings)));
+  await AsyncStorage.setItem(await settingsKey(), JSON.stringify(normalizeAISettings(settings)));
 }
 
 /**
@@ -107,7 +111,7 @@ export async function syncAISettingsFromServer(authToken: string | null | undefi
     });
     if (!res.ok) return null;
     const body = await res.json() as { settings?: unknown; updatedAt?: string | null };
-    const pending = await AsyncStorage.getItem(SETTINGS_PENDING_KEY).catch(() => null);
+    const pending = await AsyncStorage.getItem(await pendingSettingsKey()).catch(() => null);
     if (!body.updatedAt || pending) {
       // Either a change made on this device (e.g. offline) has not reached
       // the server yet, or the account has no row (first sync after this
@@ -138,11 +142,12 @@ export function pushAISettings(
 ): Promise<boolean> {
   const normalized = normalizeAISettings(settings);
   const serialized = JSON.stringify(normalized);
+  const pendingKey = pendingSettingsKey();
   // The cache (and the pending marker) are written right away so a reader
   // sees the new value even while the network write is still queued.
   const cached = Promise.all([
     saveAISettings(normalized),
-    AsyncStorage.setItem(SETTINGS_PENDING_KEY, serialized),
+    pendingKey.then((key) => AsyncStorage.setItem(key, serialized)),
   ]).catch(() => { /* cache is best-effort */ });
   const run = async (): Promise<boolean> => {
     await cached;
@@ -161,9 +166,10 @@ export function pushAISettings(
       });
       if (res.ok) {
         // Clear the marker only if no newer change was queued after this one.
-        const stillPending = await AsyncStorage.getItem(SETTINGS_PENDING_KEY).catch(() => null);
+        const key = await pendingKey;
+        const stillPending = await AsyncStorage.getItem(key).catch(() => null);
         if (stillPending === serialized) {
-          await AsyncStorage.removeItem(SETTINGS_PENDING_KEY).catch(() => { /* best-effort */ });
+          await AsyncStorage.removeItem(key).catch(() => { /* best-effort */ });
         }
       }
       return res.ok;
