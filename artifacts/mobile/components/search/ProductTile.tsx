@@ -10,6 +10,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { productTransitionKey, setPendingTileTransition } from '@/lib/tileTransition';
 
 // Fixed 4:5 aspect ratio for every card so the grid never has uneven row
 // heights — no per-image aspect-ratio measurement.
@@ -38,18 +39,33 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
   const scale = React.useRef(new Animated.Value(1)).current;
+  const mediaRef = React.useRef<View>(null);
+
+  // The photo grows into the product page (lib/tileTransition.ts); measure
+  // it first, then navigate either way.
+  const handlePress = () => {
+    hapticPrimaryAction();
+    const media = mediaRef.current;
+    if (!item.imageUri || !media?.measureInWindow) { onPress(); return; }
+    media.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) {
+        setPendingTileTransition({ postId: productTransitionKey(item.productId ?? item.id), uri: item.imageUri ?? null, rect: { x, y, width: w, height: h } });
+      }
+      onPress();
+    });
+  };
 
   return (
     <View style={{ width }}>
     <Pressable
-      onPress={() => { hapticPrimaryAction(); onPress(); }}
+      onPress={handlePress}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"
       accessibilityLabel={`Open ${item.name}, ${item.brand}`}
     >
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
-        <View style={[styles.media, { width, height: width / GRID_CARD_ASPECT, backgroundColor: item.color }]}>
+        <View ref={mediaRef} collapsable={false} style={[styles.media, { width, height: width / GRID_CARD_ASPECT, backgroundColor: item.color }]}>
           {item.imageUri ? (
             <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (

@@ -17,19 +17,30 @@ export interface PendingTileTransition {
   uri: string | null;
   /** Absolute on-screen rect of the tapped tile, from measureInWindow(). */
   rect: { x: number; y: number; width: number; height: number };
+  /** When the tile was tapped (ms); a handoff older than PENDING_TTL_MS is ignored. */
+  at?: number;
+}
+
+/** A handoff no screen picked up within this window is stale (e.g. the tap navigated elsewhere). */
+export const PENDING_TTL_MS = 1500;
+
+/** Transition key for a product tile → product page handoff (posts use their bare id). */
+export function productTransitionKey(productId: string): string {
+  return `product:${productId}`;
 }
 
 let pending: PendingTileTransition | null = null;
 
 export function setPendingTileTransition(transition: PendingTileTransition): void {
-  pending = transition;
+  pending = { ...transition, at: transition.at ?? Date.now() };
 }
 
 /** Reads and clears the pending transition — only the very next screen that asks gets it. */
-export function takePendingTileTransition(postId: string): PendingTileTransition | null {
+export function takePendingTileTransition(postId: string, now: number = Date.now()): PendingTileTransition | null {
   if (!pending || pending.postId !== postId) return null;
   const result = pending;
   pending = null;
+  if (result.at != null && now - result.at > PENDING_TTL_MS) return null;
   return result;
 }
 

@@ -4,6 +4,8 @@
  */
 import { track } from '@/lib/analytics';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Reanimated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
@@ -44,7 +46,7 @@ import {
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 import { SaveHeart } from '@/components/SaveHeart';
 import { CachedImage } from '@/components/CachedImage';
-import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
+import { Button, IconButton, Chip, QuantityStepper, BottomSheet, SuccessCheck } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII, radius } from '@/constants/radii';
@@ -67,6 +69,10 @@ import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
+import { ProductSellerRow } from '@/components/products/ProductSellerRow';
+import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
+import { productTransitionKey } from '@/lib/tileTransition';
+import { deliveryPromiseLine } from '@/lib/deliveryGuarantee';
 import { ApiError } from '@/lib/networkNotice';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
@@ -152,7 +158,8 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     id:                 row.id,
     sellerId:           row.ownerId,
     sellerName:         row.sellerDisplayName ?? 'Independent Seller',
-    sellerHandle:       '',
+    sellerHandle:       row.sellerUsername ?? '',
+    sellerAvatarUri:    row.sellerAvatarUrl ?? undefined,
     name:               row.name,
     description:        row.description ?? '',
     priceCents:         lowestPrice,
@@ -212,64 +219,128 @@ function isVariantComboAvailable(
   );
 }
 
-function ZoomableGalleryImage({ uri }: { uri: string }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const currentScale = useRef(1);
-  const pinchStartDistance = useRef(0);
-  const pinchStartScale = useRef(1);
-  const [zoomed, setZoomed] = useState(false);
+const MAX_ZOOM = 4;
+const DOUBLE_TAP_ZOOM = 2.5;
 
-  const distance = (touches: readonly any[]) => {
-    if (touches.length < 2) return 0;
-    const dx = touches[0].pageX - touches[1].pageX;
-    const dy = touches[0].pageY - touches[1].pageY;
-    return Math.sqrt(dx * dx + dy * dy);
+/**
+ * One gallery photo: pinch to zoom (1–4x), drag to look around while zoomed,
+ * double-tap to zoom in / back out. Panning is only enabled while zoomed so
+ * an unzoomed photo still swipes the gallery; `onZoomChange` lets the
+ * gallery lock paging while a photo is zoomed.
+ */
+function ZoomableGalleryImage({ uri, onZoomChange }: { uri: string; onZoomChange?: (zoomed: boolean) => void }) {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const savedTx = useSharedValue(0);
+  const savedTy = useSharedValue(0);
+  const [zoomed, setZoomedState] = useState(false);
+
+  const setZoomed = useCallback((next: boolean) => {
+    setZoomedState(next);
+    onZoomChange?.(next);
+  }, [onZoomChange]);
+
+  const clampX = (x: number, sc: number) => {
+    'worklet';
+    const max = (GALLERY_WIDTH * sc - GALLERY_WIDTH) / 2;
+    return Math.max(-max, Math.min(max, x));
+  };
+  const clampY = (y: number, sc: number) => {
+    'worklet';
+    const max = (GALLERY_HEIGHT * sc - GALLERY_HEIGHT) / 2;
+    return Math.max(-max, Math.min(max, y));
   };
 
-  const resetZoom = () => {
-    currentScale.current = 1;
+  const resetZoom = useCallback(() => {
+    scale.value = withTiming(1, { duration: 200 });
+    tx.value = withTiming(0, { duration: 200 });
+    ty.value = withTiming(0, { duration: 200 });
+    savedScale.value = 1;
+    savedTx.value = 0;
+    savedTy.value = 0;
     setZoomed(false);
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 4 }).start();
-  };
+  }, [scale, tx, ty, savedScale, savedTx, savedTy, setZoomed]);
 
-  const responder = useRef(PanResponder.create({
-    onMoveShouldSetPanResponder: event => event.nativeEvent.touches.length === 2,
-    onMoveShouldSetPanResponderCapture: event => event.nativeEvent.touches.length === 2,
-    onPanResponderGrant: event => {
-      pinchStartDistance.current = distance(event.nativeEvent.touches);
-      pinchStartScale.current = currentScale.current;
-    },
-    onPanResponderMove: event => {
-      const nextDistance = distance(event.nativeEvent.touches);
-      if (!pinchStartDistance.current || !nextDistance) return;
-      const nextScale = Math.max(1, Math.min(3.5, pinchStartScale.current * nextDistance / pinchStartDistance.current));
-      currentScale.current = nextScale;
-      scale.setValue(nextScale);
-    },
-    onPanResponderRelease: () => {
-      if (currentScale.current < 1.06) resetZoom();
-      else setZoomed(true);
-    },
-    onPanResponderTerminate: () => {
-      if (currentScale.current < 1.06) resetZoom();
-    },
-  })).current;
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.max(1, Math.min(MAX_ZOOM, savedScale.value * e.scale));
+      tx.value = clampX(tx.value, scale.value);
+      ty.value = clampY(ty.value, scale.value);
+    })
+    .onEnd(() => {
+      if (scale.value < 1.06) {
+        scale.value = withTiming(1, { duration: 200 });
+        tx.value = withTiming(0, { duration: 200 });
+        ty.value = withTiming(0, { duration: 200 });
+        savedScale.value = 1;
+        savedTx.value = 0;
+        savedTy.value = 0;
+        runOnJS(setZoomed)(false);
+        return;
+      }
+      savedScale.value = scale.value;
+      savedTx.value = tx.value;
+      savedTy.value = ty.value;
+      runOnJS(setZoomed)(true);
+    });
+
+  const pan = Gesture.Pan()
+    .enabled(zoomed)
+    .averageTouches(true)
+    .onUpdate((e) => {
+      tx.value = clampX(savedTx.value + e.translationX, scale.value);
+      ty.value = clampY(savedTy.value + e.translationY, scale.value);
+    })
+    .onEnd(() => {
+      savedTx.value = tx.value;
+      savedTy.value = ty.value;
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd((e) => {
+      if (savedScale.value > 1) {
+        runOnJS(resetZoom)();
+        return;
+      }
+      // Zoom toward the tapped point.
+      const nextTx = clampX((GALLERY_WIDTH / 2 - e.x) * (DOUBLE_TAP_ZOOM - 1), DOUBLE_TAP_ZOOM);
+      const nextTy = clampY((GALLERY_HEIGHT / 2 - e.y) * (DOUBLE_TAP_ZOOM - 1), DOUBLE_TAP_ZOOM);
+      scale.value = withTiming(DOUBLE_TAP_ZOOM, { duration: 220 });
+      tx.value = withTiming(nextTx, { duration: 220 });
+      ty.value = withTiming(nextTy, { duration: 220 });
+      savedScale.value = DOUBLE_TAP_ZOOM;
+      savedTx.value = nextTx;
+      savedTy.value = nextTy;
+      runOnJS(setZoomed)(true);
+    });
+
+  const gesture = Gesture.Simultaneous(pinch, pan, doubleTap);
+  const imageStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
+  }));
 
   return (
-    <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }} {...responder.panHandlers}>
-      <Animated.Image
-        source={{ uri }}
-        style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
-        resizeMode="contain"
-        accessibilityLabel="Product photo. Pinch with two fingers to zoom."
-      />
-      {zoomed && (
-        <TouchableOpacity style={galleryStyles.resetZoom} onPress={resetZoom} accessibilityRole="button" accessibilityLabel="Reset product photo zoom">
-          <Feather name="minimize-2" size={14} color={ON_DARK} />
-          <Text style={galleryStyles.resetZoomText}>Reset</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    <GestureDetector gesture={gesture}>
+      <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }}>
+        <Reanimated.View style={[StyleSheet.absoluteFill, imageStyle]}>
+          <CachedImage
+            source={{ uri }}
+            style={StyleSheet.absoluteFill}
+            contentFit="contain"
+            accessibilityLabel="Product photo. Pinch or double-tap to zoom."
+          />
+        </Reanimated.View>
+        {zoomed && (
+          <TouchableOpacity style={galleryStyles.resetZoom} onPress={resetZoom} accessibilityRole="button" accessibilityLabel="Reset product photo zoom">
+            <Feather name="minimize-2" size={14} color={ON_DARK} />
+            <Text style={galleryStyles.resetZoomText}>Reset</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -281,11 +352,6 @@ const galleryStyles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, bottom: 0, height: 96,
     backgroundColor: 'rgba(0,0,0,0.17)',
   },
-  galleryMeta: {
-    position: 'absolute', left: SP.md, bottom: SP.md, flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.58)',
-  },
-  galleryMetaText: { color: ON_DARK, fontFamily: FONT.medium, fontSize: FS.xs },
   dots: { position: 'absolute', bottom: 21, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   dot: { height: 6, borderRadius: 3, backgroundColor: ON_DARK },
   resetZoom: {
@@ -306,6 +372,8 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
   const scrollX = useRef(new Animated.Value(0)).current;
   const listRef = useRef<Animated.FlatList<string>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  // A zoomed photo owns horizontal drags, so the gallery stops paging.
+  const [zoomedPhoto, setZoomedPhoto] = useState(false);
 
   if (!images.length) {
     return (
@@ -325,8 +393,9 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
           keyExtractor={(uri, index) => `${uri}-${index}`}
           horizontal
           pagingEnabled
+          scrollEnabled={!zoomedPhoto}
           showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => <ZoomableGalleryImage uri={item} />}
+          renderItem={({ item }) => <ZoomableGalleryImage uri={item} onZoomChange={setZoomedPhoto} />}
           getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {
@@ -336,10 +405,6 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
           scrollEventThrottle={16}
         />
         <View style={galleryStyles.galleryShade} pointerEvents="none" />
-        <View style={galleryStyles.galleryMeta} pointerEvents="none">
-          <Feather name="maximize-2" size={13} color={ON_DARK} />
-          <Text style={galleryStyles.galleryMetaText}>Pinch to zoom</Text>
-        </View>
         {images.length > 1 && (
           <View style={galleryStyles.dots} pointerEvents="none">
             {images.map((_, index) => {
@@ -522,6 +587,13 @@ export default function BuyerProductDetailScreen() {
   const api    = useApi();
   const { isSignedIn } = useAuth();
   const { goToSignIn } = useSignInGate();
+  // Shared-element feel: the tapped product tile's photo grows into the
+  // gallery. Only on the un-animated thread route (a slide-in push would
+  // fight it); a deep link or back navigation has no handoff and no-ops.
+  const { overlay: tileExpandOverlay } = useExpandFromTileOverlay(
+    pathname === '/thread-product-detail' && productId ? productTransitionKey(productId) : undefined,
+    { x: 0, y: 0, width: GALLERY_WIDTH, height: GALLERY_HEIGHT },
+  );
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
   const sizeBadgeModel = useSizeBadgeModel(product);
@@ -553,7 +625,6 @@ export default function BuyerProductDetailScreen() {
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [reserved,        setReserved]        = useState(false);
   const [reserveLoading,  setReserveLoading]  = useState(false);
-  const [sizeChartOpen,   setSizeChartOpen]   = useState(false);
   const [sizeGuideOpen,   setSizeGuideOpen]   = useState(false);
 
   // Add to cart → the product photo flies to the bag icon, which bumps and
@@ -748,6 +819,7 @@ export default function BuyerProductDetailScreen() {
             variant="filled"
           />
         </View>
+        {tileExpandOverlay}
       </View>
     );
   }
@@ -780,6 +852,11 @@ export default function BuyerProductDetailScreen() {
       </View>
     );
   }
+
+  const sizeChart = product.sizeChart && Array.isArray((product.sizeChart as SizeChart).columns) && (product.sizeChart as SizeChart).columns.length > 0
+    ? product.sizeChart as SizeChart
+    : null;
+  const hasSizeGuide = !!sizeChart || !!product.sizeChartImageUrl;
 
   const variant = findVariant(product, selections);
   const variantPrice = variant?.priceCents ?? product.priceCents;
@@ -1133,6 +1210,13 @@ export default function BuyerProductDetailScreen() {
 
           <PreOrderShipBy productId={product.id} isPreOrder={product.isPreOrder} />
 
+          {/* The delivery guarantee (docs/payments/delivery-guarantee.md):
+              not delivered in time → refunded automatically. */}
+          <View style={s.promiseRow} testID="product-delivery-promise">
+            <Feather name="truck" size={ICON.sm} color={FG} />
+            <Text style={s.promiseText}>{deliveryPromiseLine(!!product.isPreOrder)}</Text>
+          </View>
+
           <View style={s.divider} />
 
           {/* Options — unselected options highlight after the buyer attempts to add */}
@@ -1160,11 +1244,11 @@ export default function BuyerProductDetailScreen() {
             );
           })}
 
-          {/* "Size guide" text link — only when the seller uploaded a size
-              chart photo, right under the size chips (mobbin.com/screens/
-              0c16f080-0cb8-487a-8928-6a7631cb205c). No placeholder link
-              when absent. */}
-          {!!product.sizeChartImageUrl && (
+          {/* "Size guide" text link — only when the seller added a size chart
+              (a table, a photo or both), right under the size chips
+              (mobbin.com/screens/0c16f080-0cb8-487a-8928-6a7631cb205c). No
+              placeholder link when absent. */}
+          {hasSizeGuide && (
             <TouchableOpacity
               style={s.sizeGuideLink}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeGuideOpen(true); }}
@@ -1235,37 +1319,14 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
-          {/* Size Chart — expandable table */}
-          {!!(product as any).sizeChart && (
-            <>
-              <TouchableOpacity
-                style={[sz.toggle, { borderTopColor: theme.border }]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeChartOpen(o => !o); }}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Size chart"
-                accessibilityState={{ expanded: sizeChartOpen }}
-              >
-                <Text style={[sz.label, { color: theme.text }]}>Size Chart</Text>
-                <Feather name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
-              </TouchableOpacity>
-              {sizeChartOpen && <SizeChartViewer chart={(product as any).sizeChart} />}
-            </>
-          )}
-
-
           <View style={s.divider} />
-          <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
-            <Avatar name={product.sellerName} size={40} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
-              {!!product.sellerHandle && <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>}
-            </View>
-            <View style={s.sellerViewStore}>
-              <Text style={s.sellerViewStoreText}>View store</Text>
-              <Feather name="chevron-right" size={14} color={MUTED} />
-            </View>
-          </TouchableOpacity>
+          <ProductSellerRow
+            sellerId={product.sellerId}
+            sellerName={product.sellerName}
+            sellerHandle={product.sellerHandle}
+            sellerAvatarUri={product.sellerAvatarUri}
+            onOpenStore={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)}
+          />
           <Button
             label="Message seller"
             icon="message-circle"
@@ -1409,8 +1470,11 @@ export default function BuyerProductDetailScreen() {
         </View>
       </BottomSheet>
 
+      {tileExpandOverlay}
+
       <SizeGuideSheet
         visible={sizeGuideOpen}
+        chart={sizeChart}
         imageUri={product.sizeChartImageUrl ?? null}
         onClose={() => setSizeGuideOpen(false)}
       />
@@ -1540,7 +1604,7 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
 // a translucent Glass blur over the chart photo itself would work against
 // the one thing this sheet exists to show clearly.
 
-function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imageUri: string | null; onClose: () => void }) {
+function SizeGuideSheet({ visible, chart, imageUri, onClose }: { visible: boolean; chart: SizeChart | null; imageUri: string | null; onClose: () => void }) {
   const { theme, FG, MUTED } = useThemeAliases();
   const scale = useRef(new Animated.Value(1)).current;
   const currentScale = useRef(1);
@@ -1581,7 +1645,8 @@ function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imag
     },
   })).current;
 
-  if (!imageUri) return null;
+  const hasTable = !!chart?.columns?.length;
+  if (!imageUri && !hasTable) return null;
 
   return (
     <BottomSheet visible={visible} onClose={() => { resetZoom(); onClose(); }} testID="size-guide-sheet">
@@ -1589,15 +1654,24 @@ function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imag
         <Text style={[sgs.title, { color: FG }]}>Size guide</Text>
         <IconButton name="x" size={20} variant="plain" onPress={() => { resetZoom(); onClose(); }} accessibilityLabel="Close size guide" />
       </View>
-      <View style={[sgs.imageWrap, { backgroundColor: theme.surface }]} {...responder.panHandlers}>
-        <Animated.Image
-          source={{ uri: imageUri }}
-          resizeMode="contain"
-          style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
-          accessibilityLabel="Size guide photo. Pinch with two fingers to zoom."
-        />
-      </View>
-      <Text style={[sgs.hint, { color: MUTED }]}>Pinch to zoom</Text>
+      {hasTable && chart ? (
+        <View style={{ paddingHorizontal: SP.md }} testID="size-guide-table">
+          <SizeChartViewer chart={chart} />
+        </View>
+      ) : null}
+      {imageUri ? (
+        <>
+          <View style={[sgs.imageWrap, { backgroundColor: theme.surface }]} {...responder.panHandlers}>
+            <Animated.Image
+              source={{ uri: imageUri }}
+              resizeMode="contain"
+              style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
+              accessibilityLabel="Size guide photo. Pinch with two fingers to zoom."
+            />
+          </View>
+          <Text style={[sgs.hint, { color: MUTED }]}>Pinch to zoom</Text>
+        </>
+      ) : null}
     </BottomSheet>
   );
 }
@@ -1897,14 +1971,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   addedSheetImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
   addedSheetProductName: { ...TYPE.bodyMedium, color: FG },
   addedSheetProductMeta: { ...TYPE.caption, color: MUTED, marginTop: 2 },
-  sellerCard: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm,
-    padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
-  },
-  sellerName: { ...TYPE.bodyMedium, color: FG, flexShrink: 1 },
-  sellerHandle: { ...TYPE.caption, color: MUTED, flexShrink: 1 },
-  sellerViewStore: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  sellerViewStoreText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   paymentWarningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1928,6 +1994,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
   vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 18 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
+  promiseRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: SP.md },
+  promiseText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, flexShrink: 1 },
   price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },
   comparePrice: { fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },

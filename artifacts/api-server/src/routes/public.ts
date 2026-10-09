@@ -457,7 +457,7 @@ router.get("/products/:id", async (req, res) => {
 
     // Attach seller display name
     const [seller] = await db
-      .select({ displayName: users.displayName, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
+      .select({ displayName: users.displayName, username: users.username, avatarUrl: users.avatarUrl, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
       .from(users)
       .where(eq(users.clerkId, product.ownerId))
       .limit(1);
@@ -482,6 +482,9 @@ router.get("/products/:id", async (req, res) => {
     res.json({
       ...product,
       sellerDisplayName: seller?.displayName ?? null,
+      // The product page's seller row (avatar + @handle next to Follow).
+      sellerUsername: seller?.username ?? null,
+      sellerAvatarUrl: seller?.avatarUrl ?? null,
       sellerVerified: seller ? deriveSellerVerified(seller) : false,
       sellerVacationMode: vacation.active,
       sellerVacationMessage: vacation.active ? vacation.message : null,
