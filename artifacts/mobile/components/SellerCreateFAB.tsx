@@ -8,7 +8,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -16,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
+import { Icon } from '@/components/ui/Icon';
 
 const ACTIONS = [
   { label: 'New post', description: 'Share content with your audience', icon: 'video' as const, route: '/create-post' },
@@ -83,7 +83,7 @@ export default function SellerCreateFAB() {
         accessibilityRole="button"
         accessibilityLabel="Create"
       >
-        <Feather name="plus" size={26} color={theme.onAccent} />
+        <Icon name="plus" size={26} color={theme.onAccent} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -96,7 +96,7 @@ export default function SellerCreateFAB() {
               <Text style={styles.subtitle}>What do you want to make?</Text>
             </View>
             <Pressable style={styles.close} onPress={() => setOpen(false)} accessibilityLabel="Close create menu">
-              <Feather name="x" size={20} color={theme.muted} />
+              <Icon name="x" size={20} color={theme.muted} />
             </Pressable>
           </View>
           {ACTIONS.map(action => (
@@ -107,13 +107,13 @@ export default function SellerCreateFAB() {
               onPress={() => choose(action.route)}
             >
               <View style={[styles.actionIcon, { backgroundColor: theme.accentDim }]}>
-                <Feather name={action.icon} size={19} color={theme.accent} />
+                <Icon name={action.icon} size={19} color={theme.accent} />
               </View>
               <View style={styles.actionCopy}>
                 <Text style={styles.actionLabel}>{action.label}</Text>
                 <Text style={styles.actionDescription}>{action.description}</Text>
               </View>
-               <Feather name="chevron-right" size={18} color={theme.muted} />
+               <Icon name="chevron-right" size={18} color={theme.muted} />
             </Pressable>
           ))}
         </View>

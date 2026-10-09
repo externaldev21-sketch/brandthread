@@ -172,7 +172,5 @@ const styles = StyleSheet.create({
     fontFamily: FONT.medium,
     fontSize: FS.xs,
     marginTop: SP.xxl,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
 });

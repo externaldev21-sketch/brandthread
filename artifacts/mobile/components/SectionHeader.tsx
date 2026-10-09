@@ -6,6 +6,7 @@ import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { minHitSlop } from '@/lib/hitSlop';
+import { Icon } from '@/components/ui/Icon';
 
 // The action is an 18pt-tall text link; pad its touch area (not its box) to 44pt.
 const ACTION_HIT_SLOP = minHitSlop({ width: 40, height: 18 });

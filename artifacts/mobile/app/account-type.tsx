@@ -11,6 +11,7 @@ import { PillButton, PressableScale, Reveal, StepHeadline, StepSub, StitchAccent
 import { RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 import { useAuth } from '@clerk/expo';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { FONT } from '@/lib/theme';
 
 const getCards = (theme: AppThemePreset): {
   type: AccountType;
@@ -201,7 +202,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   cardTitleWrap: { flex: 1 },
   cardKicker: { ...TYPE.eyebrow, marginBottom: 2 },
-  cardTitle: { fontSize: 20, lineHeight: 24, fontFamily: 'Inter_700Bold', color: theme.text, letterSpacing: -0.4 },
+  cardTitle: { fontSize: 20, lineHeight: 24, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.4 },
   radio: {
     width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center',

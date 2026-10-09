@@ -92,7 +92,8 @@ describe('checkout screen structure', () => {
     expect(primitives).toContain('bg: theme.background');
     const themeCtx = read('contexts/AppThemeContext.tsx');
     expect(themeCtx).toContain("const MONOCHROME = palette('#000000', '#000000', '#000000', '#FFFFFF'");
-    expect(primitives).toContain("textTransform: 'uppercase'");
+    // Section labels are sentence case (BRANDTHREAD_DESIGN.md: no all-caps labels).
+    expect(primitives).not.toContain("textTransform: 'uppercase'");
     // Contact, shipping and payment all live on this one screen: no address sheet, no second screen.
     expect(screen).toContain('<ContactSection');
     expect(screen).toContain('<ShippingSection');

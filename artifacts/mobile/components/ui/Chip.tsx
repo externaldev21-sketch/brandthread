@@ -9,7 +9,6 @@
  */
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticToggle, hapticSelection } from '@/lib/haptics';
@@ -20,6 +19,7 @@ import { RADII, radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { minHitSlop } from '@/lib/hitSlop';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 export interface ChipProps {
   label: string;
@@ -29,7 +29,7 @@ export interface ChipProps {
   disabled?: boolean;
   testID?: string;
   /** Optional leading glyph, e.g. a trending/history icon ahead of the label. */
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
   iconColor?: string;
   /** Optional trailing remove control (e.g. clearing a single recent search). */
   onRemove?: () => void;
@@ -88,7 +88,7 @@ export function Chip({
           },
         ]}
       >
-        {icon && <Feather name={icon} size={12} color={iconColor ?? contentColor} />}
+        {icon && <Icon name={icon} size={12} color={iconColor ?? contentColor} />}
         <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: 14 }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }, strikethrough && styles.struck]}>
           {label}
         </Text>
@@ -104,7 +104,7 @@ export function Chip({
             accessibilityRole="button"
             accessibilityLabel={removeAccessibilityLabel ?? `Remove ${label}`}
           >
-            <Feather name="x" size={13} color={contentColor} />
+            <Icon name="x" size={13} color={contentColor} />
           </Pressable>
         )}
       </Animated.View>

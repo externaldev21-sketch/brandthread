@@ -11,7 +11,7 @@ import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { buildDemoSellerFinance } from '@/lib/previewSellerFinance';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents, formatDeductionCents } from '@/lib/money';
 import { currentPlanSummary } from '@/lib/currentPlan';
@@ -220,7 +220,7 @@ export default function FinanceScreen() {
               {subPlan.name}
               {subPlan.priceLabel ? ' ' : null}
               {subPlan.priceLabel ? (
-                <Text style={[{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }, TABULAR_NUMS]}>
+                <Text style={[{ color: colors.mutedForeground, fontSize: 12, fontFamily: FONT.regular }, TABULAR_NUMS]}>
                    {subPlan.priceLabel}
                 </Text>
               ) : null}
@@ -307,10 +307,10 @@ export default function FinanceScreen() {
                 item.highlight && { backgroundColor: colors.accent },
               ]}
             >
-              <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
+              <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? FONT.semibold : FONT.regular }]}>
                 {item.label}
               </Text>
-              <Text style={[styles.plValue, TABULAR_NUMS, { color: item.color, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
+              <Text style={[styles.plValue, TABULAR_NUMS, { color: item.color, fontFamily: item.highlight ? FONT.bold : FONT.medium }]}>
                 {item.value}
               </Text>
             </View>
@@ -382,14 +382,14 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   accessLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
+  backText: { fontSize: 15, fontFamily: FONT.medium },
+  pageTitle: { fontSize: 28, fontFamily: FONT.bold, marginBottom: 4 },
+  pageSubtitle: { fontSize: 13, fontFamily: FONT.regular, marginBottom: 20 },
   overviewRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   overviewCard: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 4 },
-  overviewVal: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  overviewLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+  overviewVal: { fontSize: 16, fontFamily: FONT.bold },
+  overviewLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   plRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   plLabel: { fontSize: 14 },
@@ -397,16 +397,16 @@ const styles = StyleSheet.create({
   cashRow: { padding: 14, gap: 8 },
   cashBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   cashFill: { height: '100%', borderRadius: 4 },
-  cashLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  cashLabel: { fontSize: 13, fontFamily: FONT.medium },
   expRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   expLeft: { flex: 1, gap: 5 },
-  expName: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  expName: { fontSize: 13, fontFamily: FONT.medium },
   expMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  expDate: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  expAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  expDate: { fontSize: 11, fontFamily: FONT.regular },
+  expAmount: { fontSize: 14, fontFamily: FONT.semibold },
   docRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   docIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  docLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  docLabel: { flex: 1, fontSize: 14, fontFamily: FONT.regular },
 
   // Subscription card
   subCard: {
@@ -414,10 +414,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, padding: 14, marginBottom: 20, gap: 12,
   },
   subCardLeft:    { flex: 1, gap: 3 },
-  subCardLabel:   { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  subCardPlan:    { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  subCardMeta:    { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  subCardLabel:   { fontSize: 11, fontFamily: FONT.regular },
+  subCardPlan:    { fontSize: 16, fontFamily: FONT.semibold },
+  subCardMeta:    { fontSize: 12, fontFamily: FONT.regular },
   subCardRight:   { alignItems: 'flex-end' },
   subStatusPill:  { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  subStatusText:  { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  subStatusText:  { fontSize: 11, fontFamily: FONT.semibold },
 });

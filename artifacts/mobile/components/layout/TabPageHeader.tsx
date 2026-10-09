@@ -7,15 +7,15 @@
  */
 import React from 'react';
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { FONT, GUTTER, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 export interface TabPageHeaderAction {
-  name: keyof typeof Feather.glyphMap;
+  name: IconName;
   onPress: () => void;
   accessibilityLabel: string;
   badge?: number;
@@ -51,7 +51,7 @@ export function TabPageHeader({ title, actions, gutter = GUTTER, style, onBack, 
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           testID={backTestID ?? 'tab-page-header-back'}
         >
-          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+          <Icon name="arrow-left" size={ICON.md} color={theme.text} />
         </PressableScale>
       ) : null}
       <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
