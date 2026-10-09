@@ -1772,6 +1772,17 @@ export async function moveSavedItemToCollection(targetId: string, collectionId: 
   return updated;
 }
 
+/** Per-item alert toggles for a saved product (price drop / back in stock). */
+export async function setSavedItemAlerts(
+  targetId: string,
+  alerts: { notifyOnPriceDrop?: boolean; notifyOnBackInStock?: boolean },
+): Promise<SavedItem> {
+  return serviceRequest<SavedItem>(
+    '/api/buyer/saved/' + encodeURIComponent(targetId),
+    { method: 'PATCH', body: JSON.stringify(alerts) },
+  );
+}
+
 // ─── Saved Collections (boards) ────────────────────────────────────────────────
 
 export async function getCollections(): Promise<SavedCollection[]> {

@@ -1169,6 +1169,20 @@ export const savedCollections = pgTable('saved_collections', {
   userIdx: index('saved_collections_user_id_idx').on(table.userId, table.sortOrder),
 }));
 
+// One row per saved-product alert fan-out (back in stock / price drop) and
+// how many buyers it reached — the seller's reach counts (migration 302).
+export const productSaveAlertRuns = pgTable('product_save_alert_runs', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  productId:      uuid('product_id').notNull(),
+  ownerId:        text('owner_id').notNull(),
+  kind:           text('kind').notNull(), // 'back_in_stock' | 'price_drop'
+  recipientCount: integer('recipient_count').notNull().default(0),
+  priceCents:     integer('price_cents'),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  productIdx: index('product_save_alert_runs_product_idx').on(table.productId, table.kind, table.createdAt),
+}));
+
 // ─── Saved / wishlisted items ─────────────────────────────────────────────────
 
 export const savedItems = pgTable('saved_items', {
@@ -1193,8 +1207,14 @@ export const savedItems = pgTable('saved_items', {
   // When the back-in-stock transition last fired — badge shows for a window after this.
   backInStockAt: timestamp('back_in_stock_at'),
   notifyOnPriceDrop:  boolean('notify_on_price_drop').notNull().default(true),
+  // Per-item back-in-stock opt-out (migration 302). Off => no Activity row, no push.
+  notifyOnBackInStock: boolean('notify_on_back_in_stock').notNull().default(true),
+  // Last back-in-stock alert sent to this saver — cooldown guard (lib/savedProductAlerts.ts).
+  backInStockNotifiedAt: timestamp('back_in_stock_notified_at'),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
+  productTargetIdx: index('saved_items_product_target_idx').on(table.targetId)
+    .where(sql`${table.itemType} = 'product'`),
   collectionIdx: index('saved_items_collection_id_idx').on(table.collectionId),
   userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
   typeCreatedAtIndex: index('saved_items_type_created_at_idx').on(table.itemType, table.createdAt),

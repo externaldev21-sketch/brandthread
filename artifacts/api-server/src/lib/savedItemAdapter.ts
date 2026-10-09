@@ -26,6 +26,7 @@ export async function adaptSavedRows(rows: (typeof savedItems.$inferSelect)[]) {
       collectionId:  r.collectionId ?? undefined,
       savedAt:       r.createdAt?.toISOString() ?? new Date().toISOString(),
       notifyOnPriceDrop: r.notifyOnPriceDrop,
+      notifyOnBackInStock: r.notifyOnBackInStock,
       image:         badges?.image ?? undefined,
       brand:         badges?.brand ?? undefined,
       priceCents:    currentPriceCents ?? undefined,

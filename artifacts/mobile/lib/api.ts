@@ -213,6 +213,16 @@ export async function clearApiCache(cacheScope?: string): Promise<void> {
 // module scope so separate screen API clients share the same result.
 export const SELLER_PAYMENT_STATUS_CACHE_TTL_MS = 60_000;
 
+/** GET /api/products/:id/save-stats — seller-only. */
+export interface ProductSaveStats {
+  saves: number;
+  priceAlertsOn: number;
+  restockAlertsOn: number;
+  backInStockReached: number;
+  priceDropReached: number;
+  lastAlertAt: string | null;
+}
+
 export interface SellerPaymentStatus {
   ready: boolean;
   reason?: string;
@@ -1296,6 +1306,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       restore:        (id: string)             => post(`/api/products/${id}/restore`, {}),
       addVariant:     (id: string, body: unknown) => post(`/api/products/${id}/variants`, body),
       updateVariant:  (id: string, vId: string, body: unknown) => patch(`/api/products/${id}/variants/${vId}`, body),
+      /** Buyers who saved this product and how many the restock / price-drop alerts reached. */
+      saveStats:      (id: string) => get<ProductSaveStats>(`/api/products/${id}/save-stats`),
       /** Bulk-import products from a rows array. Returns { successCount, failCount, errors }. */
       import: (rows: Array<{ name: string; description?: string; category?: string; price?: string }>) =>
         post<{ successCount: number; failCount: number; errors?: string[] }>('/api/products/import', { rows }),

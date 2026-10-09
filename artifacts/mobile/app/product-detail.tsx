@@ -23,6 +23,7 @@ import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, Seconda
 
 import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory, adjustVariantStock, setVariantStock, duplicateProduct, deleteProduct } from '@/services/productService';
 import { useApi } from '@/lib/api';
+import { ProductSaveStatsRow } from '@/components/products/ProductSaveStatsRow';
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -1102,6 +1103,8 @@ function AnalyticsTab({
         <StatCard label="Return Rate" value={`${(analytics.returnRate * 100).toFixed(1)}%`} icon="rotate-ccw" accent={RED} style={{ minWidth: 120 }} />
         <StatCard label="Sell-Through" value={`${(analytics.sellThroughRate * 100).toFixed(0)}%`} icon="bar-chart-2" accent={theme.secondary} style={{ minWidth: 120 }} />
       </ScrollView>
+
+      <ProductSaveStatsRow productId={product.id} />
 
       {/* Bar chart — Fix 5: bars scaled by maxRev, height = (day.revenue / maxRev) * 60 */}
       <View style={{ paddingHorizontal: SP.md }}>

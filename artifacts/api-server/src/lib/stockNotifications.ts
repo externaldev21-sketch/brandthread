@@ -9,6 +9,7 @@ import { db, productVariants, products, savedItems, waitlistEntries } from "@wor
 import { productThumbnail } from "./activityEvents";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
+import { noteVariantPriceLowered, noteVariantStockRaised } from "./savedProductAlerts";
 
 async function likersOf(productId: string): Promise<string[]> {
   const rows = await db
@@ -148,23 +149,11 @@ export async function notifyBackInStock(input: {
   // Someone on the waitlist already got a restock notification; don't double up.
   const likers = (await likersOf(input.productId)).filter((userId) => !waitlisted.has(userId));
   // Stamp the Saved screen's "Back in stock" badge window for everyone who saved this.
-  await db.update(savedItems)
-    .set({ backInStockAt: new Date() })
-    .where(and(eq(savedItems.itemType, "product"), eq(savedItems.targetId, input.productId)));
-  await Promise.all(likers.map((userId) =>
-    publishNotification({
-      userId,
-      category: "stock",
-      type: "back_in_stock",
-      title: "Back in stock",
-      body: `${input.productName} is back in stock — get it before it's gone again.`,
-      targetId: input.productId,
-      targetType: "product",
-      cta: "Shop now",
-      analyticsOwnerId: input.ownerId,
-      pushChannelId: "stock",
-    }).catch((err) => logger.warn({ err, userId, productId: input.productId }, "Back-in-stock notification failed"))
-  ));
+  // ./savedProductAlerts does that, and alerts the opted-in savers among
+  // `likers`, only on a product-level restock (0 -> any units) — with blocks,
+  // cooldown and a chunked fan-out that runs after the seller's response.
+  if (likers.length === 0) return;
+  noteVariantStockRaised(input.productId, input.newStock - input.previousStock, likers);
 }
 
 /** Buyer-facing price drop alert for everyone who saved/wishlisted the product. */
@@ -176,20 +165,7 @@ export async function notifyPriceDrop(input: {
   newPriceCents: number;
 }): Promise<void> {
   if (input.newPriceCents >= input.previousPriceCents) return;
-  const likers = await likersOf(input.productId);
-  const formatted = (input.newPriceCents / 100).toFixed(2);
-  await Promise.all(likers.map((userId) =>
-    publishNotification({
-      userId,
-      category: "stock",
-      type: "price_drop",
-      title: "Price drop",
-      body: `${input.productName} just dropped to $${formatted}.`,
-      targetId: input.productId,
-      targetType: "product",
-      cta: "Shop now",
-      analyticsOwnerId: input.ownerId,
-      pushChannelId: "stock",
-    }).catch((err) => logger.warn({ err, userId, productId: input.productId }, "Price drop notification failed"))
-  ));
+  // Only savers opted in, below their own reference price by the minimum
+  // drop, deduped via last_notified_price_cents: ./savedProductAlerts.
+  noteVariantPriceLowered(input.productId);
 }

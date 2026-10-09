@@ -6,6 +6,8 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import crypto from "crypto";
+import { noteVariantStockRaised, productSaveStats } from "../lib/savedProductAlerts";
+import { applyProductLevelVariantEdits, parseProductLevelVariantEdits } from "../lib/productVariantEdits";
 import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -276,6 +278,20 @@ router.get("/:id", async (req, res) => {
   res.json({ ...product, variants });
 });
 
+// GET /api/products/:id/save-stats — how many buyers saved this product and
+// how many the back-in-stock / price-drop alerts have reached.
+router.get("/:id/save-stats", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
+    res.status(404).json({ error: "Not found" }); return;
+  }
+  const [product] = await db.select({ id: products.id }).from(products)
+    .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
+    .limit(1);
+  if (!product) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(await productSaveStats(product.id));
+});
+
 // PUT /api/products/:id (manager+)
 router.put("/:id", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
@@ -311,6 +327,10 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       if (problem) { res.status(problem.status).json({ error: problem.error, code: problem.code }); return; }
     }
   }
+
+  // Product-level price/stock edits for existing variants (lib/productVariantEdits.ts).
+  const variantEdits = parseProductLevelVariantEdits(req.body?.variants);
+  if ("error" in variantEdits) { res.status(400).json({ error: variantEdits.error }); return; }
 
   const updateValues = {
       ...(name         && { name }),
@@ -407,6 +427,12 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
   }
 
   if (result.published) void notifyNewProduct({ productId: updated.id });
+
+  if (variantEdits.edits.length > 0) {
+    await applyProductLevelVariantEdits({
+      productId: updated.id, ownerId, productName: updated.name, edits: variantEdits.edits,
+    });
+  }
 
   res.json(updated);
 });
@@ -521,6 +547,8 @@ router.post("/:id/variants", requireRole("manager"), async (req, res) => {
       ...(Number.isInteger(compareAtPriceCents) && compareAtPriceCents > priceCents && { compareAtPriceCents }) })
     .returning();
   res.status(201).json(variant);
+  // A new in-stock size on a sold-out product is a restock for its savers.
+  if (variant.stock > 0) noteVariantStockRaised(req.params.id, variant.stock);
 });
 
 // PATCH /api/products/:id/variants/:variantId — update stock / price (ownership via product join)
