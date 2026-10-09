@@ -9,7 +9,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
-  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo,
+  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, Pressable,
 } from 'react-native';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -70,6 +70,8 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
 import { ProductSellerRow } from '@/components/products/ProductSellerRow';
+import { SizeSheet } from '@/components/products/SizeSheet';
+import { primaryOption, sizeCells } from '@/lib/sizeSheet';
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import { productTransitionKey } from '@/lib/tileTransition';
 import { deliveryPromiseLine } from '@/lib/deliveryGuarantee';
@@ -626,6 +628,7 @@ export default function BuyerProductDetailScreen() {
   const [reserved,        setReserved]        = useState(false);
   const [reserveLoading,  setReserveLoading]  = useState(false);
   const [sizeGuideOpen,   setSizeGuideOpen]   = useState(false);
+  const [sizeSheetOpen,   setSizeSheetOpen]   = useState(false);
 
   // Add to cart → the product photo flies to the bag icon, which bumps and
   // shows the count (the feed / shop sheet pattern, #287 / #291).
@@ -867,6 +870,16 @@ export default function BuyerProductDetailScreen() {
   const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 : true;
   const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
   const paymentUnavailable = sellerPaymentReady === false;
+  // GOAT: the size is picked in a sheet (price under each size), not chips.
+  const sizeOption = primaryOption(product);
+  const sizeOptionId = sizeOption?.id ?? null;
+  const { [sizeOptionId ?? '']: _pickedSize, ...otherSelections } = selections;
+  const cells = sizeOption ? sizeCells(product, sizeOption, otherSelections) : [];
+  const stockLine = !variant ? null
+    : !inStock ? 'Sold out'
+    : variant.inventoryQuantity <= 5 ? `Only ${variant.inventoryQuantity} left`
+    : 'In stock';
+  const openSizeSheet = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeSheetOpen(true); };
 
   function handleSelect(optionId: string, valueId: string) {
     setOptionsTouched(true);
@@ -919,6 +932,7 @@ export default function BuyerProductDetailScreen() {
   }
 
   async function handleAddToCart() {
+    if (sizeOptionId && !selections[sizeOptionId]) { openSizeSheet(); return; }
     if (!allSelected) {
       // Mark options as touched so unselected options show a required indicator
       setOptionsTouched(true);
@@ -997,8 +1011,10 @@ export default function BuyerProductDetailScreen() {
       Alert.alert('Seller is away', sellerVacationMessage);
       return;
     }
+    if (sizeOptionId && !selections[sizeOptionId]) { openSizeSheet(); return; }
     if (!allSelected) {
-      Alert.alert('Select Options', 'Please select all options before continuing.');
+      setOptionsTouched(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
     if (!variant) return;
@@ -1225,6 +1241,21 @@ export default function BuyerProductDetailScreen() {
             return (
               <View key={option.id}>
                 {option.name.toLowerCase() === 'size' && <SizeRecommendationBadge model={sizeBadgeModel} />}
+                {option.id === sizeOptionId ? (
+                  <Pressable
+                    style={s.sizeRow}
+                    onPress={openSizeSheet}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${option.name}: ${option.values.find(v => v.id === selections[option.id])?.label ?? 'select'}`}
+                    testID="product-size-row"
+                  >
+                    <Text style={s.sizeRowLabel}>{option.name}</Text>
+                    <Text style={[s.sizeRowValue, !selections[option.id] && { color: MUTED }]}>
+                      {option.values.find(v => v.id === selections[option.id])?.label ?? 'Select'}
+                    </Text>
+                    <Feather name="chevron-right" size={16} color={MUTED} />
+                  </Pressable>
+                ) : (
                 <OptionPicker
                   recommendedLabel={option.name.toLowerCase() === 'size' && sizeBadgeModel?.kind === 'recommend' ? sizeBadgeModel.size : null}
                   product={product}
@@ -1232,6 +1263,7 @@ export default function BuyerProductDetailScreen() {
                   selections={selections}
                   onSelect={handleSelect}
                 />
+                )}
                 {isUnselected && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -SP.sm, marginBottom: SP.sm }}>
                     <Feather name="alert-circle" size={12} color={RED} />
@@ -1472,6 +1504,25 @@ export default function BuyerProductDetailScreen() {
 
       {tileExpandOverlay}
 
+      {sizeOption && (
+        <SizeSheet
+          visible={sizeSheetOpen}
+          title={`${sizeOption.name}s`}
+          cells={cells}
+          selectedValueId={selections[sizeOption.id] ?? null}
+          stockLine={stockLine}
+          promiseLine={deliveryPromiseLine(!!product.isPreOrder)}
+          checkoutLabel={product.isPreOrder ? 'Reserve' : 'Checkout'}
+          checkoutDisabled={product.isPreOrder ? reserved || launching : paymentUnavailable || launching || !allSelected}
+          checkoutBusy={product.isPreOrder ? reserveLoading : buyingNow}
+          addBusy={addingToCart}
+          onSelect={(valueId) => { hapticToggle(); handleSelect(sizeOption.id, valueId); }}
+          onCheckout={() => { setSizeSheetOpen(false); void (product.isPreOrder ? handleReserve() : handleBuyNow()); }}
+          onAddToBag={() => { setSizeSheetOpen(false); void handleAddToCart(); }}
+          onClose={() => setSizeSheetOpen(false)}
+        />
+      )}
+
       <SizeGuideSheet
         visible={sizeGuideOpen}
         chart={sizeChart}
@@ -1492,35 +1543,14 @@ export default function BuyerProductDetailScreen() {
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
       >
-        {/* Real "Add to cart" + "Buy now" pair (it was an unlabeled bag icon). */}
-        {addedToCart ? (
-          <Button
-            label="In your bag"
-            icon="check"
-            variant="secondary"
-            onPress={() => router.push('/(buyer)/cart' as never)}
-            accessibilityLabel="In your bag. View cart"
-            style={s.buyNowBtn}
-            testID="product-view-cart"
-          />
-        ) : (
-          <Button
-            label="Add to cart"
-            variant="secondary"
-            onPress={handleAddToCart}
-            loading={addingToCart}
-            disabled={addingToCart || launching || (allSelected && !inStock)}
-            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
-            style={s.buyNowBtn}
-            testID="product-add-to-cart"
-          />
-        )}
-
+        {/* GOAT's pair: "Checkout" (outline) + "Add to bag" (primary), equal
+            widths. With no size picked, either one opens the size sheet. */}
         {product.isPreOrder ? (
           <Button
-            label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
+            label={reserved ? 'Reserved' : 'Reserve (no charge)'}
+            icon={reserved ? 'check' : undefined}
             onPress={handleReserve}
-            variant={reserved ? 'secondary' : 'primary'}
+            variant="secondary"
             loading={reserveLoading}
             disabled={reserveLoading || reserved || launching}
             accessibilityHint={reserved ? undefined : 'Reserves this pre-order at no charge'}
@@ -1528,18 +1558,33 @@ export default function BuyerProductDetailScreen() {
           />
         ) : (
           <Button
-            label={
-              paymentUnavailable ? 'Payments unavailable'
-                : !allSelected ? 'Select options'
-                : !inStock ? 'Sold Out'
-                : 'Buy now'
-            }
-            icon={!inStock && allSelected && !paymentUnavailable ? 'clock' : undefined}
+            label={paymentUnavailable ? 'Payments unavailable' : allSelected && !inStock ? 'Sold out' : 'Checkout'}
             onPress={handleBuyNow}
-            variant="primary"
+            variant="secondary"
             loading={buyingNow}
-            disabled={buyingNow || launching || !inStock || !allSelected || paymentUnavailable}
+            disabled={buyingNow || launching || paymentUnavailable || (allSelected && !inStock)}
             style={s.buyNowBtn}
+            testID="product-checkout"
+          />
+        )}
+        {addedToCart ? (
+          <Button
+            label="In your bag"
+            icon="check"
+            onPress={() => router.push('/(buyer)/cart' as never)}
+            accessibilityLabel="In your bag. View bag"
+            style={s.buyNowBtn}
+            testID="product-view-cart"
+          />
+        ) : (
+          <Button
+            label="Add to bag"
+            onPress={handleAddToCart}
+            loading={addingToCart}
+            disabled={addingToCart || launching || (allSelected && !inStock)}
+            accessibilityLabel={!allSelected ? 'Add to bag. Pick a size first' : !inStock ? 'Sold out' : 'Add to bag'}
+            style={s.buyNowBtn}
+            testID="product-add-to-cart"
           />
         )}
       </View>
@@ -1995,6 +2040,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 18 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   promiseRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: SP.md },
+  sizeRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52, marginBottom: SP.sm,
+    borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+  },
+  sizeRowLabel: { flex: 1, fontSize: FS.base, fontFamily: FONT.medium, color: FG },
+  sizeRowValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   promiseText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, flexShrink: 1 },
   price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },
