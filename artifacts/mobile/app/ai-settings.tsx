@@ -250,7 +250,7 @@ export default function AiSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="AI Settings" onBack={() => goBackOr(router, '/ai-brain')} />
+      <ScreenHeader title="Assistant settings" onBack={() => goBackOr(router, '/ai-brain')} />
 
       <ScrollView
         style={styles.scroll}

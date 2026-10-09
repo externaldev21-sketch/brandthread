@@ -487,7 +487,7 @@ export default function EditProfileScreen() {
           <View style={styles.previewInfo}>
             <Text style={styles.previewName} numberOfLines={1}>{fields.name || 'Your brand name'}</Text>
             <Text style={styles.previewMeta} numberOfLines={1}>
-              {[fields.category, fields.location].filter(Boolean).join(' · ') || 'Category · Location'}
+              {[fields.category, fields.location].filter(Boolean).join(', ') || 'Category, Location'}
             </Text>
           </View>
         </View>

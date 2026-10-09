@@ -2193,7 +2193,7 @@ export default function AddProductScreen() {
       <SuccessSheet
         visible={!!publishSuccess}
         onClose={() => setPublishSuccess(null)}
-        title={publishSuccess?.kind === 'updated' ? 'Product updated!' : currentStatus === 'active' ? 'Product published!' : 'Draft saved!'}
+        title={publishSuccess?.kind === 'updated' ? 'Product updated' : currentStatus === 'active' ? 'Product published' : 'Draft saved'}
         subtitle={publishSuccess ? `${publishSuccess.name} ${publishSuccess.kind === 'updated' ? 'has been updated.' : currentStatus === 'active' ? 'is now live.' : 'was saved as a draft.'}` : undefined}
         primaryAction={{
           label: 'View product',

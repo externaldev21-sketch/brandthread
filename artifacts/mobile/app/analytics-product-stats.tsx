@@ -76,7 +76,7 @@ export default function AnalyticsProductStatsScreen() {
                   thumbnailUrl={p.imageUrl}
                   icon="shopping-bag"
                   title={p.name}
-                  subtitle={`${formatCompactCount(p.views)} views · ${p.addToCarts} carts · ${p.purchases} sold`}
+                  subtitle={`${formatCompactCount(p.views)} views, ${p.addToCarts} carts, ${p.purchases} sold`}
                   value={formatCents(p.revenueCents)}
                   valueLabel={p.viewToPurchasePct === null ? undefined : `${p.viewToPurchasePct}% conv.`}
                   onPress={() => router.push(`/product-detail?id=${encodeURIComponent(p.productId)}&tab=analytics` as never)}

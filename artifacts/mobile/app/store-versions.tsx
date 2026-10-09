@@ -20,7 +20,7 @@ import { StoreVersion } from '@/services/storeTypes';
 function triggerVariant(trigger: StoreVersion['trigger']): { label: string; variant: 'success' | 'purple' | 'info' | 'neutral' } {
   if (trigger === 'publish') return { label: 'Published', variant: 'success' };
   if (trigger === 'theme_change') return { label: 'Theme Change', variant: 'purple' };
-  if (trigger === 'ai_change') return { label: 'AI Change', variant: 'info' };
+  if (trigger === 'ai_change') return { label: 'Generated change', variant: 'info' };
   if (trigger === 'section_change') return { label: 'Section Change', variant: 'info' };
   return { label: 'Manual', variant: 'neutral' };
 }

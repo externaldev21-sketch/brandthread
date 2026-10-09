@@ -134,7 +134,7 @@ export default function TeamInviteScreen() {
             <View style={[styles.icon, { backgroundColor: colors.success + '22' }]}>
               <Feather name="check-circle" size={26} color={colors.success} />
             </View>
-            <Text style={[styles.title, { color: colors.foreground }]}>You're on the team!</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>You're on the team</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
               You joined {brand} as {roleLabel}. You can now work in their store from the seller dashboard.
             </Text>

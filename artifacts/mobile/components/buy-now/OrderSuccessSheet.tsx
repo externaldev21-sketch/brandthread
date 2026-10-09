@@ -150,7 +150,7 @@ export function OrderSuccessSheet({
           </View>
         </Animated.View>
 
-        <Animated.Text style={[s.eyebrow, { color: theme.muted }, stagger[0]]}>Order placed!</Animated.Text>
+        <Animated.Text style={[s.eyebrow, { color: theme.muted }, stagger[0]]}>Order placed</Animated.Text>
 
         <Animated.View style={[s.productRow, stagger[1]]}>
           {order.thumbnailUri && (

@@ -16,8 +16,8 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { DESIGN_STUDIO_ROWS } from '@/lib/firstRunTips/content';
 
 const STUDIO_TOOLS = [
-  { label: 'AI Clothing Mockups', icon: 'image' as const, desc: 'Generate photorealistic product mockups', badge: 'Popular' },
-  { label: 'AI Product Photography', icon: 'camera' as const, desc: 'Studio-quality product shots without a camera', badge: null },
+  { label: 'Clothing mockups', icon: 'image' as const, desc: 'Generate photorealistic product mockups', badge: 'Popular' },
+  { label: 'Product photography', icon: 'camera' as const, desc: 'Studio-quality product shots without a camera', badge: null },
   { label: 'Background Removal', icon: 'scissors' as const, desc: 'Clean product cutouts in seconds', badge: null },
   { label: 'Lifestyle Images', icon: 'sun' as const, desc: 'Contextual lifestyle shots for any product', badge: null },
   { label: 'Tech Pack Generator', icon: 'file-text' as const, desc: 'Professional tech packs for manufacturers', badge: 'New' },
@@ -109,7 +109,7 @@ export default function AIStudioScreen() {
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('ai'); }}
           >
             <Feather name="zap" size={13} color={mode === 'ai' ? colors.primary : colors.mutedForeground} />
-            <Text style={[styles.modeBtnText, { color: mode === 'ai' ? colors.foreground : colors.mutedForeground }]}>AI Generate</Text>
+            <Text style={[styles.modeBtnText, { color: mode === 'ai' ? colors.foreground : colors.mutedForeground }]}>Generate</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.modeBtn, mode === 'manual' && { backgroundColor: colors.card }]}
@@ -196,11 +196,11 @@ export default function AIStudioScreen() {
           key={tool.label}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            if (tool.label === 'AI Clothing Mockups') {
+            if (tool.label === 'Clothing mockups') {
               router.push('/ai-mockup-chat' as never);
               return;
             }
-            if (tool.label === 'AI Product Photography') {
+            if (tool.label === 'Product photography') {
               router.push('/ai-photography-chat' as never);
               return;
             }

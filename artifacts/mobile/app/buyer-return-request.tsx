@@ -322,7 +322,7 @@ export default function BuyerReturnRequestScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.itemName}>{item.productName}</Text>
-                <Text style={s.itemVariant}>{[item.variant, `×${item.quantity}`].filter(Boolean).join(' · ')}</Text>
+                <Text style={s.itemVariant}>{[item.variant, `×${item.quantity}`].filter(Boolean).join(', ')}</Text>
               </View>
               <Text style={s.itemPrice}>{formatCents(item.unitPriceCents * item.quantity)}</Text>
             </View>
