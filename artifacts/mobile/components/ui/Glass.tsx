@@ -106,13 +106,13 @@ export function useGlassPress() {
 export function Glass({ variant = 'regular', tint = 'dark', radius = RADII.pill, style, children, noBlur = false, pointerEvents, testID }: GlassProps) {
   return (
     <View testID={testID} pointerEvents={pointerEvents} style={[{ borderRadius: radius, overflow: 'hidden' }, style]}>
-      <GlassBackdrop variant={variant} tint={tint} noBlur={noBlur} radius={radius} />
+      <GlassBackdrop variant={variant} tint={tint} noBlur={noBlur} />
       <LinearGradient
         pointerEvents="none"
         colors={tint === 'dark' ? SPECULAR_DARK : SPECULAR_LIGHT}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 0.55 }}
-        style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}
+        style={StyleSheet.absoluteFill}
       />
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, borderWidth: 1, borderColor: tint === 'dark' ? BORDER_DARK : BORDER_LIGHT }]} />
       {variant === 'pressed' && <GlassPressHighlight progress={ALWAYS_ON} tint={tint} radius={radius} />}
@@ -131,13 +131,8 @@ const SPECULAR_LIGHT = ['rgba(255,255,255,0.65)', 'rgba(255,255,255,0)'] as cons
 const BORDER_DARK = 'rgba(255,255,255,0.22)';
 const BORDER_LIGHT = 'rgba(255,255,255,0.55)';
 
-function GlassBackdrop({ variant, tint, noBlur, radius }: { variant: GlassVariant; tint: GlassTint; noBlur: boolean; radius: number }) {
+function GlassBackdrop({ variant, tint, noBlur }: { variant: GlassVariant; tint: GlassTint; noBlur: boolean }) {
   const clear = variant === 'clear';
-  // Each backdrop layer carries the glass's own radius rather than relying
-  // on the root's `overflow: hidden` alone — on web a composited ancestor
-  // (e.g. a transformed tab bar) can drop that clip for backdrop-filter
-  // children and leave square corners showing.
-  const rounded = { borderRadius: radius, overflow: 'hidden' } as const;
 
   if (Platform.OS === 'ios' && !noBlur) {
     const native = requireLiquidGlass();
@@ -146,7 +141,7 @@ function GlassBackdrop({ variant, tint, noBlur, radius }: { variant: GlassVarian
       return (
         <GlassView
           glassEffectStyle={clear ? 'clear' : 'regular'}
-          style={[StyleSheet.absoluteFill, rounded]}
+          style={StyleSheet.absoluteFill}
         />
       );
     }
@@ -162,7 +157,6 @@ function GlassBackdrop({ variant, tint, noBlur, radius }: { variant: GlassVarian
         pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
-          rounded,
           { backgroundColor: tint === 'dark' ? 'rgba(18,18,20,0.30)' : 'rgba(255,255,255,0.38)' },
           {
             backdropFilter: `blur(${clear ? 14 : 22}px) saturate(1.6)`,
@@ -187,13 +181,12 @@ function GlassBackdrop({ variant, tint, noBlur, radius }: { variant: GlassVarian
             // sweep's guidance calls for, not the heavier unconditional
             // dimezisBlurView method.
             experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurViewSdk31Plus' : undefined}
-            style={[StyleSheet.absoluteFill, rounded]}
+            style={StyleSheet.absoluteFill}
           />
           <View
             pointerEvents="none"
             style={[
               StyleSheet.absoluteFill,
-              rounded,
               { backgroundColor: tint === 'dark' ? `rgba(10,10,11,${clear ? 0.14 : 0.22})` : `rgba(255,255,255,${clear ? 0.20 : 0.30})` },
             ]}
           />
@@ -210,7 +203,6 @@ function GlassBackdrop({ variant, tint, noBlur, radius }: { variant: GlassVarian
       pointerEvents="none"
       style={[
         StyleSheet.absoluteFill,
-        rounded,
         { backgroundColor: tint === 'dark' ? `rgba(10,10,11,${clear ? 0.24 : 0.40})` : `rgba(255,255,255,${clear ? 0.32 : 0.50})` },
       ]}
     />

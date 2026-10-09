@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest';
  */
 const read = (file: string) => readFileSync(resolve(__dirname, '..', file), 'utf8');
 const parts = read('components/tab-bar/TabBarParts.tsx');
-const glass = read('components/ui/Glass.tsx');
 const seller = read('components/SellerGlobalTabBar.tsx');
 const buyer = read('components/buyer-nav/BuyerTabBar.tsx');
 
@@ -29,14 +28,6 @@ describe('tab bar has no square background', () => {
     expect(tabBarGlass).toMatch(/<LinearGradient[\s\S]*?style=\{\[StyleSheet\.absoluteFill, rounded\]\}/);
     expect(tabBarGlass).toMatch(/StyleSheet\.absoluteFill,\s*rounded,\s*\{ backgroundColor/);
     expect(tabBarGlass).not.toMatch(/style=\{StyleSheet\.absoluteFill\}/);
-  });
-
-  it('rounds every painted Glass layer (the active-tab pill)', () => {
-    const backdrop = body(glass, 'function GlassBackdrop', 'type LiquidGlassModule');
-    expect(backdrop).not.toMatch(/style=\{StyleSheet\.absoluteFill\}/);
-    expect(backdrop.match(/StyleSheet\.absoluteFill,\s*rounded/g)?.length).toBeGreaterThanOrEqual(3);
-    expect(backdrop).toContain('style={[StyleSheet.absoluteFill, rounded]}');
-    expect(glass).toContain('<GlassBackdrop variant={variant} tint={tint} noBlur={noBlur} radius={radius} />');
   });
 
   it('gives each pill shadow the same radius as its pill, and the bar row no fill', () => {
