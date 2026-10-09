@@ -102,7 +102,7 @@ export default function AccountTypeSettingsScreen() {
               Alert.alert(
                 'Account type updated',
                 `You are now a ${accountInfo[selectedType].title}. Restart the app to apply all changes.`,
-                [{ text: 'OK', onPress: () => goBackOr(router, '/buyer-settings-menu') }],
+                [{ text: 'OK', onPress: () => goBackOr(router, '/buyer-settings') }],
               );
             } catch {
               Alert.alert('Error', 'Could not update account type. Please try again.');
@@ -117,7 +117,7 @@ export default function AccountTypeSettingsScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Account type" onBack={() => goBackOr(router, '/buyer-settings-menu')} />
+      <ScreenHeader title="Account type" onBack={() => goBackOr(router, '/buyer-settings')} />
 
       {loading ? (
         <View style={s.loadingWrap}>

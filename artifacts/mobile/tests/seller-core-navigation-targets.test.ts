@@ -32,7 +32,6 @@ const SELLER_CORE_GLOBS = [
   'app/(tabs)/more.tsx',
   'app/customers.tsx',
   'app/customer-accounts.tsx',
-  'app/customer-events.tsx',
   'app/customer-orders.tsx',
   'app/customer-privacy.tsx',
   'app/analytics-reports.tsx',

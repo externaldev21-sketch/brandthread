@@ -73,7 +73,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/add-product.tsx',
   'app/buyer-drop-detail.tsx',
   'app/buyer-live.tsx',
-  'app/buyer-login-activity.tsx',
   'app/buyer-other-profile.tsx',
   'app/buyer-post-comments.tsx',
   'app/buyer-product-detail.tsx',

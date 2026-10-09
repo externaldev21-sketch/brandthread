@@ -105,7 +105,7 @@ export default function BuyerSettingsDetail() {
   const items = useMemo(() => settings ? cfg.items(settings, router) : [], [cfg, settings, router]);
 
   return <View style={styles.page}>
-    <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings-menu')} />
+    <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings')} />
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <Card style={styles.card}>{items.map((item, i) => {

@@ -554,13 +554,12 @@ export default function ProfileScreen() {
   }), [user?.id]);
 
   // ── Menu actions ──
-  // The hamburger opens a separate full-screen pushed page
-  // (app/buyer-settings-menu.tsx) instead of a bottom sheet — see that
-  // file's header comment for why (the old translucent sheet had no
-  // backdrop dim and no reliable way to close).
+  // The hamburger opens "Settings and activity" (app/buyer-settings.tsx), a
+  // full-screen pushed page instead of a bottom sheet — the old translucent
+  // sheet had no backdrop dim and no reliable way to close.
   const handleMenu = () => {
     hapticLight();
-    router.push('/buyer-settings-menu' as any);
+    router.push('/buyer-settings' as any);
   };
 
   const handleShareProfile = () => {

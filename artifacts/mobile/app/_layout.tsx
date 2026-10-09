@@ -1551,7 +1551,6 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-my-sizes" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="find-friends-contacts" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-download-data"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1559,7 +1558,6 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-recently-watched" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="buyer-settings-menu"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="quote-post"                options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1647,7 +1645,6 @@ const AppStack = React.memo(function AppStack() {
         {/* Store settings sub-screens */}
         <Stack.Screen name="customer-accounts" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="customer-privacy"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="customer-events"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="taxes-duties" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />

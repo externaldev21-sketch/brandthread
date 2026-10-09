@@ -7,7 +7,7 @@ query string is carried over). In-app links point straight at the new home;
 `tests/legacy-routes.test.ts` fails if anything links to an old path, if a
 target is missing, or if this file falls out of date.
 
-Screens in `app/` now: **340** (route files, excluding layouts and tests).
+Screens in `app/` now: **337** (route files, excluding layouts and tests).
 
 | Old route | New home | Why |
 |---|---|---|
@@ -45,3 +45,6 @@ Screens in `app/` now: **340** (route files, excluding layouts and tests).
 | `/analytics-production` | `/manufacturer-hub` | No backend; production lives in the Manufacturer hub. |
 | `/analytics-profit` | `/finance` | No backend; payouts and fees live in Finance. |
 | `/analytics-inventory` | `/(tabs)/products?filter=low-stock` | Removed earlier; stock lives on the Products tab. |
+| `/buyer-settings-menu` | `/buyer-settings` | Profile Menu merged into Settings and activity. |
+| `/buyer-login-activity` | `/login-activity` | Same screen as the seller one (Clerk sessions); one route now. |
+| `/customer-events` | `/store-pixels` | "Not available yet" placeholder; pixel tracking lives in Store pixels. |
