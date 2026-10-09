@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   heroName: { fontFamily: FONT.bold, fontSize: FS.xxl, marginTop: SP.md },
   heroSubtitle: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4 },
 
-  sectionLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: SP.lg, marginBottom: SP.sm },
+  sectionLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, marginTop: SP.lg, marginBottom: SP.sm },
 
   themeRow: { gap: SP.sm, paddingRight: SP.md },
   themeCard: { width: 64, height: 84, borderRadius: RADIUS.md, borderWidth: 2, overflow: 'hidden' },

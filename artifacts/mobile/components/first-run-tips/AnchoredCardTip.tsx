@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     padding: SP.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  stepCount: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 0.3 },
+  stepCount: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, fontSize: FS.xs },
   skip: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.semibold, fontSize: FS.xs },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.md },
   body: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },

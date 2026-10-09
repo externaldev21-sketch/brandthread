@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   card: { width: '88%', maxWidth: 340, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   head: { flexDirection: 'row', gap: SP.sm + 2, padding: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER, alignItems: 'flex-start' },
   icon: { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
-  kicker: { fontSize: 10, fontFamily: FONT.semibold, color: SUBTLE, letterSpacing: 1 },
+  kicker: { fontSize: 11, fontFamily: FONT.semibold, color: SUBTLE },
   title: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginTop: 1 },
   meta: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
   price: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },

@@ -213,8 +213,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   errorText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
   content: { paddingHorizontal: SP.md, paddingTop: SP.sm },
   sectionLabel: {
-    color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.meta, letterSpacing: 0.6,
-    textTransform: 'uppercase', marginTop: SP.lg, marginBottom: SP.sm,
+    color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.meta, marginTop: SP.lg, marginBottom: SP.sm,
   },
   segmentRow: { flexDirection: 'row', gap: SP.sm },
   segment: { flex: 1, height: 44, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

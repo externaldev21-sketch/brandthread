@@ -112,5 +112,5 @@ const styles = StyleSheet.create({
   arrow: { marginBottom: 6 },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
   body: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 4 },
-  dismissHint: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14, letterSpacing: 0.3 },
+  dismissHint: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14 },
 });

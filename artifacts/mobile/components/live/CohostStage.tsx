@@ -157,7 +157,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingHorizontal: 10, paddingVertical: 5, backgroundColor: LIVE_RED,
   },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: theme.onAccent },
-  livePillText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 12, letterSpacing: 1.5 },
+  livePillText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 12 },
   countPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill,
     paddingHorizontal: 10, paddingVertical: 5, backgroundColor: theme.card,

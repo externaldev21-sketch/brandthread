@@ -766,9 +766,9 @@ const s = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
   },
   tierMiniQty: {
-    fontSize: 10, fontFamily: FONT.regular, color: SUBTLE,
+    fontSize: 11, fontFamily: FONT.regular, color: SUBTLE,
   },
   tierMiniPrice: {
-    fontSize: 10, fontFamily: FONT.semibold, color: FG,
+    fontSize: 11, fontFamily: FONT.semibold, color: FG,
   },
 });

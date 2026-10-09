@@ -301,7 +301,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   dnsCard: { backgroundColor: SURFACE, gap: SP.sm },
   dnsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   dnsRow: { flexDirection: 'row', gap: SP.md, alignItems: 'flex-start' },
-  dnsType: { fontSize: FS.xs, fontFamily: FONT.bold, color: FG, minWidth: 50, textTransform: 'uppercase' },
+  dnsType: { fontSize: FS.xs, fontFamily: FONT.bold, color: FG, minWidth: 50 },
   dnsHost: { fontSize: FS.xs, fontFamily: FONT.regular, color: FG },
   dnsNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   actionRow: { flexDirection: 'row', gap: SP.sm },

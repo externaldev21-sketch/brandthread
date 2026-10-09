@@ -57,8 +57,6 @@ function makeSectionStyles(colors: Colors) {
       fontSize: FS.xs,
       lineHeight: 14,
       color: colors.mutedForeground,
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
       marginBottom: 4,
       paddingHorizontal: 2,
     },

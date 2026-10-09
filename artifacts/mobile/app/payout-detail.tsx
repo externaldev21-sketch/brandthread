@@ -198,7 +198,7 @@ const createStyles = (theme: AppThemePreset) => {
     pill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: border },
     pillText: { color: text, fontSize: FS.xs, fontFamily: FONT.medium },
     group: { backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, paddingHorizontal: SP.md, marginBottom: SP.md },
-    sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm, marginTop: SP.sm },
+    sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm, marginTop: SP.sm },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: SP.md, gap: SP.md },
     rowBorder: { borderTopWidth: 1, borderTopColor: border },
     rowLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.regular },

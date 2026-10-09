@@ -255,7 +255,7 @@ const makeStyles = (_theme: unknown) => StyleSheet.create({
   cardBody: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.sm },
   note: { fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.sm },
   codeBox: { borderWidth: 1, borderRadius: RADIUS.md, paddingVertical: SP.md, alignItems: 'center', marginBottom: SP.sm },
-  code: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: 2 },
+  code: { fontFamily: FONT.bold, fontSize: FS.xl },
   input: { borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.md, minHeight: 48, justifyContent: 'center', marginBottom: SP.sm },
   inputText: { fontFamily: FONT.regular, fontSize: FS.base },
 });

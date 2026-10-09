@@ -14,7 +14,7 @@ import {
   getInitialDropBroadcastStates,
   type DropBroadcastState,
 } from '@/lib/dropBroadcastState';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { ListRow } from '@/components/ui/ListRow';
@@ -285,7 +285,7 @@ const toastStyles = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 10,
     shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
   },
-  text: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  text: { fontSize: 13, fontFamily: FONT.semibold },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -581,39 +581,39 @@ const styles = StyleSheet.create({
 
   // Banner
   banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 20 },
-  bannerText: { fontSize: 12, fontFamily: 'Inter_500Medium', flex: 1, lineHeight: 17 },
+  bannerText: { fontSize: 12, fontFamily: FONT.medium, flex: 1, lineHeight: 17 },
 
   // Card header row (title + Manage button)
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  cardTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  cardTitle: { fontSize: 17, fontFamily: FONT.semibold },
   manageBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
-  manageBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  manageBtnText: { fontSize: 12, fontFamily: FONT.semibold },
 
   // Status row
   statusRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   statusItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  statusText: { fontSize: 12, fontFamily: FONT.medium },
   statusDivider: { width: 1, height: 16 },
 
   // Generic list row (used inside cards)
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderTopWidth: 1 },
-  listRowLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  listRowLabel: { fontSize: 13, fontFamily: FONT.medium },
   chipRow: { flexDirection: 'row', gap: 4 },
   chip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  chipText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+  chipText: { fontSize: FS.xs, fontFamily: FONT.bold },
 
   payoutInfo: { flex: 1 },
-  payoutLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium', marginBottom: 3, letterSpacing: 0.3 },
-  payoutAccount: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  viewPayoutsLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  payoutLabel: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 3 },
+  payoutAccount: { fontSize: 12, fontFamily: FONT.semibold },
+  viewPayoutsLink: { fontSize: 12, fontFamily: FONT.semibold },
 
 
   // Additional providers
-  groupTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 28, marginBottom: 4 },
-  groupSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 12, lineHeight: 17 },
+  groupTitle: { fontSize: 15, fontFamily: FONT.semibold, marginTop: 28, marginBottom: 4 },
+  groupSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 12, lineHeight: 17 },
   addProviderBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 14, borderStyle: 'dashed' },
-  addProviderText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  addProviderText: { fontSize: 13, fontFamily: FONT.semibold },
 
   // Payment configuration rows
   configRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
@@ -621,55 +621,55 @@ const styles = StyleSheet.create({
   // Section headers
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   sectionDot: { width: 8, height: 8, borderRadius: 4 },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', flex: 1 },
-  sectionCount: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, flex: 1 },
+  sectionCount: { fontSize: 13, fontFamily: FONT.regular },
 
   // Note banners
   preOrderNote: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 12 },
-  preOrderNoteText: { fontSize: 12, fontFamily: 'Inter_500Medium', flex: 1 },
+  preOrderNoteText: { fontSize: 12, fontFamily: FONT.medium, flex: 1 },
 
   // Drop card
   dropCard: { borderRadius: 16, borderWidth: 1, padding: 16 },
   dropTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
-  typeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  dropName: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 14 },
+  typeText: { fontSize: 11, fontFamily: FONT.semibold },
+  dropName: { fontSize: 15, fontFamily: FONT.semibold, marginBottom: 14 },
   dropStats: { flexDirection: 'row', alignItems: 'center' },
   dropStat: { flex: 1, alignItems: 'center' },
-  dropStatVal: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 2 },
-  dropStatLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
+  dropStatVal: { fontSize: 15, fontFamily: FONT.bold, marginBottom: 2 },
+  dropStatLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   dropDivider: { width: 1, height: 28 },
 
   // Pre Order progress
   preOrderExtra: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: 'transparent' },
   progressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   progressLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  progressLabel: { fontSize: 11, fontFamily: 'Inter_500Medium' },
-  progressPct: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  progressLabel: { fontSize: 11, fontFamily: FONT.medium },
+  progressPct: { fontSize: 12, fontFamily: FONT.bold },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 10 },
   progressFill: { height: 6, borderRadius: 3 },
   shipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
-  shipText: { fontSize: 11, fontFamily: 'Inter_400Regular', flex: 1, lineHeight: 16 },
+  shipText: { fontSize: 11, fontFamily: FONT.regular, flex: 1, lineHeight: 16 },
 
   // Pre Made note
   premadeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'transparent' },
-  premadeNoteText: { fontSize: 11, fontFamily: 'Inter_400Regular', flex: 1, lineHeight: 16 },
+  premadeNoteText: { fontSize: 11, fontFamily: FONT.regular, flex: 1, lineHeight: 16 },
 
   // Broadcast button
   broadcastWrap: { marginTop: 14, paddingTop: 14, borderTopWidth: 1 },
   broadcastRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   followerPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 8 },
-  followerPillText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  followerPillText: { fontSize: 11, fontFamily: FONT.semibold },
   zeroAudience: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 9 },
-  zeroAudienceText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  zeroAudienceText: { fontSize: 12, fontFamily: FONT.medium },
   broadcastBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 7, borderRadius: 10, borderWidth: 1,
     paddingVertical: 10, paddingHorizontal: 14,
   },
-  broadcastBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  broadcastBtnText: { fontSize: 13, fontFamily: FONT.semibold },
   scheduledNotice: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 10, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14 },
-  scheduledNoticeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  scheduledNoticeText: { fontSize: 13, fontFamily: FONT.semibold },
 
   // Shared card container
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },

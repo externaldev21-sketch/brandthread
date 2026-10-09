@@ -248,7 +248,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
   heroCard: { backgroundColor: colors.elevated, borderRadius: RADIUS.lg, padding: SP.lg, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg, alignItems: 'center' },
-  heroLabel:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: SP.sm },
+  heroLabel:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground, marginBottom: SP.sm },
   heroValue:{ fontSize: 40, fontFamily: FONT.bold, color: colors.foreground },
   heroChange:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.success },
   recoveredRow:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },

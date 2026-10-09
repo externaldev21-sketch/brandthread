@@ -284,7 +284,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevated,
     borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
   },
-  contextEyebrow: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1 },
+  contextEyebrow: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11 },
   contextLabel: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base, marginTop: 3 },
   question: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4, marginTop: SP.lg },
   helper: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 6 },
@@ -340,7 +340,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignSelf: 'stretch', marginTop: SP.xl, backgroundColor: theme.card, borderRadius: RADIUS.lg,
     borderWidth: 1, borderColor: theme.border, padding: SP.md, gap: SP.md,
   },
-  nextLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1 },
+  nextLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11 },
   nextRow: { flexDirection: 'row', gap: SP.md, alignItems: 'flex-start' },
   nextIcon: {
     width: 28, height: 28, borderRadius: 14, backgroundColor: theme.cardElevated,

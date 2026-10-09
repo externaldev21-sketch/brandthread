@@ -228,7 +228,7 @@ export default function BuyerProblemReportScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
-  sectionTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  sectionTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
   typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   typeCard: {
     width: '47%', padding: SP.sm, borderRadius: RADIUS.md,

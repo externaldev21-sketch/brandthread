@@ -846,7 +846,7 @@ const makeCard = (theme: AppThemePreset) => StyleSheet.create({
   coverFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   coverFallbackText: { fontSize: 34, fontFamily: FONT.bold, color: theme.accentLight },
   yearsBadge:    { position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.pill, backgroundColor: 'rgba(10,10,11,0.78)' }, // theme-exempt: scrim over the cover photo
-  yearsText:     { fontSize: 10, fontFamily: FONT.semibold, color: '#FAFAFA' }, // theme-exempt: text on the photo scrim
+  yearsText:     { fontSize: 11, fontFamily: FONT.semibold, color: '#FAFAFA' }, // theme-exempt: text on the photo scrim
   saveOverlay:   { position: 'absolute', top: 7, right: 7, width: 28, height: 28, borderRadius: 14, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
   topRow:        { marginBottom: SP.xs },
   nameCol:       { flex: 1 },
@@ -1016,7 +1016,7 @@ const makeFm = (theme: AppThemePreset) => StyleSheet.create({
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.md },
   title:       { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
   scroll:      { paddingHorizontal: SP.md, paddingBottom: SP.lg },
-  sectionLabel:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, marginTop: SP.md, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionLabel:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, marginTop: SP.md, marginBottom: SP.sm },
   chipRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   switchRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.lg, paddingVertical: SP.sm },
   switchLabel: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
@@ -1741,7 +1741,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   searchInput:  { flex: 1, height: 36, backgroundColor: theme.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, paddingHorizontal: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text },
   filterBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   filterBtnActive:{ borderColor: theme.border, backgroundColor: theme.accentDim },
-  filterCount:  { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: theme.accent, color: theme.onAccent, fontSize: 10, fontFamily: FONT.bold, textAlign: 'center', lineHeight: 16, overflow: 'hidden' },
+  filterCount:  { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: theme.accent, color: theme.onAccent, fontSize: 11, fontFamily: FONT.bold, textAlign: 'center', lineHeight: 16, overflow: 'hidden' },
   resultCount:  { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, paddingHorizontal: SP.md, marginBottom: SP.sm },
   skeletonList: { padding: SP.md, gap: SP.md },
   skeletonRow:  { height: 132, borderRadius: RADIUS.lg, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
@@ -1778,7 +1778,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   featuredCoverFallbackText: { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.accentLight },
   featuredVerifiedBadge: { position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: 9, backgroundColor: theme.secondary, alignItems: 'center', justifyContent: 'center' },
   featuredName: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text, marginTop: SP.xs },
-  featuredMeta: { fontSize: 10, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
+  featuredMeta: { fontSize: 11, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   previewSection: { gap: SP.xs },
   previewRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: theme.cardGlass, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm },
   previewIcon:  { width: 32, height: 32, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' },
@@ -1786,7 +1786,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   previewTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   previewSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   previewBadge: { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  previewBadgeText: { fontSize: 10, fontFamily: FONT.bold, color: theme.onAccent },
+  previewBadgeText: { fontSize: 11, fontFamily: FONT.bold, color: theme.onAccent },
   compareBar:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardGlass },
   compareBarText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
 });

@@ -564,7 +564,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    letterSpacing: 0.3,
   },
   styleOptionTextSelected: { color: '#0A0A0B' },
   contentWrap: {

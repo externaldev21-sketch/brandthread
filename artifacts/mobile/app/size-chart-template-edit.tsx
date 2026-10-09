@@ -289,7 +289,7 @@ function makeStyles(c: ReturnType<typeof useColors>) {
     screen: { flex: 1, backgroundColor: c.background },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     content: { paddingHorizontal: GUTTER, paddingTop: SP.sm },
-    label: { fontFamily: FONT.semibold, fontSize: FS.meta, color: c.mutedForeground, marginBottom: SP.sm, letterSpacing: 0.4, textTransform: 'uppercase' },
+    label: { fontFamily: FONT.semibold, fontSize: FS.meta, color: c.mutedForeground, marginBottom: SP.sm },
     input: { minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base, color: c.foreground },
     notes: { minHeight: 84, paddingTop: SP.sm, textAlignVertical: 'top' },
     segment: { flexDirection: 'row', backgroundColor: c.card, borderRadius: RADIUS.pill, padding: 3, marginTop: SP.md, borderWidth: 1, borderColor: c.border },

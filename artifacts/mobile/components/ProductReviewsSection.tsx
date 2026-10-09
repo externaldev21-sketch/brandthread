@@ -297,7 +297,7 @@ export function ProductReviewsSection({
 const s = StyleSheet.create({
   wrap: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: BORDER_SUBTLE, marginBottom: 8 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  title: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, textTransform: 'uppercase', letterSpacing: 0.8 },
+  title: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, },
   seeAll: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   summaryRow: { flexDirection: 'row', gap: 20, marginBottom: 16, alignItems: 'center' },
   avgBlock: { alignItems: 'flex-start', gap: 3 },
@@ -316,7 +316,7 @@ const s = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 },
   reviewerName: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  // Was fontSize: 10 (below the 11pt floor) — "Verified buyer" specifically
+  // Was fontSize: 11 (below the 11pt floor) — "Verified buyer" specifically
   // measured as blurry-small on live.
   verifiedText: { fontSize: FS.meta, fontFamily: FONT.semibold },
   reviewDate: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
@@ -339,7 +339,7 @@ const replyS = StyleSheet.create({
 
 const fitS = StyleSheet.create({
   wrap: { marginBottom: 18 },
-  label: { fontSize: FS.meta, fontFamily: FONT.bold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
+  label: { fontSize: FS.meta, fontFamily: FONT.bold, color: MUTED, marginBottom: 2 },
   value: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 8 },
   track: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   dot: { flex: 1, height: 4, borderRadius: 2 },

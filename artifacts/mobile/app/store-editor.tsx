@@ -1415,8 +1415,6 @@ const makeBrandStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   themeSwitchName: {
     fontSize: FS.base,

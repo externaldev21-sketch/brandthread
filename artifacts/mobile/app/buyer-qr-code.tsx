@@ -130,7 +130,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
 
   card: { width: '100%', maxWidth: 320, backgroundColor: CARD, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginTop: SP.lg },
   cardTop: { paddingVertical: 12, alignItems: 'center' },
-  cardBrand: { fontFamily: FONT.bold, fontSize: FS.md, color: ON_DARK, letterSpacing: 1.5 },
+  cardBrand: { fontFamily: FONT.bold, fontSize: FS.md, color: ON_DARK },
 
   qrWrap: { alignItems: 'center', paddingVertical: SP.xl },
   qrBg: { padding: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.accent },

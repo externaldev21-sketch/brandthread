@@ -111,6 +111,7 @@ import {
 } from '@/components/onboarding/OnboardingUI';
 import { MOTION, RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 import { radius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -275,7 +276,7 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
 const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   emoji:    { fontSize: 16 },
-  chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chipText: { fontSize: 15, fontFamily: FONT.medium, color: theme.muted },
 });
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -295,7 +296,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
 }
 const createSc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  chipText:   { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chipText:   { fontSize: 15, fontFamily: FONT.medium, color: theme.muted },
 });
 
 /** Big tappable option row — one of a few answers to the screen's question. */
@@ -323,7 +324,7 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
 const createSr = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   row:     { backgroundColor: theme.card, borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, paddingHorizontal: 18, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', gap: SPACE.md, overflow: 'hidden' },
   stitch:  { position: 'absolute', top: 10, left: 18 },
-  label:   { fontSize: 17, lineHeight: 22, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2 },
+  label:   { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold, color: theme.text, marginBottom: 2 },
   labelOn: { color: theme.text },
   sub:     { ...TYPE.body, color: theme.muted },
   circle:  { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -455,7 +456,7 @@ const createSl = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   stepIconDone:   { backgroundColor: FG, borderColor: FG },
   stepDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)' },
   stepLabel:      { ...TYPE.body, lineHeight: 28, color: MUTED },
-  stepLabelActive:{ color: FG, fontFamily: 'Inter_600SemiBold' },
+  stepLabelActive:{ color: FG, fontFamily: FONT.semibold },
   });
 };
 
@@ -618,7 +619,7 @@ const createSs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   body:       { flex: 1, justifyContent: 'center' },
   hero:       { alignItems: 'center', marginBottom: SPACE.xl },
   brandBadge: { alignSelf: 'flex-start', borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 6, marginTop: SPACE.sm, borderWidth: 1 },
-  brandBadgeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  brandBadgeText: { fontSize: 13, fontFamily: FONT.semibold },
   desc:       { ...TYPE.body, color: MUTED, marginTop: SPACE.sm, marginBottom: SPACE.lg },
   features:   { gap: SPACE.sm },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
@@ -1074,7 +1075,7 @@ function BuyerAuthStep({
               <>
                 <View style={sba.bigRowIcon}>
                   <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text>
+                    <Text style={{ fontFamily: FONT.bold, fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text>
                   </View>
                 </View>
                 <Text style={sba.bigRowText}>Continue with Google</Text>
@@ -1405,7 +1406,7 @@ function SharedAuthStep({
             <PrimaryButton label={loading ? 'Verifying…' : 'Verify email'} onPress={handleVerify} disabled={!canVerify} loading={loading} />
           </Reveal>
           <TouchableOpacity style={ssa.resendBtn} onPress={() => signUp.verifications.sendEmailCode()}>
-            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.text, fontFamily: 'Inter_600SemiBold' }}>Resend</Text></Text>
+            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Resend</Text></Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1622,8 +1623,8 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
   chooseScroll: { flexGrow: 1, paddingVertical: 24, gap: 0 },
-  chooseHeadline: { fontSize: 36, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1.2, marginBottom: 8 },
-  chooseSub: { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 22, marginBottom: 32 },
+  chooseHeadline: { fontSize: 34, fontFamily: FONT.bold, color: FG, letterSpacing: -1.2, marginBottom: 8 },
+  chooseSub: { fontSize: 15, fontFamily: FONT.regular, color: MUTED, lineHeight: 22, marginBottom: 32 },
   bigRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
@@ -1631,54 +1632,54 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   appleRow: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
   bigRowIcon: { width: 28, alignItems: 'center' },
-  bigRowText: { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
+  bigRowText: { flex: 1, fontSize: 15, fontFamily: FONT.semibold, color: FG },
   signInLink: { paddingVertical: 16, alignItems: 'center' },
-  signInLinkText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
+  signInLinkText: { fontSize: 15, fontFamily: FONT.regular, color: MUTED },
   backToChoose: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
-  backToChooseText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
-  headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 4 },
-  sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
+  backToChooseText: { fontSize: 15, fontFamily: FONT.medium, color: MUTED },
+  headline:  { fontSize: 28, fontFamily: FONT.bold, color: FG, letterSpacing: -0.5, marginBottom: 4 },
+  sub:       { fontSize: 15, fontFamily: FONT.regular, color: MUTED, marginBottom: 20 },
   inputWrap: { marginBottom: 12 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
-  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
-  codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: 'Inter_700Bold' },
+  label:     { fontSize: 12, fontFamily: FONT.semibold, color: MUTED, marginBottom: 5 },
+  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: FONT.regular, color: FG },
+  codeInput: { fontSize: 22, textAlign: 'center', fontFamily: FONT.bold },
   pwRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12 },
   pwInput:   { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
   eyeBtn:    { paddingHorizontal: 14 },
-  hint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
-  error:     { color: ERR, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 10 },
+  hint:      { fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginTop: 4 },
+  error:     { color: ERR, fontSize: 13, fontFamily: FONT.regular, marginBottom: 10 },
   resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 6 },
-  resendText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
-  legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
+  resendText:{ fontSize: 15, fontFamily: FONT.regular, color: MUTED },
+  legal:     { fontSize: 12, fontFamily: FONT.regular, color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
   existingEmailChip: {
     alignSelf: 'flex-start',
     borderRadius: 20, borderWidth: 1,
     paddingHorizontal: 14, paddingVertical: 6, marginBottom: 16,
   },
-  existingEmailText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  existingEmailText: { fontSize: 13, fontFamily: FONT.semibold },
   existingCard: {
     borderRadius: 12, borderWidth: 1,
     padding: 16, marginBottom: 20,
   },
   existingCardTitle: {
-    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, lineHeight: 23,
+    fontSize: 17, fontFamily: FONT.bold, color: FG, marginBottom: 6, lineHeight: 23,
   },
   existingCardSub: {
-    fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20,
+    fontSize: 15, fontFamily: FONT.regular, color: MUTED, lineHeight: 20,
   },
   existingSignInBtn:  { marginBottom: 9, borderRadius: 12, overflow: 'hidden' },
   existingSignInGrad: { paddingVertical: 16, alignItems: 'center', borderRadius: 12 },
-  existingSignInText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  existingSignInText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   existingDiffBtn: {
     borderRadius: 12, paddingVertical: 15, alignItems: 'center',
     borderWidth: 1, borderColor: BORDER,
   },
-  existingDiffText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  existingDiffText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   sessionBtn:     { marginTop: 8, marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
   sessionBtnGrad: { paddingVertical: 16, alignItems: 'center', paddingHorizontal: 20 },
-  sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  sessionBtnText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   continueBtn:    { paddingVertical: 14, alignItems: 'center' },
-  continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
+  continueBtnText:{ fontSize: 15, fontFamily: FONT.medium, color: MUTED },
   });
 };
 
@@ -1699,19 +1700,19 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   divText:   { ...TYPE.label, color: MUTED },
   oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
   appleBtn:  { borderColor: BORDER },
-  oauthText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: FG },
+  oauthText: { fontSize: 16, fontFamily: FONT.semibold, color: FG },
   existingEmailChip: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14, paddingVertical: 8, marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
-  existingEmailText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  existingEmailText: { fontSize: 15, fontFamily: FONT.semibold },
   existingCard: {
     borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth,
     padding: SPACE.md + 2,
   },
   existingCardTitle: {
-    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, lineHeight: 23,
+    fontSize: 17, fontFamily: FONT.bold, color: FG, marginBottom: 6, lineHeight: 23,
   },
   existingCardSub: {
     ...TYPE.body, color: MUTED,
@@ -1857,14 +1858,14 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, ERR = theme.error;
   return StyleSheet.create({
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xl },
-  sectionLabel: { ...TYPE.eyebrow, color: FG, textTransform: 'uppercase', marginTop: SPACE.xl, marginBottom: SPACE.sm },
+  sectionLabel: { ...TYPE.eyebrow, color: FG, marginTop: SPACE.xl, marginBottom: SPACE.sm },
   themeRow: { gap: SPACE.xs, paddingRight: SPACE.xs },
   themeCard: { width: 104, padding: 6, borderRadius: 18, backgroundColor: CARD, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER },
   themeSwatch: { height: 56, borderRadius: 13, padding: 10, justifyContent: 'space-between' },
   themeDot: { width: 16, height: 16, borderRadius: 8 },
   themeLine: { width: 36, height: 3, borderRadius: 2 },
   themeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 8 },
-  themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
+  themeName: { flex: 1, fontSize: 12, fontFamily: FONT.semibold, color: FG },
   hint: { ...TYPE.caption, color: MUTED2, marginTop: SPACE.xs },
   sampleHeader: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: SPACE.sm },
   sampleSub: { ...TYPE.caption, color: MUTED, paddingRight: 18, marginTop: -4 },
@@ -1872,10 +1873,10 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   resultCard: { borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: SPACE.sm },
   resultImage: { width: '100%', height: 180 },
   resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, backgroundColor: 'rgba(0,0,0,0.86)' },
-  resultText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
+  resultText: { fontSize: 13, fontFamily: FONT.semibold, color: FG },
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: SPACE.xs, marginTop: SPACE.xs, padding: SPACE.sm, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: ERR },
   errorText: { flex: 1, fontSize: 12, lineHeight: 17, color: ERR },
-  retryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  retryText: { fontSize: 13, fontFamily: FONT.bold },
   continueWrap: { marginTop: SPACE.md },
   });
 };

@@ -199,7 +199,7 @@ const s = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 },
   name: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  // Was fontSize: 10 (below the 11pt floor).
+  // Was fontSize: 11 (below the 11pt floor).
   verifiedText: { fontSize: FS.meta, fontFamily: FONT.semibold },
   date: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
   fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },

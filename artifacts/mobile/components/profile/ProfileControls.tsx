@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  messagesBadgeText: { fontFamily: FONT.bold, fontSize: 10 },
+  messagesBadgeText: { fontFamily: FONT.bold, fontSize: 11 },
 
   glass: {
     width: 44, height: 44, borderRadius: 22, borderWidth: 1,
@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
   statSlot: { flex: 1, justifyContent: 'center' },
   statCell: { height: 64, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, gap: 2 },
   statValue: { ...TYPE_SCALE.title1, ...TABULAR_NUMS, letterSpacing: -0.8 },
-  statLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, letterSpacing: 0.8, textTransform: 'uppercase' },
+  statLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, },
   statDivider: { width: StyleSheet.hairlineWidth, marginVertical: SP.md },
 
   tabs: {
@@ -646,7 +646,7 @@ const styles = StyleSheet.create({
 
   section: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: SP.md },
   sectionStitch: { flex: 1, borderTopWidth: 1, borderStyle: 'dashed' },
-  sectionText: { fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 2, textTransform: 'uppercase' },
+  sectionText: { fontFamily: FONT.bold, fontSize: FS.base, },
 
   pillWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: SP.md },
   pillInline: { alignItems: 'stretch', paddingHorizontal: SP.md },

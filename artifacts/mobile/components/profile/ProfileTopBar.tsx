@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32,
     borderRadius: RADIUS.sm, overflow: 'hidden',
   },
-  switcherText: { fontFamily: FONT.semibold, fontSize: 18, flexShrink: 1, minWidth: 0 },
+  switcherText: { fontFamily: FONT.semibold, fontSize: 17, flexShrink: 1, minWidth: 0 },
   overMedia: {
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, // theme-exempt: legibility over cover media
   },

@@ -261,14 +261,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerTitle:{ fontSize: FS.md, fontFamily: FONT.bold, color: FG },
 
   heroCard:       { margin: SP.md, padding: SP.xl, borderWidth: 1, borderRadius: RADIUS.xl, alignItems: 'center' },
-  heroLabel:      { fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 2, textTransform: 'uppercase', marginBottom: SP.xs },
+  heroLabel:      { fontSize: FS.xs, fontFamily: FONT.semibold, marginBottom: SP.xs },
   heroBalance:    { fontSize: FS.h1, fontFamily: FONT.bold, color: FG, lineHeight: 42 },
   heroUnit:       { fontSize: FS.base, fontFamily: FONT.medium, marginBottom: SP.sm },
   heroValuePill:  { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, marginTop: SP.xs },
   heroValueText:  { fontSize: FS.sm, fontFamily: FONT.semibold },
   heroEmpty:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 },
 
-  sectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase', marginHorizontal: SP.md, marginTop: SP.xs, marginBottom: SP.xs },
+  sectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginHorizontal: SP.md, marginTop: SP.xs, marginBottom: SP.xs },
 
   earnCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: SP.md, marginBottom: SP.xs, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md },
   earnIconWrap: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
@@ -276,7 +276,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   earnSub:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 17 },
 
   redeemCard:         { marginHorizontal: SP.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md },
-  redeemLabel:        { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.xs },
+  redeemLabel:        { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.xs },
   redeemRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   redeemInput:        { flex: 1, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.base },
   discountPreview:    { backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 8, flexShrink: 0 },

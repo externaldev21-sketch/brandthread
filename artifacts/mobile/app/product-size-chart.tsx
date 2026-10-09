@@ -365,7 +365,7 @@ export default function ProductSizeChartScreen() {
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root:          { flex: 1, backgroundColor: 'transparent' },
   content:       { padding: SP.lg, gap: SP.md },
-  sectionTitle:  { fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  sectionTitle:  { fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.muted },
   label:         { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text },
   unitRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   unitToggle:    { flexDirection: 'row', gap: 1, backgroundColor: theme.border, borderRadius: RADIUS.sm, overflow: 'hidden' },

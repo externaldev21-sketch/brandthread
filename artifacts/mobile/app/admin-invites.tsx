@@ -357,7 +357,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     color: theme.text, fontFamily: FONT.regular, fontSize: FS.md,
   },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.md },
-  code: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md, letterSpacing: 1.5 },
+  code: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   status: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.base },
   buttons: { flexDirection: 'row', gap: SP.sm, marginTop: SP.xs },
   btnCell: { flex: 1 },

@@ -220,5 +220,5 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   advancedRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52, paddingHorizontal: SP.md },
   advancedLabel: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },
   proChip: { backgroundColor: colors.foreground, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 3 },
-  proChipText: { fontSize: 10, fontFamily: FONT.bold, color: colors.background, letterSpacing: 0.6 },
+  proChipText: { fontSize: 11, fontFamily: FONT.bold, color: colors.background },
 });

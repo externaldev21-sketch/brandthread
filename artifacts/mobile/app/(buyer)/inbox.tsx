@@ -1938,8 +1938,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   composeSectionTitle: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     paddingTop: SP.sm,
     paddingBottom: SP.xs,
   },
@@ -2069,8 +2067,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   composeSectionTitleLoose: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     marginBottom: SP.sm,
   },
   suggestedRow: {
@@ -2108,7 +2104,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginLeft: 4, paddingHorizontal: 5, height: 17, borderRadius: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  aiTagText: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  aiTagText: { fontSize: 11, fontFamily: FONT.bold },
 
   // Requests-tab header: a small gray explainer line + a quiet "Delete all"
   // text action, right-aligned on its own line beneath — Instagram-style.
@@ -2248,7 +2244,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginLeft: SP.sm,
   },
   convPreview: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: FONT.regular,
   },
   // Threads-style unread marker: one small dot at the row's right edge,

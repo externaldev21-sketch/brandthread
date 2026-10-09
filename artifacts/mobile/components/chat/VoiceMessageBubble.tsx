@@ -126,6 +126,6 @@ const vs = StyleSheet.create({
   duration: { fontSize: FS.xs, fontFamily: FONT.medium, minWidth: 32, textAlign: 'right' },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingLeft: 38 },
   speedPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth },
-  speedText: { fontSize: 10, fontFamily: FONT.semibold },
+  speedText: { fontSize: 11, fontFamily: FONT.semibold },
   transcriptionLink: { fontSize: 11, fontFamily: FONT.medium, textDecorationLine: 'underline' },
 });

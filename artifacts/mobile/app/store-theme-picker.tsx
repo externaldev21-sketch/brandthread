@@ -358,7 +358,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: SUCCESS,
-    letterSpacing: 0.5,
   },
   previewingBadge: {
     position: 'absolute',
@@ -373,7 +372,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: CYAN,
-    letterSpacing: 0.5,
   },
   themeInfo: {
     padding: SP.sm,
@@ -533,8 +531,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: SUBTLE,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   styleSheetValue: {
     fontSize: FS.sm,

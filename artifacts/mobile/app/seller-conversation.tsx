@@ -2591,7 +2591,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginTop: 4,
     gap: 3,
   },
-  bubbleTime: { fontSize: 10, fontFamily: FONT.regular },
+  bubbleTime: { fontSize: 11, fontFamily: FONT.regular },
   receiptChecks: { flexDirection: 'row', marginLeft: 2 },
   // Reaction pill row (item 68) — same treatment as buyer-conversation.tsx.
   reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },

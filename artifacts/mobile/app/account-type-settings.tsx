@@ -208,7 +208,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   currentBadge:    { flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: colors.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: SP.sm, paddingVertical: SP.xs, alignSelf: 'flex-start', marginBottom: SP.md },
   currentBadgeText:{ fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.semibold },
 
-  sectionLabel: { fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.semibold, color: colors.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
+  sectionLabel: { fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.semibold, color: colors.mutedForeground, marginBottom: SP.sm },
 
   typeCard:        { backgroundColor: colors.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: colors.border, padding: SP.md, marginBottom: SP.sm },
   typeCardTop:     { flexDirection: 'row', alignItems: 'center' },

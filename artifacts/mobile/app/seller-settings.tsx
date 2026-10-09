@@ -432,7 +432,7 @@ function makeListStyles(colors: ReturnType<typeof useColors>) {
     // Account row
     accountRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, marginBottom: 18 },
     accountAvatar: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-    accountAvatarText: { fontSize: 18, fontFamily: FONT.bold },
+    accountAvatarText: { fontSize: 17, fontFamily: FONT.bold },
     accountCopy: { flex: 1, minWidth: 0 },
     accountName: { fontSize: 17, fontFamily: FONT.bold, color: colors.foreground },
     accountEyebrow: { fontSize: 13, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
@@ -457,7 +457,7 @@ function makeListStyles(colors: ReturnType<typeof useColors>) {
     rowBadge: { backgroundColor: colors.destructive, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 2, minWidth: 18, alignItems: 'center' },
     rowBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: colors.text },
     rowSoonBadge: { borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.border },
-    rowSoonBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: colors.mutedForeground, letterSpacing: 0.3 },
+    rowSoonBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: colors.mutedForeground },
   });
 }
 

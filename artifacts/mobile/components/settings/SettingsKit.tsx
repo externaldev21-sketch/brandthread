@@ -18,7 +18,6 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -26,6 +25,7 @@ import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { PressableScale, SheetHandle, HapticSwitch } from '@/components/BrandthreadUI';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { radius } from '@/constants/radii';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -68,7 +68,7 @@ export function SettingsProfileCard({
         </Text>
       </View>
       <View style={s.profileEditBtn}>
-        <Feather name="edit-2" size={14} color={colors.foreground} />
+        <Icon name="edit-2" size={14} color={colors.foreground} />
         <Text style={s.profileEditText} numberOfLines={1}>Edit</Text>
       </View>
     </PressableScale>
@@ -91,7 +91,7 @@ export function SettingsSearchBar({
   const [focused, setFocused] = React.useState(false);
   return (
     <View style={[s.searchWrap, focused && s.searchWrapFocused]}>
-      <Feather name="search" size={16} color={colors.mutedForeground} />
+      <Icon name="search" size={16} color={colors.mutedForeground} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -105,7 +105,7 @@ export function SettingsSearchBar({
       />
       {value.length > 0 && (
         <TouchableOpacity onPress={() => onChangeText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="x-circle" size={15} color={colors.mutedForeground} />
+          <Icon name="x-circle" size={15} color={colors.mutedForeground} />
         </TouchableOpacity>
       )}
     </View>
@@ -139,7 +139,7 @@ export function SettingsSection({
 // ─── Row ────────────────────────────────────────────────────────────────────
 
 export interface SettingsRowProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   iconColor?: string;
   iconBg?: string;
   label: string;
@@ -184,7 +184,7 @@ export function SettingsRow({
   const content = (
     <View style={[s.row, !last && s.rowDivider]}>
       <View style={[s.rowIcon, { backgroundColor: iconChipBg }]}>
-        <Feather name={icon} size={16} color={iconTint} />
+        <Icon name={icon} size={16} color={iconTint} />
       </View>
       <View style={s.rowCopy}>
         <Text style={[s.rowLabel, { color: labelColor }]} numberOfLines={1}>{label}</Text>
@@ -209,7 +209,7 @@ export function SettingsRow({
           disabled={disabled}
         />
       ) : onPress && !inert ? (
-        <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+        <Icon name="chevron-right" size={17} color={colors.mutedForeground} />
       ) : null}
     </View>
   );
@@ -324,9 +324,9 @@ function makeCardStyles(colors: Colors) {
       marginBottom: 18,
     },
     profileAvatar: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
-    profileAvatarText: { fontSize: 18, fontFamily: FONT.bold },
+    profileAvatarText: { fontSize: 17, fontFamily: FONT.bold },
     profileCopy: { flex: 1, minWidth: 0 },
-    profileEyebrow: { fontSize: 11, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.4, color: colors.mutedForeground, marginBottom: 2 },
+    profileEyebrow: { fontSize: 11, fontFamily: FONT.semibold, color: colors.mutedForeground, marginBottom: 2 },
     profileName: { fontSize: 17, fontFamily: FONT.bold, color: colors.foreground, flexShrink: 1 },
     profileSub: { fontSize: 12, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
     profileEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7, flexShrink: 0 },
@@ -341,7 +341,7 @@ function makeCardStyles(colors: Colors) {
 
     // Section
     section: { marginBottom: 22 },
-    sectionTitle: { fontSize: 12, fontFamily: FONT.semibold, color: colors.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8, marginLeft: 2 },
+    sectionTitle: { fontSize: 12, fontFamily: FONT.semibold, color: colors.mutedForeground, marginBottom: 8, marginLeft: 2 },
     sectionCard: { backgroundColor: colors.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
     sectionFooter: { fontSize: 11, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 8, marginLeft: 2, lineHeight: 15 },
 
@@ -356,13 +356,13 @@ function makeCardStyles(colors: Colors) {
     rowBadge: { backgroundColor: colors.destructive, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 2, minWidth: 18, alignItems: 'center' },
     rowBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: '#FFFFFF' },
     rowSoonBadge: { backgroundColor: colors.secondary, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.border },
-    rowSoonBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: colors.mutedForeground, letterSpacing: 0.3 },
+    rowSoonBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: colors.mutedForeground },
 
     // Confirm sheet
     sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)' },
     sheetCard: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.border, borderBottomWidth: 0, paddingHorizontal: 22, paddingBottom: 36, paddingTop: 2 },
-    sheetTitle: { fontSize: 19, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center', marginTop: 10 },
-    sheetMessage: { fontSize: 14, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 8, marginBottom: 22, lineHeight: 19, paddingHorizontal: 8 },
+    sheetTitle: { fontSize: 20, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center', marginTop: 10 },
+    sheetMessage: { fontSize: 15, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 8, marginBottom: 22, lineHeight: 19, paddingHorizontal: 8 },
     sheetConfirmBtn: { borderRadius: RADIUS.md, paddingVertical: 15, alignItems: 'center', marginBottom: 10 },
     sheetConfirmText: { fontSize: FS.base, fontFamily: FONT.bold },
     sheetCancelBtn: { paddingVertical: 13, alignItems: 'center' },

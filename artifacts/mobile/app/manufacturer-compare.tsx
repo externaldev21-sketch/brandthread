@@ -151,7 +151,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pickerWrap: { paddingTop: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: SP.sm },
-  pickerLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: SP.md, marginBottom: SP.xs },
+  pickerLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, marginLeft: SP.md, marginBottom: SP.xs },
   pickerRow: { paddingHorizontal: SP.md, gap: SP.sm },
   pickerChip: { paddingHorizontal: SP.md, height: 34, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center', maxWidth: 160 },
   pickerChipActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },

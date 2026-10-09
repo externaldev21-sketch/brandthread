@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   campaignRevenue: { fontSize: FS.sm, fontFamily: FONT.bold },
   discountRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   codeWrap: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
-  code: { fontSize: FS.meta, fontFamily: FONT.bold, letterSpacing: 1 },
+  code: { fontSize: FS.meta, fontFamily: FONT.bold },
   discountInfo: { flex: 1 },
   discountType: { fontSize: FS.sm, fontFamily: FONT.semibold },
   discountMeta: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },

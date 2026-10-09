@@ -631,7 +631,6 @@ function cardStyles(theme: AppThemePreset) {
       fontSize: FS.xs,
       fontFamily: FONT.bold,
       color: theme.secondary,
-      letterSpacing: 0.4,
     },
     totalText: {
       marginLeft: 'auto' as any,

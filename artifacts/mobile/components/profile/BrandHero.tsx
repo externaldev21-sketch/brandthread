@@ -215,7 +215,7 @@ const heroStyles = StyleSheet.create({
     borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
   compactAvatarImage: { width: '100%', height: '100%' },
-  compactAvatarInitials: { fontSize: 10, fontFamily: FONT.bold },
+  compactAvatarInitials: { fontSize: 11, fontFamily: FONT.bold },
   compactName: { fontSize: FS.sm, fontFamily: FONT.semibold, maxWidth: '80%' },
 
   body: { alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.md },

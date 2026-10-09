@@ -866,7 +866,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   backBtn: { marginBottom: SPACING.lg, alignSelf: 'flex-start' },
 
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.xxxl - 4 },
-  logoText: { fontSize: 12, fontFamily: FONT.bold, color: theme.text, letterSpacing: 2.5 },
+  logoText: { fontSize: 12, fontFamily: FONT.bold, color: theme.text },
 
   headline: {
     ...TYPE_SCALE.title1,

@@ -210,7 +210,7 @@ const s = StyleSheet.create({
   title: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   body: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
   fine: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 16 },
-  section: { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUBTLE, letterSpacing: 1, textTransform: 'uppercase' },
+  section: { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUBTLE },
   points: { gap: 8, marginTop: 4 },
   point: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pointText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },

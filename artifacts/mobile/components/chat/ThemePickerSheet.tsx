@@ -80,5 +80,5 @@ const s = StyleSheet.create({
   title: { fontFamily: FONT.semibold, fontSize: FS.md, textAlign: 'center', marginBottom: SP.sm },
   tileWrap: { width: '25%', alignItems: 'center', gap: 6, marginBottom: SP.md },
   tile: { width: 56, height: 56, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
-  tileLabel: { fontSize: 10, fontFamily: FONT.medium, textAlign: 'center', lineHeight: 12 },
+  tileLabel: { fontSize: 11, fontFamily: FONT.medium, textAlign: 'center', lineHeight: 12 },
 });

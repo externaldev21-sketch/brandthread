@@ -5,7 +5,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS, type SellerPlanId } from '@/lib/sellerBilling';
 import { recommendSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 
 export function SellerPlanRecommendationStep({
@@ -88,25 +88,25 @@ export function SellerPlanRecommendationStep({
 }
 const styles = StyleSheet.create({
   root: { flexGrow: 1, paddingTop: 8, paddingBottom: 40 },
-  eyebrow: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 2.4, marginBottom: 8 },
-  title: { color: '#FFF', fontSize: 36, lineHeight: 40, fontFamily: 'Inter_700Bold', letterSpacing: -1.2 },
-  reason: { color: 'rgba(255,255,255,0.72)', fontSize: 14, lineHeight: 21, fontFamily: 'Inter_500Medium', marginTop: 8 },
-  guidance: { color: 'rgba(255,255,255,0.45)', fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular', marginTop: 6 },
+  eyebrow: { fontSize: 11, fontFamily: FONT.bold, marginBottom: 8 },
+  title: { color: '#FFF', fontSize: 34, lineHeight: 40, fontFamily: FONT.bold, letterSpacing: -1.2 },
+  reason: { color: 'rgba(255,255,255,0.72)', fontSize: 15, lineHeight: 21, fontFamily: FONT.medium, marginTop: 8 },
+  guidance: { color: 'rgba(255,255,255,0.45)', fontSize: 12, lineHeight: 18, fontFamily: FONT.regular, marginTop: 6 },
   trialBadge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginTop: 12 },
-  trialBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+  trialBadgeText: { fontSize: 11, fontFamily: FONT.bold },
   planRow: { gap: 10, paddingVertical: 18 },
   card: { width: '100%', minHeight: 340, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
   badgeRow: { minHeight: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badge: { flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
-  planName: { color: '#FFF', fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 8 },
-  tagline: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  price: { color: '#FFF', fontSize: 28, fontFamily: 'Inter_700Bold', marginTop: 12 },
-  period: { color: 'rgba(255,255,255,0.42)', fontSize: 12, fontFamily: 'Inter_400Regular' },
+  badgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
+  planName: { color: '#FFF', fontSize: 22, fontFamily: FONT.bold, marginTop: 8 },
+  tagline: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 17, fontFamily: FONT.regular, marginTop: 3 },
+  price: { color: '#FFF', fontSize: 28, fontFamily: FONT.bold, marginTop: 12 },
+  period: { color: 'rgba(255,255,255,0.42)', fontSize: 12, fontFamily: FONT.regular },
   features: { gap: 9, marginTop: 14 },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  feature: { flex: 1, color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular' },
+  feature: { flex: 1, color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17, fontFamily: FONT.regular },
   continue: { borderRadius: radius.md, minHeight: 56, justifyContent: 'center', alignItems: 'center' },
-  continueText: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  chargeNote: { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 6, fontFamily: 'Inter_400Regular' },
+  continueText: { fontSize: 16, fontFamily: FONT.bold },
+  chargeNote: { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 6, fontFamily: FONT.regular },
 });

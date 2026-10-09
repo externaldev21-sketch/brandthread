@@ -168,7 +168,7 @@ const pillStyles = StyleSheet.create({
   // #1f1f1f fill.
   notFollowing: { backgroundColor: '#FFFFFF' },
   following: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-  label: { fontSize: 14, fontFamily: FONT.semibold },
+  label: { fontSize: 15, fontFamily: FONT.semibold },
   notFollowingLabel: { color: '#000000' },
   followingLabel: { color: '#FFFFFF' },
 });

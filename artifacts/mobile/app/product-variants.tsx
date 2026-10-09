@@ -510,7 +510,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   sortChipOn: { backgroundColor: c.foreground, borderColor: c.foreground },
   sortText: { fontFamily: FONT.medium, fontSize: FS.sm, color: c.mutedForeground },
   sortTextOn: { color: c.background },
-  groupTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: c.mutedForeground, letterSpacing: 0.6, textTransform: 'uppercase', paddingTop: SP.md },
+  groupTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: c.mutedForeground, paddingTop: SP.md },
   variantRow: { paddingVertical: SP.sm + 2, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
   variantName: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
   stockPill: { width: 68, flexShrink: 0, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 8 },

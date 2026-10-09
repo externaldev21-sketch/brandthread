@@ -810,7 +810,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root:       { flex: 1, backgroundColor: 'transparent' },
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card:     { marginBottom: SP.sm },
-  codeText: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: 1.5 },
+  codeText: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   valueText:{ fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: 2, marginBottom: 2 },
   metaText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
   statPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 3 },
@@ -819,12 +819,12 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   modal:       { flex: 1, backgroundColor: BG },
 
   summaryCard: { backgroundColor: CARD_ELEVATED, borderWidth: 1.5, borderRadius: RADIUS.md, padding: SP.md, gap: 6 },
-  summaryCode: { fontSize: FS.md, fontFamily: FONT.bold, letterSpacing: 1.5 },
+  summaryCode: { fontSize: FS.md, fontFamily: FONT.bold },
   summaryValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: 2 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   summaryLine: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
-  label:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  label:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
   subLabel:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
   linkText:    { fontSize: FS.xs, fontFamily: FONT.semibold },
   input:       { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },

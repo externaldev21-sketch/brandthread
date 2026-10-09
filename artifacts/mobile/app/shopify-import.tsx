@@ -13,7 +13,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/hooks/useApi';
 import { BrandthreadCard, PrimaryButton, EmptyState, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
-import { COMP } from '@/lib/theme';
+import { COMP, FONT } from '@/lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
@@ -274,25 +274,25 @@ export default function ShopifyImportScreen() {
 const styles = StyleSheet.create({
   hero: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: 'center', marginBottom: 20, gap: 8 },
   heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  heroTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  heroSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
-  label: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 14 },
+  heroTitle: { fontSize: 17, fontFamily: FONT.bold, textAlign: 'center' },
+  heroSub: { fontSize: 13, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 19 },
+  label: { fontSize: 12, fontFamily: FONT.medium, marginBottom: 8 },
+  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 15, fontFamily: FONT.regular, marginBottom: 14 },
   connectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 14 },
-  connectBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  infoText: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginTop: 14, textAlign: 'center' },
+  connectBtnText: { fontSize: 15, fontFamily: FONT.semibold },
+  infoText: { fontSize: 11, fontFamily: FONT.regular, lineHeight: 16, marginTop: 14, textAlign: 'center' },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  toolbarAction: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  toolbarAction: { fontSize: 13, fontFamily: FONT.semibold },
   publishToggleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  publishLabel: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  publishLabel: { fontSize: 12, fontFamily: FONT.medium },
   productRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 8 },
   productImage: { width: 44, height: 44, borderRadius: 8 },
-  productTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  productMeta: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  productTitle: { fontSize: 15, fontFamily: FONT.semibold },
+  productMeta: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   summaryBar: { position: 'absolute', bottom: 76, left: 16, right: 16, borderWidth: 1, borderRadius: 12, padding: 12 },
-  summaryText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  summarySkipped: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  summaryText: { fontSize: 13, fontFamily: FONT.semibold },
+  summarySkipped: { fontSize: 11, fontFamily: FONT.regular, marginTop: 4 },
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 16 },
   importBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 14 },
-  importBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  importBtnText: { fontSize: 15, fontFamily: FONT.semibold },
 });

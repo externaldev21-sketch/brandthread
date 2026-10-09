@@ -515,7 +515,7 @@ const makeBub = (theme: AppThemePreset) => StyleSheet.create({
   systemWrap: { alignItems: 'center', marginVertical: SP.sm, paddingHorizontal: SP.lg },
   systemPill: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, maxWidth: 320 },
   systemText: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, lineHeight: 16 },
-  systemTime: { fontSize: 10, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
+  systemTime: { fontSize: 11, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
 });
 
 const makeS = (theme: AppThemePreset) => StyleSheet.create({

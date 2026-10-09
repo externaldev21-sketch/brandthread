@@ -232,7 +232,7 @@ function makeStyles(theme: AppThemePreset) {
     header: { paddingHorizontal: SP.md, paddingBottom: SP.md, gap: SP.sm },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
     headerCopy: { flex: 1, minWidth: 0 },
-    eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.6, textTransform: 'uppercase', color: theme.muted },
+    eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.muted },
     title: { fontFamily: FONT.bold, fontSize: FS.xxl, lineHeight: 32, letterSpacing: -0.5, color: theme.text },
     count: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
     ownerRow: { flexDirection: 'row', gap: SP.sm },

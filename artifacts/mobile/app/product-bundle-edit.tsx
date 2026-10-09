@@ -344,7 +344,7 @@ export default function ProductBundleEditScreen() {
 const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   content:      { padding: SP.lg, gap: SP.md },
-  sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.xs },
+  sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, marginBottom: SP.xs },
   fieldLabel:   { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, marginBottom: 4 },
   fieldHint:    { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, lineHeight: 17 },
   input:        { height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, paddingHorizontal: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: FG },

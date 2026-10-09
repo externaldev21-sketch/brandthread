@@ -148,7 +148,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   tierTable: { borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
   tierRow: { flexDirection: 'row', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: theme.border },
   tierHeaderRow: { borderTopWidth: 0, backgroundColor: theme.cardElevated },
-  tierHeaderText: { fontFamily: FONT.semibold, color: theme.muted, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.4 },
+  tierHeaderText: { fontFamily: FONT.semibold, color: theme.muted, fontSize: FS.xs },
   tierCell: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text },
   tierPrice: { fontFamily: FONT.bold, textAlign: 'right' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

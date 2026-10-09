@@ -70,7 +70,7 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 function makeSectionStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     root: { marginBottom: SP.md },
-    title: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.4, textTransform: 'uppercase', color: theme.muted },
+    title: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted },
     subtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 2 },
   });
 }

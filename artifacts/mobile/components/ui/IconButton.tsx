@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
 import { COMP, FONT } from '@/lib/theme';
@@ -17,7 +17,7 @@ import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export interface IconButtonProps {
-  name: keyof typeof Feather.glyphMap;
+  name: IconName;
   onPress: () => void;
   /** Optional: when omitted (or empty) a default is derived from the icon `name` (see lib/a11y/iconLabels.ts). */
   accessibilityLabel?: string;
@@ -69,7 +69,7 @@ export function IconButton({
       <Animated.View
         style={[
           styles.root,
-          variant === 'filled' && { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, borderRadius: RADII.chip },
+          variant === 'filled' && { backgroundColor: palette.card, borderRadius: RADII.chip },
           variant === 'glass' && { borderRadius: RADII.pill, overflow: 'hidden' },
           disabled && { opacity: 0.4 },
           { transform: [{ scale }] },
@@ -79,7 +79,7 @@ export function IconButton({
         {variant === 'glass' && (
           <Glass variant="regular" tint="dark" radius={RADII.pill} style={StyleSheet.absoluteFill} />
         )}
-        <Feather name={name} size={size} color={resolvedColor} />
+        <Icon name={name} size={size} color={resolvedColor} />
         {typeof badge === 'number' && badge > 0 && (
           <View style={[styles.badge, { backgroundColor: palette.primary, borderColor: variant === 'glass' ? '#0A0A0B' : palette.background }]}>
             <Animated.Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.badgeText, { color: palette.primaryForeground }]}>
@@ -113,5 +113,5 @@ const styles = StyleSheet.create({
   // per-weight static Inter faces has no matching real weight file, so the
   // browser synthesizes ("faux-bolds") it instead of using a real bold
   // glyph — see components/ui/AppText.tsx's doc comment.
-  badgeText: { fontSize: 10, fontFamily: FONT.bold },
+  badgeText: { fontSize: 11, fontFamily: FONT.bold },
 });

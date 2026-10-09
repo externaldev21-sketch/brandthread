@@ -1287,7 +1287,7 @@ const g = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.65)', borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3,
   },
-  stackCountText: { fontFamily: FONT.semibold, fontSize: 10, color: FG },
+  stackCountText: { fontFamily: FONT.semibold, fontSize: 11, color: FG },
 });
 
 // ─── Selection count pill ─────────────────────────────────────────────────────

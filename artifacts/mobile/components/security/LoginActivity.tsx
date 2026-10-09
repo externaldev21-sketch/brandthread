@@ -294,7 +294,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   lead: { color: theme.muted, ...TYPE_SCALE.callout, marginTop: SPACING.xs },
-  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SPACING.lg, marginBottom: SPACING.sm },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, marginTop: SPACING.lg, marginBottom: SPACING.sm },
   card: { backgroundColor: theme.card, borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingHorizontal: SPACING.md, paddingVertical: 14 },
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.borderSubtle },

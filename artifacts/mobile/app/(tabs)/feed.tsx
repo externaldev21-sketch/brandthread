@@ -824,7 +824,7 @@ function JustDroppedRailPage({
                 </View>
               )}
               <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3 }}>
-                <Text style={{ fontSize: 10, fontFamily: FONT.bold, color: '#fff' }}>
+                <Text style={{ fontSize: 11, fontFamily: FONT.bold, color: '#fff' }}>
                   {drop.releaseAt && new Date(drop.releaseAt).getTime() > Date.now() ? 'SOON' : 'LIVE'}
                 </Text>
               </View>
@@ -3703,7 +3703,7 @@ const styles = StyleSheet.create({
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
   creatorRow: { minHeight: 22, marginBottom: 5, flexDirection: 'row', alignItems: 'center', gap: 6 },
   creatorName: {
-    fontSize: 14, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 15, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   soundRow: {
@@ -3772,7 +3772,7 @@ const styles = StyleSheet.create({
     borderRadius: RADII.pill, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: BG, backgroundColor: '#FFFFFF',
   },
-  cartCountText: { fontSize: 10, lineHeight: 12, fontFamily: FONT.bold, color: '#000000', ...TABULAR_NUMS },
+  cartCountText: { fontSize: 11, lineHeight: 12, fontFamily: FONT.bold, color: '#000000', ...TABULAR_NUMS },
   findFriendsBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4,
     paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.md,
@@ -3836,7 +3836,7 @@ const styles = StyleSheet.create({
   repostEducationPreviewLineLong: { height: 8, width: 130, borderRadius: 4, backgroundColor: '#FFFFFF24' },
   repostEducationPreviewShare: { position: 'absolute', right: 16, bottom: 19 },
   repostEducationTitle: {
-    color: FG, fontFamily: FONT.bold, fontSize: 26, lineHeight: 32,
+    color: FG, fontFamily: FONT.bold, fontSize: 28, lineHeight: 32,
     textAlign: 'center', paddingHorizontal: 12, marginBottom: 22,
   },
   repostEducationPoint: {
@@ -3862,7 +3862,7 @@ const styles = StyleSheet.create({
   commentsEmpty: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, paddingVertical: 20, textAlign: 'center' },
   commentRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
   commentUser: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginBottom: 3 },
-  commentText: { fontSize: 14, fontFamily: FONT.regular, color: FG },
+  commentText: { fontSize: 15, fontFamily: FONT.regular, color: FG },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 14, paddingBottom: 4 },
   commentInput: {
     flex: 1, height: 44, borderRadius: 22, backgroundColor: SURFACE,
@@ -3870,7 +3870,7 @@ const styles = StyleSheet.create({
   },
   commentSendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
-  notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
+  notifRow: { fontSize: 13, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
   feedFooter: {
     width: '100%', height: 72, alignItems: 'center', justifyContent: 'center', gap: 10,
     backgroundColor: '#000000',

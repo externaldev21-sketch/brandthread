@@ -1325,7 +1325,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   selectAllText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   // Same label + hairline as a checkout section (CheckoutPrimitives).
   savedSection: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingTop: 14, marginBottom: SP.md },
-  savedTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: SP.sm + 4 },
+  savedTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, marginBottom: SP.sm + 4 },
   divider: { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
   multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingVertical: 14 },
   multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },

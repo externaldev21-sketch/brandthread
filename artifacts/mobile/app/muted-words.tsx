@@ -260,7 +260,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.error + '55', backgroundColor: theme.card,
   },
   errorText: { flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm },
-  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, marginTop: SP.lg, marginBottom: SP.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   suggestion: {
     flexDirection: 'row', alignItems: 'center', gap: 5, height: 34, paddingHorizontal: 12,

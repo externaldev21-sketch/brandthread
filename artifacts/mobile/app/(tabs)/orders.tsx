@@ -1288,8 +1288,6 @@ const createStyles = (theme: any) => {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
     color: MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   sectionCount: {
     fontSize: FS.xs,
@@ -1381,7 +1379,6 @@ const createStyles = (theme: any) => {
      fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: MUTED,
-    letterSpacing: 0.4,
   },
   unreadDot: {
     width: 6,
@@ -1404,7 +1401,6 @@ const createStyles = (theme: any) => {
      fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: RED,
-    letterSpacing: 0.3,
   },
   returnBadge: {
     backgroundColor: DIM,
@@ -1416,7 +1412,6 @@ const createStyles = (theme: any) => {
      fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: MUTED,
-    letterSpacing: 0.3,
   },
   disputeBadge: {
     backgroundColor: RED_DIM,
@@ -1428,7 +1423,6 @@ const createStyles = (theme: any) => {
      fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: RED,
-    letterSpacing: 0.3,
   },
   orderCustomer: {
     fontSize: FS.sm,
@@ -1496,7 +1490,6 @@ const createStyles = (theme: any) => {
      fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: STRONG,
-    letterSpacing: 0.3,
   },
 
   // Quick action

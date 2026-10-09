@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md,
     padding: SP.md, marginTop: SP.md,
   },
-  reviewTitle: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 1, textTransform: 'uppercase' },
+  reviewTitle: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.semibold },
   reviewLine: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: SP.xs },
   reviewBio: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.xs },
   reviewFee: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.sm },

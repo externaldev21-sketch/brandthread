@@ -575,7 +575,6 @@ function makeStyles(theme: AppThemePreset) {
     fontFamily: FONT.bold,
     fontSize: FS.xl,
     color: theme.text,
-    letterSpacing: 1,
   },
   verifiedBadge: {
     position: 'absolute',

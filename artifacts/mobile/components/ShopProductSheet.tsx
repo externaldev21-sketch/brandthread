@@ -2087,7 +2087,7 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   },
   preOrderText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   productName: {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: FONT.semibold,
     color: theme.text,
     lineHeight: 23,
@@ -2145,8 +2145,6 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: theme.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   descriptionText: {
     fontSize: FS.sm,

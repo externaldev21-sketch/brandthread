@@ -217,7 +217,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   verifiedText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.secondary },
   country: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   bestBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: theme.accent, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 1, alignSelf: 'flex-start', marginTop: 2 },
-  bestBadgeText: { fontSize: 10, fontFamily: FONT.bold, color: theme.onAccent },
+  bestBadgeText: { fontSize: 11, fontFamily: FONT.bold, color: theme.onAccent },
   cell: { height: 44, justifyContent: 'center', paddingHorizontal: SP.sm, borderTopWidth: 1, borderTopColor: theme.border },
   cellBest: { backgroundColor: theme.accentDim },
   cellText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text },

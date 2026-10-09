@@ -81,7 +81,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   logo: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   logoText: { fontFamily: FONT.bold, fontSize: FS.xl },
   heroTitle: { fontFamily: FONT.bold, fontSize: 15 },
-  heroSub: { fontFamily: FONT.regular, fontSize: 11.5, lineHeight: 16, marginTop: 3 },
+  heroSub: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, marginTop: 3 },
   card: { padding: 0, paddingHorizontal: SP.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
 });
