@@ -9,6 +9,7 @@ const { apiMock, routerMock } = vi.hoisted(() => {
     public: {
       search: vi.fn(),
       recent: vi.fn(),
+      trending: vi.fn(async () => ({ trending: [] })),
       removeRecent: vi.fn(),
       clearRecent: vi.fn(),
       log: vi.fn(),

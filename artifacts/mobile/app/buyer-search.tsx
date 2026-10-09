@@ -222,13 +222,28 @@ export default function BuyerSearchScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Recent searches are per account (a protected endpoint): never asked for
+  // signed out, including the web preview.
   const loadRecent = useCallback(() => {
+    if (!isSignedIn) { setRecentSearches([]); return; }
     api.public.recent(10)
       .then(({ recent }) => setRecentSearches(recent.map((r) => r.query)))
       .catch(() => setRecentSearches([]));
-  }, [api]);
+  }, [api, isSignedIn]);
 
   useEffect(() => { loadRecent(); }, [loadRecent]);
+
+  // Trending searches (public): real logged queries once there's volume,
+  // otherwise the top categories and brands.
+  const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
+  useEffect(() => {
+    if (isBuyerDevPreview() && !isSignedIn) return;
+    let cancelled = false;
+    api.public.trending(5)
+      .then(({ trending }) => { if (!cancelled) setTrendingSearches(trending.map((t) => t.term).filter(Boolean)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [api, isSignedIn]);
 
   function removeRecent(term: string) {
     hapticSelection();
@@ -349,16 +364,20 @@ export default function BuyerSearchScreen() {
   async function handleToggleFollow(person: SearchPerson) {
     if (followPending[person.userId] || person.userId.startsWith('preview-')) return;
     const wasFollowing = person.isFollowing;
+    const setFollowing = (value: boolean) =>
+      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: value } : p)));
     setFollowPending((prev) => ({ ...prev, [person.userId]: true }));
+    // Optimistic, like every other Follow button: flip now, roll back on failure.
+    setFollowing(!wasFollowing);
+    hapticPrimaryAction();
     try {
       let requested = false;
       if (wasFollowing) await api.social.unfollow(person.userId);
       else requested = (await api.social.follow(person.userId))?.status === 'requested';
       // A private account only received a follow request — not following yet.
-      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing && !requested } : p)));
-      hapticPrimaryAction();
+      if (requested) setFollowing(false);
     } catch {
-      // Keep previous state on failure.
+      setFollowing(wasFollowing);
     } finally {
       setFollowPending((prev) => {
         const next = { ...prev };
@@ -563,6 +582,16 @@ export default function BuyerSearchScreen() {
           recentSearches.slice(0, 5).map((term) => (
             <RecentSearchRow key={term} term={term} onPress={() => submitTerm(term)} onRemove={() => removeRecent(term)} />
           ))
+        )}
+        {trendingSearches.length > 0 && (
+          <View testID="buyer-search-trending">
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>Trending searches</Text>
+            </View>
+            {trendingSearches.map((term) => (
+              <RecentSearchRow key={`trending-${term}`} term={term} icon="trending-up" onPress={() => submitTerm(term)} />
+            ))}
+          </View>
         )}
       </View>
     );
