@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useApi } from '@/lib/api';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -47,7 +48,7 @@ export default function ShareStoreScreen() {
   const storeUrl  = `${BASE_URL}/${storeSlug}`;
   const handleStr = `@${handle ?? storeSlug}`;
   // Never let a seller copy/share the 'My Store' placeholder link as if it were theirs.
-  const ready = !loading && !!(profile?.username || profile?.brandName || profile?.displayName);
+  const ready = isPreviewDemoMode() || (!loading && !!(profile?.username || profile?.brandName || profile?.displayName));
 
   async function copyLink() {
     if (!ready) return;

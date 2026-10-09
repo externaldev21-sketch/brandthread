@@ -125,4 +125,16 @@ describe('screens gate their sample fallbacks on isPreviewDemoMode()', () => {
       "cached ?? (isPreviewDemoMode() ? flatten(buildPreviewComments(",
     );
   });
+
+  it('buyer profile only applies the preview Thread Cash streak/balance under demo', () => {
+    expect(src('../../app/(buyer)/profile.tsx')).toContain(
+      'if (!active || !isPreviewThreadCashEnabled() || !isPreviewDemoMode()) return;',
+    );
+  });
+
+  it('share-store never offers the placeholder link for copy/share outside demo', () => {
+    const s = src('../../app/share-store.tsx');
+    expect(s).toContain('const ready = isPreviewDemoMode() || (!loading && !!(profile?.username || profile?.brandName || profile?.displayName));');
+    expect(s.match(/disabled=\{!ready\}/g)).toHaveLength(2);
+  });
 });
