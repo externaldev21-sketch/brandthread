@@ -69,6 +69,7 @@ import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlan
 import { recommendSellerPlan } from '@/lib/sellerPlans';
 import type { SellerPlanId } from '@/lib/sellerBilling';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+import { getInstallId } from '@/lib/installId';
 import {
   queueBuyerOnboardingSync,
   isRecoverableBuyerOnboardingSyncError,
@@ -2790,7 +2791,7 @@ export default function OnboardingScreen() {
                 throw new Error('This account is already set up as a buyer.');
               }
               await api.auth.updateProfile({ accountType: 'seller' });
-              return api.logo.onboardingSample(brandName.trim(), style);
+              return api.logo.onboardingSample(brandName.trim(), style, await getInstallId());
             }}
             onContinue={() => setPlanPrepDone(true)}
           />
