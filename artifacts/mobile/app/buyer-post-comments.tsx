@@ -54,6 +54,7 @@ import type { ThreadComment } from '@/lib/safetyTypes';
 import { hapticSelection, hapticLight, hapticSuccess, hapticError, hapticDestructiveConfirm } from '@/lib/haptics';
 import { bumpCommentCount } from '@/lib/commentCountBus';
 import { buildPreviewComments, previewNotificationComments, PREVIEW_MENTION_PEOPLE } from '@/lib/previewComments';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import { MentionText } from '@/components/social/MentionText';
 import { MentionSuggestionsBar } from '@/components/MentionPickerSheet';
 import { activeMentionQuery, insertMentionHandle, type CommentMentionRef } from '@/lib/commentMentions';
@@ -728,7 +729,7 @@ export default function BuyerPostCommentsScreen() {
       // session in previewCommentsCache) and a fully working composer that
       // appends locally, instead of the old locked, empty dead-end state.
       const cached = previewCommentsCache.get(postId);
-      let seeded = cached ?? flatten(buildPreviewComments(postId, params.postAuthorName || 'the creator'));
+      let seeded = cached ?? (isPreviewDemoMode() ? flatten(buildPreviewComments(postId, params.postAuthorName || 'the creator')) : []);
       // A seeded Activity row deep-linking to "its" comment: that comment
       // has to exist here to be scrolled to — add it on top of the seed.
       const note = targetCommentId && !seeded.some((c) => c.id === targetCommentId)
@@ -1282,7 +1283,7 @@ export default function BuyerPostCommentsScreen() {
                 query={mentionQuery ?? ''}
                 active={mentionQuery !== null}
                 enabled={!isPreviewPost}
-                demoPeople={isPreviewPost ? PREVIEW_MENTION_PEOPLE : undefined}
+                demoPeople={isPreviewPost && isPreviewDemoMode() ? PREVIEW_MENTION_PEOPLE : undefined}
                 onPick={(person) => {
                   hapticSelection();
                   setInputText(value => insertMentionHandle(value, person.username ?? person.handle));

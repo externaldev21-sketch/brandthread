@@ -6,7 +6,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import {
   BrandMemory, BrandMemoryField, BrandMemorySummary, DEFAULT_BRAND_MEMORY,
 } from './aiTypes';
@@ -103,7 +103,10 @@ export async function rebuildBrandMemory(authToken?: string | null): Promise<Bra
     } catch { /* fall through to demo defaults */ }
   }
 
-  // Fallback: pre-fill with sensible demo defaults if fields are empty
+  // Real sellers never get invented defaults — the screen shows its rebuild-failed alert.
+  if (!isPreviewDemoMode()) throw new Error('Brand memory rebuild failed');
+
+  // Demo preview only: pre-fill with sensible demo defaults if fields are empty
   const demoValues: Partial<Record<keyof BrandMemory, string>> = {
     brandDescription:  'Premium streetwear brand focused on elevated basics and limited drops.',
     brandVoice:        'Confident, concise, luxury-adjacent. Never corporate.',

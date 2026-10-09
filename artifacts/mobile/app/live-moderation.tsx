@@ -19,6 +19,7 @@ import {
   addBannedWord, SLOW_MODE_OPTIONS,
   type LiveModerationState, type LiveRestrictedUser,
 } from '@/lib/live/moderationTypes';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 
 const DEMO_STATE: LiveModerationState = {
   bannedWords: ['spam', 'free followers', 'dm me'],
@@ -39,7 +40,7 @@ export default function LiveModerationScreen() {
   const insets = useSafeAreaInsets();
   const api = useApi();
   const params = useLocalSearchParams<{ streamId?: string; demo?: string }>();
-  const demo = params.demo === '1';
+  const demo = isPreviewDemoMode();
   const streamId = params.streamId ? String(params.streamId) : '';
   const live = !demo && !!streamId;
 

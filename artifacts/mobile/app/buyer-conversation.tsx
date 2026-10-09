@@ -265,7 +265,7 @@ export default function BuyerConversationScreen() {
   const quickReplyScrollRefs = useRef<Record<string, ScrollView | null>>({});
   const api = useApi();
   const { userId } = useAuth();
-  const { startCall } = useCallSession();
+  const { startCall, callsAvailable } = useCallSession();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   // A sent/claimed/cancelled Thread Cash bubble's status is set once, in the
   // message's own attachment meta, at send time — it never gets rewritten
@@ -2233,7 +2233,7 @@ export default function BuyerConversationScreen() {
         <View style={s.headerIconGroup}>
           {/* An AI account can't take a call — no voice/video icons for it,
               just the info icon below. */}
-          {conv && !isAgentConv && (
+          {conv && !isAgentConv && callsAvailable && (
             <PressableScale rippleEnabled={false}
               style={s.roundBtn}
               onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
@@ -2245,7 +2245,7 @@ export default function BuyerConversationScreen() {
               <Feather name="phone" size={ICON.lg} color={theme.muted} />
             </PressableScale>
           )}
-          {conv && !isAgentConv && (
+          {conv && !isAgentConv && callsAvailable && (
             <PressableScale rippleEnabled={false}
               style={s.roundBtn}
               onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}

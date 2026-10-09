@@ -29,6 +29,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
 import { getGeneratedSellerOrder, isGeneratedSellerOrderId } from '@/lib/previewSellerOrders';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import { useQueryClient } from '@tanstack/react-query';
 import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
 import { queryKeys } from '@/lib/queryClient';
@@ -525,7 +526,7 @@ export default function OrderDetailScreen() {
     // Preview demo orders (lib/previewSellerOrders.ts) live only on this
     // device: never fetch them (or returns) from the API.
     if (isGeneratedSellerOrderId(id)) {
-      const raw = getGeneratedSellerOrder(id);
+      const raw = isPreviewDemoMode() ? getGeneratedSellerOrder(id) : null;
       if (raw) {
         setOrder(adaptApiOrder(raw));
         queryClient.setQueryData(queryKeys.order(id), raw);

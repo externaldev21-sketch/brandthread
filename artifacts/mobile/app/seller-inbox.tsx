@@ -278,7 +278,7 @@ export default function SellerInboxScreen() {
       // identical catch-block fallback, which this previously lacked: on
       // web preview this branch left the seller inbox stuck on its loading
       // skeleton forever instead of showing the seeded preview data.
-      if (isPreviewInboxEnabled()) {
+      if (isPreviewInboxEnabled() && isPreviewDemoMode()) {
         setConvs(getSellerPreviewConversations() as unknown as ConvView[]);
         setLoadError(false);
       } else {

@@ -31,7 +31,7 @@ for (const vp of VIEWPORTS) {
     const page = await context.newPage();
 
     // 1) Outgoing call
-    await open(page, `/buyer-conversation?id=preview-conversation-01&bt_preview=buyer`);
+    await open(page, `/buyer-conversation?id=preview-conversation-01&bt_preview=buyer&demo=1`);
     const videoBtn = page.getByLabel('Video call').first();
     await videoBtn.click({ timeout: 10_000 }).catch(async () => {
       await page.getByLabel('Voice call').first().click({ timeout: 10_000 });
@@ -63,7 +63,7 @@ for (const vp of VIEWPORTS) {
     const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
     const page = await context.newPage();
 
-    await open(page, `/buyer-conversation?id=preview-conversation-01&bt_preview=buyer`);
+    await open(page, `/buyer-conversation?id=preview-conversation-01&bt_preview=buyer&demo=1`);
     await page.getByLabel('Voice call').first().click({ timeout: 10_000 });
     await page.waitForTimeout(300);
     await page.screenshot({ path: `${OUT_DIR}/5-outgoing-audio-${vp.name}.png` });

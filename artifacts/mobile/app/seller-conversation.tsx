@@ -577,7 +577,7 @@ export default function SellerConversationScreen() {
   // reflects (conversation-level readAt, not per-bubble).
   const lastOwnMsgId = useMemo(() => lastOwnMessageId(messages, myId), [messages, myId]);
 
-  const { startCall, simulateIncomingCall } = useCallSession();
+  const { startCall, simulateIncomingCall, callsAvailable } = useCallSession();
   const callLog = useCallLog(id ?? '');
   const myName = user?.fullName || user?.username || 'You';
   const myInitials = (myName[0] ?? '?').toUpperCase();
@@ -1638,7 +1638,7 @@ export default function SellerConversationScreen() {
             centered/adjacent to the name. s.header's justifyContent:
             'space-between' pushes this group to the far right. */}
         <View style={s.headerIconGroup}>
-          {id && (
+          {id && callsAvailable && (
             <>
               <PressableScale
                 style={s.headerCallBtn}
