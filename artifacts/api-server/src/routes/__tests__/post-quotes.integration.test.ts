@@ -1,13 +1,19 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import { setMediaModerationProvider, setTextModerationProvider } from "../../lib/mediaModeration";
 import crypto from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { blocks, db, follows, interactions, notificationsFeed, posts, users } from "@workspace/db";
 
 const auth = vi.hoisted(() => ({ userId: "" }));
+// Cases exercise quote authorization/query behavior independently. Keep the
+// real posting limiter, but do not carry quota from earlier cases or files
+// sharing the isolated test database's loopback IP.
+beforeEach(async () => {
+  await db.execute(sql`DELETE FROM rate_limit_buckets WHERE bucket_key LIKE 'post-create:%'`);
+});
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: any, next: () => void) => {
     req.clerkUserId = req.header("x-test-user-id") || auth.userId;

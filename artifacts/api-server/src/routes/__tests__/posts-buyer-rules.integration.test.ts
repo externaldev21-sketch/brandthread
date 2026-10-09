@@ -1,10 +1,16 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { db, follows, posts, users } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
+
+// Authorization cases must not inherit the posting/IP quota from unrelated
+// requests in this isolated test database. Limits remain active within a case.
+beforeEach(async () => {
+  await db.execute(sql`DELETE FROM rate_limit_buckets WHERE bucket_key LIKE 'post-create:%'`);
+});
 
 /**
  * RULE: only SELLER posts appear in the main (Thread) feed. Buyers can post

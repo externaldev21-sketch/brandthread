@@ -6,14 +6,20 @@
  *
  * Only the Clerk boundary, object storage and the moderation provider are mocked.
  */
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { and, eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { db, follows, mediaModerationResults, posts, reports, stories, users } from "@workspace/db";
 import { setMediaModerationProvider } from "../../lib/mediaModeration";
+
+// Each moderation scenario starts with independent posting quota. Otherwise
+// earlier loopback-IP fixtures can return 429 before image screening runs.
+beforeEach(async () => {
+  await db.execute(sql`DELETE FROM rate_limit_buckets WHERE bucket_key LIKE 'post-create:%'`);
+});
 
 vi.mock("../../middlewares/requireAuth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../middlewares/requireAuth")>();

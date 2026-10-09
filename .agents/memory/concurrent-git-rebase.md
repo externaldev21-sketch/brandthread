@@ -26,3 +26,9 @@ Keep the authoritative ordered request and per-step audit ledger in an ignored w
 **Why:** A workspace runtime replacement discarded temporary audit files while preserving the repository. Git ancestry could recover coverage, but it could not independently recover the user's intended order; the earlier complete-prefix verification was essential.
 
 **How to apply:** Persist the original sequence before starting a long batch and append each actual merge or already-included result durably. Distinguish requested order from order reconstructed from Git history.
+
+When an incoming PR is based on a single-commit snapshot of earlier local integration work, distinguish its actual PR delta from inherited snapshot differences before resolving conflicts.
+
+**Why:** The snapshot and original local commits can contain equivalent earlier work without equivalent ancestry. Ordinary three-way merging then presents hundreds of conflicts that would otherwise revert newer local repairs.
+
+**How to apply:** Identify the incoming PR's own base, compare its changed paths against conflict paths, and preserve the current version for verified snapshot-only conflicts. Manually combine actual overlapping PR edits with current behavior; then verify the requested head is a true ancestor of the completed merge.
