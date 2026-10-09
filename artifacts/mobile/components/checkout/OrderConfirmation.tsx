@@ -31,7 +31,6 @@ import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
-import { countRealOrders, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
 import { hasPlayedOrderConfetti, markOrderConfettiPlayed } from '@/lib/orderConfetti';
 import { formatCents } from '@/lib/money';
 import type { CheckoutSession } from '@/services/cartTypes';
@@ -182,20 +181,6 @@ export function OrderConfirmation({
     // A completed purchase is a meaningful, server-backed moment — exactly
     // when contextualPushPermission.ts wants to ask, never on first launch.
     if (firstVerified?.id) void requestContextualPushPermission(userId, api);
-  }, [firstVerified?.id, userId, api]);
-
-  useEffect(() => {
-    // A buyer's 5th order is a good moment to ask for an App Store review
-    // (rate limited inside maybeRequestStoreReview). Wait so the confirmation
-    // is seen first.
-    if (!firstVerified?.id || !userId) return;
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      api.buyer.orders.list()
-        .then((orders) => { if (!cancelled && countRealOrders(orders) === 5) void maybeRequestStoreReview(userId, 'fifth_order'); })
-        .catch(() => {});
-    }, 4000);
-    return () => { cancelled = true; clearTimeout(timer); };
   }, [firstVerified?.id, userId, api]);
 
   useEffect(() => {
