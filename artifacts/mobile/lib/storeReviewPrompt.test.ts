@@ -18,7 +18,7 @@ vi.mock('expo-store-review', () => ({
 }));
 
 import {
-  countRealOrders, emptyReviewState, maybeRequestStoreReview, shouldPromptForReview,
+  countDeliveredOrders, countRealOrders, emptyReviewState, isSecondDeliveryMoment, maybeRequestStoreReview, shouldPromptForReview,
   MAX_PROMPTS_PER_ACCOUNT, MIN_DAYS_BETWEEN_PROMPTS,
 } from './storeReviewPrompt';
 
@@ -80,5 +80,22 @@ describe('maybeRequestStoreReview', () => {
     expect(await maybeRequestStoreReview('u1', 'first_sale')).toBe(false);
     expect(review.requestReview).not.toHaveBeenCalled();
     expect(store.size).toBe(0);
+  });
+});
+
+describe('second delivered order moment', () => {
+  it('counts only delivered orders', () => {
+    expect(countDeliveredOrders([{ status: 'delivered' }, { status: 'shipped' }, { status: 'refunded' }])).toBe(1);
+    expect(countDeliveredOrders(null)).toBe(0);
+  });
+  it('fires from the 2nd delivered order on', () => {
+    expect(isSecondDeliveryMoment([{ status: 'delivered' }, { status: 'shipped' }])).toBe(false);
+    expect(isSecondDeliveryMoment([{ status: 'delivered' }, { status: 'delivered' }])).toBe(true);
+    expect(isSecondDeliveryMoment([{ status: 'delivered' }, { status: 'delivered' }, { status: 'delivered' }])).toBe(true);
+  });
+  it('asks once per account for that moment', async () => {
+    expect(await maybeRequestStoreReview('user_2nd', 'second_delivery', 1000)).toBe(true);
+    expect(await maybeRequestStoreReview('user_2nd', 'second_delivery', 1000 + 400 * DAY)).toBe(false);
+    expect(review.requestReview).toHaveBeenCalledTimes(1);
   });
 });

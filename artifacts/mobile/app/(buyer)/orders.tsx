@@ -9,6 +9,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { statusBadgeRepeatsHeadline } from '@/lib/buyerOrderCardStatus';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
+import { isSecondDeliveryMoment, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -346,6 +347,9 @@ export default function BuyerOrdersScreen() {
       setOrders(result.orders);
       setOrdersOwnerId(userId);
       setLoadError(!!result.error);
+      // A buyer's 2nd delivered order is the moment to ask for an App Store
+      // rating (once per account, rate limited inside maybeRequestStoreReview).
+      if (!result.error && isSecondDeliveryMoment(result.orders)) void maybeRequestStoreReview(userId, 'second_delivery');
       if (!result.error) consecutiveFailuresRef.current = 0;
       else consecutiveFailuresRef.current += 1;
       if (result.error && consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
