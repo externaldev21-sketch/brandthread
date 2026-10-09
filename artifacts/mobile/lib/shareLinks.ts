@@ -94,7 +94,7 @@ export function parseShareLink(raw: string | null | undefined): ShareLinkTarget 
   const [head, a, b] = parts;
   const q = encodeURIComponent;
 
-  if (head === 'p' && parts.length === 2 && ID_RE.test(a)) {
+  if ((head === 'p' || head === 'post') && parts.length === 2 && ID_RE.test(a)) {
     return { kind: 'post', id: a, href: `/buyer-post-viewer?postId=${q(a)}` };
   }
   if (head === 'tag' && parts.length === 2) {
@@ -110,6 +110,10 @@ export function parseShareLink(raw: string | null | undefined): ShareLinkTarget 
   }
   if (head === 'store' && a === 'product' && parts.length === 3 && ID_RE.test(b)) {
     return { kind: 'product', id: b, href: `/product-detail?id=${q(b)}` };
+  }
+  if (head === 's' && parts.length === 2 && HANDLE_RE.test(a)) {
+    const handle = a.toLowerCase();
+    return { kind: 'store', handle, href: `/u/${q(handle)}` };
   }
   if (head === 'store' && a && a !== 'product' && parts.length === 2 && HANDLE_RE.test(a)) {
     const handle = a.toLowerCase();

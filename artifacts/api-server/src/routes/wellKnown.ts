@@ -1,6 +1,9 @@
 /**
  * Universal links (iOS) and App Links (Android) verification files.
  *
+ * The web app (artifacts/mobile/server/appLinks.js) serves the same files on
+ * the share host; keep the two path lists in sync.
+ *
  * Both platforms fetch these from the website's root at app-install time to
  * confirm the app is authorized to open brandthread.app links, so they must
  * be served at the exact paths below with no auth, no redirect, and JSON.
@@ -21,6 +24,8 @@ export const DEEP_LINK_PATHS = [
   "/store/*",
   "/drops/*",
   "/p/*",
+  "/post/*",
+  "/s/*",
   "/tag/*",
   "/place/*",
   "/onboarding*",

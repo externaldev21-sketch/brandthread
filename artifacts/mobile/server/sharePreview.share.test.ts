@@ -96,4 +96,20 @@ describe("renderSharePreview — posts, stores, hashtags, places", () => {
     mockFetch({}, 404);
     expect(await renderSharePreview("/place/pl_12345", SHELL_HTML)).toBeNull();
   });
+
+  it("gives the short and long share links the same Open Graph card", async () => {
+    const postFetch = mockFetch({ authorName: "Nova", caption: "new drop", imageUrl: "https://cdn.test/n.jpg" });
+    const post = await renderSharePreview("/post/abc123def", SHELL_HTML);
+    expect(String(postFetch.mock.calls[0][0])).toContain("/public/posts/abc123def/share-preview");
+    expect(post!.html).toContain('og:title" content="Nova on Brandthread"');
+    expect(post!.html).toContain('og:image" content="https://cdn.test/n.jpg"');
+    expect(post!.html).toContain('og:url" content="https://brandthread.app/post/abc123def"');
+
+    const storeFetch = mockFetch({ name: "Atelier", description: "Knitwear", imageUrl: "https://cdn.test/a.jpg" });
+    const store = await renderSharePreview("/s/atelier", SHELL_HTML);
+    expect(String(storeFetch.mock.calls[0][0])).toContain("/public/stores/atelier/share-preview");
+    expect(store!.html).toContain('og:title" content="Atelier on Brandthread"');
+    expect(store!.html).toContain('og:image" content="https://cdn.test/a.jpg"');
+    expect(await renderSharePreview("/s/a/b", SHELL_HTML)).toBeNull();
+  });
 });
