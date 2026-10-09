@@ -177,6 +177,20 @@ interface HighDemandProduct {
   commerce: CommerceSignalData;
 }
 
+/** One row of `api.publicProducts.highDemand()` (only the fields read here). */
+interface HighDemandRow {
+  id: string;
+  name: string;
+  sellerDisplayName?: string | null;
+  images?: string[] | null;
+  currentPriceCents?: number | null;
+  variants?: Array<{ priceCents?: number | null }> | null;
+  claimedUnits?: unknown;
+  remainingUnits?: unknown;
+  demandCount?: unknown;
+  endsAt?: string | null;
+}
+
 function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100, topInset }: { pageWidth: number; pageHeight: number; bottomClearance?: number; topInset: number }) {
   const { theme } = useAppTheme();
   const { push } = useThreadPull();
@@ -194,7 +208,7 @@ function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100, top
     try {
       const rows = await api.publicProducts.highDemand(6);
       const safe = Array.isArray(rows) ? rows : [];
-      setItems(safe.map((p: any): HighDemandProduct => ({
+      setItems(safe.map((p: HighDemandRow): HighDemandProduct => ({
         id:        `hd_${p.id}`,
         productId: p.id,
         brand:     p.sellerDisplayName ?? 'Seller',
@@ -1902,6 +1916,9 @@ function isLiveStreamItem(item: SpotlightItem | LiveStreamFeedItem | JustDropped
 // Returns null only when a post has no displayable media. Photo, slideshow, and
 // video posts all share the same full-screen Thread surface.
 
+/** Fields some feed payloads carry beyond `SellerThreadPost` (read when present). */
+type FeedPostExtras = { savesCount?: number | null; location?: string | null; locationName?: string | null };
+
 function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
   if (!post.mediaUris?.length) return null;
   const tag = post.productTags?.[0];
@@ -1931,10 +1948,10 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     reposts: post.repostsCount,
     repostedByMe: post.repostedByMe,
     friendReposts: post.friendReposts,
-    shares: Number((post as any).sharesCount ?? 0),
-    saves: Number((post as any).savedCount ?? (post as any).savesCount ?? 0),
+    shares: Number(post.sharesCount ?? 0),
+    saves: Number(post.savedCount ?? (post as FeedPostExtras).savesCount ?? 0),
     savedByMe: post.savedByMe === true,
-    location: (post as any).location ?? (post as any).locationName ?? undefined,
+    location: (post as FeedPostExtras).location ?? (post as FeedPostExtras).locationName ?? undefined,
     productId: tag?.productId,
     sellerId: post.authorId,
     authorAccountType: post.authorAccountType === 'buyer' ? 'buyer' : 'seller',
@@ -2417,8 +2434,8 @@ export default function FeedScreen({
     let active = true;
     Promise.all([
       api.social.following().catch(() => []),
-      (api as any).publicDrops.list('live').catch(() => []),
-    ]).then(([followingRows, liveDrops]: [any[], any[]]) => {
+      api.publicDrops.list('live').catch(() => []),
+    ]).then(([followingRows, liveDrops]) => {
       if (!active) return;
       setJustDroppedDrops(computeJustDroppedDrops(
         Array.isArray(followingRows) ? followingRows : [],

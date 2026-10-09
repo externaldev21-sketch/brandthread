@@ -99,6 +99,19 @@ const SAMPLE_CHAT_LINES = [
   { user: 'devon91', text: 'love this collection' },
 ];
 
+/** One row of `api.live.active()`'s `streams` (only the fields read here). */
+interface LiveStreamRow {
+  id: string;
+  brand_name?: string | null;
+  seller_name?: string | null;
+  seller_id?: string;
+  title?: string | null;
+  viewer_count?: number | null;
+  avatar_url?: string | null;
+  thumbnail_url?: string | null;
+  product_tags?: Array<{ productId?: string; productName?: string; priceCents?: number }> | null;
+}
+
 interface LiveRoom {
   id: string;
   isSample: boolean;
@@ -199,12 +212,12 @@ export default function LiveFeedScreen() {
 
   useEffect(() => {
     let active = true;
-    (api as any).live.active()
-      .then((data: { streams: any[] }) => {
+    api.live.active()
+      .then((data: { streams: LiveStreamRow[] }) => {
         if (!active) return;
         const rows = Array.isArray(data?.streams) ? data.streams : [];
         if (rows.length) {
-          setRooms(rows.map((s: any): LiveRoom => ({
+          setRooms(rows.map((s: LiveStreamRow): LiveRoom => ({
             id: `live_${s.id}`,
             isSample: false,
             streamId: s.id,
@@ -441,7 +454,7 @@ function LiveRoomPage({
     hapticLight();
     const message_ = `${room.brandName} is live on Brandthread — ${room.title}`;
     if (Platform.OS === 'web') {
-      const nav = (globalThis as any).navigator;
+      const nav = (globalThis as { navigator?: { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> } }).navigator;
       if (nav?.share) {
         try { await nav.share({ title: room.brandName, text: message_, url: roomLink }); } catch { /* user cancelled */ }
         return;

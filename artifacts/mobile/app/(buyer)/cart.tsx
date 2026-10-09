@@ -55,6 +55,7 @@ import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
+import { errorMessageOr } from '@/lib/errorMessage';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
 
@@ -909,8 +910,8 @@ export default function CartScreen() {
       setLoyaltyBalance(current => Math.max(0, current - result.pointsUsed));
       setPointsInput('');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error: any) {
-      Alert.alert('Could not apply points', error?.message ?? 'Please try again.');
+    } catch (error: unknown) {
+      Alert.alert('Could not apply points', errorMessageOr(error, 'Please try again.'));
     } finally {
       setRedeemingPoints(false);
     }

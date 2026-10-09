@@ -20,6 +20,7 @@
  *     ?bt_preview=buyer. Never active outside the dev/preview gate.
  */
 import { getBlockedUsers, getMutedUsers } from '@/services/socialService';
+import type { BrandthreadApi } from '@/lib/api';
 import { isPreviewCatalogEnabled } from '@/lib/previewCatalog';
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 import { getPreviewDiscoverPosts, getPreviewBrandCards, getPreviewDiscoverPeople, getPreviewDrops } from '@/lib/previewDiscover';
@@ -96,8 +97,69 @@ function colorFor(id: string): string {
   return AVATAR_SHADES[hash % AVATAR_SHADES.length];
 }
 
+/** The slice of the API client the Discover composers use. */
+type DiscoverApi = Pick<BrandthreadApi, 'publicTrending' | 'social' | 'publicSellers' | 'publicDrops'>;
+
+/** One row of `api.publicTrending.get()` (only the fields read here). */
+interface TrendingRow {
+  id: string;
+  brand?: string | null;
+  brandId: string;
+  verified?: boolean | null;
+  mediaType?: string | null;
+  caption?: string | null;
+  likesCount?: number | null;
+  commentsCount?: number | null;
+  /** Not sent by the current payload; read when present (see below). */
+  imageUri?: string | null;
+  productTags?: DiscoverProductTag[] | null;
+}
+
+/** One row of `api.social.friendActivity()` (only the fields read here). */
+interface FriendActivityRow {
+  id: string;
+  authorId: string;
+  authorName?: string | null;
+  authorHandle?: string | null;
+  authorInitials?: string | null;
+  authorColor?: string | null;
+  type?: string | null;
+  mediaUrl?: string | null;
+  caption?: string | null;
+  likesCount?: number | null;
+  commentsCount?: number | null;
+  likedByMe?: boolean | null;
+  savedByMe?: boolean | null;
+  createdAt?: string | null;
+}
+
+/** One friend suggestion row (`getFriendSuggestions`), only the fields read here. */
+interface FriendSuggestionRow {
+  userId: string;
+  name: string;
+  handle?: string | null;
+  initials?: string | null;
+  color?: string | null;
+  avatarUrl?: string;
+  reason?: string | null;
+  isFollowing?: boolean | null;
+}
+
+/** One row of `api.publicDrops.list()` (only the fields read here). */
+interface PublicDropRow {
+  id: string;
+  name?: string | null;
+  title?: string | null;
+  brandName?: string | null;
+  sellerDisplayName?: string | null;
+  imageUri?: string | null;
+  images?: string[] | null;
+  releaseAt?: string | null;
+  live?: boolean | null;
+}
+
 /** Maps one row of `api.publicTrending.get()` into a brand/seller Discover tile. */
-function mapTrendingToPost(row: any): DiscoverPost | null {
+function mapTrendingToPost(row: TrendingRow): DiscoverPost | null {
   if (!row?.id || !row?.brandId) return null;
   return {
     id: `trend_${row.id}`,
@@ -122,7 +184,7 @@ function mapTrendingToPost(row: any): DiscoverPost | null {
 }
 
 /** Maps one row of `api.social.friendActivity()` into a buyer Discover tile. */
-function mapFriendPostToPost(row: any): DiscoverPost | null {
+function mapFriendPostToPost(row: FriendActivityRow): DiscoverPost | null {
   if (!row?.id || !row?.authorId) return null;
   return {
     id: `friend_${row.id}`,
@@ -144,7 +206,7 @@ function mapFriendPostToPost(row: any): DiscoverPost | null {
 }
 
 export interface ComposeDiscoverFeedOptions {
-  api: any;
+  api: DiscoverApi;
   isSignedIn: boolean;
   filter: 'forYou' | 'fits';
   limit?: number;
@@ -204,7 +266,7 @@ export async function composeDiscoverPosts({ api, isSignedIn, filter, limit = 30
   return posts;
 }
 
-export async function composeDiscoverBrands({ api, isSignedIn }: { api: any; isSignedIn: boolean }): Promise<DiscoverBrandCard[]> {
+export async function composeDiscoverBrands({ api, isSignedIn }: { api: DiscoverApi; isSignedIn: boolean }): Promise<DiscoverBrandCard[]> {
   const cards = new Map<string, DiscoverBrandCard>();
 
   // Brands the buyer already follows surface first — reusing the same
@@ -215,7 +277,7 @@ export async function composeDiscoverBrands({ api, isSignedIn }: { api: any; isS
     try {
       const following = await api.social.following();
       const sellers = (Array.isArray(following) ? following : []).slice(0, 8);
-      await Promise.all(sellers.map(async (f: any) => {
+      await Promise.all(sellers.map(async (f) => {
         try {
           const data = await api.publicSellers.get(f.userId);
           if (!data?.profile) return;
@@ -242,7 +304,8 @@ export async function composeDiscoverBrands({ api, isSignedIn }: { api: any; isS
 
   try {
     const { trending } = await api.publicTrending.get(40);
-    for (const row of Array.isArray(trending) ? trending : []) {
+    const trendingRows: TrendingRow[] = Array.isArray(trending) ? trending : [];
+    for (const row of trendingRows) {
       const name = (row?.brand ?? '').toLowerCase();
       if (!row?.brandId || cards.has(row.brandId) || namesSeen.has(name)) continue;
       cards.set(row.brandId, {
@@ -262,11 +325,11 @@ export async function composeDiscoverBrands({ api, isSignedIn }: { api: any; isS
   return Array.from(cards.values());
 }
 
-export async function composeDiscoverPeople({ getFriendSuggestions }: { getFriendSuggestions: () => Promise<any[]> }): Promise<DiscoverPersonSuggestion[]> {
+export async function composeDiscoverPeople({ getFriendSuggestions }: { getFriendSuggestions: () => Promise<FriendSuggestionRow[]> }): Promise<DiscoverPersonSuggestion[]> {
   let people: DiscoverPersonSuggestion[] = [];
   try {
     const rows = await getFriendSuggestions();
-    people = (Array.isArray(rows) ? rows : []).map((r: any) => ({
+    people = (Array.isArray(rows) ? rows : []).map((r: FriendSuggestionRow) => ({
       userId: r.userId,
       name: r.name,
       handle: r.handle ?? `@${String(r.name ?? '').toLowerCase().replace(/\s+/g, '')}`,
@@ -283,11 +346,11 @@ export async function composeDiscoverPeople({ getFriendSuggestions }: { getFrien
   return people;
 }
 
-export async function composeDiscoverDrops({ api }: { api: any }): Promise<DiscoverDrop[]> {
+export async function composeDiscoverDrops({ api }: { api: DiscoverApi }): Promise<DiscoverDrop[]> {
   let drops: DiscoverDrop[] = [];
   try {
     const rows = await api.publicDrops.list('upcoming');
-    drops = (Array.isArray(rows) ? rows : []).map((r: any) => ({
+    drops = (Array.isArray(rows) ? rows : []).map((r: PublicDropRow) => ({
       id: r.id,
       name: r.name ?? r.title ?? 'Drop',
       brandName: r.brandName ?? r.sellerDisplayName ?? 'Brand',

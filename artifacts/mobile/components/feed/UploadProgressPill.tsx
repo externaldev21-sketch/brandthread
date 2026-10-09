@@ -36,7 +36,7 @@ export function UploadProgressPill({ topInset }: { topInset: number }) {
   // above for why this doesn't use isBuyerDevPreview()/isSellerDevPreview().
   useEffect(() => {
     if (!IS_TEST_BUILD) return;
-    (window as any).__btUploadProgress = {
+    (window as unknown as { __btUploadProgress?: unknown }).__btUploadProgress = {
       startPostUpload, updatePostUploadProgress, completePostUpload, failPostUpload,
     };
   }, []);

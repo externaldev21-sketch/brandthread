@@ -16,7 +16,7 @@
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
-import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
@@ -74,7 +74,7 @@ export function RightActionRail({
   repostScale: Animated.Value;
   saveDrop: Animated.Value;
   saveScale: Animated.Value;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   testIdBase: string;
   /** Skips the follow badge's rotate/color-fill/fade sub-steps and just
    *  jumps to its resting state — same "disable non-essential motion"

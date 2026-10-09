@@ -113,6 +113,20 @@ export interface VerifiedOrder {
 
 type CheckoutError = { title: string; message: string };
 
+/** Hosted Checkout Session (buyer or guest createSession); guests also get an access token. */
+type HostedCheckoutSession = { sessionId: string; url: string; guestAccessToken?: string };
+
+/** Buyer or guest verifySession result (union of the fields both return). */
+type HostedSessionVerification = {
+  status: string;
+  paymentStatus: string;
+  amountTotal: number | null;
+  orderId: string | null;
+  orderNumber: string | null;
+  declineReason?: string | null;
+  orderStatus?: string | null;
+};
+
 /** Pending reconciliation entry for an in-app payment (vs a hosted Checkout Session id). */
 const PI_PREFIX = 'pi:';
 
@@ -255,7 +269,7 @@ export default function BuyerCheckoutScreen() {
             email: previous.email?.trim() || profile.email || '',
           }));
           if (addresses.length > 0 && !next.shippingAddress) {
-            const defaultAddr = addresses.find((a: any) => a.isDefault) || addresses[0];
+            const defaultAddr = addresses.find((a: SavedAddress) => a.isDefault) || addresses[0];
             handleSelectAddress(defaultAddr);
           }
         } catch {
@@ -263,7 +277,7 @@ export default function BuyerCheckoutScreen() {
         }
         // Cards on the buyer's Stripe customer (the one the PaymentIntent is created for).
         void api.reviews.paymentMethods()
-          .then((data: any) => {
+          .then((data: { paymentMethods?: SavedCard[] } | null) => {
             const cards: SavedCard[] = Array.isArray(data?.paymentMethods) ? data.paymentMethods : [];
             setSavedCards(cards);
             const preferred = cards.find(card => card.isDefault) ?? cards[0];
@@ -626,7 +640,7 @@ export default function BuyerCheckoutScreen() {
         postalCode: who.address.postalCode,
         country: who.address.country || 'US',
         phone: who.contact.phone || undefined,
-        isDefault: (who.address as any).isDefault || false,
+        isDefault: who.address.isDefault || false,
       });
     } catch {
       // ignore — address save is non-fatal
@@ -693,7 +707,7 @@ export default function BuyerCheckoutScreen() {
           continue;
         }
 
-        let result: any;
+        let result: HostedCheckoutSession;
         if (isSignedIn) {
           result = await api.buyer.checkout.createSession(
             group.items.map(item => ({ variantId: item.variantId, productId: item.productId, quantity: item.quantity })),
@@ -767,12 +781,13 @@ export default function BuyerCheckoutScreen() {
         }
 
         // Verify with retries — webhook may be slightly behind.
-        let verification: any;
+        let verification: HostedSessionVerification | undefined;
         for (let attempt = 0; attempt < 6; attempt++) {
           if (isSignedIn) {
             verification = await api.buyer.checkout.verifySession(result.sessionId);
           } else {
-            verification = await api.guest.checkout.verifySession(result.sessionId, result.guestAccessToken);
+            // Guest sessions always carry their access token (guest createSession above).
+            verification = await api.guest.checkout.verifySession(result.sessionId, result.guestAccessToken!);
           }
           if (verification.orderId || verification.paymentStatus === 'paid') break;
           await wait(2000);
@@ -863,7 +878,7 @@ export default function BuyerCheckoutScreen() {
           if (!status.complete) remaining.push(pending);
           continue;
         }
-        let result: any;
+        let result: HostedSessionVerification;
         const sessionId = pending.includes('|') ? pending.split('|')[0] : pending;
         if (pending.includes('|')) {
           const [sid, token] = pending.split('|');

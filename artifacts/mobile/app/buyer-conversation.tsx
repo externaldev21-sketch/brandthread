@@ -61,6 +61,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { formatCents } from '@/lib/money';
+import { errorMessageOr } from '@/lib/errorMessage';
 import { SheetRise } from '@/components/motion/SheetRise';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
@@ -1761,8 +1762,8 @@ export default function BuyerConversationScreen() {
                 await api.threadCash.claim({ transferId });
                 setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
                 celebrateThreadCash({ amount: amountCents, from: displayName });
-              } catch (e: any) {
-                Alert.alert('Could not claim', e?.message ?? 'Please try again.');
+              } catch (e: unknown) {
+                Alert.alert('Could not claim', errorMessageOr(e, 'Please try again.'));
                 throw e;
               }
             }}
@@ -1770,8 +1771,8 @@ export default function BuyerConversationScreen() {
               try {
                 await api.threadCash.cancel({ transferId });
                 setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
-              } catch (e: any) {
-                Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+              } catch (e: unknown) {
+                Alert.alert('Could not cancel', errorMessageOr(e, 'Please try again.'));
                 throw e;
               }
             } : undefined}

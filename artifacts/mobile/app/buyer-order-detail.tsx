@@ -40,6 +40,7 @@ import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { BuyerOrderView, cancellationReasonLabel, OrderStatus, TrackingStatus } from '@/services/orderTypes';
+import type { BuyerOrderApiRow, BuyerOrderItemApiRow } from '@/services/orderService';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import {
@@ -288,7 +289,7 @@ function ReviewSheet({
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <ModalSafeArea>
       <TouchableOpacity
-        style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' } as any}
+        style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' }}
         activeOpacity={1}
         onPress={onClose}
         accessibilityLabel="Close review"
@@ -458,7 +459,27 @@ export function fulfillmentFromStatus(status: OrderStatus): BuyerOrderView['fulf
   return 'unfulfilled';
 }
 
-export function adaptOrderDetail(row: any): BuyerOrderView {
+/** A GET /api/buyer/orders/:id line item; the detail screen reads these as sent. */
+type OrderDetailItemRow = Omit<BuyerOrderItemApiRow, 'productName' | 'quantity'> & {
+  productName: string;
+  quantity: number;
+};
+
+/** GET /api/buyer/orders/:id row (only the fields read here). */
+type OrderDetailRow = Omit<BuyerOrderApiRow, 'items'> & { items?: OrderDetailItemRow[] | null };
+
+/** A GET /api/returns/buyer row, as the return card below reads it. */
+interface BuyerReturnSummary {
+  id: string;
+  orderId: string;
+  status: string;
+  reason?: string | null;
+  refundAmountCents?: number | null;
+  sellerResponse?: string | null;
+  updatedAt: string;
+}
+
+export function adaptOrderDetail(row: OrderDetailRow): BuyerOrderView {
   const dbAddr = row.shippingAddress;
   const items = Array.isArray(row.items) ? row.items : [];
   const shippingAddress: import('@/services/orderTypes').OrderAddress = dbAddr
@@ -477,7 +498,7 @@ export function adaptOrderDetail(row: any): BuyerOrderView {
     paymentStatus:     row.stripePaymentIntentId || row.paidAt ? 'paid' : 'pending',
     // Was hard-coded 'unfulfilled', so a shipped order read "SHIPPED · Unfulfilled".
     fulfillmentStatus: fulfillmentFromStatus(status),
-    lineItems: items.map((item: any) => ({
+    lineItems: items.map((item: OrderDetailItemRow) => ({
       productId:      typeof item.productId === 'string' ? item.productId : null,
       productName:    item.productName,
       variant:        item.variantLabel ?? '',
@@ -606,7 +627,7 @@ export default function BuyerOrderDetailScreen() {
   const [trackingCopied, setTrackingCopied] = useState(false);
   const [showReceiptSheet, setShowReceiptSheet] = useState(false);
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
-  const [returnRequest, setReturnRequest] = useState<any | null>(null);
+  const [returnRequest, setReturnRequest] = useState<BuyerReturnSummary | null>(null);
 
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -660,7 +681,7 @@ export default function BuyerOrderDetailScreen() {
       api.returns.listBuyer()
         .then(rows => {
           if (!cancelled && accountGenerationRef.current === accountGeneration) {
-            setReturnRequest(rows.find((req: any) => req.orderId === id) ?? null);
+            setReturnRequest(rows.find((req: BuyerReturnSummary) => req.orderId === id) ?? null);
           }
         })
         .catch(() => {});
@@ -700,7 +721,7 @@ export default function BuyerOrderDetailScreen() {
     });
     api.returns.listBuyer().then(rows => {
       if (accountGenerationRef.current === accountGeneration) {
-        setReturnRequest(rows.find((req: any) => req.orderId === id) ?? null);
+        setReturnRequest(rows.find((req: BuyerReturnSummary) => req.orderId === id) ?? null);
       }
     }).catch(() => {});
   }
@@ -737,10 +758,10 @@ export default function BuyerOrderDetailScreen() {
       if (delivery) setOrder(prev => (prev ? { ...prev, status: 'delivered', fulfillmentStatus: 'fulfilled', delivery } : prev));
       // Re-read so the status, steps and review prompt all come from the server.
       loadBuyerOrder(order.id).then(row => setOrder(adaptOrderDetail(row))).catch(() => {});
-    } catch (err: any) {
+    } catch (err: unknown) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setShowReceiptSheet(false);
-      const code = err?.code;
+      const code = (err as { code?: unknown } | null | undefined)?.code;
       Alert.alert(
         "Couldn't confirm delivery",
         code === 'NOT_SHIPPED' ? "This order hasn't shipped yet, so there is nothing to confirm."
@@ -814,7 +835,7 @@ export default function BuyerOrderDetailScreen() {
       setReviewSubmitted(true);
       setShowReviewSheet(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
+    } catch {
       Alert.alert('Error', "Couldn't post your review. Try again.");
     } finally {
       setSubmittingReview(false);
@@ -854,7 +875,7 @@ export default function BuyerOrderDetailScreen() {
           : 'Your order has been cancelled.';
         Alert.alert('Order Cancelled', msg, [{ text: 'OK', onPress: () => goBackOr(router, '/(buyer)/orders') }]);
       }
-    } catch (err: any) {
+    } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Cannot Cancel', "This order can't be cancelled now. Message the seller for help.");
     } finally {

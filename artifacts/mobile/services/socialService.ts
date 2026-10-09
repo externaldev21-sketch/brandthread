@@ -599,15 +599,84 @@ export interface SellerThreadPost {
   }>;
 }
 
+/** Product tag on a raw API post row (only the fields read here). */
+interface ApiPostProductTagRow {
+  productId: string;
+  productName?: string | null;
+  name?: string | null;
+  priceCents?: unknown;
+  images?: string[] | null;
+  imageUri?: string;
+  variantId?: string;
+  slideIndex?: number;
+  timestamp?: number;
+}
+
+/**
+ * A raw API post row (POST/PATCH /api/posts, /api/posts/mine,
+ * /api/posts/feed, /api/public/posts, /api/feed/for-you, profile video
+ * endpoints) — only the fields the mappers below read. Server payloads are
+ * not validated, so every field is optional and read defensively.
+ */
+export interface ApiPostRow {
+  id: string;
+  userId?: string | null;
+  authorAccountType?: string | null;
+  seller?: { brandName?: string | null; displayName?: string | null; username?: string | null } | null;
+  postStatus?: string | null;
+  caption?: string | null;
+  hashtags?: string[] | null;
+  styleTags?: string[] | null;
+  mediaUrls?: string[] | null;
+  mediaUris?: string[] | null;
+  mediaUrl?: string | null;
+  mediaPaths?: string[] | null;
+  thumbnailUrl?: string | null;
+  thumbnailUri?: string | null;
+  aspectRatio?: SellerThreadPost['aspectRatio'] | null;
+  mediaType?: string | null;
+  contentType?: string | null;
+  sound?: SellerPostSound | null;
+  sponsored?: boolean | null;
+  boostId?: unknown;
+  taggedProducts?: ApiPostProductTagRow[] | null;
+  productTags?: ApiPostProductTagRow[] | null;
+  visibility?: SellerThreadPost['visibility'] | null;
+  scheduledAt?: string | null;
+  publishedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  likesCount?: number | null;
+  commentsCount?: number | null;
+  repostsCount?: number | null;
+  savedCount?: number | null;
+  savesCount?: unknown;
+  sharesCount?: number | null;
+  viewsCount?: unknown;
+  repostedByMe?: boolean | null;
+  friendReposts?: Array<{
+    userId?: unknown;
+    displayName?: unknown;
+    avatarUrl?: unknown;
+    createdAt?: unknown;
+  } | null> | null;
+  slides?: unknown;
+  slideOverlays?: SellerThreadPost['slideOverlays'] | null;
+  surface?: string | null;
+}
+
+/** A published feed/profile post row: always carries its author's id. */
+export type FeedPostApiRow = ApiPostRow & { userId: string };
+
 async function ensureSellerPostsSeed(k: SocialKeys = K()): Promise<void> {
   await AsyncStorage.removeItem(k.sellerPostsSeeded);
 }
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────────
 
-function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
+function mapOwnedApiPost(p: ApiPostRow, userId: string): SellerThreadPost {
   const now = iso();
-  const status = (['draft', 'scheduled', 'published', 'archived', 'deleted'].includes(p.postStatus)
+  const status = (typeof p.postStatus === 'string' && ['draft', 'scheduled', 'published', 'archived', 'deleted'].includes(p.postStatus)
     ? p.postStatus
     : 'published') as SellerThreadPost['postStatus'];
   const authorName = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
@@ -640,7 +709,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     isArchived:      status === 'archived',
     isDeleted:       status === 'deleted',
     sound:           p.sound ?? undefined,
-    productTags:     (Array.isArray(p.taggedProducts) ? p.taggedProducts : p.productTags ?? []).map((tag: any) => ({
+    productTags:     (Array.isArray(p.taggedProducts) ? p.taggedProducts : p.productTags ?? []).map((tag: ApiPostProductTagRow) => ({
       productId: tag.productId,
       productName: tag.productName ?? tag.name ?? 'Product',
       priceCents: typeof tag.priceCents === 'number' ? tag.priceCents : 0,
@@ -698,10 +767,10 @@ export async function createSellerPost(params: {
   /** POST carousels: ordered photo/video slides (server derives stable URLs from the paths). */
   slides?: Array<{ kind: 'photo' | 'video'; path: string; thumbnailPath: string; duration?: number }>;
   /** Per-slide overlay metadata */
-  slideOverlays?: Array<{ slideIndex: number; overlays: any[] }>;
+  slideOverlays?: NonNullable<SellerThreadPost['slideOverlays']>;
 }): Promise<SellerThreadPost> {
   const k = K();
-  const created = await serviceRequest<any>('/api/posts', {
+  const created = await serviceRequest<ApiPostRow>('/api/posts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -758,7 +827,7 @@ export async function updateSellerPost(
   >> & { surface?: 'thread' | 'profile' },
 ): Promise<SellerThreadPost> {
   const k = K();
-  const updated = await serviceRequest<any>(`/api/posts/${encodeURIComponent(id)}`, {
+  const updated = await serviceRequest<ApiPostRow>(`/api/posts/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({
       mediaUrl: patch.mediaUris?.[0],
@@ -810,7 +879,7 @@ export async function unscheduleSellerPost(id: string): Promise<SellerThreadPost
 
 async function applyOwnedPostAction(id: string, action: 'publish-now' | 'unschedule'): Promise<SellerThreadPost> {
   const k = K();
-  const updated = await serviceRequest<any>(`/api/posts/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({}) });
+  const updated = await serviceRequest<ApiPostRow>(`/api/posts/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({}) });
   const canonical = mapOwnedApiPost(updated, k.userId);
   const posts = await load<SellerThreadPost[]>(k.sellerPosts, []);
   const idx = posts.findIndex(p => p.id === id);
@@ -858,7 +927,7 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
   const k = K();
   if (k.userId === 'anon') return [];
 
-  const apiPosts = await serviceRequest<any[]>('/api/posts/mine');
+  const apiPosts = await serviceRequest<ApiPostRow[]>('/api/posts/mine');
   const mapped = (Array.isArray(apiPosts) ? apiPosts : []).map(post => mapOwnedApiPost(post, k.userId));
   if (_socialUserId === k.userId) await save(k.sellerPosts, mapped);
   return mapped;
@@ -872,7 +941,7 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
 /** API `slides` → client slides (drops malformed entries; undefined when there are none). */
 export function mapSlides(raw: unknown): PostSlide[] | undefined {
   if (!Array.isArray(raw)) return undefined;
-  const out = raw.flatMap((r: any) => (
+  const out = raw.flatMap((r: { kind?: unknown; url?: unknown; thumbnailUrl?: unknown; duration?: unknown } | null) => (
     r && (r.kind === 'photo' || r.kind === 'video') && typeof r.url === 'string'
       ? [{ kind: r.kind, url: r.url, thumbnailUrl: typeof r.thumbnailUrl === 'string' ? r.thumbnailUrl : undefined, duration: typeof r.duration === 'number' ? r.duration : undefined } as PostSlide]
       : []
@@ -880,7 +949,7 @@ export function mapSlides(raw: unknown): PostSlide[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
-export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
+export function mapApiPostToSellerThreadPost(p: FeedPostApiRow, idx: number): SellerThreadPost {
   const now = iso();
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
   const authorHandle   = '@' + (typeof p.seller?.username === 'string' && p.seller.username
@@ -915,7 +984,7 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     sound:             p.sound ?? undefined,
     sponsored:         p.sponsored === true ? true : undefined,
     sponsoredBoostId:  p.sponsored === true && typeof p.boostId === 'string' ? p.boostId : undefined,
-    productTags:       (p.taggedProducts ?? []).map((t: any) => ({
+    productTags:       (p.taggedProducts ?? []).map((t: ApiPostProductTagRow) => ({
       productId:   t.productId,
       productName: t.name ?? '',
       priceCents: typeof t.priceCents === 'number' ? t.priceCents : 0,
@@ -936,7 +1005,7 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     savedByMe:     false,
     repostedByMe:  p.repostedByMe === true,
     friendReposts: Array.isArray(p.friendReposts)
-      ? p.friendReposts.slice(0, 5).flatMap((reposter: any) => {
+      ? p.friendReposts.slice(0, 5).flatMap((reposter) => {
           if (!reposter || typeof reposter.userId !== 'string') return [];
           return [{
             userId: reposter.userId,
@@ -1869,7 +1938,7 @@ export async function getThreadPostsPage(
     seenPostIds: Array.isArray(cursor.seenPostIds) ? [...cursor.seenPostIds] : [],
   };
   const seen = new Set(next.seenPostIds);
-  const rows: any[] = [];
+  const rows: FeedPostApiRow[] = [];
 
   if (mode === 'following') {
     next.generalDone = true;
@@ -1877,7 +1946,7 @@ export async function getThreadPostsPage(
     next.followedDone = true;
   }
 
-  const addUnique = (sourceRows: any[]) => {
+  const addUnique = (sourceRows: FeedPostApiRow[]) => {
     for (const row of sourceRows) {
       if (rows.length >= pageLimit) break;
       if (typeof row?.id !== 'string' || seen.has(row.id)) continue;
@@ -1887,7 +1956,7 @@ export async function getThreadPostsPage(
   };
 
   while (rows.length < pageLimit && !next.followedDone) {
-    let followed: any[];
+    let followed: FeedPostApiRow[];
     try {
       followed = await requestThreadSource(
         '/api/posts/feed',
@@ -1950,12 +2019,12 @@ export async function getThreadPostsPage(
   // Sponsored placement (For You only): the server plans where labelled,
   // admin-approved promotions go under a frequency cap. Optional — any failure
   // leaves the organic page untouched.
-  let pageRows: any[] = rowsWithRepostContext;
+  let pageRows: FeedPostApiRow[] = rowsWithRepostContext;
   const organicBefore = next.organicServed ?? 0;
   if (mode === 'for-you' && rowsWithRepostContext.length > 0) {
     const slots = await fetchSponsoredSlots(organicBefore, rowsWithRepostContext.length);
     if (slots.length > 0) {
-      const byIndex = new Map<number, any[]>();
+      const byIndex = new Map<number, FeedPostApiRow[]>();
       for (const slot of slots) {
         if (seen.has(slot.post.id)) continue;
         seen.add(slot.post.id);
@@ -1986,11 +2055,16 @@ export type ForYouFeedEntry =
   | { kind: 'post'; post: SellerThreadPost }
   | { kind: 'live'; liveStreamId: string; sellerId: string; title: string; thumbnailUrl: string | null; viewerCount: number };
 
+/** GET /api/feed/for-you item: a post row, or a live-stream entry. */
+type ForYouApiItem =
+  | (FeedPostApiRow & { type?: 'post' })
+  | { type: 'live'; liveStreamId: string; sellerId: string; title: string; thumbnailUrl?: string | null; viewerCount?: number | null };
+
 export async function getForYouFeedPage(
   offset = 0,
   limit = 20,
 ): Promise<{ entries: ForYouFeedEntry[]; nextOffset: number | null }> {
-  const response = await serviceRequest<{ items: any[]; nextOffset: number | null }>(
+  const response = await serviceRequest<{ items: ForYouApiItem[]; nextOffset: number | null }>(
     `/api/feed/for-you?limit=${limit}&offset=${offset}`,
   );
   const entries: ForYouFeedEntry[] = (response.items ?? []).map((item, index) => {
@@ -2023,11 +2097,11 @@ async function requestThreadSource(
   path: '/api/posts/feed' | '/api/public/posts',
   offset: number,
   limit: number,
-): Promise<any[]> {
+): Promise<FeedPostApiRow[]> {
   const query = `?limit=${limit}&offset=${offset}`;
   const response = await serviceRequest(`${path}${query}`);
   if (!Array.isArray(response)) throw new Error('Invalid Thread feed response');
-  return response as any[];
+  return response as FeedPostApiRow[];
 }
 
 export interface ThreadFeedPage {
