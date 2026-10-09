@@ -137,4 +137,11 @@ describe('screens gate their sample fallbacks on isPreviewDemoMode()', () => {
     expect(s).toContain('const ready = isPreviewDemoMode() || (!loading && !!(profile?.username || profile?.brandName || profile?.displayName));');
     expect(s.match(/disabled=\{!ready\}/g)).toHaveLength(2);
   });
+
+  it('seller preview conversation getters (thread, messages, buyer orders) are demo-gated like the buyer ones', () => {
+    const s = src('../previewInbox.ts');
+    expect(s).toContain('cachedSellerConversations = isPreviewDemoMode() ? SELLER_PREVIEW_CONVERSATION_SEEDS.map(toSellerConversation) : [];');
+    expect(s).toContain('const seed = isPreviewDemoMode() ? sellerSeedById(conversationId) : undefined;');
+    expect(s).toContain('const rows: PreviewBuyerOrderSeed[] = isPreviewDemoMode() ? seed?.buyerOrders ?? [] : [];');
+  });
 });

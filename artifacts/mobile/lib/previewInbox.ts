@@ -515,7 +515,7 @@ function toSellerConversation(seed: PreviewConversationSeed): Conversation {
 let cachedSellerConversations: Conversation[] | null = null;
 
 export function getSellerPreviewConversations(): Conversation[] {
-  if (!cachedSellerConversations) cachedSellerConversations = SELLER_PREVIEW_CONVERSATION_SEEDS.map(toSellerConversation);
+  if (!cachedSellerConversations) cachedSellerConversations = isPreviewDemoMode() ? SELLER_PREVIEW_CONVERSATION_SEEDS.map(toSellerConversation) : [];
   return cachedSellerConversations;
 }
 
@@ -541,7 +541,7 @@ export function deleteSellerPreviewConversationRequest(id: string): void {
 }
 
 export function getSellerPreviewMessages(conversationId: string): Message[] {
-  const seed = sellerSeedById(conversationId);
+  const seed = isPreviewDemoMode() ? sellerSeedById(conversationId) : undefined;
   if (!seed?.messages) return [];
   return seed.messages.map((m): Message => {
     const isMe = m.fromOfficialOrParticipant === 'me'; // 'me' = the seller here
@@ -573,7 +573,7 @@ export function getSellerPreviewBuyerOrders(conversationId: string): Array<{
   id: string; orderNumber: string; status: string; totalCents: number; itemCount: number; createdAt: string;
 }> {
   const seed = sellerSeedById(conversationId);
-  const rows: PreviewBuyerOrderSeed[] = seed?.buyerOrders ?? [];
+  const rows: PreviewBuyerOrderSeed[] = isPreviewDemoMode() ? seed?.buyerOrders ?? [] : [];
   return rows.map((r) => ({
     id: r.id, orderNumber: r.orderNumber, status: r.status, totalCents: r.totalCents,
     itemCount: r.itemCount,
