@@ -28,7 +28,7 @@
  *   BACKGROUND_JOBS_ENABLED=false   disables every scheduled job on this process
  *   DISABLED_JOBS=a,b               disables the named jobs only
  * Tuning:
- *   JOB_LOCK_POOL_MAX               lock connections per process (default 5)
+ *   JOB_LOCK_POOL_MAX               lock connections per process (default 12; one per job that is running right now)
  */
 import pg from "pg";
 import { logger as defaultLogger } from "../lib/logger";
@@ -87,7 +87,7 @@ function createDefaultPool(env: NodeJS.ProcessEnv, log: Log): LockPool {
   const max = Number(env.JOB_LOCK_POOL_MAX);
   const pool = new pg.Pool({
     connectionString: env.DATABASE_URL,
-    max: Number.isInteger(max) && max > 0 ? max : 5,
+    max: Number.isInteger(max) && max > 0 ? max : 12,
     // Bounds both opening a connection and waiting for a free one.
     connectionTimeoutMillis: 30_000,
     idleTimeoutMillis: 60_000,
