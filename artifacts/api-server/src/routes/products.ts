@@ -244,7 +244,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
   if (!product) {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });
@@ -388,7 +388,7 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
   if (result.limited && access) {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });
@@ -490,7 +490,7 @@ router.post("/:id/restore", requireRole("manager"), async (req, res) => {
   if (result.kind === "limited") {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });
@@ -656,7 +656,7 @@ router.post("/import", requireRole("manager"), async (req, res) => {
   if (!inserted) {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });

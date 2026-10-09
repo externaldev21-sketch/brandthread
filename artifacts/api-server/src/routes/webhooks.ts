@@ -28,6 +28,7 @@ import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
 import { reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
+import { revenueCatSubscriptionEvent, stripeSubscriptionEndedEvent, stripeSubscriptionEvents } from "../lib/subscriptionAnalytics";
 import { grantPromotionPurchase, iapPromotionsEnabled, promotionPurchaseFromWebhookEvent } from "../lib/iapPromotions";
 import { drizzlePromoStore } from "../lib/iapPromotionsStore";
 import {
@@ -90,6 +91,7 @@ import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
+import { SELLER_TRIAL_DAYS } from "../lib/planCatalogue";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -400,7 +402,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
       // These events are completely separate from buyer checkout and Connect.
       case "customer.subscription.created":
       case "customer.subscription.updated":
-        await handleSubscriptionUpdated(event.data.object);
+        await handleSubscriptionUpdated(event.data.object, (event.data as { previous_attributes?: Record<string, unknown> }).previous_attributes ?? null);
         break;
 
       case "customer.subscription.trial_will_end":
@@ -552,6 +554,8 @@ router.post("/revenuecat", async (req: Request, res: Response): Promise<void> =>
     // Reconciliation reads the current provider state, so stale/out-of-order
     // webhook payloads cannot overwrite a newer entitlement.
     await reconcileRevenueCatEntitlement(appUserId);
+    const funnel = revenueCatSubscriptionEvent(event);
+    if (funnel) captureServerEvent(funnel.event, appUserId, funnel.props);
     res.json({ received: true });
   } catch (err) {
     // Do not permanently suppress a provider retry when the live lookup was
@@ -1413,13 +1417,15 @@ async function awardPurchasePoints(order: {
  * Handles customer.subscription.created and customer.subscription.updated.
  * Looks up the seller by stripeCustomerId and syncs their subscription status.
  */
-async function handleSubscriptionUpdated(sub: any) {
+async function handleSubscriptionUpdated(sub: any, previousAttributes: Record<string, unknown> | null = null) {
   const customerId: string =
     typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!customerId) {
     logger.warn({ subscriptionId: sub.id }, "Subscription update missing customer ID");
     return;
   }
+  const [before] = await db.select({ clerkId: users.clerkId, status: users.subscriptionStatus, planId: users.subscriptionPlanId })
+    .from(users).where(eq(users.stripeCustomerId, customerId)).limit(1);
 
   // Determine plan from the price lookup_key on the first subscription item
   const lookupKey: string | undefined = sub.items?.data?.[0]?.price?.lookup_key;
@@ -1443,8 +1449,19 @@ async function handleSubscriptionUpdated(sub: any) {
     ...(periodEnd ? { subscriptionPeriodEnd:  periodEnd } : {}),
     ...(trialStartedAt ? { subscriptionTrialStartedAt: trialStartedAt } : {}),
     ...(trialEndsAt ? { subscriptionTrialEndsAt: trialEndsAt } : {}),
+    // The past_due grace period (planCatalogue PAST_DUE_GRACE_DAYS) runs from
+    // the first past_due event; any other status clears it (BT-002).
+    subscriptionPastDueSince: sub.status === "past_due"
+      ? sql`COALESCE(${users.subscriptionPastDueSince}, now())`
+      : null,
     updatedAt: new Date(),
   }).where(eq(users.stripeCustomerId, customerId));
+
+  if (before?.clerkId) {
+    for (const { event, props } of stripeSubscriptionEvents({
+      sub, plan: planId ?? before.planId, previousStatus: before.status, previousAttributes,
+    })) captureServerEvent(event, before.clerkId, props);
+  }
 
   logger.info(
     { subscriptionId: sub.id, customerId, subscriptionStatus: sub.status, planId },
@@ -1488,7 +1505,7 @@ export async function handleSubscriptionTrialWillEnd(sub: any, eventId: string):
   }
 
   // Stripe's trial_will_end event is normally emitted three days before the
-  // end of a five-day trial. Day-four reminders are sent by the scheduled
+  // end of the trial. The day-before reminder is sent by the scheduled
   // worker from the persisted trial window; do not send this early event in
   // production or it would violate the one-reminder contract. The fallback
   // keeps compatibility with legacy webhook payloads that lack trial_start.
@@ -1531,7 +1548,7 @@ export async function handleSubscriptionTrialWillEnd(sub: any, eventId: string):
   try {
     await sendPushToUser(seller.clerkId, {
       title: "Your free trial ends soon",
-      body: `Your 5-day trial ends in 3 days — you'll be charged ${amount} on ${trialEnd} unless you cancel.`,
+      body: `Your ${SELLER_TRIAL_DAYS}-day trial ends in 3 days — you'll be charged ${amount} on ${trialEnd} unless you cancel.`,
       data: {
         notificationId: stableNotificationId("subscription-trial-ending", sub.id, seller.clerkId),
         type: "subscription_trial_will_end",
@@ -1664,11 +1681,20 @@ async function handleSubscriptionDeleted(sub: any) {
     typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!customerId) return;
 
+  const [seller] = await db.select({ clerkId: users.clerkId, planId: users.subscriptionPlanId })
+    .from(users).where(eq(users.stripeCustomerId, customerId)).limit(1);
+
   await db.update(users).set({
     subscriptionStatus: "canceled",
     subscriptionPlanId: "starter",
+    subscriptionPastDueSince: null,
     updatedAt: new Date(),
   }).where(eq(users.stripeCustomerId, customerId));
+
+  if (seller?.clerkId) {
+    const ended = stripeSubscriptionEndedEvent(seller.planId);
+    captureServerEvent(ended.event, seller.clerkId, ended.props);
+  }
 
   logger.info({ subscriptionId: sub.id, customerId }, "Subscription deleted");
 }

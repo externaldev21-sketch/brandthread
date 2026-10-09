@@ -9,7 +9,7 @@
  *   pro     $199/mo  — everything in growth + unlimited team seats, advanced analytics,
  *                       priority manufacturer intros, white-glove support, early access
  *
- * All subscriptions start with a 5-day free trial. Card is collected upfront so the
+ * All subscriptions start with a 7-day free trial (SELLER_TRIAL_DAYS). Card is collected upfront so the
  * trial auto-converts to paid on day 6 without any further seller action.
  *
  * These charges go directly to the seller's own payment method via a standard
@@ -25,9 +25,9 @@ import { requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
 import { getWebOrigin } from "../lib/webOrigin";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
-import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
+import { PLAN_CATALOGUE, SELLER_TRIAL_DAYS, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
 import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
-import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
+import { isTrialReminderDay } from "../jobs/sellerTrialReminder";
 
 const router = Router();
 router.use(requireAuth);
@@ -208,7 +208,7 @@ router.get("/status", requireRole("owner"), async (req, res) => {
     const trialEndsAt = trialEnd ?? user.subscriptionTrialEndsAt;
     const planId = user.subscriptionPlanId ?? "starter";
     const isDayFour = sub.status === "trialing" && trialStartAt && trialEndsAt
-      ? isDayFourOfFive(trialStartAt, trialEndsAt, new Date())
+      ? isTrialReminderDay(trialStartAt, trialEndsAt, new Date())
       : false;
     const trialBanner = isDayFour && user.trialBannerDismissedTrialEnd !== trialEndsAt!.toISOString()
       ? {
@@ -277,9 +277,9 @@ router.post("/trial-banner/dismiss", requireRole("owner"), async (req, res) => {
     if (
       window?.status !== "trialing" ||
       !window.trialStartedAt ||
-      !isDayFourOfFive(window.trialStartedAt, new Date(serverTrialEndAt), new Date())
+      !isTrialReminderDay(window.trialStartedAt, new Date(serverTrialEndAt), new Date())
     ) {
-      res.status(400).json({ error: "Trial reminder is only available on day four" });
+      res.status(400).json({ error: "Trial reminder is only available the day before your trial ends" });
       return;
     }
     await db.update(users).set({
@@ -365,7 +365,7 @@ router.get("/invoices", requireRole("owner"), async (req, res) => {
  *   in-place (Stripe subscription items update + prorations) instead of creating
  *   a new Checkout session — this prevents concurrent duplicate subscriptions.
  * • If no active subscription exists, creates a Stripe Checkout Session in
- *   subscription mode with a 5-day free trial. Card collected upfront so the
+ *   subscription mode with a 7-day free trial. Card collected upfront so the
  *   trial auto-converts to paid on day 6.
  * Returns { url } for redirect or { updated: true } for in-place update.
  */
@@ -422,10 +422,10 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
       mode:                      "subscription",
       customer:                  customerId,
       line_items:                [{ price: priceId, quantity: 1 }],
-      // Require card upfront even during trial — auto-converts on day 6.
+      // Require card upfront even during trial — auto-converts when it ends.
       payment_method_collection: "always",
       subscription_data: {
-        trial_period_days: 5,
+        trial_period_days: SELLER_TRIAL_DAYS,
         metadata:          { clerkUserId, planId },
       },
       success_url:          `${returnBase}/seller/subscription/return?status=success&plan=${planId}`,
@@ -495,7 +495,7 @@ router.get("/return", (req, res) => {
   const plan   = (req.query.plan   as string) ?? "";
   const title  = status === "success" ? "✓ Trial started" : "Checkout cancelled";
   const body   = status === "success"
-    ? `Your <strong>${plan}</strong> plan trial is now active. You won't be charged until your 5-day trial ends. Close this window and return to the app.`
+    ? `Your <strong>${plan}</strong> plan trial is now active. You won't be charged until your ${SELLER_TRIAL_DAYS}-day trial ends. Close this window and return to the app.`
     : "Your checkout was cancelled. Close this window and return to the app.";
 
   res.setHeader("Content-Type", "text/html");
