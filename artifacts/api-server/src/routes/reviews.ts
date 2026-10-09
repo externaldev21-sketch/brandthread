@@ -16,6 +16,7 @@ import { toPublicReview } from "../lib/publicProfile";
 import { notBlockedWith, optionalViewerId } from "../lib/safety";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { evaluateContent } from "../lib/contentModerator";
+import { publishNotification } from "./notifications-feed";
 import {
   MAX_REVIEW_PHOTO_BYTES, REVIEW_REPLY_MAX, normalizeReviewBody, parseFitNote,
   reviewExtras, reviewPhotoPrefix, validateReviewPhotos,
@@ -188,6 +189,27 @@ router.post(
 );
 
 // ─── Authenticated: create a review ──────────────────────────────────────────
+async function notifyNewReview(input: { buyerId: string; sellerId: string; reviewId: string; rating: number }): Promise<void> {
+  if (input.buyerId === input.sellerId) return;
+  const [buyer] = await db
+    .select({ displayName: users.displayName, name: users.name, username: users.username })
+    .from(users)
+    .where(eq(users.clerkId, input.buyerId))
+    .limit(1);
+  const actorName = buyer?.displayName || buyer?.name || (buyer?.username ? `@${buyer.username}` : "A customer");
+  await publishNotification({
+    userId: input.sellerId,
+    category: "reviews",
+    type: "new_review",
+    title: `${actorName} left a ${input.rating}-star review`,
+    actorId: input.buyerId,
+    actorName,
+    actorHandle: buyer?.username ? `@${buyer.username}` : undefined,
+    targetId: input.reviewId,
+    targetType: "review",
+  });
+}
+
 router.post("/", requireAuth, async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   const { orderId, sellerId, productId, rating, body, photos, fitNote } = req.body as {
@@ -254,6 +276,9 @@ router.post("/", requireAuth, async (req, res) => {
       .insert(reviews)
       .values({ buyerId, sellerId, orderId, ...values })
       .returning();
+    // A first review (not an edit) tells the seller — in Activity and by push.
+    void notifyNewReview({ buyerId, sellerId, reviewId: row.id, rating }).catch((err) =>
+      logger.warn({ err, reviewId: row.id }, "New review notification failed"));
     return res.status(201).json({ ...row, ...(await toPublicReviews([row], buyerId))[0] });
   } catch (err: any) {
     // Unique violation: (buyer_id, order_id) already exists — update idempotently.

@@ -1575,7 +1575,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
     },
     push: {
-      register:   (body: { token: string; platform?: string }) =>
+      register:   (body: { token: string; platform?: string; accountIds?: string[] }) =>
         post<{ ok: boolean }>('/api/push/register', body),
       deregister: (token: string) =>
         request<{ ok: boolean }>(
@@ -1601,6 +1601,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
           channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
+          /** Per-type settings (api-server lib/pushTypes.ts). */
+          pushTypes?: Record<string, 'off' | 'following' | 'everyone'>;
+          /** ISO end of "Pause all", or null when not paused. */
+          pausedUntil?: string | null;
         }>('/api/notification-prefs'),
       update: (body: {
         digest?: 'realtime' | 'daily';
@@ -1609,6 +1613,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         pushEnabled?: boolean;
         promotionalPush?: boolean;
         quietHours?: { start: string; end: string; timezone?: string } | null;
+        pushTypes?: Record<string, 'off' | 'following' | 'everyone'>;
+        /** Pause all pushes for 15, 60, 120, 240 or 480 minutes; null resumes. */
+        pause?: { minutes: number } | null;
       }) =>
         put<{
           digest: 'realtime' | 'daily';
@@ -1618,6 +1625,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
           channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
+          pushTypes?: Record<string, 'off' | 'following' | 'everyone'>;
+          pausedUntil?: string | null;
         }>('/api/notification-prefs', body),
     },
     logo: {
@@ -2066,7 +2075,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>('/api/call/token/renew', body),
       event: (body: {
         threadId: string;
-        type: 'started' | 'ended' | 'declined' | 'failed';
+        type: 'started' | 'ended' | 'declined' | 'failed' | 'missed';
         mode: 'voice' | 'video';
         /** Stable UUID used by the server to make lifecycle retries idempotent. */
         clientEventId: string;

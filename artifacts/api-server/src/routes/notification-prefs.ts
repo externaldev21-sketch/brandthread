@@ -9,6 +9,11 @@
  *
  * `promotionalPush` (boolean, default false) is the explicit opt-in for
  * promotional/marketing pushes (App Store 4.5.4); see lib/pushPolicy.ts.
+ *
+ * `pushTypes` ({ [key]: "off" | "following" | "everyone" }) and `pause`
+ * ({ minutes } to pause all pushes, null to resume) back the Instagram-style
+ * settings pages; see lib/pushTypes.ts. GET returns `pushTypes` and
+ * `pausedUntil` (ISO, or null when not paused).
  */
 
 import { Router } from "express";
@@ -16,6 +21,8 @@ import { db, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { channelView, parseChannelKey, channelPrefKey } from "../lib/notificationChannels";
+import { preferenceKey } from "../lib/push";
+import { PAUSE_DURATIONS_MINUTES, PUSH_TYPE_PREF_PREFIX, isPushPaused, isValidValueFor, pushTypeDefByKey, pushTypeView } from "../lib/pushTypes";
 
 const router = Router();
 router.use(requireAuth);
@@ -43,8 +50,25 @@ const SELLER_DEFAULTS = {
   seller_announcements: true,
 };
 
+/** The boolean category switches only (pushType:* values live in `pushTypes`). */
+function booleanPrefs(prefs: Record<string, unknown> | null | undefined): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(prefs ?? {})) if (typeof v === "boolean") out[k] = v;
+  return out;
+}
+
 function defaultsFor(accountType: string | null | undefined) {
   return accountType === "seller" ? SELLER_DEFAULTS : BUYER_DEFAULTS;
+}
+
+/** Separate read so a deploy before migration 281 reports "not paused" instead of failing the screen. */
+async function readPausedUntil(clerkId: string): Promise<string | null> {
+  try {
+    const [r] = await db.select({ v: users.pushPausedUntil }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+    return isPushPaused(r?.v) ? r!.v!.toISOString() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Separate read so a deploy before migration 260 reports false instead of failing the screen. */
@@ -92,8 +116,10 @@ router.get("/", async (req, res) => {
         end: row?.quietHoursEnd ?? null,
         timezone: row?.quietHoursTimezone ?? "UTC",
       },
-      categories: { ...defaultsFor(row?.accountType), ...(row?.preferences ?? {}) },
+      categories: { ...defaultsFor(row?.accountType), ...booleanPrefs(row?.preferences) },
       channels: channelView(row?.accountType, row?.preferences),
+      pushTypes: pushTypeView(row?.accountType, row?.preferences as Record<string, unknown> | null),
+      pausedUntil: await readPausedUntil(clerkId),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch notification preferences");
@@ -104,7 +130,11 @@ router.get("/", async (req, res) => {
 // ── PUT /api/seller/notification-prefs ───────────────────────────────────────
 router.put("/", async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { digest, categories, channels, pushEnabled, promotionalPush, quietHours } = req.body as {
+  const { digest, categories, channels, pushEnabled, promotionalPush, quietHours, pushTypes, pause } = req.body as {
+    /** { [key]: "off" | "following" | "everyone" } — see lib/pushTypes.ts */
+    pushTypes?: Record<string, unknown>;
+    /** { minutes: 15 | 60 | 120 | 240 | 480 } pauses all pushes; null resumes. */
+    pause?: { minutes?: unknown } | null;
     digest?: string;
     categories?: Record<string, unknown>;
     /** { inApp?: { [type]: boolean }, email?: { [type]: boolean } } */
@@ -149,8 +179,23 @@ router.put("/", async (req, res) => {
       };
     }
   }
-  if (digest === undefined && categories === undefined && channels === undefined && pushEnabled === undefined && promotionalPush === undefined && quietHoursPatch === undefined) {
-    return res.status(400).json({ error: "digest, categories, channels, pushEnabled, promotionalPush, or quietHours is required" });
+  if (pushTypes !== undefined && (!pushTypes || typeof pushTypes !== "object" || Array.isArray(pushTypes))) {
+    return res.status(400).json({ error: "pushTypes must be an object" });
+  }
+  let pausedUntilPatch: Date | null | undefined;
+  if (pause !== undefined) {
+    if (pause === null) {
+      pausedUntilPatch = null;
+    } else {
+      const minutes = (pause as { minutes?: unknown }).minutes;
+      if (typeof minutes !== "number" || !(PAUSE_DURATIONS_MINUTES as readonly number[]).includes(minutes)) {
+        return res.status(400).json({ error: `pause.minutes must be one of: ${PAUSE_DURATIONS_MINUTES.join(", ")}` });
+      }
+      pausedUntilPatch = new Date(Date.now() + minutes * 60_000);
+    }
+  }
+  if (digest === undefined && categories === undefined && channels === undefined && pushEnabled === undefined && promotionalPush === undefined && quietHoursPatch === undefined && pushTypes === undefined && pausedUntilPatch === undefined) {
+    return res.status(400).json({ error: "digest, categories, channels, pushEnabled, promotionalPush, quietHours, pushTypes, or pause is required" });
   }
 
   try {
@@ -163,7 +208,21 @@ router.put("/", async (req, res) => {
 
     const defaults = defaultsFor(current.accountType);
     const allowed = new Set(Object.keys(defaults));
-    const patch: Record<string, boolean> = {};
+    const patch: Record<string, boolean | string> = {};
+    const role = current.accountType === "seller" ? "seller" : "buyer";
+    for (const [key, value] of Object.entries(pushTypes ?? {})) {
+      const def = pushTypeDefByKey(key);
+      if (!def || (def.role && def.role !== role) || !isValidValueFor(def, value)) {
+        return res.status(400).json({ error: `Invalid notification setting: ${key}` });
+      }
+      patch[`${PUSH_TYPE_PREF_PREFIX}${key}`] = value;
+      // The per-type pages replace the old coarse switches. Turning a type on
+      // must not stay blocked by a coarse switch that has no screen any more.
+      if (value !== "off") {
+        const coarse = preferenceKey(current.accountType, def.category);
+        if (coarse) patch[coarse] = true;
+      }
+    }
     for (const [key, value] of Object.entries(categories ?? {})) {
       if (!allowed.has(key) || typeof value !== "boolean") {
         return res.status(400).json({ error: `Invalid notification category: ${key}` });
@@ -189,6 +248,7 @@ router.put("/", async (req, res) => {
       updatedAt: new Date(),
     };
     if (pushEnabled !== undefined) updates.pushEnabled = pushEnabled;
+    if (pausedUntilPatch !== undefined) updates.pushPausedUntil = pausedUntilPatch;
     if (promotionalPush !== undefined) updates.promoPushOptIn = promotionalPush;
     if (quietHoursPatch !== undefined) {
       updates.quietHoursStart = quietHoursPatch.start;
@@ -226,8 +286,10 @@ router.put("/", async (req, res) => {
         end: saved?.quietHoursEnd ?? null,
         timezone: saved?.quietHoursTimezone ?? "UTC",
       },
-      categories: merged,
+      categories: booleanPrefs(merged),
       channels: channelView(current.accountType, merged),
+      pushTypes: pushTypeView(current.accountType, merged),
+      pausedUntil: await readPausedUntil(clerkId),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to update notification preferences");

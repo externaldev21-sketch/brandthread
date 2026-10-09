@@ -15,13 +15,6 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { shouldReopenStudioMenu } from '@/lib/navigation/studioReturn';
 import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
 import { NAVIGATION_ISOLATION_TEST } from '@/lib/buildFlags';
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  useFonts,
-} from '@expo-google-fonts/inter';
 import { InteractionManager, Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SystemUI from 'expo-system-ui';
@@ -31,7 +24,7 @@ import {
   useGlobalSearchParams, usePathname, useRootNavigationState, useRouter, useSegments,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
+import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useSessionList, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
@@ -72,7 +65,7 @@ import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import OfflineBanner from '@/components/OfflineBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
 import { RevenueCatProvider } from '@/lib/revenueCat';
-import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+import { registerGrantedPushToken, setSignedInAccountIds } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
@@ -82,7 +75,7 @@ import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { SaveHeartHost } from '@/components/SaveHeartHost';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
-import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
+import { configureNotificationAccountSwitcher, createNotificationResponseHandler } from '@/lib/notificationNavigation';
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import AnalyticsBridge from '@/components/AnalyticsBridge';
 import { wrapRootComponent } from '@/lib/monitoring';
@@ -102,7 +95,7 @@ import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 import { StatusBarMask, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
-import { MUTED } from '@/lib/theme';
+import { FONT, MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
@@ -1153,7 +1146,20 @@ function ServiceConfigurer() {
 function PushRegistrar() {
   const api = useApi();
   const { isSignedIn, userId } = useAuth();
+  const { sessions } = useSessionList();
   const registeredUserRef = useRef<string | null>(null);
+  // Every account signed in on this device keeps its own pushes here
+  // (labelled with the account), so registration lists them all and runs
+  // again when one is added or signed out.
+  const signedInKey = (sessions ?? [])
+    .filter((session) => session.status === 'active' && session.user)
+    .map((session) => session.user!.id)
+    .sort()
+    .join(',');
+  useEffect(() => {
+    setSignedInAccountIds(signedInKey ? signedInKey.split(',') : []);
+    registeredUserRef.current = null;
+  }, [signedInKey]);
   useEffect(() => {
     if (!isSignedIn) return;
     if (!userId || registeredUserRef.current === userId) return;
@@ -1166,7 +1172,35 @@ function PushRegistrar() {
       registeredUserRef.current = userId;
       void registerGrantedPushToken(userId, api);
     });
-  }, [api, isSignedIn, userId]);
+  }, [api, isSignedIn, userId, signedInKey]);
+  return null;
+}
+
+/**
+ * Lets a notification tap switch to the account the push is for before
+ * opening its screen (lib/notificationNavigation.ts).
+ */
+function NotificationAccountSwitcherBridge() {
+  const { userId } = useAuth();
+  const { sessions, setActive } = useSessionList();
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+  useEffect(() => {
+    configureNotificationAccountSwitcher({
+      currentAccountId: () => userIdRef.current,
+      async switchTo(accountId) {
+        const target = (sessionsRef.current ?? []).find(
+          (session) => session.status === 'active' && session.user?.id === accountId,
+        );
+        if (!target || !setActive) return false;
+        await setActive({ session: target.id });
+        return true;
+      },
+    });
+    return () => configureNotificationAccountSwitcher(null);
+  }, [setActive]);
   return null;
 }
 
@@ -1300,10 +1334,10 @@ function RootLayoutNav() {
   if (feature && !isEnabled(feature)) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }}>
-        <Text style={{ color: '#F5F5F7', fontFamily: 'Inter_700Bold', fontSize: 22, textAlign: 'center' }}>
+        <Text style={{ color: '#F5F5F7', fontFamily: FONT.bold, fontSize: 22, textAlign: 'center' }}>
           Temporarily unavailable
         </Text>
-        <Text style={{ color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
+        <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
           This feature is paused while we make improvements. Your existing work is still safe.
         </Text>
         <PrimaryButton
@@ -1346,6 +1380,7 @@ function RootLayoutNav() {
       <AuthGate />
       <ServiceConfigurer />
       <PushRegistrar />
+      <NotificationAccountSwitcherBridge />
       <AffiliateRefCapture />
       <MarketingPixelTracker />
       <AnalyticsBridge />
@@ -1438,6 +1473,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="content" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="ai-helper" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="notification-settings-page" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="notification-channels" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="help"             options={{ headerShown: false }} />
         <Stack.Screen name="bg-removal"       options={{ headerShown: false }} />
@@ -1699,14 +1735,6 @@ const AppStack = React.memo(function AppStack() {
 });
 
 function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
-  const [fontGateExpired, setFontGateExpired] = useState(false);
-
   useEffect(() => {
     // Fire-and-forget: warms the Appearance screen's icon/theme thumbnails
     // in the background so it never has to show a loading/fade state for a
@@ -1718,18 +1746,9 @@ function RootLayout() {
     return runAfterFirstPaint(() => { void preloadAppearanceAssets(); });
   }, []);
 
-  useEffect(() => {
-    // Last-resort safety net only: expo-font can occasionally hang (a stale
-    // font cache after a hot reload, a broken preview). Everywhere else, the
-    // app waits for the real Inter faces so text never renders in a system
-    // fallback font — a swap that reads as "blurry" since the fallback's
-    // metrics and hinting don't match the app's type scale. This should
-    // essentially never fire in normal use.
-    const timeout = setTimeout(() => setFontGateExpired(true), 8000);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  const appReady = fontsLoaded || !!fontError || fontGateExpired;
+  // UI text uses the platform system font (BRANDTHREAD_DESIGN.md), so there
+  // are no font files to wait for.
+  const appReady = true;
 
   const appTree = (
     <SafeAreaProvider>
