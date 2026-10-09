@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -127,12 +127,12 @@ export default function DesignPromptEditScreen() {
             <Image source={{ uri: imageUri }} style={s.preview} resizeMode="cover" />
           ) : imageUri ? (
             <LinearGradient colors={theme.glowGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.mockPreview}>
-              <Feather name="image" size={ICON.xl} color={PURPLE_LIGHT} />
+              <Icon name="image" size={ICON.xl} color={PURPLE_LIGHT} />
               <Text style={s.mockLabel}>Project image loaded</Text>
             </LinearGradient>
           ) : (
             <View style={s.uploadZone}>
-              <Feather name="upload-cloud" size={ICON.xxl} color={theme.muted} />
+              <Icon name="upload-cloud" size={ICON.xxl} color={theme.muted} />
               <Text style={s.uploadTitle}>Upload or choose image</Text>
               <Text style={s.uploadSub}>JPG, PNG, WEBP up to 20MB</Text>
             </View>
@@ -183,7 +183,7 @@ export default function DesignPromptEditScreen() {
         <View style={s.ph}>
           <GradientCard colors={theme.primaryGradient} onPress={handleGenerate} glow style={[s.generateBtn, { shadowColor: theme.shadowColor }]}>
             <View style={s.generateInner}>
-              <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+              <Icon name="zap" size={ICON.md} color={theme.onAccent} />
               <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate edit</Text>
             </View>
           </GradientCard>
@@ -258,7 +258,7 @@ function ComparisonPanel({ label, accent, uri }: { label: string; accent: string
       {uri ? (
         <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
-        <Feather name="image" size={ICON.lg} color={accent} />
+        <Icon name="image" size={ICON.lg} color={accent} />
       )}
       <Text style={[s.compLabel, { color: accent }]}>{label}</Text>
     </View>

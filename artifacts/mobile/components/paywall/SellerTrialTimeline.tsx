@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -13,7 +13,7 @@ export interface TrialTimelineStep {
   key: string;
   label: string;
   detail: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
 }
 
 export interface SellerTrialTimelineProps {
@@ -28,7 +28,7 @@ export function SellerTrialTimeline({ theme, steps }: SellerTrialTimelineProps) 
         <View key={step.key} style={styles.row}>
           <View style={styles.iconCol}>
             <View style={[styles.iconCircle, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
-              <Feather name={step.icon} size={13} color={theme.text} />
+              <Icon name={step.icon} size={13} color={theme.text} />
             </View>
             {index < steps.length - 1 && <View style={[styles.connector, { backgroundColor: theme.border }]} />}
           </View>

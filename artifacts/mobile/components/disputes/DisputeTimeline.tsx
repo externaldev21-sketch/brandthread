@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
@@ -71,7 +71,7 @@ export function DisputeTimeline({ disputeId, demo, refreshKey = 0 }: Props) {
                       !done && !current && { borderColor: colors.border },
                     ]}
                   >
-                    {done ? <Feather name="check" size={10} color={colors.background} /> : null}
+                    {done ? <Icon name="check" size={10} color={colors.background} /> : null}
                     {current ? <View style={[styles.innerDot, { backgroundColor: colors.foreground }]} /> : null}
                   </View>
                   {!last ? (

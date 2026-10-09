@@ -6,7 +6,7 @@
  */
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -76,7 +76,7 @@ export function LaunchTimePicker({
         {TIME_CHIPS.map((c) => chip(c.label, timeValue === c.value, () => onTimeChange(c.value), c.value))}
       </ScrollView>
       <TouchableOpacity onPress={() => setCustomOpen((v) => !v)} style={s.customToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Feather name={showCustom ? 'chevron-up' : 'chevron-down'} size={13} color={colors.mutedForeground} />
+        <Icon name={showCustom ? 'chevron-up' : 'chevron-down'} size={13} color={colors.mutedForeground} />
         <Text style={[s.customText, { color: colors.mutedForeground }]}>Enter an exact date & time</Text>
       </TouchableOpacity>
       {showCustom && (

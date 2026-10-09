@@ -21,7 +21,7 @@ import { Alert, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, Vi
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSignInGate } from '@/hooks/useSignInGate';
@@ -651,7 +651,7 @@ export default function SellerProfileScreen() {
       ) : null}
       {previewAsVisitor ? (
         <View style={styles.previewBanner} testID="seller-profile-visitor-preview">
-          <Feather name="eye" size={16} color={theme.text} />
+          <Icon name="eye" size={16} color={theme.text} />
           <Text style={styles.previewText}>You’re viewing your profile as a visitor</Text>
           <Pressable onPress={goBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Exit visitor view" testID="seller-profile-exit-preview">
             <Text style={styles.previewExit}>Exit</Text>
@@ -660,7 +660,7 @@ export default function SellerProfileScreen() {
       ) : null}
       {!isOwner && seller.vacationMode ? (
         <View style={styles.vacation} accessibilityRole="alert">
-          <Feather name="sun" size={16} color={theme.warning} />
+          <Icon name="sun" size={16} color={theme.warning} />
           <View style={styles.flex}>
             <Text style={styles.vacationTitle}>This seller is away</Text>
             <Text style={styles.vacationText}>{seller.vacationMessage ?? 'Purchases and new messages are paused for now.'}</Text>
@@ -803,13 +803,13 @@ export default function SellerProfileScreen() {
   );
 }
 
-function SheetRow({ icon, label, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
+function SheetRow({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
   const { theme } = useAppTheme();
   return (
     <PressableScale style={sheetRowStyles.row} onPress={() => { hapticMedium(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
-      <Feather name={icon} size={18} color={theme.text} />
+      <Icon name={icon} size={18} color={theme.text} />
       <Text style={[sheetRowStyles.label, { color: theme.text }]}>{label}</Text>
-      <Feather name="chevron-right" size={16} color={theme.muted} />
+      <Icon name="chevron-right" size={16} color={theme.muted} />
     </PressableScale>
   );
 }

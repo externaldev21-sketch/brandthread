@@ -9,7 +9,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Ellipse, Rect, Line } from 'react-native-svg';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -318,7 +318,7 @@ export default function DesignGarmentScreen() {
                 onPress={() => { Haptics.selectionAsync(); setGarmentColor(hex); }}
               >
                 {garmentColor === hex && (
-                  <Feather name="check" size={12} color={isDarkGarment ? '#FFFFFF' : '#000000'} />
+                  <Icon name="check" size={12} color={isDarkGarment ? '#FFFFFF' : '#000000'} />
                 )}
               </TouchableOpacity>
             ))}
@@ -349,14 +349,14 @@ export default function DesignGarmentScreen() {
               style={[gs.optionToggle, showSafeArea && gs.optionToggleActive]}
               onPress={() => { Haptics.selectionAsync(); setShowSafeArea(v => !v); }}
             >
-              <Feather name="maximize" size={14} color={showSafeArea ? SUCCESS : MUTED} />
+              <Icon name="maximize" size={14} color={showSafeArea ? SUCCESS : MUTED} />
               <Text style={[gs.optionToggleText, showSafeArea && { color: SUCCESS }]}>Print-Safe Area</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[gs.optionToggle, showEmbroidery && gs.optionToggleActive]}
               onPress={() => { Haptics.selectionAsync(); setShowEmbroidery(v => !v); }}
             >
-              <Feather name="scissors" size={14} color={showEmbroidery ? CYAN : MUTED} />
+              <Icon name="scissors" size={14} color={showEmbroidery ? CYAN : MUTED} />
               <Text style={[gs.optionToggleText, showEmbroidery && { color: CYAN }]}>Embroidery-Safe</Text>
             </TouchableOpacity>
           </View>
@@ -375,7 +375,7 @@ export default function DesignGarmentScreen() {
             disabled={saving}
             activeOpacity={0.85}
           >
-            <Feather name="save" size={ICON.sm} color="#000000" />
+            <Icon name="save" size={ICON.sm} color="#000000" />
             <Text style={gs.savePlacementText}>{saving ? 'Saving…' : 'Save Placement'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -383,7 +383,7 @@ export default function DesignGarmentScreen() {
             onPress={() => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any)}
             activeOpacity={0.85}
           >
-            <Feather name="edit-2" size={ICON.sm} color={FG} />
+            <Icon name="edit-2" size={ICON.sm} color={FG} />
             <Text style={gs.openEditorLargeText}>Open in Editor</Text>
           </TouchableOpacity>
         </View>

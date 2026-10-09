@@ -6,7 +6,8 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef,
 import {
   Animated, Easing, Platform, Pressable, StyleSheet, Text, View,
 } from 'react-native';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, RADIUS, ON_DARK_MUTED } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
@@ -65,11 +66,11 @@ export function LiveHostPill({
           <View style={styles.hostText}>
             <View style={styles.hostNameRow}>
               <Text style={styles.hostName} numberOfLines={1}>{host.name}</Text>
-              {host.verified && <Feather name="check-circle" size={12} color="#fff" style={{ marginLeft: 3 }} />}
+              {host.verified && <Icon name="check-circle" size={12} color="#fff" style={{ marginLeft: 3 }} />}
             </View>
             <View style={styles.hostMetaRow}>
               <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>LIVE</Text></View>
-              <Feather name="eye" size={10} color="rgba(255,255,255,0.8)" />
+              <Icon name="eye" size={10} color="rgba(255,255,255,0.8)" />
               <Text style={[styles.hostMeta, TABULAR_NUMS]} testID="live-viewer-count">{formatViewerCount(viewerCount)}</Text>
             </View>
           </View>
@@ -86,7 +87,7 @@ export function LiveHostPill({
       >
         {following && <Glass variant="regular" tint="dark" radius={radius.sm} style={StyleSheet.absoluteFill} />}
         {following
-          ? <Feather name="check" size={14} color="#fff" />
+          ? <Icon name="check" size={14} color="#fff" />
           : <Text style={styles.followText}>Follow</Text>}
       </Pressable>
     </View>
@@ -207,7 +208,7 @@ export function LivePinnedProductCard({
         <View style={styles.pinnedThumb}>
           {product.imageUri
             ? <CachedImage source={{ uri: product.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            : <Feather name="shopping-bag" size={18} color="#111" />}
+            : <Icon name="shopping-bag" size={18} color="#111" />}
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.pinnedEyebrow}>NOW SELLING{product.remainingUnits != null ? ` · ${product.remainingUnits} LEFT` : ''}</Text>
@@ -274,7 +275,7 @@ export function LiveRail({
         testID="live-sound"
         label={muted ? 'Turn sound on' : 'Mute'}
         onPress={onToggleSound}
-        icon={<Feather name={muted ? 'volume-x' : 'volume-2'} size={RAIL_ICON_SIZE} color="#fff" />}
+        icon={<Icon name={muted ? 'volume-x' : 'volume-2'} size={RAIL_ICON_SIZE} color="#fff" />}
       />
       <RailButton
         ref={likeRef}
@@ -282,10 +283,10 @@ export function LiveRail({
         label={`Like, ${formatViewerCount(likeCount)} likes`}
         count={formatViewerCount(likeCount)}
         onPress={handleLike}
-        icon={<Animated.View style={{ transform: [{ scale: pop }] }}>{liked ? <FontAwesome name="heart" size={RAIL_ICON_SIZE} color="#fff" /> : <Feather name="heart" size={RAIL_ICON_SIZE} color="#fff" />}</Animated.View>}
+        icon={<Animated.View style={{ transform: [{ scale: pop }] }}>{liked ? <FontAwesome name="heart" size={RAIL_ICON_SIZE} color="#fff" /> : <Icon name="heart" size={RAIL_ICON_SIZE} color="#fff" />}</Animated.View>}
       />
-      <RailButton testID="live-bag" label={`Products in this live, ${productCount}`} onPress={onOpenBag} badge={productCount} icon={<Feather name="shopping-bag" size={RAIL_ICON_SIZE} color="#fff" />} />
-      <RailButton testID="live-share" label="Share this live" onPress={onShare} icon={<Feather name="send" size={RAIL_ICON_SIZE} color="#fff" />} />
+      <RailButton testID="live-bag" label={`Products in this live, ${productCount}`} onPress={onOpenBag} badge={productCount} icon={<Icon name="shopping-bag" size={RAIL_ICON_SIZE} color="#fff" />} />
+      <RailButton testID="live-share" label="Share this live" onPress={onShare} icon={<Icon name="send" size={RAIL_ICON_SIZE} color="#fff" />} />
     </View>
   );
 }
@@ -393,12 +394,12 @@ export function LiveCommentBar({
           )}
           {onShare && (
             <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={4} testID="live-comment-share">
-              <Feather name="share" size={20} color={theme.text} />
+              <Icon name="share" size={20} color={theme.text} />
             </Pressable>
           )}
           {onMore && (
             <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={4} testID="live-comment-more">
-              <Feather name="more-horizontal" size={20} color={theme.text} />
+              <Icon name="more-horizontal" size={20} color={theme.text} />
             </Pressable>
           )}
         </>

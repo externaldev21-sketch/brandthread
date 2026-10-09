@@ -6,7 +6,7 @@
  */
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -66,7 +66,7 @@ export default function AnalyticsExportScreen() {
                     <Text style={s.label}>{sec.label}</Text>
                     <Text style={s.detail}>{sec.detail}</Text>
                   </View>
-                  <View style={[s.box, on && s.boxOn]}>{on && <Feather name="check" size={13} color={colors.primaryForeground} />}</View>
+                  <View style={[s.box, on && s.boxOn]}>{on && <Icon name="check" size={13} color={colors.primaryForeground} />}</View>
                 </TouchableOpacity>
               </View>
             );

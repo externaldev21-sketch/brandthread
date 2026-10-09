@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -92,10 +92,10 @@ function GridCell({
         <View style={[styles.image, { backgroundColor: item.mediaColors?.[0] ?? theme.cardElevated }]} />
       )}
       {item.type === 'slideshow' && (
-        <Feather name="copy" size={14} color="#FFFFFF" style={styles.badge} />
+        <Icon name="copy" size={14} color="#FFFFFF" style={styles.badge} />
       )}
       {item.type === 'video' && (
-        <Feather name="play" size={14} color="#FFFFFF" style={styles.badge} />
+        <Icon name="play" size={14} color="#FFFFFF" style={styles.badge} />
       )}
     </Pressable>
   );

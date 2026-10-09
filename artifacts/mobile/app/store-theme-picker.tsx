@@ -6,7 +6,7 @@ import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -206,7 +206,7 @@ export default function StoreThemePicker() {
               style={styles.closeBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Feather name="x" size={ICON.md} color={theme.muted} />
+              <Icon name="x" size={ICON.md} color={theme.muted} />
             </TouchableOpacity>
           </View>
 

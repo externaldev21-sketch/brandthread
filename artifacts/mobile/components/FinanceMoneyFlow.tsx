@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FS, FONT } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
@@ -57,7 +57,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
   if (error && !summary) {
     return (
       <View style={[styles.stateCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Feather name="cloud-off" size={18} color={colors.mutedForeground} />
+        <Icon name="cloud-off" size={18} color={colors.mutedForeground} />
         <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn't load your balances</Text>
         <Text style={[styles.stateBody, { color: colors.mutedForeground }]}>
           Your money is safe — this is only a display problem.
@@ -90,7 +90,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
             accessibilityLabel={`${tile.label}: ${tile.value}. ${tile.caption}`}
           >
             <View style={styles.tileHead}>
-              <Feather name={tile.icon} size={13} color={colors.mutedForeground} />
+              <Icon name={tile.icon} size={13} color={colors.mutedForeground} />
               <Text style={[styles.tileLabel, { color: colors.mutedForeground }]}>{tile.label}</Text>
             </View>
             <Text style={[styles.tileValue, TABULAR_NUMS, { color: toneColor(tile.tone) }]} numberOfLines={1} adjustsFontSizeToFit>
@@ -103,7 +103,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
 
       {summary.owed.amount > 0 && (
         <View style={[styles.notice, { borderColor: colors.warning, backgroundColor: colors.card }]}>
-          <Feather name="alert-circle" size={16} color={colors.warning} />
+          <Icon name="alert-circle" size={16} color={colors.warning} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.noticeTitle, { color: colors.foreground }]}>
               You owe Brandthread {formatCents(summary.owed.amount)}
@@ -117,7 +117,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
       )}
       {summary.credit.amount > 0 && (
         <View style={[styles.notice, { borderColor: colors.border, backgroundColor: colors.card }]}>
-          <Feather name="info" size={16} color={colors.mutedForeground} />
+          <Icon name="info" size={16} color={colors.mutedForeground} />
           <Text style={[styles.noticeBody, { color: colors.mutedForeground, flex: 1 }]}>
             Brandthread owes you {formatCents(summary.credit.amount)} (for example, a label you voided after it was
             charged). Support will send it to your Stripe account.

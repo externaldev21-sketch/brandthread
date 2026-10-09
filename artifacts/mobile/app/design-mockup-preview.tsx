@@ -10,7 +10,7 @@ import {
   Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { captureRef } from 'react-native-view-shot';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -149,7 +149,7 @@ export default function DesignMockupPreviewScreen() {
       <View style={styles.root}>
         <ScreenHeader title="Mockup Preview" />
         <View style={styles.centered}>
-          <Feather name="image" size={48} color={SUBTLE} />
+          <Icon name="image" size={48} color={SUBTLE} />
           <Text style={styles.disclaimer}>Open a garment project to see the mockup preview.</Text>
           <SecondaryButton label="Go back" onPress={() => goBackOr(router)} style={{ marginTop: SP.md }} />
         </View>

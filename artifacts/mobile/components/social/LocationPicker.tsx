@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type PlaceInfo, type PlaceSearchResult } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
@@ -114,7 +114,7 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
     <View style={[styles.root, style]} testID="location-picker">
       {value ? (
         <View style={[styles.selected, { borderColor: theme.border, backgroundColor: theme.surface }]} testID="location-picker-selected">
-          <Feather name="map-pin" size={16} color={theme.text} />
+          <Icon name="map-pin" size={16} color={theme.text} />
           <Text style={styles.selectedText}>{value.name}</Text>
           {onClear ? (
             <TouchableOpacity
@@ -124,14 +124,14 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               testID="location-picker-clear"
             >
-              <Feather name="x" size={18} color={theme.muted} />
+              <Icon name="x" size={18} color={theme.muted} />
             </TouchableOpacity>
           ) : null}
         </View>
       ) : null}
 
       <View style={[styles.field, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-        <Feather name="search" size={16} color={theme.muted} />
+        <Icon name="search" size={16} color={theme.muted} />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -149,7 +149,7 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
         {searching ? <ActivityIndicator size="small" color={theme.muted} /> : null}
         {query.length > 0 && !searching ? (
           <TouchableOpacity onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Feather name="x-circle" size={16} color={theme.muted} />
+            <Icon name="x-circle" size={16} color={theme.muted} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -170,7 +170,7 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
               testID={`location-result-${index}`}
             >
               <View style={[styles.pin, { borderColor: theme.border }]}>
-                {savingKey === key ? <ActivityIndicator size="small" color={theme.muted} /> : <Feather name="map-pin" size={16} color={theme.muted} />}
+                {savingKey === key ? <ActivityIndicator size="small" color={theme.muted} /> : <Icon name="map-pin" size={16} color={theme.muted} />}
               </View>
               <View style={styles.rowText}>
                 <Text style={[styles.name, { color: theme.text }]}>{result.name}</Text>
@@ -191,7 +191,7 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
             testID="location-result-custom"
           >
             <View style={[styles.pin, { borderColor: theme.border }]}>
-              {savingKey === 'custom' ? <ActivityIndicator size="small" color={theme.muted} /> : <Feather name="plus" size={16} color={theme.muted} />}
+              {savingKey === 'custom' ? <ActivityIndicator size="small" color={theme.muted} /> : <Icon name="plus" size={16} color={theme.muted} />}
             </View>
             <View style={styles.rowText}>
               <Text style={[styles.name, { color: theme.text }]}>Add {'“'}{trimmed}{'”'}</Text>

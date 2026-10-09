@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { FONT } from '@/lib/theme';
@@ -409,7 +409,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
         <View style={[styles.titleRow, { borderBottomColor: colors.border }]}>
           <Text style={[styles.title, { color: colors.foreground }]}>Select Period</Text>
           <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-            <Feather name="x" size={20} color={colors.mutedForeground} />
+            <Icon name="x" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
 
@@ -435,7 +435,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
                   <Text style={[styles.presetLabel, { color: colors.foreground }]}>{p.label}</Text>
                   <Text style={[styles.presetHint, { color: colors.mutedForeground }]}>{p.hint}</Text>
                   {active && (
-                    <Feather name="check" size={14} color={primary} style={{ marginLeft: 4 }} />
+                    <Icon name="check" size={14} color={primary} style={{ marginLeft: 4 }} />
                   )}
                 </TouchableOpacity>
               );
@@ -448,13 +448,13 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
               {/* Month navigation */}
               <View style={styles.monthNav}>
                 <TouchableOpacity onPress={prevMonth} activeOpacity={0.7} style={styles.navBtn}>
-                  <Feather name="chevron-left" size={18} color={colors.foreground} />
+                  <Icon name="chevron-left" size={18} color={colors.foreground} />
                 </TouchableOpacity>
                 <Text style={[styles.monthTitle, { color: colors.foreground }]}>
                   {MONTH_NAMES[calMonth.getMonth()]} {calMonth.getFullYear()}
                 </Text>
                 <TouchableOpacity onPress={nextMonth} activeOpacity={0.7} style={styles.navBtn}>
-                  <Feather name="chevron-right" size={18} color={colors.foreground} />
+                  <Icon name="chevron-right" size={18} color={colors.foreground} />
                 </TouchableOpacity>
               </View>
 
@@ -478,7 +478,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
         {/* Bottom bar */}
         <View style={[styles.bottomBar, { borderTopColor: colors.border, paddingBottom: bottomPad }]}>
           <View style={styles.rangeLabel}>
-            <Feather name="calendar" size={13} color={colors.mutedForeground} />
+            <Icon name="calendar" size={13} color={colors.mutedForeground} />
             <Text style={[styles.rangeLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>
               {rangeLabel}
             </Text>

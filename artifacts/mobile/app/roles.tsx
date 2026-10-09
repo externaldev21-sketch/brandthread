@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
@@ -45,7 +45,7 @@ export default function RolesScreen() {
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               accessibilityLabel="Invite a team member"
             >
-              <Feather name="plus" size={17} color={colors.foreground} />
+              <Icon name="plus" size={17} color={colors.foreground} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
@@ -59,7 +59,7 @@ export default function RolesScreen() {
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               accessibilityLabel="About roles"
             >
-              <Feather name="more-horizontal" size={17} color={colors.foreground} />
+              <Icon name="more-horizontal" size={17} color={colors.foreground} />
             </TouchableOpacity>
           </View>
         }
@@ -72,10 +72,10 @@ export default function RolesScreen() {
           </View>
           <View style={{ flex: 1 }} />
           <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
-            <Feather name="search" size={16} color={colors.mutedForeground} />
+            <Icon name="search" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
           <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
-            <Feather name="sliders" size={16} color={colors.mutedForeground} />
+            <Icon name="sliders" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
 
@@ -96,7 +96,7 @@ export default function RolesScreen() {
                   {role.group} · {role.staffCount ?? 0} staff{role.pendingCount ? ` · ${role.pendingCount} invited` : ''}
                 </Text>
               </View>
-              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+              <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           ))}
         </View>

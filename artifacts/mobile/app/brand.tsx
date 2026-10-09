@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Image, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -135,7 +135,7 @@ export default function BrandScreen() {
       {/* AI Name Generator */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <Feather name="cpu" size={16} color={colors.primary} />
+          <Icon name="cpu" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Brand Name Generator</Text>
           <View style={[styles.aiBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
@@ -154,7 +154,7 @@ export default function BrandScreen() {
           activeOpacity={0.8}
           disabled={isGenerating}
         >
-          <Feather name={isGenerating ? 'loader' : 'zap'} size={16} color={colors.primaryForeground} />
+          <Icon name={isGenerating ? 'loader' : 'zap'} size={16} color={colors.primaryForeground} />
           <Text style={[styles.generateText, { color: colors.primaryForeground }]}>
             {isGenerating ? 'Generating…' : 'Generate Names'}
           </Text>
@@ -179,7 +179,7 @@ export default function BrandScreen() {
       {/* AI Logo Generator */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <Feather name="aperture" size={16} color={colors.primary} />
+          <Icon name="aperture" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Logo Generator</Text>
           <View style={[styles.aiBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
@@ -211,7 +211,7 @@ export default function BrandScreen() {
           activeOpacity={0.85}
           disabled={logoGenerating}
         >
-          <Feather name={logoGenerating ? 'loader' : 'aperture'} size={16} color={colors.primaryForeground} />
+          <Icon name={logoGenerating ? 'loader' : 'aperture'} size={16} color={colors.primaryForeground} />
           <Text style={[styles.generateText, { color: colors.primaryForeground }]}>
             {logoGenerating ? 'Generating…' : `Generate Logo for "${nameInput || 'Your Brand'}"`}
           </Text>
@@ -239,7 +239,7 @@ export default function BrandScreen() {
                     <AiGeneratedBadge position="topLeft" />
                     {isSelected && (
                       <View style={[styles.logoCheckBadge, { backgroundColor: colors.primary }]}>
-                        <Feather name="check" size={10} color={colors.primaryForeground} />
+                        <Icon name="check" size={10} color={colors.primaryForeground} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -252,7 +252,7 @@ export default function BrandScreen() {
                 activeOpacity={0.8}
                 onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)}
               >
-                <Feather name="download" size={15} color={colors.success} />
+                <Icon name="download" size={15} color={colors.success} />
                 <Text style={[styles.generateText, { color: colors.success }]}>Use this logo</Text>
               </TouchableOpacity>
             )}
@@ -263,7 +263,7 @@ export default function BrandScreen() {
       {/* Setup Checklist */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <Feather name="check-square" size={16} color={colors.primary} />
+          <Icon name="check-square" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Business Setup</Text>
           <Text style={[styles.checklistProgress, { color: colors.mutedForeground }]}>{doneCount}/{totalCount}</Text>
         </View>
@@ -277,7 +277,7 @@ export default function BrandScreen() {
               style={[styles.checkRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
             >
               <View style={[styles.checkBox, { backgroundColor: done ? theme.accentDim : colors.secondary, borderColor: done ? colors.success : colors.border }]}>
-                {done && <Feather name="check" size={12} color={colors.success} />}
+                {done && <Icon name="check" size={12} color={colors.success} />}
               </View>
               <Text style={[styles.checkLabel, { color: done ? colors.mutedForeground : colors.foreground }]}>{label}</Text>
             </TouchableOpacity>
@@ -288,7 +288,7 @@ export default function BrandScreen() {
       {/* Domain */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <Feather name="globe" size={16} color={colors.primary} />
+          <Icon name="globe" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Domain & Trademark</Text>
         </View>
         <View style={[styles.domainRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>

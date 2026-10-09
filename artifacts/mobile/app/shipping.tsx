@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/Badge';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -462,7 +462,7 @@ export default function ShippingScreen() {
       {activeShipments.length === 0 ? (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.emptySection}>
-            <Feather name="truck" size={20} color={colors.mutedForeground} />
+            <Icon name="truck" size={20} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No active shipments</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Buy a label on an order to start tracking.</Text>
           </View>
@@ -505,7 +505,7 @@ export default function ShippingScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {sellerReturns.length === 0 ? (
           <View style={styles.emptySection}>
-            <Feather name="rotate-ccw" size={20} color={colors.mutedForeground} />
+            <Icon name="rotate-ccw" size={20} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No return requests</Text>
           </View>
         ) : (
@@ -528,7 +528,7 @@ export default function ShippingScreen() {
                 {r.notes ? <Text style={[styles.returnReason, { color: colors.mutedForeground }]} numberOfLines={2}>{r.notes}</Text> : null}
               </View>
               <Badge label={returnStatusLabel(r.status as ReturnStatusKey)} variant={returnBadge(r.status) as any} />
-              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+              <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           ))
         )}
@@ -556,7 +556,7 @@ export default function ShippingScreen() {
                 style={[styles.countryInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
               />
               <TouchableOpacity onPress={saveShipFrom} disabled={savingShipFrom} style={[styles.smallBtn, { backgroundColor: colors.primary }]}>
-                {savingShipFrom ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="check" size={14} color={colors.primaryForeground} />}
+                {savingShipFrom ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Icon name="check" size={14} color={colors.primaryForeground} />}
               </TouchableOpacity>
             </View>
           ) : (
@@ -565,7 +565,7 @@ export default function ShippingScreen() {
               style={[styles.countryPill, { borderColor: colors.border }]}
             >
               <Text style={[styles.countryPillText, { color: colors.foreground }]}>{shipFromCountry}</Text>
-              <Feather name="edit-2" size={12} color={colors.mutedForeground} />
+              <Icon name="edit-2" size={12} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
@@ -579,7 +579,7 @@ export default function ShippingScreen() {
           activeOpacity={0.75}
           style={[styles.addRateBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
         >
-          <Feather name="plus" size={14} color={colors.primary} />
+          <Icon name="plus" size={14} color={colors.primary} />
           <Text style={[styles.addRateBtnText, { color: colors.primary }]}>Add Zone</Text>
         </TouchableOpacity>
       </View>
@@ -594,7 +594,7 @@ export default function ShippingScreen() {
       ) : zones.length === 0 ? (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.emptySection}>
-            <Feather name="globe" size={20} color={colors.mutedForeground} />
+            <Icon name="globe" size={20} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No shipping zones yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Add a Domestic zone to start, then Rest of World for everywhere else.</Text>
           </View>
@@ -642,15 +642,15 @@ export default function ShippingScreen() {
 
             <View style={styles.zoneActions}>
               <TouchableOpacity onPress={() => toggleZoneActive(zone)} style={[styles.zoneActionBtn, { borderColor: colors.border }]}>
-                <Feather name={zone.active ? 'eye-off' : 'eye'} size={13} color={colors.foreground} />
+                <Icon name={zone.active ? 'eye-off' : 'eye'} size={13} color={colors.foreground} />
                 <Text style={[styles.zoneActionText, { color: colors.foreground }]}>{zone.active ? 'Deactivate' : 'Activate'}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => openEditZone(zone)} style={[styles.zoneActionBtn, { borderColor: colors.border }]}>
-                <Feather name="edit-2" size={13} color={colors.foreground} />
+                <Icon name="edit-2" size={13} color={colors.foreground} />
                 <Text style={[styles.zoneActionText, { color: colors.foreground }]}>Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDeleteZone(zone)} style={[styles.zoneActionBtn, { borderColor: colors.border }]}>
-                <Feather name="trash-2" size={13} color={colors.destructive} />
+                <Icon name="trash-2" size={13} color={colors.destructive} />
                 <Text style={[styles.zoneActionText, { color: colors.destructive }]}>Delete</Text>
               </TouchableOpacity>
             </View>
@@ -689,7 +689,7 @@ export default function ShippingScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Legacy Flat Rate</Text>
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.emptySection}>
-              <Feather name="info" size={16} color={colors.mutedForeground} />
+              <Icon name="info" size={16} color={colors.mutedForeground} />
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
                 Your Shipping Zones above are now used at checkout instead of this old flat rate.
               </Text>
@@ -706,7 +706,7 @@ export default function ShippingScreen() {
           activeOpacity={0.75}
           style={[styles.addRateBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
         >
-          <Feather name="plus" size={14} color={colors.primary} />
+          <Icon name="plus" size={14} color={colors.primary} />
           <Text style={[styles.addRateBtnText, { color: colors.primary }]}>Add Package</Text>
         </TouchableOpacity>
       </View>
@@ -716,7 +716,7 @@ export default function ShippingScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 24 }]}>
         {presets.length === 0 ? (
           <View style={styles.emptySection}>
-            <Feather name="package" size={20} color={colors.mutedForeground} />
+            <Icon name="package" size={20} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No saved packages yet</Text>
           </View>
         ) : (
@@ -729,10 +729,10 @@ export default function ShippingScreen() {
                 </Text>
               </View>
               <TouchableOpacity onPress={() => openEditPreset(preset)} style={styles.presetIconBtn}>
-                <Feather name="edit-2" size={14} color={colors.mutedForeground} />
+                <Icon name="edit-2" size={14} color={colors.mutedForeground} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDeletePreset(preset)} style={styles.presetIconBtn}>
-                <Feather name="trash-2" size={14} color={colors.destructive} />
+                <Icon name="trash-2" size={14} color={colors.destructive} />
               </TouchableOpacity>
             </View>
           ))
@@ -852,12 +852,12 @@ export default function ShippingScreen() {
                     />
                   </View>
                   <TouchableOpacity onPress={() => removeTier(i)} disabled={zoneForm.weightTiers.length <= 1} style={styles.tierRemoveBtn}>
-                    <Feather name="x" size={16} color={zoneForm.weightTiers.length <= 1 ? colors.border : colors.destructive} />
+                    <Icon name="x" size={16} color={zoneForm.weightTiers.length <= 1 ? colors.border : colors.destructive} />
                   </TouchableOpacity>
                 </View>
               ))}
               <TouchableOpacity onPress={addTier} style={[styles.addTierBtn, { borderColor: colors.border }]}>
-                <Feather name="plus" size={13} color={colors.foreground} />
+                <Icon name="plus" size={13} color={colors.foreground} />
                 <Text style={[styles.zoneActionText, { color: colors.foreground }]}>Add tier</Text>
               </TouchableOpacity>
             </View>

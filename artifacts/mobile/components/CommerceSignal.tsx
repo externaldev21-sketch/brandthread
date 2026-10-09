@@ -24,7 +24,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import {
   BORDER,
   FG, MUTED, SUBTLE,
@@ -217,7 +217,7 @@ export function TimeRemainingLabel({ endsAt, accent, style }: TimeRemainingProps
   return (
     <View style={[sig.row, style]}>
       {isUrgent && <LivePulseDot color={urgentColor} />}
-      {!isUrgent && <Feather name="clock" size={11} color={color} />}
+      {!isUrgent && <Icon name="clock" size={11} color={color} />}
       <Text style={[sig.labelBase, { color, marginLeft: 4, fontVariant: ['tabular-nums'] }]}>
         {formatSecondsRemaining(secs)}
       </Text>
@@ -284,7 +284,7 @@ export function DemandBadge({ demandCount, accent, style }: DemandBadgeProps) {
   if (!demandCount || demandCount < HIGH_DEMAND_THRESHOLD) return null;
   return (
     <View style={[sig.demandBadge, { backgroundColor: badgeDim }, style]}>
-      <Feather name="trending-up" size={10} color={badgeAccent} />
+      <Icon name="trending-up" size={10} color={badgeAccent} />
       <Text style={[sig.demandBadgeText, { color: badgeAccent }]}>High Demand</Text>
     </View>
   );
@@ -404,7 +404,7 @@ export function HighDemandSectionHead({
   return (
     <View style={[hd.root, style]}>
       <View style={[hd.iconWrap, { backgroundColor: iconDim }]}>
-        <Feather name="trending-up" size={14} color={iconColor} />
+        <Icon name="trending-up" size={14} color={iconColor} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={hd.title}>{title}</Text>

@@ -15,7 +15,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -206,7 +206,7 @@ export default function ProductSizeChartScreen() {
           accessibilityRole="button"
         >
           <Text style={{ fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text }}>Use a saved size chart</Text>
-          <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+          <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
         </TouchableOpacity>
 
         {/* Unit toggle */}
@@ -233,7 +233,7 @@ export default function ProductSizeChartScreen() {
             <View key={idx} style={s.chip}>
               <Text style={s.chipText}>{col}</Text>
               <TouchableOpacity onPress={() => removeColumn(idx)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <Feather name="x" size={12} color={theme.muted} />
+                <Icon name="x" size={12} color={theme.muted} />
               </TouchableOpacity>
             </View>
           ))}
@@ -248,7 +248,7 @@ export default function ProductSizeChartScreen() {
             onSubmitEditing={addColumn}
           />
           <TouchableOpacity style={s.addBtn} onPress={addColumn} activeOpacity={0.8}>
-            <Feather name="plus" size={ICON.sm} color={theme.accentLight} />
+            <Icon name="plus" size={ICON.sm} color={theme.accentLight} />
           </TouchableOpacity>
         </View>
 
@@ -295,7 +295,7 @@ export default function ProductSizeChartScreen() {
                   ))}
                   <View style={[t.cell, t.actionCell]}>
                     <TouchableOpacity onPress={() => removeRow(ri)}>
-                      <Feather name="trash-2" size={14} color={theme.error} />
+                      <Icon name="trash-2" size={14} color={theme.error} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -315,7 +315,7 @@ export default function ProductSizeChartScreen() {
             onSubmitEditing={addRow}
           />
           <TouchableOpacity style={s.addBtn} onPress={addRow} activeOpacity={0.8}>
-            <Feather name="plus" size={ICON.sm} color={theme.accentLight} />
+            <Icon name="plus" size={ICON.sm} color={theme.accentLight} />
           </TouchableOpacity>
         </View>
 
@@ -337,7 +337,7 @@ export default function ProductSizeChartScreen() {
           accessibilityRole="button"
         >
           <Text style={{ fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text }}>Save as a reusable size chart</Text>
-          <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+          <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
         </TouchableOpacity>
 
         {/* Actions */}

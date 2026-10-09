@@ -11,7 +11,7 @@ import {
   Alert, ActivityIndicator, Image, TextInput, Modal, FlatList,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import * as ImagePicker from 'expo-image-picker';
@@ -273,13 +273,13 @@ export default function DesignBgReplaceScreen({
               <View style={s.sourcePreview}>
                 <Image source={{ uri: imageUri }} style={s.sourceImage} resizeMode="cover" />
                 <View style={s.sourceChip}>
-                  <Feather name="edit-2" size={ICON.xs} color={FG} />
+                  <Icon name="edit-2" size={ICON.xs} color={FG} />
                   <Text style={s.sourceChipText}>Change</Text>
                 </View>
               </View>
             ) : (
               <View style={s.uploadZone}>
-                <Feather name="upload-cloud" size={ICON.xxl} color={MUTED} />
+                <Icon name="upload-cloud" size={ICON.xxl} color={MUTED} />
                 <Text style={s.uploadTitle}>Upload source image</Text>
                 <Text style={s.uploadSub}>Tap to browse</Text>
               </View>
@@ -310,7 +310,7 @@ export default function DesignBgReplaceScreen({
                   style={[s.swatch, { backgroundColor: sw.hex }, selectedSwatchHex === sw.hex && s.swatchSelected]}
                   activeOpacity={0.8}
                 >
-                  {selectedSwatchHex === sw.hex && <Feather name="check" size={14} color={sw.hex === '#FFFFFF' || sw.hex === '#F5F0E8' || sw.hex === '#F4A7B9' ? '#000' : '#FFF'} />}
+                  {selectedSwatchHex === sw.hex && <Icon name="check" size={14} color={sw.hex === '#FFFFFF' || sw.hex === '#F5F0E8' || sw.hex === '#F4A7B9' ? '#000' : '#FFF'} />}
                 </TouchableOpacity>
               ))}
             </View>
@@ -337,7 +337,7 @@ export default function DesignBgReplaceScreen({
                   <LinearGradient colors={[gp.from, gp.to]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.gradSwatch} />
                   <Text style={s.gradLabel}>{gp.label}</Text>
                   {selectedGradient === idx && (
-                    <View style={s.gradCheck}><Feather name="check" size={12} color="#FFF" /></View>
+                    <View style={s.gradCheck}><Icon name="check" size={12} color="#FFF" /></View>
                   )}
                 </TouchableOpacity>
               ))}
@@ -362,7 +362,7 @@ export default function DesignBgReplaceScreen({
             <PrimaryButton label={uploadedBgUri ? 'Change background image' : 'Upload background image'} onPress={pickBgImage} icon="image" />
             {uploadedBgUri && (
               <View style={s.bgUploadedRow}>
-                <Feather name="check-circle" size={ICON.sm} color={PURPLE_LIGHT} />
+                <Icon name="check-circle" size={ICON.sm} color={PURPLE_LIGHT} />
                 <Text style={s.bgUploadedText}>Background image selected</Text>
               </View>
             )}
@@ -387,7 +387,7 @@ export default function DesignBgReplaceScreen({
         <View style={s.ph}>
           <GradientCard colors={theme.primaryGradient} onPress={handleGenerate} glow style={[s.generateBtn, { shadowColor: theme.shadowColor }]}>
             <View style={s.generateInner}>
-              <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+              <Icon name="zap" size={ICON.md} color={theme.onAccent} />
               <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate</Text>
             </View>
           </GradientCard>
@@ -446,14 +446,14 @@ export default function DesignBgReplaceScreen({
                     <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
                   ) : (
                     <View style={[s.productThumb, s.productThumbEmpty]}>
-                      <Feather name="package" size={ICON.md} color={SUBTLE} />
+                      <Icon name="package" size={ICON.md} color={SUBTLE} />
                     </View>
                   )}
                   <View style={{ flex: 1 }}>
                     <Text style={s.productName} numberOfLines={1}>{item.name}</Text>
                     <Text style={s.productStatus}>{item.status}</Text>
                   </View>
-                  <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+                  <Icon name="chevron-right" size={ICON.xs} color={MUTED} />
                 </TouchableOpacity>
               )}
             />

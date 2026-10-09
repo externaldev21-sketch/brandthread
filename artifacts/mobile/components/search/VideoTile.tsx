@@ -1,6 +1,6 @@
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
@@ -50,7 +50,7 @@ export function VideoTile({ item, width, onPress }: {
           style={styles.scrim}
         />
         <View style={styles.playBadge} pointerEvents="none">
-          <Feather name="play" size={14} color="#FFFFFF" />
+          <Icon name="play" size={14} color="#FFFFFF" />
         </View>
         <View style={styles.overlay} pointerEvents="none">
           {item.caption ? (
@@ -60,7 +60,7 @@ export function VideoTile({ item, width, onPress }: {
             <Text style={styles.authorName} numberOfLines={1}>{item.authorName}</Text>
             {item.likesCount > 0 && (
               <View style={styles.likesRow}>
-                <Feather name="heart" size={10} color="#FFFFFF" />
+                <Icon name="heart" size={10} color="#FFFFFF" />
                 <Text style={styles.likesText}>{formatCompactCount(item.likesCount)}</Text>
               </View>
             )}

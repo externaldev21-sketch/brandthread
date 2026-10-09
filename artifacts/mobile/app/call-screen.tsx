@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { randomUUID } from 'expo-crypto';
 import { useApi } from '@/lib/api';
 import {
@@ -410,7 +410,7 @@ function NativeCallScreen() {
           style={s.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Feather name="arrow-left" size={22} color={FG} />
+          <Icon name="arrow-left" size={22} color={FG} />
         </TouchableOpacity>
         <View style={s.headerCenter}>
           <Text style={s.headerName} numberOfLines={1}>{params.participantName ?? 'Call'}</Text>
@@ -424,12 +424,12 @@ function NativeCallScreen() {
         {status === 'unavailable' ? (
           <View style={s.unavailable}>
             <View style={s.unavailableIcon}>
-              <Feather name="phone-off" size={30} color={MUTE_RED} />
+              <Icon name="phone-off" size={30} color={MUTE_RED} />
             </View>
             <Text style={s.unavailableTitle}>Call unavailable</Text>
             <Text style={s.unavailableText}>{unavailableReason}</Text>
             <TouchableOpacity style={[s.messageButton, { backgroundColor: colors.primary }]} onPress={() => goBackOr(router)}>
-              <Feather name="message-circle" size={17} color={colors.primaryForeground} />
+              <Icon name="message-circle" size={17} color={colors.primaryForeground} />
               <Text style={[s.messageButtonText, { color: colors.primaryForeground }]}>Return to messages</Text>
             </TouchableOpacity>
           </View>
@@ -513,7 +513,7 @@ function NativeCallScreen() {
           onPress={toggleMute}
           activeOpacity={0.8}
         >
-          <Feather
+          <Icon
             name={muted ? 'mic-off' : 'mic'}
             size={24}
             color={muted ? MUTE_RED : FG}
@@ -530,7 +530,7 @@ function NativeCallScreen() {
             onPress={toggleCamera}
             activeOpacity={0.8}
           >
-            <Feather
+            <Icon
               name={cameraOff ? 'camera-off' : 'camera'}
               size={24}
               color={cameraOff ? MUTE_RED : FG}
@@ -547,7 +547,7 @@ function NativeCallScreen() {
           onPress={handleHangUp}
           activeOpacity={0.8}
         >
-          <Feather name="phone-off" size={26} color="#fff" />
+          <Icon name="phone-off" size={26} color="#fff" />
           <Text style={[s.ctrlLabel, { color: '#fff' }]}>End</Text>
         </TouchableOpacity>
 
@@ -558,7 +558,7 @@ function NativeCallScreen() {
             onPress={toggleScreenShare}
             activeOpacity={0.8}
           >
-            <Feather name="monitor" size={24} color={screenSharing ? colors.primary : FG} />
+            <Icon name="monitor" size={24} color={screenSharing ? colors.primary : FG} />
             <Text style={[s.ctrlLabel, screenSharing && { color: colors.primary }]}>
               {screenSharing ? 'Stop share' : 'Share'}
             </Text>

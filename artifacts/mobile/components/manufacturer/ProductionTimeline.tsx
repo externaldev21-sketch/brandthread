@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { formatTimestamp } from '@workspace/manufacturer-flow';
 import { BORDER, CARD_ELEVATED, FG, FONT, FS, MUTED, SP, SUBTLE, SUCCESS } from '@/lib/theme';
 import type { TimelineStep } from '@/services/manufacturerOrderFlow';
@@ -22,7 +22,7 @@ export default function ProductionTimeline({
           <View key={step.stage} style={styles.row} testID={`timeline-step-${step.stage}`}>
             <View style={styles.rail}>
               <View style={[styles.dot, done && styles.dotDone, current && styles.dotCurrent]}>
-                {done ? <Feather name="check" size={13} color="#0A0A0B" /> : current ? <View style={styles.pulse} /> : <Text style={styles.dotText}>{index + 1}</Text>}
+                {done ? <Icon name="check" size={13} color="#0A0A0B" /> : current ? <View style={styles.pulse} /> : <Text style={styles.dotText}>{index + 1}</Text>}
               </View>
               {!last && <View style={[styles.line, done && styles.lineDone]} />}
             </View>

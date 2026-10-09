@@ -8,7 +8,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -162,7 +162,7 @@ export default function QuoteCompareScreen() {
         />
       ) : quotes.length === 0 && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl }}>
-          <Feather name="inbox" size={48} color={SUBTLE} style={{ marginBottom: SP.md }} />
+          <Icon name="inbox" size={48} color={SUBTLE} style={{ marginBottom: SP.md }} />
           <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginBottom: 8 }}>No Quotes Yet</Text>
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' }}>
             No quotes have been received for this request yet.
@@ -174,7 +174,7 @@ export default function QuoteCompareScreen() {
         <View style={{ paddingHorizontal: SP.md, paddingBottom: SP.md }}>
           <BrandthreadCard style={{ backgroundColor: ORANGE_DIM, borderColor: ORANGE + '40' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
-              <Feather name="info" size={ICON.sm} color={ORANGE} />
+              <Icon name="info" size={ICON.sm} color={ORANGE} />
               <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE }}>
                 Only one quote received so far. More may arrive shortly.
               </Text>
@@ -223,7 +223,7 @@ export default function QuoteCompareScreen() {
                   <Text style={s.mfgName} numberOfLines={2}>{mfg?.name ?? 'Manufacturer'}</Text>
                   {mfg?.isVerified && (
                     <View style={s.verifiedBadge}>
-                      <Feather name="check-circle" size={11} color={SUCCESS} />
+                      <Icon name="check-circle" size={11} color={SUCCESS} />
                       <Text style={s.verifiedText}>Verified</Text>
                     </View>
                   )}

@@ -6,7 +6,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, RefreshControl, Alert, Image } from 'react-native';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';

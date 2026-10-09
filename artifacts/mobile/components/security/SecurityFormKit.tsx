@@ -5,7 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, type TextInputProps } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { IconButton } from '@/components/ui/IconButton';
@@ -86,7 +86,7 @@ export function SecuritySuccess({ title, body, onDone }: { title: string; body?:
   const colors = useColors();
   return (
     <View style={{ alignItems: 'center', paddingTop: SPACING.xl, gap: SPACING.sm }}>
-      <Feather name="check-circle" size={40} color={colors.success} />
+      <Icon name="check-circle" size={40} color={colors.success} />
       <Text testID="security-success-title" style={{ ...TYPE_SCALE.title2, color: colors.foreground }}>{title}</Text>
       {body ? <Text style={{ ...TYPE_SCALE.footnote, color: colors.mutedForeground, textAlign: 'center', lineHeight: 18 }}>{body}</Text> : null}
       <Button label="Done" onPress={onDone} fullWidth style={{ marginTop: SPACING.md }} />
@@ -100,7 +100,7 @@ export function SecurityErrorBox({ message, testID }: { message: string; testID?
   if (!message) return null;
   return (
     <View style={s.errorBox}>
-      <Feather name="alert-circle" size={14} color={colors.destructive} />
+      <Icon name="alert-circle" size={14} color={colors.destructive} />
       <Text testID={testID} style={s.errorText}>{message}</Text>
     </View>
   );

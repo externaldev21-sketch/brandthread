@@ -8,7 +8,7 @@ import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,7 +56,7 @@ type Tab = 'discover' | 'my_manufacturers' | 'quotes' | 'samples' | 'production'
 // conversations preview (both already route via ?tab=messages, which this
 // isTab()/setActiveTab logic still honors), rather than taking a 6th slot
 // that clipped off the right edge of a 393pt screen with no affordance.
-const TABS: { key: Tab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+const TABS: { key: Tab; label: string; icon: IconName }[] = [
   { key: 'discover',         label: 'Discover',       icon: 'search' },
   { key: 'my_manufacturers', label: 'My Mfgs',        icon: 'users' },
   { key: 'quotes',           label: 'Quotes',         icon: 'file-text' },
@@ -216,7 +216,7 @@ export default function ManufacturerHub() {
               activeOpacity={0.7}
             >
               <View style={s.tabInner}>
-                <Feather
+                <Icon
                   name={tab.icon}
                   size={ICON.sm}
                   color={activeTab === tab.key ? theme.accentLight : theme.muted}
@@ -522,22 +522,22 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         >
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.rfqCtaGrad}>
             <View style={s.rfqCtaIcon}>
-              <Feather name="send" size={ICON.md} color={theme.onAccent} />
+              <Icon name="send" size={ICON.md} color={theme.onAccent} />
             </View>
             <View style={s.rfqCtaBody}>
               <Text style={[s.rfqCtaTitle, getOnAccentTextStyle(theme)]}>Request for Quotation</Text>
               <Text style={[s.rfqCtaSubtitle, getOnAccentTextStyle(theme)]}>Broadcast one request to up to 10 manufacturers</Text>
             </View>
-            <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
+            <Icon name="arrow-right" size={ICON.md} color={theme.onAccent} />
           </LinearGradient>
         </TouchableOpacity>
         <View style={s.rfqSecondaryRow}>
           <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/rfq-list' as never)} testID="button-my-rfqs">
-            <Feather name="file-text" size={ICON.sm} color={theme.accentLight} />
+            <Icon name="file-text" size={ICON.sm} color={theme.accentLight} />
             <Text style={s.rfqSecondaryText}>My RFQs</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/manufacturer-compare' as never)} testID="button-compare-suppliers">
-            <Feather name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
+            <Icon name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
             <Text style={s.rfqSecondaryText}>Compare Suppliers</Text>
           </TouchableOpacity>
         </View>
@@ -571,7 +571,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
                     )}
                     {mfg.isVerified && (
                       <View style={s.featuredVerifiedBadge}>
-                        <Feather name="check-circle" size={11} color={theme.onAccent} />
+                        <Icon name="check-circle" size={11} color={theme.onAccent} />
                       </View>
                     )}
                   </View>
@@ -589,7 +589,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
             <SectionHeader title="Recent conversations" action={{ label: 'See all', onPress: () => router.setParams({ tab: 'messages' } as never) }} style={s.sectionHeaderTight} />
             {conversationsPreview.map((conv) => (
               <TouchableOpacity key={conv.id} style={s.previewRow} activeOpacity={0.8} onPress={() => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never)}>
-                <View style={s.previewIcon}><Feather name="message-circle" size={ICON.sm} color={theme.secondary} /></View>
+                <View style={s.previewIcon}><Icon name="message-circle" size={ICON.sm} color={theme.secondary} /></View>
                 <View style={s.previewBody}>
                   <Text style={s.previewTitle} numberOfLines={1}>{conv.manufacturerName}</Text>
                   <Text style={s.previewSubtitle} numberOfLines={1}>{conv.lastMessage ?? conv.contextLabel ?? 'New conversation'}</Text>
@@ -606,7 +606,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
             <SectionHeader title="Active orders" action={{ label: 'See all', onPress: () => router.setParams({ tab: 'production' } as never) }} style={s.sectionHeaderTight} />
             {ordersPreview.map((order) => (
               <TouchableOpacity key={order.id} style={s.previewRow} activeOpacity={0.8} onPress={() => router.setParams({ tab: 'production' } as never)}>
-                <View style={s.previewIcon}><Feather name="layers" size={ICON.sm} color={theme.accentLight} /></View>
+                <View style={s.previewIcon}><Icon name="layers" size={ICON.sm} color={theme.accentLight} /></View>
                 <View style={s.previewBody}>
                   <Text style={s.previewTitle} numberOfLines={1}>{order.productName}</Text>
                   <Text style={s.previewSubtitle} numberOfLines={1}>{order.manufacturerName ?? 'Manufacturer'} · {PRODUCTION_STAGES.find((stage) => stage.key === order.currentStage)?.label ?? order.currentStage}</Text>
@@ -630,7 +630,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           accessibilityLabel={searchActive ? 'Close manufacturer search' : 'Search manufacturers'}
           accessibilityState={{ expanded: searchActive }}
         >
-          <Feather name="search" size={ICON.sm} color={theme.muted} />
+          <Icon name="search" size={ICON.sm} color={theme.muted} />
         </TouchableOpacity>
         {searchActive && (
           <TextInput
@@ -650,7 +650,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           accessibilityLabel="Filter manufacturers"
           testID="button-directory-filters"
         >
-          <Feather name="sliders" size={ICON.sm} color={theme.accentLight} />
+          <Icon name="sliders" size={ICON.sm} color={theme.accentLight} />
           {activeFilterCount(filters) > 0 && <Text style={s.filterCount}>{activeFilterCount(filters)}</Text>}
         </TouchableOpacity>
       </View>
@@ -666,7 +666,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           onPress={() => setMutationError('')}
           accessibilityRole="alert"
         >
-          <Feather name="alert-circle" size={ICON.sm} color={theme.warning} />
+          <Icon name="alert-circle" size={ICON.sm} color={theme.warning} />
           <Text style={s.inlineErrorText}>{mutationError}</Text>
         </TouchableOpacity>
       )}
@@ -778,7 +778,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
             accessibilityRole="button"
             accessibilityLabel={saved ? `Remove ${mfg.name} from favorites` : `Add ${mfg.name} to favorites`}
           >
-            <Feather name="heart" size={15} color={saved ? theme.error : theme.text} />
+            <Icon name="heart" size={15} color={saved ? theme.error : theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -788,13 +788,13 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
             <Text style={card.name} numberOfLines={1}>{mfg.name}</Text>
             {mfg.isVerified && (
               <View style={[card.verifiedBadge, { backgroundColor: theme.secondaryDim }]}>
-                <Feather name="check-circle" size={11} color={theme.secondary} />
+                <Icon name="check-circle" size={11} color={theme.secondary} />
               </View>
             )}
           </View>
           <Text style={card.location} numberOfLines={1}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
           <View style={card.ratingRow}>
-            <Feather name="star" size={12} color={theme.warning} />
+            <Icon name="star" size={12} color={theme.warning} />
             <Text style={card.ratingText}>{mfg.reviewCount > 0 ? mfg.rating.toFixed(1) : 'Not rated'}</Text>
             {mfg.reviewCount > 0 && <Text style={card.reviewCount}>({mfg.reviewCount})</Text>}
           </View>
@@ -827,10 +827,10 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
           accessibilityRole="button"
           accessibilityLabel={`Request a quote from ${mfg.name}`}
         >
-          <Feather name="file-text" size={15} color={theme.secondary} />
+          <Icon name="file-text" size={15} color={theme.secondary} />
         </TouchableOpacity>
         <TouchableOpacity style={[card.profileBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]} onPress={onMessage} activeOpacity={0.7}>
-          <Feather name="message-circle" size={ICON.sm} color={theme.onAccent} />
+          <Icon name="message-circle" size={ICON.sm} color={theme.onAccent} />
           <Text style={[card.profileBtnText, { color: theme.onAccent }]}>Chat now</Text>
         </TouchableOpacity>
       </View>
@@ -922,7 +922,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
         <View style={fm.header}>
           <Text style={fm.title}>Filter Manufacturers</Text>
           <TouchableOpacity onPress={onClose}>
-            <Feather name="x" size={ICON.md} color={theme.muted} />
+            <Icon name="x" size={ICON.md} color={theme.muted} />
           </TouchableOpacity>
         </View>
 
@@ -1100,9 +1100,9 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
       keyExtractor={item => item.id}
       ListHeaderComponent={relationships.length >= 2 ? (
         <TouchableOpacity style={s.compareBar} onPress={() => router.push('/manufacturer-compare' as never)} activeOpacity={0.8} testID="button-compare-my-manufacturers">
-          <Feather name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
+          <Icon name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
           <Text style={s.compareBarText}>Compare saved suppliers side by side</Text>
-          <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+          <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
         </TouchableOpacity>
       ) : null}
       renderItem={({ item: rel }) => {
@@ -1312,7 +1312,7 @@ function QuotesFAB({ router }: { router: ReturnType<typeof useRouter> }) {
       activeOpacity={0.85}
     >
       <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={fab.grad}>
-        <Feather name="plus" size={ICON.md} color={theme.onAccent} />
+        <Icon name="plus" size={ICON.md} color={theme.onAccent} />
         <Text style={[fab.label, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Request quote</Text>
       </LinearGradient>
     </TouchableOpacity>

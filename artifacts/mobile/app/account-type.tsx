@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PillButton, PressableScale, Reveal, StepHeadline, StepSub, StitchAccent } from '@/components/onboarding/OnboardingUI';
@@ -107,7 +107,7 @@ export function AccountTypeStep({
                 {/* Icon + title + radio */}
                 <View style={styles.cardTop}>
                   <View style={[styles.iconWrap, isSelected && { borderColor: theme.text }]}>
-                    <Feather name={c.icon} size={20} color={isSelected ? theme.text : theme.muted} />
+                    <Icon name={c.icon} size={20} color={isSelected ? theme.text : theme.muted} />
                   </View>
                   <View style={styles.cardTitleWrap}>
                     <Text style={[styles.cardKicker, { color: isSelected ? theme.text : theme.subtle }]}>
@@ -125,7 +125,7 @@ export function AccountTypeStep({
                 <View style={styles.bullets}>
                   {c.bullets.map((b) => (
                     <View key={b} style={styles.bulletRow}>
-                      <Feather name="check" size={12} color={isSelected ? theme.text : theme.subtle} />
+                      <Icon name="check" size={12} color={isSelected ? theme.text : theme.subtle} />
                       <Text style={[styles.bulletText, isSelected && { color: theme.text }]}>{b}</Text>
                     </View>
                   ))}

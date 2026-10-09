@@ -7,7 +7,7 @@ import {
   View, Text, FlatList, StyleSheet,
   TextInput, Alert,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -70,7 +70,7 @@ export default function MutedAccountsScreen() {
 
       {muted.length > 0 && (
         <View style={styles.search}>
-          <Feather name="search" size={16} color={theme.muted} />
+          <Icon name="search" size={16} color={theme.muted} />
           <TextInput
             style={[styles.searchInput, WEB_INPUT_RESET]}
             value={query}

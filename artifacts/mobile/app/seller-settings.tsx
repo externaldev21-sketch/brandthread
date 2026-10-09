@@ -16,7 +16,7 @@ import { previewSellerBrandName } from '@/lib/previewIdentity';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
@@ -246,7 +246,7 @@ function AccountRow({ name, initials, onPress }: { name: string; initials: strin
         <Text style={s.accountName}>{name}</Text>
         <Text style={s.accountEyebrow}>Seller account</Text>
       </View>
-      <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+      <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
     </PressableScale>
   );
 }
@@ -261,7 +261,7 @@ function SearchField({ value, onChangeText }: { value: string; onChangeText: (v:
   const [focused, setFocused] = useState(false);
   return (
     <View style={[s.searchField, { borderColor: focused ? colors.mutedForeground : colors.border }]}>
-      <Feather name="search" size={16} color={colors.mutedForeground} />
+      <Icon name="search" size={16} color={colors.mutedForeground} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -275,7 +275,7 @@ function SearchField({ value, onChangeText }: { value: string; onChangeText: (v:
       />
       {value.length > 0 && (
         <TouchableOpacity onPress={() => onChangeText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Clear search">
-          <Feather name="x-circle" size={15} color={colors.mutedForeground} />
+          <Icon name="x-circle" size={15} color={colors.mutedForeground} />
         </TouchableOpacity>
       )}
     </View>
@@ -299,7 +299,7 @@ function SettingsGroup({ title, children }: { title?: string; children: React.Re
 }
 
 interface SettingsRowProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   testID?: string;
   onPress?: () => void;
@@ -318,7 +318,7 @@ function SettingsRow({ icon, label, testID, onPress, destructive, soon, badge, l
 
   const content = (
     <View style={[s.row, !last && s.rowDivider]}>
-      <Feather name={icon} size={22} color={iconTint} style={s.rowIcon} />
+      <Icon name={icon} size={22} color={iconTint} style={s.rowIcon} />
       <Text style={[s.rowLabel, { color: labelColor }]} numberOfLines={1}>{label}</Text>
       {badge ? (
         <View style={s.rowBadge}>
@@ -330,7 +330,7 @@ function SettingsRow({ icon, label, testID, onPress, destructive, soon, badge, l
           <Text style={s.rowSoonBadgeText}>Soon</Text>
         </View>
       ) : null}
-      {onPress && !inert ? <Feather name="chevron-right" size={17} color={colors.mutedForeground} /> : null}
+      {onPress && !inert ? <Icon name="chevron-right" size={17} color={colors.mutedForeground} /> : null}
     </View>
   );
 
@@ -368,7 +368,7 @@ function AccountScopeSheet({
               <Text style={s.subtitle}>Choose where your seller account is available.</Text>
             </View>
             <TouchableOpacity style={s.close} onPress={onClose} disabled={!!saving} accessibilityRole="button" accessibilityLabel="Close">
-              <Feather name="x" size={18} color={colors.foreground} />
+              <Icon name="x" size={18} color={colors.foreground} />
             </TouchableOpacity>
           </View>
           {loading ? (
@@ -396,7 +396,7 @@ function AccountScopeSheet({
                       style={[s.option, { borderColor: selected ? colors.primary : colors.border }, selected && { backgroundColor: colors.secondary }]}
                     >
                       <View style={s.optionIcon}>
-                        <Feather name={option.icon} size={18} color={colors.foreground} />
+                        <Icon name={option.icon} size={18} color={colors.foreground} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={s.optionTitle}>{option.label}</Text>
@@ -405,7 +405,7 @@ function AccountScopeSheet({
                       {isSaving ? (
                         <ActivityIndicator size="small" color={colors.primary} />
                       ) : (
-                        <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.mutedForeground} />
+                        <Icon name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.mutedForeground} />
                       )}
                     </TouchableOpacity>
                   );

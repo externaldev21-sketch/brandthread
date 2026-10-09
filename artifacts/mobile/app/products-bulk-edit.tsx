@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, TextInput, ScrollView, Image, StyleSheet, ActivityIndicator, Pressable,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -179,7 +179,7 @@ export default function ProductsBulkEditScreen() {
 
       <View style={s.searchWrap}>
         <View style={s.search}>
-          <Feather name="search" size={ICON.sm} color={theme.subtle} />
+          <Icon name="search" size={ICON.sm} color={theme.subtle} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -193,7 +193,7 @@ export default function ProductsBulkEditScreen() {
           />
           {query.length > 0 && (
             <Pressable onPress={() => setQuery('')} accessibilityLabel="Clear search" hitSlop={10}>
-              <Feather name="x" size={ICON.sm} color={theme.subtle} />
+              <Icon name="x" size={ICON.sm} color={theme.subtle} />
             </Pressable>
           )}
         </View>
@@ -277,7 +277,7 @@ export default function ProductsBulkEditScreen() {
       {summary && (
         <View style={[s.fullPanel, { paddingTop: topInset }]}>
           <View style={s.summaryBody}>
-            <View style={s.summaryIcon}><Feather name="check" size={28} color={theme.onAccent} /></View>
+            <View style={s.summaryIcon}><Icon name="check" size={28} color={theme.onAccent} /></View>
             <Text style={s.summaryTitle}>{summary.title}</Text>
             {summary.lines.map(l => <Text key={l} style={s.summaryLine}>{l}</Text>)}
           </View>
@@ -416,7 +416,7 @@ function PriceEditPanel({ productIds, topInset, onClose, onDone }: {
               {!it.skipped && (
                 <View style={s.previewPrices}>
                   <Text style={s.before}>{priceRangeLabel(it.beforeMin, it.beforeMax, formatCents)}</Text>
-                  <Feather name="arrow-right" size={ICON.xs ?? 12} color={theme.subtle} />
+                  <Icon name="arrow-right" size={ICON.xs ?? 12} color={theme.subtle} />
                   <Text style={s.after}>{priceRangeLabel(it.afterMin, it.afterMax, formatCents)}</Text>
                 </View>
               )}
@@ -446,7 +446,7 @@ function Checkbox({ checked, theme }: { checked: boolean; theme: any }) {
       width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
       borderColor: checked ? theme.text : theme.subtle, backgroundColor: checked ? theme.text : 'transparent',
     }}>
-      {checked && <Feather name="check" size={14} color={theme.background} />}
+      {checked && <Icon name="check" size={14} color={theme.background} />}
     </View>
   );
 }
@@ -503,7 +503,7 @@ function ProductRow({ item, checked, onPress, theme, s }: {
       {item.image ? (
         <Image source={{ uri: item.image }} style={s.thumb} />
       ) : (
-        <View style={[s.thumb, s.thumbEmpty]}><Feather name="image" size={ICON.sm} color={theme.subtle} /></View>
+        <View style={[s.thumb, s.thumbEmpty]}><Icon name="image" size={ICON.sm} color={theme.subtle} /></View>
       )}
       <View style={{ flex: 1 }}>
         <Text style={s.name} numberOfLines={1}>{item.name}</Text>

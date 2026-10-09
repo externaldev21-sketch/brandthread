@@ -4,7 +4,8 @@ import {
   View, Text, ScrollView, FlatList,
   Alert, StyleSheet, Dimensions, Share,
 } from 'react-native';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
@@ -123,14 +124,14 @@ function PostCard({
           <CachedImage source={{ uri: post.mediaUrl }} style={s.media} contentFit="cover" />
         ) : (
           <View style={[s.media, { backgroundColor: palette.elevated }]}>
-            <Feather
+            <Icon
               name={post.type === 'video' ? 'video' : 'image'}
               size={44}
               color={palette.mutedForeground}
             />
             {post.type === 'video' && (
               <View style={[s.playBtn, { backgroundColor: palette.elevated }]}>
-                <Feather name="play" size={ICON.md} color={theme.accent} />
+                <Icon name="play" size={ICON.md} color={theme.accent} />
               </View>
             )}
           </View>
@@ -142,15 +143,15 @@ function PostCard({
         <PressableScale style={s.actionItem} onPress={() => onLike(post)}>
           {post.likedByMe
             ? <FontAwesome name="heart" size={ICON.lg} color={palette.destructive} />
-            : <Feather name="heart" size={ICON.lg} color={palette.mutedForeground} />}
+            : <Icon name="heart" size={ICON.lg} color={palette.mutedForeground} />}
           <Text style={[TYPE_SCALE.callout, s.actionCount, { color: palette.mutedForeground }, post.likedByMe && { color: palette.destructive }]}>{post.likesCount}</Text>
         </PressableScale>
         <PressableScale style={s.actionItem} onPress={() => onOpenComments(post)}>
-          <Feather name="message-circle" size={ICON.lg} color={palette.mutedForeground} />
+          <Icon name="message-circle" size={ICON.lg} color={palette.mutedForeground} />
           <Text style={[TYPE_SCALE.callout, s.actionCount, { color: palette.mutedForeground }]}>{post.commentsCount}</Text>
         </PressableScale>
         <PressableScale style={s.actionItem} onPress={() => onRepost(post.id)}>
-          <Feather
+          <Icon
             name="repeat"
             size={ICON.lg}
             color={post.repostedByMe ? theme.accent : palette.mutedForeground}
@@ -165,14 +166,14 @@ function PostCard({
         >
           {saved
             ? <FontAwesome name="bookmark" size={ICON.lg} color={theme.accent} />
-            : <Feather name="bookmark" size={ICON.lg} color={palette.mutedForeground} />}
+            : <Icon name="bookmark" size={ICON.lg} color={palette.mutedForeground} />}
         </PressableScale>
         <PressableScale
           style={s.actionIcon}
           accessibilityLabel="Share post"
           onPress={() => Share.share({ message: `See ${post.authorName}'s post on Brandthread` })}
         >
-          <Feather name="send" size={ICON.lg} color={palette.mutedForeground} />
+          <Icon name="send" size={ICON.lg} color={palette.mutedForeground} />
         </PressableScale>
       </View>
 
@@ -420,7 +421,7 @@ export default function FriendsScreen() {
                 : <Text style={[TYPE_SCALE.body, s.storyInitials, { color: theme.text }]}>{myInitials}</Text>}
             </View>
             <View style={[s.plusBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-              <Feather name="plus" size={12} color={theme.onAccent} />
+              <Icon name="plus" size={12} color={theme.onAccent} />
             </View>
           </View>
           <Text style={[TYPE_SCALE.caption, s.storyLabel, { color: palette.mutedForeground }]} numberOfLines={1}>
@@ -502,7 +503,7 @@ export default function FriendsScreen() {
                   accessibilityLabel={`Message ${f.name}`}
                   onPress={() => { hapticPrimaryAction(); handleMessageFriend({ userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color } as any); }}
                 >
-                  <Feather name="message-circle" size={14} color={theme.accent} />
+                  <Icon name="message-circle" size={14} color={theme.accent} />
                 </PressableScale>
               </View>
             ))}

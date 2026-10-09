@@ -13,7 +13,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as ExpoLinking from 'expo-linking';
@@ -267,7 +267,7 @@ export function ThreadShareSheet({
             <View style={styles.headerSpacer} />
             <Text style={styles.title}>Share to</Text>
             <Pressable onPress={onClose} style={styles.close} accessibilityLabel="Close share menu" testID="thread-share-close">
-              <Feather name="x" size={20} color={theme.text} />
+              <Icon name="x" size={20} color={theme.text} />
             </Pressable>
           </View>
 
@@ -361,7 +361,7 @@ function ShareAction({
   avatar,
 }: {
   label: string;
-  icon?: React.ComponentProps<typeof Feather>['name'];
+  icon?: IconName;
   onPress: () => void;
   busy?: boolean;
   muted?: boolean;
@@ -382,7 +382,7 @@ function ShareAction({
          {busy ? <ActivityIndicator color={theme.onAccent} /> : avatar ? (
           <Text style={styles.avatarText}>{avatar.initials}</Text>
         ) : (
-           <Feather name={icon ?? 'send'} size={22} color={theme.text} />
+           <Icon name={icon ?? 'send'} size={22} color={theme.text} />
         )}
       </View>
       <Text style={styles.actionLabel} numberOfLines={2}>{label}</Text>

@@ -19,6 +19,7 @@
 import React from 'react';
 import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, ON_DARK } from '@/lib/theme';
@@ -130,7 +131,7 @@ export function CaptionBlock({
               ))}
               {friendReposts.length === 0 && (
                 <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
-                  <Feather name="user" size={13} color={ON_DARK} />
+                  <Icon name="user" size={13} color={ON_DARK} />
                 </View>
               )}
             </View>
@@ -153,7 +154,7 @@ export function CaptionBlock({
               against bright/light footage (e.g. the Maison Vela demo
               clip's silver dress). The same text shadow as the rest of
               this block keeps it legible on light and dark video alike. */}
-          {verified && <Feather name="check-circle" size={14} color={ON_DARK} style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
+          {verified && <Icon name="check-circle" size={14} color={ON_DARK} style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
           {sponsored && <Text style={styles.sponsoredLabel} accessibilityLabel="Sponsored">Sponsored</Text>}
         </View>
       </TouchableOpacity>
@@ -186,7 +187,7 @@ export function CaptionBlock({
         accessibilityState={{ checked: soundOn }}
       >
         <View style={styles.soundRow}>
-          <Feather name="music" size={12} color={`${ON_DARK}E6`} style={styles.iconTextShadow} />
+          <Icon name="music" size={12} color={`${ON_DARK}E6`} style={styles.iconTextShadow} />
           <Text style={styles.soundText} numberOfLines={1} ellipsizeMode="tail">{sound}</Text>
         </View>
       </TouchableOpacity>

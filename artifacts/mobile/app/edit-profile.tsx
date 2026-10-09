@@ -8,7 +8,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRouter } from 'expo-router';
@@ -66,7 +66,7 @@ const PREVIEW_SELLER_FIELDS: Fields = {
 };
 
 /** Quick links into existing seller settings screens — never duplicate those forms here. */
-const QUICK_LINKS: { icon: keyof typeof Feather.glyphMap; label: string; description: string; route: string }[] = [
+const QUICK_LINKS: { icon: IconName; label: string; description: string; route: string }[] = [
   { icon: 'home', label: 'Store settings', description: 'Storefront identity, localization, checkout', route: '/store-settings' },
   { icon: 'truck', label: 'Shipping & delivery', description: 'Rates, zones, and carriers', route: '/shipping-delivery' },
   { icon: 'dollar-sign', label: 'Payouts', description: 'Bank account and payout history', route: '/payouts' },
@@ -438,13 +438,13 @@ export default function EditProfileScreen() {
 
       {/* Toast */}
       <Animated.View pointerEvents="none" style={[styles.toast, { opacity: toastOpacity }]}>
-        <Feather name="check-circle" size={14} color={theme.onAccent} />
+        <Icon name="check-circle" size={14} color={theme.onAccent} />
         <Text style={styles.toastText}>{toast.message}</Text>
       </Animated.View>
 
       {profileError ? (
         <View style={styles.errorState}>
-          <Feather name="alert-circle" size={28} color={theme.muted} />
+          <Icon name="alert-circle" size={28} color={theme.muted} />
           <Text style={styles.errorTitle}>Couldn't load your profile</Text>
           <Text style={styles.errorBody}>Check your connection and try again.</Text>
           <Button label="Retry" variant="primary" size="small" style={styles.retryBtn} onPress={loadProfile} />
@@ -508,7 +508,7 @@ export default function EditProfileScreen() {
               <Image source={{ uri: bannerUri }} style={styles.bannerPreviewImage} />
             ) : (
               <View style={[styles.bannerPreviewImage, styles.bannerPreviewEmpty]}>
-                <Feather name="image" size={20} color={theme.muted} />
+                <Icon name="image" size={20} color={theme.muted} />
               </View>
             )}
           </View>
@@ -529,7 +529,7 @@ export default function EditProfileScreen() {
                   )}
                   {!uploading.avatar && (
                     <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-                      <Feather name="camera" size={12} color={theme.onAccent} />
+                      <Icon name="camera" size={12} color={theme.onAccent} />
                     </View>
                   )}
                 </View>
@@ -545,7 +545,7 @@ export default function EditProfileScreen() {
                     <Image source={{ uri: logoUri }} style={styles.avatar} />
                   ) : (
                     <View style={[styles.avatar, styles.logoEmpty]}>
-                      <Feather name="award" size={22} color={theme.muted} />
+                      <Icon name="award" size={22} color={theme.muted} />
                     </View>
                   )}
                   {uploading.logo && (
@@ -592,8 +592,8 @@ export default function EditProfileScreen() {
                 returnKeyType="done"
               />
               {usernameStatus === 'checking' && <ActivityIndicator size="small" color={theme.accent} style={{ marginLeft: 6 }} />}
-              {usernameStatus === 'ok' && <Feather name="check-circle" size={17} color={theme.success} style={{ marginLeft: 6 }} />}
-              {usernameStatus === 'taken' && <Feather name="x-circle" size={17} color={theme.error} style={{ marginLeft: 6 }} />}
+              {usernameStatus === 'ok' && <Icon name="check-circle" size={17} color={theme.success} style={{ marginLeft: 6 }} />}
+              {usernameStatus === 'taken' && <Icon name="x-circle" size={17} color={theme.error} style={{ marginLeft: 6 }} />}
             </View>
             {(usernameError || errors.username) && <Text style={styles.inlineError}>{usernameError || errors.username}</Text>}
           </View>
@@ -604,7 +604,7 @@ export default function EditProfileScreen() {
               {username ? `brandthread.app/u/${username}` : 'Add a username to get your link'}
             </Text>
             <TouchableOpacity accessibilityLabel="Copy profile link" accessibilityRole="button" onPress={handleCopyLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={!username}>
-              <Feather name="copy" size={17} color={theme.muted} />
+              <Icon name="copy" size={17} color={theme.muted} />
             </TouchableOpacity>
           </View>
         </View>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
@@ -83,7 +83,7 @@ export function PersonRow({
             <View style={styles.nameRow}>
               <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
               {person.verified && (
-                <Feather name="check-circle" size={13} color={theme.text} style={styles.verifiedBadge} />
+                <Icon name="check-circle" size={13} color={theme.text} style={styles.verifiedBadge} />
               )}
             </View>
             <Text style={[styles.sub, { color: theme.muted }]} numberOfLines={1}>

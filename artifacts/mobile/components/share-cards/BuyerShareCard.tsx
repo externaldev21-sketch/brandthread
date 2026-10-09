@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import type { BuyerShareCardData, ShareCardVariant } from '@/lib/shareCard';
@@ -32,7 +32,7 @@ export const BuyerShareCard = React.forwardRef<View, BuyerShareCardProps>(
         <Text style={[styles.handle, { color: theme.muted }]} numberOfLines={1}>{data.handle}</Text>
 
         <View style={[styles.statPill, { borderColor: theme.border, backgroundColor: theme.cardGlass }]}>
-          <Feather name="users" size={13} color={theme.text} />
+          <Icon name="users" size={13} color={theme.text} />
           <Text style={[styles.statText, { color: theme.text }]}>
             {data.statValue} {data.statLabel}
           </Text>

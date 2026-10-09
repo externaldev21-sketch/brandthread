@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -10,7 +10,7 @@ import { setNotificationBannerListener, type BannerPayload } from '@/lib/notific
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
 
 const AUTO_DISMISS_MS = 4500;
-const ICON_BY_CATEGORY: Record<string, keyof typeof Feather.glyphMap> = {
+const ICON_BY_CATEGORY: Record<string, IconName> = {
   order: 'package', orders: 'package',
   message: 'message-circle', messages: 'message-circle',
   drop: 'zap', drops: 'zap',
@@ -114,7 +114,7 @@ export default function NotificationBanner() {
       >
         <TouchableOpacity activeOpacity={0.85} onPress={handlePress} style={styles.content}>
           <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
-            <Feather name={icon} size={18} color={theme.accent} />
+            <Icon name={icon} size={18} color={theme.accent} />
           </View>
           <View style={styles.textWrap}>
             <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{payload.title}</Text>
@@ -123,7 +123,7 @@ export default function NotificationBanner() {
             )}
           </View>
           <TouchableOpacity hitSlop={12} onPress={hide} style={styles.closeButton}>
-            <Feather name="x" size={16} color={theme.muted} />
+            <Icon name="x" size={16} color={theme.muted} />
           </TouchableOpacity>
         </TouchableOpacity>
       </Animated.View>

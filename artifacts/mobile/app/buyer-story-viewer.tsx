@@ -10,7 +10,8 @@ import { prefetchImage } from '@/lib/prefetch';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -475,7 +476,7 @@ export default function BuyerStoryViewer() {
           <View style={styles.loadSkeletonTrack} />
         ) : (
           <>
-            <Feather name="camera-off" size={40} color="rgba(255,255,255,0.3)" />
+            <Icon name="camera-off" size={40} color="rgba(255,255,255,0.3)" />
             <Text style={styles.loadText}>This story's no longer available.</Text>
           </>
         )}
@@ -612,7 +613,7 @@ export default function BuyerStoryViewer() {
           />
         ) : (
           <View style={[styles.slideContent, { backgroundColor: currentSlide.backgroundColor || SURFACE }]}>
-            <Feather
+            <Icon
               name={currentSlide.type === 'video' ? 'video' : 'image'}
               size={80}
               color="rgba(255,255,255,0.2)"
@@ -638,7 +639,7 @@ export default function BuyerStoryViewer() {
                 accessibilityRole="link"
                 accessibilityLabel={overlay.linkText || overlay.linkUrl || 'Open link'}
               >
-                <Feather name="link-2" size={12} color={theme.onAccent} />
+                <Icon name="link-2" size={12} color={theme.onAccent} />
                 <Text style={[styles.linkOverlayText, getOnAccentTextStyle(theme)]} numberOfLines={1}>
                   {overlay.linkText || overlay.linkUrl}
                 </Text>
@@ -796,7 +797,7 @@ export default function BuyerStoryViewer() {
             accessibilityRole="button"
             accessibilityLabel={`Shop ${currentSlide.productTagName ?? 'this product'}`}
           >
-            <Feather name="shopping-bag" size={ICON.sm} color={PURPLE} />
+            <Icon name="shopping-bag" size={ICON.sm} color={PURPLE} />
             <Text style={styles.productTagText}>{currentSlide.productTagName}</Text>
           </Pressable>
         )}
@@ -869,7 +870,7 @@ export default function BuyerStoryViewer() {
           accessibilityLabel={`Tagged people, ${slidePeople.length}`}
           testID="story-tagged-chip"
         >
-          <Feather name="at-sign" size={ICON.sm} color={ON_DARK} />
+          <Icon name="at-sign" size={ICON.sm} color={ON_DARK} />
           {slidePeople.length > 1 ? <Text style={styles.taggedChipText}>{slidePeople.length}</Text> : null}
         </Pressable>
       ) : null}
@@ -919,7 +920,7 @@ export default function BuyerStoryViewer() {
               accessibilityRole="button"
               accessibilityLabel="Share this story"
             >
-              <Feather name="send" size={ICON.lg} color={ON_DARK} />
+              <Icon name="send" size={ICON.lg} color={ON_DARK} />
             </PressableScale>
             <PressableScale
               onPress={() => {
@@ -970,7 +971,7 @@ export default function BuyerStoryViewer() {
               accessibilityRole="button"
               accessibilityLabel="More options"
             >
-              <Feather name="more-horizontal" size={ICON.lg} color={ON_DARK} />
+              <Icon name="more-horizontal" size={ICON.lg} color={ON_DARK} />
             </PressableScale>
           </View>
         </View>
@@ -1031,7 +1032,7 @@ export default function BuyerStoryViewer() {
                       {likedSet.has(currentStory.id) ? (
                         <FontAwesome name="heart" size={ICON.lg} color={theme.text} />
                       ) : (
-                        <Feather name="heart" size={ICON.lg} color={theme.text} />
+                        <Icon name="heart" size={ICON.lg} color={theme.text} />
                       )}
                     </Animated.View>
                     {(likesCounts[currentStory.id] ?? 0) > 0 && (
@@ -1052,7 +1053,7 @@ export default function BuyerStoryViewer() {
                     accessibilityRole="button"
                     accessibilityLabel="Share this story"
                   >
-                    <Feather name="send" size={ICON.lg} color={theme.text} />
+                    <Icon name="send" size={ICON.lg} color={theme.text} />
                   </PressableScale>
                 </>
               )}

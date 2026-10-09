@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
@@ -24,7 +24,7 @@ type FieldDef = {
   key: PersistedKey | 'email' | 'birthday';
   label: string;
   placeholder: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   editable?: boolean;
   keyboardType?: 'default' | 'email-address' | 'phone-pad';
 };
@@ -115,7 +115,7 @@ export default function BuyerPersonalDetails() {
             return (
               <React.Fragment key={field.key}>
                 <View style={s.row}>
-                  <Feather name={field.icon} size={17} color={theme.accent} style={{ width: 24 }} />
+                  <Icon name={field.icon} size={17} color={theme.accent} style={{ width: 24 }} />
                   <Text style={s.rowLabel}>{field.label}</Text>
                   <TextInput
                     style={[s.input, !isEditable && s.inputDisabled]}
@@ -128,7 +128,7 @@ export default function BuyerPersonalDetails() {
                     autoCorrect={false}
                     returnKeyType="done"
                   />
-                  {!isEditable && <Feather name="lock" size={14} color={palette.mutedForeground} />}
+                  {!isEditable && <Icon name="lock" size={14} color={palette.mutedForeground} />}
                 </View>
                 {i < FIELDS.length - 1 && <View style={s.divider} />}
               </React.Fragment>
@@ -138,7 +138,7 @@ export default function BuyerPersonalDetails() {
 
         {/* Note about locked fields */}
         <View style={s.note}>
-          <Feather name="info" size={14} color={palette.mutedForeground} />
+          <Icon name="info" size={14} color={palette.mutedForeground} />
           <Text style={s.noteText}>
             Change your email in Login methods.
           </Text>

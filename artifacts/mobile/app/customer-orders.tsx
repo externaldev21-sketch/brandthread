@@ -7,7 +7,7 @@ import {
   View, Text, ScrollView, StyleSheet,
   ActivityIndicator, TouchableOpacity,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -117,7 +117,7 @@ export default function CustomerOrdersScreen() {
         </View>
       ) : error ? (
         <View style={s.center}>
-          <Feather name="alert-circle" size={28} color={colors.mutedForeground} />
+          <Icon name="alert-circle" size={28} color={colors.mutedForeground} />
           <Text style={[s.errorText, { color: colors.mutedForeground }]}>
             Couldn't load this customer. Check your connection and try again.
           </Text>
@@ -188,7 +188,7 @@ export default function CustomerOrdersScreen() {
           <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>Order History</Text>
           {orders.length === 0 ? (
             <View style={[s.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="inbox" size={28} color={colors.mutedForeground} />
+              <Icon name="inbox" size={28} color={colors.mutedForeground} />
               <Text style={[s.emptyText, { color: colors.mutedForeground }]}>No orders yet</Text>
             </View>
           ) : (

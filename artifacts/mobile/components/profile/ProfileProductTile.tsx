@@ -7,7 +7,7 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SaveHeart } from '@/components/SaveHeart';
@@ -48,7 +48,7 @@ export const ProfileProductTile = React.memo(function ProfileProductTile({
               <CachedImage source={{ uri: product.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={150} />
             ) : (
               <View style={[StyleSheet.absoluteFill, styles.placeholder]}>
-                <Feather name="shopping-bag" size={22} color={theme.muted} />
+                <Icon name="shopping-bag" size={22} color={theme.muted} />
               </View>
             )}
             <LinearGradient
@@ -58,7 +58,7 @@ export const ProfileProductTile = React.memo(function ProfileProductTile({
             />
             {owner ? (
               <View style={[styles.editBadge, { backgroundColor: theme.cardGlass }]} pointerEvents="none" testID={`profile-product-edit-${product.id}`}>
-                <Feather name="edit-2" size={12} color={theme.text} />
+                <Icon name="edit-2" size={12} color={theme.text} />
               </View>
             ) : null}
             {soldOut ? (

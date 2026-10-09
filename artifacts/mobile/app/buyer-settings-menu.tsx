@@ -18,7 +18,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -30,7 +30,7 @@ import { useJoinedCommunities } from '@/lib/communities/useCommunityClient';
 
 type MenuRow = {
   key: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   destructive?: boolean;
   /** Quiet secondary text before the chevron (e.g. "3 joined"). */
@@ -133,7 +133,7 @@ export default function BuyerSettingsMenuScreen() {
 
       <View style={s.searchWrap}>
         <View style={[s.searchField, { backgroundColor: theme.cardElevated }]}>
-          <Feather name="search" size={16} color={theme.subtle} />
+          <Icon name="search" size={16} color={theme.subtle} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -145,7 +145,7 @@ export default function BuyerSettingsMenuScreen() {
           />
           {query.length > 0 && (
             <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
-              <Feather name="x-circle" size={15} color={theme.subtle} />
+              <Icon name="x-circle" size={15} color={theme.subtle} />
             </Pressable>
           )}
         </View>
@@ -163,10 +163,10 @@ export default function BuyerSettingsMenuScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={row.value ? `${row.label}, ${row.value}` : row.label}
               >
-                <Feather name={row.icon} size={ROW_ICON_SIZE} color={row.destructive ? theme.error : theme.text} />
+                <Icon name={row.icon} size={ROW_ICON_SIZE} color={row.destructive ? theme.error : theme.text} />
                 <Text style={[s.rowLabel, { color: row.destructive ? theme.error : theme.text }]} numberOfLines={1}>{row.label}</Text>
                 {row.value ? <Text style={[s.rowValue, { color: theme.subtle }]} numberOfLines={1}>{row.value}</Text> : null}
-                {!row.destructive && <Feather name="chevron-right" size={16} color={theme.subtle} />}
+                {!row.destructive && <Icon name="chevron-right" size={16} color={theme.subtle} />}
                 {i < section.rows.length - 1 && (
                   <View style={[s.divider, { backgroundColor: theme.border }]} />
                 )}

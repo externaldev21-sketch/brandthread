@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { Dimensions, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CachedImage } from '@/components/CachedImage';
@@ -26,11 +26,11 @@ import type { DiscoverPost } from '@/lib/discoverFeed';
 const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 
 function ActionButton({ icon, label, active, onPress }: {
-  icon: keyof typeof Feather.glyphMap; label?: string; active?: boolean; onPress: () => void;
+  icon: IconName; label?: string; active?: boolean; onPress: () => void;
 }) {
   return (
     <PressableScale onPress={onPress} style={styles.actionBtn} accessibilityRole="button" accessibilityLabel={label ?? icon}>
-      <Feather name={icon} size={26} color={active ? '#FF3B57' : '#FFFFFF'} />
+      <Icon name={icon} size={26} color={active ? '#FF3B57' : '#FFFFFF'} />
       {!!label && <Text style={styles.actionLabel}>{label}</Text>}
     </PressableScale>
   );
@@ -66,7 +66,7 @@ function ViewerPage({
       )}
       {post.media === 'video' && (
         <View style={styles.playGlyph}>
-          <Feather name="play" size={40} color="#FFFFFFCC" />
+          <Icon name="play" size={40} color="#FFFFFFCC" />
         </View>
       )}
       <LinearGradient
@@ -87,7 +87,7 @@ function ViewerPage({
             </View>
           )}
           <Text style={styles.authorName} numberOfLines={1}>{post.authorName}</Text>
-          {post.authorVerified && <Feather name="check-circle" size={14} color={ON_DARK} style={{ marginLeft: 4 }} />}
+          {post.authorVerified && <Icon name="check-circle" size={14} color={ON_DARK} style={{ marginLeft: 4 }} />}
         </PressableScale>
         <View style={{ marginTop: SP.sm }}>
           <FollowButton
@@ -105,7 +105,7 @@ function ViewerPage({
             accessibilityRole="button"
             accessibilityLabel="Shop the look"
           >
-            <Feather name="shopping-bag" size={14} color="#000000" />
+            <Icon name="shopping-bag" size={14} color="#000000" />
             <Text style={styles.shopPillText}>
               Shop the look{post.productTags!.length > 1 ? ` · ${post.productTags!.length}` : ` · ${formatCents(post.productTags![0].priceCents)}`}
             </Text>

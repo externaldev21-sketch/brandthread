@@ -23,7 +23,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, SP } from '@/lib/theme';
@@ -216,7 +216,7 @@ export function ProfileVideoAffordance({
         pressed && styles.affordancePressed,
       ]}
     >
-      <Feather name={!hasVideo && !busy ? 'plus' : 'film'} size={12} color={theme.text} />
+      <Icon name={!hasVideo && !busy ? 'plus' : 'film'} size={12} color={theme.text} />
       <Text style={[styles.affordanceText, { color: theme.text }]} numberOfLines={1}>{label}</Text>
     </Pressable>
   );

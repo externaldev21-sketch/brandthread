@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import { PressableScale } from '@/components/BrandthreadUI';
 import Composer from '@/components/ui/Composer';
@@ -194,7 +194,7 @@ export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply,
                   accessibilityLabel="Remove photo"
                   testID="community-photo-remove"
                 >
-                  <Feather name="x" size={12} color={theme.onAccent} />
+                  <Icon name="x" size={12} color={theme.onAccent} />
                 </PressableScale>
               </View>
               {(p.state === 'rejected' || p.state === 'retry') && (
@@ -221,7 +221,7 @@ export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply,
 
       {inlineNote && (
         <View style={s.inlineNote} testID="community-inline-note">
-          <Feather name="info" size={14} color={theme.muted} style={{ marginTop: 1 }} />
+          <Icon name="info" size={14} color={theme.muted} style={{ marginTop: 1 }} />
           <Text style={[s.noteText, { color: theme.muted, flex: 1 }]}>{inlineNote}</Text>
         </View>
       )}
@@ -250,7 +250,7 @@ export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply,
           accessibilityRole="button"
           accessibilityLabel="Add photos"
         >
-          <Feather name="image" size={18} color={theme.onAccent} />
+          <Icon name="image" size={18} color={theme.onAccent} />
         </PressableScale>
       }
     />

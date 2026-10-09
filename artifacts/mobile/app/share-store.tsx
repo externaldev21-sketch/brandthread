@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -114,13 +114,13 @@ export default function ShareStoreScreen() {
           activeOpacity={0.85}
           onPress={copyLink}
         >
-          <Feather name={copied ? 'check' : 'copy'} size={17} color={colors.primaryForeground} />
+          <Icon name={copied ? 'check' : 'copy'} size={17} color={colors.primaryForeground} />
           <Text style={[s.copyBtnText, { color: colors.primaryForeground }]}>{copied ? 'Link copied' : 'Copy link'}</Text>
         </TouchableOpacity>
 
         {/* Share button */}
         <TouchableOpacity style={[s.shareBtn, { borderColor: colors.border }]} activeOpacity={0.8} onPress={shareLink}>
-          <Feather name="share-2" size={17} color={colors.foreground} />
+          <Icon name="share-2" size={17} color={colors.foreground} />
           <Text style={[s.shareBtnText, { color: colors.foreground }]}>Share via…</Text>
         </TouchableOpacity>
 

@@ -37,7 +37,7 @@ import {
   View,
   type ViewToken,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 
@@ -215,7 +215,7 @@ function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }
   if (!icon) return null;
   return (
     <View style={styles.typeBadge}>
-      <Feather name={icon as any} size={10} color={color} />
+      <Icon name={icon as any} size={10} color={color} />
     </View>
   );
 }
@@ -360,7 +360,7 @@ export const ActivityRowView = React.memo(function ActivityRowView({
       />
     ) : row.actors.length > 0 ? (
       <View style={styles.thumbFallback}>
-        <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+        <Icon name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
       </View>
     ) : null;
 
@@ -426,7 +426,7 @@ export const ActivityRowView = React.memo(function ActivityRowView({
             <View style={styles.iconCircle}>
               {/* Thread Cash included — activityIcon gives it a monochrome
                   dollar-sign, not the green bill artwork. */}
-              <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
+              <Icon name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
             </View>
           </View>
         )}
@@ -528,7 +528,7 @@ function SuggestedRow({ person, followState, styles, onFollow, onDismiss }: {
           accessibilityLabel={`Not interested in ${person.name}`}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Feather name="x" size={ICON.sm} color={theme.muted} />
+          <Icon name="x" size={ICON.sm} color={theme.muted} />
         </PressableScale>
       )}
     </View>
@@ -1354,7 +1354,7 @@ export default function ActivityCenterScreen() {
             noMinHeight
           >
             <Glass variant="regular" tint="dark" radius={radius.md} style={StyleSheet.absoluteFill} />
-            <Feather name="arrow-up" size={ICON.sm} color={theme.text} />
+            <Icon name="arrow-up" size={ICON.sm} color={theme.text} />
             <Text style={styles.livePillText}>New activity</Text>
           </PressableScale>
         </View>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { type IconName } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
@@ -39,7 +40,7 @@ export function EmptyState({
    *  default `button`. */
   actionStyle = 'button',
 }: {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   title?: string;
   message: string;
   actionLabel?: string;

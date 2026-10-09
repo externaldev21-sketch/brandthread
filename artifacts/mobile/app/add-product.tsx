@@ -12,7 +12,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, Platform, Image, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams, useNavigation, useFocusEffect } from 'expo-router';
 import { takePendingAiDescription, toUploadObjectPath } from '@/lib/aiHelperHandoff';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,7 +62,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 interface CollapsibleSectionProps {
   title: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   expanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
@@ -78,14 +78,14 @@ function CollapsibleSection({ title, icon, expanded, onToggle, children, hint }:
       <TouchableOpacity style={s.collapsibleHeader} onPress={onToggle} activeOpacity={0.75}>
         <View style={s.collapsibleHeaderLeft}>
           <View style={[s.collapsibleIconWrap, { backgroundColor: theme.accentDim }]}>
-            <Feather name={icon} size={15} color={theme.accentLight} />
+            <Icon name={icon} size={15} color={theme.accentLight} />
           </View>
           <View style={{ gap: 1 }}>
             <Text style={s.collapsibleTitle}>{title}</Text>
             {!expanded && hint ? <Text style={s.collapsibleHint}>{hint}</Text> : null}
           </View>
         </View>
-        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
       </TouchableOpacity>
       {expanded && (
         <View style={s.collapsibleBody}>
@@ -113,7 +113,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
           onPress={() => { hapticToggle(); onChange(Math.max(min, value - 1)); }}
           accessibilityLabel={`Decrease ${label}`}
         >
-          <Feather name="minus" size={14} color={value <= min ? theme.subtle : theme.text} />
+          <Icon name="minus" size={14} color={value <= min ? theme.subtle : theme.text} />
         </TouchableOpacity>
         <TextInput
           style={s.stepperInput}
@@ -130,7 +130,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
           onPress={() => { hapticToggle(); onChange(value + 1); }}
           accessibilityLabel={`Increase ${label}`}
         >
-          <Feather name="plus" size={14} color={theme.text} />
+          <Icon name="plus" size={14} color={theme.text} />
         </TouchableOpacity>
       </View>
     </View>
@@ -1071,7 +1071,7 @@ export default function AddProductScreen() {
                   accessibilityRole="button"
                   testID="add-product-add-photos"
                 >
-                  <Feather name="camera" size={20} color={MUTED} />
+                  <Icon name="camera" size={20} color={MUTED} />
                   <Text style={s.photoAddSlotLabel}>Add photo</Text>
                 </TouchableOpacity>
               );
@@ -1092,7 +1092,7 @@ export default function AddProductScreen() {
                   <Image source={{ uri: displayUri }} style={s.photoSlotImg} resizeMode="cover" />
                 ) : (
                   <View style={[s.photoSlotImg, s.photoSlotImgPlaceholder]}>
-                    <Feather name="image" size={20} color={MUTED} />
+                    <Icon name="image" size={20} color={MUTED} />
                   </View>
                 )}
                 {m.isCover && (
@@ -1107,13 +1107,13 @@ export default function AddProductScreen() {
                 )}
                 {upload?.status === 'error' && (
                   <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => uploadMediaAsset(m)} accessibilityLabel="Retry photo upload">
-                    <Feather name="refresh-cw" size={16} color={ON_DARK} />
+                    <Icon name="refresh-cw" size={16} color={ON_DARK} />
                     <Text style={s.mediaRetryLabel}>Retry upload</Text>
                   </TouchableOpacity>
                 )}
                 {bgStatus === 'failed' && upload?.status !== 'error' && (
                   <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => removeBackgroundForMedia(m)} accessibilityLabel="Retry background removal">
-                    <Feather name="refresh-cw" size={16} color={ON_DARK} />
+                    <Icon name="refresh-cw" size={16} color={ON_DARK} />
                     <Text style={s.mediaRetryLabel}>Retry cutout</Text>
                   </TouchableOpacity>
                 )}
@@ -1127,7 +1127,7 @@ export default function AddProductScreen() {
                   }}
                   accessibilityLabel="Remove photo"
                 >
-                  <Feather name="x" size={12} color={ON_DARK} />
+                  <Icon name="x" size={12} color={ON_DARK} />
                 </TouchableOpacity>
                 <View style={s.mediaReorderRow}>
                   <TouchableOpacity
@@ -1136,7 +1136,7 @@ export default function AddProductScreen() {
                     style={[s.mediaReorderBtn, idx === 0 && { opacity: 0.3 }]}
                     accessibilityLabel="Move photo earlier"
                   >
-                    <Feather name="chevron-left" size={12} color={ON_DARK} />
+                    <Icon name="chevron-left" size={12} color={ON_DARK} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     disabled={idx === media.length - 1}
@@ -1144,7 +1144,7 @@ export default function AddProductScreen() {
                     style={[s.mediaReorderBtn, idx === media.length - 1 && { opacity: 0.3 }]}
                     accessibilityLabel="Move photo later"
                   >
-                    <Feather name="chevron-right" size={12} color={ON_DARK} />
+                    <Icon name="chevron-right" size={12} color={ON_DARK} />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -1159,7 +1159,7 @@ export default function AddProductScreen() {
               accessibilityRole="button"
               testID="add-product-add-slot"
             >
-              <Feather name="plus" size={16} color={SUBTLE} />
+              <Icon name="plus" size={16} color={SUBTLE} />
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -1203,20 +1203,20 @@ export default function AddProductScreen() {
           />
         ) : (
           <TouchableOpacity style={s.plusRow} onPress={() => setDescOpen(true)} accessibilityRole="button">
-            <Feather name="plus" size={15} color={theme.accentLight} />
+            <Icon name="plus" size={15} color={theme.accentLight} />
             <Text style={s.plusRowText}>Add description</Text>
           </TouchableOpacity>
         )}
 
         {aiDescriptionHref ? (
           <TouchableOpacity style={s.plusRow} onPress={() => router.push(aiDescriptionHref as never)} accessibilityRole="button" testID="add-product-ai-description">
-            <Feather name="zap" size={15} color={theme.accentLight} />
+            <Icon name="zap" size={15} color={theme.accentLight} />
             <Text style={s.plusRowText}>Write with AI</Text>
           </TouchableOpacity>
         ) : null}
 
         <TouchableOpacity style={s.plusRow} onPress={openCategoryPicker} accessibilityRole="button" testID="add-product-category-row">
-          <Feather name={draftData.category ? 'tag' : 'plus'} size={15} color={theme.accentLight} />
+          <Icon name={draftData.category ? 'tag' : 'plus'} size={15} color={theme.accentLight} />
           <Text style={s.plusRowText}>{draftData.category ?? 'Select category'}</Text>
         </TouchableOpacity>
       </>
@@ -1503,7 +1503,7 @@ export default function AddProductScreen() {
                         }}
                         style={[s.colorSwatch, { backgroundColor: c.hex, borderColor: selected ? theme.accent : BORDER, borderWidth: selected ? 2 : 1 }]}
                       >
-                        {selected && <Feather name="check" size={12} color={c.hex === '#FFFFFF' || c.hex === '#F5F0E8' ? '#000' : '#fff'} />}
+                        {selected && <Icon name="check" size={12} color={c.hex === '#FFFFFF' || c.hex === '#F5F0E8' ? '#000' : '#fff'} />}
                       </TouchableOpacity>
                     );
                   })}
@@ -1524,7 +1524,7 @@ export default function AddProductScreen() {
                   >
                     {v.colorHex && <View style={[s.valueDot, { backgroundColor: v.colorHex }]} />}
                     <Text style={[s.valueChipText, { color: theme.accentLight }]}>{v.value}</Text>
-                    <Feather name="x" size={10} color={MUTED} />
+                    <Icon name="x" size={10} color={MUTED} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1550,14 +1550,14 @@ export default function AddProductScreen() {
                   updateUnsavedState(setLocalOptions, updated);
                 }}
               >
-                <Feather name="plus" size={16} color={PURPLE_LIGHT} />
+                <Icon name="plus" size={16} color={PURPLE_LIGHT} />
               </TouchableOpacity>
             </View>
             <TouchableOpacity
               style={s.deleteOptionBtn}
               onPress={() => updateUnsavedState(setLocalOptions, prev => prev.filter((_, i) => i !== idx))}
             >
-              <Feather name="trash-2" size={14} color={RED} />
+              <Icon name="trash-2" size={14} color={RED} />
               <Text style={s.deleteOptionText}>Remove option</Text>
             </TouchableOpacity>
           </BrandthreadCard>
@@ -1655,7 +1655,7 @@ export default function AddProductScreen() {
                       })}
                       style={[s.variantCheckbox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}
                     >
-                      {selected && <Feather name="check" size={11} color={theme.onAccent} />}
+                      {selected && <Icon name="check" size={11} color={theme.onAccent} />}
                     </TouchableOpacity>
                   )}
                   <Text style={s.variantTitle}>{v.title}</Text>
@@ -1689,7 +1689,7 @@ export default function AddProductScreen() {
                     returnKeyType="done"
                   />
                   <TouchableOpacity onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }}>
-                    <Feather name="trash-2" size={14} color={RED} />
+                    <Icon name="trash-2" size={14} color={RED} />
                   </TouchableOpacity>
                 </View>
               </BrandthreadCard>
@@ -1719,7 +1719,7 @@ export default function AddProductScreen() {
             )}
             {sizeChartUploadStatus === 'error' && (
               <TouchableOpacity style={s.mediaUploadOverlay} onPress={pickSizeChartPhoto} accessibilityLabel="Retry size chart photo upload">
-                <Feather name="refresh-cw" size={16} color={ON_DARK} />
+                <Icon name="refresh-cw" size={16} color={ON_DARK} />
                 <Text style={s.mediaRetryLabel}>Retry upload</Text>
               </TouchableOpacity>
             )}
@@ -1727,14 +1727,14 @@ export default function AddProductScreen() {
           <View style={s.sizeChartActions}>
             <SecondaryButton label="Replace" icon="image" onPress={pickSizeChartPhoto} />
             <TouchableOpacity style={s.deleteOptionBtn} onPress={removeSizeChartPhoto}>
-              <Feather name="trash-2" size={14} color={RED} />
+              <Icon name="trash-2" size={14} color={RED} />
               <Text style={s.deleteOptionText}>Remove</Text>
             </TouchableOpacity>
           </View>
         </View>
       ) : (
         <TouchableOpacity style={s.plusRow} onPress={pickSizeChartPhoto} accessibilityRole="button">
-          <Feather name="plus" size={15} color={theme.accentLight} />
+          <Icon name="plus" size={15} color={theme.accentLight} />
           <Text style={s.plusRowText}>Add a size chart photo</Text>
         </TouchableOpacity>
       )
@@ -1746,7 +1746,7 @@ export default function AddProductScreen() {
     if (!editProductId) return null;
     return (
       <TouchableOpacity style={s.plusRow} onPress={() => router.push(`/ai-helper?mode=size-chart&productId=${editProductId}` as never)} accessibilityRole="button" testID="add-product-ai-size-chart">
-        <Feather name="zap" size={15} color={theme.accentLight} />
+        <Icon name="zap" size={15} color={theme.accentLight} />
         <Text style={s.plusRowText}>Generate size chart with AI</Text>
       </TouchableOpacity>
     );
@@ -1769,7 +1769,7 @@ export default function AddProductScreen() {
             <BrandthreadCard style={[s.modelCard, sm === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.title}</Text>
-                {sm === m.key && <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />}
+                {sm === m.key && <Icon name="check-circle" size={18} color={PURPLE_LIGHT} />}
               </View>
               <Text style={s.modelDesc}>{m.desc}</Text>
             </BrandthreadCard>
@@ -1833,7 +1833,7 @@ export default function AddProductScreen() {
             <BrandthreadCard style={[s.modelCard, mfgMode === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.label}</Text>
-                {mfgMode === m.key && <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />}
+                {mfgMode === m.key && <Icon name="check-circle" size={18} color={PURPLE_LIGHT} />}
               </View>
               <Text style={s.modelDesc}>{m.desc}</Text>
             </BrandthreadCard>
@@ -1873,7 +1873,7 @@ export default function AddProductScreen() {
             <BrandthreadCard style={[s.modelCard, ss.status === st.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{st.label}</Text>
-                {ss.status === st.key && <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />}
+                {ss.status === st.key && <Icon name="check-circle" size={18} color={PURPLE_LIGHT} />}
               </View>
               <Text style={s.modelDesc}>{st.desc}</Text>
             </BrandthreadCard>
@@ -1963,7 +1963,7 @@ export default function AddProductScreen() {
               <Image source={{ uri: coverUri }} style={s.previewImage} resizeMode="cover" />
             ) : (
               <View style={[s.previewImage, { alignItems: 'center', justifyContent: 'center' }]}>
-                <Feather name="image" size={28} color={SUBTLE} />
+                <Icon name="image" size={28} color={SUBTLE} />
               </View>
             )}
             {pricing.isOnSale && (
@@ -2063,7 +2063,7 @@ export default function AddProductScreen() {
             testID="add-product-status-pill"
           >
             <Text style={s.statusPillText}>{currentStatus === 'active' ? 'Active' : 'Draft'}</Text>
-            <Feather name="chevron-down" size={13} color={MUTED} />
+            <Icon name="chevron-down" size={13} color={MUTED} />
           </TouchableOpacity>
           <Button
             variant="tertiary"

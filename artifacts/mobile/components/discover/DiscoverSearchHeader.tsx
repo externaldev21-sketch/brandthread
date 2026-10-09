@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, GUTTER } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -43,7 +43,7 @@ export function DiscoverSearchHeader({
         style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border }]}
         testID="discover-search-bar"
       >
-        <Feather name="search" size={16} color={theme.muted} />
+        <Icon name="search" size={16} color={theme.muted} />
         <Text style={[styles.searchPlaceholder, { color: theme.muted }]} numberOfLines={1}>Search</Text>
       </TouchableOpacity>
       {onBellPress && (

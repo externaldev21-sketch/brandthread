@@ -45,7 +45,8 @@ import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
 import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { ONBOARDING_KEY, ONBOARDING_OWNER_KEY } from './_layout';
@@ -269,7 +270,7 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
     >
       <Text style={ssc.emoji}>{emoji}</Text>
       <Text style={[ssc.chipText, selected && { color: theme.text }]}>{label}</Text>
-      {selected && <Feather name="check" size={13} color={theme.text} />}
+      {selected && <Icon name="check" size={13} color={theme.text} />}
     </PressableScale>
   );
 }
@@ -290,7 +291,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
     >
       <Text style={[sc.chipText, selected && { color: theme.text }]}>{label}</Text>
-      {selected && <Feather name="check" size={13} color={theme.text} />}
+      {selected && <Icon name="check" size={13} color={theme.text} />}
     </PressableScale>
   );
 }
@@ -341,7 +342,7 @@ function InlineError({ message }: { message: string }) {
   const { theme } = useAppTheme();
   return (
     <Reveal style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACE.sm }}>
-      <Feather name="alert-circle" size={14} color={theme.error} />
+      <Icon name="alert-circle" size={14} color={theme.error} />
       <Text style={[TYPE.label, { color: theme.error, flex: 1 }]}>{message}</Text>
     </Reveal>
   );
@@ -408,7 +409,7 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
                 <View style={sl.stepRail}>
                   <View style={[sl.stepIcon, isDone && sl.stepIconDone, isActive && { borderColor: theme.text }]}>
                     {isDone ? (
-                      <Feather name="check" size={13} color={theme.background} />
+                      <Icon name="check" size={13} color={theme.background} />
                     ) : isActive ? (
                       <ActivityIndicator size="small" color={theme.text} />
                     ) : (
@@ -489,7 +490,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
           <ThreadDraw height={120} color={theme.text} delay={120} duration={1100} style={sn.heroThread} />
           <Reveal>
             <View style={[sn.bellBg, { backgroundColor: theme.background, borderColor: theme.border, shadowColor: theme.text }]}>
-              <Feather name="bell" size={30} color={theme.text} />
+              <Icon name="bell" size={30} color={theme.text} />
             </View>
           </Reveal>
         </View>
@@ -597,7 +598,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
           ).map((f, i) => (
             <Reveal key={f} delay={copyDelay} index={i + 3}>
               <View style={ss.featureRow}>
-                <Feather name="check" size={15} color={theme.text} />
+                <Icon name="check" size={15} color={theme.text} />
                 <Text style={ss.featureText}>{f}</Text>
               </View>
             </Reveal>
@@ -902,7 +903,7 @@ function BuyerAuthStep({
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={sba.scroll} keyboardShouldPersistTaps="handled">
           <TouchableOpacity onPress={() => { setPhase('choose'); setError(''); }} style={sba.backToChoose} activeOpacity={0.7}>
-            <Feather name="arrow-left" size={16} color={MUTED} />
+            <Icon name="arrow-left" size={16} color={MUTED} />
             <Text style={sba.backToChooseText}>Back</Text>
           </TouchableOpacity>
           <Text style={sba.headline}>Create your account</Text>
@@ -987,7 +988,7 @@ function BuyerAuthStep({
                 autoComplete="new-password"
               />
               <TouchableOpacity accessibilityLabel={showPw ? 'Hide password' : 'Show password'} accessibilityRole="button" style={sba.eyeBtn} onPress={() => setShowPw(v => !v)}>
-                <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
+                <Icon name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
               </TouchableOpacity>
             </View>
             {password.length > 0 && password.length < 8 && (
@@ -1055,7 +1056,7 @@ function BuyerAuthStep({
                   <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
                 </View>
                 <Text style={sba.bigRowText}>Continue with Apple</Text>
-                <Feather name="chevron-right" size={16} color={MUTED2} />
+                <Icon name="chevron-right" size={16} color={MUTED2} />
               </>
             )}
           </TouchableOpacity>
@@ -1079,7 +1080,7 @@ function BuyerAuthStep({
                   </View>
                 </View>
                 <Text style={sba.bigRowText}>Continue with Google</Text>
-                <Feather name="chevron-right" size={16} color={MUTED2} />
+                <Icon name="chevron-right" size={16} color={MUTED2} />
               </>
             )}
           </TouchableOpacity>
@@ -1093,10 +1094,10 @@ function BuyerAuthStep({
           disabled={!!oauthLoading || loading}
         >
           <View style={sba.bigRowIcon}>
-            <Feather name="mail" size={20} color={MUTED} />
+            <Icon name="mail" size={20} color={MUTED} />
           </View>
           <Text style={sba.bigRowText}>Use email</Text>
-          <Feather name="chevron-right" size={16} color={MUTED2} />
+          <Icon name="chevron-right" size={16} color={MUTED2} />
         </TouchableOpacity>
 
         <LegalContinueNotice style={{ marginTop: 12 }} />
@@ -1368,7 +1369,7 @@ function SharedAuthStep({
           <StepSub>An account already exists with this email.</StepSub>
           <Reveal index={2}>
             <View style={[ssa.existingEmailChip, { borderColor: theme.border }]}>
-              <Feather name="mail" size={13} color={theme.muted} />
+              <Icon name="mail" size={13} color={theme.muted} />
               <Text style={[ssa.existingEmailText, { color: theme.text }]}>{email}</Text>
             </View>
           </Reveal>
@@ -1787,7 +1788,7 @@ function SellerPreviewStep({
                 </LinearGradient>
                 <View style={spreview.themeNameRow}>
                   <Text numberOfLines={1} style={spreview.themeName}>{preset.name}</Text>
-                  {selected ? <Feather name="check" size={13} color={theme.text} /> : null}
+                  {selected ? <Icon name="check" size={13} color={theme.text} /> : null}
                 </View>
               </PressableScale>
             );
@@ -1802,7 +1803,7 @@ function SellerPreviewStep({
             <Text style={spreview.sectionLabel}>One free AI sample</Text>
             <Text style={spreview.sampleSub}>See your brand name as a logo. This calls the real generator.</Text>
           </View>
-          <Feather name="zap" size={18} color={theme.text} />
+          <Icon name="zap" size={18} color={theme.text} />
         </View>
         <View style={spreview.styleRow}>
           {LOGO_SAMPLE_STYLES.map((style) => (
@@ -1817,7 +1818,7 @@ function SellerPreviewStep({
             <Image source={{ uri: sampleUri }} style={spreview.resultImage} resizeMode="contain" accessibilityLabel={`${brandName} AI logo sample`} />
             <AiGeneratedBadge position="topLeft" />
             <View style={spreview.resultCaption}>
-              <Feather name="check" size={15} color={theme.text} />
+              <Icon name="check" size={15} color={theme.text} />
               <Text style={spreview.resultText}>Your real AI sample is ready.</Text>
             </View>
           </View>
@@ -1827,7 +1828,7 @@ function SellerPreviewStep({
           <PillButton
             testID="onboarding-generate-sample"
             label="Generate free sample"
-            icon={<Feather name="image" size={18} color={theme.onAccent} />}
+            icon={<Icon name="image" size={18} color={theme.onAccent} />}
             onPress={() => { void handleGenerate(); }}
             loading={generating}
           />
@@ -1835,7 +1836,7 @@ function SellerPreviewStep({
       )}
       {sampleError ? (
         <View style={spreview.errorBox}>
-          <Feather name="alert-circle" size={14} color={theme.error} />
+          <Icon name="alert-circle" size={14} color={theme.error} />
           <Text style={spreview.errorText}>{sampleError}</Text>
           <TouchableOpacity onPress={() => { void handleGenerate(); }} disabled={generating || !!sampleUri}>
             <Text style={[spreview.retryText, { color: theme.text }]}>Retry</Text>
@@ -2889,7 +2890,7 @@ export default function OnboardingScreen() {
               accessibilityLabel="Go back"
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Feather name="chevron-left" size={20} color={FG} />
+              <Icon name="chevron-left" size={20} color={FG} />
             </PressableScale>
           )}
 

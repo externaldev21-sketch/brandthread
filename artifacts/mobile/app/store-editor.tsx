@@ -6,7 +6,7 @@ import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   TextInput, StyleSheet, Alert, Animated, RefreshControl,
   PanResponder, GestureResponderEvent, PanResponderGestureState, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -437,7 +437,7 @@ export default function StoreEditor() {
         <View style={panelStyles.header}>
           <Text style={panelStyles.title}>{s.label} Settings</Text>
           <TouchableOpacity onPress={() => setActiveSection(null)} style={panelStyles.closeBtn}>
-            <Feather name="x" size={ICON.md} color={MUTED} />
+            <Icon name="x" size={ICON.md} color={MUTED} />
           </TouchableOpacity>
         </View>
 
@@ -626,7 +626,7 @@ export default function StoreEditor() {
                 }}
                 style={panelStyles.addFaqBtn}
               >
-                <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
+                <Icon name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
                 <Text style={{ color: PURPLE_LIGHT, fontSize: FS.sm, fontFamily: FONT.semibold }}>Add Question</Text>
               </TouchableOpacity>
             </>
@@ -665,13 +665,13 @@ export default function StoreEditor() {
               <View key={i} style={[brandStyles.themeSwitchDot, { backgroundColor: c }]} />
             ))}
           </View>
-          <Feather name="chevron-right" size={ICON.md} color={MUTED} />
+          <Icon name="chevron-right" size={ICON.md} color={MUTED} />
         </TouchableOpacity>
 
         <BrandthreadCard style={brandStyles.personalizeCard}>
           <View style={brandStyles.personalizeHeader}>
             <View style={brandStyles.personalizeIcon}>
-              <Feather name="aperture" size={ICON.md} color={PURPLE_LIGHT} />
+              <Icon name="aperture" size={ICON.md} color={PURPLE_LIGHT} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={brandStyles.personalizeTitle}>Personalize {THREAD_THEME_NAME}</Text>
@@ -692,7 +692,7 @@ export default function StoreEditor() {
                 onPress={() => router.push(action.route as never)}
                 activeOpacity={0.75}
               >
-                <Feather name={action.icon} size={ICON.sm} color={FG} />
+                <Icon name={action.icon} size={ICON.sm} color={FG} />
                 <Text style={brandStyles.personalizeActionText}>{action.label}</Text>
               </TouchableOpacity>
             ))}
@@ -1009,7 +1009,7 @@ export default function StoreEditor() {
         <View style={sectionStyles.rowTop}>
           <View style={sectionStyles.rowLeft}>
             <View {...panResponder.panHandlers} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={sectionStyles.dragHandle}>
-              <Feather name="menu" size={ICON.sm} color={isDragging ? PURPLE_LIGHT : SUBTLE} />
+              <Icon name="menu" size={ICON.sm} color={isDragging ? PURPLE_LIGHT : SUBTLE} />
             </View>
             <View style={[sectionStyles.enabledDot, { backgroundColor: section.enabled ? SUCCESS : MUTED }]} />
             <View style={{ flex: 1 }}>
@@ -1051,7 +1051,7 @@ export default function StoreEditor() {
             style={sectionStyles.editBtn}
           >
             <Text style={sectionStyles.editBtnText}>{isActive ? 'Close' : 'Edit'}</Text>
-            <Feather name={isActive ? 'chevron-up' : 'chevron-right'} size={ICON.xs} color={PURPLE_LIGHT} />
+            <Icon name={isActive ? 'chevron-up' : 'chevron-right'} size={ICON.xs} color={PURPLE_LIGHT} />
           </TouchableOpacity>
         </View>
 
@@ -1067,10 +1067,10 @@ export default function StoreEditor() {
           </TouchableOpacity>
           <View style={sectionStyles.orderBtns}>
             <TouchableOpacity onPress={() => handleMoveUp(section.id)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
-              <Feather name="chevron-up" size={ICON.sm} color={MUTED} />
+              <Icon name="chevron-up" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => handleMoveDown(section.id)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
-              <Feather name="chevron-down" size={ICON.sm} color={MUTED} />
+              <Icon name="chevron-down" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1100,7 +1100,7 @@ export default function StoreEditor() {
             onPress={() => router.push('/store-sections' as never)}
             style={styles.addSectionBtn}
           >
-            <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Icon name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={styles.addSectionBtnText}>Add Section</Text>
           </TouchableOpacity>
         </View>
@@ -1155,14 +1155,14 @@ export default function StoreEditor() {
               disabled={!undoAvailable}
               style={[styles.undoBtn, !undoAvailable && styles.undoBtnDisabled]}
             >
-              <Feather name="corner-up-left" size={ICON.sm} color={undoAvailable ? FG : SUBTLE} />
+              <Icon name="corner-up-left" size={ICON.sm} color={undoAvailable ? FG : SUBTLE} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleRedo}
               disabled={!redoAvailable}
               style={[styles.undoBtn, !redoAvailable && styles.undoBtnDisabled]}
             >
-              <Feather name="corner-up-right" size={ICON.sm} color={redoAvailable ? FG : SUBTLE} />
+              <Icon name="corner-up-right" size={ICON.sm} color={redoAvailable ? FG : SUBTLE} />
             </TouchableOpacity>
             {/*
               Save/View were previously full-text buttons ("Save Draft",
@@ -1189,7 +1189,7 @@ export default function StoreEditor() {
               accessibilityRole="button"
               accessibilityLabel="Save draft"
             >
-              <Feather name="save" size={ICON.sm} color={FG} />
+              <Icon name="save" size={ICON.sm} color={FG} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push('/store-preview' as never)}
@@ -1197,7 +1197,7 @@ export default function StoreEditor() {
               accessibilityRole="button"
               accessibilityLabel="View live storefront"
             >
-              <Feather name="eye" size={ICON.sm} color={FG} />
+              <Icon name="eye" size={ICON.sm} color={FG} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push('/store-publish' as never)}

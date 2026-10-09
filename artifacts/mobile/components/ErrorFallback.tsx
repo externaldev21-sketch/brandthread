@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { reloadAppAsync } from 'expo';
@@ -57,7 +57,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         <View style={[styles.iconCircle, { borderColor: colors.border, backgroundColor: colors.card }]}>
-          <Feather name="alert-triangle" size={28} color={colors.mutedForeground} />
+          <Icon name="alert-triangle" size={28} color={colors.mutedForeground} />
         </View>
 
         <Text style={[TYPE_SCALE.title1, styles.title, { color: colors.foreground }]}>

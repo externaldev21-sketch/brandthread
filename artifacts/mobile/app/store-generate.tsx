@@ -4,7 +4,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Platform, Alert, ActivityIndicator } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -362,7 +362,7 @@ export default function StoreGenerateScreen() {
         </View>
 
         <View style={[st.contrastRow, { backgroundColor: goodContrast ? SUCCESS_DIM : RED_DIM }]}>
-          <Feather name={goodContrast ? 'check-circle' : 'alert-triangle'} size={ICON.sm} color={goodContrast ? SUCCESS : RED} />
+          <Icon name={goodContrast ? 'check-circle' : 'alert-triangle'} size={ICON.sm} color={goodContrast ? SUCCESS : RED} />
           <Text style={[st.contrastText, { color: goodContrast ? SUCCESS : RED }]}>
             {goodContrast ? 'Good contrast ratio.' : 'Text may be hard to read on this background.'}
           </Text>
@@ -378,7 +378,7 @@ export default function StoreGenerateScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Icon name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={st.colorActionText}>Generate Palette</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -386,7 +386,7 @@ export default function StoreGenerateScreen() {
             onPress={() => router.push('/store-from-logo' as never)}
             activeOpacity={0.8}
           >
-            <Feather name="image" size={ICON.sm} color={CYAN} />
+            <Icon name="image" size={ICON.sm} color={CYAN} />
             <Text style={st.colorActionText}>From Logo</Text>
           </TouchableOpacity>
         </View>
@@ -415,7 +415,7 @@ export default function StoreGenerateScreen() {
                   Heading: {heading} / Body: {body}
                 </Text>
               </View>
-              {isSelected && <Feather name="check-circle" size={ICON.sm} color={PURPLE_LIGHT} />}
+              {isSelected && <Icon name="check-circle" size={ICON.sm} color={PURPLE_LIGHT} />}
             </View>
             <Text style={[st.typoSample, {
               fontStyle: value === 'editorial' || value === 'luxury' ? 'italic' : 'normal',
@@ -450,12 +450,12 @@ export default function StoreGenerateScreen() {
             >
               {isSelected ? (
                 <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.priorityCardGrad}>
-                  <Feather name={icon as any} size={ICON.md} color={theme.onAccent} />
+                  <Icon name={icon as any} size={ICON.md} color={theme.onAccent} />
                   <Text style={[st.priorityCardTextActive, getOnAccentTextStyle(theme)]}>{label}</Text>
                 </LinearGradient>
               ) : (
                 <View style={st.priorityCard}>
-                  <Feather name={icon as any} size={ICON.md} color={MUTED} />
+                  <Icon name={icon as any} size={ICON.md} color={MUTED} />
                   <Text style={st.priorityCardText}>{label}</Text>
                 </View>
               )}
@@ -679,7 +679,7 @@ export default function StoreGenerateScreen() {
                 activeOpacity={0.8}
                 style={[st.contentCard, isSelected && st.contentCardSelected]}
               >
-                <Feather name={icon as any} size={ICON.md} color={isSelected ? PURPLE_LIGHT : MUTED} />
+                <Icon name={icon as any} size={ICON.md} color={isSelected ? PURPLE_LIGHT : MUTED} />
                 <Text style={[st.contentCardLabel, isSelected && st.contentCardLabelSelected]}>{label}</Text>
                 {(value === 'logo' || value === 'product_photos' || value === 'campaign_images') && isSelected && (
                   <TouchableOpacity
@@ -715,7 +715,7 @@ export default function StoreGenerateScreen() {
                     ) : (
                       <>
                         {(value === 'logo' ? !!answers.logoUri : (answers.contentUploads?.[value]?.length ?? 0) > 0) ? (
-                          <Feather name="check" size={12} color={PURPLE_LIGHT} />
+                          <Icon name="check" size={12} color={PURPLE_LIGHT} />
                         ) : null}
                         <Text style={st.uploadBtnText}>
                           {(value === 'logo' ? !!answers.logoUri : (answers.contentUploads?.[value]?.length ?? 0) > 0) ? 'Uploaded' : 'Upload'}
@@ -730,7 +730,7 @@ export default function StoreGenerateScreen() {
         </View>
 
         <View style={st.contentNote}>
-          <Feather name="info" size={ICON.xs} color={CYAN} />
+          <Icon name="info" size={ICON.xs} color={CYAN} />
           <Text style={st.contentNoteText}>Your existing Seller posts will be connected automatically.</Text>
         </View>
       </View>
@@ -747,7 +747,7 @@ export default function StoreGenerateScreen() {
           return (
             <View key={value} style={st.featureRow}>
               <View style={st.featureIconWrap}>
-                <Feather name={icon as any} size={ICON.sm} color={isOn ? PURPLE_LIGHT : MUTED} />
+                <Icon name={icon as any} size={ICON.sm} color={isOn ? PURPLE_LIGHT : MUTED} />
               </View>
               <View style={st.featureTextWrap}>
                 <Text style={[st.featureLabel, isOn && st.featureLabelOn]}>{label}</Text>
@@ -957,7 +957,7 @@ export default function StoreGenerateScreen() {
           style={st.navBackBtn}
           activeOpacity={0.7}
         >
-          <Feather name="arrow-left" size={ICON.sm} color={FG} />
+          <Icon name="arrow-left" size={ICON.sm} color={FG} />
           <Text style={st.navBackText}>Back</Text>
         </TouchableOpacity>
 
@@ -976,7 +976,7 @@ export default function StoreGenerateScreen() {
               style={st.navContinueGrad}
             >
               <Text style={[st.navContinueText, continueEnabled && getOnAccentTextStyle(theme)]}>Continue</Text>
-              <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
+              <Icon name="arrow-right" size={ICON.sm} color={theme.onAccent} />
             </LinearGradient>
           </TouchableOpacity>
         ) : (

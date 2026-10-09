@@ -13,7 +13,7 @@
  * sizes still render for older call sites.
  */
 import React from 'react';
-import { Platform, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import * as VectorIcons from '@expo/vector-icons';
 import { Feather } from '@expo/vector-icons';
 import { iconMappingFor, type FeatherName } from '@/lib/iconMap';
@@ -26,8 +26,14 @@ export interface IconProps {
   name: IconName;
   size?: number;
   color?: string;
-  style?: StyleProp<ViewStyle>;
+  /** Text styles (e.g. a text shadow over video) reach the glyph fallback; the SF Symbol takes the layout part. */
+  style?: StyleProp<ViewStyle | TextStyle>;
   testID?: string;
+  /** Same a11y/touch props Feather accepted, so call sites move over unchanged. */
+  accessibilityLabel?: string;
+  accessibilityRole?: 'image' | 'none' | 'imagebutton';
+  accessible?: boolean;
+  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
 }
 
 type SymbolViewComponent = React.ComponentType<{
@@ -39,6 +45,9 @@ type SymbolViewComponent = React.ComponentType<{
   fallback?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  accessibilityLabel?: string;
+  accessible?: boolean;
+  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
 }>;
 
 let symbolView: SymbolViewComponent | null | undefined;
@@ -71,12 +80,12 @@ function getMaterialIcons(): typeof VectorIcons.MaterialIcons | undefined {
   }
 }
 
-export function Icon({ name, size = ICON_SIZE.md, color = '#FFFFFF', style, testID }: IconProps) {
+export function Icon({ name, size = ICON_SIZE.md, color = '#FFFFFF', style, testID, ...a11y }: IconProps) {
   const { sf, material } = iconMappingFor(name);
   const MaterialIcons = material ? getMaterialIcons() : undefined;
   const fallback = material && MaterialIcons
-    ? <MaterialIcons name={material} size={size} color={color} style={style as never} testID={testID} />
-    : <Feather name={name} size={size} color={color} style={style as never} testID={testID} />;
+    ? <MaterialIcons name={material} size={size} color={color} style={style as never} testID={testID} {...a11y} />
+    : <Feather name={name} size={size} color={color} style={style as never} testID={testID} {...a11y} />;
 
   if (sf && isIOS()) {
     const SymbolView = getSymbolView();
@@ -89,8 +98,9 @@ export function Icon({ name, size = ICON_SIZE.md, color = '#FFFFFF', style, test
           weight="medium"
           type="monochrome"
           fallback={fallback}
-          style={[{ width: size, height: size }, style]}
+          style={[{ width: size, height: size }, style as StyleProp<ViewStyle>]}
           testID={testID}
+          {...a11y}
         />
       );
     }

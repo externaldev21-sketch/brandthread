@@ -6,7 +6,7 @@
 import { shareInvoice, invoiceFromSellerOrder } from '@/lib/invoice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -829,10 +829,10 @@ export default function OrderDetailScreen() {
             accessibilityLabel="Live updates paused. Tap to retry."
             testID="order-detail-live-updates-retry"
           >
-            <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
+            <Icon name="wifi-off" size={ICON.sm} color={ORANGE} />
             <Text style={s.pausedBannerText}>Live updates paused</Text>
             <Text style={s.pausedBannerAction}>Tap to retry</Text>
-            <Feather name="refresh-cw" size={12} color={ORANGE} />
+            <Icon name="refresh-cw" size={12} color={ORANGE} />
           </PressableScale>
         )}
         <EmptyState
@@ -892,19 +892,19 @@ export default function OrderDetailScreen() {
           accessibilityLabel="Live updates paused. Tap to retry."
           testID="order-detail-live-updates-retry"
         >
-          <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
+          <Icon name="wifi-off" size={ICON.sm} color={ORANGE} />
           <Text style={s.pausedBannerText}>Live updates paused</Text>
           <Text style={s.pausedBannerAction}>Tap to retry</Text>
-          <Feather name="refresh-cw" size={12} color={ORANGE} />
+          <Icon name="refresh-cw" size={12} color={ORANGE} />
         </PressableScale>
       )}
 
       {cancelConfirmed && (
         <View style={s.cancelBanner}>
-          <Feather name="check-circle" size={ICON.sm} color={FG} />
+          <Icon name="check-circle" size={ICON.sm} color={FG} />
           <Text style={s.cancelBannerText}>Order cancelled successfully.</Text>
           <PressableScale onPress={() => { hapticPrimaryAction(); setCancelConfirmed(false); }} accessibilityRole="button" accessibilityLabel="Dismiss">
-            <Feather name="x" size={ICON.sm} color={FG} />
+            <Icon name="x" size={ICON.sm} color={FG} />
           </PressableScale>
         </View>
       )}
@@ -957,7 +957,7 @@ export default function OrderDetailScreen() {
             {/* Warning */}
             <BrandthreadCard style={s.warningCard}>
               <View style={s.warningRow}>
-                <Feather name="alert-triangle" size={ICON.sm} color={RED} />
+                <Icon name="alert-triangle" size={ICON.sm} color={RED} />
                 <Text style={s.warningText}>
                   This will cancel the order. Any refund must be issued separately through your payment provider. This cannot be undone.
                 </Text>
@@ -1070,7 +1070,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         </View>
         {order.riskLevel !== 'low' && (
           <View style={s.riskBadge}>
-            <Feather name="alert-triangle" size={ICON.xs} color={FG} />
+            <Icon name="alert-triangle" size={ICON.xs} color={FG} />
             <Text style={s.riskBadgeText}>⚠ High Risk</Text>
           </View>
         )}
@@ -1094,7 +1094,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         <View style={s.section}>
           <BrandthreadCard style={s.cancellationCard}>
             <View style={s.cancellationHeader}>
-              <Feather name="shopping-bag" size={ICON.sm} color={FG} />
+              <Icon name="shopping-bag" size={ICON.sm} color={FG} />
               <Text style={s.cancellationTitle}>Fulfilled via Shopify</Text>
             </View>
             <InfoRow
@@ -1121,7 +1121,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         <View style={s.section}>
           <BrandthreadCard style={s.cancellationCard}>
             <View style={s.cancellationHeader}>
-              <Feather name="x-circle" size={ICON.sm} color={RED} />
+              <Icon name="x-circle" size={ICON.sm} color={RED} />
               <Text style={s.cancellationTitle}>Order Cancelled</Text>
             </View>
             <InfoRow label="Reason" value={cancellationReasonLabel(order.cancellation.reason)} valueColor={FG} />
@@ -1194,7 +1194,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         )}
         {order.status === 'delivered' && (
           <BrandthreadCard style={s.deliveredCard}>
-            <Feather name="check-circle" size={ICON.md} color={SUCCESS} />
+            <Icon name="check-circle" size={ICON.md} color={SUCCESS} />
             <Text style={s.deliveredText}>Order delivered · Read-only</Text>
           </BrandthreadCard>
         )}
@@ -1209,7 +1209,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
           <SectionHeader title="Risk Flags" />
           {order.riskFlags.map(f => (
             <View key={f.id} style={s.riskRow}>
-              <Feather name="alert-circle" size={ICON.sm} color={f.severity === 'high' ? RED : ORANGE} />
+              <Icon name="alert-circle" size={ICON.sm} color={f.severity === 'high' ? RED : ORANGE} />
               <Text style={s.riskRowText}>{f.label}</Text>
             </View>
           ))}
@@ -1259,7 +1259,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
                 <Text style={s.lineItemQty}>×{li.quantity}</Text>
                 <Text style={s.lineItemTotal}>{usd(li.totalCents)}</Text>
               </View>
-              {li.productId ? <Feather name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
+              {li.productId ? <Icon name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
             </View>
           </BrandthreadCard>
         ))}
@@ -1382,7 +1382,7 @@ function PaymentTab({ order }: { order: Order }) {
           <SectionHeader title="Held Funds" />
           <GradientCard style={{ borderColor: ORANGE + '55' }}>
             <View style={s.heldFundsNotice}>
-              <Feather name="lock" size={ICON.sm} color={ORANGE} />
+              <Icon name="lock" size={ICON.sm} color={ORANGE} />
               <Text style={s.heldFundsNoticeText}>
                 Funds are held based on fulfillment milestones. This is not legally guaranteed escrow.
               </Text>
@@ -1404,7 +1404,7 @@ function PaymentTab({ order }: { order: Order }) {
             <Text style={s.milestoneTitle}>Payout Milestones</Text>
             {order.heldFunds.milestones.map(m => (
               <View key={m.key} style={s.milestoneRow}>
-                <Feather name={m.completedAt ? 'check-circle' : 'circle'} size={ICON.sm} color={m.completedAt ? SUCCESS : SUBTLE} />
+                <Icon name={m.completedAt ? 'check-circle' : 'circle'} size={ICON.sm} color={m.completedAt ? SUCCESS : SUBTLE} />
                 <Text style={[s.milestoneLabel, m.completedAt && { color: FG }]}>{m.label}</Text>
                 {m.completedAt && <Text style={s.milestoneDate}>{fmtShort(m.completedAt)}</Text>}
               </View>
@@ -1608,18 +1608,18 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                 {/* Checklist */}
                 <View style={s.checklistRow}>
                   <View style={[s.checkItem, fulfillment.isPicked && s.checkItemDone]}>
-                    <Feather name={fulfillment.isPicked ? 'check-square' : 'square'} size={ICON.sm} color={fulfillment.isPicked ? SUCCESS : MUTED} />
+                    <Icon name={fulfillment.isPicked ? 'check-square' : 'square'} size={ICON.sm} color={fulfillment.isPicked ? SUCCESS : MUTED} />
                     <Text style={s.checkLabel}>Picked</Text>
                   </View>
                   <View style={[s.checkItem, fulfillment.isPacked && s.checkItemDone]}>
-                    <Feather name={fulfillment.isPacked ? 'check-square' : 'square'} size={ICON.sm} color={fulfillment.isPacked ? SUCCESS : MUTED} />
+                    <Icon name={fulfillment.isPacked ? 'check-square' : 'square'} size={ICON.sm} color={fulfillment.isPacked ? SUCCESS : MUTED} />
                     <Text style={s.checkLabel}>Packed</Text>
                   </View>
                 </View>
 
                 {fulfillment.fromAddress && (
                   <View style={s.fromAddrRow}>
-                    <Feather name="map-pin" size={ICON.xs} color={MUTED} />
+                    <Icon name="map-pin" size={ICON.xs} color={MUTED} />
                     <Text style={s.fromAddrText}>From: {fulfillment.fromAddress.city}, {fulfillment.fromAddress.state}</Text>
                   </View>
                 )}
@@ -1667,7 +1667,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                       accessibilityRole="button"
                       accessibilityLabel="View tracking"
                     >
-                      <Feather name="map-pin" size={ICON.xs} color={CYAN} />
+                      <Icon name="map-pin" size={ICON.xs} color={CYAN} />
                       <Text style={s.viewTrackingText}>View tracking</Text>
                     </PressableScale>
                   </BrandthreadCard>
@@ -1707,13 +1707,13 @@ function TimelineTab({ order, noteText, setNoteText, onAddNote, addingNote }: {
               <Text style={s.timelineTime}>{fmtTime(ev.createdAt)}</Text>
               {ev.isCustomerVisible && (
                 <View style={s.timelineTag}>
-                  <Feather name="eye" size={10} color={CYAN} />
+                  <Icon name="eye" size={10} color={CYAN} />
                   <Text style={[s.timelineTagText, { color: CYAN }]}>Customer</Text>
                 </View>
               )}
               {ev.isSellerNote && (
                 <View style={s.timelineTag}>
-                  <Feather name="lock" size={10} color={ORANGE} />
+                  <Icon name="lock" size={10} color={ORANGE} />
                   <Text style={[s.timelineTagText, { color: ORANGE }]}>Internal</Text>
                 </View>
               )}
@@ -1790,14 +1790,14 @@ function ReturnsTab({ returns, loadError, router }: {
               <StatusBadge label={returnRequestStatusLabel(ret.status).toUpperCase()} variant="neutral" />
               <Text style={[s.returnResolution, { color: theme.muted, textTransform: 'none' }]}>{ret.status === 'pending' ? 'Needs your review' : `Updated ${fmtShort(ret.updatedAt)}`}</Text>
               <View style={{ flex: 1 }} />
-              <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+              <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
             </View>
             <Text style={s.returnCustomer}>{ret.buyerName}</Text>
             <Text style={[s.returnItemReason, { color: theme.text }]}>{returnRequestReasonLabel(ret.reason)}</Text>
             {ret.notes ? <Text style={s.returnExplanation} numberOfLines={3}>{ret.notes}</Text> : null}
             {ret.items.map(item => (
               <View key={item.lineItemId} style={s.returnItemRow}>
-                <Feather name="package" size={ICON.xs} color={theme.muted} />
+                <Icon name="package" size={ICON.xs} color={theme.muted} />
                 <Text style={s.returnItemText}>{[item.productName, item.variantTitle, `×${item.quantity}`].filter(Boolean).join(' · ')}</Text>
               </View>
             ))}
@@ -1846,7 +1846,7 @@ function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeo
 
             {d.evidenceDeadline && (
               <View style={s.disputeDeadlineRow}>
-                <Feather name="clock" size={ICON.xs} color={deadlineUrgent ? ORANGE : MUTED} />
+                <Icon name="clock" size={ICON.xs} color={deadlineUrgent ? ORANGE : MUTED} />
                 <Text style={[s.disputeDeadline, deadlineUrgent && { color: ORANGE }]}>
                   Evidence due {fmt(d.evidenceDeadline)}{deadlineUrgent ? ` (${daysUntilDeadline}d)` : ''}
                 </Text>
@@ -1918,7 +1918,7 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
         <BrandthreadCard key={note.id} style={s.noteCard}>
           <View style={s.noteHeader}>
             <StatusBadge label={note.type.toUpperCase()} variant={noteTypeVariant(note.type)} />
-            {note.isPinned && <Feather name="bookmark" size={ICON.xs} color={GOLD} />}
+            {note.isPinned && <Icon name="bookmark" size={ICON.xs} color={GOLD} />}
             <PressableScale
               onPress={() => { hapticToggle(); onPinNote(note.id, note.isPinned); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

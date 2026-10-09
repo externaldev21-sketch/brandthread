@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
@@ -123,7 +123,7 @@ export default function CommunityCreateScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Have an invite link?</Text>
           <View style={styles.inviteRow}>
             <View style={[styles.inviteField, { backgroundColor: colors.card }]}>
-              <Feather name="link" size={16} color={colors.mutedForeground} />
+              <Icon name="link" size={16} color={colors.mutedForeground} />
               <TextInput
                 value={inviteText}
                 onChangeText={(t) => { setInviteText(t); if (inviteError) setInviteError(null); }}

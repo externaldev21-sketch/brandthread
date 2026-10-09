@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -89,7 +89,7 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
             style={({ pressed }) => [styles.brandButton, pressed && styles.pressed]}
           >
             <View style={styles.brandMark}>
-              <Feather name="arrow-left" size={16} color={theme.onAccent} />
+              <Icon name="arrow-left" size={16} color={theme.onAccent} />
             </View>
             <Text style={styles.brandName}>Brandthread</Text>
           </Pressable>

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -147,7 +147,7 @@ function StarRow({
           disabled={readonly}
           hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
         >
-          <Feather
+          <Icon
             name="star"
             size={ICON.md}
             color={i <= rating ? GOLD : BORDER}
@@ -206,7 +206,7 @@ function SampleTimeline({
             <View style={tl.dotCol}>
               {isCompleted && (
                 <View style={tl.dotCompleted}>
-                  <Feather name="check" size={13} color={BG} />
+                  <Icon name="check" size={13} color={BG} />
                 </View>
               )}
               {isActive && (
@@ -797,7 +797,7 @@ export default function SampleDetailScreen() {
           ) : (
             <TouchableOpacity onPress={handleAddImage} disabled={imageUploading} activeOpacity={0.75}>
               <GradientCard style={[s.section, s.imagePlaceholder]} colors={GRAD_CARD_GLOW}>
-                <Feather name="camera" size={ICON.xl} color={colors.accentForeground} style={{ marginBottom: SP.sm }} />
+                <Icon name="camera" size={ICON.xl} color={colors.accentForeground} style={{ marginBottom: SP.sm }} />
                 <Text style={s.imagePlaceholderText}>No images yet</Text>
                 <Text style={s.imagePlaceholderSub}>Tap to add a sample progress photo</Text>
               </GradientCard>

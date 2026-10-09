@@ -42,6 +42,7 @@ import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -3299,7 +3300,7 @@ export default function DesignCanvasScreen() {
       <View style={[styles.topBar, { paddingTop: headerTopInset + 2 }]}>
         <View style={styles.topGroup}>
           <TouchableOpacity style={styles.topBtn} onPress={handleBack} testID="btn-back">
-            <Feather name="chevron-left" size={ICON.md} color={FG} />
+            <Icon name="chevron-left" size={ICON.md} color={FG} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
@@ -3325,28 +3326,28 @@ export default function DesignCanvasScreen() {
             onLongPress={() => openSheet('brushLib')}
             testID="btn-brush"
           >
-            <Feather name="edit-2" size={ICON.sm} color={activeTopTool === 'brush' ? FG : MUTED} />
+            <Icon name="edit-2" size={ICON.sm} color={activeTopTool === 'brush' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.topBtn, activeTopTool === 'smudge' && styles.topBtnActive]}
             onPress={() => selectTool(activeTopTool === 'smudge' ? 'brush' : 'smudge')}
             testID="btn-smudge"
           >
-            <Feather name="droplet" size={ICON.sm} color={activeTopTool === 'smudge' ? FG : MUTED} />
+            <Icon name="droplet" size={ICON.sm} color={activeTopTool === 'smudge' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.topBtn, activeTopTool === 'eraser' && styles.topBtnActive]}
             onPress={() => selectTool(activeTopTool === 'eraser' ? 'brush' : 'eraser')}
             testID="btn-eraser"
           >
-            <Feather name="circle" size={ICON.sm} color={activeTopTool === 'eraser' ? FG : MUTED} />
+            <Icon name="circle" size={ICON.sm} color={activeTopTool === 'eraser' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.topBtn, activeSheet === 'layers' && styles.topBtnActive]}
             onPress={() => activeSheet === 'layers' ? closeSheet() : openSheet('layers')}
             testID="btn-layers"
           >
-            <Feather name="layers" size={ICON.sm} color={activeSheet === 'layers' ? FG : MUTED} />
+            <Icon name="layers" size={ICON.sm} color={activeSheet === 'layers' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.colorSwatch}
@@ -3369,7 +3370,7 @@ export default function DesignCanvasScreen() {
             testID="btn-actions"
             accessibilityLabel="Actions"
           >
-            <Feather name="tool" size={ICON.sm} color={activeSheet === 'wrench' ? FG : MUTED} />
+            <Icon name="tool" size={ICON.sm} color={activeSheet === 'wrench' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.topBtn}
@@ -3381,7 +3382,7 @@ export default function DesignCanvasScreen() {
             testID="btn-adjustments"
             accessibilityLabel="Adjustments"
           >
-            <Feather name="zap" size={ICON.sm} color={activeTopTool === 'adjustments' ? FG : MUTED} />
+            <Icon name="zap" size={ICON.sm} color={activeTopTool === 'adjustments' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.topBtn}
@@ -3405,7 +3406,7 @@ export default function DesignCanvasScreen() {
             testID="btn-transform"
             accessibilityLabel="Transform"
           >
-            <Feather name="arrow-up-right" size={ICON.sm} color={activeTopTool === 'transform' ? FG : MUTED} />
+            <Icon name="arrow-up-right" size={ICON.sm} color={activeTopTool === 'transform' ? FG : MUTED} />
           </TouchableOpacity>
         </View>
       )}
@@ -3453,14 +3454,14 @@ export default function DesignCanvasScreen() {
               onPress={handleUndo} testID="btn-undo"
               accessibilityLabel="Undo"
             >
-              <Feather name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
+              <Icon name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.sidebarIconBtn, !undoModelRef.current.canRedo && styles.topBtnDisabled]}
               onPress={handleRedo} testID="btn-redo"
               accessibilityLabel="Redo"
             >
-              <Feather name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
+              <Icon name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
             </TouchableOpacity>
           </View>
         </View>
@@ -3951,7 +3952,7 @@ export default function DesignCanvasScreen() {
               <View style={styles.refDragBar} {...referencePanResponder.panHandlers}>
                 <Text style={styles.refDragLabel}>Reference</Text>
                 <TouchableOpacity onPress={() => setReferenceVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Feather name="x" size={12} color={MUTED} />
+                  <Icon name="x" size={12} color={MUTED} />
                 </TouchableOpacity>
               </View>
               <RNImage
@@ -3981,7 +3982,7 @@ export default function DesignCanvasScreen() {
                 onPress={() => animGoToFrame(animCurrentFrame - 1)}
                 disabled={animCurrentFrame === 0}
               >
-                <Feather name="chevron-left" size={14} color={animCurrentFrame === 0 ? SUBTLE : FG} />
+                <Icon name="chevron-left" size={14} color={animCurrentFrame === 0 ? SUBTLE : FG} />
               </TouchableOpacity>
               <Text style={styles.animFrameLabel}>
                 Frame {animCurrentFrame + 1}/{Math.max(1, animFrames.length)}
@@ -3991,10 +3992,10 @@ export default function DesignCanvasScreen() {
                 onPress={() => animGoToFrame(animCurrentFrame + 1)}
                 disabled={animCurrentFrame >= animFrames.length - 1}
               >
-                <Feather name="chevron-right" size={14} color={animCurrentFrame >= animFrames.length - 1 ? SUBTLE : FG} />
+                <Icon name="chevron-right" size={14} color={animCurrentFrame >= animFrames.length - 1 ? SUBTLE : FG} />
               </TouchableOpacity>
               <TouchableOpacity style={[styles.animBtn, { marginLeft: SP.xs }]} onPress={animAddFrame}>
-                <Feather name="plus" size={14} color={FG} />
+                <Icon name="plus" size={14} color={FG} />
                 <Text style={styles.animAddLabel}>Frame</Text>
               </TouchableOpacity>
             </View>
@@ -4019,7 +4020,7 @@ export default function DesignCanvasScreen() {
                 style={styles.subModeChip}
                 onPress={() => openSheet('selection')}
               >
-                <Feather name="settings" size={12} color={MUTED} />
+                <Icon name="settings" size={12} color={MUTED} />
                 <Text style={styles.subModeLabel}>Settings</Text>
               </TouchableOpacity>
               {selectionRegion && (
@@ -4028,7 +4029,7 @@ export default function DesignCanvasScreen() {
                   onPress={() => setSelectionRegion(null)}
                   testID="selection-clear"
                 >
-                  <Feather name="x" size={12} color={MUTED} />
+                  <Icon name="x" size={12} color={MUTED} />
                   <Text style={styles.subModeLabel}>Clear</Text>
                 </TouchableOpacity>
               )}
@@ -4062,7 +4063,7 @@ export default function DesignCanvasScreen() {
                 style={styles.subModeChip}
                 onPress={() => openSheet('transformTool')}
               >
-                <Feather name="settings" size={12} color={MUTED} />
+                <Icon name="settings" size={12} color={MUTED} />
                 <Text style={styles.subModeLabel}>Settings</Text>
               </TouchableOpacity>
             </View>
@@ -4097,7 +4098,7 @@ export default function DesignCanvasScreen() {
                   style={[styles.subModeChip, { marginLeft: SP.sm }]}
                   onPress={() => { if (selectedLayer) resetLayerAdjustments(selectedLayer.id); }}
                 >
-                  <Feather name="refresh-cw" size={12} color={MUTED} />
+                  <Icon name="refresh-cw" size={12} color={MUTED} />
                   <Text style={styles.subModeLabel}>Reset</Text>
                 </TouchableOpacity>
               )}
@@ -4309,7 +4310,7 @@ export default function DesignCanvasScreen() {
                     if (activeTopTool === 'eraser') setEraserSize(v => Math.max(2, v - 2));
                     else setBrushSize(v => Math.max(1, v - 2));
                   }}>
-                    <Feather name="minus" size={14} color={MUTED} />
+                    <Icon name="minus" size={14} color={MUTED} />
                   </TouchableOpacity>
                   <View style={styles.sliderTrack}>
                     <View style={[styles.sliderFill, { width: `${(activeSize / 80) * 100}%` }]} />
@@ -4318,7 +4319,7 @@ export default function DesignCanvasScreen() {
                     if (activeTopTool === 'eraser') setEraserSize(v => Math.min(80, v + 2));
                     else setBrushSize(v => Math.min(80, v + 2));
                   }}>
-                    <Feather name="plus" size={14} color={MUTED} />
+                    <Icon name="plus" size={14} color={MUTED} />
                   </TouchableOpacity>
                   <Text style={styles.sliderValue}>{activeSize}</Text>
                 </View>
@@ -4403,7 +4404,7 @@ export default function DesignCanvasScreen() {
                 setLayerEditOpacity(v);
                 if (layerOptionsTarget) mutateLayer(prev => prev.map(l => l.id === layerOptionsTarget ? { ...l, opacity: v } : l));
               }}>
-                <Feather name="minus" size={ICON.sm} color={MUTED} />
+                <Icon name="minus" size={ICON.sm} color={MUTED} />
               </TouchableOpacity>
               <View style={styles.sliderTrack}>
                 <View style={[styles.sliderFill, { width: `${layerEditOpacity * 100}%` }]} />
@@ -4413,7 +4414,7 @@ export default function DesignCanvasScreen() {
                 setLayerEditOpacity(v);
                 if (layerOptionsTarget) mutateLayer(prev => prev.map(l => l.id === layerOptionsTarget ? { ...l, opacity: v } : l));
               }}>
-                <Feather name="plus" size={ICON.sm} color={MUTED} />
+                <Icon name="plus" size={ICON.sm} color={MUTED} />
               </TouchableOpacity>
             </View>
 
@@ -4594,13 +4595,13 @@ export default function DesignCanvasScreen() {
                   activeOpacity={item.disabled ? 1 : 0.7}
                 >
                   <View style={[styles.exportIcon, item.disabled && { opacity: 0.4 }]}>
-                    <Feather name={item.icon} size={ICON.sm} color={PURPLE_LIGHT} />
+                    <Icon name={item.icon} size={ICON.sm} color={PURPLE_LIGHT} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.exportLabel, item.disabled && { opacity: 0.4 }]}>{item.label}</Text>
                     <Text style={styles.exportSub}>{item.sub}</Text>
                   </View>
-                  {!item.disabled && <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
+                  {!item.disabled && <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />}
                 </TouchableOpacity>
               ));
             })()}
@@ -4683,7 +4684,7 @@ export default function DesignCanvasScreen() {
                   onPress={() => dispatchQuickAction(slot)}
                   testID={`qm-dispatch-${slot}`}
                 >
-                  <Feather name="zap" size={ICON.sm} color={FG} />
+                  <Icon name="zap" size={ICON.sm} color={FG} />
                   <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: FG }}>
                     {action.label}
                   </Text>
@@ -4715,13 +4716,13 @@ export default function DesignCanvasScreen() {
             <View style={styles.sliderRow}>
               <Text style={styles.sliderLabel}>Feather</Text>
               <TouchableOpacity onPress={() => setSelectionFeather(v => Math.max(0, v - 2))}>
-                <Feather name="minus" size={14} color={MUTED} />
+                <Icon name="minus" size={14} color={MUTED} />
               </TouchableOpacity>
               <View style={styles.sliderTrack}>
                 <View style={[styles.sliderFill, { width: `${Math.min(100, selectionFeather * 5)}%` }]} />
               </View>
               <TouchableOpacity onPress={() => setSelectionFeather(v => Math.min(20, v + 2))}>
-                <Feather name="plus" size={14} color={MUTED} />
+                <Icon name="plus" size={14} color={MUTED} />
               </TouchableOpacity>
               <Text style={styles.sliderValue}>{selectionFeather}px</Text>
             </View>
@@ -4734,7 +4735,7 @@ export default function DesignCanvasScreen() {
                 <Text style={styles.fontChipText}>Apply Feather</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.fontChip} onPress={() => setSelectionRegion(null)}>
-                <Feather name="x" size={12} color={MUTED} />
+                <Icon name="x" size={12} color={MUTED} />
                 <Text style={styles.fontChipText}>Clear</Text>
               </TouchableOpacity>
             </View>
@@ -4761,7 +4762,7 @@ export default function DesignCanvasScreen() {
                 onPress={() => setTransformSnapEnabled(v => !v)}
                 testID="transform-snap-toggle"
               >
-                {transformSnapEnabled && <Feather name="check" size={12} color={FG} />}
+                {transformSnapEnabled && <Icon name="check" size={12} color={FG} />}
                 <Text style={[styles.togglePillText, transformSnapEnabled && styles.togglePillTextActive]}>
                   {transformSnapEnabled ? 'On' : 'Off'}
                 </Text>
@@ -4786,7 +4787,7 @@ export default function DesignCanvasScreen() {
                 closeSheet();
               }}
             >
-              <Feather name="refresh-cw" size={12} color={MUTED} />
+              <Icon name="refresh-cw" size={12} color={MUTED} />
               <Text style={styles.fontChipText}>Reset Transform</Text>
             </TouchableOpacity>
           </SheetRise>
@@ -4831,7 +4832,7 @@ export default function DesignCanvasScreen() {
                               onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.max(row.min, +(value - row.step).toFixed(2)) })}
                               testID={`hsb-${row.key}-dec`}
                             >
-                              <Feather name="minus" size={14} color={MUTED} />
+                              <Icon name="minus" size={14} color={MUTED} />
                             </TouchableOpacity>
                             <View style={styles.sliderTrack}>
                               <View style={[styles.sliderFill, { width: `${Math.max(0, Math.min(100, pct))}%` }]} />
@@ -4841,7 +4842,7 @@ export default function DesignCanvasScreen() {
                               onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.min(row.max, +(value + row.step).toFixed(2)) })}
                               testID={`hsb-${row.key}-inc`}
                             >
-                              <Feather name="plus" size={14} color={MUTED} />
+                              <Icon name="plus" size={14} color={MUTED} />
                             </TouchableOpacity>
                             <Text style={[styles.sliderValue, { minWidth: 48 }]} testID={`hsb-${row.key}-value`}>{row.format(value)}</Text>
                           </View>
@@ -4852,7 +4853,7 @@ export default function DesignCanvasScreen() {
                         onPress={() => updateLayerHsb(selectedLayer.id, defaultHsbAdjustment())}
                         testID="hsb-reset"
                       >
-                        <Feather name="refresh-cw" size={12} color={MUTED} />
+                        <Icon name="refresh-cw" size={12} color={MUTED} />
                         <Text style={styles.fontChipText}>Reset</Text>
                       </TouchableOpacity>
                     </View>
@@ -4953,7 +4954,7 @@ export default function DesignCanvasScreen() {
                           const newAdj = { ...adj, [adjustmentsCurveChannel]: { ...curve, points: pts } };
                           if (selectedLayer) updateLayerCurves(selectedLayer.id, newAdj);
                         }}>
-                          <Feather name="minus" size={ICON.sm} color={MUTED} />
+                          <Icon name="minus" size={ICON.sm} color={MUTED} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.animBtn} onPress={() => {
                           // Add midpoint control point if not present
@@ -4966,13 +4967,13 @@ export default function DesignCanvasScreen() {
                           const newAdj = { ...adj, [adjustmentsCurveChannel]: { ...curve, points: bumped } };
                           if (selectedLayer) updateLayerCurves(selectedLayer.id, newAdj);
                         }}>
-                          <Feather name="plus" size={ICON.sm} color={MUTED} />
+                          <Icon name="plus" size={ICON.sm} color={MUTED} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.fontChip} onPress={() => {
                           const newAdj = { ...adj, [adjustmentsCurveChannel]: { channel: adjustmentsCurveChannel, points: [{ t: 0, v: 0 }, { t: 1, v: 1 }] } };
                           if (selectedLayer) updateLayerCurves(selectedLayer.id, newAdj);
                         }}>
-                          <Feather name="refresh-cw" size={12} color={MUTED} />
+                          <Icon name="refresh-cw" size={12} color={MUTED} />
                           <Text style={styles.fontChipText}>Reset</Text>
                         </TouchableOpacity>
                       </View>
@@ -5081,7 +5082,7 @@ function WrenchActionsSheet({
   function ActionCell({
     icon, label, sub, onPress, disabled = false, active = false, testID,
   }: {
-    icon: React.ComponentProps<typeof Feather>['name'];
+    icon: IconName;
     label: string;
     sub?: string;
     onPress: () => void;
@@ -5099,7 +5100,7 @@ function WrenchActionsSheet({
         accessibilityRole="button"
         testID={testID}
       >
-        <Feather name={icon} size={ICON.md} color={active ? FG : disabled ? SUBTLE : MUTED} />
+        <Icon name={icon} size={ICON.md} color={active ? FG : disabled ? SUBTLE : MUTED} />
         <Text style={styles.actionCellLabel}>{label}</Text>
         {sub ? <Text style={styles.actionCellSub}>{sub}</Text> : null}
       </TouchableOpacity>
@@ -5113,7 +5114,7 @@ function WrenchActionsSheet({
         onPress={onPress}
         activeOpacity={0.7}
       >
-        {active && <Feather name="check" size={12} color={FG} />}
+        {active && <Icon name="check" size={12} color={FG} />}
         <Text style={[styles.togglePillText, active && styles.togglePillTextActive]}>{label}</Text>
       </TouchableOpacity>
     );
@@ -5134,13 +5135,13 @@ function WrenchActionsSheet({
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
           <TouchableOpacity style={styles.animBtn} onPress={onDec}>
-            <Feather name="minus" size={ICON.sm} color={MUTED} />
+            <Icon name="minus" size={ICON.sm} color={MUTED} />
           </TouchableOpacity>
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, minWidth: 36, textAlign: 'center' }}>
             {format ? format(value) : String(value)}
           </Text>
           <TouchableOpacity style={styles.animBtn} onPress={onInc}>
-            <Feather name="plus" size={ICON.sm} color={MUTED} />
+            <Icon name="plus" size={ICON.sm} color={MUTED} />
           </TouchableOpacity>
         </View>
       </View>
@@ -5400,13 +5401,13 @@ function WrenchActionsSheet({
                   activeOpacity={item.disabled ? 1 : 0.7}
                 >
                   <View style={[styles.exportIcon, item.disabled && { opacity: 0.4 }]}>
-                    <Feather name={item.icon} size={ICON.sm} color={FG} />
+                    <Icon name={item.icon} size={ICON.sm} color={FG} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.exportLabel, item.disabled && { opacity: 0.4 }]}>{item.label}</Text>
                     <Text style={styles.exportSub}>{item.sub}</Text>
                   </View>
-                  {!item.disabled && <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
+                  {!item.disabled && <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />}
                 </TouchableOpacity>
               ))}
             </View>
@@ -5475,7 +5476,7 @@ function WrenchActionsSheet({
                         onPrefsChange({ ...prefs, pressureCurve: pts });
                       }}
                     >
-                      <Feather name="x" size={12} color={MUTED} />
+                      <Icon name="x" size={12} color={MUTED} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -5493,14 +5494,14 @@ function WrenchActionsSheet({
                   onPrefsChange({ ...prefs, pressureCurve: sorted });
                 }}
               >
-                <Feather name="plus" size={12} color={MUTED} />
+                <Icon name="plus" size={12} color={MUTED} />
                 <Text style={styles.fontChipText}>Add Point</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.fontChip, { alignSelf: 'flex-start', marginTop: SP.xs }]}
                 onPress={() => onPrefsChange({ ...prefs, pressureCurve: [{ force: 0, size: 0.2 }, { force: 1, size: 1 }] })}
               >
-                <Feather name="refresh-cw" size={12} color={MUTED} />
+                <Icon name="refresh-cw" size={12} color={MUTED} />
                 <Text style={styles.fontChipText}>Reset</Text>
               </TouchableOpacity>
 
@@ -5522,7 +5523,7 @@ function WrenchActionsSheet({
                     <Text style={[styles.fontChipText, quickMenuEditSlot === i && { color: PURPLE_LIGHT }]}>
                       {QUICK_MENU_ALL_ACTIONS.find(a => a.key === slot)?.label ?? slot}
                     </Text>
-                    <Feather name="chevron-down" size={12} color={MUTED} />
+                    <Icon name="chevron-down" size={12} color={MUTED} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -5680,13 +5681,13 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
             <Text style={styles.sheetLabel}>Size: {fontSize}pt</Text>
             <View style={styles.sliderRow}>
               <TouchableOpacity onPress={() => setFontSize(v => Math.max(8, v - 2))}>
-                <Feather name="minus" size={14} color={MUTED} />
+                <Icon name="minus" size={14} color={MUTED} />
               </TouchableOpacity>
               <View style={styles.sliderTrack}>
                 <View style={[styles.sliderFill, { width: `${((fontSize - 8) / 192) * 100}%` }]} />
               </View>
               <TouchableOpacity onPress={() => setFontSize(v => Math.min(200, v + 2))}>
-                <Feather name="plus" size={14} color={MUTED} />
+                <Icon name="plus" size={14} color={MUTED} />
               </TouchableOpacity>
               <Text style={styles.sliderValue}>{fontSize}</Text>
             </View>
@@ -5694,13 +5695,13 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
             <Text style={styles.sheetLabel}>Letter spacing: {letterSpacing.toFixed(1)}</Text>
             <View style={styles.sliderRow} testID="letter-spacing-row">
               <TouchableOpacity onPress={() => setLetterSpacing(v => Math.max(-2, Math.round((v - 0.5) * 10) / 10))} testID="letter-spacing-minus">
-                <Feather name="minus" size={14} color={MUTED} />
+                <Icon name="minus" size={14} color={MUTED} />
               </TouchableOpacity>
               <View style={styles.sliderTrack}>
                 <View style={[styles.sliderFill, { width: `${((letterSpacing + 2) / 12) * 100}%` }]} />
               </View>
               <TouchableOpacity onPress={() => setLetterSpacing(v => Math.min(10, Math.round((v + 0.5) * 10) / 10))} testID="letter-spacing-plus">
-                <Feather name="plus" size={14} color={MUTED} />
+                <Icon name="plus" size={14} color={MUTED} />
               </TouchableOpacity>
               <Text style={styles.sliderValue}>{letterSpacing.toFixed(1)}</Text>
             </View>
@@ -5708,13 +5709,13 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
             <Text style={styles.sheetLabel}>Line height: {lineHeight.toFixed(2)}×</Text>
             <View style={styles.sliderRow} testID="line-height-row">
               <TouchableOpacity onPress={() => setLineHeight(v => Math.max(0.8, Math.round((v - 0.1) * 100) / 100))} testID="line-height-minus">
-                <Feather name="minus" size={14} color={MUTED} />
+                <Icon name="minus" size={14} color={MUTED} />
               </TouchableOpacity>
               <View style={styles.sliderTrack}>
                 <View style={[styles.sliderFill, { width: `${((lineHeight - 0.8) / 1.7) * 100}%` }]} />
               </View>
               <TouchableOpacity onPress={() => setLineHeight(v => Math.min(2.5, Math.round((v + 0.1) * 100) / 100))} testID="line-height-plus">
-                <Feather name="plus" size={14} color={MUTED} />
+                <Icon name="plus" size={14} color={MUTED} />
               </TouchableOpacity>
               <Text style={styles.sliderValue}>{lineHeight.toFixed(2)}</Text>
             </View>
@@ -5730,7 +5731,7 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
               ))}
               {(['left', 'center', 'right'] as const).map(a => (
                 <TouchableOpacity key={a} style={[styles.toggleBtn, align === a && styles.toggleBtnActive]} onPress={() => setAlign(a)}>
-                  <Feather name={`align-${a}` as any} size={13} color={align === a ? PURPLE_LIGHT : MUTED} />
+                  <Icon name={`align-${a}` as any} size={13} color={align === a ? PURPLE_LIGHT : MUTED} />
                 </TouchableOpacity>
               ))}
             </View>

@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
@@ -138,7 +138,7 @@ export function LaunchCountdown({
           <ActivityIndicator size="small" color={subscribed ? colors.foreground : colors.primaryForeground} />
         ) : (
           <>
-            <Feather name={subscribed ? 'check' : 'bell'} size={ICON.sm} color={subscribed ? colors.foreground : colors.primaryForeground} />
+            <Icon name={subscribed ? 'check' : 'bell'} size={ICON.sm} color={subscribed ? colors.foreground : colors.primaryForeground} />
             <Text style={[s.btnText, { color: subscribed ? colors.foreground : colors.primaryForeground }]}>
               {subscribed ? "You'll be notified" : 'Notify me'}
             </Text>

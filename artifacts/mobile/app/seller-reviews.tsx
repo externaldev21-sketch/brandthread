@@ -3,7 +3,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,7 +36,7 @@ function Stars({ rating }: { rating: number }) {
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <Feather
+        <Icon
           key={i}
           name="star"
           size={13}
@@ -100,7 +100,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
       {review.seller_reply ? (
         <View style={s.replyBox}>
           <View style={s.replyHeader}>
-            <Feather name="corner-down-right" size={13} color={theme.accentLight} />
+            <Icon name="corner-down-right" size={13} color={theme.accentLight} />
             <Text style={s.replyLabel}>Your reply</Text>
           </View>
           <Text style={s.replyText}>{review.seller_reply}</Text>
@@ -114,7 +114,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
           onPress={() => setReplying(true)}
           activeOpacity={0.8}
         >
-          <Feather name="message-square" size={13} color={theme.accentLight} />
+          <Icon name="message-square" size={13} color={theme.accentLight} />
           <Text style={s.replyBtnText}>Reply publicly</Text>
         </TouchableOpacity>
       )}
@@ -254,7 +254,7 @@ export default function SellerReviewsScreen() {
           </View>
         ) : (
           <View style={s.center}>
-            <Feather name="star" size={40} color={MUTED} />
+            <Icon name="star" size={40} color={MUTED} />
             <Text style={s.emptyTitle}>No reviews yet</Text>
             <Text style={s.emptyBody}>Reviews from buyers will appear here. Complete orders to start collecting feedback.</Text>
           </View>

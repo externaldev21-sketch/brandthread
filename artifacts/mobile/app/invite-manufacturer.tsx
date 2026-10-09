@@ -12,7 +12,7 @@ import {
   ActivityIndicator, Alert, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -126,7 +126,7 @@ export default function InviteManufacturerScreen() {
         <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xl, gap: SP.md }} keyboardShouldPersistTaps="handled">
           {created ? (
             <View style={s.card} testID="invite-created">
-              <View style={s.successIcon}><Feather name="check" size={26} color={SUCCESS} /></View>
+              <View style={s.successIcon}><Icon name="check" size={26} color={SUCCESS} /></View>
               <Text style={s.title}>Your private link is ready</Text>
               <Text style={s.body}>Send it to {created.companyName} on WhatsApp, WeChat or email. When they sign up, you'll get a notification and a private conversation opens in Messages.</Text>
               <View style={s.linkBox}>
@@ -134,11 +134,11 @@ export default function InviteManufacturerScreen() {
               </View>
               <View style={s.row}>
                 <TouchableOpacity style={[s.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => void shareLink(created)} testID="invite-share">
-                  <Feather name="share" size={16} color={theme.onAccent} />
+                  <Icon name="share" size={16} color={theme.onAccent} />
                   <Text style={[s.primaryText, { color: theme.onAccent }]}>Share link</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.secondaryBtn} onPress={() => created.inviteLink && void copyLink(created.inviteLink)} testID="invite-copy">
-                  <Feather name={copied ? 'check' : 'copy'} size={16} color={FG} />
+                  <Icon name={copied ? 'check' : 'copy'} size={16} color={FG} />
                   <Text style={s.secondaryText}>{copied ? 'Copied' : 'Copy'}</Text>
                 </TouchableOpacity>
               </View>
@@ -156,7 +156,7 @@ export default function InviteManufacturerScreen() {
                     ['message-circle', 'One ongoing conversation for the whole job'],
                     ['credit-card', 'Pay their sample and bulk cards by card or Apple Pay'],
                   ].map(([icon, label]) => (
-                    <View key={label} style={s.point}><Feather name={icon as any} size={14} color={FG} /><Text style={s.pointText}>{label}</Text></View>
+                    <View key={label} style={s.point}><Icon name={icon as any} size={14} color={FG} /><Text style={s.pointText}>{label}</Text></View>
                   ))}
                 </View>
               </View>

@@ -4,7 +4,8 @@
  */
 import React from 'react';
 import { View } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 
 export function VerifiedMark({ size = 14 }: { size?: number }) {
@@ -14,7 +15,7 @@ export function VerifiedMark({ size = 14 }: { size?: number }) {
       accessibilityLabel="Official Brandthread community"
       style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.foreground, alignItems: 'center', justifyContent: 'center' }}
     >
-      <Feather name="check" size={Math.round(size * 0.68)} color={colors.background} />
+      <Icon name="check" size={Math.round(size * 0.68)} color={colors.background} />
     </View>
   );
 }

@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, HapticSwitch, TertiaryButton } from '@/components/BrandthreadUI';
@@ -133,7 +133,7 @@ export default function AiBrandMemoryScreen() {
         <PressableScale style={styles.rebuildRow} onPress={handleRebuild} disabled={rebuilding}>
           {rebuilding
             ? <ActivityIndicator size="small" color={colors.info} />
-            : <Feather name="refresh-cw" size={16} color={colors.info} />
+            : <Icon name="refresh-cw" size={16} color={colors.info} />
           }
           <Text style={styles.rebuildText}>Rebuild from data</Text>
         </PressableScale>

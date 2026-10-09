@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
@@ -105,7 +105,7 @@ export default function SizeChartTemplatesScreen() {
                     </View>
                     {applying === t.id
                       ? <ActivityIndicator color={colors.foreground} />
-                      : <Feather name={productId ? 'check' : 'chevron-right'} size={ICON.sm} color={colors.mutedForeground} />}
+                      : <Icon name={productId ? 'check' : 'chevron-right'} size={ICON.sm} color={colors.mutedForeground} />}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -126,7 +126,7 @@ export default function SizeChartTemplatesScreen() {
                   <Text style={s.rowTitle}>{p.name}</Text>
                   <Text style={s.rowMeta}>{chartSummary(p.chart)}</Text>
                 </View>
-                <Feather name="chevron-right" size={ICON.sm} color={colors.mutedForeground} />
+                <Icon name="chevron-right" size={ICON.sm} color={colors.mutedForeground} />
               </TouchableOpacity>
             ))}
           </View>

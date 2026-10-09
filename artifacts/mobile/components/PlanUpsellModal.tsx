@@ -15,7 +15,7 @@
 
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -97,12 +97,12 @@ export default function PlanUpsellModal({
           >
             {/* Close button */}
             <TouchableOpacity style={s.closeBtn} onPress={handleClose} hitSlop={8}>
-              <Feather name="x" size={18} color={theme.onAccent} style={{ opacity: 0.8 }} />
+              <Icon name="x" size={18} color={theme.onAccent} style={{ opacity: 0.8 }} />
             </TouchableOpacity>
 
             {/* Lock icon */}
             <View style={[s.lockCircle, { backgroundColor: theme.accentDim }]}>
-              <Feather name="lock" size={24} color={theme.accentLight} />
+              <Icon name="lock" size={24} color={theme.accentLight} />
             </View>
 
             <Text style={[s.headerTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Upgrade to {planLabel}</Text>
@@ -134,7 +134,7 @@ export default function PlanUpsellModal({
                     >
                       {/* Colored icon */}
                       <View style={[s.toolIconBg, { backgroundColor: tool.accentDim }]}>
-                        <Feather name={tool.icon} size={16} color={tool.accent} />
+                        <Icon name={tool.icon} size={16} color={tool.accent} />
                       </View>
 
                       {/* Labels */}
@@ -161,7 +161,7 @@ export default function PlanUpsellModal({
                 {GROWTH_EXTRAS.map((perk) => (
                   <View key={perk.label} style={s.perkRow}>
                     <View style={s.checkCircle}>
-                      <Feather name="check" size={12} color={theme.success} />
+                      <Icon name="check" size={12} color={theme.success} />
                     </View>
                     <Text style={s.perkText}>{perk.label}</Text>
                   </View>
@@ -173,7 +173,7 @@ export default function PlanUpsellModal({
                 {plan.features.map((f) => (
                   <View key={f} style={s.perkRow}>
                     <View style={s.checkCircle}>
-                      <Feather name="check" size={12} color={theme.success} />
+                      <Icon name="check" size={12} color={theme.success} />
                     </View>
                     <Text style={s.perkText}>{f}</Text>
                   </View>
@@ -183,7 +183,7 @@ export default function PlanUpsellModal({
 
             {/* ── CTA ── */}
             <TouchableOpacity style={[s.upgradeBtn, { backgroundColor: theme.accent }]} onPress={handleUpgrade} activeOpacity={0.85}>
-              <Feather name="zap" size={16} color={theme.onAccent} />
+              <Icon name="zap" size={16} color={theme.onAccent} />
               <Text style={[s.upgradeBtnText, { color: theme.onAccent }]}>Upgrade to {planLabel}{planPrice ? ` — ${planPrice}/mo` : ''}</Text>
             </TouchableOpacity>
 

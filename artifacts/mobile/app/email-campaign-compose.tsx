@@ -5,7 +5,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -182,7 +182,7 @@ export default function EmailCampaignComposeScreen() {
               style={[st.audRow, { borderColor: audience === a ? c.foreground : c.border }]}>
               <Text style={{ flex: 1, color: c.foreground, fontFamily: audience === a ? FONT.semibold : FONT.regular, fontSize: FS.md }}>{AUDIENCE_LABEL[a]}</Text>
               <Text style={{ color: c.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm }}>{counts?.[a] ?? 0}</Text>
-              {audience === a && <Feather name="check" size={ICON.sm} color={c.foreground} style={{ marginLeft: 8 }} />}
+              {audience === a && <Icon name="check" size={ICON.sm} color={c.foreground} style={{ marginLeft: 8 }} />}
             </PressableScale>
           ))}
         </View>
@@ -205,7 +205,7 @@ export default function EmailCampaignComposeScreen() {
               <PressableScale key={p.id} onPress={() => toggleProduct(p.id)} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={p.name}
                 style={[st.audRow, { borderColor: on ? c.foreground : c.border }]}>
                 <Text numberOfLines={1} style={{ flex: 1, color: c.foreground, fontFamily: on ? FONT.semibold : FONT.regular, fontSize: FS.md }}>{p.name}</Text>
-                {on && <Feather name="check" size={ICON.sm} color={c.foreground} />}
+                {on && <Icon name="check" size={ICON.sm} color={c.foreground} />}
               </PressableScale>
             );
           })}

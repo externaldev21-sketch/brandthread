@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -302,7 +302,7 @@ export default function StoreFromMoodboardScreen() {
         {/* AI badge */}
         <BrandthreadCard style={[mb.card, { borderColor: PURPLE_DIM, backgroundColor: theme.accentDim }]}>
           <View style={mb.bannerRow}>
-            <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Icon name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={[mb.bannerText, { color: PURPLE_LIGHT }]}>
               We'll pull your colors, type and vibe from your mood board.
             </Text>
@@ -322,7 +322,7 @@ export default function StoreFromMoodboardScreen() {
                 onPress={() => removeImage(idx)}
                 disabled={preparingImages}
               >
-                <Feather name="x" size={12} color={FG} />
+                <Icon name="x" size={12} color={FG} />
               </TouchableOpacity>
             </View>
           ))}
@@ -335,7 +335,7 @@ export default function StoreFromMoodboardScreen() {
               disabled={preparingImages}
               accessibilityState={{ disabled: preparingImages }}
             >
-              <Feather name="plus" size={ICON.md} color={PURPLE_LIGHT} />
+              <Icon name="plus" size={ICON.md} color={PURPLE_LIGHT} />
               <Text style={mb.addTileLabel}>Add</Text>
             </TouchableOpacity>
           )}
@@ -366,7 +366,7 @@ export default function StoreFromMoodboardScreen() {
         {analysisFailure && (
           <BrandthreadCard style={[mb.card, mb.importFailureCard]}>
             <View style={mb.bannerRow}>
-              <Feather name="image" size={ICON.sm} color={PURPLE_LIGHT} />
+              <Icon name="image" size={ICON.sm} color={PURPLE_LIGHT} />
               <View style={mb.applyFailureCopy}>
                 <Text style={mb.applyFailureTitle}>Images too large</Text>
                 <Text style={mb.applyFailureText}>{analysisFailure.message}</Text>
@@ -379,7 +379,7 @@ export default function StoreFromMoodboardScreen() {
               accessibilityRole="button"
               accessibilityLabel="Retry analyzing this mood board"
             >
-              <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+              <Icon name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
               <Text style={mb.applyRetryText}>Retry analysis</Text>
             </TouchableOpacity>
           </BrandthreadCard>
@@ -391,13 +391,13 @@ export default function StoreFromMoodboardScreen() {
             {result.source === 'fallback' && (
               <BrandthreadCard style={[mb.card, { borderColor: `${theme.warning}66`, backgroundColor: `${theme.warning}12` }]}>
                 <View style={mb.bannerRow}>
-                  <Feather name="alert-triangle" size={ICON.sm} color={theme.warning} />
+                  <Icon name="alert-triangle" size={ICON.sm} color={theme.warning} />
                   <Text style={[mb.bannerText, { color: theme.warning }]}>
                     We couldn't fully analyze your images — showing a suggested starting point.
                   </Text>
                 </View>
                 <TouchableOpacity style={mb.retryBtn} onPress={handleAnalyze} disabled={analyzing || restoringAnalysis}>
-                  <Feather name="refresh-cw" size={12} color={theme.warning} />
+                  <Icon name="refresh-cw" size={12} color={theme.warning} />
                   <Text style={[mb.retryText, { color: theme.warning }]}>Retry Analysis</Text>
                 </TouchableOpacity>
               </BrandthreadCard>
@@ -452,7 +452,7 @@ export default function StoreFromMoodboardScreen() {
             {applyFailure && (
               <BrandthreadCard style={[mb.card, mb.applyFailureCard]}>
                 <View style={mb.bannerRow}>
-                  <Feather
+                  <Icon
                     name={applyFailure.kind === 'network' ? 'wifi-off' : 'server'}
                     size={ICON.sm}
                     color={PURPLE_LIGHT}
@@ -477,7 +477,7 @@ export default function StoreFromMoodboardScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Retry applying these store settings"
                 >
-                  <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+                  <Icon name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
                   <Text style={mb.applyRetryText}>Retry apply</Text>
                 </TouchableOpacity>
               </BrandthreadCard>

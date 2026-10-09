@@ -29,7 +29,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS, useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -254,9 +254,9 @@ export function MediaCropper({
         {/* Zoom slider — the web fallback for pinch, alongside the wheel
             listener above; also usable on touch as a coarse zoom control. */}
         <View style={s.sliderRow} testID="media-cropper-zoom-slider">
-          <Feather name="zoom-out" size={16} color={theme.muted} />
+          <Icon name="zoom-out" size={16} color={theme.muted} />
           <ZoomTrack value={sliderScale} min={MIN_SCALE_DEFAULT} max={MAX_SCALE_DEFAULT} onChange={applySliderScale} />
-          <Feather name="zoom-in" size={16} color={theme.muted} />
+          <Icon name="zoom-in" size={16} color={theme.muted} />
         </View>
         <Text style={[s.hint, { color: theme.muted }]}>Drag to reposition · Pinch or use the slider to zoom</Text>
       </View>

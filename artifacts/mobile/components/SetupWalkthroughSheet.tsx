@@ -11,7 +11,7 @@ import {
   Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Pressable,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -136,7 +136,7 @@ export default function SetupWalkthroughSheet({
               accessibilityRole="button"
               accessibilityLabel="Close setup walkthrough"
             >
-              <Feather name="x" size={ICON.md} color={theme.muted} />
+              <Icon name="x" size={ICON.md} color={theme.muted} />
             </TouchableOpacity>
           </View>
 
@@ -167,8 +167,8 @@ export default function SetupWalkthroughSheet({
                     // accents — LIVE-red, end-call-red, Thread Cash green).
                     (task.completed || isActive) && { backgroundColor: theme.accent },
                   ]}>
-                    <Feather
-                      name={task.completed ? 'check' : (task.icon as keyof typeof Feather.glyphMap)}
+                    <Icon
+                      name={task.completed ? 'check' : (task.icon as IconName)}
                       size={ICON.sm}
                       color={task.completed || isActive ? theme.onAccent : theme.muted}
                     />

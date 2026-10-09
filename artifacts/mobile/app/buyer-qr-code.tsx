@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -78,7 +78,7 @@ export default function BuyerQRCode() {
             </View>
           ) : (
             <View style={[s.qrWrap, { alignItems: 'center', justifyContent: 'center' }]}>
-              <Feather name="user-x" size={40} color={MUTED} />
+              <Icon name="user-x" size={40} color={MUTED} />
               <Text style={[s.hint, { marginTop: 8, marginBottom: 0 }]}>Set a username to generate your QR code</Text>
             </View>
           )}
@@ -99,7 +99,7 @@ export default function BuyerQRCode() {
         {/* Share button */}
         <TouchableOpacity onPress={handleShare} activeOpacity={0.85} style={s.shareBtnWrap}>
           <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.shareBtn}>
-            <Feather name="share-2" size={18} color={theme.onAccent} />
+            <Icon name="share-2" size={18} color={theme.onAccent} />
             <Text style={[s.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Share QR Code</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -107,13 +107,13 @@ export default function BuyerQRCode() {
         {/* Info rows */}
         <View style={s.infoCard}>
           <View style={s.infoRow}>
-            <Feather name="user" size={17} color={PURPLE} />
+            <Icon name="user" size={17} color={PURPLE} />
             <Text style={s.infoLabel}>Profile</Text>
             <Text style={s.infoValue}>{profile?.name ?? 'Your Name'}</Text>
           </View>
           <View style={s.divider} />
           <View style={s.infoRow}>
-            <Feather name="link" size={17} color={PURPLE} />
+            <Icon name="link" size={17} color={PURPLE} />
             <Text style={s.infoLabel}>Link</Text>
             <Text style={s.infoValue} numberOfLines={1}>{qrValue}</Text>
           </View>

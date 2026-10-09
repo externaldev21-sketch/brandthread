@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -523,7 +523,7 @@ function DiscoverCard({
       <View style={styles.brandRow}>
         {item.rank <= 3 && (
           <View style={styles.rankBadge}>
-            <Feather name="trending-up" size={11} color="#FFFFFF" />
+            <Icon name="trending-up" size={11} color="#FFFFFF" />
             <Text style={styles.rankBadgeText}>#{item.rank} TRENDING</Text>
           </View>
         )}
@@ -534,7 +534,7 @@ function DiscoverCard({
           <View style={styles.brandInner}>
             <Text style={[styles.brandName, { color: theme.text }]} numberOfLines={1}>{item.brandName}</Text>
             {item.brandVerified && (
-              <Feather name="check-circle" size={13} color={theme.accent} style={{ marginLeft: 4 }} />
+              <Icon name="check-circle" size={13} color={theme.accent} style={{ marginLeft: 4 }} />
             )}
           </View>
         </PressableScale>
@@ -556,7 +556,7 @@ function DiscoverCard({
               />
             ) : (
               <View style={[styles.heroImage, styles.heroFallback, { width: cardWidth * 0.72, height: cardWidth * 0.72 }]}>
-                <Feather name="image" size={40} color="#FFFFFF88" />
+                <Icon name="image" size={40} color="#FFFFFF88" />
               </View>
             )}
           </Animated.View>
@@ -583,7 +583,7 @@ function DiscoverCard({
             }}
           >
             <View ref={priceRef} collapsable={false} style={styles.actionBtnInner}>
-              <Feather name="shopping-cart" size={16} color="#FFFFFF" />
+              <Icon name="shopping-cart" size={16} color="#FFFFFF" />
               <Text style={styles.secondaryBtnText}>Add to Cart</Text>
             </View>
           </PressableScale>

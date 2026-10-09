@@ -9,7 +9,7 @@ import {
   Alert, Image, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -208,7 +208,7 @@ export default function DesignBrandAssetsScreen() {
           </View>
         ) : (
           <View style={bas.placeholderThumb}>
-            <Feather name={assetTypeIcon(item.type)} size={ICON.lg} color={PURPLE_LIGHT} />
+            <Icon name={assetTypeIcon(item.type)} size={ICON.lg} color={PURPLE_LIGHT} />
           </View>
         )}
 
@@ -279,7 +279,7 @@ export default function DesignBrandAssetsScreen() {
         onPress={handleAddAsset}
         activeOpacity={0.85}
       >
-        <Feather name="upload" size={ICON.md} color={theme.onAccent} />
+        <Icon name="upload" size={ICON.md} color={theme.onAccent} />
         <Text style={bas.fabText}>Upload Asset</Text>
       </TouchableOpacity>
     </View>
@@ -298,8 +298,8 @@ function isLightColor(hex: string): boolean {
   }
 }
 
-function assetTypeIcon(type: BrandAssetType): keyof typeof Feather.glyphMap {
-  const map: Record<BrandAssetType, keyof typeof Feather.glyphMap> = {
+function assetTypeIcon(type: BrandAssetType): IconName {
+  const map: Record<BrandAssetType, IconName> = {
     logo:       'award',
     icon:       'aperture',
     font:       'type',

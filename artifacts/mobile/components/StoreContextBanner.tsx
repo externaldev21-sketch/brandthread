@@ -7,7 +7,7 @@ import {
   Text,
   TouchableOpacity,
   View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -159,7 +159,7 @@ export default function StoreContextBanner() {
       <View style={styles.root} accessibilityRole="summary">
         <View style={styles.message}>
           <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
-            <Feather name="users" size={13} color={theme.accentLight} />
+            <Icon name="users" size={13} color={theme.accentLight} />
           </View>
           <Text style={styles.label} numberOfLines={1}>
              Active store: <Text style={styles.ownerName}>{activeStoreName}</Text>
@@ -195,7 +195,7 @@ export default function StoreContextBanner() {
                  accessibilityLabel="Close store switcher"
                  style={styles.closeButton}
                >
-                 <Feather name="x" size={18} color={FG} />
+                 <Icon name="x" size={18} color={FG} />
                </TouchableOpacity>
              </View>
 
@@ -219,7 +219,7 @@ export default function StoreContextBanner() {
                    ]}
                  >
                    <View style={[styles.storeIcon, { backgroundColor: theme.accentDim }]}>
-                     <Feather
+                     <Icon
                        name={membership.id === 'own' ? 'home' : 'users'}
                        size={15}
                        color={theme.accentLight}
@@ -238,8 +238,8 @@ export default function StoreContextBanner() {
                    {loading
                      ? <ActivityIndicator size="small" color={theme.accentLight} />
                      : selected
-                       ? <Feather name="check" size={17} color={theme.accentLight} />
-                       : <Feather name="chevron-right" size={17} color={MUTED} />}
+                       ? <Icon name="check" size={17} color={theme.accentLight} />
+                       : <Icon name="chevron-right" size={17} color={MUTED} />}
                  </TouchableOpacity>
                );
              })}

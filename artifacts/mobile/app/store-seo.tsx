@@ -5,7 +5,7 @@ import {
   View, Text, ScrollView, TextInput, StyleSheet, Alert, TouchableOpacity, Image, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import {
   FONT, FS, SP, RADIUS, ICON,
@@ -136,7 +136,7 @@ export default function StoreSEOScreen() {
             {socialImageUploading ? (
               <ActivityIndicator size="small" color={MUTED} />
             ) : (
-              <Feather name="image" size={ICON.sm} color={MUTED} />
+              <Icon name="image" size={ICON.sm} color={MUTED} />
             )}
             <Text style={se.uploadBtnText}>{seo.socialImageUri ? 'Change social image' : 'Upload Social Image'}</Text>
           </TouchableOpacity>
@@ -180,7 +180,7 @@ export default function StoreSEOScreen() {
           </View>
           {!seo.searchVisible && (
             <View style={[se.warnBanner, { backgroundColor: RED_DIM, borderColor: RED }]}>
-              <Feather name="alert-circle" size={ICON.sm} color={RED} />
+              <Icon name="alert-circle" size={ICON.sm} color={RED} />
               <Text style={[se.warnText, { color: RED }]}>Your store won't appear in search results.</Text>
             </View>
           )}

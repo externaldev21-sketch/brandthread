@@ -11,7 +11,7 @@ import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { PressableScale, SearchBar } from '@/components/BrandthreadUI';
@@ -311,7 +311,7 @@ export default function CommunityMembersScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Actions for ${m.name}`}
           >
-            <Feather name="more-horizontal" size={20} color={colors.mutedForeground} />
+            <Icon name="more-horizontal" size={20} color={colors.mutedForeground} />
           </PressableScale>
         ) : null}
       </View>
@@ -323,7 +323,7 @@ export default function CommunityMembersScreen() {
       {loadingMore ? <ActivityIndicator color={colors.mutedForeground} style={{ paddingVertical: SP.md }} /> : null}
       {role && !debounced ? (
         <PressableScale onPress={leave} style={styles.leaveRow} accessibilityRole="button" accessibilityLabel="Leave group">
-          <Feather name="log-out" size={18} color={colors.destructive} />
+          <Icon name="log-out" size={18} color={colors.destructive} />
           <Text style={[styles.leaveText, { color: colors.destructive }]}>Leave group</Text>
         </PressableScale>
       ) : null}

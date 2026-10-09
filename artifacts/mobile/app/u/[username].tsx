@@ -30,7 +30,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -185,7 +185,7 @@ function PublicProfileLanding({
               )}
               {profile.verified && (
                 <View style={styles.verifiedBadge} accessibilityLabel="Verified">
-                  <Feather name="check" size={10} color={theme.background} />
+                  <Icon name="check" size={10} color={theme.background} />
                 </View>
               )}
             </View>
@@ -199,7 +199,7 @@ function PublicProfileLanding({
                 </Text>
                 {profile.verified && (
                   <View style={styles.verifiedInline} accessibilityLabel="Verified account">
-                    <Feather name="check-circle" size={ICON.xs} color={theme.success} />
+                    <Icon name="check-circle" size={ICON.xs} color={theme.success} />
                     <Text style={styles.verifiedText}>Verified</Text>
                   </View>
                 )}
@@ -211,7 +211,7 @@ function PublicProfileLanding({
         <View style={styles.landingBody}>
           {/* Account type label */}
           <View style={styles.accountTypePill}>
-            <Feather
+            <Icon
               name={profile.accountType === 'seller' ? 'shopping-bag' : 'user'}
               size={ICON.xs}
               color={theme.muted}
@@ -384,7 +384,7 @@ export default function PublicProfileRoute() {
         <ScreenHeader title="Profile" onBack={() => { hapticLight(); goBackOr(router); }} />
         <View style={styles.center}>
           <View style={styles.iconBox}>
-            <Feather name="user-x" size={40} color={theme.muted} />
+            <Icon name="user-x" size={40} color={theme.muted} />
           </View>
           <Text style={styles.notFoundTitle}>Profile not found</Text>
           <Text style={styles.notFoundDesc}>
@@ -411,7 +411,7 @@ export default function PublicProfileRoute() {
       <View style={styles.root}>
         <ScreenHeader title="Profile" onBack={() => { hapticLight(); goBackOr(router); }} />
         <View style={styles.center}>
-          <Feather name="wifi-off" size={40} color={theme.muted} />
+          <Icon name="wifi-off" size={40} color={theme.muted} />
           <Text style={styles.notFoundTitle}>Couldn't load this profile</Text>
           <Text style={styles.notFoundDesc}>{state.message}</Text>
           <PressableScale

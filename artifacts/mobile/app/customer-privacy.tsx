@@ -4,7 +4,7 @@ import { useColors } from '@/hooks/useColors';
 import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT } from '@/lib/theme';
 
 /**
@@ -21,7 +21,7 @@ export default function CustomerPrivacyScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Customer privacy" onBack={() => goBackOr(router, "/seller-settings")} />
       <View style={styles.empty}>
-        <Feather name="shield" size={28} color={colors.mutedForeground} />
+        <Icon name="shield" size={28} color={colors.mutedForeground} />
         <Text style={[styles.title, { color: colors.foreground }]}>Not available yet</Text>
         <Text style={[styles.body, { color: colors.mutedForeground }]}>
           Privacy and data-sharing settings aren{'’'}t configurable from the app yet.

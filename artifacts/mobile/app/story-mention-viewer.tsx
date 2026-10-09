@@ -24,7 +24,8 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -388,7 +389,7 @@ export default function StoryMentionViewerScreen() {
           <View style={styles.loadingTrack} />
         ) : (
           <>
-            <Feather name="slash" size={40} color="rgba(255,255,255,0.3)" />
+            <Icon name="slash" size={40} color="rgba(255,255,255,0.3)" />
             <Text style={styles.emptyText}>Story unavailable</Text>
           </>
         )}
@@ -415,7 +416,7 @@ export default function StoryMentionViewerScreen() {
       <Animated.View style={[styles.shrinkLayer, { transform: [{ translateY: dragY }, { scale }], opacity }]}>
         {currentUnavailable ? (
           <View style={[StyleSheet.absoluteFill, styles.centered]}>
-            <Feather name="slash" size={40} color="rgba(255,255,255,0.3)" />
+            <Icon name="slash" size={40} color="rgba(255,255,255,0.3)" />
             <Text style={styles.emptyText}>Story unavailable</Text>
           </View>
         ) : (
@@ -509,7 +510,7 @@ export default function StoryMentionViewerScreen() {
                 testID="story-mention-add"
                 noMinHeight
               >
-                <Feather name="plus-circle" size={ICON.md} color={ON_DARK} />
+                <Icon name="plus-circle" size={ICON.md} color={ON_DARK} />
                 <Text style={styles.addLabel}>Add to your story</Text>
               </PressableScale>
             </View>
@@ -544,7 +545,7 @@ export default function StoryMentionViewerScreen() {
                 <Animated.View style={{ transform: [{ scale: heartPop }] }}>
                   {isLiked
                     ? <FontAwesome name="heart" size={ICON.lg} color={theme.text} />
-                    : <Feather name="heart" size={ICON.lg} color={theme.text} />}
+                    : <Icon name="heart" size={ICON.lg} color={theme.text} />}
                 </Animated.View>
               </PressableScale>
             )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform, type StyleProp, type ViewStyle, type ImageStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -33,7 +33,7 @@ export type ChatAttachmentCardProps = {
   /** Product photo. Omit (or leave null) for an order card, which shows
    *  `icon` in a centered circle instead — orders have no single photo. */
   imageUri?: string | null;
-  icon?: React.ComponentProps<typeof Feather>['name'];
+  icon?: IconName;
   iconColor?: string;
   title: string;
   /** Price (product) or a plain subtitle line (order, when no status badge
@@ -46,7 +46,7 @@ export type ChatAttachmentCardProps = {
   statusBadge?: React.ReactNode;
   unavailable?: boolean;
   footerLabel: string;
-  footerIcon: React.ComponentProps<typeof Feather>['name'];
+  footerIcon: IconName;
   onPress: () => void;
   accessibilityLabel: string;
   testID?: string;
@@ -115,7 +115,7 @@ export function ChatAttachmentCard({
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
             <View style={[s.iconCircle, { backgroundColor: theme.card }]}>
-              <Feather name={icon} size={26} color={iconColor ?? theme.accent} />
+              <Icon name={icon} size={26} color={iconColor ?? theme.accent} />
             </View>
           </View>
         )}
@@ -143,7 +143,7 @@ export function ChatAttachmentCard({
 
       <View style={[s.footer, { borderTopColor: theme.border }]} accessibilityRole="none">
         <Text style={[s.footerText, { color: theme.text }]}>{footerLabel}</Text>
-        <Feather name={footerIcon} size={13} color={theme.text} style={s.footerIcon} />
+        <Icon name={footerIcon} size={13} color={theme.text} style={s.footerIcon} />
       </View>
     </PressableScale>
   );

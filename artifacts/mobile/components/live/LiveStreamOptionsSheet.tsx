@@ -11,7 +11,7 @@
  */
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -41,7 +41,7 @@ export function LiveStreamOptionsSheet({
           accessibilityRole="button"
           accessibilityLabel="Report live stream"
         >
-          <Feather name="flag" size={19} color={theme.text} style={styles.rowIcon} />
+          <Icon name="flag" size={19} color={theme.text} style={styles.rowIcon} />
           <Text style={[styles.rowLabel, { color: theme.text }]}>Report live stream</Text>
         </Pressable>
         <Pressable
@@ -50,7 +50,7 @@ export function LiveStreamOptionsSheet({
           accessibilityRole="button"
           accessibilityLabel={`Block ${hostName}`}
         >
-          <Feather name="slash" size={19} color={theme.text} style={styles.rowIcon} />
+          <Icon name="slash" size={19} color={theme.text} style={styles.rowIcon} />
           <Text style={[styles.rowLabel, { color: theme.text }]}>Block {hostName}</Text>
         </Pressable>
         <View style={[styles.divider, { backgroundColor: theme.border }]} />

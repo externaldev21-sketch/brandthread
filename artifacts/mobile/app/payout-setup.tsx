@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import * as Haptics from 'expo-haptics';
@@ -138,7 +138,7 @@ export default function PayoutSetupScreen() {
         <>
           <ScrollView contentContainerStyle={styles.content} testID="payout-setup-scroll">
             {complete && (
-              <View style={styles.readyBadge}><Feather name="check" size={28} color={theme.onAccent} /></View>
+              <View style={styles.readyBadge}><Icon name="check" size={28} color={theme.onAccent} /></View>
             )}
             <Text style={styles.headTitle} testID="payout-setup-title">{headline?.title}</Text>
             <Text style={styles.headBody}>{headline?.body}</Text>
@@ -203,13 +203,13 @@ function StepIcon({ status, theme }: { status: SetupStep['status']; theme: AppTh
   if (status === 'complete') {
     return (
       <View style={[iconStyles.circle, { backgroundColor: theme.text, borderColor: theme.text }]}>
-        <Feather name="check" size={14} color={theme.background} />
+        <Icon name="check" size={14} color={theme.background} />
       </View>
     );
   }
   return (
     <View style={[iconStyles.circle, { borderColor: theme.muted }]}>
-      {status === 'in_review' && <Feather name="clock" size={13} color={theme.muted} />}
+      {status === 'in_review' && <Icon name="clock" size={13} color={theme.muted} />}
     </View>
   );
 }

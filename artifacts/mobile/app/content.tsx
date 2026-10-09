@@ -4,7 +4,7 @@ import {
   ScrollView, FlatList, View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
@@ -24,7 +24,7 @@ type FilterTab = 'all' | ContentStatus;
 
 // Only types that create-post.tsx actually supports today. See docs/polish/punch-list.md
 // ("Seller: create post, AI, analytics & finance" — content.tsx item) for why the rest were cut.
-const getContentTypes = (primary: string, secondary: string, colors: ReturnType<typeof useColors>): { type: ContentType; label: string; icon: keyof typeof Feather.glyphMap; color: string }[] => [
+const getContentTypes = (primary: string, secondary: string, colors: ReturnType<typeof useColors>): { type: ContentType; label: string; icon: IconName; color: string }[] => [
   { type: 'video',        label: 'Video Post',      icon: 'video',        color: primary },
   { type: 'image',        label: 'Image Post',      icon: 'image',        color: colors.subtle },
 ];
@@ -46,8 +46,8 @@ function statusColor(s: ContentStatus, colors: ReturnType<typeof useColors>): st
   }
 }
 
-function typeIcon(t: ContentType): keyof typeof Feather.glyphMap {
-  const map: Record<ContentType, keyof typeof Feather.glyphMap> = {
+function typeIcon(t: ContentType): IconName {
+  const map: Record<ContentType, IconName> = {
     video: 'video', image: 'image', slideshow: 'layers', story: 'circle',
     announcement: 'bell', countdown: 'clock', behind_scenes: 'camera', poll: 'bar-chart-2',
   };
@@ -281,7 +281,7 @@ export default function ContentScreen() {
               accessibilityLabel={post.caption || 'Untitled post'}
             >
               <View style={[s.postThumb, { backgroundColor: colors.elevated }]}>
-                <Feather name={typeIcon(post.type)} size={ICON.md} color={colors.mutedForeground} />
+                <Icon name={typeIcon(post.type)} size={ICON.md} color={colors.mutedForeground} />
               </View>
               <View style={s.postBody}>
                 <View style={s.postTopRow}>
@@ -299,11 +299,11 @@ export default function ContentScreen() {
                 {post.status === 'published' && (
                   <View style={s.postMetrics}>
                     <View style={s.metric}>
-                      <Feather name="heart" size={ICON.xs - 3} color={colors.mutedForeground} />
+                      <Icon name="heart" size={ICON.xs - 3} color={colors.mutedForeground} />
                       <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.likes.toLocaleString()}</Text>
                     </View>
                     <View style={s.metric}>
-                      <Feather name="message-circle" size={ICON.xs - 3} color={colors.mutedForeground} />
+                      <Icon name="message-circle" size={ICON.xs - 3} color={colors.mutedForeground} />
                       <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.comments}</Text>
                     </View>
                   </View>
@@ -321,7 +321,7 @@ export default function ContentScreen() {
               >
                 {deletingPostId === post.id
                   ? <ActivityIndicator size="small" color={colors.mutedForeground} />
-                  : <Feather name="more-horizontal" size={ICON.sm} color={colors.mutedForeground} />}
+                  : <Icon name="more-horizontal" size={ICON.sm} color={colors.mutedForeground} />}
               </TouchableOpacity>
             </TouchableOpacity>
           </View>
@@ -362,7 +362,7 @@ export default function ContentScreen() {
                 accessibilityLabel={`Create a ${ct.label}`}
               >
                 <View style={[s.typeIcon, { backgroundColor: ct.color + '20' }]}>
-                  <Feather name={ct.icon} size={ICON.md} color={ct.color} />
+                  <Icon name={ct.icon} size={ICON.md} color={ct.color} />
                 </View>
                 <Text style={[s.typeLabel, { color: colors.foreground }]}>{ct.label}</Text>
               </TouchableOpacity>
@@ -427,7 +427,7 @@ export default function ContentScreen() {
           ) : posts.length === 0 ? (
             <View style={s.empty}>
               <View style={[s.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Feather name="video" size={ICON.lg} color={colors.mutedForeground} />
+                <Icon name="video" size={ICON.lg} color={colors.mutedForeground} />
               </View>
               <Text style={[s.emptyTitle, { color: colors.foreground }]}>No {tabLabel}posts yet</Text>
               <Text style={[s.emptyDesc, { color: colors.mutedForeground }]}>Create content to engage your audience.</Text>

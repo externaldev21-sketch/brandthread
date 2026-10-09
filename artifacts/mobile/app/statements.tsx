@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { File, Paths } from 'expo-file-system';
@@ -254,7 +254,7 @@ export default function StatementsScreen() {
                 {m.netCents !== null && (
                   <Text style={[styles.monthNet, TABULAR_NUMS]}>{formatSignedCents(m.netCents)}</Text>
                 )}
-                <Feather name="chevron-right" size={18} color={theme.muted} style={{ marginLeft: SP.sm }} />
+                <Icon name="chevron-right" size={18} color={theme.muted} style={{ marginLeft: SP.sm }} />
               </TouchableOpacity>
             ))}
           </View>

@@ -8,7 +8,7 @@ import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -208,7 +208,7 @@ export default function StudioScreen() {
             onPress={() => router.push('/design' as never)}
             activeOpacity={0.8}
           >
-            <Feather name="folder" size={14} color={theme.accentLight} />
+            <Icon name="folder" size={14} color={theme.accentLight} />
             <Text style={s.myProjectsBtnText}>My Projects</Text>
           </TouchableOpacity>
         )}
@@ -244,7 +244,7 @@ export default function StudioScreen() {
                 {/* Icon row */}
                 <View style={s.toolCardTop}>
                   <View style={[s.toolIconBg, { backgroundColor: toolAccentDim }]}>
-                    <Feather name={tool.icon} size={ICON.sm} color={toolAccent} />
+                    <Icon name={tool.icon} size={ICON.sm} color={toolAccent} />
                   </View>
                   {isLocked ? (
                     <LockBadge locked />
@@ -306,7 +306,7 @@ export default function StudioScreen() {
                   </View>
                   <Text style={s.projCta}>Tap to open →</Text>
                 </View>
-                <Feather name="chevron-right" size={16} color={theme.muted} />
+                <Icon name="chevron-right" size={16} color={theme.muted} />
               </TouchableOpacity>
             );
           })
@@ -316,9 +316,9 @@ export default function StudioScreen() {
             activeOpacity={0.8}
             onPress={() => router.push('/design' as never)}
           >
-            <Feather name="folder" size={20} color={theme.muted} style={{ marginRight: SP.sm }} />
+            <Icon name="folder" size={20} color={theme.muted} style={{ marginRight: SP.sm }} />
             <Text style={s.projEmptyText}>No projects yet — tap to create your first</Text>
-            <Feather name="chevron-right" size={14} color={theme.muted} />
+            <Icon name="chevron-right" size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
 

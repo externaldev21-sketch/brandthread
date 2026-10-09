@@ -11,7 +11,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated, Keyboard, Platform, Pressable, StyleSheet, View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -187,7 +187,7 @@ export default function AIBrainFAB({
             end={{ x: 1, y: 1 }}
             style={styles.tab}
           >
-            <Feather name="chevron-left" size={18} color={theme.onAccent} />
+            <Icon name="chevron-left" size={18} color={theme.onAccent} />
           </LinearGradient>
         )}
       </Pressable>

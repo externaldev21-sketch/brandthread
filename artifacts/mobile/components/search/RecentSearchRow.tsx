@@ -1,6 +1,6 @@
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
@@ -34,7 +34,7 @@ export function RecentSearchRow({ term, onPress, onRemove }: { term: string; onP
       >
         <Animated.View style={[styles.tapAreaInner, { transform: [{ scale }] }]}>
           <View style={[styles.iconWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Feather name="clock" size={18} color={theme.muted} />
+            <Icon name="clock" size={18} color={theme.muted} />
           </View>
           <Text style={[styles.term, { color: theme.text }]} numberOfLines={1}>{term}</Text>
         </Animated.View>
@@ -46,7 +46,7 @@ export function RecentSearchRow({ term, onPress, onRemove }: { term: string; onP
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         style={styles.removeBtn}
       >
-        <Feather name="x" size={18} color={theme.muted} />
+        <Icon name="x" size={18} color={theme.muted} />
       </TouchableOpacity>
     </View>
   );

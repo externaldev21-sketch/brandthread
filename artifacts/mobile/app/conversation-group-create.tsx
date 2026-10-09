@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -114,7 +114,7 @@ export default function ConversationGroupCreateScreen() {
                     <Text style={s.avatarInitials}>{item.initials}</Text>
                   </View>
                   <Text style={[s.rowName, { color: theme.text }]}>{item.name}</Text>
-                  <Feather name={checked ? 'check-circle' : 'circle'} size={ICON.md} color={checked ? theme.accent : theme.border} />
+                  <Icon name={checked ? 'check-circle' : 'circle'} size={ICON.md} color={checked ? theme.accent : theme.border} />
                 </View>
               </PressableScale>
             );

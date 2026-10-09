@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP } from '@/lib/theme';
@@ -12,7 +12,7 @@ const TRIGGER_DISTANCE = 64;
 interface SwipeActionRowProps {
   children: React.ReactNode;
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   color: string;
   onAction: () => void | Promise<void>;
   disabled?: boolean;
@@ -84,7 +84,7 @@ export default function SwipeActionRow({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
       >
-        <Feather name={icon} size={18} color={theme.onAccent} />
+        <Icon name={icon} size={18} color={theme.onAccent} />
         <Text style={[styles.actionText, { color: theme.onAccent }]}>{label}</Text>
       </AnimatedPressable>
       <Animated.View

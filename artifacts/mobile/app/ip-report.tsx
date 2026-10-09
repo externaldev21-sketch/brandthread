@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useApi } from '@/hooks/useApi';
 import { BrandthreadHeader, BrandthreadScreen, PrimaryButton, SecondaryButton, PressableScale } from '@/components/BrandthreadUI';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -71,7 +71,7 @@ export default function IpReportScreen() {
       <Text style={s.label}>Describe your rights</Text><TextInput value={description} onChangeText={setDescription} style={[s.input, s.area]} multiline placeholder="Copyright, trademark, or other rights and why this listing infringes them." placeholderTextColor={theme.subtle} />
       <Text style={s.label}>Evidence URLs (optional)</Text><TextInput value={evidence} onChangeText={setEvidence} style={[s.input, s.area]} multiline autoCapitalize="none" placeholder="One public URL per line" placeholderTextColor={theme.subtle} />
       <PrimaryButton label="Submit report" onPress={submit} loading={submitting} />
-      {cases.length > 0 && <View style={s.cases}><Text style={s.title}>Submitted cases</Text>{cases.map(item => <View key={item.caseReference} style={s.case}><View style={{ flex: 1 }}><Text style={s.ref}>{item.caseReference}</Text><Text style={s.status}>Status: {item.status}</Text></View><PressableScale onPress={() => refreshStatus(item)}><Feather name="refresh-cw" size={18} color={theme.success} /></PressableScale></View>)}</View>}
+      {cases.length > 0 && <View style={s.cases}><Text style={s.title}>Submitted cases</Text>{cases.map(item => <View key={item.caseReference} style={s.case}><View style={{ flex: 1 }}><Text style={s.ref}>{item.caseReference}</Text><Text style={s.status}>Status: {item.status}</Text></View><PressableScale onPress={() => refreshStatus(item)}><Icon name="refresh-cw" size={18} color={theme.success} /></PressableScale></View>)}</View>}
     </ScrollView>
   </BrandthreadScreen>;
 }

@@ -10,7 +10,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   Alert, ActivityIndicator, Animated, Linking, Image, Share,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -440,7 +440,7 @@ export default function FulfillOrderScreen() {
           accessibilityRole="button"
           accessibilityLabel="Close scanner"
         >
-          <Feather name="x" size={ICON.lg} color="#FFFFFF" />
+          <Icon name="x" size={ICON.lg} color="#FFFFFF" />
         </TouchableOpacity>
         <View style={s.scannerHint}>
           <Text style={s.scannerHintText}>Align the barcode within the frame</Text>
@@ -454,7 +454,7 @@ export default function FulfillOrderScreen() {
       <View style={[s.root, s.centered]}>
         <Animated.View style={{ transform: [{ scale: successScale }], opacity: successOpacity, alignItems: 'center', gap: SP.md }}>
           <View style={[s.successCircle, { backgroundColor: `${SUCCESS}26` }]}>
-            <Feather name="check" size={48} color={SUCCESS} />
+            <Icon name="check" size={48} color={SUCCESS} />
           </View>
           <Text style={s.successText}>Order shipped!</Text>
         </Animated.View>
@@ -472,7 +472,7 @@ export default function FulfillOrderScreen() {
           <React.Fragment key={n}>
             <View style={[s.stepDot, step >= n && { backgroundColor: ACCENT }]}>
               {step > n ? (
-                <Feather name="check" size={12} color={ON_ACCENT} />
+                <Icon name="check" size={12} color={ON_ACCENT} />
               ) : (
                 <Text style={[s.stepDotText, step >= n && { color: ON_ACCENT }]}>{n}</Text>
               )}
@@ -500,14 +500,14 @@ export default function FulfillOrderScreen() {
                     <Image source={{ uri: li.imageUri }} style={s.itemThumb} />
                   ) : (
                     <View style={[s.itemThumb, s.itemThumbPlaceholder]}>
-                      <Feather name="image" size={ICON.md} color={SUBTLE} />
+                      <Icon name="image" size={ICON.md} color={SUBTLE} />
                     </View>
                   )}
                   <View style={{ flex: 1 }}>
                     <Text style={s.itemName}>{li.productName}</Text>
                     <Text style={s.itemVariant}>{li.variant}{li.variant ? ' · ' : ''}Qty {li.quantity}</Text>
                   </View>
-                  <Feather
+                  <Icon
                     name={checked[li.id] ? 'check-square' : 'square'}
                     size={ICON.lg}
                     color={checked[li.id] ? SUCCESS : MUTED}
@@ -634,7 +634,7 @@ export default function FulfillOrderScreen() {
             {label && label.status !== 'voided' && (
               <GradientCard colors={[`${SUCCESS}26`, `${SUCCESS}08`]} style={{ borderColor: `${SUCCESS}55` }}>
                 <View style={{ alignItems: 'center', gap: SP.sm }}>
-                  <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
+                  <Icon name="check-circle" size={ICON.xxl} color={SUCCESS} />
                   <Text style={s.successTitle}>Label purchased</Text>
                   <Text style={s.mutedText}>{label.carrier} {label.service} · {formatCents(label.priceCents)}</Text>
                   <Text style={s.mutedText}>Tracking: {label.trackingNumber}</Text>
@@ -652,7 +652,7 @@ export default function FulfillOrderScreen() {
 
             {label && label.status === 'voided' && (
               <BrandthreadCard style={{ alignItems: 'center', gap: SP.sm, borderColor: `${ERROR}55` }}>
-                <Feather name="slash" size={ICON.xxl} color={ERROR} />
+                <Icon name="slash" size={ICON.xxl} color={ERROR} />
                 <Text style={[s.successTitle, { color: ERROR }]}>Label voided</Text>
                 <Text style={s.mutedText}>This label can no longer be used. Buy a new one or enter tracking manually.</Text>
                 <View style={s.dimRow}>

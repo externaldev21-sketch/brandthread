@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SURVEY_SIZE_CATEGORIES, toggleSize, type OnboardingSurvey } from '@/lib/onboardingSurvey';
@@ -51,7 +51,7 @@ export function SizesStep({ sizes, onChange }: Props) {
                   onPress={() => pick(key, option)}
                 >
                   <Text style={[styles.chipText, selected && { color: theme.text }]}>{option}</Text>
-                  {selected && <Feather name="check" size={13} color={theme.text} />}
+                  {selected && <Icon name="check" size={13} color={theme.text} />}
                 </PressableScale>
                 </View>
               );

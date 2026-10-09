@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { FONT, GOLD, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
@@ -22,7 +22,7 @@ export function DiscoverSafetyMenu({
   onClose: () => void;
 }) {
   if (!visible) return null;
-  const items: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; destructive?: boolean }[] = [
+  const items: { icon: IconName; label: string; onPress: () => void; destructive?: boolean }[] = [
     { icon: 'eye-off', label: 'Not interested', onPress: onNotInterested },
     { icon: 'volume-x', label: `Mute ${authorName}`, onPress: onMute },
     { icon: 'flag', label: 'Report', onPress: onReport, destructive: true },
@@ -44,7 +44,7 @@ export function DiscoverSafetyMenu({
               accessibilityRole="button"
               accessibilityLabel={item.label}
             >
-              <Feather name={item.icon} size={18} color={item.destructive ? GOLD : ON_DARK} />
+              <Icon name={item.icon} size={18} color={item.destructive ? GOLD : ON_DARK} />
               <Text style={[styles.label, item.destructive && { color: GOLD }]}>{item.label}</Text>
             </TouchableOpacity>
           ))}

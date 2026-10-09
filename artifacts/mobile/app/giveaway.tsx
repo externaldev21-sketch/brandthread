@@ -7,7 +7,7 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
@@ -62,7 +62,7 @@ export default function GiveawayScreen() {
 
         {g.youWon ? (
           <View style={[styles.banner, { borderColor: c.border }]}>
-            <Feather name="award" size={18} color={c.foreground} />
+            <Icon name="award" size={18} color={c.foreground} />
             <Text style={[styles.note, { color: c.foreground, flex: 1 }]}>You won. {g.seller.name} will be in touch about your prize.</Text>
           </View>
         ) : null}
@@ -71,7 +71,7 @@ export default function GiveawayScreen() {
         {steps.map((s, i) => (
           <View key={i} style={styles.step}>
             <View style={[styles.stepDot, { borderColor: c.border, backgroundColor: s.done ? c.foreground : 'transparent' }]}>
-              {s.done ? <Feather name="check" size={13} color={c.background} /> : <Text style={[styles.stepNum, { color: c.foreground }]}>{i + 1}</Text>}
+              {s.done ? <Icon name="check" size={13} color={c.background} /> : <Text style={[styles.stepNum, { color: c.foreground }]}>{i + 1}</Text>}
             </View>
             <Text style={[styles.stepText, { color: c.foreground }]}>{s.label}</Text>
           </View>

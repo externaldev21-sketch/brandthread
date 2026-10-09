@@ -17,7 +17,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
@@ -122,7 +122,7 @@ function DraftsFolderTile({
         testID="seller-profile-drafts-tile"
         style={[s.draftsTile, { width, height }]}
       >
-        <Feather name="file-text" size={22} color={MUTED} />
+        <Icon name="file-text" size={22} color={MUTED} />
         <Text style={s.draftsTileTitle}>Drafts</Text>
         <Text style={s.draftsTileCount}>{count}</Text>
       </TouchableOpacity>
@@ -745,7 +745,7 @@ export default function ProfileScreen() {
               setPostsLoading(true); void loadPosts();
             }}
             layout={layout}
-            icon={empty.icon as keyof typeof Feather.glyphMap}
+            icon={empty.icon as IconName}
             title={empty.title}
             description={empty.message}
             action={empty.cta ? { label: empty.cta.label, onPress: () => nav(empty.cta!.route) } : undefined}
@@ -803,7 +803,7 @@ export default function ProfileScreen() {
                 disabled={savingProfile}
                 accessibilityLabel="Close profile editor"
               >
-                <Feather name="x" size={18} color={FG} />
+                <Icon name="x" size={18} color={FG} />
               </TouchableOpacity>
             </View>
 

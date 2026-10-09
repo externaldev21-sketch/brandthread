@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -160,7 +160,7 @@ export default function ProductDetailScreen() {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Back"
           >
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
+            <Icon name="arrow-left" size={ICON.md} color={FG} />
           </PressableScale>
           <Text style={s.headerTitle} numberOfLines={1}>Product</Text>
           <View style={s.headerRight} />
@@ -189,7 +189,7 @@ export default function ProductDetailScreen() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel="Back"
         >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
+          <Icon name="arrow-left" size={ICON.md} color={FG} />
         </PressableScale>
 
         <Text style={s.headerTitle} numberOfLines={1}>{product.name}</Text>
@@ -247,7 +247,7 @@ export default function ProductDetailScreen() {
             style={s.iconBtnSmall}
             accessibilityLabel={`More actions for ${product.name}`}
           >
-            <Feather name="more-horizontal" size={ICON.md} color={FG} />
+            <Icon name="more-horizontal" size={ICON.md} color={FG} />
           </PressableScale>
         </View>
       </View>
@@ -303,7 +303,7 @@ export default function ProductDetailScreen() {
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/add-product?editId=' + id) as never); }}
       >
         <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabGrad}>
-          <Feather name="edit-2" size={ICON.md} color={theme.onAccent} />
+          <Icon name="edit-2" size={ICON.md} color={theme.onAccent} />
         </LinearGradient>
       </PressableScale>
       <AIBrainFAB context={{ screen: 'product_detail' as const, productId: String(id ?? ''), productName: String(product.name ?? '') }} bottomOffset={0} />
@@ -336,7 +336,7 @@ function OverviewTab({ product, pricing, coverImage }: {
             <Image source={{ uri: coverImage.uri }} style={ov.heroImage} resizeMode="cover" />
           ) : (
             <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={ov.heroPlaceholder}>
-              <Feather name="package" size={ICON.xxl} color="rgba(255,255,255,0.4)" />
+              <Icon name="package" size={ICON.xxl} color="rgba(255,255,255,0.4)" />
             </LinearGradient>
           )}
           <View style={ov.heroBadgeRow}>
@@ -434,12 +434,12 @@ function OverviewTab({ product, pricing, coverImage }: {
   );
 }
 
-function InfoRow({ label, value, icon, right }: { label: string; value: string; icon: keyof typeof Feather.glyphMap; right?: React.ReactNode }) {
+function InfoRow({ label, value, icon, right }: { label: string; value: string; icon: IconName; right?: React.ReactNode }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
   const ov = React.useMemo(() => makeOvStyles(theme), [theme]);
   return (
     <View style={ov.infoRow}>
-      <Feather name={icon} size={ICON.sm} color={MUTED} />
+      <Icon name={icon} size={ICON.sm} color={MUTED} />
       <Text style={ov.infoLabel}>{label}</Text>
       <View style={ov.infoValueWrap}>
         {right ?? <Text style={ov.infoValue} numberOfLines={1}>{value}</Text>}
@@ -584,11 +584,11 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
         <Text style={vt.bulkTitle}>Bulk Edit</Text>
         <View style={vt.bulkRow}>
           <PressableScale style={vt.bulkBtn} onPress={handleBulkPrice}>
-            <Feather name="dollar-sign" size={ICON.sm} color={theme.accentLight} />
+            <Icon name="dollar-sign" size={ICON.sm} color={theme.accentLight} />
             <Text style={vt.bulkBtnText}>Price</Text>
           </PressableScale>
           <PressableScale style={vt.bulkBtn} onPress={handleBulkInventory}>
-            <Feather name="layers" size={ICON.sm} color={theme.secondary} />
+            <Icon name="layers" size={ICON.sm} color={theme.secondary} />
             <Text style={vt.bulkBtnText}>Inventory</Text>
           </PressableScale>
         </View>
@@ -624,7 +624,7 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
                   <Text style={vt.sku}>SKU: {variant.sku}</Text>
                 ) : null}
                 <View style={vt.variantStockRow}>
-                  <Feather name="package" size={12} color={inStock ? (lowStock ? ORANGE : SUCCESS) : RED} />
+                  <Icon name="package" size={12} color={inStock ? (lowStock ? ORANGE : SUCCESS) : RED} />
                   <Text style={[vt.stockText, { color: inStock ? (lowStock ? ORANGE : SUCCESS) : RED }]}>
                     {variant.inventoryQuantity} in stock
                   </Text>
@@ -802,7 +802,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                     disabled={variant.inventoryQuantity <= 0}
                     accessibilityLabel={`Decrease ${variant.title} stock`}
                   >
-                    <Feather name="minus" size={12} color={variant.inventoryQuantity <= 0 ? theme.subtle : RED} />
+                    <Icon name="minus" size={12} color={variant.inventoryQuantity <= 0 ? theme.subtle : RED} />
                   </PressableScale>
                   <TextInput
                     value={draftFor(variant.id, variant.inventoryQuantity)}
@@ -819,7 +819,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                     onPress={() => applyVariantDelta(variant, 1)}
                     accessibilityLabel={`Increase ${variant.title} stock`}
                   >
-                    <Feather name="plus" size={12} color={SUCCESS} />
+                    <Icon name="plus" size={12} color={SUCCESS} />
                   </PressableScale>
                 </View>
               </View>
@@ -838,7 +838,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                 disabled={product.inventory.totalStock <= 0}
                 accessibilityLabel="Decrease stock"
               >
-                <Feather name="minus" size={12} color={product.inventory.totalStock <= 0 ? theme.subtle : RED} />
+                <Icon name="minus" size={12} color={product.inventory.totalStock <= 0 ? theme.subtle : RED} />
               </PressableScale>
               <TextInput
                 value={draftFor('total', product.inventory.totalStock)}
@@ -855,7 +855,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                 onPress={() => applyProductDelta(1)}
                 accessibilityLabel="Increase stock"
               >
-                <Feather name="plus" size={12} color={SUCCESS} />
+                <Icon name="plus" size={12} color={SUCCESS} />
               </PressableScale>
             </View>
           </BrandthreadCard>
@@ -938,7 +938,7 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
             return (
               <View key={stage} style={pt.stageItem}>
                 <View style={[pt.stageDot, done && { backgroundColor: theme.accent, borderColor: theme.accent }, current && { backgroundColor: theme.secondary, borderColor: theme.secondary, shadowColor: theme.shadowColor }]}>
-                  {done && <Feather name="check" size={8} color={theme.onAccent} />}
+                  {done && <Icon name="check" size={8} color={theme.onAccent} />}
                 </View>
                 {idx < PRODUCTION_STAGES.length - 1 && (
                   <View style={[pt.stageLine, done && pt.stageLineDone]} />
@@ -1136,7 +1136,7 @@ function AnalyticsTab({
         <BrandthreadCard elevated>
           {analytics.bestVariantId && (
             <View style={an.perfRow}>
-              <Feather name="star" size={14} color={GOLD} />
+              <Icon name="star" size={14} color={GOLD} />
               <Text style={an.perfLabel}>Best Variant</Text>
               <Text style={an.perfValue}>
                 {product.variants.find(v => v.id === analytics.bestVariantId)?.title ?? analytics.bestVariantId}
@@ -1147,7 +1147,7 @@ function AnalyticsTab({
             <>
               <View style={an.perfDivider} />
               <View style={an.perfRow}>
-                <Feather name="maximize" size={14} color={theme.accentLight} />
+                <Icon name="maximize" size={14} color={theme.accentLight} />
                 <Text style={an.perfLabel}>Best Size</Text>
                 <Text style={an.perfValue}>{analytics.bestSize}</Text>
               </View>
@@ -1157,7 +1157,7 @@ function AnalyticsTab({
             <>
               <View style={an.perfDivider} />
               <View style={an.perfRow}>
-                <Feather name="droplet" size={14} color={theme.secondary} />
+                <Icon name="droplet" size={14} color={theme.secondary} />
                 <Text style={an.perfLabel}>Best Color</Text>
                 <Text style={an.perfValue}>{analytics.bestColor}</Text>
               </View>
@@ -1218,7 +1218,7 @@ function StoreTab({
           <Image source={{ uri: coverImage.uri }} style={st.coverImg} resizeMode="cover" />
         ) : (
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.coverPlaceholder}>
-            <Feather name="image" size={ICON.xxl} color="rgba(255,255,255,0.4)" />
+            <Icon name="image" size={ICON.xxl} color="rgba(255,255,255,0.4)" />
           </LinearGradient>
         )}
 
@@ -1277,7 +1277,7 @@ function StoreTab({
 
           {/* Stock status */}
           <View style={st.stockRow}>
-            <Feather
+            <Icon
               name={stockStatus === 'out' ? 'x-circle' : stockStatus === 'low' ? 'alert-circle' : 'check-circle'}
               size={14}
               color={stockStatus === 'out' ? RED : stockStatus === 'low' ? ORANGE : SUCCESS}
@@ -1293,7 +1293,7 @@ function StoreTab({
           {product.salesModel === 'pre-order' && product.preorderSettings && (
             <GradientCard colors={[theme.accentDim, theme.secondaryDim]}>
               <View style={st.preorderRow}>
-                <Feather name="clock" size={14} color={BLUE} />
+                <Icon name="clock" size={14} color={BLUE} />
                 <Text style={st.preorderText}>
                   Pre-order · {product.preorderSettings.unitsOrdered}/{product.preorderSettings.fundingGoalUnits ?? '?'} units ordered
                 </Text>
@@ -1334,7 +1334,7 @@ function StoreTab({
             accessibilityState={{ expanded: descOpen }}
           >
             <Text style={st.descTitle}>Description</Text>
-            <Feather name={descOpen ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={MUTED} />
+            <Icon name={descOpen ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={MUTED} />
           </PressableScale>
           {descOpen && product.description ? (
             <Text style={st.descText}>{product.description}</Text>

@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -127,7 +127,7 @@ export default function StripeConnectWarning({
       >
         <View style={styles.connectBannerMain}>
           <View style={styles.connectBannerIcon}>
-            <Feather name="tool" size={20} color={RED} />
+            <Icon name="tool" size={20} color={RED} />
           </View>
           <View style={styles.message}>
             <Text style={styles.connectBannerTitle} maxFontSizeMultiplier={2}>
@@ -153,7 +153,7 @@ export default function StripeConnectWarning({
     >
       <View style={styles.connectBannerMain}>
         <View style={styles.connectBannerIcon}>
-          <Feather name="alert-circle" size={20} color={RED} />
+          <Icon name="alert-circle" size={20} color={RED} />
         </View>
         <View style={styles.message}>
           <Text style={styles.connectBannerTitle} maxFontSizeMultiplier={2}>
@@ -176,7 +176,7 @@ export default function StripeConnectWarning({
           ? <Text style={styles.opening} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={2}>Opening…</Text>
           : <>
               <Text style={styles.connectBannerFix} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={2}>Fix Now</Text>
-              <Feather name="chevron-right" size={14} color={RED} />
+              <Icon name="chevron-right" size={14} color={RED} />
             </>}
       </View>
     </TouchableOpacity>

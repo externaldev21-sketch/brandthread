@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { FONT } from '@/lib/theme';
@@ -63,7 +63,7 @@ export default function GeneralSettingsScreen() {
                     <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{profile.website}</Text>
                   ) : null}
                 </View>
-                <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+                <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
               </View>
             </TouchableOpacity>
           ) : (
@@ -73,7 +73,7 @@ export default function GeneralSettingsScreen() {
               style={[styles.card, styles.rowBetween, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Add your business details</Text>
-              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+              <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
@@ -101,7 +101,7 @@ function ExternalRow({
   colors,
   last,
 }: {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
@@ -113,9 +113,9 @@ function ExternalRow({
       activeOpacity={0.7}
       style={[styles.listRow, !last && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
     >
-      <Feather name={icon} size={17} color={colors.foreground} style={styles.listIcon} />
+      <Icon name={icon} size={17} color={colors.foreground} style={styles.listIcon} />
       <Text style={[styles.cardTitle, { color: colors.foreground, flex: 1 }]}>{label}</Text>
-      <Feather name="external-link" size={16} color={colors.mutedForeground} />
+      <Icon name="external-link" size={16} color={colors.mutedForeground} />
     </TouchableOpacity>
   );
 }

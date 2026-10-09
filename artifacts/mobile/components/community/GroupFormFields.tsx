@@ -1,7 +1,7 @@
 /** Shared fields for creating / editing a group: photo, name, description, Public vs Private, approval. */
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { CommunityAvatar } from '@/components/community/CommunityAvatar';
@@ -45,7 +45,7 @@ export function GroupFormFields({ value, onChange, errors = {}, uploading, onPic
               <CommunityAvatar community={{ name: value.name || 'Group', iconUrl: value.photoUri }} size={84} />
             ) : (
               <View style={[styles.photoEmpty, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Feather name="camera" size={24} color={colors.mutedForeground} />
+                <Icon name="camera" size={24} color={colors.mutedForeground} />
               </View>
             )}
             {uploading ? (

@@ -26,6 +26,7 @@ import {
   Platform,
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Reanimated, {
   Easing as ReanimatedEasing, useAnimatedStyle, useSharedValue, withSequence, withTiming,
 } from 'react-native-reanimated';
@@ -119,7 +120,7 @@ function FeedToastBanner({ entry }: { entry: ToastEntry }) {
       ]}
       pointerEvents="none"
     >
-      <Feather
+      <Icon
         name={isError ? 'alert-circle' : 'check-circle'}
         size={14}
         color={isError ? RED : SUCCESS}
@@ -376,7 +377,7 @@ export function EngagementButton({
   } else {
     iconNode = solidIcon
       ? <FontAwesome name={solidIcon} size={iconSize} color={iconColor} style={ebStyles.iconShadow} />
-      : <Feather name={displayIcon} size={iconSize} color={iconColor} style={ebStyles.iconShadow} />;
+      : <Icon name={displayIcon} size={iconSize} color={iconColor} style={ebStyles.iconShadow} />;
   }
   if (tapSpring) {
     iconNode = <Reanimated.View style={likeSpringStyle}>{iconNode}</Reanimated.View>;

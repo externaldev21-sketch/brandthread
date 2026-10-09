@@ -23,7 +23,7 @@ import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { CONTACT_SYNC_ENABLED } from '@/lib/contactSyncFlag';
 
 type Tab = 'incoming' | 'sent' | 'suggested';
@@ -395,9 +395,9 @@ export default function BuyerFriendRequestsScreen() {
             accessibilityLabel="Find from contacts"
             onPress={() => router.push('/find-friends-contacts' as never)}
           >
-            <Feather name="book-open" size={20} color={palette.foreground} />
+            <Icon name="book-open" size={20} color={palette.foreground} />
             <Text style={[TYPE_SCALE.body, s.contactsRowText]}>Find from contacts</Text>
-            <Feather name="chevron-right" size={18} color={palette.mutedForeground} />
+            <Icon name="chevron-right" size={18} color={palette.mutedForeground} />
           </PressableScale>
         )}
         {tab === 'incoming'  && renderIncoming()}

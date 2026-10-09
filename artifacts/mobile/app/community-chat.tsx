@@ -9,7 +9,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -296,7 +296,7 @@ export default function CommunityChatScreen() {
                     accessibilityLabel={`${newMessagesLabel(chat.newCount)}. Jump to latest`}
                     testID="community-new-messages"
                   >
-                    <Feather name="arrow-down" size={14} color={theme.onAccent} />
+                    <Icon name="arrow-down" size={14} color={theme.onAccent} />
                     <Text style={s.newPillText}>{newMessagesLabel(chat.newCount)}</Text>
                   </PressableScale>
                 </View>
@@ -330,7 +330,7 @@ export default function CommunityChatScreen() {
           accessibilityLabel="Go back"
           testID="community-chat-back"
         >
-          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+          <Icon name="arrow-left" size={ICON.md} color={theme.text} />
         </PressableScale>
 
         <View style={s.titleWrap}>
@@ -358,7 +358,7 @@ export default function CommunityChatScreen() {
 
         {community?.muted && (
           <View style={s.mutedGlyph} accessible accessibilityLabel="Notifications muted">
-            <Feather name="bell-off" size={ICON.sm} color={theme.muted} />
+            <Icon name="bell-off" size={ICON.sm} color={theme.muted} />
           </View>
         )}
         {community && (
@@ -370,7 +370,7 @@ export default function CommunityChatScreen() {
             accessibilityLabel="Group options"
             testID="community-chat-menu"
           >
-            <Feather name="more-horizontal" size={ICON.md} color={theme.text} />
+            <Icon name="more-horizontal" size={ICON.md} color={theme.text} />
           </PressableScale>
         )}
       </View>

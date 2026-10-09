@@ -8,7 +8,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
 
 export {
@@ -40,7 +40,7 @@ function SwipeUpGlyph() {
     <AnimatedGlyph>
       {t => (
         <Animated.View style={{ transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [6, -6] }) }], opacity: t.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0.35, 1, 0.35] }) }}>
-          <Feather name="chevrons-up" size={30} color="#FFFFFF" />
+          <Icon name="chevrons-up" size={30} color="#FFFFFF" />
         </Animated.View>
       )}
     </AnimatedGlyph>
@@ -52,7 +52,7 @@ function DoubleTapGlyph() {
     <AnimatedGlyph>
       {t => (
         <Animated.View style={{ transform: [{ scale: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.15, 0.8] }) }] }}>
-          <Feather name="heart" size={28} color="#FFFFFF" />
+          <Icon name="heart" size={28} color="#FFFFFF" />
         </Animated.View>
       )}
     </AnimatedGlyph>
@@ -65,7 +65,7 @@ function HoldRightGlyph() {
       {t => (
         <View style={glyphStyles.holdRow}>
           <Animated.View style={{ opacity: t.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }}>
-            <Feather name="circle" size={10} color="#FFFFFF" />
+            <Icon name="circle" size={10} color="#FFFFFF" />
           </Animated.View>
           <Animated.View style={{ transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.15] }) }] }}>
             <Text style={glyphStyles.speedText}>2x</Text>

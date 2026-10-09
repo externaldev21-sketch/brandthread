@@ -16,7 +16,7 @@ import {
   FlatList, Modal, Platform, StyleSheet, Text, TextInput, View,
   type StyleProp, type TextInputProps, type ViewStyle,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
@@ -166,7 +166,7 @@ function FieldMessage({ error, hint }: { error?: string; hint?: string }) {
   if (error) {
     return (
       <View style={styles.messageRow} accessibilityLiveRegion="polite">
-        <Feather name="alert-circle" size={12} color={ck.text} />
+        <Icon name="alert-circle" size={12} color={ck.text} />
         <Text style={styles.fieldError}>{error}</Text>
       </View>
     );
@@ -255,7 +255,7 @@ export function PickerField({
         <Text style={[styles.pickerText, { color: selected ? ck.text : ck.subtle }]} numberOfLines={1}>
           {selected?.label ?? placeholder ?? 'Select'}
         </Text>
-        <Feather name="chevron-down" size={16} color={ck.muted} />
+        <Icon name="chevron-down" size={16} color={ck.muted} />
       </PressableScale>
       <FieldMessage error={visibleError} />
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>

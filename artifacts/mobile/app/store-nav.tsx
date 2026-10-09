@@ -5,7 +5,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -252,9 +252,9 @@ export default function StoreNavScreen() {
     return (
       <View key={item.id}>
         <View style={[styles.itemRow, { paddingLeft: SP.md + depth * 20 }]}>
-          <Feather name="menu" size={ICON.sm} color={MUTED} style={styles.dragHandle} />
+          <Icon name="menu" size={ICON.sm} color={MUTED} style={styles.dragHandle} />
           <TouchableOpacity onPress={() => handleToggleVisible(item.id)} style={styles.visibleToggle}>
-            <Feather
+            <Icon
               name={item.visible ? 'eye' : 'eye-off'}
               size={ICON.sm}
               color={item.visible ? PURPLE : MUTED}
@@ -272,21 +272,21 @@ export default function StoreNavScreen() {
               onPress={() => handleMoveItem(item.id, 'up', parentId)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <Feather name="chevron-up" size={ICON.xs} color={MUTED} />
+              <Icon name="chevron-up" size={ICON.xs} color={MUTED} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.itemActionBtn}
               onPress={() => handleMoveItem(item.id, 'down', parentId)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <Feather name="chevron-down" size={ICON.xs} color={MUTED} />
+              <Icon name="chevron-down" size={ICON.xs} color={MUTED} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.itemActionBtnPurple}
               onPress={() => openEditItem(item)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <Feather name="edit-2" size={ICON.xs} color={PURPLE} />
+              <Icon name="edit-2" size={ICON.xs} color={PURPLE} />
             </TouchableOpacity>
             {canAddChild && (
               <TouchableOpacity
@@ -294,7 +294,7 @@ export default function StoreNavScreen() {
                 onPress={() => openNewItem(item.id)}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
-                <Feather name="plus" size={ICON.xs} color={CYAN} />
+                <Icon name="plus" size={ICON.xs} color={CYAN} />
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -302,7 +302,7 @@ export default function StoreNavScreen() {
               onPress={() => handleRemoveItem(item.id)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <Feather name="x" size={ICON.xs} color={RED} />
+              <Icon name="x" size={ICON.xs} color={RED} />
             </TouchableOpacity>
           </View>
         </View>
@@ -364,14 +364,14 @@ export default function StoreNavScreen() {
 
         {activeMenu && (
           <TouchableOpacity style={styles.addItemBtn} onPress={() => openNewItem(null)}>
-            <Feather name="plus" size={ICON.sm} color={PURPLE} />
+            <Icon name="plus" size={ICON.sm} color={PURPLE} />
             <Text style={styles.addItemBtnText}>+ Add Menu Item</Text>
           </TouchableOpacity>
         )}
 
         {/* Footer note */}
         <View style={styles.footerNote}>
-          <Feather name="info" size={ICON.xs} color={MUTED} />
+          <Icon name="info" size={ICON.xs} color={MUTED} />
           <Text style={styles.footerNoteText}>
             Changes to navigation take effect immediately on your published store.
           </Text>
@@ -393,7 +393,7 @@ export default function StoreNavScreen() {
                 onPress={() => setModalVisible(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Feather name="x" size={ICON.md} color={FG} />
+                <Icon name="x" size={ICON.md} color={FG} />
               </TouchableOpacity>
             </View>
 
@@ -471,7 +471,7 @@ export default function StoreNavScreen() {
                     autoCapitalize="none"
                   />
                   <View style={styles.warningRow}>
-                    <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />
+                    <Icon name="alert-triangle" size={ICON.xs} color={ORANGE} />
                     <Text style={styles.warningText}>Only link to pages you own.</Text>
                   </View>
                 </>

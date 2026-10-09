@@ -7,7 +7,7 @@
  */
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -147,7 +147,7 @@ export default function AnalyticsGoalsScreen() {
           <PrimaryButton label={editing === 'new' ? 'Add goal' : 'Save'} onPress={onSave} loading={saving} disabled={saving || !text} />
           {editing !== null && editing !== 'new' && (
             <TouchableOpacity onPress={onDelete} disabled={saving} style={s.deleteBtn} accessibilityRole="button" accessibilityLabel="Delete goal">
-              <Feather name="trash-2" size={14} color={colors.destructive} />
+              <Icon name="trash-2" size={14} color={colors.destructive} />
               <Text style={s.deleteText}>Delete goal</Text>
             </TouchableOpacity>
           )}

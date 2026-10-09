@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { type IconName } from '@/components/ui/Icon';
 
 import { QuickActionCard } from '@/components/BrandthreadUI';
 import { sellerCompactGridStyles } from '@/components/sellerCompactGridLayout';
@@ -8,7 +8,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export interface SellerQuickAction {
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   accent: string;
   badge?: boolean;
   onPress: () => void;

@@ -12,7 +12,7 @@ import {
   View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Pressable,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -280,7 +280,7 @@ export default function ProductVariantsScreen() {
             <View style={st.rowBetween}>
               <Text style={st.axisName}>{axis.name} ({axis.values.length})</Text>
               <Pressable hitSlop={10} accessibilityLabel={`Remove ${axis.name}`} onPress={() => setAxes((prev) => prev.filter((_, idx) => idx !== i))}>
-                <Feather name="trash-2" size={ICON.sm} color={colors.mutedForeground} />
+                <Icon name="trash-2" size={ICON.sm} color={colors.mutedForeground} />
               </Pressable>
             </View>
             <View style={st.chips}>
@@ -288,7 +288,7 @@ export default function ProductVariantsScreen() {
                 <Pressable key={value} style={st.chip} accessibilityLabel={`Remove ${value}`}
                   onPress={() => setAxisAt(i, { values: axis.values.filter((x) => x !== value) })}>
                   <Text style={st.chipText}>{value}</Text>
-                  <Feather name="x" size={12} color={colors.mutedForeground} />
+                  <Icon name="x" size={12} color={colors.mutedForeground} />
                 </Pressable>
               ))}
             </View>
@@ -318,7 +318,7 @@ export default function ProductVariantsScreen() {
           </BrandthreadCard>
         ) : (
           <PressableScale style={st.addOption} onPress={() => setAddingAxis(true)} accessibilityLabel="Add option">
-            <Feather name="plus-circle" size={ICON.sm} color={colors.foreground} />
+            <Icon name="plus-circle" size={ICON.sm} color={colors.foreground} />
             <Text style={st.addOptionText}>Add option</Text>
           </PressableScale>
         )}
@@ -381,7 +381,7 @@ export default function ProductVariantsScreen() {
                           <TextInput style={st.stockPill} value={stockText} keyboardType="number-pad" selectTextOnFocus
                             onChangeText={(t) => setEdit(v.id, { stock: t.replace(/[^0-9]/g, '') })} accessibilityLabel={`Stock for ${label}`} />
                           <Pressable hitSlop={8} onPress={() => setExpanded(open ? null : v.id)}>
-                            <Feather name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={colors.mutedForeground} />
+                            <Icon name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={colors.mutedForeground} />
                           </Pressable>
                         </View>
                         {open && (

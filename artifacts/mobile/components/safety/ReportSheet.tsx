@@ -21,7 +21,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import ReanimatedAnimated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -74,12 +74,12 @@ export function ReportSheet({ visible, target, onClose }: ReportSheetProps) {
             <View style={s.header}>
               {step === 'details' ? (
                 <PressableScale onPress={() => flow.setStep('reason')} style={s.headerSide} accessibilityLabel="Back">
-                  <Feather name="chevron-left" size={22} color={theme.text} />
+                  <Icon name="chevron-left" size={22} color={theme.text} />
                 </PressableScale>
               ) : <View style={s.headerSide} />}
               <Text style={s.title}>Report</Text>
               <PressableScale onPress={onClose} style={[s.headerSide, { alignItems: 'flex-end' }]} accessibilityLabel="Close">
-                <Feather name="x" size={20} color={theme.text} />
+                <Icon name="x" size={20} color={theme.text} />
               </PressableScale>
             </View>
 
@@ -105,7 +105,7 @@ export function ReportSheet({ visible, target, onClose }: ReportSheetProps) {
                       <Text style={[s.rowLabel, { flex: 1 }]}>{option.label}</Text>
                       {flow.submitting && flow.reason === option.id
                         ? <ActivityIndicator size="small" color={theme.text} />
-                        : <Feather name="chevron-right" size={18} color={theme.subtle} />}
+                        : <Icon name="chevron-right" size={18} color={theme.subtle} />}
                     </PressableScale>
                   ))}
                 </View>
@@ -136,7 +136,7 @@ export function ReportSheet({ visible, target, onClose }: ReportSheetProps) {
               </ScrollView>
             ) : (
               <View style={s.doneWrap}>
-                <View style={s.doneIcon}><Feather name="check" size={26} color={theme.onAccent} /></View>
+                <View style={s.doneIcon}><Icon name="check" size={26} color={theme.onAccent} /></View>
                 <Text style={s.doneTitle}>
                   {flow.alreadyReported ? 'You’ve already reported this' : 'Thanks for letting us know'}
                 </Text>

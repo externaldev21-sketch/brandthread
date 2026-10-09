@@ -33,7 +33,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -167,7 +167,7 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
 
       {status === 'applied' && (
         <View style={styles.actionAppliedRow}>
-          <Feather name="check-circle" size={14} color={colors.foreground} />
+          <Icon name="check-circle" size={14} color={colors.foreground} />
           <Text style={styles.actionAppliedText}>Applied</Text>
           {card.canUndo && (
             <TouchableOpacity onPress={() => onUndo(msg.id)} activeOpacity={0.7}>
@@ -253,7 +253,7 @@ function MessageBubble({
                 onPress={() => onRetry(precedingUserText ?? '')}
                 activeOpacity={0.7}
               >
-                <Feather name="refresh-cw" size={13} color={colors.destructive} />
+                <Icon name="refresh-cw" size={13} color={colors.destructive} />
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -271,7 +271,7 @@ function MessageBubble({
                 onPress={() => router.push(source.route as any)}
                 activeOpacity={0.7}
               >
-                <Feather name="link" size={11} color={colors.primary} />
+                <Icon name="link" size={11} color={colors.primary} />
                 <Text style={[styles.sourceChipText, { color: colors.primary }]} numberOfLines={1}>
                   {source.title}
                 </Text>
@@ -288,7 +288,7 @@ function MessageBubble({
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityLabel="Copy message"
             >
-              <Feather name="copy" size={13} color={colors.subtle} />
+              <Icon name="copy" size={13} color={colors.subtle} />
               <Text style={styles.msgActionText}>Copy</Text>
             </TouchableOpacity>
             {precedingUserText ? (
@@ -298,7 +298,7 @@ function MessageBubble({
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 accessibilityLabel="Regenerate response"
               >
-                <Feather name="refresh-cw" size={13} color={colors.subtle} />
+                <Icon name="refresh-cw" size={13} color={colors.subtle} />
                 <Text style={styles.msgActionText}>Regenerate</Text>
               </TouchableOpacity>
             ) : null}
@@ -762,7 +762,7 @@ export default function AiBrainScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Clear conversation"
               >
-                <Feather name="rotate-ccw" size={20} color={colors.foreground} />
+                <Icon name="rotate-ccw" size={20} color={colors.foreground} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => router.push('/ai-settings' as any)}
@@ -770,7 +770,7 @@ export default function AiBrainScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="AI settings"
               >
-                <Feather name="sliders" size={20} color={colors.foreground} />
+                <Icon name="sliders" size={20} color={colors.foreground} />
               </TouchableOpacity>
             </View>
           }
@@ -779,7 +779,7 @@ export default function AiBrainScreen() {
         {/* ── Error banner ────────────────────────────────────────────────── */}
         {errorMsg ? (
           <View style={styles.errorBanner}>
-            <Feather name="alert-circle" size={14} color={colors.destructive} style={{ marginRight: 6 }} />
+            <Icon name="alert-circle" size={14} color={colors.destructive} style={{ marginRight: 6 }} />
             <Text style={styles.errorBannerText} numberOfLines={2}>{errorMsg}</Text>
             <TouchableOpacity
               onPress={() => handleRetry(pendingRetryText)}

@@ -6,7 +6,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -166,7 +166,7 @@ export default function LoyaltyScreen() {
         ].map((item, i) => (
           <View key={i} style={s.earnCard}>
             <View style={[s.earnIconWrap, { backgroundColor: theme.accentDim }]}>
-              <Feather name={item.icon} size={18} color={theme.text} />
+              <Icon name={item.icon} size={18} color={theme.text} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.earnTitle}>{item.title}</Text>
@@ -221,7 +221,7 @@ export default function LoyaltyScreen() {
               return (
                 <View key={entry.id} style={s.historyRow}>
                   <View style={[s.historyIcon, { backgroundColor: isPositive ? theme.accentDim : `${theme.warning}1A` }]}>
-                    <Feather name={meta.icon as any} size={14} color={meta.color} />
+                    <Icon name={meta.icon as any} size={14} color={meta.color} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.historyLabel}>{meta.label}</Text>
@@ -239,7 +239,7 @@ export default function LoyaltyScreen() {
 
         {history.length === 0 && !loading && (
           <View style={{ alignItems: 'center', paddingVertical: SP.xl, paddingHorizontal: SP.xl }}>
-            <Feather name="star" size={32} color={theme.border} />
+            <Icon name="star" size={32} color={theme.border} />
             <Text style={[s.sectionLabel, { marginTop: SP.md, textAlign: 'center', letterSpacing: 0 }]}>No points yet</Text>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 18 }}>
               Make a purchase or refer a friend to start earning rewards.

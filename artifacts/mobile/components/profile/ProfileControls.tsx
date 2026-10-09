@@ -8,7 +8,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -19,7 +19,7 @@ import { SHOP_PILL_HEIGHT } from './profileLayout';
 import { radius } from '@/constants/radii';
 
 type PressState = { pressed: boolean; hovered?: boolean; focused?: boolean };
-type FeatherName = keyof typeof Feather.glyphMap;
+type FeatherName = IconName;
 
 /**
  * Hover wash, press fill and keyboard-focus glow, all painted INSIDE a
@@ -109,7 +109,7 @@ export function ProfileButton({
         {(state) => (
           <>
             <InteractionLayer state={state as PressState} radius={RADIUS.md} theme={theme} />
-            {icon ? <Feather name={icon} size={16} color={fg} /> : null}
+            {icon ? <Icon name={icon} size={16} color={fg} /> : null}
             <Text style={[styles.buttonText, { color: fg }]} numberOfLines={1}>{label}</Text>
           </>
         )}
@@ -228,7 +228,7 @@ export function ProfileGlassButton({
       {(state) => (
         <>
           <InteractionLayer state={state as PressState} radius={22} theme={theme} />
-          <Feather name={icon} size={19} color={theme.text} />
+          <Icon name={icon} size={19} color={theme.text} />
           {badge ? <View style={[styles.glassBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} /> : null}
         </>
       )}
@@ -417,7 +417,7 @@ export function ProfileTabs({
               {(state) => (
                 <>
                   {iconOnly ? null : <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />}
-                  <Feather name={tab.icon} size={iconOnly ? 24 : 22} color={color} />
+                  <Icon name={tab.icon} size={iconOnly ? 24 : 22} color={color} />
                   {iconOnly ? null : (
                     <Text style={[styles.tabLabel, { color }, selected && styles.tabLabelActive]} numberOfLines={1}>
                       {tab.label}{typeof tab.count === 'number' && tab.count > 0 ? ` ${tab.count}` : ''}
@@ -530,14 +530,14 @@ export function ShopPill({
           <>
             <InteractionLayer state={state as PressState} radius={radius.md} theme={theme} />
             <View style={[styles.pillIcon, { backgroundColor: theme.onAccent }]}>
-              <Feather name="shopping-bag" size={20} color={theme.accent} />
+              <Icon name="shopping-bag" size={20} color={theme.accent} />
             </View>
             <View style={styles.pillCopy}>
               <Text style={[styles.pillLabel, { color: theme.onAccent }]} numberOfLines={1}>{label}</Text>
               {sublabel ? <Text style={[styles.pillSub, { color: theme.onAccent }]} numberOfLines={1}>{sublabel}</Text> : null}
             </View>
             <View style={[styles.pillArrow, { borderColor: `${theme.onAccent}33` }]}>
-              <Feather name="arrow-up-right" size={18} color={theme.onAccent} />
+              <Icon name="arrow-up-right" size={18} color={theme.onAccent} />
             </View>
           </>
         )}
@@ -554,7 +554,7 @@ export function ProfileChip({ label, icon, tone = 'muted', size = 'md' }: { labe
   const color = tone === 'accent' ? theme.accent : tone === 'warning' ? theme.warning : theme.muted;
   return (
     <View style={[styles.chip, size === 'sm' && styles.chipSm, { borderColor: tone === 'muted' ? theme.border : `${color}66`, backgroundColor: theme.cardGlass }]}>
-      {icon ? <Feather name={icon} size={size === 'sm' ? 10 : 11} color={color} /> : null}
+      {icon ? <Icon name={icon} size={size === 'sm' ? 10 : 11} color={color} /> : null}
       <Text style={[styles.chipText, { color }]} numberOfLines={1}>{label}</Text>
     </View>
   );

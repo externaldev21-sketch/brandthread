@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
@@ -166,7 +166,7 @@ export default function DesignTemplatesScreen() {
                 style={ts.thumbnail}
               >
                 <View style={ts.thumbnailContent}>
-                  <Feather
+                  <Icon
                     name={
                       item.category === 'Garments' ? 'layers' :
                       item.category === 'Social' ? 'smartphone' :

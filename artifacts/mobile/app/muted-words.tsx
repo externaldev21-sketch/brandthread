@@ -8,7 +8,7 @@ import {
   View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, Platform,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -156,7 +156,7 @@ export default function MutedWordsScreen() {
         </Text>
 
         <View style={[s.inputShell, (!canEdit || atLimit) && { opacity: 0.5 }]}>
-          <Feather name="plus" size={18} color={theme.muted} />
+          <Icon name="plus" size={18} color={theme.muted} />
           <TextInput
             ref={inputRef}
             style={s.input}
@@ -188,7 +188,7 @@ export default function MutedWordsScreen() {
 
         {error ? (
           <View style={s.errorCard}>
-            <Feather name="alert-circle" size={16} color={theme.error} />
+            <Icon name="alert-circle" size={16} color={theme.error} />
             <Text style={s.errorText}>{error}</Text>
           </View>
         ) : null}
@@ -199,7 +199,7 @@ export default function MutedWordsScreen() {
             <View style={s.chips}>
               {available.map((suggestion) => (
                 <PressableScale key={suggestion} style={[s.suggestion, !canEdit && { opacity: 0.5 }]} disabled={!canEdit} onPress={() => add(suggestion)} accessibilityRole="button" accessibilityLabel={`Mute ${suggestion}`}>
-                  <Feather name="plus" size={12} color={theme.muted} />
+                  <Icon name="plus" size={12} color={theme.muted} />
                   <Text style={s.suggestionText}>{suggestion}</Text>
                 </PressableScale>
               ))}
@@ -212,7 +212,7 @@ export default function MutedWordsScreen() {
           <ActivityIndicator color={theme.text} style={{ marginTop: SP.lg }} />
         ) : words.length === 0 ? (
           <View style={s.empty}>
-            <View style={s.emptyIcon}><Feather name="volume-x" size={22} color={theme.text} /></View>
+            <View style={s.emptyIcon}><Icon name="volume-x" size={22} color={theme.text} /></View>
             <Text style={s.emptyTitle}>No muted words yet</Text>
             <Text style={s.emptyBody}>Add words you don’t want to see — like spoilers, topics or phrases.</Text>
           </View>
@@ -230,7 +230,7 @@ export default function MutedWordsScreen() {
                 >
                   {removing === word.phrase
                     ? <ActivityIndicator size="small" color={theme.muted} />
-                    : <Feather name="x" size={14} color={theme.muted} />}
+                    : <Icon name="x" size={14} color={theme.muted} />}
                 </PressableScale>
               </View>
             ))}

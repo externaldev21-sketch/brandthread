@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
@@ -108,7 +108,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
       <View style={styles.dropTop}>
         {/* Type badge */}
         <View style={[styles.typeBadge, { backgroundColor: typeBg, borderColor: typeBorder }]}>
-          <Feather
+          <Icon
             name={isPreOrder ? 'clock' : 'package'}
             size={11}
             color={typeColor}
@@ -150,7 +150,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
         <View style={styles.preOrderExtra}>
           <View style={styles.progressHeader}>
             <View style={styles.progressLabelRow}>
-              <Feather name="tool" size={12} color={colors.mutedForeground} />
+              <Icon name="tool" size={12} color={colors.mutedForeground} />
               <Text style={[styles.progressLabel, { color: colors.mutedForeground }]}>
                 Manufacturing progress
               </Text>
@@ -163,7 +163,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
             <View style={[styles.progressFill, { width: `${drop.mfgProgress * 100}%`, backgroundColor: primary }]} />
           </View>
           <View style={styles.shipRow}>
-            <Feather name="truck" size={12} color={colors.mutedForeground} />
+            <Icon name="truck" size={12} color={colors.mutedForeground} />
             <Text style={[styles.shipText, { color: colors.mutedForeground }]}>
               Ships {drop.releaseDate} · Funds release 3 days after delivery
             </Text>
@@ -174,7 +174,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
       {/* Pre Made: note */}
       {!isPreOrder && drop.status !== 'paid' && (
         <View style={styles.premadeNote}>
-          <Feather name="info" size={12} color={colors.mutedForeground} />
+          <Icon name="info" size={12} color={colors.mutedForeground} />
           <Text style={[styles.premadeNoteText, { color: colors.mutedForeground }]}>
             Inventory ships within 24–48 hrs · Payout 2–3 business days after fulfillment
           </Text>
@@ -186,14 +186,14 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
         <View style={[styles.broadcastWrap, { borderTopColor: colors.border }]}>
           {notificationScheduled ? (
             <View style={[styles.scheduledNotice, { backgroundColor: `${colors.success}1A`, borderColor: `${colors.success}40` }]}>
-              <Feather name="clock" size={14} color={colors.success} />
+              <Icon name="clock" size={14} color={colors.success} />
               <Text style={[styles.scheduledNoticeText, { color: colors.success }]}>
                 Notification scheduled for {fmtDate(drop.scheduledBroadcastAt ?? drop.releaseAt!)}
               </Text>
             </View>
           ) : broadcastPreview?.followers === 0 && broadcastState === 'idle' && !hasFutureLaunch ? (
             <View style={styles.zeroAudience}>
-              <Feather name="users" size={14} color={colors.mutedForeground} />
+              <Icon name="users" size={14} color={colors.mutedForeground} />
               <Text style={[styles.zeroAudienceText, { color: colors.mutedForeground }]}>
                 0 followers — grow your audience first
               </Text>
@@ -202,7 +202,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
             <View style={styles.broadcastRow}>
               {broadcastPreview && (
                 <View style={[styles.followerPill, { backgroundColor: colors.accent, borderColor: colors.border }]}>
-                  <Feather name="users" size={12} color={primary} />
+                  <Icon name="users" size={12} color={primary} />
                   <Text style={[styles.followerPillText, { color: colors.foreground }]}>
                     {broadcastPreview.followers} follower{broadcastPreview.followers === 1 ? '' : 's'}
                   </Text>
@@ -223,9 +223,9 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
                 {broadcastState === 'loading' ? (
                   <ActivityIndicator size="small" color={primary} />
                 ) : broadcastState === 'sent' || broadcastState === 'already_sent' ? (
-                  <Feather name="check-circle" size={14} color={colors.success} />
+                  <Icon name="check-circle" size={14} color={colors.success} />
                 ) : (
-                  <Feather name="bell" size={14} color={primary} />
+                  <Icon name="bell" size={14} color={primary} />
                 )}
                 <Text style={[
                   styles.broadcastBtnText,
@@ -271,7 +271,7 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
       ]}
       pointerEvents="none"
     >
-      <Feather name="check-circle" size={14} color={colors.success} />
+      <Icon name="check-circle" size={14} color={colors.success} />
       <Text style={[toastStyles.text, { color: colors.success }]}>{message}</Text>
     </Animated.View>
   );
@@ -450,7 +450,7 @@ export default function PaymentsScreen() {
         {/* ── Next payout banner ── */}
         {nextPayout && (
           <View style={[styles.banner, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
-            <Feather name="info" size={14} color={colors.primary} />
+            <Icon name="info" size={14} color={colors.primary} />
             <Text style={[styles.bannerText, { color: colors.foreground }]}>
                Next payout on {nextPayout.payoutDate} · {formatCents(nextPayout.totalCollectedCents)} from {nextPayout.name}
             </Text>
@@ -466,7 +466,7 @@ export default function PaymentsScreen() {
           {/* Payout account row — no real payout-account API is wired here yet, so this
               never fabricates a bank account or status; it offers to add one instead. */}
           <View style={[styles.listRow, { borderTopWidth: 0 }]}>
-            <Feather name="home" size={16} color={colors.mutedForeground} />
+            <Icon name="home" size={16} color={colors.mutedForeground} />
             <View style={styles.payoutInfo}>
               <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>Payout account</Text>
               <Text style={[styles.payoutAccount, { color: colors.foreground }]}>
@@ -484,9 +484,9 @@ export default function PaymentsScreen() {
             activeOpacity={0.7}
             onPress={() => router.push('/payouts' as never)}
           >
-            <Feather name="list" size={16} color={colors.mutedForeground} />
+            <Icon name="list" size={16} color={colors.mutedForeground} />
             <Text style={[styles.listRowLabel, { color: colors.foreground, flex: 1 }]}>View payouts</Text>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
 
           {bnpl?.available ? (
@@ -523,7 +523,7 @@ export default function PaymentsScreen() {
                   <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preOrderDrops.length}</Text>
                 </View>
                 <View style={[styles.preOrderNote, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
-                  <Feather name="clock" size={13} color={primary} />
+                  <Icon name="clock" size={13} color={primary} />
                   <Text style={[styles.preOrderNoteText, { color: primary }]}>
                     Funds collected upfront and held until each drop ships
                   </Text>
@@ -549,7 +549,7 @@ export default function PaymentsScreen() {
                   <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preMadeDrops.length}</Text>
                 </View>
                 <View style={[styles.preOrderNote, { backgroundColor: `${colors.success}17`, borderColor: `${colors.success}33` }]}>
-                  <Feather name="package" size={13} color={colors.success} />
+                  <Icon name="package" size={13} color={colors.success} />
                   <Text style={[styles.preOrderNoteText, { color: colors.success }]}>
                     Standard payout 2–3 business days after order fulfillment
                   </Text>

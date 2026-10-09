@@ -9,7 +9,7 @@ import {
   TextInput, ActivityIndicator, Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
@@ -232,7 +232,7 @@ export default function DesignProjectScreen() {
                   activeOpacity={0.8}
                 >
                   <View style={[styles.typeIcon, { backgroundColor: opt.accent + '22' }]}>
-                    <Feather name={opt.icon as any} size={ICON.lg} color={opt.accent} />
+                    <Icon name={opt.icon as any} size={ICON.lg} color={opt.accent} />
                   </View>
                   <Text style={styles.typeLabel}>{opt.label}</Text>
                   <Text style={styles.typeDesc}>{opt.desc}</Text>
@@ -263,7 +263,7 @@ export default function DesignProjectScreen() {
                       activeOpacity={0.8}
                     >
                       <View style={[styles.templateIcon, { backgroundColor: accent + '22' }]}>
-                        <Feather name="layers" size={ICON.md} color={accent} />
+                        <Icon name="layers" size={ICON.md} color={accent} />
                       </View>
                       <Text style={styles.templateName}>{tmpl.label}</Text>
                       <Text style={styles.templateViews}>{tmpl.views.join(' · ')}</Text>
@@ -295,7 +295,7 @@ export default function DesignProjectScreen() {
                       activeOpacity={0.8}
                     >
                       <View style={[styles.templateIcon, { backgroundColor: accent + '22' }]}>
-                        <Feather name="crop" size={ICON.md} color={accent} />
+                        <Icon name="crop" size={ICON.md} color={accent} />
                       </View>
                       <Text style={styles.templateName}>{preset.label}</Text>
                       <Text style={styles.templateViews}>{preset.width} × {preset.height}</Text>
@@ -327,7 +327,7 @@ export default function DesignProjectScreen() {
             {projectType === 'garment' && selectedTemplate ? (
               <BrandthreadCard style={styles.infoCard}>
                 <View style={[styles.infoIconWrap, { backgroundColor: accent + '22' }]}>
-                  <Feather name="layers" size={ICON.xl} color={accent} />
+                  <Icon name="layers" size={ICON.xl} color={accent} />
                 </View>
                 <Text style={styles.infoTitle}>{selectedTemplate.label}</Text>
                 <Text style={styles.infoSub}>Views available</Text>
@@ -358,7 +358,7 @@ export default function DesignProjectScreen() {
                         <Text style={styles.dimUnit}>px</Text>
                       </View>
                     </View>
-                    <Feather name="x" size={ICON.sm} color={SUBTLE} style={{ marginTop: 24 }} />
+                    <Icon name="x" size={ICON.sm} color={SUBTLE} style={{ marginTop: 24 }} />
                     <View style={styles.dimField}>
                       <Text style={styles.dimLabel}>Height</Text>
                       <View style={styles.dimInputWrap}>
@@ -378,7 +378,7 @@ export default function DesignProjectScreen() {
                     style={styles.customToggle}
                     onPress={() => { setUseCustomDims(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
                   >
-                    <Feather
+                    <Icon
                       name={useCustomDims ? 'check-square' : 'square'}
                       size={ICON.sm}
                       color={useCustomDims ? accent : MUTED}
@@ -487,7 +487,7 @@ export default function DesignProjectScreen() {
             <StepHeader step={6} total={6} title="Ready to create" subtitle="Review your project settings before creating." />
             <BrandthreadCard style={styles.summaryCard} elevated>
               <View style={[styles.summaryIcon, { backgroundColor: accent + '22' }]}>
-                <Feather name={options.find(o => o.type === projectType)?.icon as any ?? 'edit-2'} size={ICON.xl} color={accent} />
+                <Icon name={options.find(o => o.type === projectType)?.icon as any ?? 'edit-2'} size={ICON.xl} color={accent} />
               </View>
               <Text style={styles.summaryName}>{finalName}</Text>
 

@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import * as Clipboard from 'expo-clipboard';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -196,7 +196,7 @@ function buildListRows(msgs: Message[], unreadDividerId: string | null): ListRow
 
 // ─── Attachment icon ──────────────────────────────────────────────────────────
 
-function attachmentIcon(type: MessageAttachment['type']): keyof typeof Feather.glyphMap {
+function attachmentIcon(type: MessageAttachment['type']): IconName {
   switch (type) {
     case 'product': return 'shopping-bag';
     case 'order':   return 'package';
@@ -1133,7 +1133,7 @@ export default function BuyerConversationScreen() {
           onPress={() => { if (att.uri && !att.meta?.uploading) setViewerVideoUri(att.uri); }}
         >
           {att.uri ? <CachedImage source={{ uri: att.uri }} style={s.videoThumbImg} recyclingKey={att.uri} /> : null}
-          <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
+          <View style={s.videoPlayOverlay}><Icon name="play-circle" size={36} color="#fff" /></View>
           {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
         </PressableScale>
       );
@@ -1176,7 +1176,7 @@ export default function BuyerConversationScreen() {
             <CachedImage source={{ uri: att.uri }} style={s.storyReplyThumb} recyclingKey={att.uri} />
           ) : (
             <View style={[s.storyReplyThumb, { alignItems: 'center', justifyContent: 'center' }]}>
-              <Feather name="camera" size={ICON.sm} color={theme.muted} />
+              <Icon name="camera" size={ICON.sm} color={theme.muted} />
             </View>
           )}
           <Text style={s.storyReplyLabel} numberOfLines={1}>{att.title || 'Replied to your story'}</Text>
@@ -1214,13 +1214,13 @@ export default function BuyerConversationScreen() {
           }
         }}
       >
-        <Feather name={attachmentIcon(att.type)} size={ICON.sm} color={theme.accent} />
+        <Icon name={attachmentIcon(att.type)} size={ICON.sm} color={theme.accent} />
         <View style={{ flex: 1, marginLeft: SP.sm }}>
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
         {att.type === 'post' && (
-          <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
+          <Icon name="chevron-right" size={ICON.xs} color={theme.muted} />
         )}
       </PressableScale>
     );
@@ -1717,7 +1717,7 @@ export default function BuyerConversationScreen() {
               {cardKind === 'thread_cash' ? (
                 <ThreadCashBillIcon size={18} />
               ) : (
-                <Feather
+                <Icon
                   name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
                   size={18}
                   color={theme.accent}
@@ -1728,7 +1728,7 @@ export default function BuyerConversationScreen() {
               {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
               {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={2}>{att.subtitle}</Text> : null}
             </View>
-            {deepLink && <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />}
+            {deepLink && <Icon name="chevron-right" size={ICON.xs} color={theme.muted} />}
           </PressableScale>
           {msg.text ? (
             <View style={{ flexDirection: 'row', justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: 4 }}>
@@ -1979,11 +1979,11 @@ export default function BuyerConversationScreen() {
                 </Text>
                 {isOwn && msg.status !== 'failed' && (
                   msg.status === 'sending' ? (
-                    <Feather name="clock" size={11} color={`${theme.onAccent}B0`} style={s.receiptIcon} />
+                    <Icon name="clock" size={11} color={`${theme.onAccent}B0`} style={s.receiptIcon} />
                   ) : (
                     <View style={s.receiptChecks}>
-                      <Feather name="check" size={11} color={isRead ? theme.onAccent : `${theme.onAccent}B0`} />
-                      {isRead && <Feather name="check" size={11} color={theme.onAccent} style={{ marginLeft: -7 }} />}
+                      <Icon name="check" size={11} color={isRead ? theme.onAccent : `${theme.onAccent}B0`} />
+                      {isRead && <Icon name="check" size={11} color={theme.onAccent} style={{ marginLeft: -7 }} />}
                     </View>
                   )
                 )}
@@ -1997,7 +1997,7 @@ export default function BuyerConversationScreen() {
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={s.retryRow}
               >
-                <Feather name="alert-circle" size={11} color={theme.error} />
+                <Icon name="alert-circle" size={11} color={theme.error} />
                 <Text style={[s.retryText, { color: theme.error }]}>Tap to retry</Text>
               </PressableScale>
             )}
@@ -2091,7 +2091,7 @@ export default function BuyerConversationScreen() {
               ) : isUploading ? (
                 <UploadRing size={22} color={theme.accent} trackColor={theme.border} />
               ) : (
-                <Feather
+                <Icon
                   name={
                     selectedAttachment.type === 'voice' ? 'mic' :
                     selectedAttachment.type === 'post'  ? 'image' :
@@ -2123,7 +2123,7 @@ export default function BuyerConversationScreen() {
                 accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
                 testID="conversation-selected-attachment-remove"
               >
-                <Feather name="x" size={ICON.sm} color={theme.muted} />
+                <Icon name="x" size={ICON.sm} color={theme.muted} />
               </PressableScale>
             </View>
             );
@@ -2170,7 +2170,7 @@ export default function BuyerConversationScreen() {
             accessibilityRole="button"
             accessibilityLabel="Back"
           >
-            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+            <Icon name="arrow-left" size={ICON.md} color={theme.text} />
           </PressableScale>
 
           {/* PressableScale forwards `style` only to its inner Animated.View,
@@ -2209,7 +2209,7 @@ export default function BuyerConversationScreen() {
                   <Text style={s.headerName} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
                   {isAgentConv && (
                     <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
-                      <Feather name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
+                      <Icon name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
                       <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
                         <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
                       </View>
@@ -2242,7 +2242,7 @@ export default function BuyerConversationScreen() {
               accessibilityRole="button"
               accessibilityLabel="Voice call"
             >
-              <Feather name="phone" size={ICON.lg} color={theme.muted} />
+              <Icon name="phone" size={ICON.lg} color={theme.muted} />
             </PressableScale>
           )}
           {conv && !isAgentConv && (
@@ -2254,7 +2254,7 @@ export default function BuyerConversationScreen() {
               accessibilityRole="button"
               accessibilityLabel="Video call"
             >
-              <Feather name="video" size={ICON.lg} color={theme.muted} />
+              <Icon name="video" size={ICON.lg} color={theme.muted} />
             </PressableScale>
           )}
           <PressableScale rippleEnabled={false}
@@ -2265,7 +2265,7 @@ export default function BuyerConversationScreen() {
             accessibilityRole="button"
             accessibilityLabel={isAgentConv ? 'About Brandthread Agent' : 'More options'}
           >
-            <Feather name={isAgentConv ? 'info' : 'more-horizontal'} size={ICON.lg} color={theme.muted} />
+            <Icon name={isAgentConv ? 'info' : 'more-horizontal'} size={ICON.lg} color={theme.muted} />
           </PressableScale>
         </View>
       </View>
@@ -2310,7 +2310,7 @@ export default function BuyerConversationScreen() {
           onPress={() => router.navigate('/(buyer)/orders' as never)}
           activeOpacity={0.8}
         >
-          <Feather name="package" size={ICON.md} color={theme.accent} />
+          <Icon name="package" size={ICON.md} color={theme.accent} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
             <Text style={s.orderCardNumber}>{conv.contextOrderNumber ?? 'Order'}</Text>
             {conv.contextProductName ? (
@@ -2341,7 +2341,7 @@ export default function BuyerConversationScreen() {
           accessibilityRole="button"
           accessibilityLabel={conv.contextProductId ? `View ${conv.contextProductName}` : 'View store'}
         >
-          <Feather name="shopping-bag" size={ICON.md} color={theme.accent} />
+          <Icon name="shopping-bag" size={ICON.md} color={theme.accent} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
             <Text style={s.orderCardNumber} numberOfLines={1}>{conv.contextProductName}</Text>
             {conv.contextSellerName ? (
@@ -2357,7 +2357,7 @@ export default function BuyerConversationScreen() {
       {/* Friendship inactive banner */}
       {isDisabled && (
         <View style={s.disabledBanner}>
-          <Feather name="info" size={ICON.sm} color={theme.warning} />
+          <Icon name="info" size={ICON.sm} color={theme.warning} />
           <Text style={s.disabledBannerText}>
             Messaging disabled — friendship was removed.
           </Text>
@@ -2462,7 +2462,7 @@ export default function BuyerConversationScreen() {
               >
                 {isUploading
                   ? <UploadRing size={ICON.md} color="#000000" />
-                  : <Feather name="camera" size={18} color="#000000" />
+                  : <Icon name="camera" size={18} color="#000000" />
                 }
               </PressableScale>
             }
@@ -2481,7 +2481,7 @@ export default function BuyerConversationScreen() {
                       accessibilityRole="button"
                       accessibilityLabel="Record voice message"
                     >
-                      <Feather name="mic" size={COMPOSER_ICON} color={theme.muted} />
+                      <Icon name="mic" size={COMPOSER_ICON} color={theme.muted} />
                     </PressableScale>
                   ) : (
                     <View
@@ -2491,7 +2491,7 @@ export default function BuyerConversationScreen() {
                       accessibilityRole="button"
                       accessibilityLabel="Record voice message"
                     >
-                      <Feather name="mic" size={COMPOSER_ICON} color={theme.muted} />
+                      <Icon name="mic" size={COMPOSER_ICON} color={theme.muted} />
                     </View>
                   )}
 
@@ -2506,7 +2506,7 @@ export default function BuyerConversationScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Photo library"
               >
-                <Feather name="image" size={COMPOSER_ICON} color={theme.muted} />
+                <Icon name="image" size={COMPOSER_ICON} color={theme.muted} />
               </PressableScale>
 
               {/* Thread Cash — disabled with an explanation rather than hidden
@@ -2614,14 +2614,14 @@ export default function BuyerConversationScreen() {
             <View style={s.mediaSheetHandle} />
             <Text style={s.mediaSheetTitle}>Add to message</Text>
             <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto}>
-              <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
+              <View style={s.mediaSheetIcon}><Icon name="image" size={ICON.md} color={theme.accent} /></View>
               <View>
                 <Text style={s.mediaSheetLabel}>Photos</Text>
                 <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
               </View>
             </PressableScale>
             <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo}>
-              <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
+              <View style={s.mediaSheetIcon}><Icon name="video" size={ICON.md} color={theme.accent} /></View>
               <View>
                 <Text style={s.mediaSheetLabel}>Video clip</Text>
                 <Text style={s.mediaSheetDesc}>Under 1 minute</Text>
@@ -2629,7 +2629,7 @@ export default function BuyerConversationScreen() {
             </PressableScale>
             {isSellerConv && (
               <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={openAttachmentPicker}>
-                <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
+                <View style={s.mediaSheetIcon}><Icon name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
                 <View>
                   <Text style={s.mediaSheetLabel}>Product or post</Text>
                   <Text style={s.mediaSheetDesc}>Share from {displayName}'s store</Text>
@@ -2660,7 +2660,7 @@ export default function BuyerConversationScreen() {
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
               >
-                <Feather name="shopping-bag" size={ICON.sm} color={attachmentTab === 'product' ? theme.accent : theme.muted} />
+                <Icon name="shopping-bag" size={ICON.sm} color={attachmentTab === 'product' ? theme.accent : theme.muted} />
                 <Text style={[s.attachmentTabText, attachmentTab === 'product' && s.attachmentTabTextActive]}>
                   Products
                 </Text>
@@ -2669,7 +2669,7 @@ export default function BuyerConversationScreen() {
                 style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('post')}
               >
-                <Feather name="image" size={ICON.sm} color={attachmentTab === 'post' ? theme.accent : theme.muted} />
+                <Icon name="image" size={ICON.sm} color={attachmentTab === 'post' ? theme.accent : theme.muted} />
                 <Text style={[s.attachmentTabText, attachmentTab === 'post' && s.attachmentTabTextActive]}>
                   Posts
                 </Text>
@@ -2680,7 +2680,7 @@ export default function BuyerConversationScreen() {
                   onPress={() => setAttachmentTab('order')}
                   testID="attach-tab-order"
                 >
-                  <Feather name="package" size={ICON.sm} color={attachmentTab === 'order' ? theme.accent : theme.muted} />
+                  <Icon name="package" size={ICON.sm} color={attachmentTab === 'order' ? theme.accent : theme.muted} />
                   <Text style={[s.attachmentTabText, attachmentTab === 'order' && s.attachmentTabTextActive]}>
                     Order
                   </Text>
@@ -2696,7 +2696,7 @@ export default function BuyerConversationScreen() {
                   testID="attach-order-row"
                 >
                   <View style={s.productThumbPlaceholder}>
-                    <Feather name="package" size={ICON.md} color={theme.accent} />
+                    <Icon name="package" size={ICON.md} color={theme.accent} />
                   </View>
                   <View style={{ flex: 1, marginLeft: SP.sm }}>
                     <Text style={s.productOptionName} numberOfLines={1}>{conv.contextOrderNumber ?? 'Your order'}</Text>
@@ -2704,7 +2704,7 @@ export default function BuyerConversationScreen() {
                       <Text style={s.productOptionMeta} numberOfLines={1}>{conv.contextOrderStatus}</Text>
                     ) : null}
                   </View>
-                  <Feather name="plus-circle" size={ICON.md} color={theme.accent} />
+                  <Icon name="plus-circle" size={ICON.md} color={theme.accent} />
                 </PressableScale>
               </ScrollView>
             ) : attachmentTab === 'product' ? (
@@ -2715,7 +2715,7 @@ export default function BuyerConversationScreen() {
                 </View>
               ) : sellerProducts.length === 0 ? (
                 <View style={s.pickerLoading}>
-                  <Feather name="shopping-bag" size={ICON.lg} color={theme.subtle} />
+                  <Icon name="shopping-bag" size={ICON.lg} color={theme.subtle} />
                   <Text style={s.pickerEmptyText}>No active products available.</Text>
                 </View>
               ) : (
@@ -2740,7 +2740,7 @@ export default function BuyerConversationScreen() {
                           <CachedImage source={{ uri: product.images[0] }} style={s.productThumb} recyclingKey={product.id} />
                         ) : (
                           <View style={s.productThumbPlaceholder}>
-                            <Feather name="shopping-bag" size={ICON.md} color={theme.accent} />
+                            <Icon name="shopping-bag" size={ICON.md} color={theme.accent} />
                           </View>
                         )}
                         <View style={{ flex: 1, marginLeft: SP.sm }}>
@@ -2750,7 +2750,7 @@ export default function BuyerConversationScreen() {
                             {product.category ? ` · ${product.category}` : ''}
                           </Text>
                         </View>
-                        <Feather name="plus-circle" size={ICON.md} color={theme.accent} />
+                        <Icon name="plus-circle" size={ICON.md} color={theme.accent} />
                       </PressableScale>
                     );
                   })}
@@ -2764,7 +2764,7 @@ export default function BuyerConversationScreen() {
                 </View>
               ) : sellerPosts.length === 0 ? (
                 <View style={s.pickerLoading}>
-                  <Feather name="image" size={ICON.lg} color={theme.subtle} />
+                  <Icon name="image" size={ICON.lg} color={theme.subtle} />
                   <Text style={s.pickerEmptyText}>No published posts available.</Text>
                 </View>
               ) : (
@@ -2784,7 +2784,7 @@ export default function BuyerConversationScreen() {
                         <CachedImage source={{ uri: post.mediaUrl }} style={s.productThumb} recyclingKey={post.id} />
                       ) : (
                         <View style={s.productThumbPlaceholder}>
-                          <Feather name="image" size={ICON.md} color={theme.accent} />
+                          <Icon name="image" size={ICON.md} color={theme.accent} />
                         </View>
                       )}
                       <View style={{ flex: 1, marginLeft: SP.sm }}>
@@ -2795,7 +2795,7 @@ export default function BuyerConversationScreen() {
                           {post.mediaType ?? 'post'} · {displayName}
                         </Text>
                       </View>
-                      <Feather name="plus-circle" size={ICON.md} color={theme.accent} />
+                      <Icon name="plus-circle" size={ICON.md} color={theme.accent} />
                     </PressableScale>
                   ))}
                 </ScrollView>
@@ -2908,7 +2908,7 @@ function LikeBurst({ x, y, color, onDone }: { x: number; y: number; color: strin
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Animated.View style={{ position: 'absolute', left: x - 24, top: y - 24, opacity, transform: [{ scale }, { translateY }] }}>
-        <Feather name="heart" size={48} color={color} />
+        <Icon name="heart" size={48} color={color} />
       </Animated.View>
     </View>
   );

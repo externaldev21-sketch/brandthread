@@ -11,7 +11,7 @@ import {
   TextInput, ActivityIndicator, Platform,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -149,7 +149,7 @@ export default function RfqPostScreen() {
         </View>
 
         <View style={s.searchRow}>
-          <Feather name="search" size={ICON.sm} color={theme.subtle} />
+          <Icon name="search" size={ICON.sm} color={theme.subtle} />
           <TextInput
             style={[s.searchInput, WEB_INPUT_RESET]}
             value={query}
@@ -171,12 +171,12 @@ export default function RfqPostScreen() {
             return (
               <TouchableOpacity key={mfg.id} style={[s.mfgRow, active && s.mfgRowActive]} onPress={() => toggle(mfg.id)} activeOpacity={0.8} testID={`rfq-target-${mfg.id}`}>
                 <View style={[s.checkbox, active && s.checkboxActive]}>
-                  {active && <Feather name="check" size={13} color={theme.onAccent} />}
+                  {active && <Icon name="check" size={13} color={theme.onAccent} />}
                 </View>
                 <View style={s.mfgInfo}>
                   <View style={s.mfgNameRow}>
                     <Text style={s.mfgName} numberOfLines={1}>{mfg.businessName}</Text>
-                    {mfg.isVerified && <Feather name="check-circle" size={13} color={theme.secondary} />}
+                    {mfg.isVerified && <Icon name="check-circle" size={13} color={theme.secondary} />}
                   </View>
                   <Text style={s.mfgMeta} numberOfLines={1}>
                     {[mfg.specialty, mfg.country].filter(Boolean).join(' · ')}

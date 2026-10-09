@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect } from 'expo-router';
@@ -35,7 +35,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface NavItem {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   desc: string;
   accent: string;
@@ -104,7 +104,7 @@ const ACCOUNT_ITEMS: NavItem[] = [
 
 // ─── Section metadata ─────────────────────────────────────────────────────────
 
-const SECTIONS: { key: string; title: string; icon: keyof typeof Feather.glyphMap; items: NavItem[] }[] = [
+const SECTIONS: { key: string; title: string; icon: IconName; items: NavItem[] }[] = [
   { key: 'store',      title: 'Store',          icon: 'layout',     items: STORE_ITEMS },
   { key: 'studio',     title: 'Design Studio',  icon: 'zap',        items: STUDIO_ITEMS },
   { key: 'operations', title: 'Operations',     icon: 'tool',       items: OPERATIONS_ITEMS },
@@ -262,10 +262,10 @@ export default function MoreScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.sectionHeaderLeft}>
-                  <Feather name={icon} size={13} color={theme.subtle} style={styles.sectionIcon} />
+                  <Icon name={icon} size={13} color={theme.subtle} style={styles.sectionIcon} />
                   <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
                 </View>
-                <Feather
+                <Icon
                   name={isOpen ? 'chevron-up' : 'chevron-down'}
                   size={15}
                   color={theme.subtle}

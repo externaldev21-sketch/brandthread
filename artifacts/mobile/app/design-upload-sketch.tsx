@@ -10,7 +10,7 @@ import {
   StyleSheet, ActivityIndicator, Alert, Image, Animated, Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -140,16 +140,16 @@ export default function UploadSketchScreen() {
                 <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
                 <View style={s.resultActions}>
                   <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Saved to project')}>
-                    <Feather name="folder-plus" size={ICON.sm} color={PURPLE} />
+                    <Icon name="folder-plus" size={ICON.sm} color={PURPLE} />
                   </TouchableOpacity>
                   <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Add to garment')}>
-                    <Feather name="layers" size={ICON.sm} color={CYAN} />
+                    <Icon name="layers" size={ICON.sm} color={CYAN} />
                   </TouchableOpacity>
                   <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Create product')}>
-                    <Feather name="package" size={ICON.sm} color={FG} />
+                    <Icon name="package" size={ICON.sm} color={FG} />
                   </TouchableOpacity>
                   <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Export')}>
-                    <Feather name="download" size={ICON.sm} color={FG} />
+                    <Icon name="download" size={ICON.sm} color={FG} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -157,11 +157,11 @@ export default function UploadSketchScreen() {
           </View>
           <View style={s.footerRow}>
             <TouchableOpacity style={s.footerBtn} onPress={reset}>
-              <Feather name="refresh-cw" size={ICON.sm} color={FG} />
+              <Icon name="refresh-cw" size={ICON.sm} color={FG} />
               <Text style={s.footerBtnText}>Try again</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.footerBtn, { borderColor: PURPLE }]} onPress={() => Alert.alert('All saved')}>
-              <Feather name="save" size={ICON.sm} color={PURPLE} />
+              <Icon name="save" size={ICON.sm} color={PURPLE} />
               <Text style={[s.footerBtnText, { color: PURPLE }]}>Save all</Text>
             </TouchableOpacity>
           </View>
@@ -186,7 +186,7 @@ export default function UploadSketchScreen() {
                 key={label}
                 style={[s.processStepRow, { opacity: stepAnims[i] }]}
               >
-                <Feather
+                <Icon
                   name={i <= processStep ? 'check-circle' : 'circle'}
                   size={ICON.sm}
                   color={i <= processStep ? CYAN : SUBTLE}
@@ -255,7 +255,7 @@ export default function UploadSketchScreen() {
 
           <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
             <View style={s.generateInner}>
-              <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+              <Icon name="zap" size={ICON.md} color={theme.onAccent} />
               <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate cleaned design</Text>
             </View>
           </GradientCard>
@@ -283,7 +283,7 @@ export default function UploadSketchScreen() {
           ) : (
             <>
               <View style={s.uploadIconCircle}>
-                <Feather name="upload" size={ICON.xl} color={PURPLE} />
+                <Icon name="upload" size={ICON.xl} color={PURPLE} />
               </View>
               <Text style={s.uploadZoneTitle}>Upload sketch</Text>
               <Text style={s.uploadZoneSub}>JPG, PNG up to 20MB</Text>
@@ -299,21 +299,21 @@ export default function UploadSketchScreen() {
                 style={[s.toggle, cropEnabled && s.toggleActive]}
                 onPress={() => setCropEnabled(!cropEnabled)}
               >
-                <Feather name="crop" size={ICON.sm} color={cropEnabled ? PURPLE_LIGHT : MUTED} />
+                <Icon name="crop" size={ICON.sm} color={cropEnabled ? PURPLE_LIGHT : MUTED} />
                 <Text style={[s.toggleText, cropEnabled && { color: PURPLE_LIGHT }]}>Crop</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.toggle, contrastEnabled && s.toggleActive]}
                 onPress={() => setContrastEnabled(!contrastEnabled)}
               >
-                <Feather name="sun" size={ICON.sm} color={contrastEnabled ? CYAN : MUTED} />
+                <Icon name="sun" size={ICON.sm} color={contrastEnabled ? CYAN : MUTED} />
                 <Text style={[s.toggleText, contrastEnabled && { color: CYAN }]}>Increase contrast</Text>
               </TouchableOpacity>
             </View>
 
             <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={startProcessing}>
               <View style={s.generateInner}>
-                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
+                <Icon name="arrow-right" size={ICON.md} color={theme.onAccent} />
                 <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Process sketch</Text>
               </View>
             </GradientCard>
@@ -324,7 +324,7 @@ export default function UploadSketchScreen() {
           <View style={s.emptyHints}>
             {['Hand-drawn logos', 'Rough illustrations', 'Typography sketches', 'Pattern drafts'].map(hint => (
               <View key={hint} style={s.hintChip}>
-                <Feather name="check" size={ICON.xs} color={CYAN} />
+                <Icon name="check" size={ICON.xs} color={CYAN} />
                 <Text style={s.hintChipText}>{hint}</Text>
               </View>
             ))}

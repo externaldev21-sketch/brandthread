@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { PinnedComment } from '@/lib/live/useLiveModeration';
@@ -19,7 +19,7 @@ export function PinnedCommentBar({ comment }: { comment: PinnedComment | null })
       accessibilityLabel={`Pinned comment from ${comment.display_name}: ${comment.message}`}
       testID="live-pinned-comment"
     >
-      <Feather name="bookmark" size={13} color={theme.text} style={styles.pinIcon} />
+      <Icon name="bookmark" size={13} color={theme.text} style={styles.pinIcon} />
       <Text style={[styles.pinnedText, { color: theme.text }]} numberOfLines={2}>
         <Text style={styles.pinnedName}>{comment.display_name} </Text>
         {comment.message}
@@ -45,7 +45,7 @@ export function CohostTiles({
           {RtcSurfaceView && c.agoraUid != null ? (
             <RtcSurfaceView canvas={{ uid: c.agoraUid, renderMode: 1 }} style={StyleSheet.absoluteFill} zOrderMediaOverlay />
           ) : (
-            <View style={styles.tileFallback}><Feather name="user" size={22} color={theme.muted} /></View>
+            <View style={styles.tileFallback}><Icon name="user" size={22} color={theme.muted} /></View>
           )}
           <View style={[styles.tileName, { backgroundColor: theme.card }]}>
             <Text style={[styles.tileNameText, { color: theme.text }]} numberOfLines={1}>{c.displayName}</Text>

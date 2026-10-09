@@ -14,7 +14,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Image, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CARD, FG, FONT, FS, MUTED, ON_DARK, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -83,7 +83,7 @@ export function MentionPickerSheet({
           <View style={styles.handle} />
           <Text style={styles.title}>Mention</Text>
           <View style={styles.searchWrap}>
-            <Feather name="search" size={16} color={MUTED} />
+            <Icon name="search" size={16} color={MUTED} />
             <TextInput
               style={[styles.searchInput, WEB_INPUT_RESET]}
               placeholder="Search"

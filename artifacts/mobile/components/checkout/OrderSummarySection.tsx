@@ -5,7 +5,7 @@
  */
 import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { formatCents } from '@/lib/money';
 import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import type { CheckoutDisplayTotals } from '@/lib/checkoutReadiness';
@@ -23,7 +23,7 @@ function Thumb({ uri, ck, styles }: { uri?: string; ck: CheckoutColors; styles: 
   if (uri) return <Image source={{ uri }} style={[styles.thumb, THUMB]} resizeMode="cover" />;
   return (
     <View style={[styles.thumb, THUMB, styles.thumbFallback]}>
-      <Feather name="image" size={16} color={ck.subtle} />
+      <Icon name="image" size={16} color={ck.subtle} />
     </View>
   );
 }
@@ -69,7 +69,7 @@ function SellerGroup({ group, shippingCents, processingDays, first, ck, styles }
         {group.items.map(item => <ItemRow key={item.id} item={item} ck={ck} styles={styles} />)}
       </View>
       <View style={styles.deliveryRow} testID="checkout-delivery-window">
-        <Feather name="truck" size={14} color={ck.muted} style={{ marginTop: 2 }} />
+        <Icon name="truck" size={14} color={ck.muted} style={{ marginTop: 2 }} />
         <View style={{ flex: 1 }}>
           <Text style={styles.deliveryTitle}>
             {method ? method.service : 'No delivery option available'}

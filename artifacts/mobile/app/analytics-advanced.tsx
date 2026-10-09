@@ -8,7 +8,7 @@
  */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -42,7 +42,7 @@ function ProGate() {
       <View style={{ flex: 1, paddingHorizontal: SP.md, paddingBottom: bottom, justifyContent: 'center' }}>
         <View style={{ alignItems: 'center', gap: SP.sm }}>
           <View style={{ width: 56, height: 56, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="lock" size={22} color={colors.foreground} />
+            <Icon name="lock" size={22} color={colors.foreground} />
           </View>
           <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center' }}>Included with Pro</Text>
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginBottom: SP.md }}>

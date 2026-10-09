@@ -7,7 +7,7 @@ import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, Modal, Platform, Linking } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -171,7 +171,7 @@ export default function FreelancerProfileScreen() {
       <View style={styles.container}>
         <ScreenHeader title="Freelancer" />
         <View style={styles.center}>
-          <Feather name="alert-circle" size={24} color={theme.subtle} />
+          <Icon name="alert-circle" size={24} color={theme.subtle} />
           <Text style={styles.errorText}>{error ?? 'Freelancer not found'}</Text>
         </View>
       </View>
@@ -202,7 +202,7 @@ export default function FreelancerProfileScreen() {
           <Text style={styles.name}>{freelancer.name}</Text>
           {freelancer.username && <Text style={styles.username}>@{freelancer.username}</Text>}
           <View style={styles.serviceRow}>
-            <Feather name={serviceIcon(freelancer.serviceType)} size={13} color={theme.secondary} />
+            <Icon name={serviceIcon(freelancer.serviceType)} size={13} color={theme.secondary} />
             <Text style={[styles.serviceText, { color: theme.secondary }]}>{serviceLabel(freelancer.serviceType)}</Text>
           </View>
 
@@ -214,7 +214,7 @@ export default function FreelancerProfileScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                {rating && <Feather name="star" size={13} color={theme.warning} />}
+                {rating && <Icon name="star" size={13} color={theme.warning} />}
                 <Text style={styles.statValue}>{rating ?? 'New'}</Text>
               </View>
               <Text style={styles.statLabel}>Rating</Text>
@@ -228,12 +228,12 @@ export default function FreelancerProfileScreen() {
 
           {freelancer.payoutsReady ? (
             <View style={[styles.payBadge, { backgroundColor: theme.success + '26' }]}>
-              <Feather name="check-circle" size={12} color={theme.success} />
+              <Icon name="check-circle" size={12} color={theme.success} />
               <Text style={[styles.payBadgeText, { color: theme.success }]}>Payouts ready</Text>
             </View>
           ) : !freelancer.hasConnectedAccount ? (
             <View style={[styles.payBadge, { backgroundColor: theme.warning + '26' }]}>
-              <Feather name="clock" size={12} color={theme.warning} />
+              <Icon name="clock" size={12} color={theme.warning} />
               <Text style={[styles.payBadgeText, { color: theme.warning }]}>
                 {isOwn ? 'Payout setup incomplete' : 'Hasn\'t set up payouts yet'}
               </Text>
@@ -274,7 +274,7 @@ export default function FreelancerProfileScreen() {
                 activeOpacity={0.7}
                 onPress={() => Linking.openURL(u).catch(() => {})}
               >
-                <Feather name="external-link" size={14} color={theme.secondary} />
+                <Icon name="external-link" size={14} color={theme.secondary} />
                 <Text style={styles.linkText} numberOfLines={1}>{u.replace(/^https?:\/\//, '')}</Text>
               </TouchableOpacity>
             ))}
@@ -294,7 +294,7 @@ export default function FreelancerProfileScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.connectBtn}
                 >
-                  <Feather name="credit-card" size={16} color={theme.onAccent} />
+                  <Icon name="credit-card" size={16} color={theme.onAccent} />
                   <Text style={styles.connectBtnText}>
                     {freelancer.hasConnectedAccount ? 'Finish Payout Setup' : 'Connect Bank Account'}
                   </Text>
@@ -307,9 +307,9 @@ export default function FreelancerProfileScreen() {
               activeOpacity={0.7}
               onPress={() => router.push('/freelancer-apply' as any)}
             >
-              <Feather name="edit-3" size={16} color={colors.primary} />
+              <Icon name="edit-3" size={16} color={colors.primary} />
               <Text style={styles.manageText}>Edit Profile</Text>
-              <Feather name="chevron-right" size={16} color={theme.subtle} />
+              <Icon name="chevron-right" size={16} color={theme.subtle} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -317,16 +317,16 @@ export default function FreelancerProfileScreen() {
               activeOpacity={0.7}
               onPress={() => router.push('/freelancer-jobs' as any)}
             >
-              <Feather name="briefcase" size={16} color={theme.secondary} />
+              <Icon name="briefcase" size={16} color={theme.secondary} />
               <Text style={styles.manageText}>My Gigs</Text>
-              <Feather name="chevron-right" size={16} color={theme.subtle} />
+              <Icon name="chevron-right" size={16} color={theme.subtle} />
             </TouchableOpacity>
 
             {freelancer.isActive && (
               <TouchableOpacity style={styles.manageRow} activeOpacity={0.7} onPress={deactivate}>
-                <Feather name="eye-off" size={16} color={theme.error} />
+                <Icon name="eye-off" size={16} color={theme.error} />
                 <Text style={[styles.manageText, { color: theme.error }]}>Deactivate Listing</Text>
-                <Feather name="chevron-right" size={16} color={theme.subtle} />
+                <Icon name="chevron-right" size={16} color={theme.subtle} />
               </TouchableOpacity>
             )}
           </View>
@@ -350,13 +350,13 @@ export default function FreelancerProfileScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.hireBtn}
               >
-                <Feather name="zap" size={16} color={theme.onAccent} />
+                <Icon name="zap" size={16} color={theme.onAccent} />
                 <Text style={styles.hireBtnText}>Hire {freelancer.name.split(' ')[0]}</Text>
               </LinearGradient>
             </TouchableOpacity>
           ) : (
             <View style={styles.notPayableCard}>
-              <Feather name="info" size={14} color={theme.warning} />
+              <Icon name="info" size={14} color={theme.warning} />
               <Text style={styles.notPayableText}>
                 This freelancer hasn't set up payouts yet and can't accept paid jobs.
               </Text>
@@ -439,7 +439,7 @@ export default function FreelancerProfileScreen() {
                   <ActivityIndicator color={theme.onAccent} size="small" />
                 ) : (
                   <>
-                    <Feather name="lock" size={15} color={theme.onAccent} />
+                    <Icon name="lock" size={15} color={theme.onAccent} />
                     <Text style={styles.hireBtnText}>
                       {priceCents >= 100 ? `Pay ${formatPrice(priceCents)}` : 'Pay with Stripe'}
                     </Text>

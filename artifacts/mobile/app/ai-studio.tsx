@@ -3,7 +3,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, 
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -108,7 +108,7 @@ export default function AIStudioScreen() {
             activeOpacity={0.8}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('ai'); }}
           >
-            <Feather name="zap" size={13} color={mode === 'ai' ? colors.primary : colors.mutedForeground} />
+            <Icon name="zap" size={13} color={mode === 'ai' ? colors.primary : colors.mutedForeground} />
             <Text style={[styles.modeBtnText, { color: mode === 'ai' ? colors.foreground : colors.mutedForeground }]}>AI Generate</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -116,7 +116,7 @@ export default function AIStudioScreen() {
             activeOpacity={0.8}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('manual'); }}
           >
-            <Feather name="edit-3" size={13} color={mode === 'manual' ? colors.primary : colors.mutedForeground} />
+            <Icon name="edit-3" size={13} color={mode === 'manual' ? colors.primary : colors.mutedForeground} />
             <Text style={[styles.modeBtnText, { color: mode === 'manual' ? colors.foreground : colors.mutedForeground }]}>Manual Design</Text>
           </TouchableOpacity>
         </View>
@@ -142,7 +142,7 @@ export default function AIStudioScreen() {
               activeOpacity={0.8}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setNewCanvasVisible(true); }}
             >
-              <Feather name="plus" size={18} color={colors.primaryForeground} />
+              <Icon name="plus" size={18} color={colors.primaryForeground} />
             </TouchableOpacity>
           </View>
 
@@ -171,7 +171,7 @@ export default function AIStudioScreen() {
                         backgroundColor: p.canvas.backgroundHex || '#FFFFFF',
                         ...(ratio >= 1 ? { width: '90%' } : { height: '90%' }),
                       }]}>
-                        {!p.thumbnail && <Feather name="image" size={18} color={colors.mutedForeground} />}
+                        {!p.thumbnail && <Icon name="image" size={18} color={colors.mutedForeground} />}
                       </View>
                     </View>
                     <Text style={[styles.canvasLabel, { color: colors.foreground }]} numberOfLines={1}>{p.name || 'Untitled design'}</Text>
@@ -225,7 +225,7 @@ export default function AIStudioScreen() {
           ]}
         >
           <View style={[styles.toolIcon, { backgroundColor: selected === tool.label ? colors.accent : colors.secondary }]}>
-            <Feather name={tool.icon} size={18} color={selected === tool.label ? colors.primary : colors.mutedForeground} />
+            <Icon name={tool.icon} size={18} color={selected === tool.label ? colors.primary : colors.mutedForeground} />
           </View>
           <View style={styles.toolInfo}>
             <Text style={[styles.toolLabel, { color: colors.foreground }]}>{tool.label}</Text>
@@ -238,7 +238,7 @@ export default function AIStudioScreen() {
               <Text style={[styles.toolBadgeText, { color: colors.primary }]}>{tool.badge}</Text>
             </View>
           )}
-          <Feather name="chevron-right" size={15} color={colors.mutedForeground} />
+          <Icon name="chevron-right" size={15} color={colors.mutedForeground} />
         </TouchableOpacity>
       ))}
       </ScrollView>

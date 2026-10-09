@@ -7,12 +7,12 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
-const DEFINITIONS: { key: string; icon: keyof typeof Feather.glyphMap; label: string }[] = [
+const DEFINITIONS: { key: string; icon: IconName; label: string }[] = [
   { key: 'products',          icon: 'tag',      label: 'Products' },
   { key: 'variants',          icon: 'copy',     label: 'Variants' },
   { key: 'collections',       icon: 'tag',      label: 'Collections' },
@@ -58,7 +58,7 @@ export default function MetafieldsScreen() {
         <View style={s.section}>
           <View style={s.rowStart}>
             <Text style={[s.sectionTitle, { color: colors.foreground }]}>Metafield definitions</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+            <Icon name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
           </View>
           <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
             Add a custom piece of data to a specific part of your store.
@@ -77,7 +77,7 @@ export default function MetafieldsScreen() {
                     activeOpacity={0.7}
                     style={[s.row, i !== DEFINITIONS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
-                    <Feather name={def.icon} size={17} color={colors.foreground} style={s.rowIcon} />
+                    <Icon name={def.icon} size={17} color={colors.foreground} style={s.rowIcon} />
                     <Text style={[s.rowLabel, { color: colors.foreground, flex: 1 }]}>{def.label}</Text>
                     {count > 0 ? (
                       <View style={[s.countBadge, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
@@ -86,7 +86,7 @@ export default function MetafieldsScreen() {
                     ) : (
                       <Text style={[s.countText, { color: colors.mutedForeground }]}>0</Text>
                     )}
-                    <Feather name="chevron-right" size={16} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+                    <Icon name="chevron-right" size={16} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
                   </TouchableOpacity>
                 );
               })}
@@ -99,7 +99,7 @@ export default function MetafieldsScreen() {
         <View style={s.section}>
           <View style={s.rowStart}>
             <Text style={[s.sectionTitle, { color: colors.foreground }]}>Metaobject definitions</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+            <Icon name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
           </View>
           <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
             Metaobjects let you group fields and connect them to different parts of your store.
@@ -109,7 +109,7 @@ export default function MetafieldsScreen() {
             activeOpacity={0.7}
             style={[s.addMetaBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
           >
-            <Feather name="plus" size={16} color={colors.primary} />
+            <Icon name="plus" size={16} color={colors.primary} />
             <Text style={[s.addMetaBtnText, { color: colors.primary }]}>Add definition</Text>
           </TouchableOpacity>
         </View>

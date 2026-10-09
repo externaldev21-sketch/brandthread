@@ -3,7 +3,7 @@ import AIBrainFAB from '@/components/AIBrainFAB';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -130,7 +130,7 @@ export default function CustomersScreen() {
             accessibilityRole="button"
             accessibilityLabel="View customer analytics"
           >
-            <Feather name="bar-chart-2" size={18} color={colors.foreground} />
+            <Icon name="bar-chart-2" size={18} color={colors.foreground} />
           </TouchableOpacity>
         }
       />
@@ -147,7 +147,7 @@ export default function CustomersScreen() {
           { label: 'Avg. spend', value: formatCents(avgSpendCents), icon: 'heart' as const },
         ].map((s) => (
           <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name={s.icon} size={14} color={colors.primary} />
+            <Icon name={s.icon} size={14} color={colors.primary} />
             <Text style={[styles.statVal, { color: colors.foreground }]}>{s.value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
           </View>
@@ -156,7 +156,7 @@ export default function CustomersScreen() {
 
       {/* Search */}
       <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Feather name="search" size={16} color={colors.mutedForeground} />
+        <Icon name="search" size={16} color={colors.mutedForeground} />
         <TextInput
           style={[styles.searchInput, { color: colors.foreground }, WEB_INPUT_RESET]}
           placeholder="Search customers..."
@@ -255,7 +255,7 @@ export default function CustomersScreen() {
                   )}
                 </View>
                 <View style={styles.custRight}>
-                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                  <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
                 </View>
               </TouchableOpacity>
             );

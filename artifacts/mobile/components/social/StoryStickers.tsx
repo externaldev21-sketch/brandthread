@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
@@ -70,7 +70,7 @@ export function PollSticker({
                 <Text style={[s.optionLabel, mine && s.optionLabelMine]}>{label}</Text>
                 {revealed ? (
                   <View style={s.optionRight}>
-                    {mine ? <Feather name="check" size={14} color={STICKER.ink} /> : null}
+                    {mine ? <Icon name="check" size={14} color={STICKER.ink} /> : null}
                     <Text style={s.optionPct}>{pct}%</Text>
                   </View>
                 ) : null}
@@ -109,7 +109,7 @@ export function QuestionSticker({
       <Pressable style={s.card} onPress={onOpenResponses} accessibilityRole="button" accessibilityLabel={`${n} responses`} testID="sticker-question">
         <Text style={s.title}>{prompt}</Text>
         <View style={s.responsesBtn}>
-          <Feather name="message-circle" size={16} color={STICKER.paper} />
+          <Icon name="message-circle" size={16} color={STICKER.paper} />
           <Text style={s.responsesBtnText}>{n === 1 ? '1 response' : `${n} responses`}</Text>
         </View>
       </Pressable>
@@ -122,7 +122,7 @@ export function QuestionSticker({
         <View style={s.inputRow}><Text style={s.inputPlaceholder}>Type something…</Text></View>
       ) : answered ? (
         <View style={s.sentRow}>
-          <Feather name="check" size={16} color={STICKER.ink} />
+          <Icon name="check" size={16} color={STICKER.ink} />
           <Text style={s.sentText}>Sent</Text>
         </View>
       ) : (
@@ -148,7 +148,7 @@ export function QuestionSticker({
             accessibilityRole="button"
             accessibilityLabel="Send answer"
           >
-            {busy ? <ActivityIndicator size="small" color={STICKER.paper} /> : <Feather name="arrow-up" size={16} color={STICKER.paper} />}
+            {busy ? <ActivityIndicator size="small" color={STICKER.paper} /> : <Icon name="arrow-up" size={16} color={STICKER.paper} />}
           </Pressable>
         </View>
       )}
@@ -181,12 +181,12 @@ export function ProductSticker({
     >
       {imageUrl
         ? <CachedImage source={{ uri: imageUrl }} style={s.productImg} contentFit="cover" />
-        : <View style={[s.productImg, { backgroundColor: STICKER.silver }]}><Feather name="shopping-bag" size={18} color={STICKER.ink} /></View>}
+        : <View style={[s.productImg, { backgroundColor: STICKER.silver }]}><Icon name="shopping-bag" size={18} color={STICKER.ink} /></View>}
       <View style={s.productText}>
         <Text style={s.productName}>{name}</Text>
         <Text style={s.productSub}>{sub}</Text>
       </View>
-      {mode === 'viewer' && available ? <Feather name="chevron-right" size={18} color={STICKER.ink} /> : null}
+      {mode === 'viewer' && available ? <Icon name="chevron-right" size={18} color={STICKER.ink} /> : null}
     </Pressable>
   );
 }
@@ -274,7 +274,7 @@ export function CountdownSticker({
           accessibilityState={{ selected: !!subscribed }}
           testID="sticker-countdown-notify"
         >
-          <Feather name={subscribed ? 'check' : 'bell'} size={14} color={subscribed ? STICKER.paper : STICKER.ink} />
+          <Icon name={subscribed ? 'check' : 'bell'} size={14} color={subscribed ? STICKER.paper : STICKER.ink} />
           <Text style={[s.notifyText, subscribed && { color: STICKER.paper }]}>{subscribed ? 'You’ll be notified' : 'Notify me'}</Text>
         </Pressable>
       ) : null}

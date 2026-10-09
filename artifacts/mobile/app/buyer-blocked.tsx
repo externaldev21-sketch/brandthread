@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, ActivityIndicator,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -86,7 +86,7 @@ export default function BlockedAndMutedScreen() {
   const header = (
     <View>
       <View style={s.explainer}>
-        <Feather name="shield" size={16} color={theme.text} />
+        <Icon name="shield" size={16} color={theme.text} />
         <Text style={s.explainerText}>
           {tab === 'blocked'
             ? 'Blocked accounts can’t find your profile, see your posts, comments or stories, or message you — and you won’t see theirs. They aren’t notified.'
@@ -94,7 +94,7 @@ export default function BlockedAndMutedScreen() {
         </Text>
       </View>
       <PressableScale style={s.wordsRow} onPress={() => router.push('/muted-words' as never)} accessibilityRole="button">
-        <View style={s.wordsIcon}><Feather name="type" size={16} color={theme.text} /></View>
+        <View style={s.wordsIcon}><Icon name="type" size={16} color={theme.text} /></View>
         <View style={{ flex: 1 }}>
           <Text style={s.wordsTitle}>Muted words</Text>
           <Text style={s.wordsSub}>
@@ -103,11 +103,11 @@ export default function BlockedAndMutedScreen() {
               : `${mutedWordCount} word${mutedWordCount === 1 ? '' : 's'} muted`}
           </Text>
         </View>
-        <Feather name="chevron-right" size={18} color={theme.subtle} />
+        <Icon name="chevron-right" size={18} color={theme.subtle} />
       </PressableScale>
       {error && tab === 'blocked' ? (
         <View style={s.errorCard}>
-          <Feather name="alert-circle" size={16} color={theme.error} />
+          <Icon name="alert-circle" size={16} color={theme.error} />
           <Text style={s.errorText}>{error}</Text>
           <PressableScale onPress={() => load(true)} accessibilityRole="button"><Text style={s.retry}>Retry</Text></PressableScale>
         </View>

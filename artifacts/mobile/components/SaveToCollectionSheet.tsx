@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import ReanimatedAnimated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -121,7 +121,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
         <View style={styles.header}>
           <Text style={styles.title}>Save to…</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Close">
-            <Feather name="x" size={18} color={FG} />
+            <Icon name="x" size={18} color={FG} />
           </TouchableOpacity>
         </View>
 
@@ -140,7 +140,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
                 activeOpacity={0.7}
               >
                 <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
-                  <Feather name="bookmark" size={ICON.sm} color={theme.accent} />
+                  <Icon name="bookmark" size={ICON.sm} color={theme.accent} />
                 </View>
                 <Text style={styles.rowLabel}>All Saved (no board)</Text>
                 {busyId === 'none' ? <ActivityIndicator color={theme.accent} /> : null}
@@ -154,7 +154,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
                 activeOpacity={0.7}
               >
                 <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
-                  <Feather name="folder" size={ICON.sm} color={theme.accent} />
+                  <Icon name="folder" size={ICON.sm} color={theme.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowLabel} numberOfLines={1}>{c.name}</Text>
@@ -189,7 +189,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
               ) : (
                 <TouchableOpacity style={styles.row} onPress={() => setCreating(true)} activeOpacity={0.7}>
                   <View style={[styles.rowIcon, { borderWidth: 1, borderColor: theme.accent, backgroundColor: 'transparent' }]}>
-                    <Feather name="plus" size={ICON.sm} color={theme.accent} />
+                    <Icon name="plus" size={ICON.sm} color={theme.accent} />
                   </View>
                   <Text style={[styles.rowLabel, { color: theme.accent, fontFamily: FONT.semibold }]}>New collection</Text>
                 </TouchableOpacity>

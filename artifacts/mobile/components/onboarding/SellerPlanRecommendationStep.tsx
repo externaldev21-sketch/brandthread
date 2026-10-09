@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS, type SellerPlanId } from '@/lib/sellerBilling';
@@ -55,11 +55,11 @@ export function SellerPlanRecommendationStep({
               <View style={styles.badgeRow}>
                 {recommended && (
                   <View style={[styles.badge, { borderColor: theme.accent }]}>
-                    <Feather name="star" size={10} color={theme.secondary} />
+                    <Icon name="star" size={10} color={theme.secondary} />
                     <Text style={[styles.badgeText, { color: theme.secondary }]}>RECOMMENDED</Text>
                   </View>
                 )}
-                {selected && <Feather name="check-circle" size={18} color={theme.accentLight} />}
+                {selected && <Icon name="check-circle" size={18} color={theme.accentLight} />}
               </View>
               <Text style={styles.planName}>{plan.name}</Text>
               <Text style={styles.tagline}>{plan.tagline}</Text>
@@ -67,7 +67,7 @@ export function SellerPlanRecommendationStep({
               <View style={styles.features}>
                 {plan.features.map((feature) => (
                   <View key={feature} style={styles.featureRow}>
-                    <Feather name="check" size={13} color={selected ? theme.accentLight : theme.muted} />
+                    <Icon name="check" size={13} color={selected ? theme.accentLight : theme.muted} />
                     <Text style={styles.feature}>{feature}</Text>
                   </View>
                 ))}

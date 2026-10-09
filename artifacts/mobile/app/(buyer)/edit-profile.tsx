@@ -9,7 +9,7 @@ import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
@@ -87,7 +87,7 @@ function GenderPicker({
               onPress={() => { onSelect(option); onClose(); }}
             >
               <Text style={[styles.pickerRowText, { color: theme.text }, current === option && { color: theme.accent }]}>{option}</Text>
-              {current === option && <Feather name="check" size={16} color={theme.accent} />}
+              {current === option && <Icon name="check" size={16} color={theme.accent} />}
             </TouchableOpacity>
           ))}
         </TouchableOpacity>
@@ -507,7 +507,7 @@ export default function BuyerEditProfileScreen() {
         />
 
         <Animated.View pointerEvents="none" style={[styles.toast, { opacity: toastOpacity, backgroundColor: theme.success }]}>
-          <Feather name="check-circle" size={14} color={theme.onAccent} />
+          <Icon name="check-circle" size={14} color={theme.onAccent} />
           <Text style={[styles.toastText, { color: theme.onAccent }]}>{toast.message}</Text>
         </Animated.View>
 
@@ -525,7 +525,7 @@ export default function BuyerEditProfileScreen() {
                 )}
                 {!avatarUploading && (
                   <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-                    <Feather name="camera" size={13} color={theme.onAccent} />
+                    <Icon name="camera" size={13} color={theme.onAccent} />
                   </View>
                 )}
               </View>
@@ -614,9 +614,9 @@ export default function BuyerEditProfileScreen() {
                   returnKeyType="done"
                 />
                 {usernameStatus === 'checking' && <ActivityIndicator size="small" color={theme.accent} style={{ marginLeft: 6 }} />}
-                {usernameStatus === 'ok' && <Feather name="check-circle" size={17} color={theme.success} style={{ marginLeft: 6 }} />}
-                {usernameStatus === 'taken' && <Feather name="x-circle" size={17} color={theme.error} style={{ marginLeft: 6 }} />}
-                {usernameStatus === 'invalid' && <Feather name="alert-circle" size={17} color={theme.warning} style={{ marginLeft: 6 }} />}
+                {usernameStatus === 'ok' && <Icon name="check-circle" size={17} color={theme.success} style={{ marginLeft: 6 }} />}
+                {usernameStatus === 'taken' && <Icon name="x-circle" size={17} color={theme.error} style={{ marginLeft: 6 }} />}
+                {usernameStatus === 'invalid' && <Icon name="alert-circle" size={17} color={theme.warning} style={{ marginLeft: 6 }} />}
               </View>
               {(usernameError || errors.username || fields.username.length > 0) && (
                 <Text style={[
@@ -681,7 +681,7 @@ export default function BuyerEditProfileScreen() {
             >
               <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Gender</Text>
               <Text style={[styles.chevronLabel, { color: theme.muted }]}>{extra.gender || 'Add'}</Text>
-              <Feather name="chevron-right" size={17} color={theme.muted} />
+              <Icon name="chevron-right" size={17} color={theme.muted} />
             </TouchableOpacity>
             <Divider theme={theme} />
             <View style={styles.row}>

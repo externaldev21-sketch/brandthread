@@ -19,7 +19,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Pressable, Alert, Animated, Easing } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ThreadCashBill, ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -330,7 +330,7 @@ export function ThreadCashAttachButton({
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 testID="thread-cash-collapse"
               >
-                <Feather name="chevron-down" size={22} color={theme.muted} />
+                <Icon name="chevron-down" size={22} color={theme.muted} />
               </TouchableOpacity>
               <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
                 <ThreadCashBillMark size={14} color={theme.text} accent={theme.accent} />
@@ -607,7 +607,7 @@ export function ThreadCashMessageCard({
           <Text style={[styles.cancelLink, { color: theme.muted }]}>{busy ? '…' : 'Cancel'}</Text>
         </TouchableOpacity>
       ) : (
-        <Feather name="chevron-right" size={18} color={theme.subtle} />
+        <Icon name="chevron-right" size={18} color={theme.subtle} />
       )}
     </View>
   );

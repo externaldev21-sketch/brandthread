@@ -13,7 +13,7 @@ import {
   Modal, Pressable, TextInput, Platform } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -235,7 +235,7 @@ export default function ReviewQueueScreen() {
 
       {toast ? (
         <View style={[s.toast, { bottom: insets.bottom + SP.lg }]} pointerEvents="none" accessibilityLiveRegion="polite">
-          <Feather name="check" size={14} color={theme.onAccent} />
+          <Icon name="check" size={14} color={theme.onAccent} />
           <Text style={s.toastText}>{toast}</Text>
         </View>
       ) : null}
@@ -261,7 +261,7 @@ function QueueCard({ item, onPress }: { item: ModerationQueueItem; onPress: () =
   return (
     <PressableScale onPress={onPress} style={s.card} accessibilityRole="button" accessibilityLabel={`Review ${TARGET_LABELS[type]} report`}>
       <View style={s.cardTop}>
-        <View style={s.typeIcon}><Feather name={TARGET_ICONS[type]} size={15} color={theme.text} /></View>
+        <View style={s.typeIcon}><Icon name={TARGET_ICONS[type]} size={15} color={theme.text} /></View>
         <Text style={s.cardType}>{TARGET_LABELS[type].replace(/^\w/, (c) => c.toUpperCase())}</Text>
         <View style={[s.badge, auto ? s.badgeWarn : s.badgeNeutral]}>
           <Text style={[s.badgeText, auto && { color: theme.warning }]}>{auto ? 'Held by filter' : reasonLabel(item.reason)}</Text>
@@ -376,7 +376,7 @@ function ReviewSheet({
         <View style={s.sheetHandle} />
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={s.sheetHeader}>
-            <View style={s.typeIconLg}><Feather name={TARGET_ICONS[type]} size={18} color={theme.text} /></View>
+            <View style={s.typeIconLg}><Icon name={TARGET_ICONS[type]} size={18} color={theme.text} /></View>
             <View style={{ flex: 1 }}>
               <Text style={s.sheetTitle}>{auto ? 'Held by the content filter' : `${reasonLabel(item.reason)} report`}</Text>
               <Text style={s.sheetSub}>{TARGET_LABELS[type]} · {new Date(item.createdAt).toLocaleString()}</Text>
@@ -455,7 +455,7 @@ function ReviewSheet({
                   >
                     {busy === 'remove_content'
                       ? <ActivityIndicator color={theme.text} />
-                      : <><Feather name="trash-2" size={16} color={theme.text} /><Text style={s.outlineText}>Remove {TARGET_LABELS[type]}</Text></>}
+                      : <><Icon name="trash-2" size={16} color={theme.text} /><Text style={s.outlineText}>Remove {TARGET_LABELS[type]}</Text></>}
                   </PressableScale>
                   {item.owner && !item.owner.suspended && !item.owner.deleted ? (
                     <PressableScale
@@ -464,7 +464,7 @@ function ReviewSheet({
                       disabled={!!busy}
                       accessibilityRole="button"
                     >
-                      <Feather name="user-x" size={16} color={theme.error} />
+                      <Icon name="user-x" size={16} color={theme.error} />
                       <Text style={[s.outlineText, { color: theme.error }]}>Suspend {item.owner.name}</Text>
                     </PressableScale>
                   ) : null}
@@ -477,7 +477,7 @@ function ReviewSheet({
               <PressableScale onPress={reinstateOwner} style={s.outlineBtn} disabled={!!busy} accessibilityRole="button">
                 {busy === 'reinstate'
                   ? <ActivityIndicator color={theme.text} />
-                  : <><Feather name="user-check" size={16} color={theme.text} /><Text style={s.outlineText}>Reinstate {item.owner.name}</Text></>}
+                  : <><Icon name="user-check" size={16} color={theme.text} /><Text style={s.outlineText}>Reinstate {item.owner.name}</Text></>}
               </PressableScale>
             </View>
           ) : null}

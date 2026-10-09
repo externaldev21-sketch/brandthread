@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -402,7 +402,7 @@ export default function QuoteRequestScreen() {
         {manufacturer && (
           <GradientCard colors={GRAD_CARD_GLOW} style={sc.mfgCard}>
             <View style={sc.mfgCardRow}>
-              <Feather name="settings" size={ICON.md} color={PURPLE_LIGHT} />
+              <Icon name="settings" size={ICON.md} color={PURPLE_LIGHT} />
               <View>
                 <Text style={sc.mfgCardLabel}>For manufacturer</Text>
                 <Text style={sc.mfgCardName}>{manufacturer.name}</Text>
@@ -505,7 +505,7 @@ export default function QuoteRequestScreen() {
               style={{ flex: 1 }}
             />
             <TouchableOpacity onPress={addColorway} style={[sc.addBtn, { backgroundColor: colors.primary }]}>
-              <Feather name="plus" size={ICON.sm} color={colors.primaryForeground} />
+              <Icon name="plus" size={ICON.sm} color={colors.primaryForeground} />
             </TouchableOpacity>
           </View>
           {colorways.length > 0 && (
@@ -513,7 +513,7 @@ export default function QuoteRequestScreen() {
               {colorways.map(c => (
                 <TouchableOpacity key={c} onPress={() => removeColorway(c)} style={sc.tagChip}>
                   <Text style={sc.tagChipText}>{c}</Text>
-                  <Feather name="x" size={10} color={PURPLE_LIGHT} />
+                  <Icon name="x" size={10} color={PURPLE_LIGHT} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -562,7 +562,7 @@ export default function QuoteRequestScreen() {
         {warnings.length > 0 && (
           <GradientCard colors={['rgba(248,113,113,0.12)', 'rgba(248,113,113,0.04)'] as const} style={sc.warningCard}>
             <View style={sc.warningRow}>
-              <Feather name="alert-triangle" size={ICON.md} color={RED} />
+              <Icon name="alert-triangle" size={ICON.md} color={RED} />
               <Text style={sc.warningTitle}>Please review</Text>
             </View>
             {warnings.map(w => (

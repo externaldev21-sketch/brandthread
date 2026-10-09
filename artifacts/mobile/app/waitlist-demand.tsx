@@ -10,7 +10,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -125,7 +125,7 @@ export default function WaitlistDemandScreen() {
                       : <Text style={[s.btnText, { color: colors.primaryForeground }]}>Notify now</Text>}
                   </TouchableOpacity>
                 ) : (
-                  <Feather name={waiting === 0 ? 'check' : 'bell'} size={16} color={colors.mutedForeground} />
+                  <Icon name={waiting === 0 ? 'check' : 'bell'} size={16} color={colors.mutedForeground} />
                 )}
               </View>
             );

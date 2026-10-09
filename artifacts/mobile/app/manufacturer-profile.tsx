@@ -12,7 +12,7 @@ import {
   Alert, ActivityIndicator, Platform, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -46,7 +46,7 @@ function StarRating({ rating, size = 14, color = GOLD }: { rating: number; size?
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
       {[1, 2, 3, 4, 5].map(i => (
-        <Feather
+        <Icon
           key={i}
           name={i <= Math.round(rating) ? 'star' : 'star'}
           size={size}
@@ -174,7 +174,7 @@ export default function ManufacturerProfileScreen() {
     return (
       <View style={[s.root, { paddingTop: headerTopInset }]}>
         <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
+          <Icon name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="This profile is no longer listed, or it's a private manufacturer you aren't connected to." action={{ label: 'Back to directory', onPress: () => goBackOr(router) }} />
       </View>
@@ -199,7 +199,7 @@ export default function ManufacturerProfileScreen() {
         >
           {/* Back button */}
           <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtnHero} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Feather name="arrow-left" size={ICON.md} color={ON_DARK} />
+            <Icon name="arrow-left" size={ICON.md} color={ON_DARK} />
           </TouchableOpacity>
 
           {/* Factory icon */}
@@ -208,7 +208,7 @@ export default function ManufacturerProfileScreen() {
               <Image source={{ uri: m.profileImageUri }} style={s.factoryIconBg} resizeMode="cover" accessibilityLabel={`${m.name} lead photo`} />
             ) : (
               <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.factoryIconBg}>
-                <Feather name="settings" size={ICON.xxl} color={theme.onAccent} />
+                <Icon name="settings" size={ICON.xxl} color={theme.onAccent} />
               </LinearGradient>
             )}
           </View>
@@ -218,7 +218,7 @@ export default function ManufacturerProfileScreen() {
              <Text style={[s.heroName, getOnAccentTextStyle(theme)]}>{m.name}</Text>
             {m.isVerified && (
               <View style={[s.verifiedBadge, { backgroundColor: theme.secondaryDim }]}>
-                <Feather name="check-circle" size={14} color={theme.secondary} />
+                <Icon name="check-circle" size={14} color={theme.secondary} />
                 <Text style={[s.verifiedText, { color: theme.secondary }]}>Verified</Text>
               </View>
             )}
@@ -226,20 +226,20 @@ export default function ManufacturerProfileScreen() {
 
           {/* Location */}
           <View style={s.heroLocationRow}>
-             <Feather name="map-pin" size={12} color={theme.onAccent} />
+             <Icon name="map-pin" size={12} color={theme.onAccent} />
              <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]}>{[m.city, m.country].filter(Boolean).join(', ')}</Text>
           </View>
           {(localTimeLabel(m.timeZone) || m.isPublicDirectory === false) && (
             <View style={s.heroLocationRow}>
               {localTimeLabel(m.timeZone) ? (
                 <>
-                  <Feather name="clock" size={12} color={theme.onAccent} />
+                  <Icon name="clock" size={12} color={theme.onAccent} />
                   <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]} testID="profile-local-time">{localTimeLabel(m.timeZone)}</Text>
                 </>
               ) : null}
               {m.isPublicDirectory === false && (
                 <View style={[s.verifiedBadge, { backgroundColor: 'rgba(0,0,0,0.35)' }]}>
-                  <Feather name="lock" size={12} color={theme.onAccent} />
+                  <Icon name="lock" size={12} color={theme.onAccent} />
                   <Text style={[s.verifiedText, { color: theme.onAccent }]}>Private partner</Text>
                 </View>
               )}
@@ -258,19 +258,19 @@ export default function ManufacturerProfileScreen() {
         {/* ── Quick Actions ── */}
         <View style={s.quickActions}>
           <TouchableOpacity onPress={handleSave} style={s.qaBtn} activeOpacity={0.8}>
-            <Feather name="heart" size={ICON.md} color={saved ? RED : MUTED} />
+            <Icon name="heart" size={ICON.md} color={saved ? RED : MUTED} />
             <Text style={[s.qaBtnLabel, saved && { color: RED }]}>{saved ? 'Saved' : 'Save'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleMessage} style={s.qaBtn} activeOpacity={0.8}>
-            <Feather name="message-circle" size={ICON.md} color={CYAN} />
+            <Icon name="message-circle" size={ICON.md} color={CYAN} />
             <Text style={[s.qaBtnLabel, { color: CYAN }]}>Message</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/manufacturer-hub?tab=messages' as never)} style={s.qaBtn} activeOpacity={0.8}>
-            <Feather name="inbox" size={ICON.md} color={PURPLE_LIGHT} />
+            <Icon name="inbox" size={ICON.md} color={PURPLE_LIGHT} />
             <Text style={[s.qaBtnLabel, { color: PURPLE_LIGHT }]}>Messages</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleQuote} style={s.qaBtn} activeOpacity={0.8}>
-            <Feather name="file-text" size={ICON.md} color={PURPLE_LIGHT} />
+            <Icon name="file-text" size={ICON.md} color={PURPLE_LIGHT} />
             <Text style={[s.qaBtnLabel, { color: PURPLE_LIGHT }]}>Quote</Text>
           </TouchableOpacity>
         </View>
@@ -288,7 +288,7 @@ export default function ManufacturerProfileScreen() {
                 { icon: 'zap', label: 'Replies in', value: m.responseTimeHours > 0 ? `~${m.responseTimeHours}h` : null },
               ] as const).filter((item) => item.value).map((item) => (
                 <View key={item.label} style={s.overviewItem}>
-                  <Feather name={item.icon} size={ICON.sm} color={FG} />
+                  <Icon name={item.icon} size={ICON.sm} color={FG} />
                   <Text style={s.overviewLabel}>{item.label}</Text>
                   <Text style={s.overviewValue}>{item.value}</Text>
                 </View>
@@ -348,7 +348,7 @@ export default function ManufacturerProfileScreen() {
               {m.certifications.map(cert => (
                 <View key={cert.id} style={s.certRow}>
                   <View style={s.certIcon}>
-                    <Feather name="award" size={ICON.sm} color={GOLD} />
+                    <Icon name="award" size={ICON.sm} color={GOLD} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.certName}>{cert.name}</Text>
@@ -397,7 +397,7 @@ export default function ManufacturerProfileScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Request a sample from ${m.name}`}
             >
-              <Feather name="scissors" size={ICON.sm} color={FG} />
+              <Icon name="scissors" size={ICON.sm} color={FG} />
               <Text style={s.requestSampleBtnText}>Request a Sample</Text>
             </TouchableOpacity>
           </SectionCard>
@@ -426,7 +426,7 @@ export default function ManufacturerProfileScreen() {
                         <Image source={{ uri: product.images[0] }} style={s.catalogImage} resizeMode="cover" />
                       ) : (
                         <View style={[s.catalogImage, s.catalogImageFallback]}>
-                          <Feather name="package" size={ICON.lg} color={SUBTLE} />
+                          <Icon name="package" size={ICON.lg} color={SUBTLE} />
                         </View>
                       )}
                       <Text style={s.catalogName} numberOfLines={2}>{product.name}</Text>
@@ -502,19 +502,19 @@ export default function ManufacturerProfileScreen() {
           <SectionCard title="Contact">
             {m.email && (
               <View style={s.contactRow}>
-                <Feather name="mail" size={ICON.sm} color={PURPLE_LIGHT} />
+                <Icon name="mail" size={ICON.sm} color={PURPLE_LIGHT} />
                 <Text style={s.contactText}>{m.email}</Text>
               </View>
             )}
             {m.website && (
               <View style={s.contactRow}>
-                <Feather name="globe" size={ICON.sm} color={CYAN} />
+                <Icon name="globe" size={ICON.sm} color={CYAN} />
                 <Text style={s.contactText}>{m.website}</Text>
               </View>
             )}
             {m.phone && (
               <View style={s.contactRow}>
-                <Feather name="phone" size={ICON.sm} color={SUCCESS} />
+                <Icon name="phone" size={ICON.sm} color={SUCCESS} />
                 <Text style={s.contactText}>{m.phone}</Text>
               </View>
             )}

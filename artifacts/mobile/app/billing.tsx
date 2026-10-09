@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
@@ -140,7 +140,7 @@ export default function BillingScreen() {
         title="Billing"
         rightElement={!isReadOnly ? (
           <TouchableOpacity testID="seller-billing-export" onPress={() => exportBills()} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLabel="Export billing history">
-            <Feather name="share" size={17} color={colors.foreground} />
+            <Icon name="share" size={17} color={colors.foreground} />
           </TouchableOpacity>
         ) : undefined}
       />
@@ -173,17 +173,17 @@ export default function BillingScreen() {
           {isReadOnly ? (
             <View style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
-                <Feather name="credit-card" size={18} color={colors.foreground} />
+                <Icon name="credit-card" size={18} color={colors.foreground} />
               </View>
               <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
             </View>
           ) : (
             <TouchableOpacity testID="seller-billing-payment-method" onPress={() => openBillingPortal()} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
-                <Feather name="credit-card" size={18} color={colors.foreground} />
+                <Icon name="credit-card" size={18} color={colors.foreground} />
               </View>
               <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
-               <Feather name={Platform.OS === 'web' ? 'edit-2' : 'external-link'} size={16} color={colors.mutedForeground} />
+               <Icon name={Platform.OS === 'web' ? 'edit-2' : 'external-link'} size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
@@ -200,7 +200,7 @@ export default function BillingScreen() {
         {!isReadOnly && Platform.OS !== 'web' && (
           <View style={styles.section}>
             <TouchableOpacity onPress={restorePurchases} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]} testID="seller-revenuecat-restore">
-              <Feather name="refresh-cw" size={18} color={colors.primary} />
+              <Icon name="refresh-cw" size={18} color={colors.primary} />
               <Text style={[styles.cardText, { color: colors.foreground }]}>Restore purchases</Text>
             </TouchableOpacity>
           </View>
@@ -210,7 +210,7 @@ export default function BillingScreen() {
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Past bills</Text>
             <TouchableOpacity onPress={() => exportBills()} activeOpacity={0.7} accessibilityLabel="Export billing history">
-              <Feather name="share" size={18} color={colors.mutedForeground} />
+              <Icon name="share" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
 

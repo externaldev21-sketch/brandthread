@@ -3,7 +3,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking } 
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HapticSwitch } from '@/components/BrandthreadUI';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { FONT } from '@/lib/theme';
@@ -123,7 +123,7 @@ export default function TaxesDutiesScreen() {
           </View>
 
           <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
-            <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
+            <Icon name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
             <Text style={[styles.infoText, { color: colors.foreground }]}>
               This calculates and collects tax — it is not proof of nexus, registration, or filing compliance. Product tax codes, registrations, and the checkout address determine the actual taxability; Brandthread does not apply a local rate table or override Stripe's result.
             </Text>
@@ -166,7 +166,7 @@ export default function TaxesDutiesScreen() {
             </TouchableOpacity>
           </View>
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <Icon name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available directly in-app yet</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -182,7 +182,7 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax-inclusive pricing</Text>
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="tag" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <Icon name="tag" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -201,7 +201,7 @@ export default function TaxesDutiesScreen() {
             Delivered Duty Paid (DDP) collects import duties from the buyer at checkout and remits them for you. Delivered At Place (DAP) leaves the buyer responsible for customs duties on delivery.
           </Text>
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <Icon name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -217,14 +217,14 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <View style={styles.rowStart}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Registrations and filing</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+            <Icon name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
             Brandthread does not determine where you have nexus, register you, or file returns. Review marketplace-facilitator treatment and state obligations with a qualified accountant.
           </Text>
 
           <View style={[styles.reportCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="bar-chart-2" size={17} color={colors.foreground} style={styles.rowIcon} />
+            <Icon name="bar-chart-2" size={17} color={colors.foreground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>1099-K preparation</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { type IconName } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, SP } from '@/lib/theme';
@@ -13,7 +13,7 @@ import { Card, ListRow } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
-type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
+type Item = { label: string; sub?: string; icon?: IconName; toggle?: ToggleKey; value?: string; action?: () => void };
 
 type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>) => Item[] };
 

@@ -6,7 +6,7 @@
  */
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { deriveCardState, formatMoney, orderTypeLabel, trackingUrl } from '@workspace/manufacturer-flow';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -75,7 +75,7 @@ export default function OrderCardBubble({
     <View style={[styles.row, fromMe ? styles.right : styles.left]}>
       <View style={styles.card} testID={`order-card-${order.id}`}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => onOpenTracker(order)} style={styles.head} accessibilityRole="button" accessibilityLabel={`Open tracker for ${order.title}`}>
-          <View style={styles.icon}><Feather name={order.orderType === 'bulk' ? 'package' : 'scissors'} size={18} color={FG} /></View>
+          <View style={styles.icon}><Icon name={order.orderType === 'bulk' ? 'package' : 'scissors'} size={18} color={FG} /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.kicker}>{orderTypeLabel(order.orderType).toUpperCase()} CARD</Text>
             <Text style={styles.title} numberOfLines={2}>{order.title}</Text>
@@ -110,7 +110,7 @@ export default function OrderCardBubble({
               if (action.kind === 'pay') {
                 return (
                   <TouchableOpacity key="pay" style={[styles.primary, { backgroundColor: theme.accent }]} onPress={() => onPay(order)} disabled={paying} testID={`button-pay-${order.id}`} accessibilityRole="button">
-                    {paying ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Feather name="lock" size={14} color={theme.onAccent} />}
+                    {paying ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Icon name="lock" size={14} color={theme.onAccent} />}
                     <Text style={[styles.primaryText, { color: theme.onAccent }]}>{paying ? 'Opening checkout…' : `Pay ${formatMoney(order.priceCents, order.currency)}`}</Text>
                   </TouchableOpacity>
                 );
@@ -123,7 +123,7 @@ export default function OrderCardBubble({
               if (action.kind === 'track' && link) {
                 return (
                   <TouchableOpacity key="track" style={styles.secondary} onPress={() => void Linking.openURL(link)} testID={`button-track-${order.id}`}>
-                    <Feather name="external-link" size={13} color={FG} />
+                    <Icon name="external-link" size={13} color={FG} />
                     <Text style={styles.secondaryText}>{action.label}</Text>
                   </TouchableOpacity>
                 );
@@ -131,7 +131,7 @@ export default function OrderCardBubble({
               if (action.kind === 'confirm_delivery') {
                 return (
                   <TouchableOpacity key="confirm" style={[styles.primary, { backgroundColor: theme.accent }]} onPress={confirmDelivery} disabled={busy !== null} testID={`button-received-${order.id}`}>
-                    {busy === 'confirm' ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Feather name="check" size={14} color={theme.onAccent} />}
+                    {busy === 'confirm' ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Icon name="check" size={14} color={theme.onAccent} />}
                     <Text style={[styles.primaryText, { color: theme.onAccent }]}>{action.label}</Text>
                   </TouchableOpacity>
                 );
@@ -140,7 +140,7 @@ export default function OrderCardBubble({
             })}
             <TouchableOpacity style={styles.link} onPress={() => onOpenTracker(order)} testID={`button-tracker-${order.id}`}>
               <Text style={styles.linkText}>View tracker</Text>
-              <Feather name="chevron-right" size={14} color={MUTED} />
+              <Icon name="chevron-right" size={14} color={MUTED} />
             </TouchableOpacity>
           </View>
           {state.actions.some((action) => action.kind === 'pay') && (

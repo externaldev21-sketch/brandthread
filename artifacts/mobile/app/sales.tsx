@@ -12,7 +12,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, ActivityIndicator,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -262,13 +262,13 @@ export default function SalesScreen() {
                   <StatusBadge label={STATUS_LABEL[x.status]} variant={STATUS_VARIANT[x.status]} small />
                   <View style={{ flexDirection: 'row', gap: 10 }}>
                     <TouchableOpacity onPress={() => openEdit(x)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel={`Edit ${x.name}`}>
-                      <Feather name="edit-2" size={15} color={MUTED} />
+                      <Icon name="edit-2" size={15} color={MUTED} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => togglePause(x)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel={x.active ? `Pause ${x.name}` : `Resume ${x.name}`}>
-                      <Feather name={x.active ? 'pause-circle' : 'play-circle'} size={15} color={MUTED} />
+                      <Icon name={x.active ? 'pause-circle' : 'play-circle'} size={15} color={MUTED} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleDelete(x)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel={`Delete ${x.name}`}>
-                      <Feather name="trash-2" size={15} color={MUTED} />
+                      <Icon name="trash-2" size={15} color={MUTED} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -310,13 +310,13 @@ export default function SalesScreen() {
               {scope === 'products' && (
                 <TouchableOpacity style={s.pickerRow} onPress={() => setShowProductPicker(true)}>
                   <Text style={s.pickerRowText}>{selectedProductIds.length === 0 ? 'Add products' : `${selectedProductIds.length} product${selectedProductIds.length === 1 ? '' : 's'} selected`}</Text>
-                  <Feather name="chevron-right" size={16} color={MUTED} />
+                  <Icon name="chevron-right" size={16} color={MUTED} />
                 </TouchableOpacity>
               )}
               {scope === 'collection' && (
                 <TouchableOpacity style={s.pickerRow} onPress={() => setShowCollectionPicker(true)}>
                   <Text style={s.pickerRowText}>{collection ?? 'Choose a collection'}</Text>
-                  <Feather name="chevron-right" size={16} color={MUTED} />
+                  <Icon name="chevron-right" size={16} color={MUTED} />
                 </TouchableOpacity>
               )}
             </View>
@@ -358,7 +358,7 @@ export default function SalesScreen() {
               return (
                 <TouchableOpacity key={p.id} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedProductIds(prev => on ? prev.filter(id => id !== p.id) : [...prev, p.id]); }}>
                   <Text style={s.pickName}>{p.name}</Text>
-                  <Feather name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
+                  <Icon name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
                 </TouchableOpacity>
               );
             })}
@@ -377,7 +377,7 @@ export default function SalesScreen() {
               return (
                 <TouchableOpacity key={c} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCollection(c); setShowCollectionPicker(false); }}>
                   <Text style={s.pickName}>{c}</Text>
-                  <Feather name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
+                  <Icon name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
                 </TouchableOpacity>
               );
             })}

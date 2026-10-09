@@ -6,7 +6,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { Modal, View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -50,7 +50,7 @@ export default function SetupCelebration({
           ]}
         >
           <View style={[styles.badge, { backgroundColor: theme.accent }]}>
-            <Feather name="check" size={ICON.lg} color={theme.onAccent} />
+            <Icon name="check" size={ICON.lg} color={theme.onAccent} />
           </View>
           <Text style={[styles.title, { color: theme.text }]}>Your store is ready!</Text>
           <Text style={[styles.body, { color: theme.muted }]}>

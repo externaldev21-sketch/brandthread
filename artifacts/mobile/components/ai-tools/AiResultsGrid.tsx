@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import { ActivityIndicator, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { BORDER, CARD, FG, MUTED, RED, RED_DIM, SP, RADIUS, ICON, FONT, FS, SUBTLE } from '@/lib/theme';
@@ -84,7 +84,7 @@ function AiResultTile({
     return (
       <View style={[s.tile, s.tileFailed]}>
         <View style={s.failedBody}>
-          <Feather name="alert-circle" size={ICON.lg} color={RED} />
+          <Icon name="alert-circle" size={ICON.lg} color={RED} />
           <Text style={s.failedText}>{slot.error ?? 'Generation failed'}</Text>
           <Button
             label="Retry"
@@ -104,7 +104,7 @@ function AiResultTile({
   }
 
   if (slot.status === 'done' && slot.imageUri) {
-    const actions: Array<{ icon: keyof typeof Feather.glyphMap; onPress: () => void; label: string; loading?: boolean }> = [];
+    const actions: Array<{ icon: IconName; onPress: () => void; label: string; loading?: boolean }> = [];
     if (onSaveToLibrary) actions.push({ icon: 'bookmark', onPress: onSaveToLibrary, label: 'Save to library', loading: savingToLibrary });
     if (onDownload) actions.push({ icon: 'download', onPress: onDownload, label: 'Download', loading: saving });
     if (onUseAsProduct) actions.push({ icon: 'package', onPress: onUseAsProduct, label: 'Use as product photo' });
@@ -120,7 +120,7 @@ function AiResultTile({
         >
           <Image source={{ uri: slot.imageUri }} style={s.image} resizeMode="cover" />
           <View style={s.expandPill}>
-            <Feather name="maximize-2" size={11} color="#fff" />
+            <Icon name="maximize-2" size={11} color="#fff" />
           </View>
         </TouchableOpacity>
         <View style={s.meta}>
@@ -135,7 +135,7 @@ function AiResultTile({
               accessibilityLabel={a.label}
               disabled={a.loading}
             >
-              {a.loading ? <ActivityIndicator size="small" color={FG} /> : <Feather name={a.icon} size={ICON.sm} color={FG} />}
+              {a.loading ? <ActivityIndicator size="small" color={FG} /> : <Icon name={a.icon} size={ICON.sm} color={FG} />}
             </TouchableOpacity>
           ))}
         </View>

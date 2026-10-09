@@ -5,7 +5,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/Badge';
 import { EmptyState, IconButton, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -127,7 +127,7 @@ export default function MarketingScreen() {
           accessibilityRole="button"
           accessibilityLabel="View analytics"
         >
-          <Feather name="bar-chart-2" size={ICON.md} color={colors.foreground} />
+          <Icon name="bar-chart-2" size={ICON.md} color={colors.foreground} />
         </PressableScale>
       )}
     />
@@ -146,7 +146,7 @@ export default function MarketingScreen() {
           { label: 'SMS Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '0', icon: 'message-square' as const },
         ].map((s, i) => (
           <View key={s.label} style={[styles.statChip, i > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border }]}>
-            <Feather name={s.icon} size={14} color={colors.primary} />
+            <Icon name={s.icon} size={14} color={colors.primary} />
             <Text style={[styles.statVal, { color: colors.foreground }]}>{s.value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
           </View>
@@ -162,7 +162,7 @@ export default function MarketingScreen() {
           router.push('/integrations/klaviyo' as never);
         }}
       >
-        <Feather name={klaviyo?.connected ? 'check-circle' : 'zap'} size={16} color={klaviyo?.connected ? colors.success : colors.primaryForeground} />
+        <Icon name={klaviyo?.connected ? 'check-circle' : 'zap'} size={16} color={klaviyo?.connected ? colors.success : colors.primaryForeground} />
         <Text style={[styles.klaviyoText, { color: klaviyo?.connected ? colors.foreground : colors.primaryForeground }]}>
           {klaviyo?.connected ? `Klaviyo connected${klaviyo.companyName ? ` · ${klaviyo.companyName}` : ''}` : 'Connect Klaviyo: Email Marketing & SMS'}
         </Text>
@@ -200,7 +200,7 @@ export default function MarketingScreen() {
               style={[styles.campaignRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
             >
               <View style={[styles.campaignIcon, { backgroundColor: colors.accent }]}>
-                <Feather name="tv" size={16} color={colors.primary} />
+                <Icon name="tv" size={16} color={colors.primary} />
               </View>
               <View style={styles.campaignInfo}>
                 <Text style={[styles.campaignName, { color: colors.foreground }]} numberOfLines={1}>
@@ -257,7 +257,7 @@ export default function MarketingScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Copy code ${d.code}`}
               >
-                <Feather name="copy" size={15} color={colors.mutedForeground} />
+                <Icon name="copy" size={15} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
           ))}
@@ -271,7 +271,7 @@ export default function MarketingScreen() {
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/buyer-invite' as never); }}
         style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
       >
-        <Feather name="share-2" size={24} color={colors.primary} />
+        <Icon name="share-2" size={24} color={colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.referralTitle, { color: colors.foreground }]}>Invite and earn</Text>
           <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>
@@ -282,7 +282,7 @@ export default function MarketingScreen() {
                 : 'No referrals yet'}
           </Text>
         </View>
-        <Feather name="chevron-right" size={16} color={colors.primary} />
+        <Icon name="chevron-right" size={16} color={colors.primary} />
       </TouchableOpacity>
 
       {/* Growth: tracked links, link in bio, store pixels */}
@@ -302,12 +302,12 @@ export default function MarketingScreen() {
         accessibilityLabel="Email campaigns and audience"
         style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
       >
-        <Feather name="mail" size={24} color={colors.foreground} />
+        <Icon name="mail" size={24} color={colors.foreground} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.referralTitle, { color: colors.foreground }]}>Email campaigns</Text>
           <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>Grow your list and send to subscribers</Text>
         </View>
-        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+        <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
       </TouchableOpacity>
 
       {/* Follower push + giveaways */}
@@ -319,12 +319,12 @@ export default function MarketingScreen() {
         accessibilityRole="button"
         accessibilityLabel="Follower push"
       >
-        <Feather name="bell" size={24} color={colors.foreground} />
+        <Icon name="bell" size={24} color={colors.foreground} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.referralTitle, { color: colors.foreground }]}>Follower push</Text>
           <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>One push to your followers per day</Text>
         </View>
-        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+        <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
       </TouchableOpacity>
       <TouchableOpacity
         activeOpacity={0.85}
@@ -333,12 +333,12 @@ export default function MarketingScreen() {
         accessibilityRole="button"
         accessibilityLabel="Giveaways"
       >
-        <Feather name="gift" size={24} color={colors.foreground} />
+        <Icon name="gift" size={24} color={colors.foreground} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.referralTitle, { color: colors.foreground }]}>Giveaways</Text>
           <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>Follow and comment to enter</Text>
         </View>
-        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+        <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
       </TouchableOpacity>
     </ScrollView>
     </View>

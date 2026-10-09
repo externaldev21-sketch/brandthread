@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import type { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -111,7 +111,7 @@ export function BlockedComposer({
   return (
     <View style={[st.wrap, { borderTopColor: theme.border, backgroundColor: theme.surface, paddingBottom: Math.max(bottomInset, 12) }]}>
       <View style={[st.icon, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Feather name={byMe ? 'slash' : 'lock'} size={16} color={theme.text} />
+        <Icon name={byMe ? 'slash' : 'lock'} size={16} color={theme.text} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[st.title, { color: theme.text }]}>

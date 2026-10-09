@@ -12,7 +12,7 @@
 import React, { useEffect, useState } from 'react';
 import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
@@ -92,7 +92,7 @@ export default function SellerDropPreview() {
   if (!drop) {
     return (
       <View style={[styles.center, { backgroundColor: theme.background, gap: 12 }]}>
-        <Feather name="alert-triangle" size={28} color={theme.muted} />
+        <Icon name="alert-triangle" size={28} color={theme.muted} />
         <Text style={{ color: theme.text, fontFamily: FONT.regular }}>Couldn't load this drop.</Text>
         <TouchableOpacity onPress={() => goBackOr(router)} style={{ padding: 12 }}>
           <Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Back</Text>
@@ -114,10 +114,10 @@ export default function SellerDropPreview() {
 
           <View style={[styles.header, { paddingTop: headerTopInset + SP.sm }]}>
             <TouchableOpacity style={styles.roundBtn} onPress={() => goBackOr(router)}>
-              <Feather name="arrow-left" size={20} color={ON_DARK} />
+              <Icon name="arrow-left" size={20} color={ON_DARK} />
             </TouchableOpacity>
             <View style={styles.previewBadge}>
-              <Feather name="eye" size={12} color={ON_DARK} />
+              <Icon name="eye" size={12} color={ON_DARK} />
               <Text style={styles.previewBadgeText}>BUYER VIEW</Text>
             </View>
           </View>
@@ -148,7 +148,7 @@ export default function SellerDropPreview() {
                   <Image source={{ uri: p.images[0] }} style={styles.tileImage} resizeMode="cover" />
                 ) : (
                   <View style={[styles.tileImage, { alignItems: 'center', justifyContent: 'center' }]}>
-                    <Feather name="image" size={22} color={theme.muted} />
+                    <Icon name="image" size={22} color={theme.muted} />
                   </View>
                 )}
                 <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm, padding: 8 }} numberOfLines={2}>{p.name}</Text>

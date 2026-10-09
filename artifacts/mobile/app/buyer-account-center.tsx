@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,7 +14,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type Row = {
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   sub: string;
   route?: string;
   destructive?: boolean;

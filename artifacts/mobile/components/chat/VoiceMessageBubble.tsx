@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, PanResponder, GestureResponderEvent, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { isBarPlayed, remainingTimeLabel } from '@/lib/voicePlayback';
@@ -77,7 +77,7 @@ export function VoiceMessageBubble({
           accessibilityRole="button"
           accessibilityLabel={isPlaying ? 'Pause voice message' : 'Play voice message'}
         >
-          <Feather name={isPlaying ? 'pause' : 'play'} size={14} color={onColor} />
+          <Icon name={isPlaying ? 'pause' : 'play'} size={14} color={onColor} />
         </Pressable>
 
         <View

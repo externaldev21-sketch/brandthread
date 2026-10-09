@@ -13,7 +13,7 @@ import {
   TextInput, Modal, Share, Animated, useWindowDimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
@@ -78,7 +78,7 @@ function PostMedia({
   mediaUrl, type, mediaColor1, mediaColor2, typeIcon, onWatched, captions,
 }: {
   mediaUrl?: string; type: BuyerPost['type'];
-  mediaColor1: string; mediaColor2: string; typeIcon: keyof typeof Feather.glyphMap;
+  mediaColor1: string; mediaColor2: string; typeIcon: IconName;
   onWatched?: () => void;
   captions?: CaptionSegment[];
 }) {
@@ -99,7 +99,7 @@ function PostMedia({
   return (
     <LinearGradient colors={[mediaColor1, mediaColor2] as [string, string]} style={StyleSheet.absoluteFill}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Feather name={typeIcon} size={ICON.xl} color={MUTED} />
+        <Icon name={typeIcon} size={ICON.xl} color={MUTED} />
       </View>
     </LinearGradient>
   );
@@ -293,7 +293,7 @@ export default function BuyerPostViewer() {
       ? post.mediaUrls.map((url) => ({ kind: 'photo' as const, url }))
       : null;
 
-  const typeIcon: keyof typeof Feather.glyphMap =
+  const typeIcon: IconName =
     postType === 'photo' ? 'image' : postType === 'slideshow' ? 'layers' : 'video';
 
   const captionTrack = useReadyCaptionTrack(params.postId, postType === 'video', captionsFlag, fetchCaptionTracks);
@@ -355,7 +355,7 @@ export default function BuyerPostViewer() {
           </View>
           {isOwner && (
             <TouchableOpacity style={s.editBtn} onPress={() => { setEditOpen(true); setEditCaption(caption); }}>
-              <Feather name="edit-2" size={16} color={PURPLE} />
+              <Icon name="edit-2" size={16} color={PURPLE} />
               <Text style={s.editBtnText}>Edit caption</Text>
             </TouchableOpacity>
           )}
@@ -390,7 +390,7 @@ export default function BuyerPostViewer() {
         {/* Engagement bar */}
         <View style={s.engagementBar}>
           <TouchableOpacity style={s.engageBtn} onPress={handleLike}>
-            <Feather name="heart" size={22} color={liked ? RED : FG} />
+            <Icon name="heart" size={22} color={liked ? RED : FG} />
             <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -410,7 +410,7 @@ export default function BuyerPostViewer() {
               router.push(`/buyer-post-comments?${qs}` as never);
             }}
           >
-            <Feather name="message-circle" size={22} color={FG} />
+            <Icon name="message-circle" size={22} color={FG} />
             <Text style={s.engageCount}>{comments.length}</Text>
           </TouchableOpacity>
           <TouchableOpacity accessibilityLabel="Repost" accessibilityRole="button"
@@ -422,7 +422,7 @@ export default function BuyerPostViewer() {
               if (params.postId) await repostPost(params.postId);
             }}
           >
-            <Feather name="repeat" size={22} color={reposted ? PURPLE : FG} />
+            <Icon name="repeat" size={22} color={reposted ? PURPLE : FG} />
           </TouchableOpacity>
           <TouchableOpacity accessibilityLabel="Save post" accessibilityRole="button"
             style={s.engageBtn}
@@ -437,7 +437,7 @@ export default function BuyerPostViewer() {
               }
             }}
           >
-            <Feather name="bookmark" size={22} color={saved ? PURPLE : FG} />
+            <Icon name="bookmark" size={22} color={saved ? PURPLE : FG} />
           </TouchableOpacity>
           {captionTrack ? (
             <TouchableOpacity
@@ -460,11 +460,11 @@ export default function BuyerPostViewer() {
                 router.push(`/buyer-report?targetType=post&targetId=${params.postId ?? ''}&targetLabel=${encodeURIComponent(caption || 'Post')}&targetUserId=${post?.authorId ?? ''}` as never);
               }}
             >
-              <Feather name="flag" size={22} color={FG} />
+              <Icon name="flag" size={22} color={FG} />
             </TouchableOpacity>
           )}
           <TouchableOpacity accessibilityLabel="Share post" accessibilityRole="button" style={s.engageBtn} onPress={handleShare}>
-            <Feather name="share-2" size={22} color={FG} />
+            <Icon name="share-2" size={22} color={FG} />
           </TouchableOpacity>
         </View>
 
@@ -495,7 +495,7 @@ export default function BuyerPostViewer() {
               accessibilityRole="button"
               testID="edit-captions"
             >
-              <Feather name="type" size={16} color={FG} />
+              <Icon name="type" size={16} color={FG} />
               <Text style={s.captionsBtnText}>{captionTrack ? 'Edit captions' : 'Generate captions'}</Text>
             </TouchableOpacity>
           </View>
@@ -508,7 +508,7 @@ export default function BuyerPostViewer() {
               style={s.deleteBtn}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); setDeleteConfirm(true); }}
             >
-              <Feather name="trash-2" size={16} color={RED} />
+              <Icon name="trash-2" size={16} color={RED} />
               <Text style={s.deleteBtnText}>Delete post</Text>
             </TouchableOpacity>
           </View>

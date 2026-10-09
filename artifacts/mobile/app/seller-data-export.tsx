@@ -3,7 +3,7 @@
  */
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Share, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File, Paths } from 'expo-file-system';
@@ -17,7 +17,7 @@ import { useApi } from '@/lib/api';
 type IncludeKey = 'products' | 'orders' | 'customers';
 type Format = 'json' | 'csv';
 
-const INCLUDE_OPTIONS: { key: IncludeKey; label: string; icon: keyof typeof Feather.glyphMap; desc: string }[] = [
+const INCLUDE_OPTIONS: { key: IncludeKey; label: string; icon: IconName; desc: string }[] = [
   { key: 'products',  label: 'Products',  icon: 'package',      desc: 'All product listings, variants, and pricing' },
   { key: 'orders',    label: 'Orders',    icon: 'shopping-bag', desc: 'Order history, status, and fulfillment data' },
   { key: 'customers', label: 'Customers', icon: 'users',        desc: 'Customer contacts and purchase history' },
@@ -103,14 +103,14 @@ export default function SellerDataExportScreen() {
                 activeOpacity={0.8}
               >
                 <View style={[styles.optIcon, { backgroundColor: checked ? theme.accentDim : theme.surface }]}>
-                  <Feather name={opt.icon} size={16} color={checked ? theme.accentLight : theme.muted} />
+                  <Icon name={opt.icon} size={16} color={checked ? theme.accentLight : theme.muted} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.optLabel}>{opt.label}</Text>
                   <Text style={styles.optDesc}>{opt.desc}</Text>
                 </View>
                 <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-                  {checked && <Feather name="check" size={13} color={theme.onAccent} />}
+                  {checked && <Icon name="check" size={13} color={theme.onAccent} />}
                 </View>
               </TouchableOpacity>
             );
@@ -127,7 +127,7 @@ export default function SellerDataExportScreen() {
               onPress={() => setFormat(f)}
               activeOpacity={0.8}
             >
-              <Feather
+              <Icon
                 name={f === 'json' ? 'code' : 'file-text'}
                 size={16}
                 color={format === f ? theme.accentLight : theme.muted}
@@ -144,7 +144,7 @@ export default function SellerDataExportScreen() {
 
         {/* Privacy note */}
         <View style={styles.noteCard}>
-          <Feather name="shield" size={14} color={theme.muted} />
+          <Icon name="shield" size={14} color={theme.muted} />
           <Text style={styles.noteText}>
             Exports contain only your own seller data. Customer PII is included — store securely and handle per your privacy policy.
           </Text>
@@ -163,7 +163,7 @@ export default function SellerDataExportScreen() {
         {result && (
           <View style={styles.resultCard}>
             <View style={styles.resultHeader}>
-              <Feather name="check-circle" size={18} color={theme.success} />
+              <Icon name="check-circle" size={18} color={theme.success} />
               <Text style={styles.resultTitle}>Export ready!</Text>
             </View>
             <Text style={styles.resultDate}>

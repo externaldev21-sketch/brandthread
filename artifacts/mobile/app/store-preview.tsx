@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -176,7 +176,7 @@ export default function StorePreview() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel="Close preview"
         >
-          <Feather name="x" size={ICON.md} color={theme.text} />
+          <Icon name="x" size={ICON.md} color={theme.text} />
         </TouchableOpacity>
 
         <View style={styles.deviceToggle}>
@@ -189,7 +189,7 @@ export default function StorePreview() {
               accessibilityRole="button"
               accessibilityState={{ selected: device === mode }}
             >
-              <Feather name={mode === 'mobile' ? 'smartphone' : 'monitor'} size={ICON.sm} color={device === mode ? '#000000' : theme.text} />
+              <Icon name={mode === 'mobile' ? 'smartphone' : 'monitor'} size={ICON.sm} color={device === mode ? '#000000' : theme.text} />
             </TouchableOpacity>
           ))}
         </View>
@@ -221,7 +221,7 @@ export default function StorePreview() {
         </View>
       ) : error || !html ? (
         <View style={styles.center}>
-          <Feather name="alert-circle" size={ICON.lg} color={theme.muted} />
+          <Icon name="alert-circle" size={ICON.lg} color={theme.muted} />
           <Text style={styles.errorText}>Couldn't load your store preview.</Text>
           <TouchableOpacity onPress={load} style={styles.retryBtn}>
             <Text style={styles.retryText}>Try again</Text>

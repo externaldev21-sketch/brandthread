@@ -4,7 +4,7 @@ import { useColors } from '@/hooks/useColors';
 import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT } from '@/lib/theme';
 
 /**
@@ -22,7 +22,7 @@ export default function CustomerAccountsScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Customer accounts" onBack={() => goBackOr(router, "/seller-settings")} />
       <View style={styles.empty}>
-        <Feather name="user" size={28} color={colors.mutedForeground} />
+        <Icon name="user" size={28} color={colors.mutedForeground} />
         <Text style={[styles.title, { color: colors.foreground }]}>Not configurable from the app</Text>
         <Text style={[styles.body, { color: colors.mutedForeground }]}>
           Customer account settings aren{'’'}t editable here.

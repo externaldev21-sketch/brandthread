@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { discoverBrands, type DiscoverBrand } from '@/services/discoverService';
@@ -91,7 +91,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
             onPress={followAll}
             accessibilityRole="button"
           >
-            <Feather name="plus" size={15} color={theme.text} />
+            <Icon name="plus" size={15} color={theme.text} />
             <Text style={[styles.followAllText, { color: theme.text }]}>
               Follow all{followedCount > 0 ? ` (${followedCount}/${brands.length})` : ''}
             </Text>
@@ -142,13 +142,13 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
                     {isPending ? (
                       <ActivityIndicator size="small" color={isFollowing ? theme.onAccent : theme.muted} />
                     ) : (
-                      <Feather name={isFollowing ? 'check' : 'plus'} size={13} color={isFollowing ? theme.onAccent : theme.muted} />
+                      <Icon name={isFollowing ? 'check' : 'plus'} size={13} color={isFollowing ? theme.onAccent : theme.muted} />
                     )}
                   </View>
                 </View>
                 <View style={styles.nameRow}>
                   <Text numberOfLines={1} style={styles.cardName}>{brand.name}</Text>
-                  {brand.verified && <Feather name="check-circle" size={11} color={theme.text} />}
+                  {brand.verified && <Icon name="check-circle" size={11} color={theme.text} />}
                 </View>
               </PressableScale>
             </Reveal>

@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { PrimaryButton } from '@/components/BrandthreadUI';
@@ -144,7 +144,7 @@ export default function ProductPairingsScreen() {
           rightElement={<PrimaryButton label="Done" onPress={applyPicker} small style={{ minWidth: 72, paddingHorizontal: 16 }} />}
         />
         <View style={s.searchWrap}>
-          <Feather name="search" size={16} color={colors.mutedForeground} />
+          <Icon name="search" size={16} color={colors.mutedForeground} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -172,7 +172,7 @@ export default function ProductPairingsScreen() {
                 <Thumb uri={c.image} s={s} colors={colors} />
                 <Text style={s.name}>{c.name}</Text>
                 <View style={[s.checkbox, checked && s.checkboxOn]}>
-                  {checked ? <Feather name="check" size={14} color={colors.primaryForeground} /> : null}
+                  {checked ? <Icon name="check" size={14} color={colors.primaryForeground} /> : null}
                 </View>
               </TouchableOpacity>
             );
@@ -224,9 +224,9 @@ export default function ProductPairingsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Add product"
           >
-            <View style={[s.thumb, s.addThumb]}><Feather name="plus" size={20} color={colors.foreground} /></View>
+            <View style={[s.thumb, s.addThumb]}><Icon name="plus" size={20} color={colors.foreground} /></View>
             <Text style={s.name}>Add product</Text>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -237,18 +237,18 @@ export default function ProductPairingsScreen() {
 function Thumb({ uri, s, colors }: { uri: string | null; s: ReturnType<typeof makeStyles>; colors: ReturnType<typeof useColors> }) {
   return (
     <View style={s.thumb}>
-      {uri ? <CachedImage source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <Feather name="image" size={18} color={colors.mutedForeground} />}
+      {uri ? <CachedImage source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <Icon name="image" size={18} color={colors.mutedForeground} />}
     </View>
   );
 }
 
 function IconBtn({ name, onPress, label, disabled, colors, s }: {
-  name: keyof typeof Feather.glyphMap; onPress: () => void; label: string; disabled?: boolean;
+  name: IconName; onPress: () => void; label: string; disabled?: boolean;
   colors: ReturnType<typeof useColors>; s: ReturnType<typeof makeStyles>;
 }) {
   return (
     <TouchableOpacity style={[s.iconBtn, disabled && { opacity: 0.25 }]} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
-      <Feather name={name} size={18} color={colors.foreground} />
+      <Icon name={name} size={18} color={colors.foreground} />
     </TouchableOpacity>
   );
 }

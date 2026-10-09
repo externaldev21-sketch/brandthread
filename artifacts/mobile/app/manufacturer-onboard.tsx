@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -37,7 +37,7 @@ export default function ManufacturerOnboardScreen() {
       <View style={s.body}>
         <View style={s.hero}>
           <ThreadDraw height={72} color={FG} delay={150} duration={1200} style={s.heroThread} />
-          <View style={s.icon}><Feather name="briefcase" size={26} color={FG} /></View>
+          <View style={s.icon}><Icon name="briefcase" size={26} color={FG} /></View>
         </View>
         <StepHeadline size="title1">{token ? 'You were invited to work on Brandthread' : 'List your factory on Brandthread'}</StepHeadline>
         <Reveal index={1}>
@@ -49,14 +49,14 @@ export default function ManufacturerOnboardScreen() {
         <Reveal index={2}>
         <View style={s.card}>
           {['Free for manufacturers', 'Works in any browser, on phone or computer', 'Paid out to your bank in your currency'].map((line) => (
-            <View key={line} style={s.row}><Feather name="check" size={14} color={FG} /><Text style={s.rowText}>{line}</Text></View>
+            <View key={line} style={s.row}><Icon name="check" size={14} color={FG} /><Text style={s.rowText}>{line}</Text></View>
           ))}
         </View>
         </Reveal>
       </View>
       <PillButton
         label={token ? 'Accept invite in the portal' : 'Open the manufacturer portal'}
-        trailing={<Feather name="external-link" size={16} color={BG} />}
+        trailing={<Icon name="external-link" size={16} color={BG} />}
         onPress={() => void Linking.openURL(url)}
       />
       <Text style={s.url} selectable>{url}</Text>

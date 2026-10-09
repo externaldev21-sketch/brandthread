@@ -4,7 +4,7 @@ import {
   ActivityIndicator, Alert, Linking,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
@@ -103,7 +103,7 @@ export default function KlaviyoIntegrationScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}22` }]}>
-            <Feather name="zap" size={22} color={colors.primary} />
+            <Icon name="zap" size={22} color={colors.primary} />
           </View>
           <Text style={[styles.heroTitle, { color: colors.foreground }]}>Klaviyo: Email Marketing & SMS</Text>
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
@@ -149,7 +149,7 @@ export default function KlaviyoIntegrationScreen() {
               disabled={syncing}
               activeOpacity={0.8}
             >
-              {syncing ? <ActivityIndicator size="small" color={colors.foreground} /> : <Feather name="refresh-cw" size={15} color={colors.foreground} />}
+              {syncing ? <ActivityIndicator size="small" color={colors.foreground} /> : <Icon name="refresh-cw" size={15} color={colors.foreground} />}
               <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
             </TouchableOpacity>
 
@@ -181,7 +181,7 @@ export default function KlaviyoIntegrationScreen() {
               disabled={connecting}
               activeOpacity={0.85}
             >
-              {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="link" size={16} color={colors.primaryForeground} />}
+              {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Icon name="link" size={16} color={colors.primaryForeground} />}
               <Text style={[styles.connectBtnText, { color: colors.primaryForeground }]}>{connecting ? 'Connecting…' : 'Connect Klaviyo'}</Text>
             </TouchableOpacity>
 
@@ -191,14 +191,14 @@ export default function KlaviyoIntegrationScreen() {
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Feather name="external-link" size={13} color={colors.primary} />
+              <Icon name="external-link" size={13} color={colors.primary} />
               <Text style={[styles.helpText, { color: colors.primary }]}>Where do I find my Private API Key?</Text>
             </TouchableOpacity>
           </View>
         )}
 
         <View style={styles.infoBlock}>
-          <Feather name="shield" size={14} color={colors.mutedForeground} />
+          <Icon name="shield" size={14} color={colors.mutedForeground} />
           <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
             Your key is stored securely and only used to sync subscriber data from your Klaviyo account. We never post on your behalf.
           </Text>

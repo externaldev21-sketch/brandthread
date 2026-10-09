@@ -25,7 +25,7 @@ import {
   TouchableWithoutFeedback, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
@@ -240,7 +240,7 @@ export function BuyNowFlow({
         <View style={s.header}>
           <Text style={[s.title, { color: theme.text }]}>Buy Now</Text>
           <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
-            <Feather name="x" size={18} color={theme.text} />
+            <Icon name="x" size={18} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -269,7 +269,7 @@ export function BuyNowFlow({
 
             {defaultAddress ? (
               <View style={s.addressRow}>
-                <Feather name="map-pin" size={14} color={theme.muted} />
+                <Icon name="map-pin" size={14} color={theme.muted} />
                 <Text style={[s.addressText, { color: theme.text }]} numberOfLines={2}>
                   {defaultAddress.recipientName ? `${defaultAddress.recipientName} · ` : ''}
                   {defaultAddress.street ?? defaultAddress.line1}, {defaultAddress.city}, {defaultAddress.state}

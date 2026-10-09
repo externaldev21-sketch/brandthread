@@ -11,7 +11,7 @@ import {
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -26,7 +26,7 @@ export type PolicyType = 'shipping' | 'return' | 'refund' | 'privacy' | 'terms' 
 
 interface StorePolicy { type: PolicyType; content: string; updatedAt?: string; aiGenerated?: boolean; }
 
-const POLICY_TYPES: { type: PolicyType; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+const POLICY_TYPES: { type: PolicyType; label: string; icon: IconName }[] = [
   { type: 'shipping',   label: 'Shipping Policy',   icon: 'truck' },
   { type: 'return',     label: 'Return Policy',      icon: 'rotate-ccw' },
   { type: 'refund',     label: 'Refund Policy',      icon: 'dollar-sign' },
@@ -160,7 +160,7 @@ export default function StorePoliciesScreen() {
     return (
       <View style={[s.root, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
-          <TouchableOpacity onPress={closeEdit} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
+          <TouchableOpacity onPress={closeEdit} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Icon name="x" size={21} color={FG} /></TouchableOpacity>
           <Text style={[s.headerTitle, { color: FG }]} numberOfLines={1} ellipsizeMode="tail">{policyMeta.label}</Text>
           <Button label="Save" variant="primary" size="compact" loading={saving} onPress={handleSave} />
         </View>
@@ -175,12 +175,12 @@ export default function StorePoliciesScreen() {
             {generating ? (
               <><ActivityIndicator size="small" color={PURPLE} /><Text style={[s.aiBtnText, { color: PURPLE }]}>Generating…</Text></>
             ) : (
-              <><Feather name="zap" size={14} color={PURPLE} /><Text style={[s.aiBtnText, { color: PURPLE }]}>Generate with AI</Text></>
+              <><Icon name="zap" size={14} color={PURPLE} /><Text style={[s.aiBtnText, { color: PURPLE }]}>Generate with AI</Text></>
             )}
           </TouchableOpacity>
           {(aiGenerated || isTemplate) && (
             <View style={[s.aiBadge, { backgroundColor: `${CYAN}20`, borderColor: `${CYAN}40` }]}>
-              <Feather name={isTemplate ? 'file-text' : 'zap'} size={12} color={CYAN} />
+              <Icon name={isTemplate ? 'file-text' : 'zap'} size={12} color={CYAN} />
               <Text style={[s.aiBadgeText, { color: CYAN }]}>{isTemplate ? 'Template' : 'AI generated'}</Text>
             </View>
           )}
@@ -225,7 +225,7 @@ export default function StorePoliciesScreen() {
                   style={[s.policyRow, i !== POLICY_TYPES.length - 1 && { borderBottomWidth: 1, borderBottomColor: BORDER }]}
                 >
                   <View style={[s.policyIcon, { backgroundColor: `${PURPLE}15` }]}>
-                    <Feather name={pt.icon} size={17} color={PURPLE} />
+                    <Icon name={pt.icon} size={17} color={PURPLE} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.policyLabel, { color: FG }]}>{pt.label}</Text>
@@ -239,7 +239,7 @@ export default function StorePoliciesScreen() {
                     {hasContent && (
                       <View style={[s.statusDot, { backgroundColor: SUCCESS }]} />
                     )}
-                    <Feather name="chevron-right" size={17} color={SUBTLE} />
+                    <Icon name="chevron-right" size={17} color={SUBTLE} />
                   </View>
                 </TouchableOpacity>
               );

@@ -29,6 +29,7 @@ import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import Composer from '@/components/ui/Composer';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import { Feather, FontAwesome } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect, useIsFocused } from 'expo-router';
@@ -235,7 +236,7 @@ function LikeHeart({
       <Animated.View style={[s.commentLikeIconWrap, { transform: [{ scale: pop }] }]}>
         {liked
           ? <FontAwesome name="heart" size={16} color={theme.error} />
-          : <Feather name="heart" size={16} color={MUTED} />}
+          : <Icon name="heart" size={16} color={MUTED} />}
       </Animated.View>
       {count > 0 && (
         <Text style={[s.actionLabel, liked && { color: theme.error }]}>{count}</Text>
@@ -297,7 +298,7 @@ function CommentRow({
         >
           {comment.pinned && !comment.isReply ? (
             <View style={s.pinnedRow} testID="comment-pinned-label">
-              <Feather name="bookmark" size={10} color={MUTED} />
+              <Icon name="bookmark" size={10} color={MUTED} />
               <Text style={s.pinnedText}>Pinned</Text>
             </View>
           ) : null}
@@ -328,7 +329,7 @@ function CommentRow({
 
           {comment.pendingReview ? (
             <View style={s.reviewPill}>
-              <Feather name="eye-off" size={11} color={theme.warning} />
+              <Icon name="eye-off" size={11} color={theme.warning} />
               <Text style={s.reviewPillText}>In review · only you can see this</Text>
             </View>
           ) : null}
@@ -390,7 +391,7 @@ function ViewRepliesButton({ count, expanded, onToggle }: { count: number; expan
       <Text style={s.viewRepliesText}>
         {expanded ? 'Hide replies' : `View ${count} ${count === 1 ? 'reply' : 'replies'}`}
       </Text>
-      <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={12} color={MUTED} />
+      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={12} color={MUTED} />
     </PressableScale>
   );
 }
@@ -436,7 +437,7 @@ function CommentActionsSheet({
   };
 
   const Option = ({ icon, label, destructive, onPress }: {
-    icon: keyof typeof Feather.glyphMap; label: string; destructive?: boolean; onPress: () => void;
+    icon: IconName; label: string; destructive?: boolean; onPress: () => void;
   }) => (
     <PressableScale
       style={s.sheetOption}
@@ -444,7 +445,7 @@ function CommentActionsSheet({
       accessibilityRole="button"
       activeOpacity={0.75}
     >
-      <Feather name={icon} size={18} color={destructive ? theme.error : theme.text} />
+      <Icon name={icon} size={18} color={destructive ? theme.error : theme.text} />
       <Text style={[s.sheetOptionText, destructive && { color: theme.error }]}>{label}</Text>
     </PressableScale>
   );
@@ -1151,7 +1152,7 @@ export default function BuyerPostCommentsScreen() {
               accessibilityRole="button"
               accessibilityLabel="Close comments"
             >
-              <Feather name="x" size={20} color={FG} />
+              <Icon name="x" size={20} color={FG} />
             </PressableScale>
           </View>
 
@@ -1210,7 +1211,7 @@ export default function BuyerPostCommentsScreen() {
               ) : null}
               {meta.hiddenByMutedWords > 0 ? (
                 <PressableScale style={s.mutedNote} onPress={() => { hapticLight(); router.push('/muted-words' as never); }} accessibilityRole="button">
-                  <Feather name="volume-x" size={12} color={SUBTLE} />
+                  <Icon name="volume-x" size={12} color={SUBTLE} />
                   <Text style={s.mutedNoteText}>
                     {meta.hiddenByMutedWords} hidden by your muted words · <Text style={{ textDecorationLine: 'underline' }}>Manage</Text>
                   </Text>
@@ -1223,7 +1224,7 @@ export default function BuyerPostCommentsScreen() {
 
         {toast ? (
           <View style={s.toast} pointerEvents="none" accessibilityLiveRegion="polite">
-            <Feather name="check" size={14} color={theme.onAccent} />
+            <Icon name="check" size={14} color={theme.onAccent} />
             <Text style={s.toastText}>{toast}</Text>
           </View>
         ) : null}
@@ -1231,16 +1232,16 @@ export default function BuyerPostCommentsScreen() {
         <View style={[s.inputWrap, composerLocked && { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
           {sendError ? (
             <PressableScale style={s.sendErrorBanner} onPress={() => { hapticLight(); setSendError(null); }} accessibilityRole="alert">
-              <Feather name="alert-circle" size={12} color={theme.error} />
+              <Icon name="alert-circle" size={12} color={theme.error} />
               <Text style={s.sendErrorText} numberOfLines={3}>{sendError}</Text>
-              <Feather name="x" size={12} color={theme.error} />
+              <Icon name="x" size={12} color={theme.error} />
             </PressableScale>
           ) : null}
           {heldNotice ? (
             <PressableScale style={s.heldBanner} onPress={() => { hapticLight(); setHeldNotice(null); }} accessibilityRole="alert">
-              <Feather name="eye-off" size={12} color={theme.warning} />
+              <Icon name="eye-off" size={12} color={theme.warning} />
               <Text style={s.heldBannerText} numberOfLines={2}>{heldNotice}</Text>
-              <Feather name="x" size={12} color={MUTED} />
+              <Icon name="x" size={12} color={MUTED} />
             </PressableScale>
           ) : null}
           {replyingTo ? (
@@ -1254,7 +1255,7 @@ export default function BuyerPostCommentsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Cancel reply"
               >
-                <Feather name="x" size={14} color={MUTED} />
+                <Icon name="x" size={14} color={MUTED} />
               </PressableScale>
             </View>
           ) : null}
@@ -1331,7 +1332,7 @@ export default function BuyerPostCommentsScreen() {
                       accessibilityRole="button"
                       accessibilityLabel="Emoji"
                     >
-                      <Feather name="smile" size={18} color={MUTED} />
+                      <Icon name="smile" size={18} color={MUTED} />
                     </PressableScale>
                     <PressableScale
                       style={s.inputTool}

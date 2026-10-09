@@ -6,7 +6,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Easing, Platform, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
@@ -140,7 +140,7 @@ export default function LaunchPublishScreen() {
               }]}
             />
             <Animated.View style={[s.badge, { transform: [{ scale: pop }] }]}>
-              <Feather name="check" size={40} color={theme.onAccent} />
+              <Icon name="check" size={40} color={theme.onAccent} />
             </Animated.View>
           </View>
           <Text style={s.title}>You're live</Text>

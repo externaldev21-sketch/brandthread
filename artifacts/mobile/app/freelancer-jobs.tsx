@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi, type FreelancerJob } from '@/lib/api';
@@ -277,7 +277,7 @@ export default function FreelancerJobsScreen() {
           </View>
         ) : jobs.length === 0 ? (
           <View style={styles.centerBox}>
-            <Feather name="briefcase" size={26} color={SUBTLE} />
+            <Icon name="briefcase" size={26} color={SUBTLE} />
             <Text style={styles.emptyTitle}>
               {tab === 'gigs' ? 'No gigs yet' : 'No hires yet'}
             </Text>

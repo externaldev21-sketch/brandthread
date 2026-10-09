@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -54,7 +54,7 @@ export function CopyRow({ value, label = 'Copy link' }: { value: string; label?:
         }}
         style={st.copyBtn}
       >
-        <Feather name={done ? 'check' : 'copy'} size={18} color={colors.foreground} />
+        <Icon name={done ? 'check' : 'copy'} size={18} color={colors.foreground} />
       </PressableScale>
     </View>
   );

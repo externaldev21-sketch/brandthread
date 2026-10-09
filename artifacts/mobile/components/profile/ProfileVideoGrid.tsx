@@ -5,7 +5,7 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
@@ -135,7 +135,7 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
               />
             ) : (
               <View style={[StyleSheet.absoluteFill, styles.placeholder]}>
-                <Feather name={item.kind === 'video' ? 'film' : 'image'} size={22} color={theme.muted} />
+                <Icon name={item.kind === 'video' ? 'film' : 'image'} size={22} color={theme.muted} />
                 {item.caption ? (
                   <Text style={[styles.placeholderCaption, { color: theme.subtle }]} numberOfLines={3}>{item.caption}</Text>
                 ) : null}
@@ -148,12 +148,12 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
             />
             {(item.slideCount ?? 0) > 1 || item.kind !== 'video' ? (
               <View style={styles.kindBadge} pointerEvents="none">
-                <Feather name={(item.slideCount ?? 0) > 1 || item.kind === 'slideshow' ? 'layers' : 'image'} size={11} color="#FFFFFF" /* theme-exempt: over media */ />
+                <Icon name={(item.slideCount ?? 0) > 1 || item.kind === 'slideshow' ? 'layers' : 'image'} size={11} color="#FFFFFF" /* theme-exempt: over media */ />
               </View>
             ) : null}
             {item.productCount > 0 ? (
               <View style={styles.bagBadge} pointerEvents="none">
-                <Feather name="shopping-bag" size={11} color="#FFFFFF" /* theme-exempt: over media */ />
+                <Icon name="shopping-bag" size={11} color="#FFFFFF" /* theme-exempt: over media */ />
               </View>
             ) : null}
             {item.statusLabel ? (
@@ -163,7 +163,7 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
             ) : null}
             {metric ? (
               <View style={styles.metric} pointerEvents="none">
-                <Feather name={metric.icon} size={15} color="#FFFFFF" /* theme-exempt: over media */ />
+                <Icon name={metric.icon} size={15} color="#FFFFFF" /* theme-exempt: over media */ />
                 <Text style={styles.metricText}>{metric.value}</Text>
               </View>
             ) : null}

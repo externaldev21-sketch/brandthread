@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -8,7 +8,7 @@ import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { Card, CardDivider, SectionTitle } from '@/components/analytics/AnalyticsKit';
 
 /** Mobbin reference: Shopify Analytics "Reports" rows above the overview. */
-export const ANALYTICS_REPORTS: { label: string; icon: keyof typeof Feather.glyphMap; href: string; badge?: string }[] = [
+export const ANALYTICS_REPORTS: { label: string; icon: IconName; href: string; badge?: string }[] = [
   { label: 'Product stats', icon: 'shopping-bag', href: '/analytics-product-stats' },
   { label: 'Threads and videos', icon: 'play-circle', href: '/analytics-content' },
   { label: 'Audience', icon: 'users', href: '/analytics-audience' },
@@ -42,10 +42,10 @@ export function AnalyticsReportsList() {
               testID={`report-${r.href.replace('/analytics-', '')}`}
               onPress={() => { Haptics.selectionAsync(); router.push(r.href as never); }}
             >
-              <Feather name={r.icon} size={18} color={colors.foreground} />
+              <Icon name={r.icon} size={18} color={colors.foreground} />
               <Text style={s.label}>{r.label}</Text>
               {!!r.badge && <View style={s.badge}><Text style={s.badgeText}>{r.badge}</Text></View>}
-              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+              <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
         ))}

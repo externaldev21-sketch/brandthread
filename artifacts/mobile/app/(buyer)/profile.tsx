@@ -19,7 +19,7 @@ import {
   View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView, Pressable,
   useWindowDimensions, type LayoutChangeEvent, type FlatList,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -98,7 +98,7 @@ const TAB_ITEMS: ProfileTab[] = [
   { key: 'Orders', label: 'Orders', icon: 'package' },
 ];
 
-function savedTypeIcon(type: string): keyof typeof Feather.glyphMap {
+function savedTypeIcon(type: string): IconName {
   if (type === 'post') return 'bookmark';
   if (type === 'product') return 'shopping-bag';
   if (type === 'collection') return 'folder';
@@ -164,7 +164,7 @@ function BottomSheet({
 function SheetRow({
   icon, label, destructive, onPress, last,
 }: {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   destructive?: boolean;
   onPress: () => void;
@@ -182,9 +182,9 @@ function SheetRow({
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Feather name={icon} size={22} color={destructive ? theme.error : theme.text} />
+      <Icon name={icon} size={22} color={destructive ? theme.error : theme.text} />
       <Text style={[sheetStyles.sheetRowText, { color: destructive ? theme.error : theme.text }]}>{label}</Text>
-      {!destructive ? <Feather name="chevron-right" size={18} color={theme.subtle} style={sheetStyles.sheetRowChevron} /> : null}
+      {!destructive ? <Icon name="chevron-right" size={18} color={theme.subtle} style={sheetStyles.sheetRowChevron} /> : null}
     </Pressable>
   );
 }
@@ -228,7 +228,7 @@ const SavedCell = React.memo(function SavedCell({
     <View style={{ width: size, padding: SP.xs / 2 }}>
       <PressableScale onPress={handlePress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={item.title}>
         <View style={[cellStyles.savedTile, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Feather name={savedTypeIcon(item.type)} size={ICON.md} color={item.accentColor || theme.accent} />
+          <Icon name={savedTypeIcon(item.type)} size={ICON.md} color={item.accentColor || theme.accent} />
           <Text style={[cellStyles.savedTitle, { color: theme.text }]} numberOfLines={2}>{item.title}</Text>
           {item.subtitle ? <Text style={[cellStyles.savedSubtitle, { color: theme.muted }]} numberOfLines={1}>{item.subtitle}</Text> : null}
         </View>
@@ -253,7 +253,7 @@ const OrderRow = React.memo(function OrderRow({ order, theme, onPress }: {
         <CachedImage source={{ uri: order.lineItems[0].imageUri }} style={cellStyles.orderCardImage} contentFit="cover" />
       ) : (
         <View style={[cellStyles.orderCardImage, cellStyles.orderCardImagePlaceholder, { backgroundColor: theme.cardElevated }]}>
-          <Feather name="shopping-bag" size={ICON.md} color={theme.muted} />
+          <Icon name="shopping-bag" size={ICON.md} color={theme.muted} />
         </View>
       )}
       <View style={cellStyles.orderCardBody}>
@@ -263,7 +263,7 @@ const OrderRow = React.memo(function OrderRow({ order, theme, onPress }: {
         </Text>
         <OrderStatusTimeline status={order.status} compact />
       </View>
-      <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+      <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
     </PressableScale>
   );
 });
@@ -283,7 +283,7 @@ const DraftsFolderTile = React.memo(function DraftsFolderTile({
         testID="buyer-profile-drafts-tile"
         style={[cellStyles.draftsTile, { width, height, backgroundColor: theme.cardElevated, borderColor: theme.border }]}
       >
-        <Feather name="file-text" size={ICON.md} color={theme.muted} />
+        <Icon name="file-text" size={ICON.md} color={theme.muted} />
         <Text style={[cellStyles.draftsTitle, { color: theme.text }]}>Drafts</Text>
         <Text style={[cellStyles.draftsCount, { color: theme.muted }]}>{count}</Text>
       </PressableScale>
@@ -758,7 +758,7 @@ export default function ProfileScreen() {
   // One table decides every tab's empty copy + CTA (own profile → CTA).
   const emptyTabKey = activeTab === 'Posts' ? 'buyer:posts' : `buyer:${activeTab.toLowerCase()}`;
   const empty = profileEmptyState(emptyTabKey as ProfileEmptyTab, true);
-  const emptyIcon = empty.icon as keyof typeof Feather.glyphMap;
+  const emptyIcon = empty.icon as IconName;
   const emptyIllustration = empty.illustration;
   const emptyTitle = empty.title;
   const emptyDescription = empty.message;

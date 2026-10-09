@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -55,7 +55,7 @@ export function LegalConsent({
             checked && { backgroundColor: theme.accent, borderColor: theme.accent },
           ]}
         >
-          {checked ? <Feather name="check" size={13} color={theme.onAccent} /> : null}
+          {checked ? <Icon name="check" size={13} color={theme.onAccent} /> : null}
         </View>
         <Text style={[styles.text, { color: theme.muted }]}>
           I agree to the {link('Terms of Service', '/terms')} and {link('Community Guidelines', '/community-guidelines')}, including zero tolerance for abusive or objectionable content, and I’ve read the {link('Privacy Policy', '/privacy')}.

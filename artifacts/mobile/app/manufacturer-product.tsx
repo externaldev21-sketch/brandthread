@@ -5,7 +5,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -53,7 +53,7 @@ export default function ManufacturerProductScreen() {
               {product.images.map((uri, index) => <Image key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />)}
             </ScrollView>
           ) : (
-            <View style={[s.gallery, s.galleryFallback]}><Feather name="package" size={ICON.xxl} color={theme.subtle} /></View>
+            <View style={[s.gallery, s.galleryFallback]}><Icon name="package" size={ICON.xxl} color={theme.subtle} /></View>
           )}
 
           <View style={s.body}>
@@ -65,17 +65,17 @@ export default function ManufacturerProductScreen() {
 
             <View style={s.statsGrid}>
               <View style={s.statItem}>
-                <Feather name="package" size={ICON.sm} color={theme.text} />
+                <Icon name="package" size={ICON.sm} color={theme.text} />
                 <Text style={s.statLabel}>MOQ</Text>
                 <Text style={s.statValue}>{product.moq.toLocaleString('en-US')} units</Text>
               </View>
               <View style={s.statItem}>
-                <Feather name="clock" size={ICON.sm} color={theme.text} />
+                <Icon name="clock" size={ICON.sm} color={theme.text} />
                 <Text style={s.statLabel}>Lead time</Text>
                 <Text style={s.statValue}>{product.leadTimeDays} days</Text>
               </View>
               <View style={s.statItem}>
-                <Feather name="scissors" size={ICON.sm} color={theme.text} />
+                <Icon name="scissors" size={ICON.sm} color={theme.text} />
                 <Text style={s.statLabel}>Sample price</Text>
                 <Text style={s.statValue}>{product.samplePriceLabel ?? formatCents(product.samplePriceCents)}</Text>
               </View>

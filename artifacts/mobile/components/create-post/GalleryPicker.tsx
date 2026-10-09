@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { FONT } from '@/lib/theme';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -115,7 +115,7 @@ export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], de
         <MediaThumb asset={item} style={{ width: tile, height: tile }} />
         {item.kind === 'video' ? <Text style={s.duration}>{formatDuration(item.duration)}</Text> : null}
         <View style={[s.circle, n ? s.circleOn : null]}>
-          {n ? <Text style={s.circleNum}>{n}</Text> : <Feather name="plus" size={13} color={CP.white} />}
+          {n ? <Text style={s.circleNum}>{n}</Text> : <Icon name="plus" size={13} color={CP.white} />}
         </View>
       </Pressable>
     );
@@ -134,12 +134,12 @@ export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], de
             testID="gallery-destination"
           >
             <Text style={s.title}>{MODE_LABEL[mode][0] + MODE_LABEL[mode].slice(1).toLowerCase()}</Text>
-            <Feather name="chevron-down" size={18} color={CP.white} />
+            <Icon name="chevron-down" size={18} color={CP.white} />
           </Pressable>
         ) : (
           <Pressable style={s.titleBtn} onPress={() => { tap(); setAlbumPage(true); }} accessibilityRole="button" accessibilityLabel="Choose album" testID="gallery-album">
             <Text style={s.title}>{media.album.title}</Text>
-            <Feather name="chevron-down" size={18} color={CP.white} />
+            <Icon name="chevron-down" size={18} color={CP.white} />
           </Pressable>
         )}
         <View style={{ width: 44 }} />
@@ -213,7 +213,7 @@ export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], de
                   accessibilityLabel="Remove"
                   testID={`gallery-remove-${a.id}`}
                 >
-                  <Feather name="x" size={12} color={CP.black} />
+                  <Icon name="x" size={12} color={CP.black} />
                 </Pressable>
               </View>
             )}
@@ -243,7 +243,7 @@ export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], de
           ).map((row) => (
             <Pressable key={row.key} style={s.albumRow} onPress={() => { tap(); row.press(); }} accessibilityRole="button" testID={`gallery-option-${row.key}`}>
               <Text style={s.albumTitle}>{row.title}</Text>
-              {row.on ? <Feather name="check" size={20} color={CP.white} /> : null}
+              {row.on ? <Icon name="check" size={20} color={CP.white} /> : null}
             </Pressable>
           ))}
         </SubPage>

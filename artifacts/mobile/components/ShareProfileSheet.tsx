@@ -34,7 +34,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
@@ -277,7 +277,7 @@ export function ShareProfileSheet({
               testID="share-profile-close"
               noMinHeight
             >
-              <Feather name="x" size={ICON.md} color={theme.text} />
+              <Icon name="x" size={ICON.md} color={theme.text} />
             </PressableScale>
 
             <View style={styles.stylePicker} accessibilityRole="tablist" accessibilityLabel="Profile background style">
@@ -307,7 +307,7 @@ export function ShareProfileSheet({
               testID="share-profile-scan"
               noMinHeight
             >
-              <Feather name="maximize" size={ICON.md} color={theme.text} />
+              <Icon name="maximize" size={ICON.md} color={theme.text} />
             </PressableScale>
           </View>
 
@@ -315,16 +315,16 @@ export function ShareProfileSheet({
           <View style={styles.centerWrap}>
             {loading ? (
               <View style={[styles.card, { alignItems: 'center', justifyContent: 'center' }]}>
-                <Feather name="loader" size={24} color="#0A0A0B" />
+                <Icon name="loader" size={24} color="#0A0A0B" />
               </View>
             ) : !isSignedIn ? (
               <View style={[styles.card, styles.stateCard]}>
-                <Feather name="link-2" size={28} color="#0A0A0B" />
+                <Icon name="link-2" size={28} color="#0A0A0B" />
                 <Text style={styles.stateText}>Sign in to share your profile</Text>
               </View>
             ) : error ? (
               <View style={[styles.card, styles.stateCard]}>
-                <Feather name="wifi-off" size={28} color="#0A0A0B" />
+                <Icon name="wifi-off" size={28} color="#0A0A0B" />
                 <Text style={styles.stateText}>Couldn't load profile</Text>
                 <PressableScale onPress={load} accessibilityRole="button" accessibilityLabel="Retry">
                   <Text style={styles.retryText}>Retry</Text>
@@ -332,7 +332,7 @@ export function ShareProfileSheet({
               </View>
             ) : !normalizedUsername || !canonicalUrl ? (
               <View style={[styles.card, styles.stateCard]}>
-                <Feather name="at-sign" size={28} color="#0A0A0B" />
+                <Icon name="at-sign" size={28} color="#0A0A0B" />
                 <Text style={styles.stateText}>Set a username to get a shareable QR code.</Text>
               </View>
             ) : (
@@ -481,7 +481,7 @@ function ShareToast({ message, visible, variant }: { message: string; visible: b
   const color = variant === 'success' ? SUCCESS : RED;
   return (
     <Animated.View style={[styles.toast, { opacity, borderColor: `${color}44` }]}>
-      <Feather name={variant === 'success' ? 'check-circle' : 'alert-circle'} size={ICON.sm} color={color} />
+      <Icon name={variant === 'success' ? 'check-circle' : 'alert-circle'} size={ICON.sm} color={color} />
       <Text style={[styles.toastText, { color }]}>{message}</Text>
     </Animated.View>
   );
@@ -490,7 +490,7 @@ function ShareToast({ message, visible, variant }: { message: string; visible: b
 function ShareTile({
   icon, label, busy, onPress, textColor,
 }: {
-  icon: React.ComponentProps<typeof Feather>['name'];
+  icon: IconName;
   label: string;
   busy?: boolean;
   onPress: () => void;
@@ -514,7 +514,7 @@ function ShareTile({
         testID={`share-profile-tile-${label.toLowerCase().replace(/\s+/g, '-')}`}
       >
         <View style={styles.tileIconCircle}>
-          <Feather name={icon} size={20} color={textColor} />
+          <Icon name={icon} size={20} color={textColor} />
         </View>
         <Text style={[styles.tileLabel, { color: textColor }]} numberOfLines={1}>{label}</Text>
       </PressableScale>

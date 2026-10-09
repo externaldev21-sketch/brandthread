@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
@@ -116,7 +116,7 @@ export function DropsCalendar({ drops }: { drops: CalendarDropRow[] }) {
                   style={[styles.bell, on ? { backgroundColor: theme.text } : { borderColor: theme.border, borderWidth: 1 }]}
                   testID={`drop-bell-${row.id}`}
                 >
-                  <Feather name="bell" size={18} color={on ? theme.background : theme.text} />
+                  <Icon name="bell" size={18} color={on ? theme.background : theme.text} />
                 </PressableScale>
               </View>
             );

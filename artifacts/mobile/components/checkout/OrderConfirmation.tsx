@@ -19,7 +19,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -72,7 +72,7 @@ function Row({ label, children, testID }: { label: string; children: React.React
  * icon weight) for "Create an account".
  */
 function LinkRow({ icon, label, hint, onPress, subtle, testID }: {
-  icon: React.ComponentProps<typeof Feather>['name'];
+  icon: IconName;
   label: string;
   hint?: string;
   onPress: () => void;
@@ -90,9 +90,9 @@ function LinkRow({ icon, label, hint, onPress, subtle, testID }: {
       rippleEnabled={false}
       testID={testID}
     >
-      <Feather name={icon} size={subtle ? 16 : 18} color={subtle ? theme.muted : theme.text} />
+      <Icon name={icon} size={subtle ? 16 : 18} color={subtle ? theme.muted : theme.text} />
       <Text style={[subtle ? styles.linkSubtle : styles.linkLabel, { color: subtle ? theme.muted : theme.text }]}>{label}</Text>
-      <Feather name="chevron-right" size={16} color={theme.muted} />
+      <Icon name="chevron-right" size={16} color={theme.muted} />
     </PressableScale>
   );
 }
@@ -137,7 +137,7 @@ function SellerProductsCarousel({ sellerId, sellerName }: { sellerId: string; se
                 {product.images?.[0] ? (
                   <CachedImage source={{ uri: product.images[0] }} style={StyleSheet.absoluteFill} contentFit="cover" />
                 ) : (
-                  <Feather name="image" size={18} color={theme.subtle} />
+                  <Icon name="image" size={18} color={theme.subtle} />
                 )}
               </View>
               <Text style={[styles.moreName, { color: theme.text }]} numberOfLines={1}>{product.name}</Text>
@@ -242,7 +242,7 @@ export function OrderConfirmation({
       <View style={styles.hero}>
         {finalizing ? (
           <View style={[styles.pending, { borderColor: theme.border }]}>
-            <Feather name="clock" size={32} color={theme.text} />
+            <Icon name="clock" size={32} color={theme.text} />
           </View>
         ) : (
           <SuccessCheck variant="draw" size={64} haptic={false} testID="checkout-success-check" />
@@ -328,7 +328,7 @@ export function OrderConfirmation({
                   <CachedImage source={{ uri: item.imageUri }} style={[styles.thumb, { borderColor: theme.border }]} contentFit="cover" />
                 ) : (
                   <View style={[styles.thumb, styles.thumbFallback, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
-                    <Feather name="image" size={16} color={theme.subtle} />
+                    <Icon name="image" size={16} color={theme.subtle} />
                   </View>
                 )}
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -353,12 +353,12 @@ export function OrderConfirmation({
             accessibilityLabel={`Message ${firstGroup.sellerName}`}
             rippleEnabled={false}
           >
-            <Feather name="message-circle" size={18} color={theme.text} />
+            <Icon name="message-circle" size={18} color={theme.text} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.itemName, { color: theme.text }]}>Message {firstGroup.sellerName}</Text>
               <Text style={[styles.rowSub, { color: theme.muted }]}>Questions about sizing, shipping or your order</Text>
             </View>
-            <Feather name="chevron-right" size={18} color={theme.muted} />
+            <Icon name="chevron-right" size={18} color={theme.muted} />
           </PressableScale>
         </View>
       ) : null}

@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -139,13 +139,13 @@ export default function RfqCompareScreen() {
                   <Text style={s.mfgName} numberOfLines={2}>{quote.manufacturerName}</Text>
                   {quote.manufacturerIsVerified && (
                     <View style={s.verifiedRow}>
-                      <Feather name="check-circle" size={11} color={theme.secondary} />
+                      <Icon name="check-circle" size={11} color={theme.secondary} />
                       <Text style={s.verifiedText}>Verified</Text>
                     </View>
                   )}
                   {quote.manufacturerCountry ? <Text style={s.country}>{quote.manufacturerCountry}</Text> : null}
                   {isBest && (
-                    <View style={s.bestBadge}><Feather name="award" size={11} color={theme.onAccent} /><Text style={s.bestBadgeText}>Best price</Text></View>
+                    <View style={s.bestBadge}><Icon name="award" size={11} color={theme.onAccent} /><Text style={s.bestBadgeText}>Best price</Text></View>
                   )}
                 </View>
 
@@ -190,7 +190,7 @@ export default function RfqCompareScreen() {
 
       {pendingQuotes.length > 0 && quotedQuotes.length > 0 && (
         <View style={s.pendingBanner}>
-          <Feather name="clock" size={ICON.sm} color={theme.warning} />
+          <Icon name="clock" size={ICON.sm} color={theme.warning} />
           <Text style={s.pendingText}>{pendingQuotes.length} more {pendingQuotes.length === 1 ? 'manufacturer hasn’t' : 'manufacturers haven’t'} responded yet.</Text>
         </View>
       )}

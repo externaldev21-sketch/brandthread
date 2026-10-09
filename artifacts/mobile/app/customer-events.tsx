@@ -4,7 +4,7 @@ import { useColors } from '@/hooks/useColors';
 import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT } from '@/lib/theme';
 
 /**
@@ -20,7 +20,7 @@ export default function CustomerEventsScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Customer events" onBack={() => goBackOr(router, "/seller-settings")} />
       <View style={styles.empty}>
-        <Feather name="activity" size={28} color={colors.mutedForeground} />
+        <Icon name="activity" size={28} color={colors.mutedForeground} />
         <Text style={[styles.title, { color: colors.foreground }]}>Not available yet</Text>
         <Text style={[styles.body, { color: colors.mutedForeground }]}>
           Event pixels and tracking aren{'’'}t configurable from the app yet.

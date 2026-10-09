@@ -8,7 +8,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
@@ -30,7 +30,7 @@ function historyLabel(entry: ThreadCashEntry): string {
   }
 }
 
-function historyGlyph(entry: ThreadCashEntry, theme: AppThemePreset): { icon: React.ComponentProps<typeof Feather>['name']; color: string } {
+function historyGlyph(entry: ThreadCashEntry, theme: AppThemePreset): { icon: IconName; color: string } {
   switch (entry.source) {
     case 'live_gift': return { icon: 'gift', color: theme.success };
     case 'send_received': return { icon: 'message-circle', color: theme.success };
@@ -90,7 +90,7 @@ export default function ThreadCashHistoryScreen() {
                 style={[styles.row, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.borderSubtle }]}
               >
                 <View style={[styles.icon, { backgroundColor: theme.cardElevated }]}>
-                  <Feather name={glyph.icon} size={16} color={glyph.color} />
+                  <Icon name={glyph.icon} size={16} color={glyph.color} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.label, { color: theme.text }]} numberOfLines={1}>{historyLabel(entry)}</Text>

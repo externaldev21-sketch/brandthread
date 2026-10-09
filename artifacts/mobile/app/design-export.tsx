@@ -11,7 +11,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -33,7 +33,7 @@ interface FormatOption {
   id: string;
   label: string;
   desc: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
 }
 
 const FORMATS: FormatOption[] = [
@@ -152,7 +152,7 @@ export default function DesignExportScreen() {
             >
               <View style={styles.formatRow}>
                 <View style={[styles.formatIcon, selectedFormat === fmt.id && { backgroundColor: PURPLE_DIM }]}>
-                  <Feather name={fmt.icon} size={18} color={selectedFormat === fmt.id ? PURPLE_LIGHT : MUTED} />
+                  <Icon name={fmt.icon} size={18} color={selectedFormat === fmt.id ? PURPLE_LIGHT : MUTED} />
                 </View>
                 <View style={styles.formatInfo}>
                   <Text style={[styles.formatLabel, selectedFormat === fmt.id && { color: PURPLE_LIGHT }]}>
@@ -161,7 +161,7 @@ export default function DesignExportScreen() {
                   <Text style={styles.formatDesc}>{fmt.desc}</Text>
                 </View>
                 {selectedFormat === fmt.id && (
-                  <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />
+                  <Icon name="check-circle" size={18} color={PURPLE_LIGHT} />
                 )}
               </View>
             </BrandthreadCard>
@@ -197,7 +197,7 @@ export default function DesignExportScreen() {
         {/* Color space note */}
         <BrandthreadCard style={styles.noteCard}>
           <View style={styles.noteRow}>
-            <Feather name="info" size={14} color={CYAN} />
+            <Icon name="info" size={14} color={CYAN} />
             <Text style={styles.noteText}>
               RGB for digital. CMYK note included in print exports.
             </Text>

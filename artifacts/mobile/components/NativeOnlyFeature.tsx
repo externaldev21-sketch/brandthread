@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -11,7 +11,7 @@ import { FONT } from '@/lib/theme';
 interface NativeOnlyFeatureProps {
   title: string;
   description: string;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
 }
 
 /**
@@ -40,7 +40,7 @@ export default function NativeOnlyFeature({
       ]}
     >
       <View style={[styles.iconBox, { backgroundColor: colors.accent }]}>
-        <Feather name={icon} size={34} color={colors.primary} />
+        <Icon name={icon} size={34} color={colors.primary} />
       </View>
       <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
       <Text style={[styles.description, { color: colors.mutedForeground }]}>

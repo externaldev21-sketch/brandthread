@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -251,10 +251,10 @@ export default function AiDesignChatScreen() {
         <Text style={[s.chipText, active && s.chipTextActive]} numberOfLines={1}>{value ?? label}</Text>
         {active ? (
           <Pressable hitSlop={8} onPress={onClear} accessibilityLabel={`Clear ${label}`}>
-            <Feather name="x" size={13} color={colors.background} />
+            <Icon name="x" size={13} color={colors.background} />
           </Pressable>
         ) : (
-          <Feather name="chevron-down" size={13} color={colors.text} />
+          <Icon name="chevron-down" size={13} color={colors.text} />
         )}
       </Pressable>
     );
@@ -289,7 +289,7 @@ export default function AiDesignChatScreen() {
           >
             <Image source={{ uri: current.imageUri }} style={s.refineThumb} />
             <Text style={[s.chipText, s.chipTextActive]}>Refining</Text>
-            <Feather name="x" size={13} color={colors.background} />
+            <Icon name="x" size={13} color={colors.background} />
           </Pressable>
         ) : (
           <>
@@ -303,7 +303,7 @@ export default function AiDesignChatScreen() {
               >
                 <Image source={{ uri: referenceUri }} style={s.refineThumb} />
                 <Text style={[s.chipText, s.chipTextActive]}>Reference</Text>
-                <Feather name="x" size={13} color={colors.background} />
+                <Icon name="x" size={13} color={colors.background} />
               </Pressable>
             ) : null}
             {chip('garment', 'Garment', garmentLabel, () => setGarment(null))}
@@ -332,10 +332,10 @@ export default function AiDesignChatScreen() {
       return (
         <View style={s.assistantRow}>
           <View style={[s.assistantBubble, s.errorBubble]}>
-            <Feather name="alert-circle" size={14} color={colors.destructive} />
+            <Icon name="alert-circle" size={14} color={colors.destructive} />
             <Text style={s.errorText}>{item.error}</Text>
             <TouchableOpacity onPress={handleRetry} style={s.retryBtn}>
-              <Feather name="refresh-cw" size={12} color={theme.accent} />
+              <Icon name="refresh-cw" size={12} color={theme.accent} />
               <Text style={[s.retryText, { color: theme.accent }]}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -442,7 +442,7 @@ export default function AiDesignChatScreen() {
               accessibilityLabel="Attach reference image"
               testID="ai-design-attach"
             >
-              <Feather name="plus" size={20} color={colors.text} />
+              <Icon name="plus" size={20} color={colors.text} />
             </Pressable>
           )}
         />
@@ -475,7 +475,7 @@ export default function AiDesignChatScreen() {
 }
 
 function ActionPill({ icon, label, onPress, primary, disabled, s, colors, testID }: {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   primary?: boolean;
@@ -493,7 +493,7 @@ function ActionPill({ icon, label, onPress, primary, disabled, s, colors, testID
       accessibilityLabel={label}
       testID={testID}
     >
-      <Feather name={icon} size={15} color={primary ? colors.background : colors.text} />
+      <Icon name={icon} size={15} color={primary ? colors.background : colors.text} />
       <Text style={[s.actionText, primary && { color: colors.background }]}>{label}</Text>
     </Pressable>
   );

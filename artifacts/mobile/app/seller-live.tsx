@@ -8,7 +8,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, 
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
@@ -335,7 +335,7 @@ function SellerLiveNativeScreen() {
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, s.cameraPlaceholder]}>
-          <Feather name="video" size={48} color={MUTED} />
+          <Icon name="video" size={48} color={MUTED} />
           <Text style={s.cameraPlaceholderText}>Camera preview available on device</Text>
         </View>
       )}
@@ -360,7 +360,7 @@ function SellerLiveNativeScreen() {
       {/* Viewer count */}
       <View style={[s.viewerRow, { paddingTop: headerTopInset + 48 }]}>
         <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-          <Feather name="eye" size={13} color="#fff" />
+          <Icon name="eye" size={13} color="#fff" />
           <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
         </View>
       </View>
@@ -369,7 +369,7 @@ function SellerLiveNativeScreen() {
       {tipsTotalCents != null && tipsTotalCents > 0 && (
         <View style={[s.tipsRow, { paddingTop: headerTopInset + 78 }]} pointerEvents="none">
           <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]} testID="seller-live-tips-total">
-            <Feather name="gift" size={13} color="#fff" />
+            <Icon name="gift" size={13} color="#fff" />
             <Text style={s.viewerText}>{formatCents(tipsTotalCents)} in tips</Text>
           </View>
         </View>
@@ -379,7 +379,7 @@ function SellerLiveNativeScreen() {
       <View style={[s.rightRail, { paddingTop: headerTopInset + 80 }]}>
         {/* Products */}
         <TouchableOpacity onPress={() => setShowProductPicker(true)} style={s.railBtn} activeOpacity={0.7}>
-          <Feather name="shopping-bag" size={22} color="#fff" />
+          <Icon name="shopping-bag" size={22} color="#fff" />
           {productTags.length > 0 && (
             <View style={[s.railBadge, { backgroundColor: LIVE_RED }]}>
               <Text style={s.railBadgeText}>{productTags.length}</Text>
@@ -388,7 +388,7 @@ function SellerLiveNativeScreen() {
         </TouchableOpacity>
         {/* Live-only discount codes */}
         <TouchableOpacity onPress={() => setShowLiveCodes(true)} style={s.railBtn} activeOpacity={0.7} accessibilityLabel="Live codes">
-          <Feather name="tag" size={21} color="#fff" />
+          <Icon name="tag" size={21} color="#fff" />
         </TouchableOpacity>
         {/* Switch camera */}
         <TouchableOpacity
@@ -396,7 +396,7 @@ function SellerLiveNativeScreen() {
           activeOpacity={0.7}
           onPress={() => engineRef.current?.switchCamera?.()}
         >
-          <Feather name="refresh-cw" size={20} color="#fff" />
+          <Icon name="refresh-cw" size={20} color="#fff" />
         </TouchableOpacity>
         {/* Moderation */}
         <TouchableOpacity
@@ -406,7 +406,7 @@ function SellerLiveNativeScreen() {
           accessibilityLabel="Moderation"
           onPress={() => router.push({ pathname: '/live-moderation', params: { streamId: params.streamId } } as any)}
         >
-          <Feather name="shield" size={20} color="#fff" />
+          <Icon name="shield" size={20} color="#fff" />
         </TouchableOpacity>
         {/* Co-host */}
         <TouchableOpacity
@@ -416,7 +416,7 @@ function SellerLiveNativeScreen() {
           accessibilityLabel="Invite a co-host"
           onPress={() => router.push({ pathname: '/live-cohost', params: { streamId: params.streamId } } as any)}
         >
-          <Feather name="user-plus" size={20} color="#fff" />
+          <Icon name="user-plus" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -437,7 +437,7 @@ function SellerLiveNativeScreen() {
                   { backgroundColor: tag.highlighted ? LIVE_RED : 'rgba(0,0,0,0.65)' },
                 ]}
               >
-                <Feather name="shopping-bag" size={12} color={LIVE_RED} />
+                <Icon name="shopping-bag" size={12} color={LIVE_RED} />
                 <Text style={s.productChipText} numberOfLines={1}>{tag.productName}</Text>
                 <Text style={s.productChipPrice}>{formatCents(tag.priceCents ?? 0)}</Text>
                 {tag.highlighted && <Text style={s.featuredLabel}>FEATURED</Text>}
@@ -506,7 +506,7 @@ function SellerLiveNativeScreen() {
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>Tag products</Text>
               <TouchableOpacity onPress={() => setShowProductPicker(false)}>
-                <Feather name="x" size={22} color={FG} />
+                <Icon name="x" size={22} color={FG} />
               </TouchableOpacity>
             </View>
             <ScrollView>
@@ -524,7 +524,7 @@ function SellerLiveNativeScreen() {
                        <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatCents(p.priceCents ?? 0)}</Text>
                     </View>
                     <View style={[s.checkbox, tagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
-                      {tagged && <Feather name="check" size={13} color={theme.onAccent} />}
+                      {tagged && <Icon name="check" size={13} color={theme.onAccent} />}
                     </View>
                   </TouchableOpacity>
                 );

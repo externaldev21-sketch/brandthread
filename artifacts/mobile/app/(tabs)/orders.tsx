@@ -7,7 +7,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -363,7 +363,7 @@ export function OrderRow({
         {/* Selection checkbox */}
         {selectionMode && (
           <View style={[s.selBox, selected && s.selBoxActive]}>
-            {selected && <Feather name="check" size={10} color={theme.background} />}
+            {selected && <Icon name="check" size={10} color={theme.background} />}
           </View>
         )}
 
@@ -380,7 +380,7 @@ export function OrderRow({
               {order.hasUnreadMessage && <View style={s.unreadDot} />}
               {isHighRisk && (
                 <View style={s.riskBadge}>
-                  <Feather name="alert-triangle" size={9} color={RED} />
+                  <Icon name="alert-triangle" size={9} color={RED} />
                   <Text style={s.riskText}>RISK</Text>
                 </View>
               )}
@@ -472,7 +472,7 @@ export function OrderRow({
           )}
           {order.status === 'shipped' && order.shipments[0] && (
             <View style={s.trackingPill}>
-              <Feather name="truck" size={10} color={STRONG} />
+              <Icon name="truck" size={10} color={STRONG} />
               <Text style={s.trackingText}>
                 {order.shipments[0].carrier} · {order.shipments[0].trackingNumber?.slice(-6)}
               </Text>
@@ -523,7 +523,7 @@ function SortModal({
             <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
               {label}
             </Text>
-            {current === key && <Feather name="check" size={ICON.sm} color={STRONG} />}
+            {current === key && <Icon name="check" size={ICON.sm} color={STRONG} />}
           </TouchableOpacity>
         ))}
         <Button label="Cancel" variant="secondary" fullWidth style={s.modalCloseBtn} onPress={onClose} accessibilityLabel="Cancel sorting" />
@@ -564,7 +564,7 @@ function FilterSheet({
               <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
                 {label}
               </Text>
-              {current === key && <Feather name="check" size={ICON.sm} color={STRONG} />}
+              {current === key && <Icon name="check" size={ICON.sm} color={STRONG} />}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -1199,19 +1199,19 @@ export default function OrdersScreen() {
             <Text style={s.bulkCount}>{selectedIds.length} selected</Text>
             <View style={s.bulkActions}>
               <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkReady} accessibilityRole="button" accessibilityLabel="Mark selected orders ready">
-                <Feather name="package" size={ICON.xs} color={STRONG} />
+                <Icon name="package" size={ICON.xs} color={STRONG} />
                 <Text style={[s.bulkBtnText, { color: STRONG }]}>Ready</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={handleBulkFulfill} accessibilityRole="button" accessibilityLabel="Fulfill selected orders">
-                <Feather name="send" size={ICON.xs} color={STRONG} />
+                <Icon name="send" size={ICON.xs} color={STRONG} />
                 <Text style={[s.bulkBtnText, { color: STRONG }]}>Fulfill</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={handleExportCsv} accessibilityRole="button" accessibilityLabel="Export selected orders">
-                <Feather name="download" size={ICON.xs} color={MUTED} />
+                <Icon name="download" size={ICON.xs} color={MUTED} />
                 <Text style={[s.bulkBtnText, { color: MUTED }]}>Export</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={() => setSelectedIds([])} accessibilityRole="button" accessibilityLabel="Clear selected orders">
-                <Feather name="x" size={ICON.xs} color={RED} />
+                <Icon name="x" size={ICON.xs} color={RED} />
                 <Text style={[s.bulkBtnText, { color: RED }]}>Clear</Text>
               </TouchableOpacity>
             </View>

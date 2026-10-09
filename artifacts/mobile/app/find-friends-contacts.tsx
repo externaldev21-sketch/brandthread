@@ -13,7 +13,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -175,13 +175,13 @@ export default function FindFriendsContacts() {
       {phase === 'intro' && (
         <View style={s.flex}>
           <ScrollView contentContainerStyle={s.introScroll} showsVerticalScrollIndicator={false}>
-            <View style={s.iconWrap}><Feather name="users" size={28} color={palette.foreground} /></View>
+            <View style={s.iconWrap}><Icon name="users" size={28} color={palette.foreground} /></View>
             <Text style={s.title}>Find friends you know</Text>
             <Text style={s.body}>See which of your contacts are already on Brandthread.</Text>
             <View style={s.points}>
               {POINTS.map((p) => (
                 <View key={p.icon} style={s.pointRow}>
-                  <View style={s.pointIcon}><Feather name={p.icon} size={18} color={palette.foreground} /></View>
+                  <View style={s.pointIcon}><Icon name={p.icon} size={18} color={palette.foreground} /></View>
                   <Text style={s.pointText}>{p.text}</Text>
                 </View>
               ))}
@@ -197,7 +197,7 @@ export default function FindFriendsContacts() {
       {phase === 'denied' && (
         <View style={s.flex}>
           <View style={s.center}>
-            <View style={s.iconWrap}><Feather name="lock" size={28} color={palette.foreground} /></View>
+            <View style={s.iconWrap}><Icon name="lock" size={28} color={palette.foreground} /></View>
             <Text style={s.title}>Contacts access is off</Text>
             <Text style={s.body}>Turn on Contacts for Brandthread in Settings to find friends.</Text>
           </View>

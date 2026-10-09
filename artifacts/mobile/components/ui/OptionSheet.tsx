@@ -21,7 +21,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -34,7 +34,7 @@ export interface OptionSheetOption {
   id: string;
   label: string;
   description?: string;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
 }
 
 export interface OptionSheetProps {
@@ -66,7 +66,7 @@ export function OptionSheet({ visible, onClose, title, description, options, sel
               icon={opt.icon}
               title={opt.label}
               subtitle={opt.description}
-              right={opt.id === selectedId ? <Feather name="check" size={18} color={palette.accent} /> : undefined}
+              right={opt.id === selectedId ? <Icon name="check" size={18} color={palette.accent} /> : undefined}
               onPress={() => { hapticLight(); onSelect(opt.id); }}
               testID={`${testID ?? 'option-sheet'}-${opt.id}`}
             />

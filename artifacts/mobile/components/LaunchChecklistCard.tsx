@@ -5,7 +5,7 @@
  */
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -38,13 +38,13 @@ export default function LaunchChecklistCard() {
         {next && (
           <View style={s.next}>
             <Text style={s.nextText}>Next: {LAUNCH_STEP_META[next].title}</Text>
-            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+            <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
           </View>
         )}
       </PressableScale>
       <View style={s.close}>
         <PressableScale onPress={dismiss} accessibilityLabel="Dismiss" hitSlop={10} noMinHeight style={s.closeBtn}>
-          <Feather name="x" size={ICON.sm} color={theme.muted} />
+          <Icon name="x" size={ICON.sm} color={theme.muted} />
         </PressableScale>
       </View>
     </View>

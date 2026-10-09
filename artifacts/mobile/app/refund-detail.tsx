@@ -3,7 +3,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -41,14 +41,14 @@ function QtySelector({ value, max, onChange }: { value: number; max: number; onC
         style={qtyS.btn}
         onPress={() => onChange(Math.max(0, value - 1))}
       >
-        <Feather name="minus" size={ICON.xs} color={value === 0 ? SUBTLE : FG} />
+        <Icon name="minus" size={ICON.xs} color={value === 0 ? SUBTLE : FG} />
       </TouchableOpacity>
       <Text style={qtyS.val}>{value}</Text>
       <TouchableOpacity
         style={qtyS.btn}
         onPress={() => onChange(Math.min(max, value + 1))}
       >
-        <Feather name="plus" size={ICON.xs} color={value === max ? SUBTLE : FG} />
+        <Icon name="plus" size={ICON.xs} color={value === max ? SUBTLE : FG} />
       </TouchableOpacity>
     </View>
   );
@@ -197,7 +197,7 @@ export default function RefundDetailScreen() {
       >
         {/* 2. REFUND NOTICE */}
         <View style={styles.demoNotice}>
-          <Feather name="alert-triangle" size={ICON.sm} color={ORANGE} />
+          <Icon name="alert-triangle" size={ICON.sm} color={ORANGE} />
           <Text style={styles.demoText}>
             Issuing a refund from the app isn{'’'}t available yet. Use this screen to prepare the amount, then complete the refund from your Stripe dashboard.
           </Text>
@@ -343,7 +343,7 @@ export default function RefundDetailScreen() {
           </View>
           {overMax && (
             <View style={styles.warningRow}>
-              <Feather name="alert-triangle" size={ICON.xs} color={RED} />
+              <Icon name="alert-triangle" size={ICON.xs} color={RED} />
               <Text style={styles.warningText}>
                 Amount exceeds max refundable ({formatCents(maxRefundable)})
               </Text>

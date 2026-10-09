@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -141,14 +141,14 @@ export default function FulfillBatchScreen() {
                 <SectionHeader title={`Results — ${successCount} succeeded, ${failCount} failed`} />
                 {results.map(r => (
                   <BrandthreadCard key={r.orderId} style={s.resultRow}>
-                    <Feather name={r.ok ? 'check-circle' : 'alert-circle'} size={ICON.md} color={r.ok ? SUCCESS : ERROR} />
+                    <Icon name={r.ok ? 'check-circle' : 'alert-circle'} size={ICON.md} color={r.ok ? SUCCESS : ERROR} />
                     <View style={{ flex: 1 }}>
                       <Text style={s.orderNumber}>#{r.orderNumber}</Text>
                       <Text style={s.mutedText}>{r.message}</Text>
                     </View>
                     {r.labelUrl && (
                       <TouchableOpacity onPress={() => Linking.openURL(r.labelUrl!)} accessibilityRole="button" accessibilityLabel={`Open label for order ${r.orderNumber}`}>
-                        <Feather name="external-link" size={ICON.md} color={ACCENT} />
+                        <Icon name="external-link" size={ICON.md} color={ACCENT} />
                       </TouchableOpacity>
                     )}
                   </BrandthreadCard>

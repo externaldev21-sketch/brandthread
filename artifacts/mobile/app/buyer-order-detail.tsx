@@ -37,7 +37,7 @@ import { mapDelivery, safeTrackingUrl } from '@/lib/deliveryGuarantee';
 import { DeliveryTrackerCard, AutoRefundCard } from '@/components/orders/DeliveryTracker';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { BuyerOrderView, cancellationReasonLabel, OrderStatus, TrackingStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
@@ -304,7 +304,7 @@ function ReviewSheet({
             <Text style={[rvs.title, { color: theme.text }]}>Rate {sellerName}</Text>
           </View>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Close">
-            <Feather name="x" size={22} color={theme.text} />
+            <Icon name="x" size={22} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -361,7 +361,7 @@ function ReviewSheet({
                   hitSlop={12}
                   noMinHeight
                 >
-                  <Feather name="x" size={11} color={theme.background} />
+                  <Icon name="x" size={11} color={theme.background} />
                 </PressableScale>
               </View>
             </View>
@@ -373,7 +373,7 @@ function ReviewSheet({
               accessibilityRole="button"
               accessibilityLabel="Add photos"
             >
-              <Feather name="camera" size={16} color={theme.text} />
+              <Icon name="camera" size={16} color={theme.text} />
               <Text style={[rvs.addPhotoText, { color: theme.text }]}>Add photos</Text>
             </PressableScale>
           )}
@@ -524,7 +524,7 @@ export function BuyerCancellationDetailsCard({ order }: {
     <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
       <GradientCard colors={[`${theme.error}24`, `${theme.error}0D`]} style={{ borderColor: `${theme.error}59` }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
-          <Feather name="x-circle" size={ICON.sm} color={theme.error} />
+          <Icon name="x-circle" size={ICON.sm} color={theme.error} />
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Order Cancelled</Text>
         </View>
         <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 2 }}>
@@ -556,7 +556,7 @@ export function BuyerTrackingAlertCard({ trackingStatus }: { trackingStatus?: Tr
     <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
       <GradientCard colors={[`${color}24`, `${color}0D`]} style={{ borderColor: `${color}66` }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
-          <Feather name={isOutForDelivery ? 'truck' : 'alert-triangle'} size={ICON.sm} color={color} />
+          <Icon name={isOutForDelivery ? 'truck' : 'alert-triangle'} size={ICON.sm} color={color} />
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color }}>{title}</Text>
         </View>
         <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20 }}>{message}</Text>
@@ -887,7 +887,7 @@ export default function BuyerOrderDetailScreen() {
       <BrandthreadScreen noSafeTop>
         <ScreenHeader title="Order Details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg }}>
-          <Feather name="wifi-off" size={40} color={theme.muted} />
+          <Icon name="wifi-off" size={40} color={theme.muted} />
           <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.base, marginTop: SP.md, textAlign: 'center' }}>
             Could not load order details
           </Text>
@@ -953,7 +953,7 @@ export default function BuyerOrderDetailScreen() {
             </View>
             {!order.delivery && order.isPreOrder && order.preOrderEstShipDate && (
               <View style={styles.preOrderInfoRow}>
-                <Feather name="clock" size={ICON.xs} color={CYAN} />
+                <Icon name="clock" size={ICON.xs} color={CYAN} />
                 <Text style={[styles.preOrderInfoText, { color: CYAN }]}>
                   Pre-order — Est. ship {fmtDate(order.preOrderEstShipDate)}
                 </Text>
@@ -961,7 +961,7 @@ export default function BuyerOrderDetailScreen() {
             )}
             {!order.delivery && order.trackingNumber && (
               <View style={styles.trackingInfoRow}>
-                <Feather name="truck" size={ICON.xs} color={theme.muted} />
+                <Icon name="truck" size={ICON.xs} color={theme.muted} />
                 <Text style={[styles.trackingInfoText, { color: theme.text }]}>
                   Shipped via {order.trackingCarrier}
                 </Text>
@@ -1038,7 +1038,7 @@ export default function BuyerOrderDetailScreen() {
                   <Text style={styles.returnTitle}>{returnStatusLabel(returnRequest.status as ReturnStatusKey)}</Text>
                 </View>
                 <StatusBadge label={returnStatusLabel(returnRequest.status as ReturnStatusKey).toUpperCase()} variant="neutral" />
-                <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+                <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
               </View>
               <Text style={styles.returnDetail}>Reason: {returnReasonLabel(String(returnRequest.reason ?? 'other'))}</Text>
               {returnRequest.refundAmountCents != null && (
@@ -1086,7 +1086,7 @@ export default function BuyerOrderDetailScreen() {
                 />
               ) : (
                 <View style={[styles.itemThumb, styles.itemThumbFallback]}>
-                  <Feather name="image" size={18} color={theme.subtle} />
+                  <Icon name="image" size={18} color={theme.subtle} />
                 </View>
               )}
               {/* Info */}
@@ -1098,7 +1098,7 @@ export default function BuyerOrderDetailScreen() {
                 <Text style={styles.lineItemPrice}>{formatCents(item.unitPriceCents * item.quantity)}</Text>
                 {item.quantity > 1 && <Text style={styles.lineItemVariant}>×{item.quantity}</Text>}
               </View>
-              {item.productId ? <Feather name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
+              {item.productId ? <Icon name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
             </TouchableOpacity>
           ))}
           <TouchableOpacity
@@ -1109,9 +1109,9 @@ export default function BuyerOrderDetailScreen() {
             testID="order-seller-profile"
             style={styles.sellerLinkRow}
           >
-            <Feather name="shopping-bag" size={ICON.sm} color={theme.muted} />
+            <Icon name="shopping-bag" size={ICON.sm} color={theme.muted} />
             <Text style={styles.sellerLinkText} numberOfLines={1}>Sold by {order.sellerName}</Text>
-            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+            <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
           </TouchableOpacity>
         </SectionCard>
 
@@ -1174,7 +1174,7 @@ export default function BuyerOrderDetailScreen() {
             </View>
             {order.estimatedDelivery && order.status !== 'delivered' && (
               <View style={styles.estDeliveryRow}>
-                <Feather name="calendar" size={ICON.xs} color={theme.muted} />
+                <Icon name="calendar" size={ICON.xs} color={theme.muted} />
                 <Text style={styles.estDeliveryText}>Est. delivery {fmtDate(order.estimatedDelivery)}</Text>
               </View>
             )}
@@ -1201,7 +1201,7 @@ export default function BuyerOrderDetailScreen() {
             <Text style={[sc.title, { paddingHorizontal: 0, marginBottom: SP.sm }]}>Pre-order Status</Text>
             <GradientCard colors={[theme.secondaryDim, `${theme.secondary}0A`]} style={{ borderColor: `${theme.secondary}59` }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
-                <Feather name="clock" size={ICON.sm} color={CYAN} />
+                <Icon name="clock" size={ICON.sm} color={CYAN} />
                 <Text style={[styles.preOrderTitle, { color: CYAN }]}>Your pre-order is being produced.</Text>
               </View>
               {order.preOrderEstShipDate && (
@@ -1253,7 +1253,7 @@ export default function BuyerOrderDetailScreen() {
         {/* Review CTA or submitted state */}
         {order.status === 'delivered' && reviewSubmitted && (
           <View style={styles.reviewDoneRow}>
-            <Feather name="check-circle" size={ICON.sm} color={theme.success} />
+            <Icon name="check-circle" size={ICON.sm} color={theme.success} />
             <Text style={styles.reviewDoneText}>Review submitted — thank you!</Text>
           </View>
         )}
@@ -1268,12 +1268,12 @@ export default function BuyerOrderDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Leave a review"
           >
-            <Feather name="star" size={ICON.sm} color={theme.warning} />
+            <Icon name="star" size={ICON.sm} color={theme.warning} />
             <View style={{ flex: 1 }}>
               <Text style={styles.reviewCTATitle}>Leave a Review</Text>
               <Text style={styles.reviewCTASub}>Share your experience with {order.sellerName}</Text>
             </View>
-            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+            <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
           </TouchableOpacity>
         )}
 
@@ -1288,7 +1288,7 @@ export default function BuyerOrderDetailScreen() {
             <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
               <View style={{ alignItems: 'center', marginBottom: SP.md }}>
                 <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${theme.error}24`, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
-                  <Feather name="x-circle" size={24} color={theme.error} />
+                  <Icon name="x-circle" size={24} color={theme.error} />
                 </View>
                 <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Cancel this order?</Text>
               </View>
@@ -1317,7 +1317,7 @@ export default function BuyerOrderDetailScreen() {
             <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
               <View style={{ alignItems: 'center', marginBottom: SP.md }}>
                 <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
-                  <Feather name="package" size={24} color={theme.text} />
+                  <Icon name="package" size={24} color={theme.text} />
                 </View>
                 <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Did it arrive?</Text>
               </View>

@@ -11,7 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   BG, CARD, BORDER, FG, MUTED,
@@ -97,7 +97,7 @@ export default function PublicCollectionScreen() {
   if (state.kind === 'not_found' || state.kind === 'error') {
     return (
       <View style={[styles.root, styles.center, { paddingTop: headerTopInset }]}>
-        <Feather name={state.kind === 'not_found' ? 'folder' : 'alert-circle'} size={40} color={MUTED} />
+        <Icon name={state.kind === 'not_found' ? 'folder' : 'alert-circle'} size={40} color={MUTED} />
         <Text style={styles.messageTitle}>
           {state.kind === 'not_found' ? 'Collection not found' : 'Something went wrong'}
         </Text>
@@ -132,7 +132,7 @@ export default function PublicCollectionScreen() {
           <Image source={{ uri: collection.coverImageUrl }} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]}>
-            <Feather name="folder" size={36} color={MUTED} />
+            <Icon name="folder" size={36} color={MUTED} />
           </View>
         )}
 
@@ -155,7 +155,7 @@ export default function PublicCollectionScreen() {
                   <Image source={{ uri: item.image }} style={styles.tileImage} />
                 ) : (
                   <View style={[styles.tileImage, styles.coverPlaceholder]}>
-                    <Feather name="shopping-bag" size={20} color={MUTED} />
+                    <Icon name="shopping-bag" size={20} color={MUTED} />
                   </View>
                 )}
                 <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>

@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -271,7 +271,7 @@ export default function StoreFromLogoScreen() {
         {/* AI badge */}
         <BrandthreadCard style={[fl.card, { borderColor: PURPLE_DIM, backgroundColor: theme.accentDim }]}>
           <View style={fl.bannerRow}>
-            <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Icon name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={[fl.bannerText, { color: PURPLE_LIGHT }]}>
               We'll pull your colors, type and vibe from your logo.
             </Text>
@@ -299,7 +299,7 @@ export default function StoreFromLogoScreen() {
             </>
           ) : (
             <>
-              <Feather name="upload" size={ICON.xxl} color={PURPLE} />
+              <Icon name="upload" size={ICON.xxl} color={PURPLE} />
               <Text style={fl.uploadLabel}>Tap to upload logo</Text>
               <Text style={fl.uploadSub}>PNG, JPG, or SVG</Text>
             </>
@@ -327,7 +327,7 @@ export default function StoreFromLogoScreen() {
         {analysisFailure && (
           <BrandthreadCard style={[fl.card, fl.importFailureCard]}>
             <View style={fl.bannerRow}>
-              <Feather name="image" size={ICON.sm} color={PURPLE_LIGHT} />
+              <Icon name="image" size={ICON.sm} color={PURPLE_LIGHT} />
               <View style={fl.applyFailureCopy}>
                 <Text style={fl.applyFailureTitle}>Image too large</Text>
                 <Text style={fl.applyFailureText}>{analysisFailure.message}</Text>
@@ -340,7 +340,7 @@ export default function StoreFromLogoScreen() {
               accessibilityRole="button"
               accessibilityLabel="Retry analyzing this logo"
             >
-              <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+              <Icon name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
               <Text style={fl.applyRetryText}>Retry analysis</Text>
             </TouchableOpacity>
           </BrandthreadCard>
@@ -352,13 +352,13 @@ export default function StoreFromLogoScreen() {
             {result.source === 'fallback' && (
               <BrandthreadCard style={[fl.card, { borderColor: `${theme.warning}66`, backgroundColor: `${theme.warning}12` }]}>
                 <View style={fl.bannerRow}>
-                  <Feather name="alert-triangle" size={ICON.sm} color={theme.warning} />
+                  <Icon name="alert-triangle" size={ICON.sm} color={theme.warning} />
                   <Text style={[fl.bannerText, { color: theme.warning }]}>
                     We couldn't fully analyze your image — showing a suggested starting point.
                   </Text>
                 </View>
                 <TouchableOpacity style={fl.retryBtn} onPress={handleAnalyze} disabled={analyzing || restoringAnalysis}>
-                  <Feather name="refresh-cw" size={12} color={theme.warning} />
+                  <Icon name="refresh-cw" size={12} color={theme.warning} />
                   <Text style={[fl.retryText, { color: theme.warning }]}>Retry Analysis</Text>
                 </TouchableOpacity>
               </BrandthreadCard>
@@ -419,7 +419,7 @@ export default function StoreFromLogoScreen() {
             {applyFailure && (
               <BrandthreadCard style={[fl.card, fl.applyFailureCard]}>
                 <View style={fl.bannerRow}>
-                  <Feather
+                  <Icon
                     name={applyFailure.kind === 'network' ? 'wifi-off' : 'server'}
                     size={ICON.sm}
                     color={PURPLE_LIGHT}
@@ -444,7 +444,7 @@ export default function StoreFromLogoScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Retry applying this store design"
                 >
-                  <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+                  <Icon name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
                   <Text style={fl.applyRetryText}>Retry apply</Text>
                 </TouchableOpacity>
               </BrandthreadCard>

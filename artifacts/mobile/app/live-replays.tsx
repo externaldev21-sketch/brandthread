@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useScreenPadding } from '@/components/layout/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -141,12 +141,12 @@ export default function LiveReplaysScreen() {
                   {item.thumbnailUrl ? (
                     <CachedImage source={{ uri: item.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
                   ) : (
-                    <View style={styles.thumbFallback}><Feather name="play" size={22} color={theme.muted} /></View>
+                    <View style={styles.thumbFallback}><Icon name="play" size={22} color={theme.muted} /></View>
                   )}
                   {duration ? <Text style={styles.duration}>{duration}</Text> : null}
                   {hidden ? (
                     <View style={styles.lock} accessibilityLabel="Hidden from visitors">
-                      <Feather name="lock" size={12} color={theme.text} />
+                      <Icon name="lock" size={12} color={theme.text} />
                     </View>
                   ) : null}
                 </Pressable>
@@ -159,7 +159,7 @@ export default function LiveReplaysScreen() {
                     testID={`live-replay-manage-${item.streamId}`}
                     style={styles.manage}
                   >
-                    <Feather name="more-horizontal" size={16} color={theme.text} />
+                    <Icon name="more-horizontal" size={16} color={theme.text} />
                   </Pressable>
                 ) : null}
                 <Text style={styles.title} numberOfLines={2}>{item.title}</Text>

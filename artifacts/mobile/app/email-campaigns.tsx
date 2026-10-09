@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -18,16 +18,16 @@ import {
 } from '@/lib/emailMarketing';
 import { FONT, FS, ICON, SP } from '@/lib/theme';
 
-function NavRow({ icon, title, sub, onPress }: { icon: keyof typeof Feather.glyphMap; title: string; sub?: string; onPress: () => void }) {
+function NavRow({ icon, title, sub, onPress }: { icon: IconName; title: string; sub?: string; onPress: () => void }) {
   const c = useColors();
   return (
     <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={title} style={st.navRow}>
-      <Feather name={icon} size={ICON.md} color={c.foreground} />
+      <Icon name={icon} size={ICON.md} color={c.foreground} />
       <View style={{ flex: 1 }}>
         <Text style={[st.navTitle, { color: c.foreground }]}>{title}</Text>
         {sub ? <Text style={[st.navSub, { color: c.mutedForeground }]}>{sub}</Text> : null}
       </View>
-      <Feather name="chevron-right" size={ICON.sm} color={c.mutedForeground} />
+      <Icon name="chevron-right" size={ICON.sm} color={c.mutedForeground} />
     </PressableScale>
   );
 }
@@ -94,7 +94,7 @@ export default function EmailCampaignsScreen() {
                     {cmp.status === 'scheduled' && cmp.scheduledAt ? ` · ${formatWhen(cmp.scheduledAt)}` : ''}
                   </Text>
                 </View>
-                <Feather name="chevron-right" size={ICON.sm} color={c.mutedForeground} />
+                <Icon name="chevron-right" size={ICON.sm} color={c.mutedForeground} />
               </PressableScale>
             </View>
           ))

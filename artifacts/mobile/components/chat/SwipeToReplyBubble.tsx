@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { hapticSelection } from '@/lib/haptics';
 import { REPLY_THRESHOLD, clampSwipeTravel, nextCrossedState, shouldClaimSwipe } from '@/lib/swipeToReply';
 
@@ -84,7 +84,7 @@ export function SwipeToReplyBubble({
           { backgroundColor: iconBg, opacity: iconOpacity, transform: [{ scale: iconScale }] },
         ]}
       >
-        <Feather name="corner-up-left" size={15} color={iconColor} />
+        <Icon name="corner-up-left" size={15} color={iconColor} />
       </Animated.View>
       <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
         {children}

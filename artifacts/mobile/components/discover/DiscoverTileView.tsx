@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
 import { FONT, FS } from '@/lib/theme';
@@ -55,12 +55,12 @@ export function DiscoverTileView({
       )}
       {post.media === 'video' && (
         <View style={styles.glyphWrap}>
-          <Feather name="play" size={13} color="#FFFFFF" />
+          <Icon name="play" size={13} color="#FFFFFF" />
         </View>
       )}
       {post.media === 'slideshow' && (
         <View style={styles.glyphWrap}>
-          <Feather name="copy" size={13} color="#FFFFFF" />
+          <Icon name="copy" size={13} color="#FFFFFF" />
         </View>
       )}
     </Pressable>

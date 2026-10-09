@@ -6,7 +6,7 @@ import React, { useCallback, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -191,7 +191,7 @@ export default function ShoppingPreferences() {
           ]).map((item, i, arr) => (
             <React.Fragment key={item.key}>
               <View style={s.alertRow}>
-                <Feather name={item.icon as any} size={19} color={colors.primary} style={{ width: 28 }} />
+                <Icon name={item.icon as any} size={19} color={colors.primary} style={{ width: 28 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.alertLabel}>{item.label}</Text>
                   <Text style={s.alertSub}>{item.sub}</Text>
@@ -209,7 +209,7 @@ export default function ShoppingPreferences() {
         {/* Shopping activity */}
         <View style={[s.card, { marginTop: SP.sm }]}>
           <View style={s.alertRow}>
-            <Feather name="eye" size={19} color={colors.primary} style={{ width: 28 }} />
+            <Icon name="eye" size={19} color={colors.primary} style={{ width: 28 }} />
             <View style={{ flex: 1 }}>
               <Text style={s.alertLabel}>Shopping activity</Text>
               <Text style={s.alertSub}>Let brands see what you've viewed and saved</Text>
@@ -221,7 +221,7 @@ export default function ShoppingPreferences() {
           </View>
           <View style={s.divider} />
           <View style={s.alertRow}>
-            <Feather name="sliders" size={19} color={colors.primary} style={{ width: 28 }} />
+            <Icon name="sliders" size={19} color={colors.primary} style={{ width: 28 }} />
             <View style={{ flex: 1 }}>
               <Text style={s.alertLabel}>Personalized recommendations</Text>
               <Text style={s.alertSub}>Use your activity to surface relevant products</Text>

@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Platform, Pressable, StyleSheet, View, type ViewToken } from 'react-native';
 import { useIsFocused } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { CachedImage } from '@/components/CachedImage';
 import type { PostSlide } from '@/services/socialTypes';
 import { CREATE_CANVAS } from '@/lib/theme';
@@ -34,7 +34,7 @@ function SlideVideo({ uri, active, width, height }: { uri: string; active: boole
         testID="carousel-mute"
         hitSlop={8}
       >
-        <Feather name={muted ? 'volume-x' : 'volume-2'} size={14} color={CREATE_CANVAS.white} />
+        <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color={CREATE_CANVAS.white} />
       </Pressable>
     </View>
   );
@@ -75,12 +75,12 @@ export function PostCarousel({ slides, width, dotColor = CREATE_CANVAS.white, do
         <>
           {index > 0 ? (
             <Pressable onPress={() => go(index - 1)} style={[s.arrow, { left: 10, top: height / 2 - 16 }]} accessibilityRole="button" accessibilityLabel="Previous slide" testID="carousel-prev">
-              <Feather name="chevron-left" size={18} color={CREATE_CANVAS.white} />
+              <Icon name="chevron-left" size={18} color={CREATE_CANVAS.white} />
             </Pressable>
           ) : null}
           {index < slides.length - 1 ? (
             <Pressable onPress={() => go(index + 1)} style={[s.arrow, { right: 10, top: height / 2 - 16 }]} accessibilityRole="button" accessibilityLabel="Next slide" testID="carousel-next">
-              <Feather name="chevron-right" size={18} color={CREATE_CANVAS.white} />
+              <Icon name="chevron-right" size={18} color={CREATE_CANVAS.white} />
             </Pressable>
           ) : null}
         </>

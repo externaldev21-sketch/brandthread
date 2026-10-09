@@ -6,7 +6,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Alert, Share, StyleSheet, Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -138,7 +138,7 @@ export default function LinkInBioScreen() {
             <View style={s.profileRow}>
               {page.avatarUrl
                 ? <Image source={{ uri: page.avatarUrl }} style={[s.avatar, { borderColor: colors.border }]} accessibilityLabel="Profile photo" />
-                : <View style={[s.avatar, s.avatarPh, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Feather name="user" size={28} color={colors.mutedForeground} /></View>}
+                : <View style={[s.avatar, s.avatarPh, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Icon name="user" size={28} color={colors.mutedForeground} /></View>}
               <View style={{ flex: 1 }}>
                 <Field label="Name" value={page.displayName} onChangeText={(v) => edit({ displayName: v })} maxLength={60} />
               </View>
@@ -153,7 +153,7 @@ export default function LinkInBioScreen() {
                 accessibilityRole="button" accessibilityLabel="Add link"
                 style={[s.addPill, { backgroundColor: colors.primary }]}
               >
-                <Feather name="plus" size={16} color={colors.primaryForeground} />
+                <Icon name="plus" size={16} color={colors.primaryForeground} />
                 <Text style={{ color: colors.primaryForeground, fontFamily: FONT.semibold, fontSize: FS.sm }}>Add</Text>
               </PressableScale>
             </View>
@@ -176,10 +176,10 @@ export default function LinkInBioScreen() {
                 <View style={s.linkRow}>
                   <View style={s.arrows}>
                     <PressableScale onPress={() => move(i, -1)} disabled={i === 0} accessibilityRole="button" accessibilityLabel={`Move ${l.title} up`} style={s.arrowBtn}>
-                      <Feather name="chevron-up" size={18} color={i === 0 ? colors.subtle : colors.foreground} />
+                      <Icon name="chevron-up" size={18} color={i === 0 ? colors.subtle : colors.foreground} />
                     </PressableScale>
                     <PressableScale onPress={() => move(i, 1)} disabled={i === page.links.length - 1} accessibilityRole="button" accessibilityLabel={`Move ${l.title} down`} style={s.arrowBtn}>
-                      <Feather name="chevron-down" size={18} color={i === page.links.length - 1 ? colors.subtle : colors.foreground} />
+                      <Icon name="chevron-down" size={18} color={i === page.links.length - 1 ? colors.subtle : colors.foreground} />
                     </PressableScale>
                   </View>
                   <PressableScale
@@ -193,7 +193,7 @@ export default function LinkInBioScreen() {
                   <View style={s.linkSide}>
                     <HapticSwitch value={l.enabled} onValueChange={(v) => toggleLink(l, v)} accessibilityLabel={`Show ${l.title}`} />
                     <PressableScale onPress={() => removeLink(l)} accessibilityRole="button" accessibilityLabel={`Delete ${l.title}`} style={s.arrowBtn}>
-                      <Feather name="trash-2" size={16} color={colors.mutedForeground} />
+                      <Icon name="trash-2" size={16} color={colors.mutedForeground} />
                     </PressableScale>
                   </View>
                 </View>

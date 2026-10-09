@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
@@ -147,7 +147,7 @@ export default function HashtagScreen() {
     <View>
       <View style={styles.hero}>
         <View style={[styles.badge, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-          <Feather name="hash" size={30} color={theme.text} />
+          <Icon name="hash" size={30} color={theme.text} />
         </View>
         <View style={styles.heroText}>
           {longTag ? null : <Text style={styles.title} accessibilityRole="header">#{tag}</Text>}

@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/Badge';
 import { FONT } from '@/lib/theme';
 
@@ -28,7 +28,7 @@ export default function MobileAppBuilderScreen() {
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.heroTop}>
             <View style={[styles.heroIcon, { backgroundColor: primary + '22' }]}>
-              <Feather name="smartphone" size={22} color={primary} />
+              <Icon name="smartphone" size={22} color={primary} />
             </View>
             <Badge label="Pro" variant="gold" />
           </View>
@@ -37,7 +37,7 @@ export default function MobileAppBuilderScreen() {
             Turn your storefront into a fully branded iOS & Android app — no code required.
           </Text>
           <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: primary }]} activeOpacity={0.85}>
-            <Feather name="zap" size={15} color={colors.primaryForeground} />
+            <Icon name="zap" size={15} color={colors.primaryForeground} />
             <Text style={[styles.ctaText, { color: colors.primaryForeground }]}>Start building</Text>
           </TouchableOpacity>
         </View>
@@ -47,7 +47,7 @@ export default function MobileAppBuilderScreen() {
           {FEATURES.map((f, i) => (
             <View key={f.title} style={[styles.featureRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
               <View style={[styles.featureIcon, { backgroundColor: colors.secondary }]}>
-                <Feather name={f.icon} size={16} color={primary} />
+                <Icon name={f.icon} size={16} color={primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.featureTitle, { color: colors.foreground }]}>{f.title}</Text>
