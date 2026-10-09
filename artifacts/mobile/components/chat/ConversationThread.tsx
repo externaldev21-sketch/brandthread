@@ -2781,7 +2781,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         onRequestClose={() => setShowMediaSheet(false)}
       >
         <ModalSafeArea>
-          <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
+          <PressableScale accessibilityRole="button" accessibilityLabel="Close" rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
           <SheetRise style={s.mediaSheet}>
             <View style={s.mediaSheetHandle} />
             <Text style={s.mediaSheetTitle}>Add to message</Text>

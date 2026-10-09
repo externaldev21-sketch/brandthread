@@ -122,7 +122,7 @@ export default function NotificationBanner() {
               <Text style={[styles.body, { color: theme.muted }]} numberOfLines={2}>{payload.body}</Text>
             )}
           </View>
-          <TouchableOpacity hitSlop={12} onPress={hide} style={styles.closeButton}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss notification" hitSlop={12} onPress={hide} style={styles.closeButton}>
             <Feather name="x" size={16} color={theme.muted} />
           </TouchableOpacity>
         </TouchableOpacity>

@@ -629,11 +629,11 @@ function Stepper({ label, value, min, max, onChange, colors, theme }: any) {
     <View style={{ flex: 1, gap: SP.xs }}>
       <Text style={[s.helper, { color: colors.mutedForeground }]}>{label}</Text>
       <View style={[s.stepperRow, { borderColor: colors.border, backgroundColor: colors.elevated }]}>
-        <TouchableOpacity onPress={() => onChange(Math.max(min, value - 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Decrease ${label}`} onPress={() => onChange(Math.max(min, value - 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="minus" size={14} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[s.rowLabel, { color: colors.foreground }]}>{value >= 65 ? '65+' : value}</Text>
-        <TouchableOpacity onPress={() => onChange(Math.min(max, value + 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Increase ${label}`} onPress={() => onChange(Math.min(max, value + 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="plus" size={14} color={colors.foreground} />
         </TouchableOpacity>
       </View>

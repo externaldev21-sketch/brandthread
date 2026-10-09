@@ -111,7 +111,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
   return (
     <Modal transparent animationType="none" visible={modalVisible} onRequestClose={onClose}>
       <ReanimatedAnimated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
-        <TouchableWithoutFeedback onPress={onClose}>
+        <TouchableWithoutFeedback accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
       </ReanimatedAnimated.View>

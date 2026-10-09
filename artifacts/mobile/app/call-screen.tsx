@@ -405,7 +405,7 @@ function NativeCallScreen() {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={s.header}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="End call"
           onPress={handleHangUp}
           style={s.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}

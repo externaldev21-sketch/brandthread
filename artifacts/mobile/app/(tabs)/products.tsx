@@ -195,7 +195,7 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
       presentationStyle="overFullScreen"
       onRequestClose={closeSheet}
     >
-      <Pressable style={sh.overlay} onPress={closeSheet} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Close" style={sh.overlay} onPress={closeSheet} />
       <SheetRise style={sh.sheet}>
         <View style={sh.handle} />
         <Text style={sh.sheetTitle} numberOfLines={1}>{p.name}</Text>
@@ -283,7 +283,7 @@ function QuickEditPriceSheet({ product, visible, onClose, onSaved }: QuickEditPr
       presentationStyle="overFullScreen"
       onRequestClose={closeSheet}
     >
-      <Pressable style={sh.overlay} onPress={closeSheet} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Close" style={sh.overlay} onPress={closeSheet} />
       <SheetRise style={sh.sheet}>
         <View style={sh.handle} />
         <Text style={sh.sheetTitle} numberOfLines={1}>Edit price · {p.name}</Text>
@@ -348,7 +348,7 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
     >
-      <Pressable style={sh.overlay} onPress={onClose} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Close" style={sh.overlay} onPress={onClose} />
       <SheetRise style={[sh.sheet, { paddingBottom: SP.xl }]}>
         <View style={sh.handle} />
         <Text style={sh.sheetTitle}>Filter Products</Text>
@@ -392,7 +392,7 @@ function SortModal({
   const PURPLE_LIGHT = theme.accentLight;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={sh.overlay} onPress={onClose} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Close" style={sh.overlay} onPress={onClose} />
       <SheetRise style={sh.sheet}>
         <View style={sh.handle} />
         <Text style={sh.sheetTitle}>Sort Products</Text>

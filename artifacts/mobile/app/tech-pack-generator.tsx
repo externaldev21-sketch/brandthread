@@ -327,7 +327,7 @@ export default function TechPackGeneratorScreen() {
               {photos.map((p) => (
                 <View key={p.id} style={styles.trayThumbWrap}>
                   <Image source={{ uri: p.uri }} style={styles.trayThumb} resizeMode="cover" />
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove photo"
                     style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
                     onPress={() => removePhoto(p.id)}
                     activeOpacity={0.8}
@@ -337,7 +337,7 @@ export default function TechPackGeneratorScreen() {
                 </View>
               ))}
               {photos.length < MAX_PHOTOS && (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add photos"
                   onPress={pickPhotos}
                   activeOpacity={0.8}
                   style={[styles.addTile, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -384,12 +384,12 @@ export default function TechPackGeneratorScreen() {
                         onChangeText={(v) => renameSize(size, v)}
                         style={[styles.sizeInput, { color: colors.foreground, borderColor: colors.border }]}
                       />
-                      <TouchableOpacity onPress={() => removeSize(size)} style={{ marginLeft: 4 }}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove size ${size}`} onPress={() => removeSize(size)} style={{ marginLeft: 4 }}>
                         <Feather name="x" size={12} color={colors.mutedForeground} />
                       </TouchableOpacity>
                     </View>
                   ))}
-                  <TouchableOpacity onPress={addSize} style={[styles.tableCell, styles.addColBtn, { borderColor: colors.border }]}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add size" onPress={addSize} style={[styles.tableCell, styles.addColBtn, { borderColor: colors.border }]}>
                     <Feather name="plus" size={14} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
@@ -416,7 +416,7 @@ export default function TechPackGeneratorScreen() {
                         />
                       </View>
                     ))}
-                    <TouchableOpacity onPress={() => removeRow(i)} style={[styles.tableCell, styles.addColBtn]}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove row ${i + 1}`} onPress={() => removeRow(i)} style={[styles.tableCell, styles.addColBtn]}>
                       <Feather name="trash-2" size={13} color={colors.destructive} />
                     </TouchableOpacity>
                   </View>

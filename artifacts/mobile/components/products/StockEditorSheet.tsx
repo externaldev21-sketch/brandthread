@@ -125,7 +125,7 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
 
   return (
     <Modal visible={visible} transparent animationType="fade" presentationStyle="overFullScreen" onRequestClose={onClose}>
-      <Pressable style={s.overlay} onPress={onClose} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Close" style={s.overlay} onPress={onClose} />
       <SheetRise style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.xl) }]}>
         <View style={s.handle} />
         <Text style={s.title} numberOfLines={1}>Edit stock · {product.name}</Text>

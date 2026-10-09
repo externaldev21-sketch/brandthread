@@ -30,7 +30,7 @@ export function ThemePickerSheet({
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <PressableScale rippleEnabled={false} style={s.backdrop} activeOpacity={1} onPress={onClose} />
+      <PressableScale accessibilityRole="button" accessibilityLabel="Close" rippleEnabled={false} style={s.backdrop} activeOpacity={1} onPress={onClose} />
       <SheetRise style={[s.sheet, { backgroundColor: theme.surface, paddingBottom: bottomInset + SP.md }]}>
         <View style={[s.handle, { backgroundColor: theme.border }]} />
         <Text style={[s.title, { color: theme.text }]}>Theme</Text>

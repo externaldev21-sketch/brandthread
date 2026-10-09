@@ -397,7 +397,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
       onRequestClose={onClose}
     >
       {/* Backdrop */}
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
       {/* Sheet */}
       <SheetRise style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -407,7 +407,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
         {/* Title */}
         <View style={[styles.titleRow, { borderBottomColor: colors.border }]}>
           <Text style={[styles.title, { color: colors.foreground }]}>Select Period</Text>
-          <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} activeOpacity={0.7}>
             <Feather name="x" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
@@ -446,13 +446,13 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
             <View style={[styles.calSection, { borderBottomColor: colors.border }]}>
               {/* Month navigation */}
               <View style={styles.monthNav}>
-                <TouchableOpacity onPress={prevMonth} activeOpacity={0.7} style={styles.navBtn}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous month" onPress={prevMonth} activeOpacity={0.7} style={styles.navBtn}>
                   <Feather name="chevron-left" size={18} color={colors.foreground} />
                 </TouchableOpacity>
                 <Text style={[styles.monthTitle, { color: colors.foreground }]}>
                   {MONTH_NAMES[calMonth.getMonth()]} {calMonth.getFullYear()}
                 </Text>
-                <TouchableOpacity onPress={nextMonth} activeOpacity={0.7} style={styles.navBtn}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next month" onPress={nextMonth} activeOpacity={0.7} style={styles.navBtn}>
                   <Feather name="chevron-right" size={18} color={colors.foreground} />
                 </TouchableOpacity>
               </View>
