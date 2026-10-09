@@ -62,25 +62,31 @@ export function TabBarGlass({ theme, radius, animatedStyle }: { theme: AppThemeP
   // whole navigator wrapped in a BlurTargetView, which cannot sample video
   // surfaces and redraws the feed every frame, so Android uses a denser tint.
   const hasBlur = Platform.OS !== 'android';
+  // Every painted layer carries the pill's own radius instead of relying on
+  // the wrapper's `overflow: hidden` alone: on web a composited ancestor
+  // (the bar's slide transform) can drop that clip for backdrop-filter
+  // children, leaving square blur/tint corners around the rounded pill.
+  const rounded = { borderRadius: radius, overflow: 'hidden' } as const;
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden', pointerEvents: 'none' }, animatedStyle]}>
       {hasBlur && (
         <BlurView
           intensity={Platform.OS === 'ios' ? 60 : 70}
           tint={Platform.OS === 'ios' ? 'systemThinMaterialDark' : 'dark'}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, rounded]}
         />
       )}
       <View
         style={[
           StyleSheet.absoluteFill,
+          rounded,
           { backgroundColor: hasBlur ? `${theme.background}8C` : `${theme.surface}EB` },
         ]}
       />
       <LinearGradient
         colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.03)', 'rgba(255,255,255,0)']}
         locations={[0, 0.45, 1]}
-        style={StyleSheet.absoluteFill}
+        style={[StyleSheet.absoluteFill, rounded]}
       />
       <Animated.View
         style={[
