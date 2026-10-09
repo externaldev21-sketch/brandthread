@@ -294,7 +294,9 @@ router.get("/balance", requirePayoutsRead(), async (req, res) => {
 //   pending    in the seller's Stripe balance, still settling
 //   paidOut    everything Brandthread has sent to the seller's Stripe account
 //   owed       what the seller owes Brandthread (e.g. a failed drop's
-//              refunds after the bulk order was paid, unrecovered labels)
+//              refunds after the bulk order was paid, unrecovered labels,
+//              refund costs, lost chargebacks and dispute fees that are
+//              netted from the next payouts — lib/money/sellerRecovery.ts)
 router.get("/summary", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
@@ -304,11 +306,13 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
     }).from(ledgerPostings)
       .where(and(
         eq(ledgerPostings.partyId, sellerId),
-        inArray(ledgerPostings.account, ["seller_held", "seller_paid_out", "platform_funds_advanced"]),
+        inArray(ledgerPostings.account, ["seller_held", "seller_paid_out", "platform_funds_advanced", "seller_recoverable"]),
       ))
       .groupBy(ledgerPostings.account);
     const sum = (account: string) => Number(sellerSums.find((row) => row.account === account)?.total ?? 0);
     const advanced = sum("platform_funds_advanced");
+    // Collected from the seller's next order payouts (sellerRecovery.ts).
+    const recoveryOwed = Math.max(0, -sum("seller_recoverable"));
     // Per drop: a positive balance is held for the seller; a negative
     // balance on a finished drop is a shortfall the seller owes.
     const heldByDrop = await db.execute(sql`
@@ -368,7 +372,7 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
         sellerEffectCents: sql<string>`COALESCE((
           SELECT SUM(p.amount_cents) FROM ledger_postings p
           WHERE p.transaction_id = ledger_transactions.id AND p.party_id = ${sellerId}
-            AND p.account IN ('seller_held', 'seller_paid_out', 'platform_funds_advanced')
+            AND p.account IN ('seller_held', 'seller_paid_out', 'platform_funds_advanced', 'seller_recoverable')
         ), 0)`,
       }).from(ledgerTransactions)
         .where(eq(ledgerTransactions.sellerId, sellerId))
@@ -435,7 +439,9 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
         ...money(sum("seller_paid_out")),
         toBank: paidToBankCents === null ? null : money(paidToBankCents),
       },
-      owed: money(Math.max(0, -advanced) + dropShortfallOwed),
+      owed: money(Math.max(0, -advanced) + dropShortfallOwed + recoveryOwed),
+      // The part of `owed` that upcoming order payouts net first. Additive.
+      recoveryOwedCents: recoveryOwed,
       credit: money(Math.max(0, advanced)),
       lifetime: {
         grossSales: money(Number(fees[0]?.grossSales ?? 0)),

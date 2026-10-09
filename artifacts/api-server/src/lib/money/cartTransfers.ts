@@ -28,6 +28,7 @@ import { logger } from "../logger";
 import { orderHeldCents, postLedgerTransaction } from "./ledger";
 import { orderFundsMachine } from "./stateMachines";
 import { payoutMayRelease, payoutReleasableSql } from "../delivery/payoutGate";
+import { netRecoveriesFromRelease } from "./sellerRecovery";
 import { isDefinitiveStripeRejection, stripeErrorCode } from "./stripeMoney";
 import {
   expiredReservationCheckouts, releaseStockReservation,
@@ -72,8 +73,29 @@ export async function settleTransferOrder(
     return "not_ready";
   }
 
+  // A seller who owes Brandthread (refund costs, a lost chargeback, a
+  // dispute fee) has it netted from this transfer first (ledger seller_held
+  // → seller_recoverable, so the held balance below shrinks by exactly that
+  // much). Decided once, before the first attempt, so a retried transfer
+  // sends the same amount under the same idempotency key.
+  const net = await db.transaction(async (tx) => {
+    const [locked] = ((await tx.execute(sql`
+      SELECT funds_state, stripe_transfer_id, recovery_netted_cents FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
+    `)) as unknown as { rows: Array<{ funds_state: string | null; stripe_transfer_id: string | null; recovery_netted_cents: number | null }> }).rows;
+    if (!locked || locked.funds_state !== "held" || locked.stripe_transfer_id) return null;
+    if (locked.recovery_netted_cents !== null) return { nettedCents: locked.recovery_netted_cents };
+    const available = Math.max(0, await orderHeldCents(tx, orderId, order.ownerId));
+    const result = await netRecoveriesFromRelease(tx, {
+      sellerId: order.ownerId, orderId, availableCents: available, ledgerKey: `order-transfer/${orderId}`,
+    });
+    await tx.update(orders).set({ recoveryNettedCents: result.nettedCents }).where(eq(orders.id, orderId));
+    return result;
+  });
+  if (!net) return "already";
+
   // What this order still holds for the seller: its net, minus anything a
-  // partial refund already took from it before the transfer went out.
+  // partial refund already took from it before the transfer went out (and
+  // anything netted for what the seller owes just above).
   const amount = Math.max(0, await orderHeldCents(db, orderId, order.ownerId));
   let transfer: Stripe.Transfer | null = null;
   if (amount > 0) {

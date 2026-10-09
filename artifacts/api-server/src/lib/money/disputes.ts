@@ -13,15 +13,18 @@
  * Brandthread (platform_funds_advanced) when the money was already paid out.
  * A reinstatement posts the exact opposite of each withdrawal it reverses.
  *
- * Known gap, deliberately not modelled: Stripe's dispute fee (and any refund
- * of it on a win). Who bears it is a business decision; the fee is stored in
- * the dispute_events payload so nothing is lost, but no ledger posting is made.
+ * Stripe's dispute fee and a lost chargeback are settled when the dispute
+ * closes (lib/money/sellerRecovery.ts recordDisputeClosedRecovery): the
+ * seller bears both, as a seller_recoverable debt netted from their next
+ * payouts. An open dispute is never collected, so a won dispute needs only
+ * the reinstatement below.
  */
 import { and, eq, like, sql } from "drizzle-orm";
 import { db, ledgerTransactions } from "@workspace/db";
 import { logger } from "../logger";
 import { adjustDropWalletForRefund } from "./escrow";
 import { orderHeldCents, postLedgerTransaction, type DbExecutor, type LedgerPosting } from "./ledger";
+import { reverseLostChargebackRecovery } from "./sellerRecovery";
 
 type OrderRow = {
   id: string;
@@ -144,6 +147,8 @@ export async function recordDisputeReinstatement(input: {
         })),
       });
       if (!result.posted || !result.transactionId) return { posted: false, reason: "already_posted" } as const;
+      // Reinstated after it was lost: the seller no longer owes it.
+      await reverseLostChargebackRecovery(tx, withdrawal.id);
       const heldReturned = original
         .filter((p) => p.account === "seller_held")
         .reduce((sum, p) => sum + Math.abs(Number(p.amount_cents)), 0);

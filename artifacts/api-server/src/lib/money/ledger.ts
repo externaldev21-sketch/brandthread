@@ -56,6 +56,23 @@ export const LEDGER_ACCOUNTS = {
    */
   thread_cash_seller_cash_out: "thread_cash_seller_cash_out",
   /**
+   * What a seller owes Brandthread and is collected from their next order
+   * payouts (party = seller, order = the order it came from). Negative =
+   * owed: refund costs Brandthread fronted (Stripe fee, label) once the
+   * order's own money ran out, lost chargebacks, and Stripe's dispute fee.
+   * Goes back up as the debt is netted from a later release or transfer —
+   * see lib/money/sellerRecovery.ts.
+   */
+  seller_recoverable: "seller_recoverable",
+  /**
+   * Brandthread's own cost of lost chargebacks: its commission and the
+   * processing fee on the disputed sale, plus any seller debt written off.
+   * Negative = cost to the platform.
+   */
+  platform_dispute_losses: "platform_dispute_losses",
+  /** Stripe's dispute fees (positive = paid to Stripe; negative = returned). */
+  stripe_dispute_fees: "stripe_dispute_fees",
+  /**
    * Gift card money Brandthread holds for a store (party = seller): credited
    * when a buyer purchases a gift card, released to `seller_paid_out` only when
    * the card is redeemed at that store — see lib/giftCards/payout.ts.

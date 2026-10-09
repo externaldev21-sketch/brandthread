@@ -19,7 +19,11 @@
  *  - In-stock orders: the seller's share is pulled back from their Stripe
  *    balance (reverse_transfer). Held orders: it comes out of the held funds;
  *    if those were already spent (bulk order, label) the drop shows a
- *    shortfall the seller owes.
+ *    shortfall the seller owes, absorbed by the drop's later releases.
+ *  - Orders without a drop (one-page checkout): what the order's held money
+ *    can't cover (Stripe's fee, a label) is a debt the seller owes
+ *    (seller_recoverable), netted from their next payouts —
+ *    lib/money/sellerRecovery.ts.
  *  - One-page checkout orders (charge_model "transfer", lib/money/
  *    cartTransfers.ts): the cart's PaymentIntent is partially refunded for
  *    this order only. The seller's share is reversed from this order's own
@@ -42,6 +46,7 @@ import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode } from "
 import { restoreStockForOrder } from "../stockReservation";
 import { reverseCommissionForOrder } from "../affiliate/service";
 import { restoreGiftCardsOnFullRefund } from "../giftCards/payout";
+import { refundShortfallPosting } from "./sellerRecovery";
 
 export type RefundReason =
   | "buyer_cancelled" | "seller_cancelled" | "return_approved" | "drop_failed" | "oversold"
@@ -364,12 +369,15 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
         : { account: "platform_funds_advanced", partyId: sellerId, amountCents: pfr });
     } else if (locked.funds_state === "released") {
       postings.push({ account: "seller_paid_out", partyId: sellerId, amountCents: -reversalCents });
-      postings.push({ account: "seller_held", partyId: sellerId, orderId: null, amountCents: -(sellerShare - reversalCents) });
+      postings.push(refundShortfallPosting(locked, -(sellerShare - reversalCents)));
     } else {
+      // The order holds only the seller's net (Stripe's fee and any label
+      // were paid from it), so a full refund needs more than it holds: the
+      // rest is a debt the seller owes, netted from their next payouts.
       const held = Math.max(0, await orderHeldCents(tx, locked.id, sellerId));
       const fromOrder = Math.min(sellerShare, held);
       postings.push({ account: "seller_held", partyId: sellerId, amountCents: -fromOrder });
-      postings.push({ account: "seller_held", partyId: sellerId, orderId: null, amountCents: -(sellerShare - fromOrder) });
+      postings.push(refundShortfallPosting(locked, -(sellerShare - fromOrder)));
     }
     await postLedgerTransaction(tx, {
       idempotencyKey: `order-refund/${refund.id}`,

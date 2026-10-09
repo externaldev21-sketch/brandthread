@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, disputes, disputeEvents, orders } from "@workspace/db";
 import { logger } from "../logger";
 import { recordDisputeReinstatement, recordDisputeWithdrawal } from "../money/disputes";
+import { recordDisputeClosedRecovery } from "../money/sellerRecovery";
 import type { DisputeDeps, DisputeStore } from "./webhook";
 
 const STATUS_EVENT_KINDS = ["created", "updated", "evidence_submitted", "won", "lost", "warning_closed"] as const;
@@ -88,6 +89,7 @@ export function buildDisputeDeps(notify: DisputeDeps["notify"]): DisputeDeps {
     ledger: {
       withdraw: (input) => recordDisputeWithdrawal(input),
       reinstate: (input) => recordDisputeReinstatement(input),
+      settle: (input) => recordDisputeClosedRecovery(input),
     },
     notify,
     log: logger,
