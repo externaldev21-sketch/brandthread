@@ -6,10 +6,12 @@
  * DELETE /api/buyer/saved/:targetId           — unsave
  */
 import { Router } from "express";
-import { db, savedItems, posts } from "@workspace/db";
+import { db, savedItems, savedCollections, posts } from "@workspace/db";
 import { notifyPostSave } from "../lib/activityEvents";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, cents, idParams, validateInput } from "../lib/commerceValidation";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
 import { blockRelation } from "../lib/safety";
 import { publicPostCondition as visiblePostCondition } from "../lib/postVisibility";
@@ -20,6 +22,31 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const router = Router();
 router.use(requireAuth);
 
+const saveItemBody = bodyObject({
+  type: z.string().max(40).nullish(),
+  targetId: z.string().max(200).optional(),
+  title: z.string().max(500).optional(),
+  subtitle: z.string().max(1_000).nullish(),
+  accentColor: z.string().max(4_096).nullish(),
+  collectionId: z.string().uuid().nullish(),
+  priceCents: cents.nullish(),
+});
+const moveItemBody = bodyObject({ collectionId: z.string().uuid().nullish() });
+const targetParams = idParams("targetId");
+
+/**
+ * A saved item may only be filed into one of the saver's own boards: a public
+ * board lists its items by collectionId alone, so an unchecked id would let
+ * anyone pin their own titled items onto someone else's shared board.
+ */
+async function ownsCollection(userId: string, collectionId: string | null | undefined): Promise<boolean> {
+  if (!collectionId) return true;
+  const [row] = await db.select({ id: savedCollections.id }).from(savedCollections)
+    .where(and(eq(savedCollections.id, collectionId), eq(savedCollections.userId, userId)))
+    .limit(1);
+  return !!row;
+}
+
 router.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const rows = await db.select().from(savedItems)
@@ -28,7 +55,7 @@ router.get("/", async (req, res) => {
   return res.json(await adaptSavedRows(rows));
 });
 
-router.post("/", async (req, res) => {
+router.post("/", validateInput({ body: saveItemBody }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { type, targetId, title, subtitle, accentColor, collectionId, priceCents } = req.body as {
     type: string;
@@ -42,6 +69,7 @@ router.post("/", async (req, res) => {
   };
 
   if (!targetId || !title) return res.status(400).json({ error: "targetId and title required" });
+  if (!await ownsCollection(userId, collectionId)) return res.status(404).json({ error: "Collection not found" });
 
   let savedPost: { userId: string; styleTags: unknown } | null = null;
   if (type === "post") {
@@ -93,9 +121,10 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.patch("/:targetId", async (req, res) => {
+router.patch("/:targetId", validateInput({ params: targetParams, body: moveItemBody }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { collectionId } = req.body as { collectionId?: string | null };
+  if (!await ownsCollection(userId, collectionId)) return res.status(404).json({ error: "Collection not found" });
 
   const [row] = await db.update(savedItems)
     .set({ collectionId: collectionId ?? null })
@@ -105,7 +134,7 @@ router.patch("/:targetId", async (req, res) => {
   return res.json((await adaptSavedRows([row]))[0]);
 });
 
-router.delete("/:targetId", async (req, res) => {
+router.delete("/:targetId", validateInput({ params: targetParams }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   await db.delete(savedItems)
     .where(and(eq(savedItems.userId, userId), eq(savedItems.targetId, req.params.targetId)));

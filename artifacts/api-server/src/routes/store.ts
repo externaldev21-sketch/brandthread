@@ -5,7 +5,9 @@ import {
   products, productVariants, storePixels,
 } from "@workspace/db";
 import { eq, and, desc, isNull, inArray } from "drizzle-orm";
+import { z } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { bodyObject, idParams, looseRecord, validateInput } from "../lib/commerceValidation";
 import { getWebOrigin } from "../lib/webOrigin";
 import crypto from "crypto";
 import { ATTRIBUTION_SCRIPT, buildPixelInjection, requestOptsOutOfTracking } from "../lib/growth/pixels";
@@ -799,6 +801,28 @@ router.get("/site/:slug", async (req, res): Promise<void> => {
 
 router.use(requireAuth);
 
+// ── Request schemas ──────────────────────────────────────────────────────────
+// The storefront JSON columns (theme/branding/seo/socialLinks/sections) are
+// free-form documents written by the mobile editor, so they are only checked
+// for type and size. Unknown keys pass through (and are ignored by PUT /).
+const storeIdParams = idParams("id");
+const saveStoreBody = bodyObject({
+  title: z.string().max(300).nullish(),
+  subtitle: z.string().max(1_000).nullish(),
+  description: z.string().max(10_000).nullish(),
+  theme: looseRecord.nullish(),
+  branding: looseRecord.nullish(),
+  sections: z.array(z.unknown()).max(500).nullish(),
+  seo: looseRecord.nullish(),
+  socialLinks: looseRecord.nullish(),
+  analyticsCode: z.string().max(20_000).nullish(),
+});
+const saveVersionBody = bodyObject({
+  label: z.string().max(300).optional(),
+  snapshot: looseRecord.nullish(),
+});
+const addDomainBody = bodyObject({ domain: z.string().max(253) });
+
 // ─── Helper — get or create storefront for a seller ──────────────────────────
 async function getOrCreateStorefront(ownerId: string) {
   const existing = await db
@@ -838,7 +862,7 @@ router.get("/", async (req, res) => {
 });
 
 // PUT /api/store — save the storefront
-router.put("/", async (req, res) => {
+router.put("/", validateInput({ body: saveStoreBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const sf = await getOrCreateStorefront(ownerId);
 
@@ -916,7 +940,7 @@ router.get("/versions", async (req, res) => {
 // updated, so the explicit payload is always more accurate than re-reading the
 // server row).  When `snapshot` is absent the server falls back to the current
 // DB row so callers that don't need a specific pre-mutation snapshot still work.
-router.post("/versions", async (req, res) => {
+router.post("/versions", validateInput({ body: saveVersionBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { label = "Version", snapshot } = req.body;
   const sf = await getOrCreateStorefront(ownerId);
@@ -948,7 +972,7 @@ router.post("/versions", async (req, res) => {
 //
 // Only DB columns that are actually present in the snapshot are updated;
 // absent fields are left at their current values, not overwritten with null.
-router.post("/versions/:id/restore", async (req, res): Promise<void> => {
+router.post("/versions/:id/restore", validateInput({ params: storeIdParams }), async (req, res): Promise<void> => {
   const ownerId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const sf = await getOrCreateStorefront(ownerId);
@@ -1021,7 +1045,7 @@ router.get("/domains", async (req, res) => {
 });
 
 // POST /api/store/domains — add a custom domain
-router.post("/domains", async (req, res): Promise<void> => {
+router.post("/domains", validateInput({ body: addDomainBody }), async (req, res): Promise<void> => {
   const ownerId = (req as any).clerkUserId as string;
   const { domain } = req.body;
   if (!domain) { res.status(400).json({ error: "domain required" }); return; }
@@ -1038,7 +1062,7 @@ router.post("/domains", async (req, res): Promise<void> => {
 });
 
 // POST /api/store/domains/:id/verify — attempt DNS verification
-router.post("/domains/:id/verify", async (req, res): Promise<void> => {
+router.post("/domains/:id/verify", validateInput({ params: storeIdParams }), async (req, res): Promise<void> => {
   const ownerId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const sf = await getOrCreateStorefront(ownerId);
@@ -1080,7 +1104,7 @@ router.post("/domains/:id/verify", async (req, res): Promise<void> => {
 });
 
 // DELETE /api/store/domains/:id — remove a custom domain
-router.delete("/domains/:id", async (req, res) => {
+router.delete("/domains/:id", validateInput({ params: storeIdParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const sf = await getOrCreateStorefront(ownerId);

@@ -3,6 +3,8 @@ import { db, discountCodes, discountCodeUses, liveStreams, products, shopifyImpo
 import { broadcastToRoom } from "../ws/liveHub";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, cents, dateLike, idParams, validateInput } from "../lib/commerceValidation";
 import { requirePermission } from "../middlewares/requireRole";
 import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
 import crypto from "crypto";
@@ -36,6 +38,32 @@ async function validateExtensions(sellerId: string, v: {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Type/size guards; the handlers keep the type-specific value rules, the
+// product/collection/live-stream ownership checks and their messages.
+const discountIdParams = idParams("id");
+const discountFields = {
+  code: z.string().max(64).nullish(),
+  type: z.string().max(40).optional(),
+  // Percent (1–100) or a fixed amount; never negative.
+  value: z.number().finite().min(0).max(100_000_000).nullish(),
+  minOrderCents: cents.nullish(),
+  appliesTo: z.string().max(40).nullish(),
+  productIds: z.array(z.string().max(160)).max(1_000).nullish(),
+  collectionIds: z.array(z.string().max(160)).max(1_000).nullish(),
+  maxUses: z.number().int().min(0).max(100_000_000).nullish(),
+  maxUsesPerCustomer: z.number().finite().max(100_000_000).nullish(),
+  minQuantity: z.number().finite().max(100_000).nullish(),
+  oneUsePerCustomer: z.boolean().nullish(),
+  singleUse: z.boolean().nullish(),
+  firstOrderOnly: z.boolean().nullish(),
+  startsAt: dateLike.nullish(),
+  expiresAt: dateLike.nullish(),
+  liveStreamId: z.string().max(160).nullish(),
+};
+const createDiscountBody = bodyObject(discountFields);
+const updateDiscountBody = bodyObject({ ...discountFields, active: z.boolean().nullish() });
 
 /** What a viewer may see of a live-only code (shared in the live, so the code itself is public to viewers). */
 export function toLiveCodePublic(code: typeof discountCodes.$inferSelect) {
@@ -103,7 +131,7 @@ router.get("/collections", async (req, res) => {
 });
 
 // POST / — create a new discount code
-router.post("/", requirePermission("marketing"), async (req, res) => {
+router.post("/", requirePermission("marketing"), validateInput({ body: createDiscountBody }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const {
@@ -339,7 +367,7 @@ router.get("/validate", async (req, res) => {
 // ─── Seller Parameterized Endpoints ──────────────────────────────────────────
 
 // PATCH /:id — update any editable field, or pause/resume via `active`
-router.patch("/:id", requirePermission("marketing"), async (req, res) => {
+router.patch("/:id", requirePermission("marketing"), validateInput({ params: discountIdParams, body: updateDiscountBody }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const { id } = req.params;
@@ -361,6 +389,24 @@ router.patch("/:id", requirePermission("marketing"), async (req, res) => {
       productIds?: string[];
       value?: number;
     };
+
+    // Same value bounds as create, checked against the code's stored type:
+    // percentage savings are not capped downstream, so 150% must never land.
+    if (typeof value === "number") {
+      const [existing] = await db
+        .select({ type: discountCodes.type })
+        .from(discountCodes)
+        .where(and(eq(discountCodes.id, id), eq(discountCodes.sellerId, sellerId)))
+        .limit(1);
+      if (existing?.type === "percentage" && (value < 1 || value > 100)) {
+        res.status(400).json({ error: "value must be between 1 and 100 for percentage codes" });
+        return;
+      }
+      if (existing?.type === "fixed" && value <= 0) {
+        res.status(400).json({ error: "value must be greater than 0 for fixed codes" });
+        return;
+      }
+    }
 
     const updates: Record<string, unknown> = {};
     if (active !== undefined) updates.active = active;
@@ -436,7 +482,7 @@ router.get("/:id/uses", async (req, res) => {
 });
 
 // DELETE /:id — delete a code (only if ownerId matches sellerId)
-router.delete("/:id", requirePermission("marketing"), async (req, res) => {
+router.delete("/:id", requirePermission("marketing"), validateInput({ params: discountIdParams }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const { id } = req.params;

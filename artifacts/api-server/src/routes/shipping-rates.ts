@@ -2,6 +2,8 @@ import { Router } from "express";
 import { db, shippingRates, shippingZones } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, cents, idParams, validateInput } from "../lib/commerceValidation";
 import crypto from "crypto";
 
 const router = Router();
@@ -66,6 +68,16 @@ router.get("/calculate", async (req, res) => {
 // All routes below require authentication
 router.use(requireAuth);
 
+// Type/size guards; the handlers keep the non-negative-integer checks.
+const rateIdParams = idParams("id");
+const rateFields = {
+  name: z.string().max(200).nullish(),
+  flatRateCents: cents.optional(),
+  freeAboveCents: cents.nullish(),
+};
+const createRateBody = bodyObject(rateFields);
+const updateRateBody = bodyObject({ ...rateFields, active: z.boolean().optional() });
+
 // GET /api/shipping-rates — list all rates for the authenticated seller
 router.get("/", async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
@@ -77,7 +89,7 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/shipping-rates — create a new shipping rate
-router.post("/", async (req, res) => {
+router.post("/", validateInput({ body: createRateBody }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { name, flatRateCents, freeAboveCents } = req.body;
 
@@ -114,7 +126,7 @@ router.post("/", async (req, res) => {
 });
 
 // PATCH /api/shipping-rates/:id — update a shipping rate
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", validateInput({ params: rateIdParams, body: updateRateBody }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { id } = req.params;
 
@@ -163,7 +175,7 @@ router.patch("/:id", async (req, res) => {
 });
 
 // DELETE /api/shipping-rates/:id — delete a shipping rate
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validateInput({ params: rateIdParams }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { id } = req.params;
 

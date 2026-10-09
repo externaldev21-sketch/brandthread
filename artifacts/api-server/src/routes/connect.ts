@@ -9,6 +9,15 @@ import type Stripe from "stripe";
 import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, validateInput } from "../lib/commerceValidation";
+
+// allowListedRedirect() decides which URLs are acceptable; this only bounds
+// the input it is handed.
+const onboardBody = bodyObject({
+  refreshUrl: z.string().max(2_048).optional(),
+  returnUrl: z.string().max(2_048).optional(),
+});
 import { requireStripe, stripe } from "../lib/stripe";
 import { allowedWebOrigins, getWebOrigin } from "../lib/webOrigin";
 import {
@@ -150,7 +159,7 @@ router.use(requireAuth);
  * Reuses the existing account on every call. Body (optional): { refreshUrl,
  * returnUrl } — only https URLs on Brandthread's own allow-listed origins.
  */
-router.post("/onboard", async (req, res) => {
+router.post("/onboard", validateInput({ body: onboardBody }), async (req, res) => {
   try {
     const client = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;

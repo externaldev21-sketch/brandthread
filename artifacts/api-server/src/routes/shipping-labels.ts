@@ -4,6 +4,8 @@ import {
   db, orders, orderItems, productVariants, shippingLabelQuotes, shippingLabels, orderFundReservations, dropWallets, sellerCashoutAttempts,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { addressInput, bodyObject, idParams, parcelDimension, validateInput } from "../lib/commerceValidation";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { createShipment, findTransaction, purchaseTransaction, refundTransaction } from "../lib/shippo";
 import { parcelInputError, suggestParcel } from "../lib/parcelSuggestion";
@@ -21,6 +23,26 @@ import { publishNotification } from "./notifications-feed";
 const router = Router();
 router.use(requireAuth);
 router.use(teamContext());
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Shape/size guards; parcelInputError / parseItemIds keep the range and item
+// rules. A label's price always comes from the provider's rate, never from the
+// client (the app also sends priceCents on purchase; it is ignored).
+const orderParams = idParams("orderId");
+const labelItemIds = z.array(z.string().max(160)).max(500).nullish();
+const ratesBody = bodyObject({
+  fromAddress: addressInput.nullish(),
+  length: parcelDimension.optional(),
+  width: parcelDimension.optional(),
+  height: parcelDimension.optional(),
+  weight: parcelDimension.optional(),
+  itemIds: labelItemIds,
+});
+const purchaseBody = bodyObject({
+  rateId: z.string().max(200).optional(),
+  idempotencyKey: z.string().max(200).optional(),
+  itemIds: labelItemIds,
+});
 const ELIGIBLE_STATUSES = ["pending", "processing", "fulfilled"];
 // A label for part of an order may also be bought once earlier items shipped.
 const PARTIAL_ELIGIBLE_STATUSES = [...ELIGIBLE_STATUSES, "shipped"];
@@ -59,7 +81,7 @@ router.get("/:orderId/parcel-suggestion", requireRole("staff"), async (req, res)
   res.json(suggestParcel(lines));
 });
 
-router.post("/:orderId/rates", requireRole("staff"), async (req, res) => {
+router.post("/:orderId/rates", requireRole("staff"), validateInput({ params: orderParams, body: ratesBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const parcelError = parcelInputError(req.body ?? {});
   if (parcelError) return void res.status(400).json({ error: parcelError });
@@ -129,7 +151,7 @@ async function shipLabelledItems(
   }
 }
 
-router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
+router.post("/:orderId/purchase", requireRole("staff"), validateInput({ params: orderParams, body: purchaseBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { rateId, idempotencyKey } = req.body;
   // Optional: a label for some of the order's items (split shipment).
@@ -416,7 +438,7 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
   }
 });
 
-router.post("/:orderId/:labelId/void", requireRole("staff"), async (req, res) => {
+router.post("/:orderId/:labelId/void", requireRole("staff"), validateInput({ params: idParams("orderId", "labelId") }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const claim = await db.transaction(async (tx) => {
     const lock = await tx.execute(sql`

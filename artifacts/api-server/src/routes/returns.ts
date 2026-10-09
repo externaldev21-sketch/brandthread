@@ -1,7 +1,9 @@
 import express, { Router } from "express";
 import { db, returns, orders, orderItems, users } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
+import { z } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { bodyObject, cents, idParams, validateInput } from "../lib/commerceValidation";
 import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds";
 import crypto from "crypto";
 import { reversePurchasePointsOnce } from "./loyalty";
@@ -16,6 +18,27 @@ import { normalizeUploadedImage } from "../lib/productImageResize";
 const router = Router();
 const objectStorage = new ObjectStorageService();
 router.use(requireAuth);
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Type/size guards; the handlers keep their ownership, status and evidence
+// checks. requestedItems only selects order lines by id — prices always come
+// from the order itself — so its other fields pass through unchecked.
+const returnIdParams = idParams("id");
+const createReturnBody = bodyObject({
+  orderId: z.string().max(160).optional(),
+  reason: z.string().max(500).optional(),
+  notes: z.string().max(5_000).nullish(),
+  resolutionRequested: z.string().max(40).nullish(),
+  evidenceUrls: z.array(z.string().max(2_048)).max(20).optional(),
+  requestedItems: z.array(z.object({ lineItemId: z.string().max(160).nullish() }).passthrough()).max(200).optional(),
+});
+const returnStatusBody = bodyObject({
+  status: z.string().max(20).optional(),
+  sellerResponse: z.string().max(5_000).nullish(),
+  // Upper-bounded again by the refund service against what was actually paid.
+  refundAmountCents: cents.optional(),
+  refundOnScan: z.boolean().optional(),
+});
 
 // ─── Evidence photos (item 108) ───────────────────────────────────────────────
 // Buyers upload return photos first (POST /evidence), then send the returned
@@ -159,7 +182,7 @@ async function notifyReturnStatus(returnId: string, status: "pending" | "approve
 // ─── BUYER ENDPOINTS ──────────────────────────────────────────────────────────
 
 // POST / — buyer creates a return request
-router.post("/", async (req, res) => {
+router.post("/", validateInput({ body: createReturnBody }), async (req, res) => {
   try {
     const clerkUserId = (req as any).clerkUserId as string;
     const { orderId, reason, notes, resolutionRequested, evidenceUrls, requestedItems } = req.body as {
@@ -434,7 +457,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // PATCH /:id/status — seller approves or denies a return
-router.patch("/:id/status", async (req, res) => {
+router.patch("/:id/status", validateInput({ params: returnIdParams, body: returnStatusBody }), async (req, res) => {
   try {
     const clerkUserId = (req as any).clerkUserId as string;
     const { id } = req.params;

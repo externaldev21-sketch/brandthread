@@ -7,6 +7,8 @@ import express, { Router } from "express";
 import { db, interactions, orders, posts, users } from "@workspace/db";
 import { and, count, eq, isNotNull, notInArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, validateInput } from "../lib/commerceValidation";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
@@ -41,6 +43,30 @@ import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeratio
 
 const router = Router();
 router.use(requireAuth);
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// validateBrandName / validateHandle / normalizeStoreAccent / normalizeSocialLink
+// own the business rules and seller-facing messages; these only bound types
+// and sizes.
+const identityBody = bodyObject({
+  brandName: z.string().max(500).nullish(),
+  handle: z.string().max(500).nullish(),
+});
+const accentBody = bodyObject({ color: z.string().max(64).nullish() });
+const socialLinksBody = bodyObject({
+  instagram: z.string().max(2_048).nullish(),
+  tiktok: z.string().max(2_048).nullish(),
+});
+const policyBody = bodyObject({
+  returnPolicy: z.string().max(20_000).nullish(),
+  cancellationPolicy: z.string().max(20_000).nullish(),
+});
+const onboardingDataBody = bodyObject({
+  goals: z.array(z.string().max(200)).max(50).nullish(),
+  brandStage: z.string().max(200).nullish(),
+  sellModel: z.string().max(200).nullish(),
+  styleInterests: z.array(z.string().max(200)).max(100).nullish(),
+});
 const objectStorage = new ObjectStorageService();
 
 const IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
@@ -300,7 +326,7 @@ router.get("/identity/check", async (req, res): Promise<void> => {
 });
 
 // ─── PUT /api/seller/identity ─────────────────────────────────────────────────
-router.put("/identity", async (req, res): Promise<void> => {
+router.put("/identity", validateInput({ body: identityBody }), async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const nameCheck = await nameAvailability(clerkId, req.body?.brandName);
   if (!nameCheck.available) {
@@ -335,7 +361,7 @@ router.put("/identity", async (req, res): Promise<void> => {
 });
 
 // ─── PUT /api/seller/profile/accent ───────────────────────────────────────────
-router.put("/profile/accent", async (req, res): Promise<void> => {
+router.put("/profile/accent", validateInput({ body: accentBody }), async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const raw = req.body?.color;
   const color = raw === null ? null : normalizeStoreAccent(raw);
@@ -358,7 +384,7 @@ router.put("/profile/accent", async (req, res): Promise<void> => {
 // ─── PUT /api/seller/social-links ─────────────────────────────────────────────
 // Merges into users.socialLinks, leaving any other keys untouched. An empty
 // value removes that platform's link.
-router.put("/social-links", async (req, res): Promise<void> => {
+router.put("/social-links", validateInput({ body: socialLinksBody }), async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const platforms: SocialPlatform[] = ["instagram", "tiktok"];
   const next: Partial<Record<SocialPlatform, string>> = {};
@@ -388,7 +414,7 @@ router.put("/social-links", async (req, res): Promise<void> => {
 });
 
 // ─── PATCH /api/seller/policy ─────────────────────────────────────────────────
-router.patch("/policy", async (req, res): Promise<void> => {
+router.patch("/policy", validateInput({ body: policyBody }), async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const { returnPolicy, cancellationPolicy } = req.body as {
     returnPolicy?:       string;
@@ -430,7 +456,7 @@ router.post("/tutorial/seen", async (req, res) => {
 });
 
 // ─── POST /api/seller/onboarding/data ────────────────────────────────────────
-router.post("/onboarding/data", async (req, res) => {
+router.post("/onboarding/data", validateInput({ body: onboardingDataBody }), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { goals, brandStage, sellModel, styleInterests } = req.body as {
     goals?:          string[];
