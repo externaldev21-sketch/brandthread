@@ -175,7 +175,7 @@ function makeStyles(ck: CheckoutColors) {
     add: { marginTop: 25, minWidth: 84 },
     center: { alignItems: 'center', paddingTop: SP.xl, gap: SP.xs },
     emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
-    label: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, textTransform: 'uppercase', color: ck.muted },
+    label: { fontFamily: FONT.semibold, fontSize: FS.xs, color: ck.muted },
     total: { fontFamily: FONT.bold, fontSize: 34, color: ck.text, marginTop: SP.xs },
     fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted },
     cardWrap: { marginTop: SP.md },

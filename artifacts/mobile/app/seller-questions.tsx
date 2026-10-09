@@ -149,7 +149,7 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: { paddingVertical: SP.md, borderTopWidth: 1, gap: 6 },
-  product: { fontSize: FS.meta, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.6 },
+  product: { fontSize: FS.meta, fontFamily: FONT.semibold },
   q: { fontSize: FS.base, fontFamily: FONT.bold, lineHeight: 22 },
   a: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 20 },
   meta: { fontSize: FS.meta, fontFamily: FONT.medium },

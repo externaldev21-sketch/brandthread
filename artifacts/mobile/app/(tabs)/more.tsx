@@ -389,7 +389,6 @@ const createStyles = (theme: any) => {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: SUBTLE_THEME,
-    letterSpacing: 1.5,
     marginBottom: SP.sm,
   },
   switcherRow: {
@@ -483,7 +482,6 @@ const createStyles = (theme: any) => {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: SUBTLE_THEME,
-    letterSpacing: 1.5,
   },
   sectionItems: {
     marginHorizontal: SP.md,

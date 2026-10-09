@@ -457,7 +457,7 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 const bs = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADII.pill, marginRight: SPACING.xxs, marginBottom: SPACING.xxs },
-  badgeText: { color: '#0A0A0B', fontSize: 10, fontFamily: FONT.bold, letterSpacing: 0.2 },
+  badgeText: { color: '#0A0A0B', fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.2 },
 });
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
@@ -484,7 +484,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   },
   badgeRow: { position: 'absolute', left: SPACING.xs, top: SPACING.xs, right: SPACING.xs, flexDirection: 'row', flexWrap: 'wrap' },
   tileInfo: { paddingHorizontal: SPACING.sm, paddingTop: SPACING.xs + 2, paddingBottom: SPACING.sm, gap: 2 },
-  tileBrand: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: FONT.semibold },
+  tileBrand: { ...TYPE_SCALE.caption, color: palette.mutedForeground, fontFamily: FONT.semibold },
   tileTitle: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: theme.text },
   tileSubtitle: { ...TYPE_SCALE.caption, color: palette.mutedForeground },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xxs, marginTop: 1 },

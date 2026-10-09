@@ -203,7 +203,7 @@ export default function RfqPostScreen() {
 const makeS = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
   scroll: { padding: SP.md, gap: SP.sm },
-  sectionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, marginTop: SP.md, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, marginTop: SP.md, marginBottom: SP.sm },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.lg },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginBottom: SP.sm },
   typeChip: { paddingHorizontal: SP.md, height: 34, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },

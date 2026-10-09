@@ -581,7 +581,7 @@ const createStyles = (theme: AppThemePreset) => {
   bankLabel:    { color: text, fontSize: FS.base, fontFamily: FONT.medium },
   bankSub:      { color: muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   settingsSection:{ backgroundColor: card, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: border, marginBottom: SP.md },
-  sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm },
   settingsRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: border },
   settingsLabel:{ color: muted, fontSize: FS.sm, fontFamily: FONT.regular },
   settingsValue:{ color: text, fontSize: FS.sm, fontFamily: FONT.medium },

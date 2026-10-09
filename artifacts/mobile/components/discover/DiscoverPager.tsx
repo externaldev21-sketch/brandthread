@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADII.pill,
     backgroundColor: 'rgba(255,255,255,0.16)',
   },
-  rankBadgeText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.6 },
+  rankBadgeText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11 },
   heroWrap: { alignItems: 'center', justifyContent: 'center', marginBottom: SP.lg },
   heroFloat: { alignItems: 'center', justifyContent: 'center' },
   heroImage: {

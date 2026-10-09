@@ -577,7 +577,7 @@ function makeStyles(theme: any) {
       flexDirection: 'row', alignItems: 'center', height: 64, marginTop: SP.md, paddingHorizontal: SP.md,
       borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, gap: 6,
     },
-    unit: { fontFamily: FONT.semibold, fontSize: 24, color: theme.muted },
+    unit: { fontFamily: FONT.semibold, fontSize: 22, color: theme.muted },
     valueInput: { flex: 1, minWidth: 0, width: '100%', fontFamily: FONT.bold, fontSize: 28, color: theme.text, padding: 0, outlineWidth: 0 } as any,
     switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.lg },
     switchLabel: { flex: 1, fontFamily: FONT.medium, fontSize: FS.base, color: theme.text },

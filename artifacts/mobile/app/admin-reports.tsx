@@ -539,7 +539,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   sheetTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg },
   sheetSub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   contentBox: { backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.md, marginBottom: SP.sm },
-  contentEyebrow: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 10, letterSpacing: 1, marginBottom: 6 },
+  contentEyebrow: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, marginBottom: 6 },
   contentText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22 },
   detailCard: { backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, paddingHorizontal: SP.md, marginBottom: SP.md },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.md, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.borderSubtle },

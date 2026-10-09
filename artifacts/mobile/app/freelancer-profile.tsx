@@ -493,8 +493,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   payBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   section: { marginTop: SP.lg },
   sectionTitle: {
-    color: theme.subtle, fontSize: FS.xs, fontFamily: FONT.semibold,
-    letterSpacing: 1, textTransform: 'uppercase', marginBottom: SP.sm,
+    color: theme.subtle, fontSize: FS.xs, fontFamily: FONT.semibold, marginBottom: SP.sm,
   },
   bio: { color: theme.muted, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 21 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

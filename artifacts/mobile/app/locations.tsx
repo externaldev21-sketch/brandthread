@@ -284,7 +284,7 @@ const s = StyleSheet.create({
   emptyText: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 20 },
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   locationRow: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, gap: 10 },
-  rowLabel: { fontSize: 14, fontFamily: FONT.semibold },
+  rowLabel: { fontSize: 15, fontFamily: FONT.semibold },
   primaryBadge: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   primaryBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   rowDescription: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
@@ -297,6 +297,6 @@ const s = StyleSheet.create({
   modal: { flex: 1 },
   modalBody: { padding: 20, gap: 16, paddingBottom: 60 },
   formField: { gap: 6 },
-  formLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.6 },
+  formLabel: { fontSize: FS.xs, fontFamily: FONT.semibold },
   formInput: { borderRadius: RADIUS.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.sm, fontFamily: FONT.regular },
 });

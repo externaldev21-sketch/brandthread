@@ -179,8 +179,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   searchInput: { flex: 1, minWidth: 0, color: theme.text, fontFamily: FONT.regular, fontSize: FS.base, height: 44 },
   sectionLabel: {
-    color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.meta, letterSpacing: 0.6,
-    textTransform: 'uppercase', marginTop: SP.lg, marginBottom: SP.sm,
+    color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.meta, marginTop: SP.lg, marginBottom: SP.sm,
   },
   rowBtn: { width: 112 },
   emptyText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingVertical: SP.lg },

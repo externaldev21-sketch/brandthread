@@ -95,7 +95,7 @@ export function Button({
   // 36pt 'compact' button (Instagram's own-profile buttons are ~13-14pt
   // semibold on ~32-34pt buttons).
   const labelType = size === 'compact'
-    ? { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold }
+    ? { fontSize: 15, lineHeight: 18, fontFamily: FONT.semibold }
     : size === 'small'
       ? { fontSize: 15, lineHeight: 20, fontFamily: FONT.semibold }
       : TYPE_SCALE.headline;

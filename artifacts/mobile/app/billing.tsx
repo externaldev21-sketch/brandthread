@@ -293,9 +293,9 @@ const styles = StyleSheet.create({
   listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   emptyBills: { padding: 18, alignItems: 'center' },
   billRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, gap: 10 },
-  billId: { fontSize: 14, fontFamily: FONT.semibold },
+  billId: { fontSize: 15, fontFamily: FONT.semibold },
   billNote: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
-  billAmount: { fontSize: 14, fontFamily: FONT.semibold },
+  billAmount: { fontSize: 15, fontFamily: FONT.semibold },
   statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { fontSize: 11, fontFamily: FONT.semibold },
 });

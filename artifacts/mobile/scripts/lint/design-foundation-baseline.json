@@ -1,8 +1,6 @@
 {
   "app/(buyer)/cart.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/(buyer)/edit-profile.tsx": {
     "feather": 1
@@ -11,40 +9,31 @@
     "feather": 1
   },
   "app/(buyer)/inbox.tsx": {
-    "feather": 1,
-    "uppercase": 2,
-    "letterSpacing": 3
+    "feather": 1
   },
   "app/(buyer)/orders.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/(buyer)/profile.tsx": {
     "feather": 1
   },
   "app/(tabs)/analytics.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/(tabs)/feed.tsx": {
     "feather": 1
   },
   "app/(tabs)/following.tsx": {
-    "feather": 1,
-    "uppercase": 1
+    "feather": 1
   },
   "app/(tabs)/marketing.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/(tabs)/more.tsx": {
-    "feather": 1,
-    "letterSpacing": 2
+    "feather": 1
   },
   "app/(tabs)/orders.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 6
+    "feather": 1
   },
   "app/(tabs)/products.tsx": {
     "feather": 1
@@ -59,9 +48,7 @@
     "feather": 1
   },
   "app/account-type-settings.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/account-type.tsx": {
     "feather": 1
@@ -72,16 +59,11 @@
   "app/add-product.tsx": {
     "feather": 1
   },
-  "app/admin-invites.tsx": {
-    "letterSpacing": 1
-  },
   "app/admin-reports.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/ai-brain.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/ai-brand-memory.tsx": {
     "feather": 1
@@ -93,9 +75,7 @@
     "feather": 1
   },
   "app/ai-settings.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/ai-studio.tsx": {
     "feather": 1
@@ -113,9 +93,7 @@
     "feather": 1
   },
   "app/analytics-marketing.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/analytics-production.tsx": {
     "feather": 1
@@ -123,32 +101,23 @@
   "app/analytics-products.tsx": {
     "feather": 1
   },
-  "app/analytics-profit.tsx": {
-    "uppercase": 1,
-    "letterSpacing": 1
-  },
   "app/analytics-store.tsx": {
     "feather": 1
   },
   "app/appearance.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/billing.tsx": {
     "feather": 1
   },
   "app/biometric-unlock.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/boost.tsx": {
     "feather": 1
   },
   "app/brand.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-account-center.tsx": {
     "feather": 1
@@ -160,8 +129,7 @@
     "feather": 1
   },
   "app/buyer-blocked.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-checkout.tsx": {
     "feather": 1
@@ -170,70 +138,49 @@
     "feather": 1
   },
   "app/buyer-collection.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-conversation.tsx": {
     "feather": 1
   },
   "app/buyer-download-data.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-drafts.tsx": {
     "feather": 1
   },
   "app/buyer-drop-detail.tsx": {
-    "feather": 1,
-    "letterSpacing": 11
+    "feather": 1
   },
   "app/buyer-friend-requests.tsx": {
     "feather": 1
-  },
-  "app/buyer-gift-cards.tsx": {
-    "uppercase": 1,
-    "letterSpacing": 1
   },
   "app/buyer-highlight-stories.tsx": {
     "feather": 1
   },
   "app/buyer-highlights-manager.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-invite.tsx": {
-    "feather": 1,
-    "uppercase": 2,
-    "letterSpacing": 3
+    "feather": 1
   },
   "app/buyer-live.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 3
+    "feather": 1
   },
   "app/buyer-muted.tsx": {
     "feather": 1
   },
   "app/buyer-notifications.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-order-detail.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 5
+    "feather": 1
   },
   "app/buyer-other-profile.tsx": {
     "feather": 1
   },
   "app/buyer-payment-methods.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-personal-details.tsx": {
     "feather": 1
@@ -245,47 +192,34 @@
     "feather": 1
   },
   "app/buyer-problem-report.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-product-detail.tsx": {
-    "feather": 1,
-    "uppercase": 4,
-    "letterSpacing": 6
+    "feather": 1
   },
   "app/buyer-qr-code.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-recently-watched.tsx": {
     "feather": 1
   },
   "app/buyer-refund-request.tsx": {
-    "feather": 1,
-    "uppercase": 2,
-    "letterSpacing": 2
+    "feather": 1
   },
   "app/buyer-report.tsx": {
-    "feather": 1,
-    "letterSpacing": 2
+    "feather": 1
   },
   "app/buyer-restricted.tsx": {
     "feather": 1
   },
   "app/buyer-return-request.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-saved.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-search.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/buyer-settings-detail.tsx": {
     "feather": 1
@@ -301,9 +235,7 @@
     "feather": 1
   },
   "app/buyer-your-activity.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/c/[collectionId].tsx": {
     "feather": 1
@@ -312,8 +244,7 @@
     "feather": 1
   },
   "app/camera-capture.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/checkout.tsx": {
     "feather": 1
@@ -348,9 +279,6 @@
   "app/conversation-search.tsx": {
     "feather": 1
   },
-  "app/creator-program.tsx": {
-    "letterSpacing": 1
-  },
   "app/customer-accounts.tsx": {
     "feather": 1
   },
@@ -358,9 +286,7 @@
     "feather": 1
   },
   "app/customer-orders.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/customer-privacy.tsx": {
     "feather": 1
@@ -369,8 +295,7 @@
     "feather": 1
   },
   "app/delete-account.tsx": {
-    "feather": 1,
-    "letterSpacing": 2
+    "feather": 1
   },
   "app/design-ai-photoshoot.tsx": {
     "feather": 1
@@ -433,9 +358,7 @@
     "feather": 1
   },
   "app/discounts.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 3
+    "feather": 1
   },
   "app/dispute-detail.tsx": {
     "feather": 1
@@ -444,9 +367,7 @@
     "feather": 1
   },
   "app/drafts.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/edit-profile.tsx": {
     "feather": 1
@@ -455,16 +376,10 @@
     "feather": 1
   },
   "app/email-campaign-compose.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/email-campaigns.tsx": {
     "feather": 1
-  },
-  "app/fees.tsx": {
-    "uppercase": 1,
-    "letterSpacing": 1
   },
   "app/finance.tsx": {
     "feather": 1
@@ -473,21 +388,16 @@
     "feather": 1
   },
   "app/forgot-password.tsx": {
-    "feather": 1,
-    "letterSpacing": 2
+    "feather": 1
   },
   "app/freelancer-apply.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/freelancer-jobs.tsx": {
     "feather": 1
   },
   "app/freelancer-profile.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/fulfill-batch.tsx": {
     "feather": 1
@@ -499,12 +409,7 @@
     "feather": 1
   },
   "app/gift-card-buy.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 2
-  },
-  "app/gift-cards-manage.tsx": {
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/giveaway.tsx": {
     "feather": 1
@@ -513,35 +418,25 @@
     "feather": 1
   },
   "app/help.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/integrations/index.tsx": {
     "feather": 1
   },
   "app/integrations/klaviyo.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/integrations/shopify-fulfillment.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/invite-manufacturer.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/ip-report.tsx": {
     "feather": 1
   },
   "app/languages.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/launch-checklist.tsx": {
     "feather": 1
@@ -556,17 +451,10 @@
     "feather": 1
   },
   "app/live-cohost.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/live-feed.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
-  },
-  "app/live-moderation.tsx": {
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/live-replays.tsx": {
     "feather": 1
@@ -578,29 +466,19 @@
     "feather": 1
   },
   "app/locations.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/login-methods.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 3
+    "feather": 1
   },
   "app/loyalty.tsx": {
-    "feather": 1,
-    "uppercase": 3,
-    "letterSpacing": 3
+    "feather": 1
   },
   "app/manufacturer-compare.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/manufacturer-hub.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/manufacturer-messages.tsx": {
     "feather": 1
@@ -609,9 +487,7 @@
     "feather": 1
   },
   "app/manufacturer-product.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/manufacturer-profile.tsx": {
     "feather": 1
@@ -632,36 +508,22 @@
     "feather": 1
   },
   "app/muted-words.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/onboarding.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/order-detail.tsx": {
     "feather": 1
   },
   "app/payments.tsx": {
-    "feather": 1,
-    "letterSpacing": 2
-  },
-  "app/payout-detail.tsx": {
-    "uppercase": 1,
-    "letterSpacing": 1
-  },
-  "app/payout-schedule.tsx": {
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/payout-setup.tsx": {
     "feather": 1
   },
   "app/payouts.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/plans.tsx": {
     "feather": 1
@@ -670,13 +532,10 @@
     "feather": 1
   },
   "app/product-bundle-edit.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/product-bundles.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/product-detail.tsx": {
     "feather": 1
@@ -685,8 +544,7 @@
     "feather": 1
   },
   "app/product-launches.tsx": {
-    "feather": 1,
-    "letterSpacing": 2
+    "feather": 1
   },
   "app/product-pairings.tsx": {
     "feather": 1
@@ -695,60 +553,43 @@
     "feather": 1
   },
   "app/product-size-chart.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/product-store.tsx": {
     "feather": 1
   },
   "app/product-variants.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/product-video.tsx": {
     "feather": 1
   },
   "app/production-detail.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/products-bulk-edit.tsx": {
     "feather": 1
   },
   "app/profile-products.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/quote-compare.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/quote-detail.tsx": {
-    "feather": 1,
-    "uppercase": 1
+    "feather": 1
   },
   "app/quote-request.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/refund-detail.tsx": {
     "feather": 1
   },
   "app/request-sample.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/return-detail.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 2
+    "feather": 1
   },
   "app/rfq-compare.tsx": {
     "feather": 1
@@ -757,60 +598,43 @@
     "feather": 1
   },
   "app/rfq-post.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/roles.tsx": {
     "feather": 1
   },
   "app/sales.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/sample-detail.tsx": {
-    "feather": 1,
-    "uppercase": 2
-  },
-  "app/security.tsx": {
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/seller-conversation.tsx": {
     "feather": 1
-  },
-  "app/seller-creator-detail.tsx": {
-    "letterSpacing": 1
   },
   "app/seller-creator-program.tsx": {
     "feather": 1
   },
   "app/seller-data-export.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/seller-drop-create.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/seller-drop-preview.tsx": {
-    "feather": 1,
-    "letterSpacing": 3
+    "feather": 1
   },
   "app/seller-drops.tsx": {
     "feather": 1
   },
   "app/seller-go-live.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/seller-inbox.tsx": {
     "feather": 1
   },
   "app/seller-live.tsx": {
-    "feather": 1,
-    "letterSpacing": 2
+    "feather": 1
   },
   "app/seller-profile.tsx": {
     "feather": 1
@@ -818,26 +642,17 @@
   "app/seller-push-broadcast.tsx": {
     "feather": 1
   },
-  "app/seller-questions.tsx": {
-    "uppercase": 1,
-    "letterSpacing": 1
-  },
   "app/seller-reviews.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/seller-schedule-live.tsx": {
     "feather": 1
   },
   "app/seller-settings.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/seller-verification.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/setup.tsx": {
     "feather": 1
@@ -849,76 +664,55 @@
     "feather": 1
   },
   "app/shipping.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/shopify-import.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/shopping-preferences.tsx": {
     "feather": 1
   },
   "app/sign-in.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/size-chart-template-apply.tsx": {
     "feather": 1
   },
   "app/size-chart-template-edit.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/size-chart-templates.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/statements.tsx": {
     "feather": 1
   },
   "app/store-ai-improve.tsx": {
-    "feather": 1,
-    "uppercase": 2,
-    "letterSpacing": 2
+    "feather": 1
   },
   "app/store-builder.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 6
+    "feather": 1
   },
   "app/store-collections.tsx": {
     "feather": 1
   },
   "app/store-domain.tsx": {
-    "feather": 1,
-    "uppercase": 1
+    "feather": 1
   },
   "app/store-editor.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/store-from-logo.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/store-from-moodboard.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/store-from-social.tsx": {
     "feather": 1
   },
   "app/store-generate.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/store-generating.tsx": {
     "feather": 1
@@ -936,9 +730,7 @@
     "feather": 1
   },
   "app/store-publish.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/store-sections.tsx": {
     "feather": 1
@@ -950,9 +742,7 @@
     "feather": 1
   },
   "app/store-theme-picker.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 3
+    "feather": 1
   },
   "app/store-versions.tsx": {
     "feather": 1
@@ -961,9 +751,7 @@
     "feather": 1
   },
   "app/subscription.tsx": {
-    "feather": 1,
-    "uppercase": 2,
-    "letterSpacing": 3
+    "feather": 1
   },
   "app/taxes-duties.tsx": {
     "feather": 1
@@ -990,16 +778,13 @@
     "feather": 1
   },
   "app/u/[username].tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/users.tsx": {
     "feather": 1
   },
   "app/vacation-mode.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "app/waitlist-demand.tsx": {
     "feather": 1
@@ -1014,18 +799,13 @@
     "feather": 1
   },
   "components/BrandDropsCard.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
-  },
-  "components/BrandthreadUI.tsx": {
-    "letterSpacing": 2
+    "feather": 1
   },
   "components/BuyerProtectionNote.tsx": {
     "feather": 1
   },
   "components/CommerceSignal.tsx": {
-    "feather": 1,
-    "letterSpacing": 2
+    "feather": 1
   },
   "components/DateRangePicker.tsx": {
     "feather": 1
@@ -1040,8 +820,7 @@
     "feather": 1
   },
   "components/FeedGestureGuide.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/FinanceMoneyFlow.tsx": {
     "feather": 1
@@ -1101,8 +880,7 @@
     "feather": 1
   },
   "components/ShareProfileSheet.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/ShopProductSheet.tsx": {
     "feather": 1
@@ -1171,8 +949,7 @@
     "feather": 1
   },
   "components/analytics/AnalyticsReportsList.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/analytics/InsightCharts.tsx": {
     "feather": 1
@@ -1190,8 +967,7 @@
     "feather": 1
   },
   "components/buyer-feed/FeedTopBar.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/buyer-feed/HeartBurstParticles.tsx": {
     "feather": 1
@@ -1325,8 +1101,7 @@
     "feather": 1
   },
   "components/discover/DiscoverPager.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/discover/DiscoverPostViewer.tsx": {
     "feather": 1
@@ -1352,18 +1127,11 @@
   "components/feed/UploadProgressPill.tsx": {
     "feather": 1
   },
-  "components/first-run-tips/AnchoredCardTip.tsx": {
-    "letterSpacing": 1
-  },
-  "components/first-run-tips/FullScreenGuideTip.tsx": {
-    "letterSpacing": 1
-  },
   "components/first-run-tips/GestureHintTip.tsx": {
     "feather": 1
   },
   "components/first-run-tips/SpotlightTip.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/giftCards/GiftCardFace.tsx": {
     "feather": 1
@@ -1393,11 +1161,7 @@
     "feather": 1
   },
   "components/live/CohostStage.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
-  },
-  "components/live/LiveAvatarRing.tsx": {
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/live/LiveCodesHostSheet.tsx": {
     "feather": 1
@@ -1406,8 +1170,7 @@
     "feather": 1
   },
   "components/live/LiveEmptyState.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/live/LiveModerationOverlays.tsx": {
     "feather": 1
@@ -1416,12 +1179,10 @@
     "feather": 1
   },
   "components/live/LiveOverlays.tsx": {
-    "feather": 1,
-    "letterSpacing": 3
+    "feather": 1
   },
   "components/live/LiveProductsSheet.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/live/LiveStreamOptionsSheet.tsx": {
     "feather": 1
@@ -1430,15 +1191,13 @@
     "feather": 1
   },
   "components/manufacturer/OrderCardBubble.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/manufacturer/ProductionTimeline.tsx": {
     "feather": 1
   },
   "components/manufacturer/RfqChatCards.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/media/MediaCropper.tsx": {
     "feather": 1
@@ -1456,8 +1215,7 @@
     "feather": 1
   },
   "components/onboarding/SellerPlanRecommendationStep.tsx": {
-    "feather": 1,
-    "letterSpacing": 3
+    "feather": 1
   },
   "components/onboarding/SizesStep.tsx": {
     "feather": 1
@@ -1489,18 +1247,11 @@
   "components/paywall/SellerPaywallBullets.tsx": {
     "feather": 1
   },
-  "components/paywall/SellerPaywallHeadline.tsx": {
-    "letterSpacing": 1
-  },
-  "components/paywall/SellerPaywallOneTimeOffer.tsx": {
-    "letterSpacing": 1
-  },
   "components/paywall/SellerPaywallSocialProof.tsx": {
     "feather": 1
   },
   "components/paywall/SellerPlanSelector.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/paywall/SellerTrialTimeline.tsx": {
     "feather": 1
@@ -1589,9 +1340,6 @@
   "components/search/TagRow.tsx": {
     "feather": 1
   },
-  "components/search/TrendingTags.tsx": {
-    "letterSpacing": 1
-  },
   "components/search/VideoTile.tsx": {
     "feather": 1
   },
@@ -1599,14 +1347,10 @@
     "feather": 1
   },
   "components/security/LoginActivity.tsx": {
-    "feather": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/security/SecurityFormKit.tsx": {
     "feather": 1
-  },
-  "components/settings/SettingsKit.tsx": {
-    "letterSpacing": 1
   },
   "components/share-cards/BuyerShareCard.tsx": {
     "feather": 1
@@ -1642,15 +1386,10 @@
     "feather": 1
   },
   "components/social/StoryStickers.tsx": {
-    "feather": 1,
-    "uppercase": 1,
-    "letterSpacing": 1
+    "feather": 1
   },
   "components/social/StoryTray.tsx": {
     "feather": 1
-  },
-  "components/splash/AppIntroSplash.tsx": {
-    "letterSpacing": 1
   },
   "components/store-setup/StoreSetupField.tsx": {
     "feather": 1

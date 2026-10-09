@@ -254,7 +254,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     color: theme.text,
     fontFamily: FONT.bold,
     // FS.h1 (36) — the largest step on the declared type scale in lib/theme.ts.
-    fontSize: 36,
+    fontSize: 34,
     lineHeight: 42,
     letterSpacing: -1.2,
     marginBottom: 18,

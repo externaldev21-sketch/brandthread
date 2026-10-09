@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   iconBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   listWrap: { paddingHorizontal: 20 },
   roleRow: { paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  roleName: { fontSize: 14, fontFamily: FONT.semibold },
+  roleName: { fontSize: 15, fontFamily: FONT.semibold },
   roleSub: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   footerNote: { paddingVertical: 18, alignItems: 'center', marginTop: 4 },
   footerText: { fontSize: 13, fontFamily: FONT.regular },

@@ -170,5 +170,5 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   rowTitle: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base },
   rowSubtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  dismissHint: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 48, letterSpacing: 0.3 },
+  dismissHint: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 48 },
 });

@@ -216,8 +216,8 @@ const styles = StyleSheet.create({
   heroSub: { fontSize: 13, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 19 },
 
   section: { borderRadius: 14, borderWidth: 1, padding: 18 },
-  label: { fontSize: 12, fontFamily: FONT.medium, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: FONT.regular, marginBottom: 14 },
+  label: { fontSize: 12, fontFamily: FONT.medium, marginBottom: 8 },
+  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 15, fontFamily: FONT.regular, marginBottom: 14 },
   connectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 14 },
   connectBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
   helpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 },
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
 
   connectedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  connectedText: { fontSize: 14, fontFamily: FONT.semibold },
+  connectedText: { fontSize: 15, fontFamily: FONT.semibold },
   statsRow: { flexDirection: 'row', marginBottom: 12 },
   statBox: { flex: 1, alignItems: 'center', gap: 3 },
   statVal: { fontSize: 20, fontFamily: FONT.bold },

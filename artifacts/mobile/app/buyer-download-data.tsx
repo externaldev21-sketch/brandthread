@@ -137,7 +137,7 @@ export default function BuyerDownloadData() {
 const makeStyles = (palette: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
   intro: { ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 18, marginBottom: SPACING.md },
-  groupLabel: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SPACING.xs },
+  groupLabel: { ...TYPE_SCALE.caption, color: palette.mutedForeground, marginBottom: SPACING.xs },
   card: { padding: 0, overflow: 'hidden', marginBottom: SPACING.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: SPACING.md + 32 + SPACING.sm },
   note: { flexDirection: 'row', gap: 8, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: 12, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },

@@ -141,7 +141,7 @@ function makeStyles(c: ReturnType<typeof useColors>) {
     screen: { flex: 1, backgroundColor: c.background },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md },
     content: { paddingHorizontal: GUTTER, paddingTop: SP.sm },
-    section: { fontFamily: FONT.semibold, fontSize: FS.meta, color: c.mutedForeground, marginTop: SP.md, marginBottom: SP.sm, letterSpacing: 0.4, textTransform: 'uppercase' },
+    section: { fontFamily: FONT.semibold, fontSize: FS.meta, color: c.mutedForeground, marginTop: SP.md, marginBottom: SP.sm },
     group: { backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, overflow: 'hidden' },
     row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, minHeight: 64, paddingVertical: SP.sm },
     rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },

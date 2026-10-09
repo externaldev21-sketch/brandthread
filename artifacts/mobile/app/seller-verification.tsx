@@ -406,8 +406,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
      color: theme.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
     marginBottom: SP.xs,
   },
   benefitRow: {

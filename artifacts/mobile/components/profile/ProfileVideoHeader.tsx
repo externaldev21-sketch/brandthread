@@ -275,9 +275,9 @@ const styles = StyleSheet.create({
   statsInline: { flex: 1, minWidth: 0, marginLeft: 14 },
   // Below the fade, on solid background: name → @handle+chip → bio/link.
   belowAvatarRow: { paddingHorizontal: SP.md, paddingTop: 12 },
-  name: { fontFamily: FONT.bold, fontSize: 18, lineHeight: 23, letterSpacing: -0.3 },
+  name: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 23, letterSpacing: -0.3 },
   handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm, marginTop: 4 },
-  handle: { fontFamily: FONT.medium, fontSize: 14, lineHeight: 18, flexShrink: 1 },
+  handle: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 18, flexShrink: 1 },
   // Seller own profile (stacked-chips layout): a smaller handle under the name.
   handleCompact: { fontSize: 13, lineHeight: 17 },
   // Chips stacked vertically, left-aligned, one gap apart.

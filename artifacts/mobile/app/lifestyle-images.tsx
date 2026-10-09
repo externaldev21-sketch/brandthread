@@ -424,7 +424,7 @@ export default function LifestyleImagesScreen() {
                       <Feather name="package" size={20} color={colors.mutedForeground} />
                     </View>
                   )}
-                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: FONT.semibold, fontSize: 14 }} numberOfLines={1}>
+                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: FONT.semibold, fontSize: 15 }} numberOfLines={1}>
                     {item.name}
                   </Text>
                   <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
     borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center',
     justifyContent: 'center', paddingVertical: 40, gap: 10,
   },
-  dropzoneTitle: { fontSize: 14, fontFamily: FONT.semibold },
+  dropzoneTitle: { fontSize: 15, fontFamily: FONT.semibold },
   trayRow: { gap: 10, paddingVertical: 4 },
   trayThumbWrap: { position: 'relative' },
   trayThumb: { width: 72, height: 72, borderRadius: 12 },
@@ -468,14 +468,14 @@ const styles = StyleSheet.create({
   },
   inputLabel: { fontSize: 12, fontFamily: FONT.semibold, marginTop: 20, marginBottom: 8 },
   input: {
-    borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: FONT.regular,
+    borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 15, fontFamily: FONT.regular,
     minHeight: 72, textAlignVertical: 'top',
   },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: 14, paddingVertical: 15,
   },
-  primaryBtnText: { fontSize: 14, fontFamily: FONT.semibold },
+  primaryBtnText: { fontSize: 15, fontFamily: FONT.semibold },
   secondaryBtn: { alignItems: 'center', paddingVertical: 10 },
   secondaryBtnText: { fontSize: 13, fontFamily: FONT.regular },
   resultFrame: {

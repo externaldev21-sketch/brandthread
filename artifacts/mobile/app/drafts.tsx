@@ -274,8 +274,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontFamily: FONT.semibold,
     color: MUTED,
     marginBottom: SP.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
   },
   sortLabel: {
     marginTop: SP.md,

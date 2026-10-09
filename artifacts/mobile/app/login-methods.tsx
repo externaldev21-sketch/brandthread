@@ -619,7 +619,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
 
   sectionLabel: {
     fontSize: 11, fontFamily: FONT.semibold, color: colors.mutedForeground,
-    textTransform: 'uppercase', letterSpacing: 0.8,
     marginBottom: SPACING.sm, marginTop: SPACING.lg, paddingHorizontal: 2,
   },
 
@@ -695,13 +694,11 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   },
   secretText: {
     fontSize: 15, fontFamily: FONT.semibold,
-    letterSpacing: 2,
   },
   codeInput: {
     backgroundColor: colors.card, borderRadius: RADII.chip, borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: SPACING.md, paddingVertical: 14,
-    fontSize: 28, fontFamily: FONT.bold, color: colors.foreground,
-    letterSpacing: 8, marginBottom: SPACING.lg,
+    fontSize: 28, fontFamily: FONT.bold, color: colors.foreground, marginBottom: SPACING.lg,
   },
   backupCodesBox: {
     backgroundColor: colors.card, borderRadius: RADII.chip, borderWidth: 1, borderColor: colors.border,

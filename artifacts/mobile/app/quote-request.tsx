@@ -854,8 +854,7 @@ const sc = StyleSheet.create({
     gap: SP.sm,
   },
   summarySection: {
-    fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED,
-    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.xs,
+    fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.xs,
   },
   summaryRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

@@ -3103,7 +3103,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginLeft: 4,
   },
   headerAiTagText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: FONT.bold,
   },
   headerStatusLine: {
@@ -3299,7 +3299,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: 3,
   },
   bubbleTime: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: FONT.regular,
   },
   receiptIcon: {

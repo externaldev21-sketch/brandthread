@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 12,
   },
-  userName: { fontSize: 14, fontFamily: FONT.semibold },
+  userName: { fontSize: 15, fontFamily: FONT.semibold },
   userEmail: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
   statusText: { fontSize: 12, fontFamily: FONT.semibold },

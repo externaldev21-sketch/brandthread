@@ -153,7 +153,7 @@ const c = StyleSheet.create({
   countdownBar: { flexDirection: 'row', gap: SPACING.xs, alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: RADII.chip, paddingHorizontal: SPACING.xs + 2, paddingVertical: 6 }, // theme-exempt: dark scrim over media
   countdownUnit: { alignItems: 'center', minWidth: 28 },
   countdownNum: { color: '#FFFFFF' }, // theme-exempt: white text over scrim
-  countdownLabel: { color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' }, // theme-exempt: white text over scrim
+  countdownLabel: { color: 'rgba(255,255,255,0.7)' }, // theme-exempt: white text over scrim
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADII.pill, paddingHorizontal: SPACING.xs + 2, paddingVertical: 6, alignSelf: 'flex-start' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFFFFF' },
   liveText: { color: '#FFFFFF' }, // theme-exempt: white text on the success scrim badge

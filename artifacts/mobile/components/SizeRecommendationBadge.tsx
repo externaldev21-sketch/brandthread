@@ -79,7 +79,7 @@ export function SizeRecommendationBadge({
 export function RecommendedTag() {
   const { theme } = useAppTheme();
   return (
-    <Text style={{ fontSize: 10, fontFamily: FONT.medium, color: theme.muted, marginTop: 3, textAlign: 'center' }}>
+    <Text style={{ fontSize: 11, fontFamily: FONT.medium, color: theme.muted, marginTop: 3, textAlign: 'center' }}>
       Recommended
     </Text>
   );

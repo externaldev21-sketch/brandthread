@@ -228,5 +228,5 @@ const makeStyles = (theme: AppThemePreset, palette: ReturnType<typeof useColors>
   },
   errorText: { flex: 1, color: theme.text, ...TYPE_SCALE.callout, fontFamily: FONT.medium },
   retry: { color: theme.text, ...TYPE_SCALE.callout, fontFamily: FONT.semibold, textDecorationLine: 'underline' },
-  sectionLabel: { color: theme.subtle, ...TYPE_SCALE.caption, letterSpacing: 1, marginTop: SPACING.lg, marginBottom: SPACING.sm },
+  sectionLabel: { color: theme.subtle, ...TYPE_SCALE.caption, marginTop: SPACING.lg, marginBottom: SPACING.sm },
 });

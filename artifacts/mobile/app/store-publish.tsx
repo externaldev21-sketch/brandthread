@@ -330,7 +330,7 @@ function makePubStyles(c: { FG: string; MUTED: string; SUCCESS: string; RED: str
     },
     validHeaderText: { fontSize: FS.base, fontFamily: FONT.semibold, flex: 1 },
     issueSection: { gap: SP.sm, marginTop: SP.sm },
-    issueTitle: { fontSize: FS.sm, fontFamily: FONT.bold, color: c.MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
+    issueTitle: { fontSize: FS.sm, fontFamily: FONT.bold, color: c.MUTED },
     issueRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
     issueText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
     revalidateBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', paddingVertical: SP.sm },

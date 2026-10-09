@@ -328,7 +328,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   statusPillRow: { flexDirection: 'row', marginBottom: SP.sm },
   statusPill: { borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 9, paddingVertical: 3 },
-  statusPillText: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.4, color: theme.muted },
+  statusPillText: { fontFamily: FONT.bold, fontSize: FS.xs, color: theme.muted },
   headline: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4, color: theme.text },
   headlineBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 20 },
 
@@ -342,7 +342,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, paddingTop: 2 },
   stepTime: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 2 },
 
-  cardTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, letterSpacing: 0.4, textTransform: 'uppercase', color: theme.muted, marginBottom: SP.sm },
+  cardTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.muted, marginBottom: SP.sm },
   cardBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, lineHeight: 20 },
   actions: { gap: SP.sm, marginTop: SP.md },
   row: { flexDirection: 'row', gap: SP.sm },

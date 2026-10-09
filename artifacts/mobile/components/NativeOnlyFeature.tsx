@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   },
   title: {
     maxWidth: 560,
-    fontSize: 26,
+    fontSize: 28,
     lineHeight: 32,
     fontFamily: FONT.bold,
     textAlign: 'center',

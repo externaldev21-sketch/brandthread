@@ -828,7 +828,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // theme-exempt: fixed 70%-white on this page's fixed-dark chrome, same
   // intentional pattern as the field's #1f1f1f fill and the Follow pill.
   sectionLabel: {
-    ...TYPE_SCALE.caption, fontSize: 11, letterSpacing: 1.2, fontFamily: FONT.semibold,
+    ...TYPE_SCALE.caption, fontSize: 11, fontFamily: FONT.semibold,
     color: 'rgba(255,255,255,0.7)',
     paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.lg, paddingBottom: 12,
   },

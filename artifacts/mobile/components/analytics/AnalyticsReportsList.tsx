@@ -26,7 +26,7 @@ export function AnalyticsReportsList() {
     row: { flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget + 4, paddingHorizontal: SP.md, gap: SP.sm },
     label: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: colors.foreground },
     badge: { borderRadius: RADIUS.xs, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 6, paddingVertical: 2 },
-    badgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: colors.foreground, letterSpacing: 0.5 },
+    badgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: colors.foreground },
   }), [colors]);
   return (
     <View>

@@ -269,7 +269,7 @@ const s = StyleSheet.create({
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden', marginBottom: SP.lg },
   policyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
   policyIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  policyLabel: { fontSize: 14, fontFamily: FONT.semibold },
+  policyLabel: { fontSize: 15, fontFamily: FONT.semibold },
   policySub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   policyRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 7, height: 7, borderRadius: 4 },

@@ -176,5 +176,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#000',
   },
-  tagText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
+  tagText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
 });

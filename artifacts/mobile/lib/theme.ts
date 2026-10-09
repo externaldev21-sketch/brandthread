@@ -172,11 +172,13 @@ export const FS = {
   sm:   13,
   base: 15,
   md:   17,
-  lg:   19,
+  // lg/xxl/h2/h1 sit on the iOS scale (title3 20, title1 28, largeTitle 34)
+  // so every FS token is one of TEXT's sizes.
+  lg:   20,
   xl:   22,
-  xxl:  26,
-  h2:   30,
-  h1:   36,
+  xxl:  28,
+  h2:   28,
+  h1:   34,
 } as const;
 
 // ─── Spacing ──────────────────────────────────────────────────────────────────

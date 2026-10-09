@@ -85,7 +85,7 @@ function FeeRow({ styles, label, note, value, last }: { styles: ReturnType<typeo
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1 },
   content: { padding: SP.md, paddingBottom: SP.xl * 2, gap: SP.sm },
-  sectionTitle: { color: theme.muted, fontSize: FS.xs, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: SP.sm, marginBottom: 2 },
+  sectionTitle: { color: theme.muted, fontSize: FS.xs, fontFamily: FONT.medium, marginTop: SP.sm, marginBottom: 2 },
   card: { backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
   feeRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, padding: SP.md },
   feeRowRule: { borderBottomWidth: 1, borderBottomColor: theme.border },

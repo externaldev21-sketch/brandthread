@@ -1635,7 +1635,7 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   followText: {
     fontFamily: FONT.semibold,
-    fontSize: 14,
+    fontSize: 15,
   },
   followTextNotFollowing: {
     color: '#000000',

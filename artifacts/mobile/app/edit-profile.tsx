@@ -800,10 +800,10 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     borderWidth: 3, borderColor: theme.card, overflow: 'hidden',
   },
   previewLogo: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  previewLogoText: { fontSize: 18, fontFamily: FONT.bold, color: theme.onAccent },
+  previewLogoText: { fontSize: 17, fontFamily: FONT.bold, color: theme.onAccent },
   previewInfo: { paddingHorizontal: 14, paddingTop: 8, gap: 2 },
   previewName: { fontSize: 16, fontFamily: FONT.bold, color: theme.text },
-  previewMeta: { fontSize: 12.5, fontFamily: FONT.regular, color: theme.muted },
+  previewMeta: { fontSize: 13, fontFamily: FONT.regular, color: theme.muted },
 
   bannerPreviewSlot: { marginLeft: 8 },
   bannerPreviewImage: { width: 64, height: 40, borderRadius: 8 },
@@ -824,7 +824,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 2, // theme-exempt: scrim over avatar media
   },
   imageOverlayText: { color: '#FFF', fontSize: 11, fontFamily: FONT.semibold },
-  editPhotoLink: { fontSize: 12.5, fontFamily: FONT.medium, color: theme.accentLight },
+  editPhotoLink: { fontSize: 13, fontFamily: FONT.medium, color: theme.accentLight },
 
   card: {
     backgroundColor: theme.card, marginHorizontal: 14, borderRadius: 12,
@@ -847,6 +847,6 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     padding: 0, textAlign: 'right',
   },
   charCounter: { fontSize: 11, fontFamily: FONT.regular, color: theme.muted, textAlign: 'right', marginTop: 4 },
-  inlineError: { fontSize: 11.5, fontFamily: FONT.regular, color: theme.error, paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
+  inlineError: { fontSize: 12, fontFamily: FONT.regular, color: theme.error, paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
   inlineErrorNoIndent: { fontSize: 11, fontFamily: FONT.regular, color: theme.error, marginTop: 2 },
 });

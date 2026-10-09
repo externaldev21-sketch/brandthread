@@ -118,7 +118,6 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    letterSpacing: 1.1,
     marginBottom: 2,
   },
   name: {

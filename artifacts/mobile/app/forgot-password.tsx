@@ -341,10 +341,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   backBtn: { width: 40, height: 40, justifyContent: 'center', marginBottom: 20 },
 
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
-  logoText: { fontSize: 12, fontFamily: FONT.bold, color: theme.text, letterSpacing: 2.5 },
+  logoText: { fontSize: 12, fontFamily: FONT.bold, color: theme.text },
 
   headline: {
-    fontSize: 32, fontFamily: FONT.bold,
+    fontSize: 34, fontFamily: FONT.bold,
     color: theme.text, letterSpacing: -0.8, marginBottom: 8,
   },
   subtitle: {
@@ -360,7 +360,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     fontSize: 15, fontFamily: FONT.regular, color: theme.text,
   },
   codeInput: {
-    letterSpacing: 8, fontSize: 22, textAlign: 'center',
+    fontSize: 22, textAlign: 'center',
     fontFamily: FONT.bold,
   },
   pwRow: {
@@ -390,7 +390,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   secondaryBtnText: { fontSize: 15, fontFamily: FONT.bold, color: theme.text },
 
   resendBtn:  { paddingVertical: 14, alignItems: 'center' },
-  resendText: { fontSize: 14, fontFamily: FONT.regular, color: theme.muted },
+  resendText: { fontSize: 15, fontFamily: FONT.regular, color: theme.muted },
 
   // Success card
   successCard: {
@@ -407,11 +407,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     elevation: 12,
   },
   successTitle: {
-     fontSize: 26, fontFamily: FONT.bold, color: theme.text,
+     fontSize: 28, fontFamily: FONT.bold, color: theme.text,
     letterSpacing: -0.5, marginBottom: 8, textAlign: 'center',
   },
   successSub: {
-    fontSize: 14, fontFamily: FONT.regular,
+    fontSize: 15, fontFamily: FONT.regular,
      color: theme.muted, lineHeight: 21, textAlign: 'center',
   },
 

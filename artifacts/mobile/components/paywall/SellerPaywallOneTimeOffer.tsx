@@ -117,8 +117,8 @@ const styles = StyleSheet.create({
   handleWrap: { alignItems: 'center', paddingTop: SP.xs, paddingBottom: 2 },
   handle: { width: 36, height: 4, borderRadius: RADIUS.pill, opacity: 0.3 },
   wrap: { paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.lg, alignItems: 'center' },
-  eyebrow: { fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 1.2 },
+  eyebrow: { fontSize: FS.xs, fontFamily: FONT.semibold },
   title: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center', marginTop: 8 },
-  priceRow: { fontSize: 26, fontFamily: FONT.semibold, marginTop: 12 },
+  priceRow: { fontSize: 28, fontFamily: FONT.semibold, marginTop: 12 },
   strike: { fontSize: FS.sm, fontFamily: FONT.regular, textDecorationLine: 'line-through' },
 });

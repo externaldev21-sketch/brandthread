@@ -200,9 +200,9 @@ const styles = StyleSheet.create({
   card: { borderRadius: 18, borderWidth: 1, padding: 24, alignItems: 'center' },
   icon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   title: { fontSize: 20, fontFamily: FONT.bold, textAlign: 'center' },
-  sub: { fontSize: 14, fontFamily: FONT.regular, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  sub: { fontSize: 15, fontFamily: FONT.regular, textAlign: 'center', marginTop: 8, lineHeight: 20 },
   inviteMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 16 },
   btn: { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, marginTop: 18, alignSelf: 'stretch', alignItems: 'center' },
-  btnText: { fontSize: 14, fontFamily: FONT.semibold },
+  btnText: { fontSize: 15, fontFamily: FONT.semibold },
   hint: { fontSize: 12, fontFamily: FONT.regular, marginTop: 10, textAlign: 'center' },
 });

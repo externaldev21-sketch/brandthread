@@ -395,7 +395,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
     goLiveBtn:         { marginTop: SP.xs, borderRadius: radius.md, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
     liveDot:           { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
-    goLiveBtnText:      { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 0.5 },
+    goLiveBtnText:      { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base },
 
     // Feature-products entry point
     featureProductsBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: GLASS, borderRadius: radius.md, paddingHorizontal: 14, height: 38, alignSelf: 'flex-start' },

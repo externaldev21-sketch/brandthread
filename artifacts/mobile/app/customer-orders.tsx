@@ -252,7 +252,7 @@ const s = StyleSheet.create({
   tagText:      { fontSize: 11, fontFamily: FONT.semibold },
   notes:        { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
 
-  sectionTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: FS.sm, fontFamily: FONT.semibold },
   emptyCard:    { borderRadius: 14, borderWidth: 1, padding: 32, alignItems: 'center', gap: 8 },
   emptyText:    { fontSize: FS.sm, fontFamily: FONT.regular },
   orderList:    { borderRadius: 14, borderWidth: 1 },

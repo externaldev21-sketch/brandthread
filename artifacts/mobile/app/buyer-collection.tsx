@@ -289,7 +289,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   tileImage: { width: '100%', height: '100%' },
   tilePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   tileInfo: { paddingTop: SP.xs, gap: 1 },
-  tileBrand: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.3 },
+  tileBrand: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium },
   tileTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
   tilePrice: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },

@@ -38,7 +38,7 @@ export const TYPE_SCALE: Record<TypeRoleName, TypeRole> = {
   title2:   { fontSize: 22, lineHeight: 28, fontFamily: FONT.semibold },
   headline: { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold },
   body:     { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular },
-  callout:  { fontSize: 14, lineHeight: 19, fontFamily: FONT.regular },
+  callout:  { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular },
   footnote: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular },
   caption:  { fontSize: 11, lineHeight: 13, fontFamily: FONT.medium },
 } as const;

@@ -138,7 +138,7 @@ export default function SellerDropPreview() {
         </View>
 
         <View style={{ padding: SP.md }}>
-          <Text style={{ color: theme.muted, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1, marginBottom: SP.sm }}>
+          <Text style={{ color: theme.muted, fontFamily: FONT.bold, fontSize: FS.xs, marginBottom: SP.sm }}>
             {products.length} {products.length === 1 ? 'PIECE' : 'PIECES'}
           </Text>
           <View style={styles.grid}>
@@ -175,11 +175,11 @@ const styles = StyleSheet.create({
   header: { position: 'absolute', top: 0, left: SP.md, right: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   roundBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   previewBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 6 },
-  previewBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1 },
+  previewBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11 },
   copy: { padding: 20 },
-  name: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: 32, marginBottom: 8 },
+  name: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: 34, marginBottom: 8 },
   countdownText: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.md, fontVariant: ['tabular-nums'] },
-  live: { color: '#FF3B30', fontFamily: FONT.extrabold, fontSize: FS.md, letterSpacing: 1.2 },
+  live: { color: '#FF3B30', fontFamily: FONT.extrabold, fontSize: FS.md },
   earlyAccess: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: { width: (W - SP.md * 2 - 10) / 2, borderRadius: RADIUS.sm, overflow: 'hidden' },

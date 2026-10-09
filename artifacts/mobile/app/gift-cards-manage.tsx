@@ -220,10 +220,10 @@ function makeStyles(ck: CheckoutColors) {
     chipText: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
     inlineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
     inlineButton: { marginTop: 25, minWidth: 84 },
-    total: { fontFamily: FONT.bold, fontSize: 30, color: ck.text },
+    total: { fontFamily: FONT.bold, fontSize: 28, color: ck.text },
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm + 2, borderTopWidth: 1, borderTopColor: ck.divider },
     void: { fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline', color: ck.text },
     codeBox: { gap: SP.sm, padding: SP.md, borderRadius: 14, borderWidth: 1, borderColor: ck.fieldBorder, marginBottom: SP.md },
-    code: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: 2, color: ck.text },
+    code: { fontFamily: FONT.bold, fontSize: FS.lg, color: ck.text },
   });
 }

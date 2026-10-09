@@ -129,7 +129,7 @@ const s = StyleSheet.create({
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
   rowIcon: { marginRight: 12 },
-  rowLabel: { fontSize: 14, fontFamily: FONT.semibold },
+  rowLabel: { fontSize: 15, fontFamily: FONT.semibold },
   countBadge: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3 },
   countBadgeText: { fontSize: 11, fontFamily: FONT.semibold },
   countText: { fontSize: 13, fontFamily: FONT.regular },

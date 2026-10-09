@@ -178,7 +178,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
 
 const sc = StyleSheet.create({
   root:  { marginBottom: SP.md },
-  title: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: SP.sm, paddingHorizontal: SP.md },
+  title: { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.sm, paddingHorizontal: SP.md },
 });
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
@@ -197,7 +197,7 @@ const row = StyleSheet.create({
   root:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.xs },
   label: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
   value: { fontSize: FS.sm, fontFamily: FONT.semibold, flex: 1, textAlign: 'right' },
-  mono:  { fontFamily: FONT.regular, letterSpacing: 0.5, fontSize: FS.xs },
+  mono:  { fontFamily: FONT.regular, fontSize: FS.xs },
 });
 
 // ─── Star Rating component ────────────────────────────────────────────────────
@@ -420,7 +420,7 @@ const rvs = StyleSheet.create({
   },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
   header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SP.lg },
-  eyebrow: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.6, marginBottom: 4 },
+  eyebrow: { fontFamily: FONT.bold, fontSize: FS.xs, marginBottom: 4 },
   title: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.3 },
   starsRow: { alignItems: 'center', marginBottom: SP.lg, gap: SP.sm },
   ratingLabel: { fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center' },
@@ -1363,7 +1363,7 @@ const makeStyles = (theme: AppThemePreset) => {
     trackingChip: { borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, maxWidth: 180 },
     trackingChipText: { fontSize: FS.xs, fontFamily: FONT.medium },
     returnHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-    returnEyebrow: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.7 },
+    returnEyebrow: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.xs },
     returnTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md, marginTop: 2 },
     returnDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4 },
     sellerResponse: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, padding: SP.sm, marginTop: SP.sm },
@@ -1396,7 +1396,7 @@ const makeStyles = (theme: AppThemePreset) => {
     paymentNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm, textAlign: 'center' },
 
     // Tracking
-    trackingNumberDisplay: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.text, letterSpacing: 1 },
+    trackingNumberDisplay: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.text },
     carrierChip: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
     carrierChipText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
     estDeliveryRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },

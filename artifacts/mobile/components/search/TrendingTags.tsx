@@ -56,7 +56,7 @@ export function TrendingTags({ onPress }: { onPress: (tag: string) => void }) {
 }
 
 const styles = StyleSheet.create({
-  label: { ...TYPE_SCALE.caption, fontSize: 11, fontFamily: FONT.semibold, letterSpacing: 1.2, paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.sm, paddingBottom: SPACING.xs },
+  label: { ...TYPE_SCALE.caption, fontSize: 11, fontFamily: FONT.semibold, paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.sm, paddingBottom: SPACING.xs },
   track: { flexDirection: 'row', gap: SPACING.xs, paddingHorizontal: SCREEN_GUTTER, paddingBottom: SPACING.sm },
   chip: { height: 34, borderRadius: RADII.pill, borderWidth: 1, paddingHorizontal: SPACING.md, alignItems: 'center', justifyContent: 'center' },
 });

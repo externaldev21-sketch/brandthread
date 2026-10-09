@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  messagesBadgeText: { fontFamily: FONT.bold, fontSize: 10 },
+  messagesBadgeText: { fontFamily: FONT.bold, fontSize: 11 },
 
   glass: {
     width: 44, height: 44, borderRadius: 22, borderWidth: 1,

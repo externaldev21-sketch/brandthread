@@ -462,7 +462,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   rowTitle: { fontSize: FS.base, fontFamily: FONT.medium },
   rowSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill, marginRight: SP.sm },
-  pillText: { fontSize: 10, fontFamily: FONT.bold },
+  pillText: { fontSize: 11, fontFamily: FONT.bold },
   modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#00000066' },
   muteSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingHorizontal: SP.md, paddingTop: SP.sm },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.md },

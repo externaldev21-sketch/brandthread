@@ -601,10 +601,10 @@ const styles = StyleSheet.create({
   listRowLabel: { fontSize: 13, fontFamily: FONT.medium },
   chipRow: { flexDirection: 'row', gap: 4 },
   chip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  chipText: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  chipText: { fontSize: FS.xs, fontFamily: FONT.bold },
 
   payoutInfo: { flex: 1 },
-  payoutLabel: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 3, letterSpacing: 0.3 },
+  payoutLabel: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 3 },
   payoutAccount: { fontSize: 12, fontFamily: FONT.semibold },
   viewPayoutsLink: { fontSize: 12, fontFamily: FONT.semibold },
 
@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
   dropName: { fontSize: 15, fontFamily: FONT.semibold, marginBottom: 14 },
   dropStats: { flexDirection: 'row', alignItems: 'center' },
   dropStat: { flex: 1, alignItems: 'center' },
-  dropStatVal: { fontSize: 14, fontFamily: FONT.bold, marginBottom: 2 },
+  dropStatVal: { fontSize: 15, fontFamily: FONT.bold, marginBottom: 2 },
   dropStatLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   dropDivider: { width: 1, height: 28 },
 

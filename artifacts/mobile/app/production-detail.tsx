@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: SP.md, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: SP.sm },
   statLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
   statValue: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginTop: 2 },
-  section: { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUBTLE, letterSpacing: 1, textTransform: 'uppercase' },
+  section: { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUBTLE },
   primary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, borderRadius: RADIUS.md, marginTop: SP.xs },
   primarySmall: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 14, borderRadius: RADIUS.md },
   primaryText: { fontSize: FS.base, fontFamily: FONT.bold },

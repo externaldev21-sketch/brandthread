@@ -1296,7 +1296,7 @@ function RootLayoutNav() {
         <Text style={{ color: '#F5F5F7', fontFamily: FONT.bold, fontSize: 22, textAlign: 'center' }}>
           Temporarily unavailable
         </Text>
-        <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
+        <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: 15, lineHeight: 21, textAlign: 'center' }}>
           This feature is paused while we make improvements. Your existing work is still safe.
         </Text>
         <PrimaryButton

@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   caption: {
-    fontSize: 14, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
+    fontSize: 15, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
     lineHeight: 19, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },

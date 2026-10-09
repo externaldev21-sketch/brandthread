@@ -498,7 +498,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   analyzeBtn: { marginHorizontal: SP.md, marginBottom: SP.md },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, justifyContent: 'center', padding: SP.md },
   loadingText: { fontSize: FS.base, fontFamily: FONT.medium, color: MUTED },
-  resultSectionLabel: { fontSize: FS.sm, fontFamily: FONT.bold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
+  resultSectionLabel: { fontSize: FS.sm, fontFamily: FONT.bold, color: MUTED },
   swatchRow: { flexDirection: 'row', gap: SP.md },
   swatch: { width: 48, height: 48, borderRadius: RADIUS.sm },
   paletteRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

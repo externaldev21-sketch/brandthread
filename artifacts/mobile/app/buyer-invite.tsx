@@ -241,11 +241,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     alignItems: 'center',
   },
   codeLabel: {
-    fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted,
-    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm,
+    fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, marginBottom: SP.sm,
   },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
-  codeText: { fontSize: 32, fontFamily: FONT.bold, color: theme.text, letterSpacing: 6 },
+  codeText: { fontSize: 34, fontFamily: FONT.bold, color: theme.text },
   copyPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: theme.accentDim, paddingHorizontal: 14, paddingVertical: SP.sm, borderRadius: RADIUS.pill,
@@ -275,7 +274,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md, gap: SP.sm,
   },
   sectionLabel: {
-    fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.8,
+    fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted,
   },
   joinedRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   joinedName: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },

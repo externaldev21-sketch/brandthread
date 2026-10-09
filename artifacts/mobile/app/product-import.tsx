@@ -386,7 +386,7 @@ export default function ProductImportScreen() {
       <Modal visible={showCsvModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowCsvModal(false)}>
         <View style={{ flex: 1, backgroundColor: BG, padding: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <Text style={{ fontSize: 18, fontFamily: FONT.bold, color: FG }}>Paste CSV Data</Text>
+            <Text style={{ fontSize: 17, fontFamily: FONT.bold, color: FG }}>Paste CSV Data</Text>
             <TouchableOpacity
               onPress={() => setShowCsvModal(false)}
               style={{ width: 44, height: 44, backgroundColor: SURFACE, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' }}

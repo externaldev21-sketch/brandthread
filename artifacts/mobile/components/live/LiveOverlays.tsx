@@ -423,11 +423,11 @@ const styles = StyleSheet.create({
   hostTap: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0 },
   hostText: { flexShrink: 1, minWidth: 0, justifyContent: 'center' },
   hostNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
-  hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 14, lineHeight: 18, flexShrink: 1 },
+  hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 15, lineHeight: 18, flexShrink: 1 },
   hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 16, marginTop: 2 },
   hostMeta: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 },
-  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 12, letterSpacing: 0.8 },
+  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 12 },
   followBtn: {
     minWidth: 66, height: 32, paddingHorizontal: 14, borderRadius: radius.sm,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   // Nested inside the chat Text (not a row View) so "username HOST message"
   // flows and wraps as one line of text instead of the tag forcing a break.
   hostTagText: {
-    color: '#000', backgroundColor: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.6,
+    color: '#000', backgroundColor: '#fff', fontFamily: FONT.bold, fontSize: FS.xs,
     borderRadius: 3,
   },
   eventPill: {
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   // text color subpixel-antialiases against the live video underneath, which
   // reads as a soft/smudgy mid-grey rather than a crisp silver (see
   // lib/theme.ts's ON_DARK_MUTED doc comment).
-  pinnedEyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.6 },
+  pinnedEyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.bold, fontSize: FS.xs },
   pinnedName: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 1 },
   pinnedPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
   pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.sm },

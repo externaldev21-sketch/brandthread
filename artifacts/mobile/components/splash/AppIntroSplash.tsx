@@ -411,6 +411,5 @@ const styles = StyleSheet.create({
   wordmarkChar: {
     fontFamily: FONT.semibold,
     fontSize: 13,
-    letterSpacing: 4,
   },
 });

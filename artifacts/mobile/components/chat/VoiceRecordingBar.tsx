@@ -117,5 +117,5 @@ const rs = StyleSheet.create({
   sendBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   micGhost: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', opacity: 0.5 },
   webLockRow: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center', paddingTop: 6 },
-  webLockText: { fontFamily: FONT.regular, fontSize: 10 },
+  webLockText: { fontFamily: FONT.regular, fontSize: 11 },
 });

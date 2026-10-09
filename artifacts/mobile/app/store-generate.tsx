@@ -1276,7 +1276,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   contentNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: FG, flex: 1 },
   // Features
   featureGroup: { gap: SP.sm },
-  featureGroupLabel: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT, letterSpacing: 0.3 },
+  featureGroupLabel: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',

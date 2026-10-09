@@ -398,7 +398,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     cardName: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
     cardValue: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginTop: 2, marginBottom: 2 },
     metaText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
-    label: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+    label: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
     input: { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
     segRow: { flexDirection: 'row', gap: 8 },
     seg: { paddingVertical: 11, paddingHorizontal: 10, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },

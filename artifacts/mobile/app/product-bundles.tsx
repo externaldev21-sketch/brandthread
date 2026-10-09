@@ -147,6 +147,6 @@ const r = StyleSheet.create({
   badge:       { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill },
   activeBadge: { backgroundColor: SUCCESS_DIM },
   draftBadge:  { backgroundColor: ORANGE_DIM },
-  badgeText:   { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.4 },
+  badgeText:   { fontFamily: FONT.semibold, fontSize: FS.xs },
   meta:        { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
 });

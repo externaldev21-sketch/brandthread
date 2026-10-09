@@ -534,7 +534,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   analyzeBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, justifyContent: 'center', padding: SP.md },
   loadingText: { fontSize: FS.base, fontFamily: FONT.medium, color: MUTED },
-  resultLabel: { fontSize: FS.sm, fontFamily: FONT.bold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
+  resultLabel: { fontSize: FS.sm, fontFamily: FONT.bold, color: MUTED },
   resultValue: { fontSize: FS.base, fontFamily: FONT.regular, color: FG },
   divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)' },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

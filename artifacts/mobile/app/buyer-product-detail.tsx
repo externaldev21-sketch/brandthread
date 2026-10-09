@@ -483,7 +483,7 @@ const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   colorDot: { width: 28, height: 28, borderRadius: RADII.chip - 2 },
   unavail: { opacity: 0.4 },
   slashOverlay: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  slash: { fontSize: 18, color: RED, fontFamily: FONT.bold },
+  slash: { fontSize: 17, color: RED, fontFamily: FONT.bold },
   });
 };
 
@@ -1686,7 +1686,7 @@ function WornInVideos({ productId, productName }: { productId: string; productNa
 
 const wv = StyleSheet.create({
   divider: { height: 1, marginVertical: SP.md },
-  header: { fontSize: FS.sm, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  header: { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.sm },
   card: { width: 104 },
   thumb: { width: 104, height: 150, borderRadius: RADIUS.md },
   playBadge: {
@@ -1814,7 +1814,7 @@ const makeSizeChartStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => 
   cell:       { width: 72, paddingVertical: 8, paddingHorizontal: 4, justifyContent: 'center' },
   sizeCell:   { width: 52 },
   headerCell: { backgroundColor: PURPLE_DIM },
-  headerText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: PURPLE_LIGHT, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4 },
+  headerText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: PURPLE_LIGHT, textAlign: 'center' },
   sizeText:   { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG, textAlign: 'center' },
   valueText:  { fontFamily: FONT.medium, fontSize: FS.meta, color: MUTED, textAlign: 'center' },
   notes:      { fontFamily: FONT.medium, fontSize: FS.meta, color: SUBTLE, marginTop: SP.sm, lineHeight: 17 },
@@ -1884,9 +1884,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  preOrderBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: CYAN, letterSpacing: 0.4 },
+  preOrderBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: CYAN },
   saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
+  saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED },
   productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
   addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
   addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
@@ -1943,7 +1943,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   stockRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SP.sm },
   stockDot: { width: 8, height: 8, borderRadius: 4 },
   stockText: { fontSize: FS.sm, fontFamily: FONT.medium },
-  descTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  descTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
   desc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 22 },
   // Passed as StickyFooter's own `style` — it already supplies the absolute
   // positioning, safe-area/tab-bar-aware bottom padding, background, and
@@ -1959,7 +1959,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
   },
   buyNowBtn: { flex: 1 },
-  reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
   reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   reviewStars: { fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD, marginBottom: 2 },
   reviewBody: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 20 },

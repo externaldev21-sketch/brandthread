@@ -166,7 +166,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 40,
     marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
-  followAllText: { fontSize: 14, fontFamily: FONT.semibold },
+  followAllText: { fontSize: 15, fontFamily: FONT.semibold },
   loadingWrap: { paddingVertical: SPACE.xxl, alignItems: 'center' },
   emptyText: { ...TYPE.label, color: theme.muted, paddingVertical: SPACE.lg, textAlign: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SPACE.xs },

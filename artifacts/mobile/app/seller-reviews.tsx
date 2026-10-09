@@ -281,7 +281,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   statsRow:   { flexDirection: 'row', padding: 16, gap: 0, borderBottomWidth: 1, borderBottomColor: BORDER },
   stat:       { flex: 1, alignItems: 'center', gap: 2 },
-  statVal:    { fontSize: 18, fontFamily: FONT.bold, color: FG },
+  statVal:    { fontSize: 17, fontFamily: FONT.bold, color: FG },
   statLabel:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   statDivider: { width: 1, backgroundColor: BORDER, marginVertical: 4 },
 
@@ -298,7 +298,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   replyBox:   { backgroundColor: PURPLE_DIM, borderRadius: 10, padding: 12, gap: 6 },
   replyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  replyLabel: { fontSize: 11, fontFamily: FONT.semibold, color: PURPLE_LIGHT, textTransform: 'uppercase', letterSpacing: 0.5 },
+  replyLabel: { fontSize: 11, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   replyText:  { fontSize: 13, fontFamily: FONT.regular, color: FG, lineHeight: 19 },
 
   replyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: PURPLE + '44' },
@@ -314,7 +314,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   submitText: { fontSize: 13, fontFamily: FONT.bold, color: ON_ACCENT },
 
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
-  errorText:  { fontSize: 14, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
+  errorText:  { fontSize: 15, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
   retryBtn:   { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: BORDER },
   retryText:  { fontSize: 13, fontFamily: FONT.semibold, color: FG },
   emptyTitle: { fontSize: 16, fontFamily: FONT.bold, color: FG },

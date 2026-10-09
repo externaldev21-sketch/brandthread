@@ -746,13 +746,13 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 16, backgroundColor: '#3D2B56', overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
   },
-  avatarLetter: { color: '#fff', fontFamily: FONT.bold, fontSize: 14 },
+  avatarLetter: { color: '#fff', fontFamily: FONT.bold, fontSize: 15 },
   hostText: { flexShrink: 1 },
   hostNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   hostName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 13, flexShrink: 1 },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, height: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 2 },
-  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
+  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   viewerText: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
   // Monochrome brand: red is reserved for the LIVE badge only, so Follow is
   // a plain white pill with black text (the "following" state drops to a
@@ -792,7 +792,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 6,
   },
   captionText: {
-    color: '#fff', fontFamily: FONT.medium, fontSize: 14, textAlign: 'center', lineHeight: 18,
+    color: '#fff', fontFamily: FONT.medium, fontSize: 15, textAlign: 'center', lineHeight: 18,
   },
   captionUser: { fontFamily: FONT.bold },
 

@@ -338,7 +338,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   sheetCard:     { maxHeight: '80%', backgroundColor: theme.background, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border },
   sheetCategoryPill: { alignSelf: 'flex-start', backgroundColor: theme.accentDim, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4 },
-  sheetCategoryText: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.3, textTransform: 'uppercase' },
+  sheetCategoryText: { fontSize: FS.xs, fontFamily: FONT.bold },
   sheetTitle:    { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 },
   sheetBody:     { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted, lineHeight: 23 },
 });

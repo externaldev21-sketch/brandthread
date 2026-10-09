@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   section: { marginTop: SP.lg, gap: SP.sm },
   sectionTitle: { fontFamily: FONT.bold, fontSize: FS.base, marginBottom: 2 },
   upRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: RADIUS.md, padding: 10 },
-  upWhen: { fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.8 },
+  upWhen: { fontFamily: FONT.bold, fontSize: 11 },
   upTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 2 },
   upHost: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
   pillBtn: { flexDirection: 'row', alignItems: 'center', height: 32, paddingHorizontal: 12, borderRadius: radius.sm },

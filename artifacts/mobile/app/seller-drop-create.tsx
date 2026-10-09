@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   field: { gap: 8 },
-  label: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1 },
+  label: { fontFamily: FONT.bold, fontSize: FS.xs },
   hint: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   input: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, fontSize: FS.sm, fontFamily: FONT.medium },
   segmented: { flexDirection: 'row', gap: 8 },

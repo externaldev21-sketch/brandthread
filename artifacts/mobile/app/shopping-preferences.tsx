@@ -275,7 +275,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   catChipActive: { backgroundColor: colors.accent, borderColor: colors.primary },
-  catEmoji: { fontSize: 14 },
+  catEmoji: { fontSize: 15 },
   catLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   catLabelActive: { color: colors.primary },
 

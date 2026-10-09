@@ -414,7 +414,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
   },
   readyText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm },
-  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, marginTop: SP.lg, marginBottom: SP.sm },
   listCard: { padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, gap: 10 },
   listRow: { flexDirection: 'row', gap: SP.sm },
   listText: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
@@ -427,7 +427,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   fieldLabel: { color: theme.muted, fontFamily: FONT.medium, fontSize: FS.sm, marginTop: SP.xl, marginBottom: SP.sm },
   input: {
     height: 54, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
-    color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: 2, paddingHorizontal: SP.md,
+    color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg, paddingHorizontal: SP.md,
   },
   passwordInput: { fontFamily: FONT.medium, fontSize: FS.base, letterSpacing: 0 },
   codeLink: { alignSelf: 'flex-start', marginTop: SP.sm, minHeight: 28, justifyContent: 'center' },

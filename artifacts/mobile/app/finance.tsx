@@ -345,8 +345,8 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   plRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  plLabel: { fontSize: 14 },
-  plValue: { fontSize: 14 },
+  plLabel: { fontSize: 15 },
+  plValue: { fontSize: 15 },
   cashRow: { padding: 14, gap: 8 },
   cashBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   cashFill: { height: '100%', borderRadius: 4 },
@@ -356,10 +356,10 @@ const styles = StyleSheet.create({
   expName: { fontSize: 13, fontFamily: FONT.medium },
   expMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   expDate: { fontSize: 11, fontFamily: FONT.regular },
-  expAmount: { fontSize: 14, fontFamily: FONT.semibold },
+  expAmount: { fontSize: 15, fontFamily: FONT.semibold },
   docRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   docIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  docLabel: { flex: 1, fontSize: 14, fontFamily: FONT.regular },
+  docLabel: { flex: 1, fontSize: 15, fontFamily: FONT.regular },
 
   // Subscription card
   subCard: {

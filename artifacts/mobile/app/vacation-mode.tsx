@@ -197,7 +197,7 @@ const createStyles = (theme: { accent: string }) => {
   toggleSub:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
 
   card:       { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
-  label:      { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 },
+  label:      { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginBottom: 6 },
   optional:   { fontFamily: FONT.regular, textTransform: 'none', letterSpacing: 0 },
   input:      { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, minHeight: 44 },
   fieldHint:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 6 },

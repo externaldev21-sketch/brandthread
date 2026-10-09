@@ -1623,7 +1623,7 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
   chooseScroll: { flexGrow: 1, paddingVertical: 24, gap: 0 },
-  chooseHeadline: { fontSize: 36, fontFamily: FONT.bold, color: FG, letterSpacing: -1.2, marginBottom: 8 },
+  chooseHeadline: { fontSize: 34, fontFamily: FONT.bold, color: FG, letterSpacing: -1.2, marginBottom: 8 },
   chooseSub: { fontSize: 15, fontFamily: FONT.regular, color: MUTED, lineHeight: 22, marginBottom: 32 },
   bigRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
@@ -1634,22 +1634,22 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   bigRowIcon: { width: 28, alignItems: 'center' },
   bigRowText: { flex: 1, fontSize: 15, fontFamily: FONT.semibold, color: FG },
   signInLink: { paddingVertical: 16, alignItems: 'center' },
-  signInLinkText: { fontSize: 14, fontFamily: FONT.regular, color: MUTED },
+  signInLinkText: { fontSize: 15, fontFamily: FONT.regular, color: MUTED },
   backToChoose: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
-  backToChooseText: { fontSize: 14, fontFamily: FONT.medium, color: MUTED },
+  backToChooseText: { fontSize: 15, fontFamily: FONT.medium, color: MUTED },
   headline:  { fontSize: 28, fontFamily: FONT.bold, color: FG, letterSpacing: -0.5, marginBottom: 4 },
-  sub:       { fontSize: 14, fontFamily: FONT.regular, color: MUTED, marginBottom: 20 },
+  sub:       { fontSize: 15, fontFamily: FONT.regular, color: MUTED, marginBottom: 20 },
   inputWrap: { marginBottom: 12 },
   label:     { fontSize: 12, fontFamily: FONT.semibold, color: MUTED, marginBottom: 5 },
   input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: FONT.regular, color: FG },
-  codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: FONT.bold },
+  codeInput: { fontSize: 22, textAlign: 'center', fontFamily: FONT.bold },
   pwRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12 },
   pwInput:   { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
   eyeBtn:    { paddingHorizontal: 14 },
   hint:      { fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginTop: 4 },
   error:     { color: ERR, fontSize: 13, fontFamily: FONT.regular, marginBottom: 10 },
   resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 6 },
-  resendText:{ fontSize: 14, fontFamily: FONT.regular, color: MUTED },
+  resendText:{ fontSize: 15, fontFamily: FONT.regular, color: MUTED },
   legal:     { fontSize: 12, fontFamily: FONT.regular, color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
   existingEmailChip: {
     alignSelf: 'flex-start',
@@ -1665,7 +1665,7 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: 17, fontFamily: FONT.bold, color: FG, marginBottom: 6, lineHeight: 23,
   },
   existingCardSub: {
-    fontSize: 14, fontFamily: FONT.regular, color: MUTED, lineHeight: 20,
+    fontSize: 15, fontFamily: FONT.regular, color: MUTED, lineHeight: 20,
   },
   existingSignInBtn:  { marginBottom: 9, borderRadius: 12, overflow: 'hidden' },
   existingSignInGrad: { paddingVertical: 16, alignItems: 'center', borderRadius: 12 },
@@ -1679,7 +1679,7 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   sessionBtnGrad: { paddingVertical: 16, alignItems: 'center', paddingHorizontal: 20 },
   sessionBtnText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   continueBtn:    { paddingVertical: 14, alignItems: 'center' },
-  continueBtnText:{ fontSize: 14, fontFamily: FONT.medium, color: MUTED },
+  continueBtnText:{ fontSize: 15, fontFamily: FONT.medium, color: MUTED },
   });
 };
 
@@ -1706,7 +1706,7 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14, paddingVertical: 8, marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
-  existingEmailText: { fontSize: 14, fontFamily: FONT.semibold },
+  existingEmailText: { fontSize: 15, fontFamily: FONT.semibold },
   existingCard: {
     borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth,
     padding: SPACE.md + 2,
@@ -1858,7 +1858,7 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, ERR = theme.error;
   return StyleSheet.create({
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xl },
-  sectionLabel: { ...TYPE.eyebrow, color: FG, textTransform: 'uppercase', marginTop: SPACE.xl, marginBottom: SPACE.sm },
+  sectionLabel: { ...TYPE.eyebrow, color: FG, marginTop: SPACE.xl, marginBottom: SPACE.sm },
   themeRow: { gap: SPACE.xs, paddingRight: SPACE.xs },
   themeCard: { width: 104, padding: 6, borderRadius: 18, backgroundColor: CARD, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER },
   themeSwatch: { height: 56, borderRadius: 13, padding: 10, justifyContent: 'space-between' },

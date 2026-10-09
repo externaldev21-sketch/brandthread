@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   divider: { height: 10 },
   manageBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   manageBtnText: { fontSize: 13, fontFamily: FONT.semibold },
-  rowLabel: { fontSize: 14, fontFamily: FONT.semibold },
+  rowLabel: { fontSize: 15, fontFamily: FONT.semibold },
   rowDescription: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2, lineHeight: 17 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 12 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 2 },

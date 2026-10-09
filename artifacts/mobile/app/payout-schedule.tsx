@@ -364,7 +364,7 @@ const createStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: SP.md, paddingBottom: SP.lg },
-    sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm },
+    sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm },
     card: { backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, padding: SP.md, marginBottom: SP.sm },
     cardOn: { borderColor: text, borderWidth: 2, padding: SP.md - 1 },
     cardOff: { opacity: 0.6 },

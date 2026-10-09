@@ -84,7 +84,7 @@ function HLFormModal({
                 accessibilityRole="button"
                 accessibilityLabel="Change highlight emoji"
               >
-                <Text style={{ fontSize: 36 }}>{emoji}</Text>
+                <Text style={{ fontSize: 34 }}>{emoji}</Text>
                 <Text style={[s.emojiHint, { color: colors.mutedForeground }]}>
                   {emojiGridOpen ? 'Choose below' : 'Tap to change'}
                 </Text>
@@ -419,7 +419,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', paddingBottom: SPACING.md },
   emojiBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   labelInput: { borderWidth: 1, borderRadius: RADII.input, padding: SPACING.md, ...TYPE_SCALE.body, marginBottom: SPACING.md },
-  colorLabel: { fontFamily: FONT.semibold, ...TYPE_SCALE.caption, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SPACING.sm },
+  colorLabel: { fontFamily: FONT.semibold, ...TYPE_SCALE.caption, marginBottom: SPACING.sm },
   colorRow: { flexDirection: 'row', gap: 10, marginBottom: SPACING.lg, flexWrap: 'wrap' },
   colorSwatch: { width: 32, height: 32, borderRadius: 16 },
   colorSwatchActive: { borderWidth: 3 },

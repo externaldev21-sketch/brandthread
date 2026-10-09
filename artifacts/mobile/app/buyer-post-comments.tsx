@@ -1521,7 +1521,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   emojiBtn: { alignItems: 'center', justifyContent: 'center' },
   composerFlush: { paddingHorizontal: 0, paddingTop: 0, backgroundColor: CARD },
   inputTool: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
-  mentionIcon: { color: MUTED, fontFamily: FONT.bold, fontSize: 18, lineHeight: 20 },
+  mentionIcon: { color: MUTED, fontFamily: FONT.bold, fontSize: 17, lineHeight: 20 },
 
   // Actions sheet
   sheetScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.55)' }, // theme-exempt: matches components/ui/BottomSheet.tsx's backdrop
