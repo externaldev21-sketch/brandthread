@@ -38,6 +38,21 @@ function scopedTab(tab: string): string {
 
 const memoryCache = new Map<string, unknown[]>();
 
+/**
+ * Bumped on every follow, unfollow, block or unblock. The feed compares it on
+ * refocus so the Following tab picks up a newly followed account's posts as
+ * soon as the viewer comes back, without resetting the feed on the tap itself.
+ */
+let followGraphVersion = 0;
+
+export function noteFollowGraphChanged(): void {
+  followGraphVersion += 1;
+}
+
+export function getFollowGraphVersion(): number {
+  return followGraphVersion;
+}
+
 /** Synchronous — returns whatever is already in memory for this tab, or undefined. */
 export function getCachedFeedPosts<T>(tab: string): T[] | undefined {
   return memoryCache.get(scopedTab(tab)) as T[] | undefined;

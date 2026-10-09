@@ -14,7 +14,7 @@ vi.mock("@workspace/db", () => ({
 }));
 
 import { MemoryStore, __setCacheStoreForTests } from "../../lib/cacheStore";
-import { cacheKeyFor, invalidateResponseCache, responseCache } from "../responseCache";
+import { bumpResponseCacheGeneration, cacheKeyFor, forgetViewerBlocksMemo, invalidateResponseCache, responseCache } from "../responseCache";
 
 let server: Server;
 let base = "";
@@ -29,6 +29,10 @@ async function start() {
     if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
     res.setHeader("Cache-Control", "public, max-age=30");
     res.status(status).json({ q: req.query.q ?? null, n: hits, viewer: auth.userId });
+  });
+  app.get("/gen-search", responseCache({ name: "gsearch", ttlSeconds: 30, scope: "viewer-blocks", generational: true }), (req, res) => {
+    hits++;
+    res.json({ q: req.query.q ?? null, n: hits, viewer: auth.userId });
   });
   app.get("/product/:id", responseCache({ name: "product", ttlSeconds: 15, scope: "anon", idKey: (r) => String(r.params.id) }), (req, res) => {
     hits++;
@@ -112,6 +116,27 @@ describe("responseCache with a store", () => {
     expect((await get("/search?q=blocked")).cache).toBe("HIT");
     auth.userId = null;
     expect((await get("/search?q=blocked")).body.viewer).toBeNull();
+  });
+
+  it("a fresh block is honored on the next request once the memo is forgotten", async () => {
+    auth.userId = "viewer_new_blocker";
+    await get("/search?q=fresh"); // memo says "no blocks": served the shared entry
+    blocks.users.add("viewer_new_blocker");
+    expect((await get("/search?q=fresh")).cache).toBe("HIT"); // stale memo, still shared
+    await forgetViewerBlocksMemo("viewer_new_blocker", "someone_else");
+    const after = await get("/search?q=fresh");
+    expect(after.cache).toBe("MISS");
+    expect(after.body.viewer).toBe("viewer_new_blocker");
+  });
+
+  it("a generation bump drops every entry of that namespace, and only that one", async () => {
+    await get("/gen-search?q=a");
+    await get("/search?q=a");
+    expect((await get("/gen-search?q=a")).cache).toBe("HIT");
+    await bumpResponseCacheGeneration("gsearch");
+    expect((await get("/gen-search?q=a")).cache).toBe("MISS");
+    expect((await get("/gen-search?q=a")).cache).toBe("HIT");
+    expect((await get("/search?q=a")).cache).toBe("HIT");
   });
 
   it("memoizes the has-blocks lookup instead of querying per request", async () => {

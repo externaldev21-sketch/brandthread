@@ -45,6 +45,7 @@ import { viewerPostStates } from "../lib/viewerPostState";
 import { followingSortDirection } from "../lib/followingSort";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
 import { viewerCanSeeContent } from "../lib/privateAccount";
+import { afterBlockChange, afterFollowChange } from "../lib/relationshipCaches";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -373,6 +374,7 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
     })();
   }
 
+  if (result.inserted.length > 0) await afterFollowChange(myId);
   res.json({ ok: true, isFollowing: true, followersCount: result.followersCount, followingCount: await followingCount(myId) });
 });
 
@@ -415,6 +417,7 @@ router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
       .where(eq(follows.followingId, target));
     return countRow?.n ?? 0;
   });
+  await afterFollowChange(myId);
   res.json({ ok: true, isFollowing: false, followersCount, followingCount: await followingCount(myId) });
 });
 
@@ -455,6 +458,7 @@ router.delete("/followers/:userId", rateLimit("follow"), async (req, res) => {
       .where(eq(follows.followingId, myId));
     return { removed: deleted.length > 0, followersCount: countRow?.n ?? 0 };
   });
+  if (result.removed) await afterFollowChange(target);
 
   res.json({ ok: true, removed: result.removed, followersCount: result.followersCount });
 });
@@ -884,7 +888,8 @@ router.get("/following", async (req, res) => {
   const orderClause = direction === "asc" ? asc(follows.createdAt) : desc(follows.createdAt);
   const rows = await db
     .select({ followingId: follows.followingId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followerId, ownerId))
+    // On someone else's list, people with a block either way against the viewer are left out.
+    .from(follows).where(and(eq(follows.followerId, ownerId), notBlockedWith(myId, follows.followingId)))
     .orderBy(orderClause)
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
@@ -922,7 +927,7 @@ router.get("/followers", async (req, res) => {
   const { limit, offset } = page.data;
   const rows = await db
     .select({ followerId: follows.followerId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followingId, ownerId))
+    .from(follows).where(and(eq(follows.followingId, ownerId), notBlockedWith(myId, follows.followerId)))
     .orderBy(desc(follows.createdAt))
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
@@ -1740,6 +1745,7 @@ router.post("/block", async (req, res) => {
       and(eq(followRequests.requesterId, userId), eq(followRequests.targetId, myId)),
     ));
   });
+  await afterBlockChange(myId, userId);
 
   res.json({ ok: true });
 });
@@ -1761,6 +1767,7 @@ router.delete("/block/:userId", async (req, res) => {
   const target = (await resolveToClerkId(req.params.userId)) ?? req.params.userId;
   await db.delete(blocks)
     .where(and(eq(blocks.blockerId, myId), eq(blocks.blockedId, target)));
+  await afterBlockChange(myId, target);
   res.json({ ok: true });
 });
 

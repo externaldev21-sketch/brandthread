@@ -250,7 +250,7 @@ export default function BuyerStoryViewer() {
     const viewKey = `${myUserId}:${id}`;
     if (recordedViewsRef.current.has(viewKey)) return;
     recordedViewsRef.current.add(viewKey);
-    api.social.viewStory(id).catch(() => { recordedViewsRef.current.delete(viewKey); });
+    trackStoryView(id).catch(() => { recordedViewsRef.current.delete(viewKey); });
   }, [api, currentStory?.id, currentStory?.authorId, myUserId, isHighlight]);
 
   // Seed like state from server story data

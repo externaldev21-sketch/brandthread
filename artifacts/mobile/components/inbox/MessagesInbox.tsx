@@ -281,6 +281,8 @@ type StoryTrayRow = {
    *  for the tray by being LIVE (tapping them opens the live pager, never
    *  the story viewer, so no story needs to be resolved). */
   storyId: string | null;
+  /** Full oldest-first reel, so every shown story is recorded as seen. */
+  storyIds?: string[];
   seen: boolean;
   closeFriendsOnly: boolean;
   latestCreatedAt: number;
@@ -468,7 +470,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       setStoryTrayRows(others.map(r => ({
         authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
         color: r.authorColor, avatarUri: r.avatarUrl ?? undefined,
-        storyId: r.storyIds[r.storyIds.length - 1] ?? null, seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
+        storyId: r.storyIds[r.storyIds.length - 1] ?? null, storyIds: [...r.storyIds].reverse(), seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
       })));
       // Resolve the real (media-bearing) Story objects so the viewer — which
       // reads its queue purely from local storage — can actually show them.
@@ -753,7 +755,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   const storyQueue: Array<{ authorId: string; storyId: string }> = [
     ...(myStoryId ? [{ authorId: 'me', storyId: myStoryId }] : []),
     ...orderedStoryTray.filter((r): r is StoryTrayRow & { storyId: string } => !!r.storyId)
-      .map(r => ({ authorId: r.authorId, storyId: r.storyId })),
+      .flatMap(r => (r.storyIds?.length ? r.storyIds : [r.storyId]).map(storyId => ({ authorId: r.authorId, storyId }))),
   ];
 
   function openStoryViewerFor(authorId: string) {

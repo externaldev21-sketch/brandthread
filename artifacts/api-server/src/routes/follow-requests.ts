@@ -20,6 +20,7 @@ import { actorFieldsFromProfile } from "../lib/activityEvents";
 import { profilesById } from "../lib/safety";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
 import { CLOSE_FRIENDS_MAX, normalizeCloseFriendIds, relationshipLockKey } from "../lib/privateAccount";
+import { afterFollowChange } from "../lib/relationshipCaches";
 
 const router = Router();
 router.use(requireAuth);
@@ -106,6 +107,7 @@ async function resolveRequest(req: any, res: any, action: "approve" | "decline")
 
   if (!result.found) { res.status(404).json({ error: "Follow request not found" }); return; }
   if (result.approved && result.inserted.length > 0) {
+    await afterFollowChange(requesterId);
     promotePendingRequestsOnFollow(requesterId, myId).catch(() => { /* non-critical */ });
     (async () => {
       try {

@@ -24,6 +24,8 @@ import {
 import { reportServerError } from '@/lib/monitoringHooks';
 import { trackAfter } from '@/lib/analytics/trackAfter';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { noteFollowGraphChanged } from '@/lib/feedPostsCache';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type { StatementDetail, StatementFormat, StatementList } from '@/lib/statements';
 import type { PayoutDetail, PayoutScheduleInfo, WeeklyAnchor } from '@/lib/payoutScheduleView';
@@ -3042,10 +3044,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
       /** Follow another buyer */
       follow: (userId: string) =>
-        trackAfter(post<{ ok: boolean; isFollowing: boolean; followersCount: number; followingCount?: number; status?: 'requested' }>('/api/social/follow', { userId }), [['follow', { surface: 'profile' }]]),
+        trackAfter(post<{ ok: boolean; isFollowing: boolean; followersCount: number; followingCount?: number; status?: 'requested' }>('/api/social/follow', { userId }), [['follow', { surface: 'profile' }]])
+          .then((res) => { noteFollowGraphChanged(); return res; }),
       /** Unfollow a buyer */
       unfollow: (userId: string) =>
-        del<{ ok: boolean; isFollowing: boolean; followersCount: number; followingCount?: number }>(`/api/social/follow/${encodeURIComponent(userId)}`),
+        del<{ ok: boolean; isFollowing: boolean; followersCount: number; followingCount?: number }>(`/api/social/follow/${encodeURIComponent(userId)}`)
+          .then((res) => { noteFollowGraphChanged(); return res; }),
       /** Batch follow state for up to 100 accounts, keyed by the ids as sent. */
       statuses: (userIds: string[]) =>
         get<Record<string, { isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean }>>(
