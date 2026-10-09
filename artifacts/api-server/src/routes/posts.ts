@@ -600,7 +600,7 @@ router.get("/feed", requireAuth, async (req, res) => {
 // feed means a buyer post can never surface there no matter what fields are
 // set on it, but we additionally hard-block video/product-tagging for buyers
 // below so the write path itself can't be used to fake a Thread post.
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, rateLimit("post-create"), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
 
   const [poster] = await db
