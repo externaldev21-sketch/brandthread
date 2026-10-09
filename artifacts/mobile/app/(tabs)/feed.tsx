@@ -30,6 +30,7 @@ import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
+import { useFeedWatchSignals } from '@/hooks/useFeedWatchSignals';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
 import {
@@ -1034,6 +1035,8 @@ type VideoVisualProps = {
   isActive: boolean;
   paused: boolean;
   onWatched?: () => void;
+  /** Feed post id to record watch time / skips for (For You ranking). */
+  signalPostId?: string;
   muted?: boolean;
   posterUri?: string;
   posterSource?: ImageSourcePropType;
@@ -1176,6 +1179,7 @@ function LiveVideoVisual({
   isActive,
   paused,
   onWatched,
+  signalPostId,
   muted = false,
   posterUri,
   posterSource,
@@ -1267,6 +1271,7 @@ function LiveVideoVisual({
   }, [isActive, player, progressBottom]);
   const isScreenFocused = useIsFocused();
   useMeaningfulVideoWatch(player, isActive && !paused && isScreenFocused, onWatched);
+  useFeedWatchSignals(player, isActive, signalPostId);
   React.useEffect(() => {
     // isFocused is required (not just isActive) so navigating to a modal on
     // top of the feed (e.g. the comments sheet) pauses this clip, and — the
@@ -1666,6 +1671,7 @@ function SpotlightPageImpl({
                 preload={preload}
                 paused={paused || holdPaused}
                 onWatched={() => onVideoWatched(item.id)}
+                signalPostId={item.id}
                 rate={speedActive ? 2 : 1}
                 muted={!soundOn}
                 posterUri={item.videoPosterUri}
