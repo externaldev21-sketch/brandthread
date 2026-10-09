@@ -25,6 +25,7 @@ import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant }
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
 import { blockedUserIds, isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
+import { taggedProductVisibleTo } from "../lib/productVisibility";
 import {
   paginationMetadata,
   parsePagination,
@@ -529,7 +530,7 @@ router.get("/collections/:id", async (req, res) => {
         id: collection.id,
         name: collection.name,
         coverImageUrl,
-        itemCount: items.length,
+        itemCount: adaptedItems.length,
         ownerName: owner?.brandName ?? owner?.displayName ?? "Brandthread",
       },
       items: adaptedItems,
@@ -1360,7 +1361,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       })
       .from(postTaggedProducts)
       .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-      .where(inArray(postTaggedProducts.postId, postIds));
+      .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(viewerId)));
 
     for (const t of tags) {
       if (!tagsByPost.has(t.postId)) tagsByPost.set(t.postId, []);
@@ -1753,7 +1754,7 @@ router.get("/posts", async (req, res) => {
         })
         .from(postTaggedProducts)
         .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-        .where(inArray(postTaggedProducts.postId, postIds))
+        .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(viewerId)))
         .orderBy(postTaggedProducts.position),
 
       db

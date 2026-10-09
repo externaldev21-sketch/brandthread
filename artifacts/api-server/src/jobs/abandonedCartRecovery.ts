@@ -35,6 +35,19 @@ export const PUSH_REMINDER_AFTER_MS = 60 * 60 * 1000;
 export const EMAIL_REMINDER_AFTER_MS = 24 * 60 * 60 * 1000;
 const INTERVAL_MS = 10 * 60 * 1000;
 
+/**
+ * Never nudge a buyer about a line whose product was deleted or taken off
+ * sale. The line is matched by the stored productId, else its variant.
+ */
+function cartLineStillForSale() {
+  return sql`NOT EXISTS (
+    SELECT 1 FROM products p
+    WHERE (p.id::text = ${cartItems.itemData}->>'productId'
+        OR p.id IN (SELECT pv.product_id FROM product_variants pv WHERE pv.id::text = ${cartItems.variantId}))
+      AND (p.deleted_at IS NOT NULL OR p.status <> 'active')
+  )`;
+}
+
 type ClaimedRow = { userId: string; itemData: unknown };
 
 function groupByUser(rows: ClaimedRow[]): Map<string, EmailLineItem[]> {
@@ -74,7 +87,8 @@ export async function runCartReminders(now: Date = new Date()): Promise<{ pushed
         AND ${cartItems.updatedAt} >= ${emailCutoff}
         AND ${cartItems.pushRemindedAt} IS NULL
         AND ${cartItems.notifiedAbandonedAt} IS NULL
-        AND ${cartItems.savedForLater} = false`)
+        AND ${cartItems.savedForLater} = false
+        AND ${cartLineStillForSale()}`)
       .returning({ userId: cartItems.userId, itemData: cartItems.itemData });
 
     for (const [userId, items] of groupByUser(claimed)) {
@@ -103,7 +117,7 @@ export async function runCartReminders(now: Date = new Date()): Promise<{ pushed
     const claimed = await db
       .update(cartItems)
       .set({ notifiedAbandonedAt: now })
-      .where(sql`${cartItems.updatedAt} < ${emailCutoff} AND ${cartItems.notifiedAbandonedAt} IS NULL AND ${cartItems.savedForLater} = false`)
+      .where(sql`${cartItems.updatedAt} < ${emailCutoff} AND ${cartItems.notifiedAbandonedAt} IS NULL AND ${cartItems.savedForLater} = false AND ${cartLineStillForSale()}`)
       .returning({ userId: cartItems.userId, itemData: cartItems.itemData });
 
     const byUser = groupByUser(claimed);

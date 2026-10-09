@@ -30,6 +30,7 @@ import {
 } from "@workspace/db";
 import { resolveToClerkId } from "./public";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { taggedProductVisibleTo } from "../lib/productVisibility";
 import {
   authorInGoodStanding,
   isBlockedEitherWay,
@@ -130,7 +131,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
       })
       .from(postTaggedProducts)
       .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-      .where(inArray(postTaggedProducts.postId, postIds))
+      .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(viewerId)))
       .orderBy(postTaggedProducts.position),
     db.select({ postId: interactions.postId, n: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "like")))
