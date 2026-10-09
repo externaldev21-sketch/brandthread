@@ -19,7 +19,7 @@ describe('no white-flash background regressions', () => {
     expect(layout).toContain('SystemUI.setBackgroundColorAsync(background)');
     // Also set once at module load, before the themed effect can run, so the
     // very first native frames aren't the OS default either.
-    expect(layout).toMatch(/SystemUI\.setBackgroundColorAsync\('#0A0A0B'\)/);
+    expect(layout).toMatch(/SystemUI\.setBackgroundColorAsync\('#000000'\)/);
   });
 
   it('sets the Android navigation bar icon style for every one of the (all-dark) 12 themes', () => {
@@ -56,9 +56,23 @@ describe('no white-flash background regressions', () => {
     expect(String(backgroundColor).toUpperCase()).not.toBe('#FFFFFF');
   });
 
+  it('splash, native root view and web document all start on the default theme background', () => {
+    const appJson = JSON.parse(read('app.json'));
+    const splashPlugin = (appJson.expo?.plugins ?? []).find(
+      (p: unknown) => Array.isArray(p) && p[0] === 'expo-splash-screen',
+    );
+    // Default Monochrome theme background (contexts/AppThemeContext.tsx) —
+    // the intro overlay drawn over the splash uses it, so any other value is
+    // a visible tone step on every cold start.
+    expect(splashPlugin[1]?.backgroundColor).toBe('#000000');
+    expect(appJson.expo?.backgroundColor).toBe('#000000');
+    expect(read('app/+html.tsx')).toContain('html, body, #root { background-color: #000000;');
+    expect(read('contexts/AppThemeContext.tsx')).toMatch(/const MONOCHROME = palette\('#000000'/);
+  });
+
   it('paints the web document background reactively (persisted theme, not a fixed hardcode)', () => {
     const layout = read('app/_layout.tsx');
-    expect(layout).toContain("document.body.style.backgroundColor = '#0A0A0B'");
+    expect(layout).toContain("document.body.style.backgroundColor = '#000000'");
     expect(layout).toContain('peekPersistedTheme(AsyncStorage)');
     expect(layout).toContain('document.body.style.backgroundColor = persisted.background');
   });
