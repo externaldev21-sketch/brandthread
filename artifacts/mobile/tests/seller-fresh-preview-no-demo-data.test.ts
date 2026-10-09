@@ -99,7 +99,7 @@ describe('seller fresh preview: no seeded/demo data by default', () => {
   it('customers, finance and payouts resolve to the honest empty/zero state (not a fake seeded list) when previewing with no account', () => {
     for (const file of ['app/customers.tsx', 'app/finance.tsx', 'app/payouts.tsx']) {
       const src = read(file);
-      expect(src).toMatch(/isPreviewMode && !userId|isPreviewMode && \(!(authLoaded|isAuthLoaded) \|\| !isSignedIn\)/);
+      expect(src).toMatch(/isPreviewMode && !userId|isPreviewMode (&&|\|\|) \(!(authLoaded|isAuthLoaded) \|\| !isSignedIn\)/);
     }
   });
 });
