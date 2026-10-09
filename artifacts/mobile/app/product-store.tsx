@@ -25,6 +25,7 @@ import { calcPricing } from '@/lib/productUtils';
 import { formatCents, integerPercent } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { buildProductUrl } from '@/lib/shareLinks';
+import { PREVIEW_PRODUCT_REVIEW_SUMMARY, previewReviewsEnabled } from '@/lib/previewReviews';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_H = 380;
@@ -106,6 +107,7 @@ export default function ProductStoreScreen() {
   const [reviewSummary, setReviewSummary] = useState<{ avgRating: number; totalCount: number } | null>(null);
   useEffect(() => {
     if (!id) return;
+    if (previewReviewsEnabled()) { setReviewSummary(PREVIEW_PRODUCT_REVIEW_SUMMARY); return; }
     let cancelled = false;
     api.reviews.forProduct(id)
       .then((r) => { if (!cancelled) setReviewSummary({ avgRating: Number(r?.avgRating ?? 0), totalCount: Number(r?.totalCount ?? 0) }); })
