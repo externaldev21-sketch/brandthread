@@ -27,6 +27,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useUser } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path } from 'react-native-svg';
+import Reanimated, { Easing as ReanimatedEasing, cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import {
   CARD, BORDER, FG, MUTED, ON_DARK, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -64,6 +65,21 @@ import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
+
+/**
+ * The recording sweep on the shutter: one linear turn over the max clip
+ * length, run on the UI thread (Reanimated) from the moment recording starts —
+ * not a 60ms setInterval re-rendering this whole screen to step a rotation.
+ */
+function RecordProgressRing({ style }: { style: object }) {
+  const turn = useSharedValue(0);
+  useEffect(() => {
+    turn.value = withTiming(360, { duration: MAX_VIDEO_SECONDS * 1000, easing: ReanimatedEasing.linear });
+    return () => cancelAnimation(turn);
+  }, [turn]);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value}deg` }] }));
+  return <Reanimated.View style={[style, animatedStyle]} />;
+}
 
 type Step = 'camera' | 'create' | 'edit';
 type CaptureMode = 'story' | 'post' | 'live';
@@ -533,7 +549,6 @@ export default function StoryComposer() {
     ]).start();
   }, [mode, modeLayouts, modeIndicatorX, modeIndicatorWidth]);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordProgress, setRecordProgress] = useState(0);
   const [lastGalleryUri, setLastGalleryUri] = useState<string | null>(null);
   // Instagram-style latest-photo thumbnail on the gallery button — read-only
   // (no permission prompt of its own): only checks an already-granted
@@ -560,8 +575,8 @@ export default function StoryComposer() {
   }, []);
   const cameraRef = useRef<CameraView>(null);
   const recordingRef = useRef(false);
-  const recordTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const recordStart = useRef(0);
+  // Max-length guard for a held recording (the sweep itself is RecordProgressRing).
+  const recordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Camera left rail: Create / Boomerang / Layout / Hands-free ──
   const [railExpanded, setRailExpanded] = useState(false);
@@ -677,7 +692,7 @@ export default function StoryComposer() {
   // ── Camera controls ──────────────────────────────────────────────────────
 
   const clearRecordTimer = useCallback(() => {
-    if (recordTimer.current) clearInterval(recordTimer.current);
+    if (recordTimer.current) clearTimeout(recordTimer.current);
     recordTimer.current = null;
   }, []);
 
@@ -695,14 +710,8 @@ export default function StoryComposer() {
     if (!cameraRef.current || recordingRef.current) return;
     recordingRef.current = true;
     setIsRecording(true);
-    setRecordProgress(0);
-    recordStart.current = Date.now();
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    recordTimer.current = setInterval(() => {
-      const elapsed = (Date.now() - recordStart.current) / 1000;
-      setRecordProgress(Math.min(1, elapsed / MAX_VIDEO_SECONDS));
-      if (elapsed >= MAX_VIDEO_SECONDS) stopRecording();
-    }, 60);
+    recordTimer.current = setTimeout(stopRecording, MAX_VIDEO_SECONDS * 1000);
     try {
       const result = await cameraRef.current.recordAsync({ maxDuration: MAX_VIDEO_SECONDS });
       if (result?.uri) {
@@ -714,7 +723,6 @@ export default function StoryComposer() {
     } finally {
       recordingRef.current = false;
       setIsRecording(false);
-      setRecordProgress(0);
       clearRecordTimer();
     }
   }, [clearRecordTimer, stopRecording]);
@@ -1312,7 +1320,7 @@ export default function StoryComposer() {
             >
               <View style={styles.shutterRing}>
                 {isRecording ? (
-                  <View style={[styles.progressRing, { transform: [{ rotate: `${recordProgress * 360}deg` }] }]} />
+                  <RecordProgressRing style={styles.progressRing} />
                 ) : null}
                 {compositing ? (
                   <ActivityIndicator color="#000" />

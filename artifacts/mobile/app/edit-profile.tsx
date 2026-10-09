@@ -10,6 +10,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
+import { DeferredTextInput } from '@/components/ui/DeferredTextInput';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -718,7 +719,7 @@ function FieldRow({
     <View>
       <View style={styles.row}>
         <Text style={styles.rowLabel}>{label}</Text>
-        <TextInput
+        <DeferredTextInput
           style={[styles.rowInput, error && { color: theme.error }]}
           value={value}
           onChangeText={onChange}

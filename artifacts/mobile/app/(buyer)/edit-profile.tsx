@@ -7,6 +7,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
+import { DeferredTextInput } from '@/components/ui/DeferredTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -572,7 +573,7 @@ export default function BuyerEditProfileScreen() {
             <View>
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Name</Text>
-                <TextInput
+                <DeferredTextInput
                   style={[styles.rowInput, { color: theme.text }]}
                   value={fields.name}
                   onChangeText={v => set('name', v)}
@@ -636,7 +637,7 @@ export default function BuyerEditProfileScreen() {
             <View style={[styles.row, { alignItems: 'flex-start', paddingTop: 13 }]}>
               <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Bio</Text>
               <View style={{ flex: 1 }}>
-                <TextInput
+                <DeferredTextInput
                   style={[styles.rowInput, { color: theme.text, textAlignVertical: 'top', minHeight: 60 }]}
                   value={fields.bio}
                   onChangeText={v => set('bio', v.slice(0, BIO_MAX))}
@@ -655,7 +656,7 @@ export default function BuyerEditProfileScreen() {
             <View>
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Link</Text>
-                <TextInput
+                <DeferredTextInput
                   style={[styles.rowInput, { color: theme.text }, errors.link && { color: theme.error }]}
                   value={fields.link}
                   onChangeText={v => set('link', v)}
