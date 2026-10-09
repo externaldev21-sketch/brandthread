@@ -13,8 +13,18 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { db, users, products, orders, drops, dropWallets, dropWalletTransactions } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { cappedUnknown, jsonList, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler keeps the last 12 turns and slices content.
+const supportMessageBody = looseBody({
+  messages: jsonList(2_000, 200_000),
+});
+const supportEscalateBody = looseBody({
+  summary:             cappedUnknown(20_000),
+  conversationSnippet: cappedUnknown(100_000),
+});
 router.use(requireAuth);
 
 // ─── Context fetcher ──────────────────────────────────────────────────────────
@@ -230,7 +240,7 @@ function buildSupportPrompt(role: string, accountSummary: string): string {
 }
 
 // ─── POST /api/support-chat/message ──────────────────────────────────────────
-router.post("/message", async (req: Request, res: Response): Promise<void> => {
+router.post("/message", validateBody(supportMessageBody), async (req: Request, res: Response): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const { messages } = req.body as {
     messages?: { role: string; content: string }[];
@@ -286,7 +296,7 @@ router.post("/message", async (req: Request, res: Response): Promise<void> => {
 
 // ─── POST /api/support-chat/escalate ─────────────────────────────────────────
 // Creates a support ticket and returns confirmation.
-router.post("/escalate", async (req: Request, res: Response): Promise<void> => {
+router.post("/escalate", validateBody(supportEscalateBody), async (req: Request, res: Response): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const { summary, conversationSnippet } = req.body as {
     summary?: string;

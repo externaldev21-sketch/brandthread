@@ -18,8 +18,13 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { QUICK_REPLY_LIMIT, validateQuickReply } from "../lib/quickReplies";
 import { validateAwayInput } from "../lib/awaySchedule";
 import { loadAwaySettings } from "../lib/awayAutoReply";
+import { boundedBody, cappedUnknown, validateBody } from "../middlewares/bodySchemas";
 
 export const quickRepliesRouter = Router();
+
+// Shape + size guards; validateQuickReply / validateAwayInput keep their limits.
+const quickReplyBody = boundedBody({ title: cappedUnknown(5_000), body: cappedUnknown(20_000) }, 100_000);
+const awayMessageBody = boundedBody({ message: cappedUnknown(20_000), mode: cappedUnknown(40) }, 100_000);
 export const awayMessageRouter = Router();
 quickRepliesRouter.use(requireAuth);
 awayMessageRouter.use(requireAuth);
@@ -49,7 +54,7 @@ quickRepliesRouter.get("/", async (req, res) => {
   return res.json({ quickReplies: rows.map(view), limit: QUICK_REPLY_LIMIT });
 });
 
-quickRepliesRouter.post("/", rateLimit("mutation"), async (req, res) => {
+quickRepliesRouter.post("/", rateLimit("mutation"), validateBody(quickReplyBody), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   if (!(await isSeller(sellerId))) return res.status(403).json({ error: "Sellers only." });
   const v = validateQuickReply(req.body ?? {});
@@ -68,7 +73,7 @@ quickRepliesRouter.post("/", rateLimit("mutation"), async (req, res) => {
   }
 });
 
-quickRepliesRouter.put("/:id", rateLimit("mutation"), async (req, res) => {
+quickRepliesRouter.put("/:id", rateLimit("mutation"), validateBody(quickReplyBody), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { id } = req.params as { id: string };
   if (!UUID_RE.test(id)) return res.status(404).json({ error: "Quick reply not found." });
@@ -113,7 +118,7 @@ awayMessageRouter.get("/", async (req, res) => {
   });
 });
 
-awayMessageRouter.put("/", rateLimit("mutation"), async (req, res) => {
+awayMessageRouter.put("/", rateLimit("mutation"), validateBody(awayMessageBody), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   if (!(await isSeller(sellerId))) return res.status(403).json({ error: "Sellers only." });
   const v = validateAwayInput(req.body ?? {});

@@ -22,8 +22,19 @@ import {
 } from "../lib/places";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { mutedPhrasesFor, notBlockedWith, optionalViewerId, profilesById } from "../lib/safety";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; parsePlaceInput keeps the name / text / coordinate rules.
+const createPlaceBody = looseBody({
+  name:    cappedUnknown(1_000),
+  city:    cappedUnknown(1_000),
+  region:  cappedUnknown(1_000),
+  country: cappedUnknown(1_000),
+  lat:     cappedUnknown(64),
+  lng:     cappedUnknown(64),
+});
 const PAGE_DEFAULT = 30;
 const PAGE_MAX = 50;
 
@@ -182,7 +193,7 @@ router.get("/search", rateLimit("public-read"), async (req, res) => {
   }
 });
 
-router.post("/", requireAuth, rateLimit("mutation"), async (req, res) => {
+router.post("/", requireAuth, rateLimit("mutation"), validateBody(createPlaceBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const parsed = parsePlaceInput(req.body);
   if (!parsed.ok) return res.status(parsed.status).json({ error: parsed.error, ...(parsed.code ? { code: parsed.code } : {}) });

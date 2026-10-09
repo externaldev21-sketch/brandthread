@@ -59,6 +59,7 @@ async function resumeSubscriptionAfterRestore(clerkUserId: string, log: { warn: 
 }
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
+import { cappedList, cappedUnknown, looseBody } from "../middlewares/bodySchemas";
 import {
   getClerkEmailAddress,
   normalizeProfileName,
@@ -306,7 +307,19 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
 // ─── POST /api/auth/data-export ─────────────────────────────────────────────
 // Immediate authenticated portability export. The server derives ownership
 // from Clerk and never accepts a user ID from the client.
-router.post("/data-export", requireAuth, async (req, res) => {
+// Account / security bodies. Endpoints that take no input accept only an empty
+// object (the mobile client sends `{}`), so stray fields are rejected.
+const emptyBodySchema = z.preprocess((value) => value ?? {}, z.object({}).strict());
+const dataExportBodySchema = looseBody({
+  include: cappedList(50, 100),
+});
+const accountDeletionBodySchema = looseBody({
+  confirmation: cappedUnknown(100),
+  password:     cappedUnknown(1_024),
+  code:         cappedUnknown(100),
+});
+
+router.post("/data-export", requireAuth, validateRequest({ body: dataExportBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const requested = Array.isArray(req.body?.include) ? req.body.include : ["profile", "orders", "messages"];
   const allowed = new Set(["profile", "orders", "messages"]);
@@ -380,7 +393,7 @@ router.get("/account/deletion-check", requireAuth, async (req, res) => {
 // ─── POST /api/auth/account/deletion-code ───────────────────────────────────
 // Re-auth for accounts without a password (Google/Apple sign-in): emails a
 // hashed, single-use, 15-minute code that DELETE /account then requires.
-router.post("/account/deletion-code", requireAuth, rateLimit("authentication"), async (req, res) => {
+router.post("/account/deletion-code", requireAuth, rateLimit("authentication"), validateRequest({ body: emptyBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   try {
     const [account] = await db.select({ email: users.email, deletedAt: users.deletedAt })
@@ -500,11 +513,11 @@ export async function accountDeletionHandler(req: Request, res: Response) {
     });
   }
 }
-router.delete("/account", requireAuth, rateLimit("authentication"), accountDeletionHandler);
+router.delete("/account", requireAuth, rateLimit("authentication"), validateRequest({ body: accountDeletionBodySchema }), accountDeletionHandler);
 
 // ─── POST /api/auth/account/restore ─────────────────────────────────────────
 // Explicit cancel for API clients; signing back in (POST /auth/sync) also cancels.
-router.post("/account/restore", requireAuth, async (req, res) => {
+router.post("/account/restore", requireAuth, validateRequest({ body: emptyBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   try {
     const restored = await restoreAccount(clerkUserId);
@@ -597,7 +610,7 @@ router.delete("/sessions/:sessionId", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/sessions/revoke-others", requireAuth, async (req, res) => {
+router.post("/sessions/revoke-others", requireAuth, validateRequest({ body: emptyBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const currentSessionId = getAuth(req).sessionId ?? null;
   try {

@@ -25,6 +25,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or, ilike } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, optNumberish, optText, validateBody } from "../middlewares/bodySchemas";
 import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
@@ -47,6 +48,35 @@ import {
 } from "../lib/dmMedia";
 
 const router = Router();
+
+// ── Request body schemas (text / settings bodies) ────────────────────────────
+// Shape + size guards only. Attachment payloads are intentionally left to the
+// handlers' own attachment policy (passed through untouched), as is
+// /upload-media, which has its own size limit.
+const DM_TEXT_MAX = 20_000;
+const createConversationBody = looseBody({
+  type:               cappedUnknown(40),
+  participant:        jsonValue(10_000),
+  participants:       jsonList(100, 10_000),
+  myInfo:             jsonValue(10_000),
+  contextOrderId:     cappedUnknown(500),
+  contextOrderNumber: cappedUnknown(500),
+  contextOrderStatus: cappedUnknown(500),
+  contextProductId:   cappedUnknown(500),
+  contextProductName: cappedUnknown(2_000),
+  contextSellerName:  cappedUnknown(2_000),
+});
+const sendMessageBody = looseBody({
+  text:      optText(DM_TEXT_MAX),
+  replyToId: cappedUnknown(200),
+});
+const muteConversationBody = looseBody({ muted: optBoolish, durationMinutes: optNumberish });
+const reactionBody = looseBody({ reactionType: cappedUnknown(40) });
+const typingBody = looseBody({ typing: optBoolish });
+const pinBody = looseBody({ pinned: optBoolish });
+const nicknameBody = looseBody({ targetUserId: cappedUnknown(200), nickname: optText(1_000) });
+const themeBody = looseBody({ themeId: cappedUnknown(100) });
+const disappearingBody = looseBody({ enabled: optBoolish });
 router.use(requireAuth);
 
 // Attachment types a message may carry. "product"/"order" get extra
@@ -341,7 +371,7 @@ router.get("/", async (req, res) => {
 type ParticipantInput = { userId: string; name: string; handle: string; initials: string; color: string; accountType: string };
 
 // ─── POST /api/conversations ──────────────────────────────────────────────────
-router.post("/", rateLimit("messaging"), async (req, res) => {
+router.post("/", rateLimit("messaging"), validateBody(createConversationBody), async (req, res) => {
   const myUserId = (req as any).clerkUserId as string;
   const {
     type,
@@ -551,7 +581,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // ─── PATCH /api/conversations/:id/mute ───────────────────────────────────────
-router.patch("/:id/mute", async (req, res) => {
+router.patch("/:id/mute", validateBody(muteConversationBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const muted = (req.body as { muted?: unknown } | undefined)?.muted;
@@ -655,7 +685,7 @@ router.get("/:id/messages", async (req, res) => {
 });
 
 // ─── POST /api/conversations/:id/messages ────────────────────────────────────
-router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
+router.post("/:id/messages", rateLimit("messaging"), validateBody(sendMessageBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params as { id: string };
   const { text, attachment, attachments, replyToId } = req.body as {
@@ -978,7 +1008,7 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
 // ─── PUT /api/conversations/:id/messages/:messageId/reactions ────────────────
 // Upserts the caller's reaction on a message — a user has at most one active
 // reaction per message; re-reacting replaces it.
-router.put("/:id/messages/:messageId/reactions", async (req, res) => {
+router.put("/:id/messages/:messageId/reactions", validateBody(reactionBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id, messageId } = req.params;
   const { reactionType } = req.body as { reactionType?: string };
@@ -1111,7 +1141,7 @@ router.patch("/:id/read", async (req, res) => {
 // immediately on send/clear/blur. No websocket layer exists, so the other
 // side picks this up on its own light poll of the conversation — see
 // otherTyping in buildConversationView above.
-router.patch("/:id/typing", rateLimit("mutation"), async (req, res) => {
+router.patch("/:id/typing", rateLimit("mutation"), validateBody(typingBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params as { id: string };
   const typing = req.body?.typing === true;
@@ -1146,7 +1176,7 @@ const MUTE_FOREVER = new Date("9999-12-31T00:00:00.000Z");
 //   - a positive number  → muted for that many minutes from now
 //   - -1                 → muted "Until I turn it back on"
 //   - null / 0 / omitted → unmuted
-router.patch("/:id/mute", async (req, res) => {
+router.patch("/:id/mute", validateBody(muteConversationBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const { durationMinutes } = req.body as { durationMinutes?: number | null };
@@ -1175,7 +1205,7 @@ router.patch("/:id/mute", async (req, res) => {
 // pinnedAt on the current user's own conversation_participants row — the
 // same per-membership pattern as mute above, so pinning one side of a
 // conversation never affects the other participant's inbox.
-router.patch("/:id/pin", async (req, res) => {
+router.patch("/:id/pin", validateBody(pinBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const { pinned } = req.body as { pinned?: boolean };
@@ -1198,7 +1228,7 @@ router.patch("/:id/pin", async (req, res) => {
 // ─── PATCH /api/conversations/:id/nickname ───────────────────────────────────
 // Chat details > Nicknames. Body: { targetUserId: string, nickname: string }.
 // An empty/whitespace-only nickname clears it back to the real name.
-router.patch("/:id/nickname", async (req, res) => {
+router.patch("/:id/nickname", validateBody(nicknameBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const { targetUserId, nickname } = req.body as { targetUserId?: string; nickname?: string };
@@ -1261,7 +1291,7 @@ async function insertSystemMessage(conversationId: string, actorId: string, titl
 // app's default monochrome look. Posts a system line into the thread —
 // "You changed the theme to [Name]. Change" — visible to both participants,
 // since the theme itself is a conversation-level property, not per-user.
-router.patch("/:id/theme", async (req, res) => {
+router.patch("/:id/theme", validateBody(themeBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const { themeId } = req.body as { themeId?: string | null };
@@ -1284,7 +1314,7 @@ router.patch("/:id/theme", async (req, res) => {
 // ─── PATCH /api/conversations/:id/disappearing ───────────────────────────────
 // Chat details > Disappearing messages. Body: { enabled: boolean }. Posts the
 // matching system line ("You turned on/off disappearing messages. Change").
-router.patch("/:id/disappearing", async (req, res) => {
+router.patch("/:id/disappearing", validateBody(disappearingBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const { enabled } = req.body as { enabled?: boolean };

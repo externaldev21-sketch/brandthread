@@ -27,8 +27,17 @@ import {
   BROADCAST_TITLE_MAX,
   type BroadcastInput,
 } from "../lib/sellerPushBroadcast";
+import { boundedBody, cappedUnknown, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; validateBroadcastInput keeps the title/body/deeplink rules.
+const broadcastBody = boundedBody({
+  title:        cappedUnknown(5_000),
+  body:         cappedUnknown(20_000),
+  deeplinkType: cappedUnknown(100),
+  deeplinkId:   cappedUnknown(200),
+}, 100_000);
 router.use(requireAuth);
 
 function adapt(row: typeof sellerPushBroadcasts.$inferSelect) {
@@ -85,7 +94,7 @@ router.get("/", requirePermission("marketing"), async (req, res) => {
   }
 });
 
-router.post("/preview", requirePermission("marketing"), rateLimit("mutation"), async (req, res) => {
+router.post("/preview", requirePermission("marketing"), rateLimit("mutation"), validateBody(broadcastBody), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const checked = await parseAndCheck(sellerId, req.body);
@@ -106,7 +115,7 @@ router.post("/preview", requirePermission("marketing"), rateLimit("mutation"), a
   }
 });
 
-router.post("/", requirePermission("marketing"), rateLimit("mutation"), async (req, res) => {
+router.post("/", requirePermission("marketing"), rateLimit("mutation"), validateBody(broadcastBody), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const checked = await parseAndCheck(sellerId, req.body);

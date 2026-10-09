@@ -62,8 +62,27 @@ import {
   setCallQualityRating,
   transitionCall,
 } from "../lib/dmCallsStore";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handlers keep their own required / enum checks.
+const callTokenBody = looseBody({
+  conversationId: cappedUnknown(200),
+  threadId:       cappedUnknown(200),
+  mode:           cappedUnknown(20),
+});
+const callRenewBody = looseBody({
+  threadId:        cappedUnknown(200),
+  mode:            cappedUnknown(20),
+  clientRenewalId: cappedUnknown(200),
+});
+const callEventBody = looseBody({
+  threadId:      cappedUnknown(200),
+  type:          cappedUnknown(40),
+  mode:          cappedUnknown(20),
+  clientEventId: cappedUnknown(200),
+});
 router.use(requireAuth);
 
 // ─── Helpers (shared with live.ts pattern) ────────────────────────────────────
@@ -164,7 +183,7 @@ router.get("/availability", (_req, res) => {
 
 // ─── POST /api/call/token ─────────────────────────────────────────────────────
 
-router.post("/token", async (req, res) => {
+router.post("/token", validateBody(callTokenBody), async (req, res) => {
   const callerId = (req as any).clerkUserId as string;
   const { conversationId, threadId = conversationId, mode = "video" } = req.body ?? {};
 
@@ -238,7 +257,7 @@ router.post("/token", async (req, res) => {
 // Renewal is intentionally manufacturer-thread-only. Unlike the initial token
 // endpoint's legacy DM fallback, a renewal must prove that the caller is still
 // one of the two participants on the same authoritative thread.
-router.post("/token/renew", async (req, res) => {
+router.post("/token/renew", validateBody(callRenewBody), async (req, res) => {
   const callerId = (req as any).clerkUserId as string;
   const {
     threadId,
@@ -669,7 +688,7 @@ router.get("/dm/conversations/:conversationId/calls", async (req, res) => {
   return res.json({ calls: calls.map((c) => serializeCall(c, userId, view.participants, view.avatars)) });
 });
 
-router.post("/events", async (req, res) => {
+router.post("/events", validateBody(callEventBody), async (req, res) => {
   const callerId = (req as any).clerkUserId as string;
   const { threadId, type, mode = "video", clientEventId } = req.body ?? {};
   const allowedTypes = new Set(["started", "ended", "declined", "failed"]);

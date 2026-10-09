@@ -19,8 +19,12 @@ import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler checks content type and size limits.
+const startUploadBody = looseBody({ contentType: cappedUnknown(200), size: cappedUnknown(64) });
 const storage = new ObjectStorageService();
 
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
@@ -76,7 +80,7 @@ async function receivedChunks(id: string): Promise<Map<number, number>> {
   return received;
 }
 
-router.post("/uploads", requireAuth, express.json(), async (req, res) => {
+router.post("/uploads", requireAuth, express.json(), validateBody(startUploadBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller or buyer account required" });
   const contentType = String(req.body?.contentType ?? "").split(";")[0].toLowerCase();

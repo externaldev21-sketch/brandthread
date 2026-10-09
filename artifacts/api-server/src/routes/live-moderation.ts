@@ -23,8 +23,18 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { broadcastToRoom, disconnectUserFromRoom } from "../ws/liveHub";
 import { clampSlowMode, normalizeBannedWords } from "../lib/liveModeration";
 import { loadEffectiveSettings } from "../lib/liveModerationState";
+import { cappedList, cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; normalizeBannedWords / clampSlowMode keep their rules.
+const moderationSettingsBody = looseBody({
+  bannedWords:     cappedList(5_000, 1_000),
+  slowModeSeconds: cappedUnknown(64),
+  saveAsDefault:   cappedUnknown(10),
+});
+const pinCommentBody = looseBody({ commentId: cappedUnknown(200) });
+const restrictUserBody = looseBody({ userId: cappedUnknown(200) });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -59,7 +69,7 @@ router.get("/moderation-defaults", requireAuth, wrap(async (req, res) => {
   });
 }));
 
-router.put("/moderation-defaults", requireAuth, wrap(async (req, res) => {
+router.put("/moderation-defaults", requireAuth, validateBody(moderationSettingsBody), wrap(async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const bannedWords = normalizeBannedWords(req.body?.bannedWords);
   const slowModeSeconds = clampSlowMode(req.body?.slowModeSeconds);
@@ -98,7 +108,7 @@ router.get("/:id/moderation", requireAuth, wrap(async (req, res) => {
 }));
 
 // ─── Host: banned words + slow mode ──────────────────────────────────────────
-router.put("/:id/moderation/settings", requireAuth, wrap(async (req, res) => {
+router.put("/:id/moderation/settings", requireAuth, validateBody(moderationSettingsBody), wrap(async (req, res) => {
   const stream = await hostStream(req, res);
   if (!stream) return;
   const current = await loadEffectiveSettings(stream.id, stream.seller_id);
@@ -123,7 +133,7 @@ router.put("/:id/moderation/settings", requireAuth, wrap(async (req, res) => {
 }));
 
 // ─── Host: pin / unpin ───────────────────────────────────────────────────────
-router.post("/:id/moderation/pin", requireAuth, wrap(async (req, res) => {
+router.post("/:id/moderation/pin", requireAuth, validateBody(pinCommentBody), wrap(async (req, res) => {
   const stream = await hostStream(req, res);
   if (!stream) return;
   const commentId = req.body?.commentId ?? null;
@@ -189,9 +199,9 @@ async function clearRestriction(req: Request, res: Response, kind: "mute" | "ban
   return res.json({ ok: true });
 }
 
-router.post("/:id/moderation/mute", requireAuth, wrap((req, res) => setRestriction(req, res, "mute")));
+router.post("/:id/moderation/mute", requireAuth, validateBody(restrictUserBody), wrap((req, res) => setRestriction(req, res, "mute")));
 router.delete("/:id/moderation/mute/:userId", requireAuth, wrap((req, res) => clearRestriction(req, res, "mute")));
-router.post("/:id/moderation/ban", requireAuth, wrap((req, res) => setRestriction(req, res, "ban")));
+router.post("/:id/moderation/ban", requireAuth, validateBody(restrictUserBody), wrap((req, res) => setRestriction(req, res, "ban")));
 router.delete("/:id/moderation/ban/:userId", requireAuth, wrap((req, res) => clearRestriction(req, res, "ban")));
 
 // ─── Host: remove a single comment ───────────────────────────────────────────

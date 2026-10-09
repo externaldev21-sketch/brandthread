@@ -2,13 +2,18 @@ import { Router } from "express";
 import { db, pushTokens } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handlers keep their own required-field checks.
+const registerPushBody = looseBody({ token: cappedUnknown(4_096), platform: cappedUnknown(40) });
+const deregisterPushBody = looseBody({ token: cappedUnknown(4_096) });
 
 // POST /api/push/register
 // Upserts a push token for the authenticated user.
 // Body: { token: string, platform?: 'ios' | 'android' | 'web' }
-router.post("/register", requireAuth, async (req, res) => {
+router.post("/register", requireAuth, validateBody(registerPushBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { token, platform } = req.body as { token: string; platform?: string };
 
@@ -30,7 +35,7 @@ router.post("/register", requireAuth, async (req, res) => {
 // DELETE /api/push/deregister
 // Removes a push token on logout.
 // Body: { token: string }
-router.delete("/deregister", requireAuth, async (req, res) => {
+router.delete("/deregister", requireAuth, validateBody(deregisterPushBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { token } = req.body as { token: string };
 

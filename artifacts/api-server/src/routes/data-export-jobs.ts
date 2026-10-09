@@ -19,8 +19,12 @@ import { kickDataExportJobs, downloadUrlFor } from "../jobs/dataExportJob";
 import { isMailerConfigured } from "../lib/mailer";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { getWebOrigin } from "../lib/webOrigin";
+import { cappedList, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guard; normalizeExportCategories filters to known categories.
+const exportJobBody = looseBody({ include: cappedList(50, 100) });
 const storage = new ObjectStorageService();
 
 type JobRow = typeof dataExportJobs.$inferSelect;
@@ -39,7 +43,7 @@ function publicJob(job: JobRow, now = new Date()) {
 }
 
 // POST /api/auth/data-export/jobs  { include?: string[] }
-router.post("/jobs", requireAuth, async (req, res) => {
+router.post("/jobs", requireAuth, validateBody(exportJobBody), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const include = normalizeExportCategories(
     req.body?.include ?? ["profile", "orders", "messages"],

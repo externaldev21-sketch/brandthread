@@ -3,8 +3,16 @@ import { and, eq } from "drizzle-orm";
 import { db, notificationDeliveries, notificationEvents, notificationsFeed } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { recordNotificationEvent, type NotificationEventType } from "../lib/push";
+import { cappedUnknown, jsonValue, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler keeps its own required / enum checks.
+const notificationEventBody = looseBody({
+  notificationId: cappedUnknown(1_000),
+  eventType:      cappedUnknown(40),
+  occurredAt:     jsonValue(200),
+});
 router.use(requireAuth);
 
 const EVENT_TYPES = new Set<NotificationEventType>(["receipt", "open", "tap"]);
@@ -12,7 +20,7 @@ const EVENT_TYPES = new Set<NotificationEventType>(["receipt", "open", "tap"]);
 // POST /api/notifications/events
 // Client event IDs are deliberately not trusted as ownership identifiers. The
 // server derives the dedupe key from the authenticated user and event fields.
-router.post("/events", async (req, res) => {
+router.post("/events", validateBody(notificationEventBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const body = req.body as {
     notificationId?: unknown;

@@ -29,8 +29,12 @@ import {
   shapeReplay,
   type ReplayRow,
 } from "../lib/liveReplayAccess";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guard; normalizeVisibility keeps the enum rule.
+const replayVisibilityBody = looseBody({ visibility: cappedUnknown(40) });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -118,7 +122,7 @@ async function loadOwnedReplay(streamId: string, userId: string): Promise<Replay
 }
 
 // ─── PATCH /api/live-replays/:streamId ───────────────────────────────────────
-router.patch("/:streamId", requireAuth, async (req, res) => {
+router.patch("/:streamId", requireAuth, validateBody(replayVisibilityBody), async (req, res) => {
   try {
     const userId = (req as any).clerkUserId as string;
     const visibility = normalizeVisibility(req.body?.visibility);

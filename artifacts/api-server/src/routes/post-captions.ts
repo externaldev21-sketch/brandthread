@@ -20,8 +20,13 @@ import {
   MAX_SEGMENTS, MAX_SEGMENT_TEXT,
 } from "../lib/captions";
 import { evaluateContent } from "../lib/contentModerator";
+import { cappedUnknown, jsonList, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler matches segments to the stored track itself.
+const generateCaptionsBody = looseBody({ force: cappedUnknown(10) });
+const editCaptionsBody = looseBody({ segments: jsonList(5_000, 10_000) });
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LANG_RE = /^[a-z]{2,3}$/;
 
@@ -61,7 +66,7 @@ async function ownedVideo(req: Request, res: Response) {
 }
 
 // Registered before the generic `/:language` routes so "generate" is not read as a language.
-router.post("/:id/captions/generate", requireAuth, rateLimit("expensive"), async (req, res) => {
+router.post("/:id/captions/generate", requireAuth, rateLimit("expensive"), validateBody(generateCaptionsBody), async (req, res) => {
   if (!(await captionsAvailable())) return unavailable(res);
   const post = await ownedVideo(req, res);
   if (!post) return;
@@ -128,7 +133,7 @@ router.get("/:id/captions/:language", async (req, res) => {
   return res.json(trackJson(row, id));
 });
 
-router.patch("/:id/captions/:language", requireAuth, async (req, res) => {
+router.patch("/:id/captions/:language", requireAuth, validateBody(editCaptionsBody), async (req, res) => {
   if (!(await captionsAvailable())) return unavailable(res);
   const post = await ownedVideo(req, res);
   if (!post) return;

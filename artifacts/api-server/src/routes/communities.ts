@@ -60,8 +60,34 @@ import { broadcastToCommunity, closeCommunityRoom, kickFromCommunity } from "../
 import { noteCommunityMessage } from "../lib/communityPush";
 import { getWebOrigin } from "../lib/webOrigin";
 import { logger } from "../lib/logger";
+import { cappedUnknown, jsonList, LIMITS, looseBody, optBoolish, optNumberish, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// ── Request body schemas ─────────────────────────────────────────────────────
+// Shape + size guards; the handlers keep NAME_MIN/NAME_MAX, DESCRIPTION_MAX,
+// MAX_BODY, MAX_ATTACHMENTS, moderated-URL and enum checks (with their messages).
+const uploadPhotoBody = looseBody({ data: cappedUnknown(46_000_000), mimeType: cappedUnknown(100) });
+const communityFields = {
+  name:            cappedUnknown(LIMITS.name),
+  description:     cappedUnknown(LIMITS.shortText),
+  visibility:      cappedUnknown(40),
+  requireApproval: optBoolish,
+  iconUrl:         cappedUnknown(LIMITS.url),
+  coverUrl:        cappedUnknown(LIMITS.url),
+};
+const createCommunityBody = looseBody(communityFields);
+const updateCommunityBody = looseBody(communityFields);
+const joinByCodeBody = looseBody({ code: cappedUnknown(200) });
+const muteBody = looseBody({ muted: optBoolish });
+const readBody = looseBody({ seq: optNumberish });
+const roleBody = looseBody({ role: cappedUnknown(40) });
+const communityMessageBody = looseBody({
+  text:        cappedUnknown(LIMITS.message),
+  attachments: jsonList(50, 10_000),
+  replyToId:   cappedUnknown(200),
+});
+const reactionBody = looseBody({ reactionType: cappedUnknown(40) });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NAME_MIN = 3;
@@ -371,7 +397,7 @@ router.get("/mine", async (req, res) => {
 
 // ─── Photo upload (moderated) ─────────────────────────────────────────────────
 
-router.post("/upload-photo", rateLimit("messaging"), async (req, res) => {
+router.post("/upload-photo", rateLimit("messaging"), validateBody(uploadPhotoBody), async (req, res) => {
   const userId = uid(req);
   const { data, mimeType = "image/jpeg" } = (req.body ?? {}) as { data?: unknown; mimeType?: unknown };
   if (typeof data !== "string" || !data) return res.status(400).json({ error: "data (base64) is required", code: "VALIDATION_ERROR" });
@@ -418,7 +444,7 @@ router.post("/upload-photo", rateLimit("messaging"), async (req, res) => {
 
 // ─── Create ───────────────────────────────────────────────────────────────────
 
-router.post("/", rateLimit("community-create"), async (req, res) => {
+router.post("/", rateLimit("community-create"), validateBody(createCommunityBody), async (req, res) => {
   const userId = uid(req);
   const body = (req.body ?? {}) as Record<string, unknown>;
   const name = typeof body.name === "string" ? body.name.trim().replace(/\s+/g, " ") : "";
@@ -475,7 +501,7 @@ router.post("/", rateLimit("community-create"), async (req, res) => {
 
 // ─── Join by invite code ──────────────────────────────────────────────────────
 
-router.post("/join-by-code", rateLimit("mutation"), async (req, res) => {
+router.post("/join-by-code", rateLimit("mutation"), validateBody(joinByCodeBody), async (req, res) => {
   const userId = uid(req);
   const code = typeof req.body?.code === "string" ? req.body.code.trim().toLowerCase() : "";
   if (!/^[a-z0-9]{6,16}$/.test(code)) return res.status(404).json({ error: "This invite link isn't valid.", code: "INVITE_INVALID" });
@@ -506,7 +532,7 @@ router.get("/:id", async (req, res) => {
   return res.json(communityView(c, member));
 });
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", validateBody(updateCommunityBody), async (req, res) => {
   const ctx = await requireAdmin(req, res);
   if (!ctx) return;
   const b = (req.body ?? {}) as Record<string, unknown>;
@@ -580,7 +606,7 @@ router.post("/:id/leave", async (req, res) => {
   return res.json({ ok: true });
 });
 
-router.patch("/:id/mute", async (req, res) => {
+router.patch("/:id/mute", validateBody(muteBody), async (req, res) => {
   const ctx = await requireMember(req, res);
   if (!ctx) return;
   if (typeof req.body?.muted !== "boolean") return res.status(400).json({ error: "muted must be a boolean", code: "VALIDATION_ERROR" });
@@ -589,7 +615,7 @@ router.patch("/:id/mute", async (req, res) => {
   return res.json({ muted: req.body.muted });
 });
 
-router.patch("/:id/read", async (req, res) => {
+router.patch("/:id/read", validateBody(readBody), async (req, res) => {
   const ctx = await requireMember(req, res);
   if (!ctx) return;
   const seq = Number.isFinite(Number(req.body?.seq)) ? Number(req.body.seq) : Number(ctx.community.lastSeq);
@@ -720,7 +746,7 @@ router.get("/:id/bans", async (req, res) => {
   return res.json(rows.map((r) => ({ userId: r.userId, name: profiles.get(r.userId)?.name ?? "Brandthread member", bannedAt: r.createdAt.toISOString() })));
 });
 
-router.patch("/:id/members/:userId/role", async (req, res) => {
+router.patch("/:id/members/:userId/role", validateBody(roleBody), async (req, res) => {
   const userId = uid(req);
   const c = await loadCommunity(String(req.params.id));
   if (!c) return res.status(404).json({ error: "Group not found", code: "NOT_FOUND" });
@@ -819,7 +845,7 @@ router.get("/:id/messages", async (req, res) => {
   });
 });
 
-router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
+router.post("/:id/messages", rateLimit("messaging"), validateBody(communityMessageBody), async (req, res) => {
   const ctx = await requireMember(req, res);
   if (!ctx) return;
   const { userId, community } = ctx;
@@ -934,7 +960,7 @@ async function messageInCommunity(communityId: string, mid: string) {
   return m && !m.deletedAt ? m : null;
 }
 
-router.put("/:id/messages/:mid/reactions", rateLimit("mutation"), async (req, res) => {
+router.put("/:id/messages/:mid/reactions", rateLimit("mutation"), validateBody(reactionBody), async (req, res) => {
   const ctx = await requireMember(req, res);
   if (!ctx) return;
   const reactionType = req.body?.reactionType;
