@@ -5,9 +5,9 @@
  * screens on Mobbin.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Pressable } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useReviewActions } from '@/lib/useReviewActions';
-import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -114,8 +114,7 @@ export default function ProductReviewsScreen() {
             ))}
           </ScrollView>
 
-          <FlatList
-            {...LONG_LIST_TUNING}
+          <FlashList
             data={filtered}
             keyExtractor={item => item.id}
             refreshControl={pull.refreshControl}

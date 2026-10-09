@@ -40,6 +40,7 @@ export function DiscoverTileView({
           style={styles.image}
           contentFit={post.media === 'video' ? 'cover' : 'contain'}
           cachePolicy="memory-disk"
+          recyclingKey={post.id}
         />
       ) : (
         // Some real posts (e.g. the current public Trending endpoint) carry

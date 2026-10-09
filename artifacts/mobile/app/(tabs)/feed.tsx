@@ -56,6 +56,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
+import { spotlightPagePropsEqual } from '@/lib/feedPageMemo';
 import { remoteVideoUri, withVideoCaching } from '@/lib/videoPreload';
 import { useFeedVideoPreload } from '@/hooks/useFeedVideoPreload';
 import { mark as perfMark } from '@/lib/perf';
@@ -1846,49 +1847,9 @@ function SpotlightPageImpl({
   );
 }
 
-/**
- * `engagement` is looked up as `engagements[id] ?? initialEngagement(item)`
- * at the call site, so any post with no engagement entry yet gets a brand
- * new object every render of the parent list (e.g. on every like elsewhere
- * in the feed) even though its actual values haven't changed. A plain
- * `React.memo` would see that new reference and re-render anyway, so this
- * compares the engagement fields themselves rather than the object identity.
- */
-function engagementEqual(a: EngagementState | undefined, b: EngagementState | undefined) {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return a.liked === b.liked && a.likes === b.likes
-    && a.saved === b.saved && a.saves === b.saves
-    && a.reposted === b.reposted && a.reposts === b.reposts
-    && a.following === b.following && (a.comments?.length ?? 0) === (b.comments?.length ?? 0);
-}
-
-const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
-  prev.item === next.item
-  && prev.isActive === next.isActive
-  && prev.preload === next.preload
-  && prev.isFirstItem === next.isFirstItem
-  && prev.pageWidth === next.pageWidth
-  && prev.pageHeight === next.pageHeight
-  && prev.bottomClearance === next.bottomClearance
-  && prev.videoFrameInset === next.videoFrameInset
-  && prev.immersive === next.immersive
-  && prev.hasTabBar === next.hasTabBar
-  && prev.soundOn === next.soundOn
-  && engagementEqual(prev.engagement, next.engagement)
-  && prev.onLike === next.onLike
-  && prev.onDoubleTapLike === next.onDoubleTapLike
-  && prev.onSave === next.onSave
-  && prev.onRepost === next.onRepost
-  && prev.onFollow === next.onFollow
-  && prev.onOpenComments === next.onOpenComments
-  && prev.onShopTag === next.onShopTag
-  && prev.onOpenCreator === next.onOpenCreator
-  && prev.onNotInterested === next.onNotInterested
-  && prev.onVideoWatched === next.onVideoWatched
-  && prev.onToggleSound === next.onToggleSound
-  && prev.reduceMotion === next.reduceMotion
-));
+// Compares `engagement` by value and every callback by identity — see
+// lib/feedPageMemo.ts for why a like then re-renders only its own page.
+const SpotlightPage = React.memo(SpotlightPageImpl, spotlightPagePropsEqual);
 
 // CommentsModal replaced by navigation to /buyer-post-comments (see handleOpenComments).
 
@@ -2091,6 +2052,12 @@ export default function FeedScreen({
   const { showToast } = useFeedToast();
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
+  // Latest engagements for the like/save/repost/follow handlers. Reading it
+  // through a ref keeps those callbacks' identities stable across a like, so
+  // SpotlightPage's memo comparator only re-renders the page whose own
+  // `engagement` changed instead of every mounted page.
+  const engagementsRef = useRef(engagements);
+  engagementsRef.current = engagements;
   // The feed's sound on/off choice — a single app-wide preference (not
   // per-post), persisted so it survives leaving and returning to the feed.
   const [soundOn, setSoundOn] = useState(false);
@@ -2689,7 +2656,7 @@ export default function FeedScreen({
 
   const handleLike = useCallback(async (id: string): Promise<void> => {
     if (!requireSignIn()) return;
-    const snapshot = engagements[id] ?? engagementFor(id);
+    const snapshot = engagementsRef.current[id] ?? engagementFor(id);
     const willLike = !snapshot.liked;
     // Optimistic update
     update(id, e => ({ liked: willLike, likes: willLike ? e.likes + 1 : Math.max(0, e.likes - 1) }));
@@ -2709,7 +2676,7 @@ export default function FeedScreen({
         }
       }
     }
-  }, [engagements, engagementFor, showToast]);
+  }, [engagementFor, showToast]);
 
   const handleDoubleTapLike = useCallback((id: string) => {
     setEngagements(prev => {
@@ -2725,7 +2692,7 @@ export default function FeedScreen({
 
   const handleSave = useCallback(async (id: string): Promise<void> => {
     if (!requireSignIn()) return;
-    const cur = engagements[id] ?? engagementFor(id);
+    const cur = engagementsRef.current[id] ?? engagementFor(id);
     const willSave = !cur.saved;
     const snapshot = { saved: cur.saved, saves: cur.saves };
     // Optimistic update
@@ -2754,7 +2721,7 @@ export default function FeedScreen({
         }
       }
     }
-  }, [engagements, engagementFor, itemsById, showToast, requireSignIn]);
+  }, [engagementFor, itemsById, showToast, requireSignIn]);
 
   const showRepostEducationOnce = useCallback(async () => {
     const key = `bt:repost-education:${userId ?? 'preview'}:v1`;
@@ -2772,7 +2739,7 @@ export default function FeedScreen({
     if (!requireSignIn()) return;
     if (repostPendingRef.current.has(id)) return;
     repostPendingRef.current.add(id);
-    const snapshot = engagements[id] ?? engagementFor(id);
+    const snapshot = engagementsRef.current[id] ?? engagementFor(id);
     const willRepost = !snapshot.reposted;
     update(id, e => ({ reposted: willRepost, reposts: willRepost ? e.reposts + 1 : Math.max(0, e.reposts - 1) }));
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -2802,14 +2769,14 @@ export default function FeedScreen({
       await showRepostEducationOnce();
     }
     repostPendingRef.current.delete(id);
-  }, [api, engagements, engagementFor, showRepostEducationOnce, showToast, requireSignIn]);
+  }, [api, engagementFor, showRepostEducationOnce, showToast, requireSignIn]);
 
   const handleFollow = useCallback(async (id: string): Promise<void> => {
     if (!requireSignIn()) return;
     const item = sellerFeedPosts.find(post => post.id === id);
     if (!item?.sellerId) return;
     const sellerId = item.sellerId;
-    const wasFollowing = engagements[id]?.following ?? false;
+    const wasFollowing = engagementsRef.current[id]?.following ?? false;
     // Optimistic — flip all posts by this seller
     setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, state]) => [
       postId,
@@ -2840,7 +2807,7 @@ export default function FeedScreen({
       ])));
       showToast('Could not update follow. Check your connection.', 'error');
     }
-  }, [engagements, feedTab, loadFeed, sellerFeedPosts, showToast, requireSignIn]);
+  }, [feedTab, loadFeed, sellerFeedPosts, showToast, requireSignIn]);
 
   // "Not interested" removes the post from this session's feed immediately
   // (a real, visible effect — not just a toast) and records the signal so

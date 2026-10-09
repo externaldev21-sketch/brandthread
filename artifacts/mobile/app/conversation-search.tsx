@@ -4,8 +4,8 @@
  * (GET /api/conversations/:id/messages?q=...), never a global search.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
-import { LONG_LIST_TUNING } from '@/lib/listTuning';
+import { View, Text, TextInput, StyleSheet, ActivityIndicator } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -86,8 +86,7 @@ export default function ConversationSearchScreen() {
       {loading ? (
         <ActivityIndicator style={{ marginTop: SP.xl }} color={theme.text} />
       ) : (
-        <FlatList
-          {...LONG_LIST_TUNING}
+        <FlashList
           data={results}
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}
