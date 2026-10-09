@@ -26,7 +26,7 @@ import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import {
-  reconcileCartLoad, mergeGuestLines, createSerialSync, type CartDirtyState,
+  reconcileCartLoad, mergeGuestLines, createSerialSync, chargeableSubtotalCents, type CartDirtyState,
 } from './cartSync';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
@@ -633,7 +633,7 @@ export function groupCartBySeller(items: CartItem[]): CartSellerGroup[] {
     }
     const group = map.get(item.sellerId)!;
     group.items.push(item);
-    group.subtotalCents += item.priceCents * item.quantity;
+    group.subtotalCents += chargeableSubtotalCents([item]);
     if (item.isPreOrder) group.hasPreOrder = true;
   }
   return Array.from(map.values());
@@ -642,7 +642,8 @@ export function groupCartBySeller(items: CartItem[]): CartSellerGroup[] {
 // ─── Cart summary ─────────────────────────────────────────────────────────────
 
 export function calculateCartSummary(items: CartItem[], discountTotalCents = 0, shippingTotalCents = 0): CheckoutSummary {
-  const subtotalCents = items.reduce((s, i) => s + i.priceCents * i.quantity, 0);
+  // Unavailable lines are shown but never charged (see chargeableSubtotalCents).
+  const subtotalCents = chargeableSubtotalCents(items);
   const taxTotalCents = 0; // Calculated accurately by Stripe at checkout; not estimated here
   const totalCents = Math.max(0, subtotalCents - discountTotalCents + shippingTotalCents + taxTotalCents);
   return {

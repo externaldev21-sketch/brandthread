@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyLiveFields, reconcileCartLoad, mergeGuestLines, createSerialSync,
+  applyLiveFields, reconcileCartLoad, mergeGuestLines, createSerialSync, chargeableSubtotalCents,
   OUT_OF_STOCK_REASON, NO_LONGER_AVAILABLE_REASON, type CartLiveFields,
 } from '../cartSync';
 import type { Cart, CartItem, SavedCartItem } from '../cartTypes';
@@ -187,5 +187,19 @@ describe('createSerialSync', () => {
     expect(await p1).toBe(true);
     expect(await p2).toBe(true);
     expect(sent).toEqual([1, 2]);
+  });
+});
+
+describe('chargeableSubtotalCents', () => {
+  it('counts only lines the buyer can check out', () => {
+    expect(chargeableSubtotalCents([
+      item({ priceCents: 9800, quantity: 1, isAvailable: false }),
+      item({ priceCents: 22000, quantity: 1 }),
+      item({ priceCents: 14500, quantity: 2 }),
+    ])).toBe(22000 + 29000);
+  });
+  it('is zero for an empty or fully unavailable bag', () => {
+    expect(chargeableSubtotalCents([])).toBe(0);
+    expect(chargeableSubtotalCents([item({ isAvailable: false })])).toBe(0);
   });
 });

@@ -77,6 +77,15 @@ export function applyLiveFields<T extends CartItem | SavedCartItem>(line: T & { 
   return next;
 }
 
+/**
+ * What the bag charges for: lines the buyer can actually check out. An
+ * unavailable line (sold out / removed) stays visible with its warning but
+ * never counts toward a subtotal or total — checkout leaves it out too.
+ */
+export function chargeableSubtotalCents(items: ReadonlyArray<Pick<CartItem, 'priceCents' | 'quantity' | 'isAvailable'>>): number {
+  return items.reduce((sum, i) => (i.isAvailable === false ? sum : sum + i.priceCents * i.quantity), 0);
+}
+
 /** Copy live fields from server lines onto local lines with the same variant. */
 function applyServerLiveByVariant<T extends CartItem | SavedCartItem>(local: T[], server: unknown[]): T[] {
   const liveByVariant = new Map<string, unknown>();
