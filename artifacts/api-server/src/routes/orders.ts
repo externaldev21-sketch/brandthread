@@ -19,6 +19,8 @@ import { withRiskView } from "../lib/risk/orderRisk";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { notifyBuyerPreparing } from "../lib/delivery/notifications";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
+import { z } from "@workspace/api-zod";
+import { bodyObject, centsLike, idArray, idParams, intLike, str, validateInput } from "../lib/commerceValidation";
 
 const router = Router();
 router.use(requireAuth);
@@ -76,6 +78,53 @@ async function notifyOrderShipped(
     logger.warn({ orderId: order.id }, "Shipping email delivery failed");
   }
 }
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Shape/type/size guards only; the handlers keep their own business checks
+// (status transitions, cancellation reasons, tracking enums) and messages.
+const orderIdParams = idParams("id");
+
+// Seller manual order. Not charged to anyone's card: it records an
+// off-platform sale, so a client-entered custom-item price/shipping only sets
+// the stored totals (variant prices are always resolved server-side).
+const createOrderBody = bodyObject({
+  customerId: str(160).nullish(),
+  dropId: str(160).nullish(),
+  items: z.array(z.object({
+    variantId: str(160).nullish(),
+    productName: str(500).optional(),
+    variantLabel: str(500).nullish(),
+    quantity: intLike(1, 10_000).optional(),
+    priceCents: centsLike.nullish(),
+  }).passthrough()).max(200),
+  shippingCents: centsLike.optional(),
+  notes: str(5_000).nullish(),
+  shippingAddress: z.record(z.unknown()).nullish(),
+});
+
+const orderStatusBody = bodyObject({
+  status: str(40),
+  reason: str(80).nullish(),
+  notes: z.string().max(2_000).nullish(),
+});
+
+const orderTrackingBody = bodyObject({
+  trackingNumber: str(200).optional(),
+  carrier: str(100).nullish(),
+  trackingStatus: str(40).optional(),
+  estimatedDelivery: str(40).nullish(),
+});
+
+const orderItemsTrackingBody = bodyObject({
+  itemIds: idArray(500),
+  trackingNumber: str(200),
+  carrier: str(100).nullish(),
+});
+
+const fulfillmentChecklistBody = bodyObject({
+  isPicked: z.boolean().optional(),
+  isPacked: z.boolean().optional(),
+});
 
 // GET /api/orders
 router.get("/", async (req, res) => {
@@ -136,7 +185,7 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/orders — transactional, server-side prices, stock validation (manager+)
-router.post("/", requireRole("manager"), async (req, res) => {
+router.post("/", requireRole("manager"), validateInput({ body: createOrderBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { customerId, dropId, items, shippingCents = 0, notes, shippingAddress } = req.body;
 
@@ -161,6 +210,19 @@ router.post("/", requireRole("manager"), async (req, res) => {
       };
       const resolvedItems: ResolvedItem[] = [];
       let subtotalCents = 0;
+
+      // The order stores these ids and the seller's order detail later reads
+      // the customer row by id alone, so only accept the seller's own records.
+      if (customerId) {
+        const [ownCustomer] = await tx.select({ id: customers.id }).from(customers)
+          .where(and(eq(customers.id, customerId), eq(customers.ownerId, ownerId))).limit(1);
+        if (!ownCustomer) throw Object.assign(new Error("Customer not found"), { status: 404 });
+      }
+      if (dropId) {
+        const [ownDrop] = await tx.select({ id: drops.id }).from(drops)
+          .where(and(eq(drops.id, dropId), eq(drops.ownerId, ownerId))).limit(1);
+        if (!ownDrop) throw Object.assign(new Error("Drop not found"), { status: 404 });
+      }
 
       for (const item of items) {
         if (!item.productName || typeof item.productName !== "string") {
@@ -381,7 +443,7 @@ const VALID_CANCELLATION_REASONS = [
 const CANCELLATION_NOTES_MAX_LENGTH = 1000;
 
 // PATCH /api/orders/:id/status — fulfillment (staff+)
-router.patch("/:id/status", requireRole("staff"), async (req, res) => {
+router.patch("/:id/status", requireRole("staff"), validateInput({ params: orderIdParams, body: orderStatusBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { status, reason, notes } = req.body;
   const valid = ["pending", "processing", "fulfilled", "shipped", "delivered", "cancelled"];
@@ -596,7 +658,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
 });
 
 // PATCH /api/orders/:id/tracking — fulfillment (staff+)
-router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
+router.patch("/:id/tracking", requireRole("staff"), validateInput({ params: orderIdParams, body: orderTrackingBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const {
     trackingNumber: rawTrackingNumber,
@@ -877,7 +939,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
 // PATCH /api/orders/:id/items-tracking — ship part of an order (staff+)
 // Each shipment carries its own tracking number; the delivery guarantee then
 // tracks, and if needed refunds, item by item (lib/delivery).
-router.patch("/:id/items-tracking", requireRole("staff"), async (req, res) => {
+router.patch("/:id/items-tracking", requireRole("staff"), validateInput({ params: orderIdParams, body: orderItemsTrackingBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { itemIds, trackingNumber: rawTracking, carrier: rawCarrier } = req.body ?? {};
   const trackingNumber = typeof rawTracking === "string" ? rawTracking.trim() : "";
@@ -921,7 +983,7 @@ router.patch("/:id/items-tracking", requireRole("staff"), async (req, res) => {
 // (mobile Fulfillment.isPicked/isPacked). Not a money- or status-path field:
 // it only records whether the seller has checked off picking/packing the
 // order's line items in the fulfillment wizard.
-router.patch("/:id/fulfillment-checklist", requireRole("staff"), async (req, res) => {
+router.patch("/:id/fulfillment-checklist", requireRole("staff"), validateInput({ params: orderIdParams, body: fulfillmentChecklistBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { isPicked, isPacked } = req.body ?? {};
   if (isPicked === undefined && isPacked === undefined) {

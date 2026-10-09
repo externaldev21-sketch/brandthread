@@ -10,11 +10,22 @@ import { Router } from "express";
 import { db, savedCollections, savedItems } from "@workspace/db";
 import { eq, and, asc, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, idParams, validateInput } from "../lib/commerceValidation";
 import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
 
 const router = Router();
 router.use(requireAuth);
+
+const collectionIdParams = idParams("id");
+const createCollectionBody = bodyObject({ name: z.string().max(200).optional() });
+const updateCollectionBody = bodyObject({
+  name: z.string().max(200).nullish(),
+  coverImageUrl: z.string().max(4_096).nullish(),
+  isPublic: z.boolean().nullish(),
+});
+const reorderCollectionsBody = bodyObject({ orderedIds: z.array(z.string().max(160)).max(500) });
 
 async function withCovers(userId: string, rows: (typeof savedCollections.$inferSelect)[]) {
   if (rows.length === 0) return [];
@@ -77,7 +88,7 @@ router.get("/:id/items", async (req, res) => {
   return res.json({ collection: (await withCovers(userId, [collection]))[0], items: await adaptSavedRows(rows) });
 });
 
-router.post("/", async (req, res) => {
+router.post("/", validateInput({ body: createCollectionBody }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { name } = req.body as { name?: string };
   if (!name || !name.trim()) return res.status(400).json({ error: "name required" });
@@ -93,7 +104,7 @@ router.post("/", async (req, res) => {
   return res.status(201).json((await withCovers(userId, [row]))[0]);
 });
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", validateInput({ params: collectionIdParams, body: updateCollectionBody }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { name, coverImageUrl, isPublic } = req.body as {
     name?: string;
@@ -114,7 +125,7 @@ router.patch("/:id", async (req, res) => {
   return res.json((await withCovers(userId, [row]))[0]);
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validateInput({ params: collectionIdParams }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   // Items belonging to this collection fall back to unfiled ("All") — never deleted.
   await db.update(savedItems)
@@ -125,7 +136,7 @@ router.delete("/:id", async (req, res) => {
   return res.json({ ok: true });
 });
 
-router.post("/reorder", async (req, res) => {
+router.post("/reorder", validateInput({ body: reorderCollectionsBody }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { orderedIds } = req.body as { orderedIds?: string[] };
   if (!Array.isArray(orderedIds) || orderedIds.length === 0) {

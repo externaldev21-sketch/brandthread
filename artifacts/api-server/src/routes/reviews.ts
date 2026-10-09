@@ -9,6 +9,8 @@ import crypto from "node:crypto";
 import { db, reviews, reviewHelpfulVotes, orders, orderItems, productVariants, products, users } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, idParams, validateInput } from "../lib/commerceValidation";
 import { logger } from "../lib/logger";
 import { assertReviewOrderAuth } from "../lib/reviewOrderAuth";
 import { resolveToClerkId } from "./public";
@@ -34,6 +36,21 @@ import {
 })();
 
 const router = Router();
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Type/size guards; normalizeReviewBody / validateReviewPhotos / parseFitNote
+// and assertReviewOrderAuth keep the business rules and their messages.
+const createReviewBody = bodyObject({
+  orderId: z.string().max(160).nullish(),
+  sellerId: z.string().max(160).optional(),
+  productId: z.string().max(160).nullish(),
+  rating: z.number().finite().optional(),
+  body: z.string().max(20_000).nullish(),
+  photos: z.array(z.string().max(2_048)).max(20).nullish(),
+  fitNote: z.string().max(100).nullish(),
+});
+const replyBody = bodyObject({ replyText: z.string().max(20_000).optional() });
+const reviewIdParams = idParams("reviewId");
 const objectStorage = new ObjectStorageService();
 
 const REVIEW_PHOTO_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
@@ -188,7 +205,7 @@ router.post(
 );
 
 // ─── Authenticated: create a review ──────────────────────────────────────────
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, validateInput({ body: createReviewBody }), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   const { orderId, sellerId, productId, rating, body, photos, fitNote } = req.body as {
     orderId?:   string;
@@ -284,7 +301,7 @@ async function helpfulState(reviewId: string, userId: string) {
   return { helpfulCount: row?.n ?? 0, viewerHelpful: !!row?.mine };
 }
 
-router.put("/:reviewId/helpful", requireAuth, async (req, res) => {
+router.put("/:reviewId/helpful", requireAuth, validateInput({ params: reviewIdParams }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const reviewId = req.params.reviewId as string;
   if (!UUID_RE.test(reviewId)) return res.status(404).json({ error: "Review not found" });
@@ -296,7 +313,7 @@ router.put("/:reviewId/helpful", requireAuth, async (req, res) => {
   return res.json(await helpfulState(reviewId, userId));
 });
 
-router.delete("/:reviewId/helpful", requireAuth, async (req, res) => {
+router.delete("/:reviewId/helpful", requireAuth, validateInput({ params: reviewIdParams }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const reviewId = req.params.reviewId as string;
   if (!UUID_RE.test(reviewId)) return res.status(404).json({ error: "Review not found" });
@@ -333,7 +350,7 @@ router.get("/mine", requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/reviews/:reviewId/reply  (seller only)
-router.post("/:reviewId/reply", requireAuth, async (req, res) => {
+router.post("/:reviewId/reply", requireAuth, validateInput({ params: reviewIdParams, body: replyBody }), async (req, res) => {
   const sellerId  = (req as any).clerkUserId as string;
   const reviewId = req.params.reviewId as string;
   const { replyText } = req.body as { replyText?: string };

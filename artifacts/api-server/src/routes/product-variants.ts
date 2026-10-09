@@ -15,7 +15,9 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import {
   db, products, productVariants, productOptionAxes, productVariantOptions, productStockRules,
 } from "@workspace/db";
+import { z } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { bodyObject, idParams, validateInput } from "../lib/commerceValidation";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import { isUniqueViolation } from "../lib/dbErrors";
@@ -25,6 +27,43 @@ import {
   MAX_MATRIX_VARIANTS, MAX_PRICE_CENTS, MAX_STOCK, baseSkuFromName, buildSku, columnAxisFor, comboKey,
   generateCombos, matrixSize, normalizeAxes, uniqueSku, validateBulkUpdates, validateStockRules,
 } from "../lib/variantMatrix";
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Shape/size guards only; lib/variantMatrix keeps the business validation and
+// its seller-facing messages. Unknown keys pass through untouched.
+const productParams = idParams("productId");
+const anyNumber = z.number().finite().min(-1_000_000_000).max(1_000_000_000);
+const axesBody = bodyObject({
+  axes: z.array(z.object({
+    name: z.union([z.string().max(200), z.number()]).nullish(),
+    values: z.array(z.union([z.string().max(200), z.number()]).nullable()).max(500).optional(),
+  }).passthrough()).max(50),
+});
+const generateBody = bodyObject({
+  priceCents: anyNumber.optional(),
+  stock: anyNumber.optional(),
+  lowStockThreshold: anyNumber.optional(),
+  baseSku: z.string().max(200).optional(),
+});
+const bulkBody = bodyObject({
+  updates: z.array(z.object({
+    variantId: z.string().max(160).optional(),
+    priceCents: anyNumber.optional(),
+    stock: anyNumber.optional(),
+    lowStockThreshold: anyNumber.optional(),
+    sku: z.string().max(200).nullish(),
+  }).passthrough()).max(2_000),
+});
+const nullableInt = z.union([anyNumber, z.literal("")]).nullish();
+const stockRulesBody = bodyObject({
+  soldOutBehavior: z.string().max(40).nullish(),
+  lowStockThresholdDefault: nullableInt,
+  limitedQuantityEnabled: z.boolean().nullish(),
+  limitedQuantityTotal: nullableInt,
+  showRemainingCounter: z.boolean().nullish(),
+  counterThreshold: nullableInt,
+  applyLowStockToVariants: z.boolean().nullish(),
+});
 
 const router = Router();
 router.use(requireAuth);
@@ -81,7 +120,7 @@ router.get("/:productId", async (req, res) => {
   res.json({ product, ...(await loadState(product.id)), maxVariants: MAX_MATRIX_VARIANTS });
 });
 
-router.put("/:productId/axes", requireRole("manager"), async (req, res) => {
+router.put("/:productId/axes", requireRole("manager"), validateInput({ params: productParams, body: axesBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const product = await ownedProduct(req.params.productId, ownerId);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
@@ -103,7 +142,7 @@ router.put("/:productId/axes", requireRole("manager"), async (req, res) => {
   res.json({ axes: parsed.axes, matrixSize: size, max: MAX_MATRIX_VARIANTS });
 });
 
-router.post("/:productId/generate", requireRole("manager"), async (req, res) => {
+router.post("/:productId/generate", requireRole("manager"), validateInput({ params: productParams, body: generateBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const product = await ownedProduct(req.params.productId, ownerId);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
@@ -190,7 +229,7 @@ router.post("/:productId/generate", requireRole("manager"), async (req, res) => 
   res.status(created.length > 0 ? 201 : 200).json({ created: created.length, skipped: size - missing.length, ...(await loadState(product.id)) });
 });
 
-router.patch("/:productId/variants/bulk", requireRole("manager"), async (req, res) => {
+router.patch("/:productId/variants/bulk", requireRole("manager"), validateInput({ params: productParams, body: bulkBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const product = await ownedProduct(req.params.productId, ownerId);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
@@ -264,7 +303,7 @@ router.get("/:productId/stock-rules", async (req, res) => {
   res.json(rulesPayload(rule));
 });
 
-router.put("/:productId/stock-rules", requireRole("manager"), async (req, res) => {
+router.put("/:productId/stock-rules", requireRole("manager"), validateInput({ params: productParams, body: stockRulesBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const product = await ownedProduct(req.params.productId, ownerId);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }

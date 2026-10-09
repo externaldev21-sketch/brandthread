@@ -36,10 +36,27 @@ import {
   validateScheduleInput,
 } from "../lib/money/payoutSchedule";
 import { assertBreakdownReconciles, buildPayoutBreakdown } from "../lib/money/payoutBreakdown";
+import { z } from "@workspace/api-zod";
+import { bodyObject, validateInput } from "../lib/commerceValidation";
 
 const router = Router();
 router.use(requireAuth);
 router.use(teamContext());
+
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Size/shape guards only. The handlers keep the money checks (positive safe
+// integer, USD only, idempotency key format, schedule enums) and their
+// specific error codes, so amount is not narrowed further here.
+const payoutBody = bodyObject({
+  amount: z.union([z.number(), z.string().max(40)]).optional(),
+  currency: z.string().max(10).optional(),
+  idempotencyKey: z.string().max(200).optional(),
+  method: z.string().max(20).optional(),
+});
+const payoutScheduleBody = bodyObject({
+  interval: z.string().max(20).optional(),
+  weeklyAnchor: z.string().max(20).nullish(),
+});
 const PAYOUT_CURRENCY = "usd";
 const SAFE_PROVIDER_RETRY_WINDOW_MS = 20 * 60 * 60 * 1000;
 
@@ -593,7 +610,7 @@ router.get("/statement.csv", requirePayoutsRead(), async (req, res) => {
 
 // ─── POST /api/finance/payout — manual bank payout ────────────────────────────
 
-router.post("/payout", requirePermission("payouts"), async (req, res) => {
+router.post("/payout", requirePermission("payouts"), validateInput({ body: payoutBody }), async (req, res) => {
   const sellerId = getSellerId(req);
   if (await denyIfAgeRestricted(sellerId, res)) return;
   const { amount, currency, idempotencyKey } = req.body;
@@ -1075,7 +1092,7 @@ router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
   }
 });
 
-router.patch("/payout-schedule", requirePermission("payouts"), async (req, res) => {
+router.patch("/payout-schedule", requirePermission("payouts"), validateInput({ body: payoutScheduleBody }), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const parsed = validateScheduleInput(req.body);

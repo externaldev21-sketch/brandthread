@@ -8,9 +8,26 @@ import { and, eq, inArray, isNull, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
 import { clearSalesCache } from "../lib/pricing/salesRuntime";
+import { z } from "@workspace/api-zod";
+import { bodyObject, idParams, numLike, validateInput } from "../lib/commerceValidation";
 
 const router = Router();
 router.use(requireAuth);
+
+// Type/size guards; validate() below keeps the business rules and messages.
+const saleIdParams = idParams("id");
+const saleBody = bodyObject({
+  name: z.string().max(500).optional(),
+  discountType: z.string().max(20).optional(),
+  // percent: 1–90 · fixed: cents off each unit (validate() enforces whole numbers)
+  value: numLike(-100_000_000, 100_000_000).optional(),
+  scope: z.string().max(20).optional(),
+  productIds: z.array(z.string().max(160)).max(1_000).nullish(),
+  collection: z.string().max(200).nullish(),
+  startsAt: z.string().max(64).nullish(),
+  endsAt: z.string().max(64).nullish(),
+  active: z.boolean().optional(),
+});
 
 const TYPES = ["percent", "fixed"] as const;
 const SCOPES = ["store", "products", "collection"] as const;
@@ -95,7 +112,7 @@ router.get("/collections", async (req, res) => {
 });
 
 // POST / — create
-router.post("/", requirePermission("marketing"), async (req, res) => {
+router.post("/", requirePermission("marketing"), validateInput({ body: saleBody }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const b = req.body as Body;
@@ -125,7 +142,7 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
 });
 
 // PATCH /:id — edit, pause / resume (`active`)
-router.patch("/:id", requirePermission("marketing"), async (req, res) => {
+router.patch("/:id", requirePermission("marketing"), validateInput({ params: saleIdParams, body: saleBody }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const b = req.body as Body;
@@ -174,7 +191,7 @@ router.patch("/:id", requirePermission("marketing"), async (req, res) => {
 });
 
 // DELETE /:id
-router.delete("/:id", requirePermission("marketing"), async (req, res) => {
+router.delete("/:id", requirePermission("marketing"), validateInput({ params: saleIdParams }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const deleted = await db.delete(sales)

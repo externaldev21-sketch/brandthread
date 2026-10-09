@@ -13,11 +13,25 @@ import { Router } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { db, sellerPackagePresets } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "@workspace/api-zod";
+import { bodyObject, idParams, numLike, validateInput } from "../lib/commerceValidation";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 
 const router = Router();
 router.use(requireAuth);
 router.use(teamContext());
+
+// Type/size guards; toDimension and the handlers keep the positive-number rules.
+const presetIdParams = idParams("id");
+const presetDimension = numLike(-1_000_000, 1_000_000);
+const presetFields = {
+  name: z.string().max(200).optional(),
+  weightOz: presetDimension.optional(),
+  lengthIn: presetDimension.optional(),
+  widthIn: presetDimension.optional(),
+  heightIn: presetDimension.optional(),
+};
+const presetBody = bodyObject(presetFields);
 
 function toDimension(value: unknown): string | null {
   const n = typeof value === "string" ? Number(value) : value;
@@ -33,7 +47,7 @@ router.get("/", requireRole("staff"), async (req, res) => {
   res.json({ presets: rows });
 });
 
-router.post("/", requireRole("staff"), async (req, res) => {
+router.post("/", requireRole("staff"), validateInput({ body: presetBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
   const weightOz = Number(req.body?.weightOz);
@@ -53,7 +67,7 @@ router.post("/", requireRole("staff"), async (req, res) => {
   res.status(201).json({ preset });
 });
 
-router.patch("/:id", requireRole("staff"), async (req, res) => {
+router.patch("/:id", requireRole("staff"), validateInput({ params: presetIdParams, body: presetBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const update: Record<string, unknown> = { updatedAt: new Date() };
   if (req.body?.name !== undefined) {
@@ -82,7 +96,7 @@ router.patch("/:id", requireRole("staff"), async (req, res) => {
   res.json({ preset });
 });
 
-router.delete("/:id", requireRole("staff"), async (req, res) => {
+router.delete("/:id", requireRole("staff"), validateInput({ params: presetIdParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const [deleted] = await db.delete(sellerPackagePresets)
     .where(and(eq(sellerPackagePresets.id, req.params.id), eq(sellerPackagePresets.ownerId, ownerId)))
