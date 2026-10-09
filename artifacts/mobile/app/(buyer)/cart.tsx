@@ -19,6 +19,7 @@ import { Header, StickyFooter } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { applyCartQuantity } from '@/lib/cartOptimistic';
 import * as Haptics from 'expo-haptics';
 import {
   getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot,
@@ -647,7 +648,7 @@ export default function CartScreen() {
   const router = useRouter();
   const { push } = useThreadPull();
   const api = useApi();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId: cartOwnerId } = useAuth();
   const { showUndo } = useUndoToast();
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
@@ -728,17 +729,20 @@ export default function CartScreen() {
     }
   }, [load]);
 
+  // Revisits refresh silently over the cart already on screen; the loading
+  // state is only for the very first load (no flash back to a spinner).
+  const hasLoadedCartRef = useRef<string | null | undefined>(undefined);
   useFocusEffect(useCallback(() => {
     let active = true;
-    setLoading(true);
-    void load();
+    if (hasLoadedCartRef.current !== cartOwnerId) setLoading(true);
+    void load().then(() => { hasLoadedCartRef.current = cartOwnerId; });
     if (isSignedIn) {
       void api.loyalty.get()
         .then(result => { if (active) setLoyaltyBalance(Math.max(0, Number(result.balance ?? 0))); })
         .catch(() => {});
     }
     return () => { active = false; };
-  }, [api, load, isSignedIn]));
+  }, [api, load, isSignedIn, cartOwnerId]));
 
   const groups = groupCartBySeller(cart.items);
   const hasPreOrder = cart.items.some(i => i.isPreOrder);
@@ -773,39 +777,44 @@ export default function CartScreen() {
     setSelectedIds(allSelected ? new Set() : new Set(cart.items.map(i => i.id)));
   }
 
-  async function handleQtyDec(itemId: string) {
+  // Quantity steppers are optimistic: the new count shows on the tap itself
+  // (lib/cartOptimistic.ts mirrors the service's own rules) and is persisted
+  // right after. cartRef tracks the latest optimistic cart so rapid taps
+  // build on each other instead of on a stale render. Only a failed write
+  // rolls back.
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
+
+  async function changeQuantity(itemId: string, delta: number) {
     if (pendingByItemId[itemId]) return;
     Haptics.selectionAsync();
-    const item = cart.items.find(i => i.id === itemId);
+    const snapshot = cartRef.current;
+    const item = snapshot.items.find(i => i.id === itemId);
     if (!item) return;
-    const snapshot = cart;
-    setPending(itemId, 'qty_dec');
+    const target = item.quantity + delta;
+    const optimistic = applyCartQuantity(snapshot, itemId, target);
+    cartRef.current = optimistic;
+    setCart(optimistic);
+    if (target <= 0) {
+      showUndo({
+        message: `"${item.productName}" removed`,
+        undo: async () => setCart(await restoreCartSnapshot(snapshot)),
+      });
+    }
     try {
-      const newCart = await updateCartItemQuantity(itemId, item.quantity - 1);
-      setCart(newCart);
-      if (item.quantity === 1) {
-        showUndo({
-          message: `"${item.productName}" removed`,
-          undo: async () => setCart(await restoreCartSnapshot(snapshot)),
-        });
-      }
-    } finally {
-      clearPending(itemId);
+      await updateCartItemQuantity(itemId, target);
+    } catch {
+      cartRef.current = snapshot;
+      setCart(snapshot);
     }
   }
 
-  async function handleQtyInc(itemId: string) {
-    if (pendingByItemId[itemId]) return;
-    Haptics.selectionAsync();
-    const item = cart.items.find(i => i.id === itemId);
-    if (!item) return;
-    setPending(itemId, 'qty_inc');
-    try {
-      const newCart = await updateCartItemQuantity(itemId, item.quantity + 1);
-      setCart(newCart);
-    } finally {
-      clearPending(itemId);
-    }
+  function handleQtyDec(itemId: string) {
+    void changeQuantity(itemId, -1);
+  }
+
+  function handleQtyInc(itemId: string) {
+    void changeQuantity(itemId, 1);
   }
 
   async function handleRemove(itemId: string) {

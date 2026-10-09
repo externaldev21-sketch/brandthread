@@ -57,6 +57,9 @@ import { canBuyerCancel } from '@/services/orderPolicy';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { PRESS_IN_REUSE_MS, queryKeys } from '@/lib/queryClient';
+import { classifyNetworkError } from '@/lib/networkNotice';
 import { isReturnEligible, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -580,6 +583,7 @@ export default function BuyerOrderDetailScreen() {
   const api = useApi();
   const { reorder, busyOrderId: reorderBusyId, element: reorderElement } = useReorderFlow();
   const { userId } = useAuth();
+  const queryClient = useQueryClient();
 
   // The real order, or — only when that request fails in the dev-web
   // preview (no account) — the seeded order a preview Activity row points
@@ -592,9 +596,12 @@ export default function BuyerOrderDetailScreen() {
     })
   ), [api]);
 
-  const [storedOrder, setOrder] = useState<BuyerOrderView | null>(null);
+  // Cache-first: the row warmed by the order list's press-in prefetch (or a
+  // recent visit) paints on the first frame; the focus fetch below refreshes it.
+  const cachedRow = id ? queryClient.getQueryData<unknown>(queryKeys.buyerOrder(id)) : undefined;
+  const [storedOrder, setOrder] = useState<BuyerOrderView | null>(() => (cachedRow ? adaptOrderDetail(cachedRow as any) : null));
   const [orderOwnerId, setOrderOwnerId] = useState<string | null | undefined>(userId);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !cachedRow);
   const [fetchError, setFetchError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
@@ -609,10 +616,16 @@ export default function BuyerOrderDetailScreen() {
   const [returnRequest, setReturnRequest] = useState<any | null>(null);
 
   const consecutiveFailuresRef = useRef(0);
+  const hasOrderRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const accountGenerationRef = useRef(0);
 
+  const lastAccountRef = useRef(userId);
   useEffect(() => {
+    // Only an actual account change resets — not the first mount, which
+    // would throw away the cached order painted above.
+    if (lastAccountRef.current === userId) return;
+    lastAccountRef.current = userId;
     accountGenerationRef.current += 1;
     consecutiveFailuresRef.current = 0;
     setOrder(null);
@@ -633,8 +646,20 @@ export default function BuyerOrderDetailScreen() {
     consecutiveFailuresRef.current = 0;
     setIsFetching(true);
 
+    let firstFetch = true;
     function fetchOrder() {
-      loadBuyerOrder(id!).then(row => {
+      // The first fetch of a focus may reuse a press-in prefetch from the last
+      // few seconds (or join one still in flight); anything older, and every
+      // later poll, is a real refresh — orders change (cancel, ship, receipt).
+      // Either way the result lands in the query cache so the next visit
+      // paints instantly.
+      const staleTime = firstFetch ? PRESS_IN_REUSE_MS : 0;
+      firstFetch = false;
+      queryClient.fetchQuery({
+        queryKey: queryKeys.buyerOrder(id!),
+        queryFn: () => loadBuyerOrder(id!),
+        staleTime,
+      }).then(row => {
         if (!cancelled && accountGenerationRef.current === accountGeneration) {
           setOrder(adaptOrderDetail(row));
           setOrderOwnerId(userId);
@@ -643,13 +668,18 @@ export default function BuyerOrderDetailScreen() {
           setIsFetching(false);
           consecutiveFailuresRef.current = 0;
         }
-      }).catch(() => {
+      }).catch((err: unknown) => {
         if (!cancelled && accountGenerationRef.current === accountGeneration) {
-          setOrder(null);
+          // Bad connection with the order already on screen: keep showing it
+          // (it refreshes on the next poll) instead of swapping in the error
+          // state. A real answer (e.g. 404) still clears it.
+          if (!hasOrderRef.current || classifyNetworkError(err) === null) {
+            setOrder(null);
+            setFetchError(true);
+          }
           setOrderOwnerId(userId);
           setLoading(false);
           setIsFetching(false);
-          setFetchError(true);
           consecutiveFailuresRef.current += 1;
           if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
             clearInterval(timerRef.current);
@@ -706,6 +736,7 @@ export default function BuyerOrderDetailScreen() {
   }
 
   const order = visibleOrderForBuyer(storedOrder, orderOwnerId, userId);
+  hasOrderRef.current = !!order;
   const visibleLoading = loading || orderOwnerId !== userId;
 
   function handleCopyTracking() {

@@ -42,7 +42,7 @@ export interface RailEngagement {
 export function RightActionRail({
   creator, hostId, avatarColor, avatarUri, initials, accentColor,
   engagement, commentsCount, shares, saves,
-  onOpenCreator, onFollow, onLike, onOpenComments, onRepost, onSave, onShare,
+  onOpenCreator, onPressInCreator, onFollow, onLike, onOpenComments, onRepost, onSave, onShare,
   heartScale, likeRing, repostSpin, repostScale, saveDrop, saveScale,
   style, testIdBase, reduceMotion,
 }: {
@@ -62,6 +62,8 @@ export function RightActionRail({
   shares: number;
   saves: number;
   onOpenCreator: () => void;
+  /** Press-in on the avatar: warm the profile it opens. */
+  onPressInCreator?: () => void;
   onFollow: () => Promise<void> | void;
   onLike: () => Promise<void> | void;
   onOpenComments: () => void;
@@ -147,6 +149,7 @@ export function RightActionRail({
           onLayout={avatarHit.onLayout}
           activeOpacity={0.8}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
+          onPressIn={onPressInCreator}
           accessibilityRole="button"
           accessibilityLabel={`View ${creator}'s profile`}
         >

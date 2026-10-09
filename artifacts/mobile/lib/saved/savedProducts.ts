@@ -5,6 +5,9 @@
 import { getSavedItems, removeSavedItem, saveItem } from '@/services/socialService';
 import { createSavedProductsStore, type SavedProductDraft } from './savedProductsStore';
 import { emitSaveHeartEvent } from './saveHeartBus';
+import {
+  enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure, setEngagementRetryFallback,
+} from '@/lib/engagementRetryQueue';
 
 export const savedProducts = createSavedProductsStore({
   fetchSaved: () => getSavedItems(),
@@ -16,6 +19,33 @@ export const savedProducts = createSavedProductsStore({
     priceCents: d.priceCents,
   }),
   remove: (productId) => removeSavedItem(productId),
+  // Bad connection: keep the heart as tapped and deliver the change in the
+  // background (lib/engagementRetryQueue.ts); only a real refusal rolls back.
+  queueRetry: (draft, saved, error) => {
+    if (!isRetryableFailure(error)) return false;
+    void enqueueEngagementRetry({
+      kind: 'save_product',
+      targetId: draft.productId,
+      payload: { value: saved ? 'add' : 'remove', title: draft.title, brand: draft.brand, priceCents: draft.priceCents },
+    });
+    ensureEngagementRetryPump();
+    return true;
+  },
+});
+
+setEngagementRetryFallback('save_product', async (action) => {
+  const p = action.payload ?? {};
+  if (p.value === 'remove') {
+    await removeSavedItem(action.targetId);
+    return;
+  }
+  await saveItem({
+    type: 'product',
+    targetId: action.targetId,
+    title: typeof p.title === 'string' ? p.title : '',
+    subtitle: typeof p.brand === 'string' ? p.brand : undefined,
+    priceCents: typeof p.priceCents === 'number' ? p.priceCents : undefined,
+  });
 });
 
 /** Tap: save / unsave. Signed-out buyers get a sign-in prompt, never an API call. */

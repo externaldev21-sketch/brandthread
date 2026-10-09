@@ -26,8 +26,16 @@ import {
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
   markConversationRead, subscribeSocial,
   setConversationTheme, setConversationDisappearing,
+  sendQueuedMessage, getCachedConversation, getCachedMessages,
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
+import {
+  clientIdFromOutboxMessageId, discardOutboxMessage, enqueueOutboxMessage, isOutboxMessageId,
+  mergeOutboxIntoThread, outboxEntryToMessage, retryOutboxMessage, subscribeOutboxEvents,
+  type OutboxEntry,
+} from '@/lib/messageOutbox';
+import { useMessageOutbox } from '@/hooks/useMessageOutbox';
+import { peekWarmThread } from '@/lib/conversationPrefetch';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
@@ -285,9 +293,13 @@ export default function BuyerConversationScreen() {
   const myId = userId ?? MY_USER_ID;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
-  const [conv, setConv] = useState<Conversation | null>(null);
+  // Cache-first: the inbox row's press-in loaded this thread's last-known
+  // copy into memory (lib/conversationPrefetch.ts), so the first frame shows
+  // it instead of an empty thread; loadData below refreshes it.
+  const warmThread = params.id && !isPreviewConversationId(params.id) ? peekWarmThread(userId, params.id) : undefined;
+  const [conv, setConv] = useState<Conversation | null>(() => warmThread?.conversation ?? null);
   const callLog = useCallLog(conv?.id ?? params.id ?? '');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => warmThread?.messages ?? []);
   const [text, setText] = useState('');
   const { showUndo } = useUndoToast();
   const textInputRef = useRef<TextInput>(null);
@@ -298,6 +310,30 @@ export default function BuyerConversationScreen() {
   const [isSending, setIsSending] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+
+  // Offline outbox (lib/messageOutbox.ts): a sent message shows right away
+  // with the existing "sending" clock and is delivered in order — now, or on
+  // reconnect/foreground if the device is offline.
+  const sendQueued = useCallback((entry: OutboxEntry) => sendQueuedMessage(userId ?? '', entry), [userId]);
+  const outboxEnabled = !!userId && !!conv?.id && !isPreviewConversationId(conv.id);
+  const { entries: outboxEntries, flush: flushOutboxNow } = useMessageOutbox(userId, conv?.id, sendQueued, outboxEnabled);
+  useEffect(() => {
+    if (!userId || !conv?.id) return;
+    const convId = conv.id;
+    return subscribeOutboxEvents((event) => {
+      if (event.userId !== userId || event.entry.conversationId !== convId) return;
+      if (event.type === 'sent') {
+        const stored = event.result as Message | null;
+        if (stored?.id) setMessages((prev) => (prev.some((m) => m.id === stored.id) ? prev : [...prev, stored]));
+        return;
+      }
+      // Same as before the outbox: the server's reason, and the draft back in
+      // the composer (unless the user already started a new one).
+      Alert.alert('Message not sent', apiErrorMessage(event.error, 'Please check your connection and try again.'));
+      setText((current) => (current.trim().length > 0 ? current : event.entry.text));
+      setSelectedAttachment((current) => current ?? ((event.entry.attachment as MessageAttachment | undefined) ?? null));
+    });
+  }, [userId, conv?.id]);
   const [copiedToast, setCopiedToast] = useState(false);
   const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
@@ -447,6 +483,14 @@ export default function BuyerConversationScreen() {
       }
 
       if (params.id) {
+        // Nothing on screen yet (opened without an inbox press-in, e.g. from a
+        // notification): paint the on-device copy before the network answers.
+        const [cachedConv, cachedMsgs] = await Promise.all([
+          getCachedConversation(params.id).catch(() => null),
+          getCachedMessages(params.id).catch(() => [] as Message[]),
+        ]);
+        if (cachedConv) setConv((prev) => prev ?? cachedConv);
+        if (cachedMsgs.length > 0) setMessages((prev) => (prev.length > 0 ? prev : cachedMsgs));
         loadedConv = await getConversation(params.id);
         if (loadedConv) {
           unreadBeforeRead = loadedConv.unreadCount ?? 0;
@@ -1063,6 +1107,8 @@ export default function BuyerConversationScreen() {
     // (long-press menu, double-tap-like, and the existing-chip re-tap below)
     // refuses to fire while the request is still pending.
     if (!conv || isRequestMode) return;
+    // Still queued: there is no server message to react to yet.
+    if (isOutboxMessageId(msg.id)) return;
     hapticSelection();
     const prevMessages = messages;
     const { next } = applyOptimisticReaction(msg.reactions, myId, MY_NAME, type);
@@ -1458,6 +1504,20 @@ export default function BuyerConversationScreen() {
       return;
     }
 
+    if (userId) {
+      await enqueueOutboxMessage(userId, conv.id, {
+        text: t,
+        attachment: att ?? undefined,
+        // A reply to a message that is itself still queued has no server id yet.
+        replyToId: replyingTo && !isOutboxMessageId(replyingTo.id) ? replyingTo.id : undefined,
+        replyPreview: replyingTo?.text,
+        replyToAuthorName: replyingTo?.fromName,
+      });
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      void flushOutboxNow();
+      return;
+    }
+
     setIsSending(true);
     try {
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
@@ -1591,6 +1651,12 @@ export default function BuyerConversationScreen() {
     closeMessageSheet();
     hapticDestructiveConfirm();
     if (!conv || !msg) return;
+    // Deleting a still-queued message just takes it out of the outbox.
+    const queuedId = clientIdFromOutboxMessageId(msg.id);
+    if (queuedId) {
+      if (userId) void discardOutboxMessage(userId, conv.id, queuedId);
+      return;
+    }
     // A seeded preview conversation has no real backend record to delete
     // against — just drop it from local state instead of 401-ing.
     if (isPreviewConversationId(conv.id)) {
@@ -1993,7 +2059,15 @@ export default function BuyerConversationScreen() {
             {/* Failed / retry */}
             {isOwn && msg.status === 'failed' && (
               <PressableScale rippleEnabled={false}
-                onPress={() => { if (conv) void retryMessage(conv.id, msg.id).catch(() => {}); }}
+                onPress={() => {
+                  if (!conv) return;
+                  const queuedId = clientIdFromOutboxMessageId(msg.id);
+                  if (queuedId && userId) {
+                    void retryOutboxMessage(userId, conv.id, queuedId).then(() => flushOutboxNow());
+                    return;
+                  }
+                  void retryMessage(conv.id, msg.id).catch(() => {});
+                }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={s.retryRow}
               >
@@ -2053,7 +2127,12 @@ export default function BuyerConversationScreen() {
 
   // ── Main render ─────────────────────────────────────────────────────────────
 
-  const visibleMessages = messages.filter(m => !m.deletedForMe);
+  const visibleMessages = mergeOutboxIntoThread(
+    messages.filter(m => !m.deletedForMe),
+    outboxEntries.map((entry) => outboxEntryToMessage(entry, {
+      fromId: myId, fromName: 'You', fromInitials: MY_INITIALS, fromColor: theme.accent,
+    })),
+  );
   const listData = mergeCallLogRows(buildListRows(visibleMessages, unreadDividerId), callLog);
 
   useEffect(() => {

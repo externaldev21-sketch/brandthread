@@ -1099,9 +1099,17 @@ export const messages = pgTable('messages', {
   disappearAt:    timestamp('disappear_at', { withTimezone: true }),
   // True for seller away auto-replies (migration 142).
   isAutomated:    boolean('is_automated').notNull().default(false),
+  // Client-generated id for an outgoing message (migration 263). A send that
+  // is retried after a dropped connection (the mobile offline outbox) carries
+  // the same id, so the server returns the already-stored row instead of
+  // inserting a duplicate. Null for sends that don't supply one.
+  clientMessageId: text('client_message_id'),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   conversationOrderIdx: index('messages_conversation_order_idx').on(table.conversationId, table.createdAt),
+  clientMessageIdx:     uniqueIndex('messages_client_message_id_uniq')
+    .on(table.conversationId, table.senderId, table.clientMessageId)
+    .where(sql`${table.clientMessageId} IS NOT NULL`),
   readWorkIdx:          index('messages_read_work_idx').on(table.conversationId, table.readAt, table.createdAt),
   moderationIdx:        index('messages_moderation_review_idx').on(table.moderationStatus, table.reportedAt),
   retentionIdx:         index('messages_retention_idx').on(table.retentionUntil),

@@ -48,6 +48,7 @@ import {
   createBuyNowSession,
   getCart,
   getBuyerProduct,
+  warmCart,
 } from '@/services/cartService';
 import type {
   BuyerProduct,
@@ -484,6 +485,8 @@ export function ShopProductSheet({
   // parent's `setShopSelection(null)` (which unmounts this component) can
   // never race the animation and yank it mid-flight.
   const [sheetOpen, setSheetOpen] = useState(true);
+  // Confirm the bag in the background so "Add to bag" is instant (see warmCart).
+  useEffect(() => { warmCart(); }, []);
   const {
     modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout,
   } = useSheetTransition(

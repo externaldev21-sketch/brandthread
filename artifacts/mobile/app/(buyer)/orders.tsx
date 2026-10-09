@@ -10,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
+import { prefetchBuyerOrderOnPressIn } from '@/lib/detailPrefetch';
 import * as Haptics from 'expo-haptics';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
@@ -113,7 +114,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
   const thumbs = order.lineItems.slice(0, 4);
 
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} disabled={isPreview}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} onPressIn={isPreview ? undefined : () => prefetchBuyerOrderOnPressIn(order.id)} disabled={isPreview}>
       {/* Top row */}
       <View style={styles.cardTopRow}>
         <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>

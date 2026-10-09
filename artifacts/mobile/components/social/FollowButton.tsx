@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
+import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure } from '@/lib/engagementRetryQueue';
 
 export type FollowState = {
   isFollowing: boolean;
@@ -57,7 +58,14 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
           onChange?.(state, -1);
         }
       }
-    } catch {
+    } catch (error) {
+      // Bad connection: keep what the user tapped and deliver it in the
+      // background (lib/engagementRetryQueue.ts). Only a real refusal rolls back.
+      if (isRetryableFailure(error)) {
+        void enqueueEngagementRetry({ kind: 'follow', targetId: userId, payload: { value: wasFollowing ? 'unfollow' : undefined } });
+        ensureEngagementRetryPump();
+        return;
+      }
       // Roll back on failure.
       setState(state);
       onChange?.(state, wasFollowing ? 1 : -1);

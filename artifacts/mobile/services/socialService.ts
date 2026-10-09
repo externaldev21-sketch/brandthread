@@ -13,6 +13,8 @@ import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { purgeAuthorFromFeedPostsCache } from '@/lib/feedPostsCache';
 import { queryClient } from '@/lib/queryClient';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
+import { OutboxAccountMismatchError, type OutboxEntry } from '@/lib/messageOutbox';
+import { setEngagementRetryFallback, setEngagementRetryOwnerResolver } from '@/lib/engagementRetryQueue';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
@@ -1011,6 +1013,24 @@ export async function setSellerFollowing(
   return state;
 }
 
+// Background retries for follow taps that couldn't reach the server (see
+// lib/engagementRetryQueue.ts): queued actions belong to the account that
+// queued them, and a queued follow replays through setSellerFollowing even
+// when the feed (the queue's main executor) isn't mounted.
+setEngagementRetryOwnerResolver(() => _socialUserId);
+setEngagementRetryFallback('follow', async (action) => {
+  await setSellerFollowing(action.targetId, action.payload?.value !== 'unfollow');
+});
+// Same request the feed's executor sends (api.posts.interact), so a queued
+// like replays from any screen.
+setEngagementRetryFallback('like', async (action) => {
+  const value = typeof action.payload?.value === 'string' ? action.payload.value : undefined;
+  await serviceRequest(`/api/posts/${encodeURIComponent(action.targetId)}/interact`, {
+    method: 'POST',
+    body: JSON.stringify({ type: 'like', value }),
+  });
+});
+
 /** Backwards-compatible one-shot page loader for non-paginated callers. */
 export async function getThreadPosts(offset = 0, limit = 30): Promise<SellerThreadPost[]> {
   const cursor = createThreadFeedCursor();
@@ -1263,12 +1283,19 @@ export async function getMessages(conversationId: string, k: SocialKeys = K()): 
   if (_socialUserId === k.userId) await save(msgKey, remote);
   return remote;
 }
-export async function sendMessage(conversationId: string, text: string, attachment?: MessageAttachment, replyToId?: string): Promise<Message> {
+export async function sendMessage(
+  conversationId: string,
+  text: string,
+  attachment?: MessageAttachment,
+  replyToId?: string,
+  /** Makes the send idempotent server-side — see lib/messageOutbox.ts. */
+  clientMessageId?: string,
+): Promise<Message> {
   const k = K();
   const msgKey = k.messages(conversationId);
   const message = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text, attachment, replyToId }),
+    body: JSON.stringify({ text, attachment, replyToId, clientMessageId }),
   });
   if (_socialUserId === k.userId) {
     const messages = await load<Message[]>(msgKey, []);
@@ -1282,6 +1309,37 @@ export async function sendMessage(conversationId: string, text: string, attachme
   }
   return message;
 }
+/** The account this service is currently scoped to ('anon' when signed out). */
+export function getSocialUserId(): string {
+  return _socialUserId;
+}
+
+/** Delivers one queued message from lib/messageOutbox.ts for `userId`. Refuses
+ *  (leaving it queued) if a different account is signed in by now. */
+export async function sendQueuedMessage(userId: string, entry: OutboxEntry): Promise<Message> {
+  if (_socialUserId !== userId) throw new OutboxAccountMismatchError();
+  return sendMessage(
+    entry.conversationId,
+    entry.text,
+    entry.attachment as MessageAttachment | undefined,
+    entry.replyToId,
+    entry.clientMessageId,
+  );
+}
+
+/** Cached copy of a thread from its last successful load, for an instant
+ *  first paint before the network answers. Empty when nothing is cached. */
+export async function getCachedMessages(conversationId: string, k: SocialKeys = K()): Promise<Message[]> {
+  const cached = await load<Message[]>(k.messages(conversationId), []);
+  return Array.isArray(cached) ? cached : [];
+}
+
+/** Cached copy of one conversation from the last inbox/thread load (null if none). */
+export async function getCachedConversation(conversationId: string, k: SocialKeys = K()): Promise<Conversation | null> {
+  const conversations = await load<Conversation[]>(k.conversations, []);
+  return Array.isArray(conversations) ? conversations.find((c) => c?.id === conversationId) ?? null : null;
+}
+
 export async function retryMessage(conversationId: string, messageId: string): Promise<void> {
   const k = K();
   const msgKey = k.messages(conversationId);
