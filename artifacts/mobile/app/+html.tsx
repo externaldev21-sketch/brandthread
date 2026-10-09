@@ -83,7 +83,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
 // module load for the same reason once JS runs; this covers the gap before
 // that).
 const responsiveBackground = `
-  html, body, #root { background-color: #0A0A0B; height: 100%; }
+  html, body, #root { background-color: #000000; height: 100%; }
 `;
 
 // Universal, theme-agnostic interaction polish for every shared

@@ -7,6 +7,7 @@
     "icon": "./assets/images/app-icons/monochrome.png",
     "scheme": "brandthread",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -346,7 +347,7 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#0A0A0B"
+          "backgroundColor": "#000000"
         }
       ],
       "expo-web-browser",
