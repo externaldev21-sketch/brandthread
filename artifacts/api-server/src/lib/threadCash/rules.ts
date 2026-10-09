@@ -25,6 +25,19 @@ export function isExpiringCreditSource(source: string): boolean {
   return !NON_EXPIRING_CREDIT_SOURCES.has(source);
 }
 
+/**
+ * Whether a credit row expires. Funding decides when it is known: money a
+ * person paid in never expires, while promo (reward) credit always does —
+ * including promo a buyer relayed to a seller as a Live gift, so gifting
+ * can't be used to dodge expiry. Rows without a funding fall back to the
+ * source rule above.
+ */
+export function isExpiringCredit(source: string, funding?: string | null): boolean {
+  if (funding === "paid") return false;
+  if (funding === "promo") return true;
+  return isExpiringCreditSource(source);
+}
+
 /** `expiryDays` as an active policy: a positive integer, else never. */
 export function activeExpiryDays(config: Pick<ThreadCashConfig, "expiryDays">): number | null {
   const days = config.expiryDays;

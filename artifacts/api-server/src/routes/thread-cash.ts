@@ -1,9 +1,13 @@
 /**
  * Thread Cash — platform-funded buyer reward credit.
  *
- * Thread Cash is NOT money: it can't be cashed out, withdrawn, or converted
- * to money. It is earned via a daily check-in with weekly streaks and spent
- * only toward purchases in the app.
+ * Reward Thread Cash is NOT money: credit from check-ins, streaks, referrals,
+ * refunds and promos — and anything sent by a friend — can't be cashed out,
+ * withdrawn, or converted to money, and it expires (90 days by default). It
+ * is spent only toward purchases in the app. The only cashable Thread Cash is
+ * money a person actually paid in and gifted a seller in a Live
+ * (lib/threadCash/funding.ts). Every reward path passes the server-side kill
+ * switch, monthly budget and per-device cap in lib/threadCash/earnGate.ts.
  *
  * GET  /api/thread-cash             — balance, streak state, config, history
  * POST /api/thread-cash/check-in    — DEPRECATED, kept for older clients; claim today's
@@ -28,13 +32,12 @@
  *                                      Gift a live stream's host: instant, no mutual-follow
  *                                      gate, no pending claim (unlike /send). Lands on the
  *                                      seller's balance with source 'live_gift'.
- * POST /api/thread-cash/cash-out    — SELLER-ONLY. Converts a seller's earned Thread
- *                                      Cash (from Live gifts / message payments — see
- *                                      lib/threadCash/cashOut.ts) into a real Stripe
- *                                      Transfer to their payout balance. Unlike buyer
- *                                      Thread Cash, a seller's earned balance is real
- *                                      value and can be cashed out. Requires the
- *                                      "payouts" permission, same as POST /finance/payout.
+ * POST /api/thread-cash/cash-out    — SELLER-ONLY. Converts the PAID part of a seller's
+ *                                      Live-gift Thread Cash (see lib/threadCash/cashOut.ts)
+ *                                      into a real Stripe Transfer to their payout balance.
+ *                                      Reward/promo credit and peer sends are never
+ *                                      cashable. Requires the "payouts" permission, same as
+ *                                      POST /finance/payout.
  */
 import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
@@ -52,6 +55,7 @@ import {
   awardDailyActiveTimeClaimOnce,
   recordThreadCashHeartbeat,
   getBalanceCents,
+  getCashableBalanceCents,
   getHistory,
   getThreadCashConfig,
   isFeatureEnabled,
@@ -70,6 +74,31 @@ import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checko
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
 import { stripe } from "../lib/stripe";
 import { liveTipsGate } from "../lib/liveTips";
+import { threadCashEarnPauseReason } from "../lib/threadCash/earnGate";
+
+/**
+ * Outcomes where the claim was valid but no reward is paid today (rewards
+ * paused, monthly budget spent, device already earned today). Answered 200
+ * with `awarded: false` so the app marks the day done instead of retrying.
+ */
+const NO_REWARD_TODAY_CODES = new Set([
+  "THREAD_CASH_EARN_PAUSED",
+  "THREAD_CASH_REWARDS_BUDGET_EXHAUSTED",
+  "THREAD_CASH_DEVICE_CHECKIN_CAP",
+]);
+
+function sendNoRewardToday(res: any, error: ThreadCashError, balanceCents: number): void {
+  res.json({
+    ok: true,
+    awarded: false,
+    code: error.code,
+    message: error.message,
+    earnedCents: 0,
+    streakBonusCents: 0,
+    streakBroken: false,
+    balanceCents,
+  });
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -100,16 +129,24 @@ router.get("/", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   // Post anything that has lapsed first so the balance never includes it.
   await expireThreadCashForBuyer(buyerId).catch((err) => logger.warn({ err, buyerId }, "Thread Cash lazy expiry failed"));
-  const [balanceCents, config, { state, timezone }, openRedemptions] = await Promise.all([
+  const [balanceCents, cashableCents, config, { state, timezone }, openRedemptions] = await Promise.all([
     getBalanceCents(db, buyerId),
+    getCashableBalanceCents(db, buyerId),
     getThreadCashConfig(),
     loadStreakState(buyerId),
     listOpenThreadCashRedemptions(db, buyerId),
   ]);
   const preview = computeCheckIn(state, config, new Date(), timezone);
   const expiry = await getExpirySummary(buyerId).catch(() => null);
+  const earnPausedReason = await threadCashEarnPauseReason().catch(() => "earn_disabled" as const);
   res.json({
     balanceCents,
+    // Additive: why rewards aren't being paid right now (kill switch, or
+    // checkout spend still off), or null when they are.
+    earnPausedReason,
+    // How much of balanceCents a seller may cash out: paid Live gifts only,
+    // never reward credit or peer sends. Additive field.
+    cashableCents,
     // Additive: the rules as enforced, and what lapses soon (null if the lookup failed).
     rules: describeRules(config),
     expiry: expiry && {
@@ -172,6 +209,10 @@ router.post("/check-in", async (req, res) => {
       deviceId,
     }));
   } catch (error) {
+    if (error instanceof ThreadCashError && NO_REWARD_TODAY_CODES.has(error.code)) {
+      sendNoRewardToday(res, error, await getBalanceCents(db, buyerId));
+      return;
+    }
     if (error instanceof ThreadCashError) {
       res.status(error.status).json({ error: error.message, code: error.code });
       return;
@@ -232,6 +273,11 @@ router.post("/daily/heartbeat", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   const timezone = normalizeTimezone(req.body?.timezone);
   const activeSeconds = Math.max(0, Math.floor(Number(req.body?.activeSeconds)) || 0);
+  // Rewards off (kill switch): nothing to count toward.
+  if (await threadCashEarnPauseReason()) {
+    res.json({ ok: true, heartbeatCount: 0, paused: true });
+    return;
+  }
   const localDate = localDateString(new Date(), timezone);
   const { heartbeatCount } = await recordThreadCashHeartbeat(buyerId, localDate, activeSeconds);
   res.json({ ok: true, heartbeatCount });
@@ -276,6 +322,10 @@ router.post("/daily/claim", async (req, res) => {
       activeSeconds,
     }));
   } catch (error) {
+    if (error instanceof ThreadCashError && NO_REWARD_TODAY_CODES.has(error.code)) {
+      sendNoRewardToday(res, error, await getBalanceCents(db, buyerId));
+      return;
+    }
     if (error instanceof ThreadCashError) {
       res.status(error.status).json({ error: error.message, code: error.code });
       return;
@@ -426,11 +476,13 @@ router.post("/redeem/:token/cancel", async (req, res) => {
 
 // ─── POST /api/thread-cash/send, /claim, /cancel ────────────────────────────
 // Peer-to-peer transfer between friends who follow each other (mutual
-// follow, checked at both send and claim). Feature-flagged as a server-side
-// kill switch only — 'threadCashSend' is ON by default.
+// follow, checked at both send and claim). 'threadCashSend' is OFF until
+// legal sign-off on peer-to-peer transfer (migration 261); a missing flag
+// row also reads as off. Received sends are promo credit: spendable, never
+// cashable.
 router.post("/send", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  if (!(await isFeatureEnabled("threadCashSend", true))) {
+  if (!(await isFeatureEnabled("threadCashSend"))) {
     res.status(503).json({ error: "Sending Thread Cash isn't available right now.", code: "THREAD_CASH_SEND_DISABLED" });
     return;
   }
@@ -474,8 +526,8 @@ router.post("/send", async (req, res) => {
 // ─── POST /api/thread-cash/live-gift ────────────────────────────────────────
 // A viewer gifting a live stream's host — instant, unconditional (never
 // gated on mutual follow, never sits pending a claim, unlike /send). The
-// seller's credit lands with source 'live_gift', which cashOut.ts already
-// treats as real, cashable value.
+// seller's credit lands with source 'live_gift' and the funding the buyer
+// spent: only a paid part is cashable (cashOut.ts); promo stays promo.
 router.post("/live-gift", liveTipsGate(), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   const { streamId, amountCents: rawAmount } = req.body ?? {};
@@ -515,7 +567,7 @@ router.post("/live-gift", liveTipsGate(), async (req, res) => {
 
 router.post("/claim", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  if (!(await isFeatureEnabled("threadCashSend", true))) {
+  if (!(await isFeatureEnabled("threadCashSend"))) {
     res.status(503).json({ error: "Sending Thread Cash isn't available right now.", code: "THREAD_CASH_SEND_DISABLED" });
     return;
   }
@@ -538,7 +590,7 @@ router.post("/claim", async (req, res) => {
 
 router.post("/cancel", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  if (!(await isFeatureEnabled("threadCashSend", true))) {
+  if (!(await isFeatureEnabled("threadCashSend"))) {
     res.status(503).json({ error: "Sending Thread Cash isn't available right now.", code: "THREAD_CASH_SEND_DISABLED" });
     return;
   }
@@ -560,8 +612,8 @@ router.post("/cancel", async (req, res) => {
 });
 
 // ─── POST /api/thread-cash/cash-out ─────────────────────────────────────────
-// Seller-only: converts earned Thread Cash into a real Stripe Transfer to
-// the seller's own payout balance. Gated on the "payouts" permission (not
+// Seller-only: converts paid Live-gift Thread Cash (never reward credit)
+// into a real Stripe Transfer to the seller's own payout balance. Gated on the "payouts" permission (not
 // requireAuth alone) — same money-moving-write rule as POST /finance/payout:
 // a team member with only view access can see the balance but never cash it
 // out. `GET /api/thread-cash/quote` lets the client preview the payout/fee

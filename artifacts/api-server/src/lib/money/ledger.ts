@@ -41,13 +41,27 @@ export const LEDGER_ACCOUNTS = {
   /** Opening balances migrated from before the ledger existed. */
   legacy_opening: "legacy_opening",
   /**
-   * Brandthread's own cost of covering a Thread Cash discount at checkout so
+   * Brandthread's cost of covering a Thread Cash discount at checkout so
    * the seller still receives their full item-price payout (party = seller).
-   * Recognised as an expense when Thread Cash is spent (Thread Cash itself is
-   * tracked separately, as SUM(thread_cash_entries), not as a balance-sheet
-   * liability in this ledger — see docs/payments/thread-cash-checkout-todo.md).
+   * The top-up transfer posts here (negative); the spend that caused it
+   * posts the same amount back from `thread_cash_liability` (positive), so
+   * once both have run the cost sits where the credit was issued
+   * (`thread_cash_rewards_expense`) and this account nets to zero.
    */
   thread_cash_seller_topup: "thread_cash_seller_topup",
+  /**
+   * Thread Cash Brandthread owes its holders (positive = outstanding).
+   * Credited when reward credit is issued, debited when it is spent at
+   * checkout, cashed out or expires — see lib/threadCash/liability.ts.
+   * Credit issued before this account existed is reported as "unbooked" by
+   * getThreadCashLiabilityReport rather than back-posted.
+   */
+  thread_cash_liability: "thread_cash_liability",
+  /**
+   * Marketing cost of platform-funded Thread Cash rewards (check-in, streak,
+   * referral, promo). Negative = cost; expiry gives it back (positive).
+   */
+  thread_cash_rewards_expense: "thread_cash_rewards_expense",
   /**
    * Brandthread's cost of a seller cashing out their earned Thread Cash
    * (from Live gifts / message payments) into their real payout balance

@@ -7,6 +7,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import {
   db, loyaltyPoints, notificationsFeed, orders, referrals, threadCashEntries, users,
 } from "@workspace/db";
+import { allowThreadCashRewards, seedRewardsGmv } from "../../testUtils/threadCashRewards";
 
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: any, next: any) => {
@@ -29,6 +30,7 @@ const allIds = [inviterId, friendA, friendB, friendC, veteran];
 let code = "";
 let server: Server;
 let base = "";
+let restoreEnv: () => void;
 
 async function call(method: string, path: string, userId?: string, body?: unknown) {
   const res = await fetch(`${base}/api/referrals${path}`, {
@@ -59,6 +61,8 @@ async function balance(buyerId: string) {
 }
 
 beforeAll(async () => {
+  restoreEnv = allowThreadCashRewards();
+  await seedRewardsGmv();
   for (const id of allIds) {
     await db.insert(users).values({ clerkId: id, email: `${id}@example.com`, name: id, accountType: "buyer" });
   }
@@ -78,6 +82,7 @@ afterAll(async () => {
   await db.delete(referrals).where(eq(referrals.inviterId, inviterId));
   await db.delete(users).where(inArray(users.clerkId, allIds));
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  restoreEnv();
 });
 
 describe("referral program: give $10 / get $10 Thread Cash", () => {
@@ -99,22 +104,20 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
     expect(stats.body.clicks).toBe(1);
   });
 
-  it("gives the invitee $10 on joining and the inviter 500 points (unchanged), exactly once", async () => {
+  it("credits no Thread Cash on joining (both wait for a paid order); the inviter's 500 points are unchanged", async () => {
     const first = await call("POST", "/apply", friendA, { code });
     expect(first.status).toBe(200);
-    expect(first.body).toMatchObject({ ok: true, inviterId, inviteeRewardCents: 1000 });
+    expect(first.body).toMatchObject({ ok: true, inviterId, inviteeRewardCents: 0 });
 
     const again = await call("POST", "/apply", friendA, { code });
     expect(again.status).toBe(409);
 
-    expect(await balance(friendA)).toBe(1000);
-    expect(await balance(inviterId)).toBe(0); // inviter waits for the first paid order
+    // A sign-up alone costs nothing to fake, so it earns nothing.
+    expect(await balance(friendA)).toBe(0);
+    expect(await balance(inviterId)).toBe(0);
     const points = await db.select().from(loyaltyPoints)
       .where(and(eq(loyaltyPoints.buyerId, inviterId), eq(loyaltyPoints.source, "referral")));
     expect(points.map((p) => p.points)).toEqual([500]);
-
-    const [entry] = await db.select().from(threadCashEntries).where(eq(threadCashEntries.buyerId, friendA));
-    expect(entry).toMatchObject({ source: "referral", idempotencyKey: `referral:${friendA}:invitee` });
   });
 
   it("rejects self-referral, unknown codes and existing customers", async () => {
@@ -144,12 +147,17 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
     ]);
     expect(results.filter((r) => r.rewarded)).toHaveLength(1);
     expect(await balance(inviterId)).toBe(1000);
+    // The friend's welcome credit lands with the same first paid order.
+    expect(await balance(friendA)).toBe(1000);
+    const [welcome] = await db.select().from(threadCashEntries).where(eq(threadCashEntries.buyerId, friendA));
+    expect(welcome).toMatchObject({ source: "referral", funding: "promo", idempotencyKey: `referral:${friendA}:invitee` });
 
     // A later order or webhook redelivery never pays again.
     const later = await placeOrder(friendA, 9000);
     expect(await qualifyReferralForOrder(later)).toMatchObject({ rewarded: false });
     expect(await qualifyReferralForOrder(real)).toMatchObject({ rewarded: false });
     expect(await balance(inviterId)).toBe(1000);
+    expect(await balance(friendA)).toBe(1000);
 
     const [ref] = await db.select().from(referrals).where(eq(referrals.inviteeId, friendA));
     expect(ref).toMatchObject({ status: "rewarded", inviterRewardCents: 1000, qualifyingOrderId: real });
@@ -174,6 +182,8 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
       const [ref] = await db.select().from(referrals).where(eq(referrals.inviteeId, friendB));
       expect(ref.status).toBe("capped");
       expect(await balance(inviterId)).toBe(1000);
+      // The friend still gets their welcome credit with their first paid order.
+      expect(await balance(friendB)).toBe(1000);
 
       const stats = await call("GET", "/stats", inviterId);
       expect(stats.body.earnedCents).toBe(50_000);
@@ -190,5 +200,26 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
     expect(stats.body).toMatchObject({ total: 3, earnedCents: 1000, pendingCents: 1000, pointsEarned: 1500 });
     const statuses = Object.fromEntries(stats.body.referrals.map((r: any) => [r.inviteeId, r.status]));
     expect(statuses).toMatchObject({ [friendA]: "rewarded", [friendB]: "capped", [friendC]: "pending" });
+  });
+
+  it("pays nothing while rewards are paused or the budget is spent, and the referral stays pending", async () => {
+    const { qualifyReferralForOrder } = await import("../../lib/referrals/rewards");
+    const orderId = await placeOrder(friendC, 2500);
+
+    const paused = allowThreadCashRewards({ THREAD_CASH_EARN_ENABLED: "false" });
+    try {
+      expect(await qualifyReferralForOrder(orderId)).toEqual({ rewarded: false, reason: "earn_paused" });
+    } finally { paused(); }
+    const broke = allowThreadCashRewards({ THREAD_CASH_REWARDS_MONTHLY_CAP_CENTS: "0" });
+    try {
+      expect(await qualifyReferralForOrder(orderId)).toEqual({ rewarded: false, reason: "budget_exhausted" });
+    } finally { broke(); }
+    expect(await balance(friendC)).toBe(0);
+    const [pending] = await db.select().from(referrals).where(eq(referrals.inviteeId, friendC));
+    expect(pending.status).toBe("pending");
+
+    expect(await qualifyReferralForOrder(orderId)).toMatchObject({ rewarded: true });
+    expect(await balance(friendC)).toBe(1000);
+    expect(await balance(inviterId)).toBe(2000);
   });
 });

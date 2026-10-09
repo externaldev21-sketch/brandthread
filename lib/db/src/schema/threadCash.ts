@@ -33,6 +33,12 @@ export const threadCashEntries = pgTable('thread_cash_entries', {
   // Required for redeem/spend-style mutations so a client retry or double
   // tap can never post twice; enforced by a unique partial index.
   idempotencyKey: text('idempotency_key'),
+  // 'promo' (platform-funded rewards: check-ins, streaks, referral, promo
+  // refunds, admin credit) | 'paid' (money a person actually paid in). Only
+  // paid funds a seller receives as a Live gift are withdrawable (migration
+  // 261; api-server lib/threadCash/funding.ts). Debits record which funds
+  // they consumed.
+  funding:     text('funding').notNull().default('promo'),
   createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -116,3 +122,16 @@ export const threadCashTransfers = pgTable('thread_cash_transfers', {
   idempotencyKey: text('idempotency_key'),
   createdAt:      timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// Per-device reward cap (migration 261): one row per (device, account,
+// buyer-local day) a daily/streak reward was paid, so rewards are capped per
+// phone across every account on it. `deviceKey` is a SHA-256 of the app's
+// install id, never the raw id.
+export const threadCashDeviceRewards = pgTable('thread_cash_device_rewards', {
+  deviceKey:  text('device_key').notNull(),
+  buyerId:    text('buyer_id').notNull(),
+  localDate:  text('local_date').notNull(),
+  createdAt:  timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.deviceKey, t.buyerId, t.localDate] }),
+}));

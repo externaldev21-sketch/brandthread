@@ -28,6 +28,7 @@ import { logger } from "../logger";
 import { orderHeldCents, postLedgerTransaction } from "./ledger";
 import { orderFundsMachine } from "./stateMachines";
 import { payoutMayRelease, payoutReleasableSql } from "../delivery/payoutGate";
+import { applyThreadCashSellerTopup } from "../threadCash/checkoutTopup";
 import { isDefinitiveStripeRejection, stripeErrorCode } from "./stripeMoney";
 import {
   expiredReservationCheckouts, releaseStockReservation,
@@ -126,6 +127,12 @@ export async function settleTransferOrder(
       });
     }
   });
+  if (settled) {
+    // Thread Cash the buyer spent is platform-funded: pay the seller that
+    // part now, with the rest of the order (idempotent; no-op without it).
+    await applyThreadCashSellerTopup(stripeClient, orderId).catch((err) =>
+      logger.error({ err, orderId }, "Thread Cash top-up after order transfer failed"));
+  }
   return settled ? "transferred" : "already";
 }
 
