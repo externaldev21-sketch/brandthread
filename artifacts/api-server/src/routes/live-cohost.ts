@@ -26,8 +26,13 @@ import {
   checkInviteAllowed, transitionCohost, type CohostAction, type CohostActor, type CohostStatus,
 } from "../lib/liveCohost";
 import { logger } from "../lib/logger";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handlers keep their required-field checks.
+const cohostUserBody = looseBody({ userId: cappedUnknown(200) });
+const cohostRespondBody = looseBody({ accept: cappedUnknown(10) });
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
@@ -141,7 +146,7 @@ router.get("/:id/cohosts", wrap(async (req, res) => {
 }));
 
 // ─── Host: invite ────────────────────────────────────────────────────────────
-router.post("/:id/cohost/invite", requireAuth, wrap(async (req, res) => {
+router.post("/:id/cohost/invite", requireAuth, validateBody(cohostUserBody), wrap(async (req, res) => {
   const me = (req as any).clerkUserId as string;
   const stream = await loadStream(req, res);
   if (!stream) return;
@@ -220,7 +225,7 @@ async function applyTransition(
   return t.to;
 }
 
-router.post("/:id/cohost/cancel", requireAuth, wrap(async (req, res) => {
+router.post("/:id/cohost/cancel", requireAuth, validateBody(cohostUserBody), wrap(async (req, res) => {
   const me = (req as any).clerkUserId as string;
   const stream = await loadStream(req, res);
   if (!stream) return;
@@ -230,7 +235,7 @@ router.post("/:id/cohost/cancel", requireAuth, wrap(async (req, res) => {
   return undefined;
 }));
 
-router.post("/:id/cohost/respond", requireAuth, wrap(async (req, res) => {
+router.post("/:id/cohost/respond", requireAuth, validateBody(cohostRespondBody), wrap(async (req, res) => {
   const me = (req as any).clerkUserId as string;
   const stream = await loadStream(req, res);
   if (!stream) return;
@@ -257,7 +262,7 @@ router.post("/:id/cohost/token", requireAuth, wrap(async (req, res) => {
   return res.json(publisherCreds(stream, me));
 }));
 
-router.post("/:id/cohost/remove", requireAuth, wrap(async (req, res) => {
+router.post("/:id/cohost/remove", requireAuth, validateBody(cohostUserBody), wrap(async (req, res) => {
   const me = (req as any).clerkUserId as string;
   const stream = await loadStream(req, res);
   if (!stream) return;

@@ -27,6 +27,7 @@ import { blockRelation, publishingRestriction } from "../lib/safety";
 import { evaluateContent } from "../lib/contentModerator";
 import { audienceAllows, normalizeAudience, viewerRelations } from "../lib/storyAccess";
 import { resolveToClerkId } from "./public";
+import { cappedList, cappedUnknown, looseBody, optNumberish, validateBody } from "../middlewares/bodySchemas";
 
 export const MAX_HIGHLIGHTS = 50;
 export const MAX_HIGHLIGHT_ITEMS = 100;
@@ -35,6 +36,17 @@ const MAX_TITLE = 24;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const router = Router();
+
+// Shape + size guards; the clean* helpers keep their own trimming / slicing.
+const highlightFields = {
+  title:      cappedUnknown(1_000),
+  coverUrl:   cappedUnknown(4_096),
+  coverEmoji: cappedUnknown(100),
+  coverColor: cappedUnknown(100),
+};
+const createHighlightBody = looseBody({ ...highlightFields, storyIds: cappedList(500, 200) });
+const updateHighlightBody = looseBody({ ...highlightFields, position: optNumberish });
+const addHighlightItemBody = looseBody({ storyId: cappedUnknown(200) });
 router.use(requireAuth);
 
 type HighlightRow = typeof storyHighlights.$inferSelect;
@@ -245,7 +257,7 @@ router.get("/highlights/:id", async (req, res) => {
 });
 
 // ─── Writes (owner only) ──────────────────────────────────────────────────────
-router.post("/highlights", async (req, res) => {
+router.post("/highlights", validateBody(createHighlightBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const restriction = await publishingRestriction(myId);
   if (restriction) { res.status(restriction.status).json(restriction.body); return; }
@@ -269,7 +281,7 @@ router.post("/highlights", async (req, res) => {
   res.status(201).json(highlightView(row, items.get(row.id) ?? []));
 });
 
-router.patch("/highlights/:id", async (req, res) => {
+router.patch("/highlights/:id", validateBody(updateHighlightBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const row = await ownHighlight(myId, String(req.params.id));
   if (!row) { res.status(404).json({ error: "Highlight not found" }); return; }
@@ -299,7 +311,7 @@ router.delete("/highlights/:id", async (req, res) => {
   res.json({ id: row.id, deleted: true });
 });
 
-router.post("/highlights/:id/items", async (req, res) => {
+router.post("/highlights/:id/items", validateBody(addHighlightItemBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const row = await ownHighlight(myId, String(req.params.id));
   if (!row) { res.status(404).json({ error: "Highlight not found" }); return; }

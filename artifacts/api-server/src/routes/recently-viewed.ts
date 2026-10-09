@@ -10,13 +10,17 @@ import { Router } from "express";
 import { db, recentlyViewedProducts, products, productVariants, users } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guard; the handler requires productId itself.
+const recentlyViewedBody = looseBody({ productId: cappedUnknown(200) });
 router.use(requireAuth);
 
 const MAX_HISTORY = 30;
 
-router.post("/", async (req, res) => {
+router.post("/", validateBody(recentlyViewedBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { productId } = req.body as { productId?: string };
   if (!productId) return res.status(400).json({ error: "productId required" });

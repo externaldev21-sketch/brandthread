@@ -24,8 +24,12 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { CAROUSEL_CANVAS, MAX_CAROUSEL_VIDEO_SECONDS, MAX_SLIDES_BY_SURFACE } from "../lib/postLimits";
 import { adjustFilters, cropFilter, parseAdjust, parseCrop, type Adjust, type CropRect } from "../lib/carouselAdjust";
+import { jsonList, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guard; parseItems validates each item itself.
+const composeCarouselBody = looseBody({ items: jsonList(100, 20_000) });
 const storage = new ObjectStorageService();
 const exec = promisify(execFile);
 const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
@@ -74,7 +78,7 @@ function parseItems(raw: unknown): { ok: true; items: Item[] } | { ok: false; er
   return { ok: true, items };
 }
 
-router.post("/compose-carousel", requireAuth, async (req, res) => {
+router.post("/compose-carousel", requireAuth, validateBody(composeCarouselBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!(await canPost(clerkId))) return res.status(403).json({ error: "Seller or buyer account required" });
   const parsed = parseItems((req.body as { items?: unknown })?.items);

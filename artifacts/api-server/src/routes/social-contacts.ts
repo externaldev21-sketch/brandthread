@@ -22,8 +22,13 @@ import {
   parseHashList, resolveMatchedUserIds,
 } from "../lib/contactHashes";
 import { formatUser } from "./social";
+import { cappedList, cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; parseHashList keeps the MAX_CONTACT_HASHES (413) and digest checks.
+const matchContactsBody = looseBody({ hashes: cappedList(20_000, 200) });
+const optInBody = looseBody({ phoneHash: cappedUnknown(200) });
 router.use(requireAuth);
 
 function requireEnabled(_req: Request, res: Response, next: NextFunction) {
@@ -48,7 +53,7 @@ router.get("/status", async (req, res) => {
   }
 });
 
-router.post("/match", requireEnabled, rateLimit("contact-match"), async (req, res) => {
+router.post("/match", requireEnabled, rateLimit("contact-match"), validateBody(matchContactsBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const parsed = parseHashList((req.body ?? {}).hashes);
   if (!parsed.ok) { res.status(parsed.status).json({ error: parsed.error }); return; }
@@ -87,7 +92,7 @@ router.post("/match", requireEnabled, rateLimit("contact-match"), async (req, re
   }
 });
 
-router.post("/opt-in", requireEnabled, rateLimit("follow"), async (req, res) => {
+router.post("/opt-in", requireEnabled, rateLimit("follow"), validateBody(optInBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const phoneHash = (req.body ?? {}).phoneHash;
   if (phoneHash !== undefined && phoneHash !== null && !isValidContactHash(phoneHash)) {

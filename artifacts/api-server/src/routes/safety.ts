@@ -14,8 +14,12 @@ import { db, mutedWords } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { MAX_MUTED_WORDS, MAX_MUTED_WORD_LENGTH, normalizeMutedPhrase } from "../lib/contentModerator";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guard; normalizeMutedPhrase enforces MAX_MUTED_WORD_LENGTH after normalising.
+const mutedWordBody = looseBody({ phrase: cappedUnknown(1_000) });
 router.use(requireAuth);
 
 router.get("/muted-words", async (req, res) => {
@@ -31,7 +35,7 @@ router.get("/muted-words", async (req, res) => {
   });
 });
 
-router.post("/muted-words", rateLimit("report"), async (req, res) => {
+router.post("/muted-words", rateLimit("report"), validateBody(mutedWordBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const phrase = normalizeMutedPhrase((req.body as { phrase?: unknown })?.phrase);
   if (!phrase) {

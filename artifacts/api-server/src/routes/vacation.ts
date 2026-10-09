@@ -8,8 +8,16 @@ import { Router } from "express";
 import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { cappedUnknown, looseBody, optText, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler requires a boolean vacationMode itself.
+const vacationBody = looseBody({
+  vacationMode:    cappedUnknown(10),
+  vacationMessage: optText(10_000),
+  vacationUntil:   cappedUnknown(100),
+});
 router.use(requireAuth);
 
 // GET /api/seller/vacation
@@ -41,7 +49,7 @@ router.get("/", async (req, res) => {
 });
 
 // PUT /api/seller/vacation
-router.put("/", async (req, res) => {
+router.put("/", validateBody(vacationBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { vacationMode, vacationMessage, vacationUntil } = req.body as {
     vacationMode?:    boolean;

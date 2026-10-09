@@ -41,8 +41,20 @@ import { markScheduledLiveStarted } from "../lib/scheduledLives";
 import { broadcastToRoom } from "../ws/liveHub";
 import { canJoinStream, checkCommentAllowed } from "../lib/liveModeration";
 import { loadEffectiveSettings, loadLastCommentAt, loadRestriction } from "../lib/liveModerationState";
+import { cappedUnknown, jsonList, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handlers keep title / productTags / 500-char chat rules.
+const startLiveBody = looseBody({
+  title:           cappedUnknown(2_000),
+  description:     cappedUnknown(20_000),
+  thumbnailUrl:    cappedUnknown(4_096),
+  productTags:     jsonList(500, 20_000),
+  scheduledLiveId: cappedUnknown(200),
+});
+const liveProductsBody = looseBody({ productTags: jsonList(500, 20_000) });
+const liveCommentBody = looseBody({ message: cappedUnknown(5_000) });
 
 /** Hosting a live is a Pro feature; watching one is not. */
 const hostPlan = requirePlan("pro");
@@ -86,7 +98,7 @@ function randomChannelName(): string {
 }
 
 // ─── POST /api/live/start ─────────────────────────────────────────────────────
-router.post("/start", requireAuth, hostPlan, async (req, res) => {
+router.post("/start", requireAuth, hostPlan, validateBody(startLiveBody), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   if (await denyIfAgeRestricted(sellerId, res)) return;
   const { title, description, thumbnailUrl, productTags = [], scheduledLiveId } = req.body;
@@ -396,7 +408,7 @@ router.post("/:id/end", requireAuth, hostPlan, async (req, res) => {
 });
 
 // ─── PATCH /api/live/:id/products ────────────────────────────────────────────
-router.patch("/:id/products", requireAuth, hostPlan, async (req, res) => {
+router.patch("/:id/products", requireAuth, hostPlan, validateBody(liveProductsBody), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { productTags } = req.body;
   if (!Array.isArray(productTags)) return res.status(400).json({ error: "productTags must be an array" });
@@ -418,7 +430,7 @@ router.patch("/:id/products", requireAuth, hostPlan, async (req, res) => {
 });
 
 // ─── POST /api/live/:id/comment ───────────────────────────────────────────────
-router.post("/:id/comment", requireAuth, async (req, res) => {
+router.post("/:id/comment", requireAuth, validateBody(liveCommentBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { message } = req.body;
   if (typeof message !== "string" || !message.trim()) return res.status(400).json({ error: "message required" });

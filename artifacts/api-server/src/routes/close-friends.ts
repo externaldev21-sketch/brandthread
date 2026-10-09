@@ -15,10 +15,14 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, closeFriends, follows } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { blockedUserIds, profilesById } from "../lib/safety";
+import { cappedList, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 export const CLOSE_FRIENDS_CAP = 500;
 
 const router = Router();
+
+// Shape + size guard; the handler keeps its own per-item and cap checks.
+const closeFriendsBody = looseBody({ userIds: cappedList(2_000, 200) });
 router.use(requireAuth);
 
 async function listFor(userId: string) {
@@ -44,7 +48,7 @@ router.get("/close-friends", async (req, res) => {
   res.json(await listFor(myId));
 });
 
-router.put("/close-friends", async (req, res) => {
+router.put("/close-friends", validateBody(closeFriendsBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const raw = (req.body as { userIds?: unknown })?.userIds;
   if (!Array.isArray(raw) || raw.some((v) => typeof v !== "string" || !v || v.length > 200)) {

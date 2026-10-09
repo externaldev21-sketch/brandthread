@@ -20,8 +20,12 @@ import { actorFieldsFromProfile } from "../lib/activityEvents";
 import { profilesById } from "../lib/safety";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
 import { CLOSE_FRIENDS_MAX, normalizeCloseFriendIds, relationshipLockKey } from "../lib/privateAccount";
+import { cappedList, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guard; normalizeCloseFriendIds keeps the per-item rules.
+const closeFriendsBody = looseBody({ friendIds: cappedList(CLOSE_FRIENDS_MAX * 4, 200) });
 router.use(requireAuth);
 
 function personFields(row: {
@@ -151,7 +155,7 @@ router.get("/close-friends", async (req, res) => {
   res.json({ friendIds: friends.map((f) => f.userId), friends });
 });
 
-router.put("/close-friends", rateLimit("follow"), async (req, res) => {
+router.put("/close-friends", rateLimit("follow"), validateBody(closeFriendsBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const ids = normalizeCloseFriendIds((req.body as any)?.friendIds, myId);
   if (!ids) {

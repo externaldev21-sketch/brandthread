@@ -25,8 +25,12 @@ import {
 } from "../lib/reportTargets";
 import { profilesById, type ReportTargetType } from "../lib/safety";
 import heldRouter from "./moderationHeld";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler checks the action enum and slices the note.
+const resolveReportBody = looseBody({ action: cappedUnknown(100), note: cappedUnknown(20_000) });
 router.use(requireAuth);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -141,7 +145,7 @@ router.get("/reports", async (req, res) => {
 });
 
 // ─── POST /api/moderation/reports/:id/resolve ────────────────────────────────
-router.post("/reports/:id/resolve", async (req, res) => {
+router.post("/reports/:id/resolve", validateBody(resolveReportBody), async (req, res) => {
   const moderatorId = (req as any).clerkUserId as string;
   const reportId = String(req.params.id);
   if (!UUID_RE.test(reportId)) return res.status(404).json({ error: "Report not found" });

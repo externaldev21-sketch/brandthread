@@ -37,8 +37,19 @@ import {
 } from "../lib/teamInvites";
 import crypto from "crypto";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handlers keep role / email / context rules.
+const teamContextBody = looseBody({ storeContext: cappedUnknown(200), membershipId: cappedUnknown(200) });
+const teamInviteBody = looseBody({
+  email:    cappedUnknown(500),
+  username: cappedUnknown(500),
+  name:     cappedUnknown(500),
+  role:     cappedUnknown(40),
+});
+const teamRoleBody = looseBody({ role: cappedUnknown(40) });
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
 // `owner` plus the five roles offered on invite. Permissions here mirror
@@ -314,7 +325,7 @@ router.get("/my-membership", async (req, res) => {
 // POST /api/team/context — validate an explicit store selection. The selection
 // is request-scoped; clients should send the returned membership id in
 // X-Store-Context on subsequent requests.
-router.post("/context", async (req, res) => {
+router.post("/context", validateBody(teamContextBody), async (req, res) => {
   const selection =
     typeof req.body?.storeContext === "string"
       ? req.body.storeContext
@@ -536,7 +547,7 @@ router.get("/members/:id", async (req, res) => {
 // POST /api/team/invite — owner creates (or refreshes) an invite
 // Body: { email?, username?, name?, role }. Either `email` or `username` must
 // be given; a `username` is resolved to that user's account email.
-router.post("/invite", requireRole("owner"), async (req, res) => {
+router.post("/invite", requireRole("owner"), validateBody(teamInviteBody), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { email, username, name, role = "viewer" } = req.body ?? {};
   if (!isInviteRole(role)) {
@@ -741,8 +752,8 @@ async function handleRoleChange(req: any, res: any) {
   );
   res.json(decorateMember(updated, true));
 }
-router.patch("/members/:id", requireRole("owner"), handleRoleChange);
-router.patch("/members/:id/role", requireRole("owner"), handleRoleChange);
+router.patch("/members/:id", requireRole("owner"), validateBody(teamRoleBody), handleRoleChange);
+router.patch("/members/:id/role", requireRole("owner"), validateBody(teamRoleBody), handleRoleChange);
 
 // DELETE /api/team/members/:id — owner soft-removes a member (access revoked)
 router.delete("/members/:id", requireRole("owner"), async (req, res) => {
