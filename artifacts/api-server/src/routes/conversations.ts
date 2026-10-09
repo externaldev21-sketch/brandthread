@@ -25,6 +25,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or, ilike } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, optNumberish, optText, validateBody } from "../middlewares/bodySchemas";
 import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
@@ -40,7 +41,6 @@ import {
   checkUpload, validateMediaAttachment, decideOrderShare, decidePostShare, decideProductShare,
 } from "../lib/dmAttachmentPolicy";
 import { IMMUTABLE_PUBLIC_CACHE_CONTROL, normalizeUploadedImage } from "../lib/productImageResize";
-import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, optNumberish, optText, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
 
