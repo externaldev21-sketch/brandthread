@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Linking } from 'react-native';
+import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, useWindowDimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Linking } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -158,9 +158,6 @@ interface BuyerOrderRow {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const SCREEN_W = Dimensions.get('window').width;
-const BUBBLE_MAX = SCREEN_W * 0.75;
-
 // Shared with app/buyer-conversation.tsx via lib/chatGrouping.ts — see that
 // module's doc comment for why the two screens' grouping math is
 // consolidated even though their JSX/render code isn't.
@@ -234,6 +231,9 @@ function groupByDate(msgs: Msg[], callLog: CallLogEntry[] = []): ListRow[] {
 
 export default function SellerConversationScreen() {
   const { theme } = useAppTheme();
+  // Bubbles cap at 75% of the live window width (re-fits on iPad rotation / split view).
+  const { width: SCREEN_W } = useWindowDimensions();
+  const BUBBLE_MAX = SCREEN_W * 0.75;
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const BG = theme.background;
   const CARD = theme.card;

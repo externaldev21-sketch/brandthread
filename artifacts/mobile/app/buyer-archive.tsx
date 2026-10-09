@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Dimensions,
+  View, Text, StyleSheet, TouchableOpacity, useWindowDimensions,
   FlatList, RefreshControl, Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -24,9 +24,7 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { radius } from '@/constants/radii';
 
-const { width } = Dimensions.get('window');
 const GAP = SP.xs;
-const CELL = (width - SP.md * 2 - GAP * 2) / 3;
 
 type ArchiveTab = 'posts' | 'stories';
 
@@ -34,7 +32,10 @@ export default function BuyerArchive() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
   const PURPLE_DIM = theme.accentDim;
-  const styles = makeStyles(theme);
+  // Live window width so the 3-up grid re-fits on iPad rotation / split view.
+  const { width } = useWindowDimensions();
+  const CELL = (width - SP.md * 2 - GAP * 2) / 3;
+  const styles = makeStyles(theme, CELL);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [tab, setTab] = useState<ArchiveTab>('posts');
@@ -199,7 +200,7 @@ export default function BuyerArchive() {
   );
 }
 
-const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentDim: string }, CELL: number) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
   tabRow: { flexDirection: 'row', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm },
   tabPill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SP.sm, backgroundColor: CARD, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER },

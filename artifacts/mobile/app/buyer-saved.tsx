@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
-  View, Text, FlatList, Alert, StyleSheet, Dimensions,
+  View, Text, FlatList, Alert, StyleSheet, useWindowDimensions,
   Modal, TextInput, Animated, Pressable,
 } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
@@ -34,9 +34,7 @@ import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 
-const { width: W } = Dimensions.get('window');
 const GAP = SPACING.xs;
-const TILE_SIZE = (W - SPACING.md * 2 - GAP) / 2;
 
 type MainTab = 'all' | 'collections' | 'drops';
 const MAIN_TABS: { id: MainTab; label: string }[] = [
@@ -73,7 +71,10 @@ function TilePressable({ onPress, onLongPress, accessibilityLabel, children, sty
 export default function BuyerSaved() {
   const { theme } = useAppTheme();
   const palette = useColors();
-  const styles = makeStyles(theme, palette);
+  // Live window width so the 2-up grid re-fits on iPad rotation / split view.
+  const { width: W } = useWindowDimensions();
+  const TILE_SIZE = (W - SPACING.md * 2 - GAP) / 2;
+  const styles = makeStyles(theme, palette, TILE_SIZE);
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -460,7 +461,7 @@ const bs = StyleSheet.create({
   badgeText: { color: '#0A0A0B', fontSize: 10, fontFamily: FONT.bold, letterSpacing: 0.2 },
 });
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>, TILE_SIZE: number) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   tabBar: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
   gridContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs, gap: GAP, paddingBottom: SPACING.xxl },

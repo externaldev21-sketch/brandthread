@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, Dimensions, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, Platform, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -27,7 +27,6 @@ import { formatCents, integerPercent } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { buildProductUrl } from '@/lib/shareLinks';
 
-const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_H = 380;
 
 // ─── Helper Components ────────────────────────────────────────────────────────
@@ -86,6 +85,8 @@ export default function ProductStoreScreen() {
   const SUCCESS_DIM = `${SUCCESS}26`;
   const BLUE = theme.accentLight;
   const s = React.useMemo(() => makeStyles(theme), [theme]);
+  // Live window width so the gallery re-fits on iPad rotation / split view.
+  const { width: SCREEN_W } = useWindowDimensions();
   const router = useRouter();
   const { id, variantId } = useLocalSearchParams<{ id: string; variantId?: string }>();
   const insets = useSafeAreaInsets();

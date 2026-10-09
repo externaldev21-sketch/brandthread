@@ -6,7 +6,7 @@
  * scope this PR covers.
  */
 import React, { useState } from 'react';
-import { Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -23,8 +23,6 @@ import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
-
-const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 
 function ActionButton({ icon, label, active, onPress }: {
   icon: keyof typeof Feather.glyphMap; label?: string; active?: boolean; onPress: () => void;
@@ -46,6 +44,7 @@ function ViewerPage({
   onSafetyMenu: (post: DiscoverPost) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { height: WINDOW_HEIGHT } = useWindowDimensions();
   const [liked, setLiked] = useState(!!post.likedByMe);
   const [likesCount, setLikesCount] = useState(post.likesCount);
   const [saved, setSaved] = useState(!!post.savedByMe);
@@ -146,6 +145,8 @@ export function DiscoverPostViewer({
 }) {
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
+  // Each page is one live window tall (re-fits on iPad rotation / split view).
+  const { height: WINDOW_HEIGHT } = useWindowDimensions();
 
   function openProfile(post: DiscoverPost) {
     if (post.authorAccountType === 'seller') {

@@ -7,7 +7,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Image, Animated, Dimensions,
+  StyleSheet, ActivityIndicator, Alert, Image, Animated, useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -27,9 +27,6 @@ import {
   generateSketchToDesign, GenerateDesignResult,
 } from '@/services/designService';
 
-const { width: SW } = Dimensions.get('window');
-const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
-
 type Step = 'upload' | 'process' | 'style' | 'results';
 
 const PROCESS_STEPS = [
@@ -41,7 +38,9 @@ const PROCESS_STEPS = [
 export default function UploadSketchScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
-  const s = createStyles(theme);
+  // Live window width so the 2-up cards re-fit on iPad rotation / split view.
+  const { width: SW } = useWindowDimensions();
+  const s = createStyles(theme, (SW - SP.lg * 2 - SP.sm) / 2);
   const router = useRouter();
   const [step, setStep] = useState<Step>('upload');
   const [sketchUri, setSketchUri] = useState<string | null>(null);
@@ -335,7 +334,7 @@ export default function UploadSketchScreen() {
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme'], COL_W: number) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
   content: { padding: SP.lg, paddingBottom: SP.xxl },

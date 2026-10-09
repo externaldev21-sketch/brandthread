@@ -7,7 +7,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Dimensions } from 'react-native';
+  Alert, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,8 +26,6 @@ import {
 } from '@/components/BrandthreadUI';
 import { getProject, exportProject } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
-
-const { width: SCREEN_W } = Dimensions.get('window');
 
 interface FormatOption {
   id: string;
@@ -62,7 +60,9 @@ const SIZES: SizeOption[] = [
 export default function DesignExportScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
-  const styles = createStyles(theme);
+  // Live window width so the preview re-fits on iPad rotation / split view.
+  const { width: SCREEN_W } = useWindowDimensions();
+  const styles = createStyles(theme, SCREEN_W);
   const router   = useRouter();
   const headerTopInset = useHeaderTopInset();
   const insets = useSafeAreaInsets();
@@ -217,7 +217,7 @@ export default function DesignExportScreen() {
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme'], SCREEN_W: number) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },

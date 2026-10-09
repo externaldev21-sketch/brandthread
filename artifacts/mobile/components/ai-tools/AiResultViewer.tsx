@@ -7,15 +7,13 @@
  * this family that shows a results grid.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import type { AiResultSlot } from './AiResultTypes';
-
-const { width: SW, height: SH } = Dimensions.get('window');
 
 export interface AiResultViewerAction {
   icon: keyof typeof Feather.glyphMap;
@@ -35,6 +33,8 @@ interface AiResultViewerProps {
 
 export function AiResultViewer({ visible, items, index, onIndexChange, onClose, actions }: AiResultViewerProps) {
   const insets = useSafeAreaInsets();
+  // Live window size so each full-screen page re-fits on iPad rotation / split view.
+  const { width: SW, height: SH } = useWindowDimensions();
   const [showBefore, setShowBefore] = useState(false);
   const current = items[index];
 
@@ -44,7 +44,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={s.root}>
+      <View style={[s.root, { width: SW, height: SH }]}>
         <FlatList
           data={items}
           keyExtractor={(item) => String(item.id)}
@@ -62,7 +62,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
               <Image
                 cachePolicy="memory-disk"
                 source={{ uri: showBefore && item.id === current.id ? item.sourceUri : item.imageUri }}
-                style={s.image}
+                style={[s.image, { width: SW, height: SH }]}
                 contentFit="contain"
               />
             </View>
@@ -116,8 +116,8 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, width: SW, height: SH, backgroundColor: '#000' },
-  image: { width: SW, height: SH },
+  root: { flex: 1, backgroundColor: '#000' },
+  image: {},
   topBar: {
     position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

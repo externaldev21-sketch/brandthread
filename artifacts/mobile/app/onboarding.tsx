@@ -22,7 +22,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Dimensions,
   Easing,
   Image,
   Linking,
@@ -113,7 +112,6 @@ import { MOTION, RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingT
 import { radius } from '@/constants/radii';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
-const { width: SW } = Dimensions.get('window');
 let sm: any = {};
 // Runtime aliases are used only by legacy inline controls; all StyleSheets below
 // are factories and receive theme values directly.

@@ -14,7 +14,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, ScrollView, TouchableOpacity, Pressable, StyleSheet, Image,
-  ActivityIndicator, Alert, Modal, TextInput, useWindowDimensions, Dimensions,
+  ActivityIndicator, Alert, Modal, TextInput, useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter } from 'expo-router';
@@ -66,7 +66,6 @@ const PLACEMENTS: { key: PlacementType; label: string }[] = [
 ];
 
 const GRID_GAP = 12;
-const SCREEN_W_FOR_GRID = Dimensions.get('window').width;
 const SCREEN_PAD = SP.md;
 
 let seq = 0;
@@ -76,9 +75,9 @@ export default function AiDesignChatScreen() {
   useHideTabBar();
   const { theme } = useAppTheme();
   const colors = useColors();
-  const s = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { width: screenW } = useWindowDimensions();
+  const s = useMemo(() => createStyles(colors, screenW), [colors, screenW]);
   const cardSize = screenW - SCREEN_PAD * 2;
   const tileSize = Math.floor((screenW - SCREEN_PAD * 2 - GRID_GAP * 2) / 3);
 
@@ -501,7 +500,7 @@ function ActionPill({ icon, label, onPress, primary, disabled, s, colors, testID
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>, SCREEN_W_FOR_GRID: number) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   gridContent: { paddingHorizontal: SCREEN_PAD, paddingTop: SP.md, paddingBottom: SP.md },
   sectionLabel: {

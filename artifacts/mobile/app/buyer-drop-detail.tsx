@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  AccessibilityInfo, ActivityIndicator, Alert, Animated, Dimensions, Image, LayoutAnimation,
-  Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View,
+  AccessibilityInfo, ActivityIndicator, Alert, Animated, Image, LayoutAnimation,
+  Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View, useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -33,8 +33,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const { width: W } = Dimensions.get('window');
-const HERO_H = Math.max(470, Math.min(590, W * 1.38));
 
 // Reuse the app's single low-stock threshold convention (CommerceSignal.tsx).
 const LOW_STOCK_THRESHOLD = URGENCY_UNITS_THRESHOLD;
@@ -227,6 +225,7 @@ function ProductTile({
   onPress: () => void;
 }) {
   const { theme } = useAppTheme();
+  const { width: W } = useWindowDimensions();
   const imageUri = product.images?.find(Boolean);
   const soldOut = isLive && !!product.soldOut;
   const lowStock = isLive && !soldOut && typeof product.stockRemaining === 'number' && product.stockRemaining <= LOW_STOCK_THRESHOLD;
@@ -255,7 +254,7 @@ function ProductTile({
         accessibilityRole="button"
         accessibilityLabel={locked ? 'Locked — unlocks at launch' : `${product.name}${soldOut ? ', sold out' : ''}`}
       >
-        <View style={styles.productMedia}>
+        <View style={[styles.productMedia, { height: (W - SP.md * 2 - 10) * 0.68 }]}>
           {imageUri ? (
             <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={locked ? 22 : 0} />
           ) : (
@@ -307,6 +306,9 @@ export default function BuyerDropDetail() {
   const colors = useColors();
   const { theme } = useAppTheme();
   const { dropId, dropName } = useLocalSearchParams<{ dropId: string; dropName?: string }>();
+  // Live window width so the hero re-fits on iPad rotation / split view.
+  const { width: W } = useWindowDimensions();
+  const HERO_H = Math.max(470, Math.min(590, W * 1.38));
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
@@ -473,7 +475,7 @@ export default function BuyerDropDetail() {
   return (
     <View style={styles.root}>
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}>
-        <View style={styles.hero}>
+        <View style={[styles.hero, { height: HERO_H }]}>
           {heroUri ? (
             heroIsVideo ? <HeroVideo uri={heroUri} /> : <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
@@ -526,7 +528,7 @@ export default function BuyerDropDetail() {
               </View>
             </View>
 
-            <Text style={styles.dropName}>{drop.name ?? dropName}</Text>
+            <Text style={[styles.dropName, { maxWidth: W - 40 }]}>{drop.name ?? dropName}</Text>
 
             {showRecap ? (
               <View style={styles.livePanel}>
@@ -670,7 +672,7 @@ export default function BuyerDropDetail() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.md },
-  hero: { height: HERO_H, backgroundColor: CARD, position: 'relative', justifyContent: 'flex-end' },
+  hero: { backgroundColor: CARD, position: 'relative', justifyContent: 'flex-end' },
   heroHeader: { position: 'absolute', top: 0, left: SP.md, right: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 },
   roundButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   heroBadge: { backgroundColor: 'rgba(0,0,0,0.58)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', borderRadius: RADIUS.pill, paddingHorizontal: 13, paddingVertical: 7 },
@@ -682,7 +684,7 @@ const styles = StyleSheet.create({
   brandNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   brandName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
   dropType: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 1.2, marginTop: 2 },
-  dropName: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: FS.h1, lineHeight: 41, letterSpacing: -1.5, marginBottom: SP.lg, maxWidth: W - 40 },
+  dropName: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: FS.h1, lineHeight: 41, letterSpacing: -1.5, marginBottom: SP.lg },
   eyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.7, marginBottom: 9 },
   timerRow: { flexDirection: 'row', justifyContent: 'space-between' },
   timerUnit: { minWidth: 58 },
@@ -712,7 +714,7 @@ const styles = StyleSheet.create({
   stockText: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: SP.md },
   productTile: { borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD },
-  productMedia: { height: (W - SP.md * 2 - 10) * 0.68, justifyContent: 'flex-end' },
+  productMedia: { justifyContent: 'flex-end' },
   productFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD },
   productCaption: { padding: 11 },
   productName: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 17 },
