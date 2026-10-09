@@ -13,9 +13,22 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { db, users, products, orders, drops, dropWallets, dropWalletTransactions } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { recentSellerPayouts } from "../lib/money/sellerPayouts";
 
 const router = Router();
 router.use(requireAuth);
+
+// orders.funds_state → what it means for the seller's money.
+function orderPayoutLabel(fundsState: string | null | undefined): string {
+  switch (fundsState) {
+    case "settled_direct": return "paid to seller's Stripe balance";
+    case "held": return "held until the order ships";
+    case "release_pending": return "being released to seller's Stripe balance";
+    case "released": return "released to seller's Stripe balance";
+    case "refunded": return "refunded to buyer";
+    default: return "n/a";
+  }
+}
 
 // ─── Context fetcher ──────────────────────────────────────────────────────────
 async function buildUserContext(clerkId: string): Promise<{ role: string; summary: string }> {
@@ -66,7 +79,9 @@ async function buildUserContext(clerkId: string): Promise<{ role: string; summar
         status:      orders.status,
         totalCents:  orders.totalCents,
         createdAt:   orders.createdAt,
-        payoutStatus: (orders as any).payoutStatus,
+        // The order's money state (lib/money). There is no per-order payout
+        // column; the seller's bank payouts are listed separately below.
+        fundsState:  orders.fundsState,
       })
         .from(orders)
         .where(eq(orders.ownerId, clerkId))
@@ -110,6 +125,9 @@ async function buildUserContext(clerkId: string): Promise<{ role: string; summar
         LIMIT  5
       `).catch(() => ({ rows: [] as any[] }));
 
+      // Bank payouts — status from Stripe Connect payout webhooks.
+      const bankPayouts = await recentSellerPayouts(clerkId, 5).catch(() => []);
+
       const cents = (n: number) => `$${(n / 100).toFixed(2)}`;
       const orderStatusCount = (status: string) =>
         sellerOrders.filter(o => o.status === status).length;
@@ -128,7 +146,7 @@ async function buildUserContext(clerkId: string): Promise<{ role: string; summar
         `=== RECENT ORDERS (${sellerOrders.length} shown) ===`,
         `Pending: ${orderStatusCount("pending")}, Processing: ${orderStatusCount("processing")}, Shipped: ${orderStatusCount("shipped")}, Delivered: ${orderStatusCount("delivered")}, Cancelled: ${orderStatusCount("cancelled")}`,
         sellerOrders.slice(0, 10).map(o =>
-          `- Order #${o.orderNumber}: status=${o.status}, total=${cents(o.totalCents ?? 0)}, payout=${(o as any).payoutStatus ?? "n/a"}, date=${new Date(o.createdAt).toDateString()}`
+          `- Order #${o.orderNumber}: status=${o.status}, total=${cents(o.totalCents ?? 0)}, payout=${orderPayoutLabel(o.fundsState)}, date=${new Date(o.createdAt).toDateString()}`
         ).join("\n"),
         ``,
         `=== DROP WALLETS ===`,
@@ -147,6 +165,15 @@ async function buildUserContext(clerkId: string): Promise<{ role: string; summar
               `- ${t.type} ${cents(Number(t.amount_cents))} for drop "${t.drop_title}": "${t.description}" on ${new Date(t.created_at).toDateString()}`
             ).join("\n")
           : "No recent transactions.",
+        ``,
+        `=== RECENT BANK PAYOUTS ===`,
+        bankPayouts.length > 0
+          ? bankPayouts.map((p) =>
+              `- ${cents(p.amountCents)} ${p.currency.toUpperCase()}: status=${p.status}`
+              + (p.arrivalDate ? `, arrival=${p.arrivalDate.toDateString()}` : "")
+              + (p.status === "failed" && p.failureMessage ? `, failure="${p.failureMessage}"` : "")
+            ).join("\n")
+          : "No bank payouts recorded yet.",
       ].join("\n");
 
       return { role: "seller", summary };

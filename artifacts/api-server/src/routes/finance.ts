@@ -36,6 +36,7 @@ import {
   validateScheduleInput,
 } from "../lib/money/payoutSchedule";
 import { assertBreakdownReconciles, buildPayoutBreakdown } from "../lib/money/payoutBreakdown";
+import { listSellerPayouts, paidToBankCents as syncedPaidToBankCents, upsertPayoutFromApi } from "../lib/money/sellerPayouts";
 
 const router = Router();
 router.use(requireAuth);
@@ -203,7 +204,8 @@ router.get("/balance", requirePayoutsRead(), async (req, res) => {
 
     const [balance, payouts, reservationRows, processingRows, account, externalAccounts] = await Promise.all([
       stripe.balance.retrieve({}, { stripeAccount: accountId }),
-      stripe.payouts.list({ limit: 1, status: "pending" }, { stripeAccount: accountId }),
+      // Webhook-fed seller_payouts (backfilled from Stripe on first read).
+      listSellerPayouts({ stripe, stripeAccountId: accountId, sellerId, limit: 1, status: "pending" }),
       db.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
         .from(orderFundReservations)
         .where(and(
@@ -384,12 +386,12 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
     const accountId = await getStripeAccount(sellerId);
     if (stripe && accountId) {
       try {
-        const [balance, reservationRows, payoutPage] = await Promise.all([
+        const [balance, reservationRows, paidToBank] = await Promise.all([
           stripe.balance.retrieve({}, { stripeAccount: accountId }),
           db.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
             .from(orderFundReservations)
             .where(and(eq(orderFundReservations.ownerId, sellerId), eq(orderFundReservations.status, "reserved"))),
-          stripe.payouts.list({ limit: 100 }, { stripeAccount: accountId }),
+          syncedPaidToBankCents({ stripe, stripeAccountId: accountId, sellerId, currency: PAYOUT_CURRENCY }),
         ]);
         const avail = balance.available.find((entry) => entry.currency === PAYOUT_CURRENCY)?.amount ?? 0;
         const pend = balance.pending.find((entry) => entry.currency === PAYOUT_CURRENCY)?.amount ?? 0;
@@ -397,9 +399,7 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
           available: cashOutableAmount(avail, Number(reservationRows[0]?.reserved ?? 0)),
           pending: pend,
         };
-        paidToBankCents = payoutPage.data
-          .filter((payout) => payout.status === "paid" && payout.currency === PAYOUT_CURRENCY)
-          .reduce((total, payout) => total + payout.amount, 0);
+        paidToBankCents = paidToBank;
       } catch (err) {
         stripeError = true;
         req.log.warn({ err }, "Stripe balance unavailable for finance summary");
@@ -472,10 +472,9 @@ router.get("/payouts", requirePayoutsRead(), async (req, res) => {
       return;
     }
 
-    const result = await stripe.payouts.list(
-      { limit, expand: ["data.destination"] },
-      { stripeAccount: accountId },
-    );
+    // seller_payouts is kept current by Connect payout.* webhooks; the first
+    // read for an account copies its history from Stripe into it.
+    const result = await listSellerPayouts({ stripe, stripeAccountId: accountId, sellerId, limit });
 
     res.json({
       payouts: result.data.map(p => ({
@@ -487,12 +486,12 @@ router.get("/payouts", requirePayoutsRead(), async (req, res) => {
         arrivalDate: new Date(p.arrival_date * 1000).toISOString(),
         created:     new Date(p.created * 1000).toISOString(),
         description: p.description,
-        failureCode: (p as any).failure_code ?? null,
-        failureMessage: (p as any).failure_message ?? null,
-        method:      (p as any).method ?? null,
+        failureCode: p.failure_code ?? null,
+        failureMessage: p.failure_message ?? null,
+        method:      p.method ?? null,
         // Bank last4 comes from destination
-        destination: (p as any).destination
-          ? { last4: (p as any).destination?.last4 ?? null, brand: (p as any).destination?.brand ?? null }
+        destination: p.destination
+          ? { last4: p.destination.last4 ?? null, brand: p.destination.brand ?? null }
           : null,
       })),
       hasMore:   result.has_more,
@@ -1015,7 +1014,7 @@ router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
       stripe.accounts.retrieve(accountId),
       stripe.accounts.listExternalAccounts(accountId, { limit: 100 }),
       stripe.balance.retrieve({}, { stripeAccount: accountId }),
-      stripe.payouts.list({ limit: 1, status: "pending" }, { stripeAccount: accountId }),
+      listSellerPayouts({ stripe, stripeAccountId: accountId, sellerId, limit: 1, status: "pending" }),
       db.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
         .from(orderFundReservations)
         .where(and(eq(orderFundReservations.ownerId, sellerId), eq(orderFundReservations.status, "reserved"))),
@@ -1154,6 +1153,9 @@ router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
       }
       throw providerError;
     }
+    // A live read is the newest status there is; keep seller_payouts current.
+    await upsertPayoutFromApi(payout, accountId, sellerId)
+      .catch((err) => req.log.warn({ err, payoutId }, "Could not store retrieved payout"));
 
     // Stripe only attributes balance transactions to automatic payouts.
     const automatic = payout.automatic === true;
