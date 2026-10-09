@@ -16,7 +16,7 @@ import React from 'react';
 import { Platform, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import * as VectorIcons from '@expo/vector-icons';
 import { Feather } from '@expo/vector-icons';
-import { iconMappingFor, type FeatherName } from '@/lib/iconMap';
+import { MATERIAL_FILLED, iconMappingFor, type FeatherName } from '@/lib/iconMap';
 
 export type IconName = FeatherName;
 
@@ -82,7 +82,9 @@ function getMaterialIcons(): typeof VectorIcons.MaterialIcons | undefined {
 
 export function Icon({ name, size = ICON_SIZE.md, color = '#FFFFFF', style, testID, ...a11y }: IconProps) {
   const { sf, material } = iconMappingFor(name);
-  const MaterialIcons = material ? getMaterialIcons() : undefined;
+  // Off iOS, only line-style Material glyphs replace Feather; solid ones would
+  // sit next to outline icons on the same screen (see MATERIAL_FILLED).
+  const MaterialIcons = material && !MATERIAL_FILLED.has(material) ? getMaterialIcons() : undefined;
   const fallback = material && MaterialIcons
     ? <MaterialIcons name={material} size={size} color={color} style={style as never} testID={testID} {...a11y} />
     : <Feather name={name} size={size} color={color} style={style as never} testID={testID} {...a11y} />;

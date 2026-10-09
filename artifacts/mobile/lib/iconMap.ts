@@ -221,3 +221,19 @@ export const ICON_MAP: Partial<Record<FeatherName, IconMapping>> = {
 export function iconMappingFor(name: FeatherName): IconMapping {
   return ICON_MAP[name] ?? {};
 }
+
+/**
+ * Material glyphs (Android/web) that are solid shapes where the Feather
+ * original is a line drawing. Icon renders the Feather glyph instead for
+ * these, so a screen never mixes filled and outline icons off iOS (where
+ * SF Symbols are used). Everything else in ICON_MAP is a line glyph.
+ */
+export const MATERIAL_FILLED: ReadonlySet<MaterialName> = new Set<MaterialName>([
+  'album', 'archive', 'bar-chart', 'bolt', 'build', 'call-end', 'camera', 'check-box', 'cloud-off', 'cloud-upload',
+  'content-paste', 'dark-mode', 'dashboard', 'description', 'edit', 'event', 'explore', 'forward', 'headset', 'home',
+  'how-to-reg', 'image', 'inbox', 'insert-drive-file', 'inventory-2', 'layers', 'local-offer', 'local-shipping', 'lock-open',
+  'map', 'memory', 'menu-book', 'message', 'mic-off', 'military-tech', 'movie', 'music-note', 'person-add-alt', 'person-remove',
+  'phone', 'photo-camera', 'place', 'print', 'public', 'report', 'save', 'send', 'sensors', 'settings', 'share', 'shield',
+  'shopping-bag', 'shopping-cart', 'smartphone', 'storage', 'support', 'tablet', 'tv', 'videocam', 'videocam-off', 'view-column',
+  'visibility', 'visibility-off', 'volume-off', 'vpn-key', 'water-drop', 'wb-sunny', 'wifi-off',
+]);
