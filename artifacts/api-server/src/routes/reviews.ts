@@ -14,6 +14,7 @@ import { assertReviewOrderAuth } from "../lib/reviewOrderAuth";
 import { resolveToClerkId } from "./public";
 import { toPublicReview } from "../lib/publicProfile";
 import { notBlockedWith, optionalViewerId } from "../lib/safety";
+import { sellerRatingSummary } from "../lib/sellerRating";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { evaluateContent } from "../lib/contentModerator";
 import {
@@ -101,16 +102,17 @@ router.get("/product/:productId", async (req, res) => {
     LIMIT  50
   `)).rows;
 
+  // Same block filter as the list, so the count matches what is shown.
   const [agg] = await db
     .select({
       avgRating:  sql<number>`round(avg(rating)::numeric, 1)`,
       totalCount: sql<number>`count(*)::int`,
     })
     .from(reviews)
-    .where(eq(reviews.productId, productId));
+    .where(and(eq(reviews.productId, productId), notBlockedWith(viewerId, reviews.buyerId)));
 
   return res.json({
-    reviews:    await toPublicReviews(rows as any[], optionalViewerId(req)),
+    reviews:    await toPublicReviews(rows as any[], viewerId),
     avgRating:  Number(agg?.avgRating  ?? 0),
     totalCount: Number(agg?.totalCount ?? 0),
   });
@@ -133,18 +135,12 @@ router.get("/seller/:sellerId", async (req, res) => {
     .orderBy(desc(reviews.createdAt))
     .limit(50);
 
-  const [agg] = await db
-    .select({
-      avgRating:  sql<number>`round(avg(rating)::numeric, 1)`,
-      totalCount: sql<number>`count(*)::int`,
-    })
-    .from(reviews)
-    .where(eq(reviews.sellerId, canonicalClerkId));
+  const agg = await sellerRatingSummary(canonicalClerkId);
 
   return res.json({
     reviews:    await toPublicReviews(rows as any[], optionalViewerId(req)),
-    avgRating:  Number(agg?.avgRating  ?? 0),
-    totalCount: Number(agg?.totalCount ?? 0),
+    avgRating:  agg.avgRating,
+    totalCount: agg.totalCount,
   });
 });
 

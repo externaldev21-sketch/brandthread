@@ -1015,6 +1015,32 @@ export async function cancelThreadCash(transferId: string, senderId: string): Pr
   });
 }
 
+/**
+ * Account purge: every still-pending send to or from `clerkId` is cancelled
+ * and returned to its sender exactly as a sender-initiated cancel would be
+ * (status "cancelled" + a "send_cancelled" ledger credit). Ledger history is
+ * never removed. Runs inside the caller's transaction.
+ */
+export async function cancelPendingThreadCashForAccount(tx: DbExecutor, clerkId: string): Promise<number> {
+  const cancelled = await tx.update(threadCashTransfers)
+    .set({ status: "cancelled", cancelledAt: new Date() })
+    .where(and(
+      eq(threadCashTransfers.status, "pending"),
+      sql`(${threadCashTransfers.senderId} = ${clerkId} OR ${threadCashTransfers.recipientId} = ${clerkId})`,
+    ))
+    .returning({ id: threadCashTransfers.id, senderId: threadCashTransfers.senderId, amountCents: threadCashTransfers.amountCents });
+  if (cancelled.length > 0) {
+    await tx.insert(threadCashEntries).values(cancelled.map((t) => ({
+      buyerId: t.senderId,
+      amountCents: t.amountCents,
+      source: "send_cancelled",
+      referenceId: t.id,
+      note: `Cancelled Thread Cash send of $${(t.amountCents / 100).toFixed(2)}`,
+    })));
+  }
+  return cancelled.length;
+}
+
 async function expireOneTransfer(tx: DbExecutor, transfer: typeof threadCashTransfers.$inferSelect): Promise<boolean> {
   const [expired] = await tx.update(threadCashTransfers)
     .set({ status: "expired" })

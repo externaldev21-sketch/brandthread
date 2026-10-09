@@ -7,9 +7,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
-  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo,
+  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, AppState,
 } from 'react-native';
-import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -661,6 +661,48 @@ export default function BuyerProductDetailScreen() {
 
     return () => { cancelled = true; };
   }, [productId, reloadTick]);
+
+  // Live refresh: a seller's price / stock edit shows when the buyer comes
+  // back to this page (screen focus) or to the app (foreground). Silent — no
+  // loader, no re-recorded view or analytics — and it only replaces the
+  // product when something actually changed, so selections and layout stay put.
+  const silentRefreshProduct = useCallback(async () => {
+    if (!productId || isPreviewProductId(productId)) return;
+    try {
+      const row = await api.publicProducts.get(productId);
+      if (!row || row.error) return;
+      const next = adaptApiProductToBuyerProduct(row);
+      setProduct(prev => {
+        if (!prev || prev.id !== next.id) return prev;
+        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+      });
+      setSellerVacationMessage(
+        row.sellerVacationMode
+          ? row.sellerVacationMessage ?? 'This seller is currently away and is not accepting purchases.'
+          : null,
+      );
+      setDemandClaimedUnits(typeof row.claimedUnits  === 'number' ? row.claimedUnits  : 0);
+      setDemandRemainingUnits(typeof row.remainingUnits === 'number' ? row.remainingUnits : 0);
+      setDemandCount(typeof row.demandCount === 'number' ? row.demandCount : null);
+      setDemandEndsAt(row.endsAt ?? null);
+    } catch {
+      // Keep what's on screen; the next focus / foreground tries again.
+    }
+  }, [api, productId]);
+
+  // The first focus is the mount, which the load effect above already covers.
+  const focusedOnceRef = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!focusedOnceRef.current) { focusedOnceRef.current = true; return; }
+    void silentRefreshProduct();
+  }, [silentRefreshProduct]));
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') void silentRefreshProduct();
+    });
+    return () => sub.remove();
+  }, [silentRefreshProduct]);
 
   // Real per-source traffic tracking for the seller's own Dashboard — a
   // signed-out shopper's visit still counts, so this never gates on

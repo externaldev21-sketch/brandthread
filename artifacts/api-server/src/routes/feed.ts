@@ -13,9 +13,10 @@
  * watch_time, rewatch, shop taps, add-to-bag, skip, and not-interested.
  */
 import { attachQuoteData } from "../lib/quotedPosts";
+import { taggedProductVisibleTo } from "../lib/productVisibility";
 import { Router } from "express";
 import { db, posts, interactions, users, liveStreams, postTaggedProducts, products, productVariants } from "@workspace/db";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "@workspace/api-zod";
 import { requireAuth, requireModerator } from "../middlewares/requireAuth";
 import { validateRequest } from "../middlewares/validateRequest";
@@ -164,7 +165,7 @@ router.get("/for-you", requireAuth, async (req, res) => {
       })
       .from(postTaggedProducts)
       .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-      .where(inArray(postTaggedProducts.postId, postIds))
+      .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(userId)))
       .orderBy(postTaggedProducts.position);
     const productIds = [...new Set(tagRows.map((t) => t.productId))];
     const priceRows = productIds.length === 0 ? [] : await db

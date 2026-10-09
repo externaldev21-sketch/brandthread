@@ -22,7 +22,7 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { InteractionManager, Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
+import { AppState, InteractionManager, Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SystemUI from 'expo-system-ui';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -59,6 +59,7 @@ import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socia
 import { clearCartCache, initCartService } from '@/services/cartService';
 import { initDesignService } from '@/services/designService';
 import { initProductService } from '@/services/productService';
+import { adoptGuestCart, flushDirtyCart } from '@/services/cartService';
 import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
 import { initTabDataCache } from '@/lib/tabDataCache';
@@ -1090,6 +1091,8 @@ function ServiceConfigurer() {
     initAnalyticsService(newUserId);
 
     if (!newUserId || !isSignedIn) return;
+    // Bring the signed-out bag into this account once (then it's cleared).
+    void adoptGuestCart(newUserId);
     // Defense in depth for people who sign in on another device or have an
     // older session from before onboarding started provisioning local users.
     void api.auth.sync()
@@ -1121,6 +1124,19 @@ function ServiceConfigurer() {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isSignedIn, api]);
+
+  // Back in the foreground: retry a bag edit that never reached the server
+  // (offline) and a guest-bag hand-off that couldn't finish. No-ops otherwise.
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId || !isSignedIn) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      void flushDirtyCart();
+      void adoptGuestCart(userId);
+    });
+    return () => sub.remove();
+  }, [user?.id, isSignedIn]);
 
   useEffect(() => subscribeStoreContext((context) => {
     initDesignService(user?.id ?? null, context);

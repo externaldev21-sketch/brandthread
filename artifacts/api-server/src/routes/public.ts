@@ -25,6 +25,8 @@ import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant }
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
 import { blockedUserIds, isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
+import { taggedProductVisibleTo } from "../lib/productVisibility";
+import { sellerRatingSummary, sellerSalesCount } from "../lib/sellerRating";
 import {
   paginationMetadata,
   parsePagination,
@@ -529,7 +531,7 @@ router.get("/collections/:id", async (req, res) => {
         id: collection.id,
         name: collection.name,
         coverImageUrl,
-        itemCount: items.length,
+        itemCount: adaptedItems.length,
         ownerName: owner?.brandName ?? owner?.displayName ?? "Brandthread",
       },
       items: adaptedItems,
@@ -1301,7 +1303,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
     eq(products.status, "active"),
     isNull(products.deletedAt),
   );
-  const [sellerProducts, sellerPosts, [{ activeProductsCount }], [{ publicPostsCount }], likesCount, [followersRow], [followingRow]] = await Promise.all([
+  const [sellerProducts, sellerPosts, [{ activeProductsCount }], [{ publicPostsCount }], likesCount, [followersRow], [followingRow], rating, salesCount] = await Promise.all([
     db
       .select()
       .from(products)
@@ -1329,6 +1331,8 @@ router.get("/sellers/:sellerId", async (req, res) => {
     publicProfileLikes(canonicalClerkId),
     db.select({ total: count() }).from(follows).where(eq(follows.followingId, canonicalClerkId)),
     db.select({ total: count() }).from(follows).where(eq(follows.followerId, canonicalClerkId)),
+    sellerRatingSummary(canonicalClerkId),
+    sellerSalesCount(canonicalClerkId),
   ]);
 
   // Attach variants to each product — mirrors the /products list enrichment so
@@ -1360,7 +1364,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       })
       .from(postTaggedProducts)
       .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-      .where(inArray(postTaggedProducts.postId, postIds));
+      .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(viewerId)));
 
     for (const t of tags) {
       if (!tagsByPost.has(t.postId)) tagsByPost.set(t.postId, []);
@@ -1395,6 +1399,10 @@ router.get("/sellers/:sellerId", async (req, res) => {
       likesCount,
       followersCount: Number(followersRow?.total ?? 0),
       followingCount: Number(followingRow?.total ?? 0),
+      // Same rollup as GET /api/reviews/seller/:id; 0 / 0 when unreviewed.
+      avgRating: rating.avgRating,
+      reviewCount: rating.totalCount,
+      salesCount,
       // Cover video (null while unset or moderated away); never the raw status.
       ...publicCoverFields(seller),
       coverVideoModerationStatus: undefined,
@@ -1753,7 +1761,7 @@ router.get("/posts", async (req, res) => {
         })
         .from(postTaggedProducts)
         .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-        .where(inArray(postTaggedProducts.postId, postIds))
+        .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(viewerId)))
         .orderBy(postTaggedProducts.position),
 
       db
