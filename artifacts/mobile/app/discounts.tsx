@@ -15,7 +15,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, ActivityIndicator, Platform,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { InlineSlider } from '@/components/InlineSlider';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -29,18 +29,16 @@ import {
   DISCOUNT_FILTERS, DISCOUNT_STATUS_LABEL, discountSummaryLine, discountUsageLine, groupDiscountsByDay,
   matchesDiscountFilter, matchesDiscountSearch, type DiscountFilter,
 } from '@/lib/discountList';
-import { BottomSheet, Chip, ListRow } from '@/components/ui';
-import { TYPE_SCALE } from '@/constants/typography';
+import { BottomSheet, Chip, EmptyState, ListRow } from '@/components/ui';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { addPreviewDiscount, deletePreviewDiscount, getPreviewDiscounts, updatePreviewDiscount, whenPreviewSellerFreshStoreReady, type PreviewDiscount } from '@/lib/previewSellerFreshStore';
 import {
-  FONT, FS, SP, RADIUS,
+  FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { PrimaryButton, HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { EmptyState } from '@/components/layout';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products' | 'collections';
@@ -96,9 +94,6 @@ function fmtValue(d: Pick<DiscountCode, 'type' | 'value'>) {
   if (d.type === 'free_shipping') return 'Free shipping';
   return 'Free item';
 }
-
-/** Inputs are solid #1C1C1E app-wide (no translucent fills). */
-const INPUT_BG = '#1C1C1E';
 
 function randomCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -414,28 +409,24 @@ export default function DiscountsScreen() {
 
           {loadError ? (
             <EmptyState
-              icon="alert-circle"
-              title="Couldn't load your codes"
-              message="Pull to refresh."
-              actionLabel="Try again"
-              onAction={() => { void loadDiscounts(); }}
-              variant="error"
+              title="Couldn't load your codes."
+              action={{ label: 'Try again', onPress: () => { void loadDiscounts(); } }}
+              style={{ marginTop: 96 }}
             />
           ) : discounts.length === 0 ? (
-            // Shopify's empty Discounts: title, one line, "Create discount".
+            // Shopify's empty Discounts pattern, as one line + "Create discount".
             <EmptyState
-              icon="tag"
-              title="Manage discount codes"
-              message="Create codes buyers enter at checkout for a percentage off, a fixed amount, free shipping or a free item."
-              actionLabel="Create discount"
-              onAction={openNewModal}
+              title="No discount codes yet."
+              action={{ label: 'Create discount', onPress: openNewModal }}
+              style={{ marginTop: 96 }}
+              testID="discounts-empty"
             />
           ) : (
             <>
-              <View style={[s.searchWrap, { backgroundColor: INPUT_BG }]}>
-                <Feather name="search" size={16} color={MUTED} />
+              <View style={[s.searchWrap, { backgroundColor: FILL_ELEVATED }]}>
+                <Icon name="search" size={16} color={MUTED} />
                 <TextInput
-                  style={[s.searchInput, TYPE_SCALE.body, WEB_INPUT_RESET]}
+                  style={[s.searchInput, TEXT.body, WEB_INPUT_RESET]}
                   value={search}
                   onChangeText={setSearch}
                   placeholder="Search"
@@ -446,7 +437,7 @@ export default function DiscountsScreen() {
                 />
                 {search ? (
                   <TouchableOpacity onPress={() => setSearch('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
-                    <Feather name="x-circle" size={16} color={MUTED} />
+                    <Icon name="x-circle" size={16} color={MUTED} />
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -457,10 +448,7 @@ export default function DiscountsScreen() {
               </View>
               {visibleGroups.length === 0 ? (
                 <EmptyState
-                  icon="tag"
-                  title={search.trim() ? 'No matching codes' : `No ${DISCOUNT_FILTERS.find(f => f.id === filter)?.label.toLowerCase()} codes`}
-                  message={search.trim() ? 'Try a different code.' : 'Codes with this status will show up here.'}
-                  compact
+                  title={search.trim() ? 'No codes match your search.' : `No ${DISCOUNT_FILTERS.find(f => f.id === filter)?.label.toLowerCase()} codes.`}
                 />
               ) : visibleGroups.map(group => (
                 <View key={group.label}>
@@ -480,8 +468,8 @@ export default function DiscountsScreen() {
         {actionFor && (
           <View style={{ paddingBottom: SP.sm }}>
             <View style={s.sheetHeader}>
-              <Text style={[TYPE_SCALE.headline, { color: theme.text, letterSpacing: 1 }]}>{actionFor.code}</Text>
-              <Text style={[TYPE_SCALE.footnote, { color: MUTED, marginTop: 2 }]} numberOfLines={2}>{discountSummaryLine(actionFor)}</Text>
+              <Text style={[TEXT.headline, { color: theme.text }]}>{actionFor.code}</Text>
+              <Text style={[TEXT.footnote, { color: MUTED, marginTop: 2 }]} numberOfLines={2}>{discountSummaryLine(actionFor)}</Text>
             </View>
             <ListRow icon="edit-2" title="Edit" onPress={() => { const d = actionFor; setActionFor(null); openEditModal(d); }} testID="discount-action-edit" />
             <ListRow icon="copy" title="Copy code" onPress={() => { copyCode(actionFor.code); setActionFor(null); }} />
@@ -510,14 +498,14 @@ export default function DiscountsScreen() {
             <View style={[s.summaryCard, { borderColor: theme.accent + '55' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={[s.summaryCode, { color: theme.accent }]}>{code.trim() || 'YOURCODE'}</Text>
-                <Feather name="tag" size={16} color={theme.accent} />
+                <Icon name="tag" size={16} color={theme.accent} />
               </View>
               <Text style={s.summaryValue}>{summaryValueLabel}</Text>
-              <View style={s.summaryRow}><Feather name="shopping-bag" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryScopeLabel}</Text></View>
-              {minQuantity.trim() ? <View style={s.summaryRow}><Feather name="layers" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. {minQuantity.trim()} item{minQuantity.trim() === '1' ? '' : 's'}</Text></View> : null}
-              {minOrderCents ? <View style={s.summaryRow}><Feather name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatCents(minOrderCents)}</Text></View> : null}
-              <View style={s.summaryRow}><Feather name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}{firstOrderOnly ? ' · First order only' : ''}</Text></View>
-              <View style={s.summaryRow}><Feather name="calendar" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryDatesLabel}</Text></View>
+              <View style={s.summaryRow}><Icon name="shopping-bag" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryScopeLabel}</Text></View>
+              {minQuantity.trim() ? <View style={s.summaryRow}><Icon name="layers" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. {minQuantity.trim()} item{minQuantity.trim() === '1' ? '' : 's'}</Text></View> : null}
+              {minOrderCents ? <View style={s.summaryRow}><Icon name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatCents(minOrderCents)}</Text></View> : null}
+              <View style={s.summaryRow}><Icon name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}{firstOrderOnly ? ' · First order only' : ''}</Text></View>
+              <View style={s.summaryRow}><Icon name="calendar" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryDatesLabel}</Text></View>
             </View>
 
             {/* Code */}
@@ -612,7 +600,7 @@ export default function DiscountsScreen() {
                   <Text style={s.pickerRowText}>
                     {selectedProductIds.length === 0 ? 'Choose products…' : `${selectedProductIds.length} product${selectedProductIds.length === 1 ? '' : 's'} selected`}
                   </Text>
-                  <Feather name="chevron-right" size={16} color={MUTED} />
+                  <Icon name="chevron-right" size={16} color={MUTED} />
                 </TouchableOpacity>
               )}
             </View>
@@ -631,7 +619,7 @@ export default function DiscountsScreen() {
                       }}
                     >
                       <Text style={s.productName} numberOfLines={1}>{c.title}</Text>
-                      <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
+                      <Icon name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
                     </TouchableOpacity>
                   );
                 })}
@@ -760,7 +748,7 @@ export default function DiscountsScreen() {
                   }}
                 >
                   <Text style={s.productName} numberOfLines={1}>{p.name}</Text>
-                  <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
+                  <Icon name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
                 </TouchableOpacity>
               );
             })}
@@ -774,7 +762,7 @@ export default function DiscountsScreen() {
 function DiscountRow({ d, first, onPress }: { d: DiscountCode; first: boolean; onPress: () => void }) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
-  // Silver status chip: Active reads white, every other status quiet silver.
+  // Status chip on the one #1C1C1E fill: Active reads white, every other status silver.
   const live = d.status === 'active';
   return (
     <TouchableOpacity
@@ -787,8 +775,8 @@ function DiscountRow({ d, first, onPress }: { d: DiscountCode; first: boolean; o
     >
       <View style={s.rowTop}>
         <Text style={s.codeText} numberOfLines={1}>{d.code}</Text>
-        <View style={[s.statusChip, { borderColor: live ? theme.text : theme.border }]}>
-          <Text style={[TYPE_SCALE.caption, { color: live ? theme.text : theme.muted }]}>{DISCOUNT_STATUS_LABEL[d.status]}</Text>
+        <View style={s.statusChip}>
+          <Text style={[TEXT.caption, { color: live ? theme.text : theme.muted }]}>{DISCOUNT_STATUS_LABEL[d.status]}</Text>
         </View>
       </View>
       <Text style={s.metaText} numberOfLines={2}>{discountSummaryLine(d)}</Text>
@@ -810,12 +798,12 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   searchWrap: { height: 44, flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: FG },
   filterRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: SP.sm, marginBottom: SP.xs },
-  groupLabel: { ...TYPE_SCALE.footnote, color: MUTED, marginTop: SP.md, marginBottom: 2 },
+  groupLabel: { ...TEXT.footnote, color: MUTED, marginTop: SP.md, marginBottom: 2 },
   row:      { paddingVertical: 14, gap: 3 },
   rowTop:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
-  codeText: { ...TYPE_SCALE.headline, color: FG, letterSpacing: 1, flexShrink: 1 },
-  metaText: { ...TYPE_SCALE.footnote, color: MUTED },
-  statusChip: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 3 },
+  codeText: { ...TEXT.headline, color: FG, flexShrink: 1 },
+  metaText: { ...TEXT.footnote, color: MUTED },
+  statusChip: { backgroundColor: FILL_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 3 },
   sheetHeader: { paddingHorizontal: SP.md, paddingTop: SP.xs, paddingBottom: SP.sm },
 
   modal:       { flex: 1, backgroundColor: BG },
