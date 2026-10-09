@@ -292,7 +292,9 @@ router.post("/token/renew", async (req, res) => {
 router.post("/events", async (req, res) => {
   const callerId = (req as any).clerkUserId as string;
   const { threadId, type, mode = "video", clientEventId } = req.body ?? {};
-  const allowedTypes = new Set(["started", "ended", "declined", "failed"]);
+  // "missed": the caller hung up (or the ring timed out) before the other
+  // side answered — the recipient gets a "Missed call" push.
+  const allowedTypes = new Set(["started", "ended", "declined", "failed", "missed"]);
   if (!threadId || !allowedTypes.has(type) || (mode !== "voice" && mode !== "video") || !isValidCallClientEventId(clientEventId)) {
     return res.status(400).json({ error: "threadId, valid type/mode, and an 8–128 character clientEventId are required" });
   }
@@ -324,7 +326,21 @@ router.post("/events", async (req, res) => {
   }
   const recipientIsManufacturer = callerId === thread.buyerClerkId;
   const recipientId = recipientIsManufacturer ? thread.manufacturerClerkId : thread.buyerClerkId;
-  if (recipientId && (type === "started" || type === "declined" || type === "failed")) {
+  if (recipientId && type === "missed") {
+    await publishNotification({
+      userId: recipientId,
+      category: "message",
+      type: "missed_call",
+      title: `Missed ${mode} call`,
+      body: "Tap to open the conversation.",
+      actorId: callerId,
+      targetId: threadId,
+      targetType: "manufacturer_thread",
+      cta: recipientIsManufacturer
+        ? `/manufacturers/messages/${threadId}`
+        : `/manufacturer-messages?threadId=${threadId}`,
+    }).catch((error) => req.log.error({ err: error, threadId }, "Missed call notification failed"));
+  } else if (recipientId && (type === "started" || type === "declined" || type === "failed")) {
     await publishNotification({
       userId: recipientId,
       category: "message",

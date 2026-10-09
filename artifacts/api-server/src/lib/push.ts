@@ -3,11 +3,12 @@
  * Sends push messages via the Expo Push Service (no APNs/FCM credentials needed in dev).
  * In production, upgrade to direct APNs/FCM for higher throughput.
  */
-import { db, notificationBatchQueue, notificationDeliveries, notificationEvents, pushTokens, users } from "@workspace/db";
-import { and, eq, sql } from "drizzle-orm";
+import { db, follows, notificationBatchQueue, notificationDeliveries, notificationEvents, pushTokens, users } from "@workspace/db";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { withRetry } from "./retry";
 import { isPromotionalPush, promoConsentAllows } from "./pushPolicy";
+import { decidePushType, isPushPaused } from "./pushTypes";
 import crypto from "node:crypto";
 
 export interface PushPayload {
@@ -80,6 +81,9 @@ const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>
   announcements: "announcement",
   giveaway: "giveaway",
   giveaways: "giveaway",
+  // A buyer's review of the seller (routes/reviews.ts).
+  review: "social",
+  reviews: "social",
 };
 
 /**
@@ -111,6 +115,8 @@ export function normalizePushEventCategory(
 export interface ExpoPushMessage {
   to: string;
   title: string;
+  /** iOS only: shown under the title. Used for the account label on multi-account devices. */
+  subtitle?: string;
   body: string;
   data: Record<string, unknown>;
   sound: string | null;
@@ -148,26 +154,55 @@ export function preferenceKey(accountType: string | null, category: PushEventCat
   return buyerPreferences[category] ?? null;
 }
 
+export interface PushTokenTarget {
+  token: string;
+  platform?: string | null;
+  /** Another signed-in account on this device also receives pushes here. */
+  sharedWithOtherAccount?: boolean;
+}
+
+/**
+ * On a device signed in to more than one account, every push says which
+ * account it is for: iOS shows "@handle" as the subtitle; Android has no
+ * subtitle, so the title is prefixed instead. Single-account devices are
+ * unchanged.
+ */
+export function accountLabelledContent(
+  target: PushTokenTarget,
+  title: string,
+  accountHandle: string | null | undefined,
+): { title: string; subtitle?: string } {
+  const handle = (accountHandle ?? "").trim().replace(/^@/, "");
+  if (!target.sharedWithOtherAccount || !handle) return { title };
+  if (target.platform === "android") return { title: `@${handle} · ${title}` };
+  return { title, subtitle: `@${handle}` };
+}
+
 export function buildExpoPushMessages(
-  tokens: { token: string }[],
+  tokens: PushTokenTarget[],
   payload: PushPayload,
+  accountHandle?: string | null,
 ): ExpoPushMessage[] {
-  return tokens.map((token) => ({
-    to: token.token,
-    title: payload.title,
-    body: payload.body,
-    data: payload.data ?? {},
-    sound: payload.sound ?? "default",
-    badge: payload.badge,
-    channelId: payload.channelId,
-  }));
+  return tokens.map((token) => {
+    const labelled = accountLabelledContent(token, payload.title, accountHandle);
+    return {
+      to: token.token,
+      title: labelled.title,
+      ...(labelled.subtitle ? { subtitle: labelled.subtitle } : {}),
+      body: payload.body,
+      data: payload.data ?? {},
+      sound: payload.sound ?? "default",
+      badge: payload.badge,
+      channelId: payload.channelId,
+    };
+  });
 }
 
 /** Keep stable-ID retries limited to token deliveries that are not sent. */
-export function unsentPushTokens(
-  tokens: { token: string }[],
+export function unsentPushTokens<T extends { token: string }>(
+  tokens: T[],
   sentTokens: Iterable<string>,
-): { token: string }[] {
+): T[] {
   const sent = new Set(sentTokens);
   return tokens.filter((token) => !sent.has(token.token));
 }
@@ -224,6 +259,7 @@ export async function sendPushToUser(
         quietHoursStart: users.quietHoursStart,
         quietHoursEnd: users.quietHoursEnd,
         quietHoursTimezone: users.quietHoursTimezone,
+        username: users.username,
       })
       .from(users)
       .where(eq(users.clerkId, userId))
@@ -267,12 +303,59 @@ export async function sendPushToUser(
       const key = preferenceKey(recipient?.accountType ?? null, category);
       if (key && recipient?.preferences?.[key] === false) return false;
     }
-    const tokens = await db
-      .select({ token: pushTokens.token })
+
+    // Settings → Notifications → Pause all. Read separately so a deploy that
+    // precedes migration 281 keeps sending instead of failing every push.
+    try {
+      const [pause] = await db
+        .select({ pushPausedUntil: users.pushPausedUntil })
+        .from(users)
+        .where(eq(users.clerkId, userId))
+        .limit(1);
+      if (isPushPaused(pause?.pushPausedUntil)) return false;
+    } catch (err) {
+      logger.warn({ err }, "Push pause unreadable; sending");
+    }
+
+    // Per-type settings (lib/pushTypes.ts): Off, or "From profiles I follow".
+    const typeDecision = decidePushType(
+      recipient?.preferences as Record<string, unknown> | null | undefined,
+      payload.data?.type,
+      typeof payload.data?.actorId === "string" ? payload.data.actorId : null,
+    );
+    if (typeDecision === "skip") return false;
+    if (typeDecision === "needs_follow_check") {
+      const [followRow] = await db
+        .select({ followingId: follows.followingId })
+        .from(follows)
+        .where(and(eq(follows.followerId, userId), eq(follows.followingId, String(payload.data?.actorId))))
+        .limit(1);
+      if (!followRow) return false;
+    }
+
+    const ownTokens = await db
+      .select({ token: pushTokens.token, platform: pushTokens.platform })
       .from(pushTokens)
       .where(and(eq(pushTokens.userId, userId), eq(pushTokens.isActive, true)));
 
-    if (!tokens.length) return false;
+    if (!ownTokens.length) return false;
+
+    // Devices also signed in to another account get the account label.
+    const sharedRows = await db
+      .select({ token: pushTokens.token })
+      .from(pushTokens)
+      .where(and(
+        inArray(pushTokens.token, ownTokens.map((t) => t.token)),
+        ne(pushTokens.userId, userId),
+        eq(pushTokens.isActive, true),
+      ));
+    const shared = new Set(sharedRows.map((r) => r.token));
+    const tokens: PushTokenTarget[] = ownTokens.map((t) => ({
+      token: t.token,
+      platform: t.platform,
+      sharedWithOtherAccount: shared.has(t.token),
+    }));
+    const accountHandle = recipient?.username ?? null;
 
     const notificationId =
       typeof payload.data?.notificationId === "string" && payload.data.notificationId
@@ -280,7 +363,14 @@ export async function sendPushToUser(
         : crypto.randomUUID();
     const enrichedPayload: PushPayload = {
       ...payload,
-      data: { ...(payload.data ?? {}), notificationId },
+      // accountId: which signed-in account this is for, so a tap can switch
+      // to it first (mobile lib/notificationNavigation.ts).
+      data: {
+        ...(payload.data ?? {}),
+        notificationId,
+        accountId: userId,
+        ...(accountHandle ? { accountHandle } : {}),
+      },
     };
     // Stable notification IDs are also the delivery idempotency key. Never
     // include a token whose delivery is already sent: a second token failing
@@ -294,7 +384,7 @@ export async function sendPushToUser(
       ));
     const pendingTokens = unsentPushTokens(tokens, sentRows.map((row) => row.pushToken));
     if (!pendingTokens.length) return true;
-    const messages = buildExpoPushMessages(pendingTokens, enrichedPayload);
+    const messages = buildExpoPushMessages(pendingTokens, enrichedPayload, accountHandle);
 
     // Expo Push Service accepts up to 100 messages per request
     const chunks: Array<{ messages: typeof messages; tokenRows: typeof tokens }> = [];
@@ -325,7 +415,7 @@ export async function sendPushToUser(
         const rowsByToken = new Map(deliveryRows.map((row) => [row.pushToken, row]));
         const sendableTokenRows = tokenRows.filter((token) => rowsByToken.has(token.token));
         const sendableRows = sendableTokenRows.map((token) => rowsByToken.get(token.token)!);
-        const sendableMessages = buildExpoPushMessages(sendableTokenRows, enrichedPayload);
+        const sendableMessages = buildExpoPushMessages(sendableTokenRows, enrichedPayload, accountHandle);
         if (!sendableRows.length) return;
 
         let response: Response;

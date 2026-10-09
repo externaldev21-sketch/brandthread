@@ -1575,7 +1575,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
     },
     push: {
-      register:   (body: { token: string; platform?: string }) =>
+      register:   (body: { token: string; platform?: string; accountIds?: string[] }) =>
         post<{ ok: boolean }>('/api/push/register', body),
       deregister: (token: string) =>
         request<{ ok: boolean }>(
@@ -2066,7 +2066,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>('/api/call/token/renew', body),
       event: (body: {
         threadId: string;
-        type: 'started' | 'ended' | 'declined' | 'failed';
+        type: 'started' | 'ended' | 'declined' | 'failed' | 'missed';
         mode: 'voice' | 'video';
         /** Stable UUID used by the server to make lifecycle retries idempotent. */
         clientEventId: string;

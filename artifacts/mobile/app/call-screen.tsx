@@ -121,12 +121,12 @@ function NativeCallScreen() {
   const callStartedRef = useRef(false);
   const credentialsIssuedRef = useRef(false);
   const remoteJoinedRef = useRef(false);
-  const terminalEventRef = useRef<'ended' | 'failed' | 'declined' | null>(null);
+  const terminalEventRef = useRef<'ended' | 'failed' | 'declined' | 'missed' | null>(null);
   // Keep one UUID per lifecycle type. If an SDK callback repeats or an API
   // request is retried, the server receives the same idempotency key.
-  const eventIdsRef = useRef<Partial<Record<'started' | 'ended' | 'failed' | 'declined', string>>>({});
+  const eventIdsRef = useRef<Partial<Record<'started' | 'ended' | 'failed' | 'declined' | 'missed', string>>>({});
 
-  function clientEventIdFor(type: 'started' | 'ended' | 'failed' | 'declined') {
+  function clientEventIdFor(type: 'started' | 'ended' | 'failed' | 'declined' | 'missed') {
     const existing = eventIdsRef.current[type];
     if (existing) return existing;
     const clientEventId = randomUUID();
@@ -139,7 +139,7 @@ function NativeCallScreen() {
    * The server independently authorizes the manufacturer thread, so a failed
    * best-effort audit request must never change call UI or retry indefinitely.
    */
-  function emitTerminalEvent(type: 'ended' | 'failed' | 'declined') {
+  function emitTerminalEvent(type: 'ended' | 'failed' | 'declined' | 'missed') {
     if (params.manufacturerCall !== '1' || !params.conversationId || terminalEventRef.current) return;
     terminalEventRef.current = type;
     void api.call.event({
@@ -335,7 +335,8 @@ function NativeCallScreen() {
       if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
       renewalTimerRef.current = null;
       if (callStartedRef.current || credentialsIssuedRef.current) {
-        emitTerminalEvent(remoteJoinedRef.current ? 'ended' : 'declined');
+        // Nobody answered before I hung up: a missed call for the other side.
+    emitTerminalEvent(remoteJoinedRef.current ? 'ended' : 'missed');
       }
       try {
         engineRef.current?.leaveChannel();
@@ -379,7 +380,8 @@ function NativeCallScreen() {
     clearInterval(timerRef.current!);
     if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
     renewalTimerRef.current = null;
-    emitTerminalEvent(remoteJoinedRef.current ? 'ended' : 'declined');
+    // Nobody answered before I hung up: a missed call for the other side.
+    emitTerminalEvent(remoteJoinedRef.current ? 'ended' : 'missed');
     try {
       engineRef.current?.leaveChannel();
       engineRef.current?.release();

@@ -182,6 +182,8 @@ export const users = pgTable('users', {
   quietHoursStart:    text('quiet_hours_start'),
   quietHoursEnd:       text('quiet_hours_end'),
   quietHoursTimezone: text('quiet_hours_timezone').notNull().default('UTC'),
+  // Settings → Notifications → Pause all (migration 281). Future = no pushes.
+  pushPausedUntil: timestamp('push_paused_until'),
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -844,7 +846,8 @@ export const klaviyoIntegrations = pgTable('klaviyo_integrations', {
 export const pushTokens = pgTable('push_tokens', {
   id:        uuid('id').primaryKey().defaultRandom(),
   userId:    text('user_id').notNull(),
-  token:     text('token').notNull().unique(),
+  // Unique per (token, user) — one device can carry several signed-in accounts (migration 281).
+  token:     text('token').notNull(),
   platform:  text('platform').notNull().default('unknown'), // 'ios' | 'android' | 'web'
   // Set false when Expo's push receipt API reports DeviceNotRegistered (app
   // uninstalled, token revoked). Inactive tokens are excluded from sends but
@@ -855,7 +858,10 @@ export const pushTokens = pgTable('push_tokens', {
   deactivatedReason: text('deactivated_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  tokenUserUnique: uniqueIndex('push_tokens_token_user_unique').on(table.token, table.userId),
+  tokenIdx: index('push_tokens_token_idx').on(table.token),
+}));
 
 // ─── Seller Quote Requests (seller → manufacturer quote/sample requests) ───────
 

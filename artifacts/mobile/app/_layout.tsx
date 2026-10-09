@@ -31,7 +31,7 @@ import {
   useGlobalSearchParams, usePathname, useRootNavigationState, useRouter, useSegments,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
+import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useSessionList, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
@@ -72,7 +72,7 @@ import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import OfflineBanner from '@/components/OfflineBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
 import { RevenueCatProvider } from '@/lib/revenueCat';
-import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+import { registerGrantedPushToken, setSignedInAccountIds } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
@@ -82,7 +82,7 @@ import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { SaveHeartHost } from '@/components/SaveHeartHost';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
-import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
+import { configureNotificationAccountSwitcher, createNotificationResponseHandler } from '@/lib/notificationNavigation';
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import AnalyticsBridge from '@/components/AnalyticsBridge';
 import { wrapRootComponent } from '@/lib/monitoring';
@@ -1153,7 +1153,20 @@ function ServiceConfigurer() {
 function PushRegistrar() {
   const api = useApi();
   const { isSignedIn, userId } = useAuth();
+  const { sessions } = useSessionList();
   const registeredUserRef = useRef<string | null>(null);
+  // Every account signed in on this device keeps its own pushes here
+  // (labelled with the account), so registration lists them all and runs
+  // again when one is added or signed out.
+  const signedInKey = (sessions ?? [])
+    .filter((session) => session.status === 'active' && session.user)
+    .map((session) => session.user!.id)
+    .sort()
+    .join(',');
+  useEffect(() => {
+    setSignedInAccountIds(signedInKey ? signedInKey.split(',') : []);
+    registeredUserRef.current = null;
+  }, [signedInKey]);
   useEffect(() => {
     if (!isSignedIn) return;
     if (!userId || registeredUserRef.current === userId) return;
@@ -1166,7 +1179,35 @@ function PushRegistrar() {
       registeredUserRef.current = userId;
       void registerGrantedPushToken(userId, api);
     });
-  }, [api, isSignedIn, userId]);
+  }, [api, isSignedIn, userId, signedInKey]);
+  return null;
+}
+
+/**
+ * Lets a notification tap switch to the account the push is for before
+ * opening its screen (lib/notificationNavigation.ts).
+ */
+function NotificationAccountSwitcherBridge() {
+  const { userId } = useAuth();
+  const { sessions, setActive } = useSessionList();
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+  useEffect(() => {
+    configureNotificationAccountSwitcher({
+      currentAccountId: () => userIdRef.current,
+      async switchTo(accountId) {
+        const target = (sessionsRef.current ?? []).find(
+          (session) => session.status === 'active' && session.user?.id === accountId,
+        );
+        if (!target || !setActive) return false;
+        await setActive({ session: target.id });
+        return true;
+      },
+    });
+    return () => configureNotificationAccountSwitcher(null);
+  }, [setActive]);
   return null;
 }
 
@@ -1346,6 +1387,7 @@ function RootLayoutNav() {
       <AuthGate />
       <ServiceConfigurer />
       <PushRegistrar />
+      <NotificationAccountSwitcherBridge />
       <AffiliateRefCapture />
       <MarketingPixelTracker />
       <AnalyticsBridge />
