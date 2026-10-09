@@ -24,6 +24,8 @@ import { StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { Product } from '@/services/productTypes';
 import { formatCents, integerPercent } from '@/lib/money';
+import { stockStatusLabel } from '@/lib/productBulk';
+import { stockFlagColors } from '@/components/products/StockFlag';
 
 export function getCategoryColors(category: string, theme: AppThemePreset): readonly [string, string] {
   if (category === 'T-shirt' || category === 'Sweatshirt') return [theme.accent, theme.secondary];
@@ -72,8 +74,11 @@ export const ProductCard = React.memo(function ProductCard({
 
   const stock = product.inventory.totalStock;
   const threshold = product.inventory.lowStockThreshold;
-  const stockColor = stock === 0 ? theme.error : stock <= threshold ? theme.warning : theme.success;
-  const stockLabel = stock === 0 ? 'Out of stock' : stock <= threshold ? `${stock} in stock` : `${stock} in stock`;
+  // Monochrome stock marker (Shopify's "N available" line): silver count when
+  // healthy, a white "Low stock" pill at/below the threshold, a quiet dark
+  // "Out of stock" pill at 0 — no warning colours.
+  const { level: stockLevelKey, label: stockLabel } = stockStatusLabel(stock, threshold);
+  const flagColors = stockFlagColors(stockLevelKey === 'low_stock' ? 'low_stock' : 'out_of_stock', theme);
 
   const price = product.pricing.priceCents;
   const compare = product.pricing.compareAtPriceCents;
@@ -92,7 +97,7 @@ export const ProductCard = React.memo(function ProductCard({
     return (
       <View style={[s.swipeActions, { height: imageHeight }]}>
         <PressableScale
-          style={[s.swipeBtn, { backgroundColor: theme.warning }]}
+          style={[s.swipeBtn, { backgroundColor: theme.muted }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); closeSwipe(); onQuickArchive(product); }}
           accessibilityLabel={isArchived ? `Unarchive ${product.name}` : `Archive ${product.name}`}
         >
@@ -157,14 +162,21 @@ export const ProductCard = React.memo(function ProductCard({
             {/* Stock warning chip, bottom of image — tap opens the quick
                 per-variant stock editor. */}
             {(stock === 0 || stock <= threshold) && (
-              <PressableScale
-                style={[s.chipBottomLeft, { backgroundColor: stockColor }]}
-                onPress={() => onEditStock(product)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
-              >
-                <Text style={s.chipBottomLabel} numberOfLines={1}>{stockLabel}</Text>
-              </PressableScale>
+              // Positioned by a plain View: PressableScale puts `style` on its
+              // inner view, so an absolute `bottom` there anchored to a
+              // zero-height wrapper at the top of the image and the chip was
+              // clipped out of sight.
+              <View style={s.chipBottomLeft} pointerEvents="box-none">
+                <PressableScale
+                  style={[s.chipBottomInner, { backgroundColor: flagColors.bg, borderColor: flagColors.border }]}
+                  noMinHeight
+                  onPress={() => onEditStock(product)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
+                >
+                  <Text style={[s.chipBottomLabel, { color: flagColors.fg }]} numberOfLines={1}>{stockLabel}</Text>
+                </PressableScale>
+              </View>
             )}
           </View>
 
@@ -198,7 +210,7 @@ export const ProductCard = React.memo(function ProductCard({
                 hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                 accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
               >
-                <Text style={[s.stock, { color: stockColor }]}>{stockLabel}</Text>
+                <Text style={[s.stock, { color: theme.muted }]}>{stockLabel}</Text>
               </PressableScale>
             )}
           </View>
@@ -235,6 +247,9 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     left: SP.xs,
     right: SP.xs,
     bottom: SP.xs,
+  },
+  chipBottomInner: {
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: RADIUS.xs,
     paddingHorizontal: SP.xs,
     paddingVertical: 3,

@@ -1,32 +1,60 @@
 /**
- * Select products — bulk edit prices, archive and duplicate.
+ * Select products — bulk edit prices and stock, archive and duplicate.
  *
  * Entry: the "..." menu on the Products tab. Works on the server catalog
  * (GET /api/product-bulk/products); every action is applied to the whole
- * selection or not at all.
+ * selection or not at all. Prices and stock share one editor (Price / Stock
+ * tabs) with the same preview → apply flow.
+ *
+ * Stock editing follows Shopify iOS's inventory adjust sheet (Cancel · title,
+ * a big quantity with − / + either side, then the result per product), run
+ * over the whole selection: Set to / Add / Remove, preview before → after
+ * totals per product with low / out-of-stock flags, then Apply.
+ *
+ * The signed-out seller preview cannot reach the API: `&demo=1` edits a local
+ * copy of the preview catalog with the server's own rules (lib/productBulk.ts),
+ * and a fresh preview shows the honest empty catalog.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, ScrollView, Image, StyleSheet, ActivityIndicator, Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { Header } from '@/components/layout';
-import { HapticSwitch, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
+import { Button, SegmentedControl } from '@/components/ui';
+import { StockFlag } from '@/components/products/StockFlag';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import {
-  PRICE_EDIT_MODES, buildPriceChange, bulkErrorMessage, priceRangeLabel,
-  type BulkPriceResult, type BulkProduct, type BulkRounding, type BulkStatusFilter, type PriceEditMode,
+  PRICE_EDIT_MODES, STOCK_EDIT_MODES, applyLocalPrice, applyLocalStock, buildPriceChange, buildStockChange,
+  bulkCatalogFromProducts, bulkErrorMessage, filterLocalCatalog, planLocalPrice, planLocalStock, priceRangeLabel,
+  stockPreviewFlags, stockStatusLabel,
+  type BulkPriceResult, type BulkProduct, type BulkRounding, type BulkStatusFilter, type BulkStockChange,
+  type BulkStockResult, type LocalBulkEntry, type PriceEditMode,
 } from '@/lib/productBulk';
+
+type EditTab = 'price' | 'stock';
+const EDIT_TABS: Array<{ id: EditTab; label: string }> = [
+  { id: 'price', label: 'Price' },
+  { id: 'stock', label: 'Stock' },
+];
+
+/** Local catalog edits for the signed-out seller preview (`&demo=1`). */
+interface LocalCatalog {
+  entries: LocalBulkEntry[];
+  update: (next: LocalBulkEntry[]) => void;
+}
 
 const STATUS_CHIPS: Array<{ key: BulkStatusFilter; label: string }> = [
   { key: 'all', label: 'All' },
@@ -70,8 +98,15 @@ export default function ProductsBulkEditScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [priceOpen, setPriceOpen] = useState(false);
+  const [editTab, setEditTab] = useState<EditTab | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const preview = isSellerDevPreview();
+  // Demo is URL-only (lib/devPreview.ts); the route param keeps this reactive
+  // when the screen mounts before the preview query lands on the URL.
+  const { demo: demoParam } = useLocalSearchParams<{ demo?: string }>();
+  const demo = preview && (isPreviewDemoMode() || demoParam === '1');
+  // Demo preview edits a local copy of the preview catalog; null everywhere else.
+  const [catalog, setCatalog] = useState<LocalBulkEntry[] | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 250);
@@ -79,10 +114,19 @@ export default function ProductsBulkEditScreen() {
   }, [query]);
 
   const load = useCallback(async () => {
-    if (isSellerDevPreview()) {
-      setItems([]);
+    if (preview) {
+      // The seller preview cannot call the API (lib/api.ts rejects): demo
+      // mode edits the preview catalog locally, a fresh preview is empty.
+      setError(null);
+      if (demo && !catalog) {
+        const { getPreviewSellerProducts } = await import('@/lib/previewSellerProducts');
+        setCatalog(bulkCatalogFromProducts(getPreviewSellerProducts()));
+        return;
+      }
+      const next = demo && catalog ? filterLocalCatalog(catalog, debounced, status) : [];
+      setItems(next);
+      setSelected(prev => new Set([...prev].filter(id => next.some(i => i.id === id))));
       setLoading(false);
-      setError('Product bulk editing is unavailable in the signed-out preview.');
       return;
     }
     if (!isLoaded || !isSignedIn) {
@@ -100,7 +144,7 @@ export default function ProductsBulkEditScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api, debounced, status, isLoaded, isSignedIn]);
+  }, [api, debounced, status, isLoaded, isSignedIn, preview, demo, catalog]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -124,7 +168,9 @@ export default function ProductsBulkEditScreen() {
     setBusy(true);
     try {
       const ids = [...selected];
-      const res = await api.productBulk.status({ productIds: ids, status: target });
+      const res = catalog
+        ? localStatus(catalog, ids, target, setCatalog)
+        : await api.productBulk.status({ productIds: ids, status: target });
       setSummary({
         title: target === 'archived' ? 'Products archived' : 'Products restored',
         lines: [`${res.updated.length} ${res.updated.length === 1 ? 'product' : 'products'} ${target === 'archived' ? 'archived' : 'moved to drafts'}`],
@@ -154,7 +200,9 @@ export default function ProductsBulkEditScreen() {
   async function runDuplicate() {
     setBusy(true);
     try {
-      const res = await api.productBulk.duplicate({ productIds: [...selected] });
+      const res = catalog
+        ? localDuplicate(catalog, [...selected], setCatalog)
+        : await api.productBulk.duplicate({ productIds: [...selected] });
       setSummary({
         title: 'Products duplicated',
         lines: [
@@ -175,7 +223,7 @@ export default function ProductsBulkEditScreen() {
 
   return (
     <View style={[s.root]}>
-      <Header title="Select products" onBack={() => goBackOr(router)} dividerVariant="none" />
+      <ScreenHeader title="Select products" onBack={() => goBackOr(router)} />
 
       <View style={s.searchWrap}>
         <View style={s.search}>
@@ -227,7 +275,7 @@ export default function ProductsBulkEditScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: barBottom + (selected.size > 0 ? 140 : SP.xl) }}
+          contentContainerStyle={{ paddingBottom: barBottom + (selected.size > 0 ? 200 : SP.xl) }}
         >
           {items.length === 0 && !loading ? (
             <View style={s.center}>
@@ -246,20 +294,41 @@ export default function ProductsBulkEditScreen() {
             {busy && <ActivityIndicator color={theme.background} size="small" />}
           </View>
           <View style={s.barActions}>
-            <BarButton label="Edit prices" disabled={busy} onPress={() => setPriceOpen(true)} s={s} />
+            <BarButton label="Edit prices" disabled={busy} onPress={() => setEditTab('price')} s={s} />
+            <BarButton label="Edit stock" disabled={busy} onPress={() => setEditTab('stock')} s={s} />
+          </View>
+          <View style={s.barActions}>
             <BarButton label={allArchived ? 'Unarchive' : 'Archive'} disabled={busy} onPress={confirmArchive} s={s} />
             <BarButton label="Duplicate" disabled={busy} onPress={() => { void runDuplicate(); }} s={s} />
           </View>
         </View>
       )}
 
-      {priceOpen && (
-        <PriceEditPanel
+      {editTab && (
+        <EditPanel
+          tab={editTab}
+          onTab={setEditTab}
           productIds={[...selected]}
           topInset={topInset}
-          onClose={() => setPriceOpen(false)}
-          onDone={(res) => {
-            setPriceOpen(false);
+          local={catalog ? { entries: catalog, update: setCatalog } : null}
+          onClose={() => setEditTab(null)}
+          onStockDone={(res) => {
+            setEditTab(null);
+            const n = res.summary.changedProducts;
+            setSummary({
+              title: 'Stock updated',
+              lines: [
+                `${n} ${n === 1 ? 'product' : 'products'} updated`,
+                `${res.summary.variants} ${res.summary.variants === 1 ? 'variant' : 'variants'} changed`,
+                ...(res.summary.lowAfter > 0 ? [`${res.summary.lowAfter} ${res.summary.lowAfter === 1 ? 'variant' : 'variants'} low on stock`] : []),
+                ...(res.summary.outAfter > 0 ? [`${res.summary.outAfter} ${res.summary.outAfter === 1 ? 'variant' : 'variants'} out of stock`] : []),
+              ],
+            });
+            setSelected(new Set());
+            void load();
+          }}
+          onPriceDone={(res) => {
+            setEditTab(null);
             setSummary({
               title: 'Prices updated',
               lines: [
@@ -282,7 +351,7 @@ export default function ProductsBulkEditScreen() {
             {summary.lines.map(l => <Text key={l} style={s.summaryLine}>{l}</Text>)}
           </View>
           <View style={[s.summaryFooter, { paddingBottom: barBottom + SP.md }]}>
-            <PrimaryButton label="Done" onPress={() => setSummary(null)} />
+            <Button label="Done" onPress={() => setSummary(null)} fullWidth />
           </View>
         </View>
       )}
@@ -290,12 +359,217 @@ export default function ProductsBulkEditScreen() {
   );
 }
 
-// ─── Price edit panel ─────────────────────────────────────────────────────────
+// ─── Edit panel (Price / Stock tabs) ─────────────────────────────────────────
 
-function PriceEditPanel({ productIds, topInset, onClose, onDone }: {
+function EditPanel({ tab, onTab, productIds, topInset, local, onClose, onPriceDone, onStockDone }: {
+  tab: EditTab;
+  onTab: (tab: EditTab) => void;
   productIds: string[];
   topInset: number;
+  local: LocalCatalog | null;
   onClose: () => void;
+  onPriceDone: (res: BulkPriceResult) => void;
+  onStockDone: (res: BulkStockResult) => void;
+}) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  return (
+    <View style={[s.fullPanel, { paddingTop: topInset }]}>
+      <View style={s.panelHeader}>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Cancel">
+          <Text style={s.panelCancel}>Cancel</Text>
+        </Pressable>
+        <Text style={s.panelTitle}>{tab === 'price' ? 'Edit prices' : 'Edit stock'}</Text>
+        <View style={{ width: 52 }} />
+      </View>
+      <View style={s.tabs}>
+        <SegmentedControl
+          options={EDIT_TABS}
+          selectedId={tab}
+          onChange={(id) => onTab(id as EditTab)}
+          testID="bulk-edit-tabs"
+        />
+      </View>
+      {tab === 'price'
+        ? <PriceEditor productIds={productIds} local={local} onDone={onPriceDone} />
+        : <StockEditor productIds={productIds} local={local} onDone={onStockDone} />}
+    </View>
+  );
+}
+
+// ─── Stock editor ─────────────────────────────────────────────────────────────
+
+function StockEditor({ productIds, local, onDone }: {
+  productIds: string[];
+  local: LocalCatalog | null;
+  onDone: (res: BulkStockResult) => void;
+}) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const api = useApi();
+  const tabBar = useTabBarMetrics();
+  const [mode, setMode] = useState<BulkStockChange['mode']>('set');
+  const [input, setInput] = useState('');
+  const [remote, setRemote] = useState<BulkStockResult | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const seq = useRef(0);
+
+  const change = useMemo(() => buildStockChange(mode, input), [mode, input]);
+  const localPreview = useMemo(
+    () => (local && change ? planLocalStock(local.entries, productIds, change) : null),
+    [local, change, productIds],
+  );
+  const preview = local ? localPreview : remote;
+
+  useEffect(() => {
+    if (local) return;
+    if (!change) { setRemote(null); return; }
+    const mine = ++seq.current;
+    setPreviewing(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await api.productBulk.stock({ productIds, change, preview: true });
+        if (mine === seq.current) { setRemote(res); setError(null); }
+      } catch (err) {
+        if (mine === seq.current) { setRemote(null); setError(bulkErrorMessage(err, 'Could not preview this stock change.')); }
+      } finally {
+        if (mine === seq.current) setPreviewing(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [api, change, productIds, local]);
+
+  function step(delta: number) {
+    const current = /^\d+$/.test(input.trim()) ? Number(input.trim()) : 0;
+    setInput(String(Math.max(0, Math.min(1_000_000, current + delta))));
+  }
+
+  async function apply() {
+    if (!change || applying) return;
+    setApplying(true);
+    try {
+      if (local) {
+        const res = planLocalStock(local.entries, productIds, change, false);
+        local.update(applyLocalStock(local.entries, res));
+        onDone(res);
+        return;
+      }
+      const res = await api.productBulk.stock({ productIds, change });
+      onDone(res);
+    } catch (err) {
+      setError(bulkErrorMessage(err, 'Could not update stock. Nothing was changed.'));
+      setApplying(false);
+    }
+  }
+
+  const n = productIds.length;
+  const canApply = !!preview && preview.summary.changedProducts > 0 && !applying;
+  const lowOut = preview
+    ? [
+      preview.summary.outAfter > 0 ? `${preview.summary.outAfter} out of stock` : null,
+      preview.summary.lowAfter > 0 ? `${preview.summary.lowAfter} low` : null,
+    ].filter(Boolean).join(' · ')
+    : '';
+
+  return (
+    <>
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: SP.xl }}>
+        <Text style={s.sectionLabel}>Change</Text>
+        <SegRow
+          options={STOCK_EDIT_MODES}
+          value={mode}
+          onChange={(m) => setMode(m)}
+          s={s}
+        />
+
+        <View style={s.stepperRow}>
+          <Pressable
+            onPress={() => step(-1)}
+            style={s.stepBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Decrease quantity"
+          >
+            <Feather name="minus" size={ICON.md} color={theme.text} />
+          </Pressable>
+          <TextInput
+            value={input}
+            onChangeText={(t) => setInput(t.replace(/[^\d]/g, '').slice(0, 7))}
+            placeholder="0"
+            placeholderTextColor={theme.subtle}
+            keyboardType="number-pad"
+            style={s.qtyInput}
+            accessibilityLabel={mode === 'set' ? 'New quantity' : mode === 'add' ? 'Quantity to add' : 'Quantity to remove'}
+            testID="bulk-stock-input"
+          />
+          <Pressable
+            onPress={() => step(1)}
+            style={s.stepBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Increase quantity"
+          >
+            <Feather name="plus" size={ICON.md} color={theme.text} />
+          </Pressable>
+        </View>
+        <Text style={s.qtyCaption}>Applies to every variant</Text>
+
+        <View style={s.previewHead}>
+          <Text style={s.sectionLabel}>Preview</Text>
+          {previewing ? <ActivityIndicator size="small" color={theme.muted} /> : lowOut ? <Text style={s.previewCount}>{lowOut}</Text> : null}
+        </View>
+        {change && preview ? preview.items.map(it => {
+          const flags = it.skipped ? [] : stockPreviewFlags(it);
+          return (
+            <View key={it.productId} style={s.previewRow} testID="bulk-stock-preview-row">
+              {it.image ? (
+                <Image source={{ uri: it.image }} style={s.previewThumb} />
+              ) : (
+                <View style={[s.previewThumb, s.thumbEmpty]}><Feather name="image" size={ICON.sm} color={theme.subtle} /></View>
+              )}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.previewName} numberOfLines={1}>{it.name}</Text>
+                <Text style={s.previewMeta} numberOfLines={1}>
+                  {it.skipped ? 'No variants' : `${it.variants.length} ${it.variants.length === 1 ? 'variant' : 'variants'}`}
+                </Text>
+                {flags.length > 0 && (
+                  <View style={s.flagRow}>
+                    {flags.map(f => <StockFlag key={f.label} level={f.level} label={f.label} theme={theme} />)}
+                  </View>
+                )}
+              </View>
+              {!it.skipped && (
+                <View style={s.previewPrices}>
+                  <Text style={s.beforeQty}>{it.beforeTotal}</Text>
+                  <Feather name="arrow-right" size={ICON.xs ?? 12} color={theme.subtle} />
+                  <Text style={s.afterQty}>{it.afterTotal}</Text>
+                </View>
+              )}
+            </View>
+          );
+        }) : null}
+        {error && <Text style={[s.errorText, { marginTop: SP.md }]}>{error}</Text>}
+      </ScrollView>
+
+      <View style={[s.summaryFooter, { paddingBottom: tabBar.occupiedHeight + SP.md }]}>
+        <Button
+          label={`Apply to ${n} ${n === 1 ? 'product' : 'products'}`}
+          onPress={apply}
+          loading={applying}
+          disabled={!canApply}
+          fullWidth
+        />
+      </View>
+    </>
+  );
+}
+
+// ─── Price editor ─────────────────────────────────────────────────────────────
+
+function PriceEditor({ productIds, local, onDone }: {
+  productIds: string[];
+  local: LocalCatalog | null;
   onDone: (res: BulkPriceResult) => void;
 }) {
   const { theme } = useAppTheme();
@@ -308,7 +582,7 @@ function PriceEditPanel({ productIds, topInset, onClose, onDone }: {
   const [input, setInput] = useState('');
   const [rounding, setRounding] = useState<BulkRounding>('none');
   const [keepOld, setKeepOld] = useState(false);
-  const [preview, setPreview] = useState<BulkPriceResult | null>(null);
+  const [remote, setPreview] = useState<BulkPriceResult | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,8 +590,15 @@ function PriceEditPanel({ productIds, topInset, onClose, onDone }: {
 
   const change = useMemo(() => buildPriceChange(mode, input), [mode, input]);
   const unit = PRICE_EDIT_MODES.find(m => m.key === mode)!.unit;
+  const compareAt = keepOld ? 'previous' as const : 'none' as const;
+  const localPreview = useMemo(
+    () => (local && change ? planLocalPrice(local.entries, productIds, change, rounding, compareAt) : null),
+    [local, change, productIds, rounding, compareAt],
+  );
+  const preview: BulkPriceResult | null = local ? localPreview : remote;
 
   useEffect(() => {
+    if (local) return;
     if (!change) { setPreview(null); return; }
     const mine = ++seq.current;
     setPreviewing(true);
@@ -334,12 +615,18 @@ function PriceEditPanel({ productIds, topInset, onClose, onDone }: {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [api, change, rounding, keepOld, productIds]);
+  }, [api, change, rounding, keepOld, productIds, local]);
 
   async function apply() {
     if (!change || applying) return;
     setApplying(true);
     try {
+      if (local) {
+        const res = planLocalPrice(local.entries, productIds, change, rounding, compareAt, false);
+        local.update(applyLocalPrice(local.entries, res));
+        onDone(res);
+        return;
+      }
       const res = await api.productBulk.price({
         productIds, change, rounding, compareAt: keepOld ? 'previous' : 'none',
       });
@@ -354,16 +641,8 @@ function PriceEditPanel({ productIds, topInset, onClose, onDone }: {
   const canApply = !!preview && preview.summary.changedProducts > 0 && !applying;
 
   return (
-    <View style={[s.fullPanel, { paddingTop: topInset }]}>
-      <View style={s.panelHeader}>
-        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Cancel">
-          <Text style={s.panelCancel}>Cancel</Text>
-        </Pressable>
-        <Text style={s.panelTitle}>Edit prices</Text>
-        <View style={{ width: 52 }} />
-      </View>
-
-      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+    <>
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: SP.xl }}>
         <Text style={s.sectionLabel}>Change</Text>
         <SegRow
@@ -427,15 +706,41 @@ function PriceEditPanel({ productIds, topInset, onClose, onDone }: {
       </ScrollView>
 
       <View style={[s.summaryFooter, { paddingBottom: tabBar.occupiedHeight + SP.md }]}>
-        <PrimaryButton
+        <Button
           label={`Apply to ${n} ${n === 1 ? 'product' : 'products'}`}
           onPress={apply}
           loading={applying}
           disabled={!canApply}
+          fullWidth
         />
       </View>
-    </View>
+    </>
   );
+}
+
+// ─── Local (preview) status + duplicate ──────────────────────────────────────
+
+function localStatus(
+  entries: LocalBulkEntry[], ids: string[], target: 'archived' | 'draft', update: (next: LocalBulkEntry[]) => void,
+) {
+  const want = new Set(ids);
+  const updated = entries.filter(e => want.has(e.product.id) && e.product.status !== target).map(e => e.product.id);
+  update(entries.map(e => (want.has(e.product.id) ? { ...e, product: { ...e.product, status: target } } : e)));
+  return { status: target, updated, unchanged: ids.filter(id => !updated.includes(id)) };
+}
+
+function localDuplicate(entries: LocalBulkEntry[], ids: string[], update: (next: LocalBulkEntry[]) => void) {
+  const want = new Set(ids);
+  const copies = entries.filter(e => want.has(e.product.id)).map((e, i) => {
+    const id = `${e.product.id}-copy-${Date.now()}-${i}`;
+    return {
+      sourceId: e.product.id,
+      product: { ...e.product, id, name: `${e.product.name} (copy)`, status: 'draft', totalStock: 0 },
+      variants: e.variants.map(v => ({ ...v, variantId: `${v.variantId}-copy-${i}`, sku: `${v.sku}-COPY`, stock: 0 })),
+    };
+  });
+  update([...copies.map(({ sourceId: _s, ...c }) => c), ...entries]);
+  return { created: copies.map(c => ({ sourceId: c.sourceId, id: c.product.id, name: c.product.name })) };
 }
 
 // ─── Small pieces ─────────────────────────────────────────────────────────────
@@ -486,10 +791,13 @@ function BarButton({ label, onPress, disabled, s }: { label: string; onPress: ()
 function ProductRow({ item, checked, onPress, theme, s }: {
   item: BulkProduct; checked: boolean; onPress: () => void; theme: any; s: ReturnType<typeof makeStyles>;
 }) {
+  // Shopify's picker row: price · status · "N available" — the stock count
+  // reads in silver like the rest of the line.
   const meta = [
     priceRangeLabel(item.minPriceCents, item.maxPriceCents, formatCents),
-    `${item.variantCount} ${item.variantCount === 1 ? 'variant' : 'variants'}`,
     item.status === 'active' ? null : item.status[0].toUpperCase() + item.status.slice(1),
+    stockStatusLabel(item.totalStock, null).label,
+    item.variantCount > 1 ? `${item.variantCount} variants` : null,
   ].filter(Boolean).join(' · ');
   return (
     <PressableScale
@@ -523,6 +831,23 @@ function makeStyles(theme: any) {
       flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: 44, paddingHorizontal: SP.md,
       borderRadius: RADIUS.md, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
     },
+    tabs: { paddingHorizontal: SP.md, paddingBottom: SP.xs },
+    stepperRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: SP.lg },
+    stepBtn: {
+      width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
+    },
+    qtyInput: {
+      flex: 1, minWidth: 0, height: 80, borderRadius: 40, borderWidth: 1, borderColor: theme.border,
+      backgroundColor: theme.card, textAlign: 'center', ...TYPE_SCALE.title1, fontSize: 40, lineHeight: 46,
+      color: theme.text, padding: 0, outlineWidth: 0, ...TABULAR_NUMS,
+    } as any,
+    qtyCaption: { ...TYPE_SCALE.footnote, color: theme.muted, textAlign: 'center', marginTop: SP.sm },
+    previewCount: { ...TYPE_SCALE.footnote, color: theme.muted, marginTop: SP.lg, marginBottom: SP.sm },
+    previewThumb: { width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: theme.card },
+    flagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+    beforeQty: { ...TYPE_SCALE.footnote, color: theme.muted, ...TABULAR_NUMS },
+    afterQty: { ...TYPE_SCALE.footnote, fontFamily: FONT.bold, color: theme.text, ...TABULAR_NUMS },
     searchInput: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base, color: theme.text, padding: 0, outlineWidth: 0 } as any,
     chips: { paddingHorizontal: SP.md, paddingVertical: SP.sm },
     seg: { flexDirection: 'row', gap: SP.sm },
