@@ -56,9 +56,10 @@ import {
   useApi,
 } from '@/lib/api';
 import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socialKeysForUser } from '@/services/socialService';
-import { adoptGuestCart, clearCartCache, flushDirtyCart, initCartService } from '@/services/cartService';
+import { clearCartCache, initCartService } from '@/services/cartService';
 import { initDesignService } from '@/services/designService';
 import { initProductService } from '@/services/productService';
+import { adoptGuestCart, flushDirtyCart } from '@/services/cartService';
 import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
 import { initTabDataCache } from '@/lib/tabDataCache';
