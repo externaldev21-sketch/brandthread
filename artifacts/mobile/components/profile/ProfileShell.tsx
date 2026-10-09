@@ -31,7 +31,7 @@
  */
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, Animated, FlatList, RefreshControl, StyleSheet, Text, View,
+  AccessibilityInfo, Animated, FlatList, Platform, RefreshControl, StyleSheet, Text, View,
   type ListRenderItem,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -307,7 +307,9 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   });
 
   const onScroll = useMemo(
-    () => Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false }),
+    // Every consumer of scrollY is opacity/transform, so the collapse runs on
+    // the UI thread; the JS listener above still receives values.
+    () => Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: Platform.OS !== 'web' }),
     [scrollY],
   );
 

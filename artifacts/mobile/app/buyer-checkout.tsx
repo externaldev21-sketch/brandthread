@@ -33,6 +33,7 @@
  *    confirmation screen.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useStableCallback } from '@/hooks/useStableCallback';
 import {
   KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
@@ -115,6 +116,13 @@ type CheckoutError = { title: string; message: string };
 
 /** Pending reconciliation entry for an in-app payment (vs a hosted Checkout Session id). */
 const PI_PREFIX = 'pi:';
+// Stable empties for guests, so memoized sections aren't handed a fresh []
+// on every render (every keystroke in the contact/address fields).
+const NO_SAVED_CARDS: SavedCard[] = [];
+const NO_SAVED_ADDRESSES: SavedAddress[] = [];
+// The wallet button (Apple Pay / Google Pay / Link) only depends on totals and
+// stable callbacks — skip it when the buyer is typing an address.
+const MemoExpressPay = React.memo(ExpressPay);
 
 function wait(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -283,7 +291,8 @@ export default function BuyerCheckoutScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const handleSelectAddress = (addr: SavedAddress) => {
+  // Only touches state setters, so one identity for the memoized ShippingSection.
+  const handleSelectAddress = useCallback((addr: SavedAddress) => {
     const parts = addr.recipientName ? addr.recipientName.split(' ') : [];
     setAddress({
       id: addr.id,
@@ -301,7 +310,7 @@ export default function BuyerCheckoutScreen() {
       ...previous,
       phone: addr.phone || previous.phone || '',
     }));
-  };
+  }, []);
 
   const sessionRef = useRef(session);
   sessionRef.current = session;
@@ -583,7 +592,9 @@ export default function BuyerCheckoutScreen() {
     };
   };
 
-  const expressQuote = async (walletAddress: WalletContact['address']) => {
+  // Stable identities (always calling the latest closure) so the memoized
+  // wallet button below isn't re-rendered by every keystroke in the forms.
+  const expressQuote = useStableCallback(async (walletAddress: WalletContact['address']) => {
     if (!session) return null;
     try {
       const value = await api.buyer.checkout.paymentIntent.quote(buildQuoteBody(session, {
@@ -594,9 +605,9 @@ export default function BuyerCheckoutScreen() {
     } catch {
       return null;
     }
-  };
+  });
 
-  const expressCreateIntent = async (wallet: WalletContact) => {
+  const expressCreateIntent = useStableCallback(async (wallet: WalletContact) => {
     setError(null);
     setPlacing(true);
     const who = walletCheckout(wallet);
@@ -605,13 +616,13 @@ export default function BuyerCheckoutScreen() {
     const clientSecret = await startPaymentIntent(current, who);
     if (!clientSecret) setPlacing(false);
     return clientSecret;
-  };
+  });
 
-  const expressOutcome = (outcome: ConfirmOutcome, wallet: WalletContact | null) => {
+  const expressOutcome = useStableCallback((outcome: ConfirmOutcome, wallet: WalletContact | null) => {
     if (outcome.status === 'canceled' && !startedRef.current) return; // closed the sheet before paying
     setPlacing(true);
     void finishInApp(outcome, wallet ? walletCheckout(wallet) : { contact, address });
-  };
+  });
 
   const saveAddressIfAsked = async (who: { address: CheckoutAddressDraft; contact: Partial<CheckoutContact> }) => {
     if (!isSignedIn || who.address.saveAddress === false || who.address.id) return;
@@ -1034,7 +1045,7 @@ export default function BuyerCheckoutScreen() {
 
           <ExpressSection visible={expressVisible}>
             {inApp ? (
-              <ExpressPay
+              <MemoExpressPay
                 amountCents={totals.totalCents}
                 subtotalCents={totals.subtotalCents}
                 shippingCents={totals.shippingCents}
@@ -1054,7 +1065,7 @@ export default function BuyerCheckoutScreen() {
           <ShippingSection
             address={address}
             onChange={setAddress}
-            savedAddresses={isSignedIn ? savedAddresses : []}
+            savedAddresses={isSignedIn ? savedAddresses : NO_SAVED_ADDRESSES}
             onSelectSaved={handleSelectAddress}
             canSaveAddresses={!!isSignedIn}
             showErrors={false}
@@ -1062,7 +1073,7 @@ export default function BuyerCheckoutScreen() {
 
           <PaymentSection
             path={payment.path}
-            savedCards={isSignedIn ? savedCards : []}
+            savedCards={isSignedIn ? savedCards : NO_SAVED_CARDS}
             selectedCard={selectedCard}
             onSelectCard={setSelectedCard}
             onCardComplete={setCardComplete}

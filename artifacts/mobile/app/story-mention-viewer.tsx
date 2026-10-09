@@ -252,7 +252,9 @@ export default function StoryMentionViewerScreen() {
       toValue: 1,
       duration: Math.max(0, (1 - progressValue.current) * total),
       easing: Easing.linear,
-      useNativeDriver: false,
+      // Drives a translateX (see the progress fill below), so it runs on the
+      // UI thread and keeps moving even while JS is busy.
+      useNativeDriver: Platform.OS !== 'web',
     });
     anim.start(({ finished }) => { if (finished) nextRef.current(); });
     return () => anim.stop();
@@ -463,9 +465,18 @@ export default function StoryMentionViewerScreen() {
             >
               {slideIdx > index ? (
                 <View style={styles.progressFull} />
-              ) : slideIdx === index ? (
+              ) : slideIdx === index && trackWidth > 0 ? (
+                // A full-width fill slid in from the left inside the clipped
+                // track — the same picture as growing its width, but a
+                // transform, so it animates on the native driver.
                 <Animated.View
-                  style={[styles.progressFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: [0, trackWidth || 1] }) }]}
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: trackWidth,
+                      transform: [{ translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [-trackWidth, 0] }) }],
+                    },
+                  ]}
                 />
               ) : null}
             </View>

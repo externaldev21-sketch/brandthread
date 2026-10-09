@@ -17,7 +17,7 @@
  *   4. Submitted                — tabs (For you / Accounts / Products /
  *      Tags / Brands) + tab content.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
   useWindowDimensions, ActivityIndicator,
@@ -187,6 +187,10 @@ export default function BuyerSearchScreen() {
   const activeFilterCount = countActiveFilters(filters);
   const setFilters = useCallback((next: SearchFilters) => { sessionFilters = next; setFiltersState(next); }, []);
   const trimmedQuery = query.trim();
+  // Result filtering (preview matching, derived hashtags) follows the query
+  // at low priority so it never holds up the keystroke being drawn in the
+  // field; the field, suggestions and empty/cancel states use the live value.
+  const resultsQuery = useDeferredValue(trimmedQuery);
 
   // Browse grid backing the unfocused entry state — the same "For You"
   // Explore composition Discover uses (Instagram's own search tab defaults
@@ -277,22 +281,24 @@ export default function BuyerSearchScreen() {
   const videoResultsRaw = useMemo(() => results.filter((r): r is VideoResult => r.kind === 'video'), [results]);
   // Blend in bundled preview posts/products when the live API has nothing
   // for this query — matched against name/author/brand, not just caption.
-  const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
-    : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
-  const productResults = productResultsRaw.length > 0 ? productResultsRaw
-    : (trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
+  const videoResults = useMemo(() => (videoResultsRaw.length > 0 ? videoResultsRaw
+    : (resultsQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], resultsQuery)) : [])),
+  [videoResultsRaw, resultsQuery]);
+  const productResults = useMemo(() => (productResultsRaw.length > 0 ? productResultsRaw
+    : (resultsQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], resultsQuery)) : [])),
+  [productResultsRaw, resultsQuery, activeFilterCount]);
   const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
   // Server-side hashtag search first (real post counts), then tags derived
   // from the matched captions for anything the index does not know yet.
   const tagRows = useMemo(() => {
     const merged = new Map<string, SearchTag>();
     for (const t of serverTags) merged.set(t.tag, t);
-    for (const t of deriveTags(videoResults, trimmedQuery)) {
+    for (const t of deriveTags(videoResults, resultsQuery)) {
       const key = normalizeTag(t.tag);
       if (key && !merged.has(key)) merged.set(key, { tag: key, postCount: t.postCount });
     }
     return [...merged.values()];
-  }, [serverTags, videoResults, trimmedQuery]);
+  }, [serverTags, videoResults, resultsQuery]);
 
   function openHashtag(tag: string) {
     hapticPrimaryAction();

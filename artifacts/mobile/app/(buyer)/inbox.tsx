@@ -883,9 +883,9 @@ export default function InboxScreen() {
   }
 
   function openMessagesSearch() {
+    // The search field mounts with this render and takes focus itself
+    // (autoFocus below) — no deferred focus() racing the commit.
     setIsSearchBarOpen(true);
-    // Ref isn't attached until this render commits the search field in.
-    setTimeout(() => messagesSearchInputRef.current?.focus(), 0);
   }
 
   function cancelMessagesSearch() {
@@ -1494,6 +1494,7 @@ export default function InboxScreen() {
               <Feather name="search" size={16} color={theme.muted} />
               <TextInput
                 ref={messagesSearchInputRef}
+                autoFocus
                 style={[s.searchInput, { color: theme.text }, WEB_INPUT_RESET]}
                 value={messagesSearchQuery}
                 onChangeText={setMessagesSearchQuery}

@@ -1368,7 +1368,9 @@ export function HapticSwitch({
     Animated.timing(anim, {
       toValue: on ? 1 : 0,
       duration: 200,
-      useNativeDriver: false, // animating backgroundColor/border, not transform-only
+      // backgroundColor, opacity and translateX are all on the native
+      // driver's allowlist, so the toggle runs on the UI thread.
+      useNativeDriver: NATIVE_DRIVER,
     }).start();
   }, [on, anim]);
 

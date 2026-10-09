@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
+import { useAfterModalDismiss } from '@/hooks/useAfterModalDismiss';
 
 const ACTIONS = [
   { label: 'New post', description: 'Share content with your audience', icon: 'video' as const, route: '/create-post' },
@@ -32,6 +33,10 @@ export default function SellerCreateFAB() {
   const { role, isLoaded: isRoleLoaded } = useRole();
   const [open, setOpen] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  // Navigate once the create menu has actually closed: on iOS, presenting a
+  // modal route (e.g. /create-post is a fullScreenModal) while this Modal is
+  // still dismissing is dropped or glitches.
+  const menu = useAfterModalDismiss(open);
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -57,9 +62,9 @@ export default function SellerCreateFAB() {
   if (!isRoleLoaded || role !== 'seller' || keyboardVisible || Platform.OS === 'web' || blockedRoute) return null;
 
   const choose = (route: string) => {
+    menu.runAfterDismiss(() => router.push(route as never));
     setOpen(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setTimeout(() => router.push(route as never), 0);
   };
 
   return (
@@ -86,7 +91,7 @@ export default function SellerCreateFAB() {
         <Feather name="plus" size={26} color={theme.onAccent} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} onDismiss={menu.onDismiss}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={styles.handle} />

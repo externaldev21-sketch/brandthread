@@ -9,6 +9,7 @@ import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useAfterModalDismiss } from '@/hooks/useAfterModalDismiss';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   BrandthreadCard, SearchBar, SectionHeader, FilterChip, FormInput,
@@ -55,6 +56,9 @@ export default function HelpScreen() {
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [article, setArticle] = useState<Faq | null>(null);
+  // "Contact support" from inside the article sheet scrolls once the sheet
+  // has actually closed, not after a guessed delay.
+  const articleSheet = useAfterModalDismiss(!!article);
 
   // Ticket form state
   const [subject, setSubject]       = useState('');
@@ -285,6 +289,7 @@ export default function HelpScreen() {
         animationType="slide"
         transparent
         onRequestClose={() => setArticle(null)}
+        onDismiss={articleSheet.onDismiss}
       >
         <View style={s.sheetBackdrop}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setArticle(null)} />
@@ -299,7 +304,7 @@ export default function HelpScreen() {
                 <Text style={s.sheetBody}>{article.a}</Text>
                 <PrimaryButton
                   label="Still need help? Contact support"
-                  onPress={() => { setArticle(null); setTimeout(scrollToContact, 250); }}
+                  onPress={() => { articleSheet.runAfterDismiss(scrollToContact); setArticle(null); }}
                   icon="life-buoy"
                   style={{ marginTop: SP.md }}
                 />

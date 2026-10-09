@@ -131,7 +131,7 @@ export function RightActionRail({
     // fades out (200ms) before unmounting.
     Animated.timing(followBadgeRotate, { toValue: 1, duration: 150, useNativeDriver: true }).start(() => {
       setShowCheck(true);
-      Animated.timing(followBadgeColor, { toValue: 1, duration: 100, useNativeDriver: false }).start(() => {
+      Animated.timing(followBadgeColor, { toValue: 1, duration: 100, useNativeDriver: true }).start(() => {
         Animated.timing(followBadgeOpacity, { toValue: 0, duration: 200, delay: 250, useNativeDriver: true }).start(() => {
           setBadgeVisible(false);
         });
