@@ -625,37 +625,3 @@ export const DISPUTE_TYPES: { key: DisputeType; label: string }[] = [
   { key: 'other',              label: 'Other' },
 ];
 
-export const DEMO_CARRIER_RATES: ShippingRate[] = [
-  {
-    id: 'rate_ups_ground',
-    carrier: 'UPS', service: 'Ground',
-    priceCents: 899, estimatedDays: 5,
-    estimatedDelivery: 'Jul 21',
-    trackingIncluded: true, insuranceIncluded: false,
-    isRecommended: false,
-  },
-  {
-    id: 'rate_usps_priority',
-    carrier: 'USPS', service: 'Priority Mail',
-    priceCents: 1240, estimatedDays: 3,
-    estimatedDelivery: 'Jul 19',
-    trackingIncluded: true, insuranceIncluded: true,
-    isRecommended: true,
-  },
-  {
-    id: 'rate_fedex_2day',
-    carrier: 'FedEx', service: '2Day',
-    priceCents: 1985, estimatedDays: 2,
-    estimatedDelivery: 'Jul 18',
-    trackingIncluded: true, insuranceIncluded: true,
-    isRecommended: false,
-  },
-  {
-    id: 'rate_ups_next',
-    carrier: 'UPS', service: 'Next Day Air',
-    priceCents: 3850, estimatedDays: 1,
-    estimatedDelivery: 'Jul 17',
-    trackingIncluded: true, insuranceIncluded: true,
-    isRecommended: false,
-  },
-];

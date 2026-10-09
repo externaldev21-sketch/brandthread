@@ -45,7 +45,7 @@ import {
   isPreviewInboxEnabled, isPreviewConversationId, getPreviewConversations,
   subscribePreviewTyping, setPreviewConversationPinned,
 } from '@/lib/previewInbox';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import {
   scheduleDeleteConversationRequest, undoDeleteConversationRequest, blockConversationRequestUser,
 } from '@/lib/requestActions';
@@ -383,7 +383,7 @@ export default function InboxScreen() {
     // truthy userId, which must not be enough on its own to reach the real
     // stories endpoints below.
     if (!userId || isBuyerDevPreview()) {
-      if (isPreviewStoriesEnabled()) {
+      if (isPreviewStoriesEnabled() && isPreviewDemoMode()) {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
@@ -419,7 +419,7 @@ export default function InboxScreen() {
       const fetched = (await Promise.all(fetches)).flat();
       if (fetched.length) cacheStoriesForViewer(fetched).catch(() => {});
     } catch {
-      if (isPreviewStoriesEnabled()) {
+      if (isPreviewStoriesEnabled() && isPreviewDemoMode()) {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,

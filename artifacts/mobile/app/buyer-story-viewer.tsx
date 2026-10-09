@@ -272,8 +272,8 @@ export default function BuyerStoryViewer() {
     let cancelled = false;
     setViewersLoading(true);
     api.social.storyViewers(currentStory.id)
-      .then(rows => { if (!cancelled) setServerViewers(rows.length ? rows : (!myUserId ? PREVIEW_STORY_VIEWERS : [])); })
-      .catch(() => { if (!cancelled) setServerViewers(!myUserId ? PREVIEW_STORY_VIEWERS : []); })
+      .then(rows => { if (!cancelled) setServerViewers(rows.length ? rows : (!myUserId && isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : [])); })
+      .catch(() => { if (!cancelled) setServerViewers(!myUserId && isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : []); })
       .finally(() => { if (!cancelled) setViewersLoading(false); });
     return () => { cancelled = true; };
   }, [currentStory?.id, myUserId]);

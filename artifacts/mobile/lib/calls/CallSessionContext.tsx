@@ -18,17 +18,23 @@ import React, {
   createContext, useCallback, useContext, useMemo, useRef, useState,
 } from 'react';
 import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import { createPreviewCallProvider, schedulePreviewIncomingTimeout } from './previewCallProvider';
 import type {
   CallEndReason, CallLogEntry, CallProvider, CallSession, StartCallInput,
 } from './types';
 
 const provider: CallProvider = createPreviewCallProvider();
+// The only provider is simulated, so calls exist only in demo preview.
+// Latched at boot (like BOOT_PREVIEW) because Expo Router drops `demo=1` on navigation.
+const CALLS_AVAILABLE = isPreviewDemoMode();
 
 interface CallSessionContextValue {
   session: CallSession | null;
   /** Most recent call-log entries, newest first, keyed by conversationId — read by the two conversation screens to render bubbles. */
   logsByConversation: Record<string, CallLogEntry[]>;
+  /** False until a real call provider ships — screens hide their call buttons. */
+  callsAvailable: boolean;
   startCall(input: StartCallInput): Promise<void>;
   /** Preview/QA only: ring an incoming call without a second device. */
   simulateIncomingCall(input: StartCallInput): void;
@@ -105,6 +111,7 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   }, [appendLog, teardownSubscription]);
 
   const startCall = useCallback(async (input: StartCallInput) => {
+    if (!CALLS_AVAILABLE) return;
     if (sessionRef.current && sessionRef.current.status !== 'ended') return; // one call at a time
     hapticPrimaryAction();
     const { callId } = await provider.start(input);
@@ -128,6 +135,7 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   }, [applyPatch]);
 
   const simulateIncomingCall = useCallback((input: StartCallInput) => {
+    if (!CALLS_AVAILABLE) return;
     if (sessionRef.current && sessionRef.current.status !== 'ended') return;
     const callId = `preview_incoming_${Date.now()}`;
     const next: CallSession = {
@@ -217,6 +225,7 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   const value = useMemo<CallSessionContextValue>(() => ({
     session,
     logsByConversation,
+    callsAvailable: CALLS_AVAILABLE,
     startCall,
     simulateIncomingCall,
     acceptCall,

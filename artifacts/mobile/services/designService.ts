@@ -1387,6 +1387,8 @@ export async function exportProject(
   format: string,
   size: ExportSizeKind = 'original',
 ): Promise<DesignExport> {
+  // No real renderer/export pipeline exists yet — never report a fake file outside demo.
+  if (!isPreviewDemoMode()) throw new Error('Design export is not available');
   await delay(800);
   return {
     id: uid('export'),

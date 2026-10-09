@@ -27,15 +27,15 @@ describe("fresh-install: personal preview modules gate their seeded cast on isPr
     expect(s).toMatch(/cachedNotifications = !isPreviewDemoMode\(\) \? \[\] : PREVIEW_FOLLOWER_SEEDS\.map/);
   });
 
-  it("previewActivity.ts: the personal activity feed and live-arrival cosmetic are demo-gated, suggestions stay public", () => {
+  it("previewActivity.ts: the personal activity feed, live-arrival cosmetic and seeded suggestions are demo-gated", () => {
     const s = src("../previewActivity.ts");
     expect(s).toContain("import { isPreviewDemoMode } from './devPreview';");
     expect(s).toMatch(/if \(!isPreviewDemoMode\(\)\) \{ cached = \[\]; return cached; \}/);
     expect(s).toContain("isPreviewActivityEnabled() && isPreviewDemoMode() && !liveArrivalDelivered");
-    // getPreviewSuggestedPeople (reused by Discover's public People row) must
-    // NOT be demo-gated — a fresh user can still see suggested public sellers.
+    // getPreviewSuggestedPeople is a seeded (fake) cast, so it is demo-only too:
+    // fresh preview and plain __DEV__ builds show the real (empty) suggestions.
     const suggestedFn = s.slice(s.indexOf("export function getPreviewSuggestedPeople"));
-    expect(suggestedFn.slice(0, 400)).not.toContain("isPreviewDemoMode");
+    expect(suggestedFn.slice(0, 400)).toContain("if (!isPreviewDemoMode()) return [];");
   });
 
   it("previewStories.ts: the story tray is demo-gated", () => {

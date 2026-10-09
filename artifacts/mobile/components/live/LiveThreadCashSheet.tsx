@@ -24,7 +24,11 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
+import { getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+
+// Dev preview role only (not every __DEV__ build): demo shows the sample balance, fresh shows the empty one.
+const isPreviewRole = () => __DEV__ && (isBuyerDevPreview() || isSellerDevPreview());
 import { hapticLight } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
@@ -65,8 +69,8 @@ export function LiveThreadCashSheet({
     // to answer this in the dev-web preview, so attempting the real call
     // first just means a multi-second wait for it to time out before the
     // fallback balance ever appears — check preview first instead.
-    if (isPreviewThreadCashEnabled()) {
-      setBalanceCents(PREVIEW_THREAD_CASH_STATUS.balanceCents);
+    if (isPreviewRole()) {
+      setBalanceCents(getPreviewThreadCashStatus().balanceCents);
       return undefined;
     }
     let cancelled = false;
@@ -93,7 +97,7 @@ export function LiveThreadCashSheet({
     if (!selected || sending || balanceCents == null || selected > balanceCents) return;
     setSending(true);
     hapticLight();
-    if (recipientId && streamId && !isPreviewThreadCashEnabled()) {
+    if (recipientId && streamId && !isPreviewRole()) {
       try {
         await api.threadCash.liveGift({
           streamId,

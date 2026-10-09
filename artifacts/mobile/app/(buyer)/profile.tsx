@@ -72,7 +72,7 @@ import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRo
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
@@ -504,7 +504,7 @@ export default function ProfileScreen() {
     // own guard is `currentStreak > 0`); `isPreviewThreadCashEnabled()` is
     // `__DEV__`-gated, so none of this ever fires in a production build.
     const applyPreviewFallback = () => {
-      if (!active || !isPreviewThreadCashEnabled()) return;
+      if (!active || !isPreviewThreadCashEnabled() || !isPreviewDemoMode()) return;
       const status = getPreviewThreadCashStatus();
       setThreadCashBalanceCents(Math.max(0, status.balanceCents));
       setThreadCashStreak(status.streak);

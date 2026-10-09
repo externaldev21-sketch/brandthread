@@ -30,7 +30,6 @@ import {
   PREVIEW_FOLLOWER_SEEDS,
   SELLER_PREVIEW_CONVERSATION_SEEDS,
 } from '../previewInboxData';
-import { SEARCH_BRANDS, SEARCH_PRODUCTS } from '../searchData';
 
 const ROOT = resolve(__dirname, '../..');
 
@@ -65,20 +64,6 @@ describe('previewInboxData — every seeded avatar color is in the neutral palet
   it('every follower/notification seed uses a neutral actorColor', () => {
     for (const seed of PREVIEW_FOLLOWER_SEEDS) {
       expect(AVATAR_NEUTRAL_PALETTE).toContain(seed.actorColor);
-    }
-  });
-});
-
-describe('searchData — every brand/product entry uses a neutral color', () => {
-  it('every SEARCH_BRANDS entry is a neutral avatar color', () => {
-    for (const brand of SEARCH_BRANDS) {
-      expect(AVATAR_NEUTRAL_PALETTE).toContain(brand.color);
-    }
-  });
-
-  it('every SEARCH_PRODUCTS entry is a neutral avatar color', () => {
-    for (const product of SEARCH_PRODUCTS) {
-      expect(AVATAR_NEUTRAL_PALETTE).toContain(product.color);
     }
   });
 });

@@ -52,7 +52,7 @@ export default function AiHelperScreen() {
   const { isSignedIn } = useAuth();
   const p = useLocalSearchParams<{ mode?: string; postId?: string; productId?: string; paths?: string; name?: string; draft?: string; demo?: string }>();
   const mode: Mode = p.mode === 'description' || p.mode === 'size-chart' ? p.mode : 'caption';
-  const demo = isPreviewDemoMode() || p.demo === '1' && !isSignedIn;
+  const demo = isPreviewDemoMode();
   const signedOut = !isSignedIn && !demo;
   const paths = useMemo(() => (p.paths ? String(p.paths).split(',').filter(Boolean).slice(0, 4) : []), [p.paths]);
 

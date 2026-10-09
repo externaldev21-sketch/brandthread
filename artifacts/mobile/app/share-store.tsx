@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useApi } from '@/lib/api';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -46,8 +47,11 @@ export default function ShareStoreScreen() {
     : brandName.toLowerCase().replace(/[^a-z0-9]/g, '');
   const storeUrl  = `${BASE_URL}/${storeSlug}`;
   const handleStr = `@${handle ?? storeSlug}`;
+  // Never let a seller copy/share the 'My Store' placeholder link as if it were theirs.
+  const ready = isPreviewDemoMode() || (!loading && !!(profile?.username || profile?.brandName || profile?.displayName));
 
   async function copyLink() {
+    if (!ready) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await Clipboard.setStringAsync(storeUrl);
     setCopied(true);
@@ -55,6 +59,7 @@ export default function ShareStoreScreen() {
   }
 
   async function shareLink() {
+    if (!ready) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Share.share({
@@ -109,8 +114,9 @@ export default function ShareStoreScreen() {
 
         {/* Copy link button */}
         <TouchableOpacity
-          style={[s.copyBtn, { backgroundColor: copied ? colors.success : colors.primary }]}
+          style={[s.copyBtn, { backgroundColor: copied ? colors.success : colors.primary }, !ready && { opacity: 0.5 }]}
           activeOpacity={0.85}
+          disabled={!ready}
           onPress={copyLink}
         >
           <Feather name={copied ? 'check' : 'copy'} size={17} color={colors.primaryForeground} />
@@ -118,7 +124,7 @@ export default function ShareStoreScreen() {
         </TouchableOpacity>
 
         {/* Share button */}
-        <TouchableOpacity style={[s.shareBtn, { borderColor: colors.border }]} activeOpacity={0.8} onPress={shareLink}>
+        <TouchableOpacity style={[s.shareBtn, { borderColor: colors.border }, !ready && { opacity: 0.5 }]} activeOpacity={0.8} disabled={!ready} onPress={shareLink}>
           <Feather name="share-2" size={17} color={colors.foreground} />
           <Text style={[s.shareBtnText, { color: colors.foreground }]}>Share via…</Text>
         </TouchableOpacity>

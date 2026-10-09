@@ -59,6 +59,7 @@ import { CenteredToast } from '@/components/social/CenteredToast';
 import { Glass } from '@/components/ui/Glass';
 import { LiveRowEnter } from '@/components/motion/LiveRowEnter';
 import { findActivityArrivals } from '@/lib/activity';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import StoryMentionsRail from '@/components/StoryMentionsRail';
 import { useStoryMentions } from '@/hooks/useStoryMentions';
 import { storyMentionViewerHref } from '@/lib/storyMentionsRail';
@@ -766,7 +767,7 @@ export default function ActivityCenterScreen() {
     // and the audit/e2e harnesses that fake a signed-in Clerk user would
     // otherwise still reach this real, backend-less endpoint first and log
     // a console 404 before the fallback ever ran.
-    if (isPreviewActivityEnabled()) { showPreviewSuggestions(); return; }
+    if (isPreviewActivityEnabled() && (isBuyerDevPreview() || isSellerDevPreview())) { showPreviewSuggestions(); return; }
     try {
       const people = await getSuggestedPeople();
       setSuggested(people);
@@ -785,7 +786,7 @@ export default function ActivityCenterScreen() {
     // a fetch that can only fail (and, under the audit/e2e harnesses that
     // fake a signed-in Clerk user, would log a real console 404 before this
     // exact same fallback ran anyway).
-    if (isPreviewActivityEnabled()) {
+    if (isPreviewActivityEnabled() && (isBuyerDevPreview() || isSellerDevPreview())) {
       retriedRef.current = false;
       const seeded = withoutPendingDeletes(applyPreviewFollowState(getVisiblePreviewActivity()));
       applyPage(seeded, mode);

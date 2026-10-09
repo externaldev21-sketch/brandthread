@@ -30,7 +30,7 @@ describe('profile screens never hit the real API in dev-preview, however Clerk i
 
   it('(buyer)/profile.tsx: loadCounts, the saved-items/orders load, the story ring and Thread Cash all also check isBuyerDevPreview()', () => {
     const src = read('app/(buyer)/profile.tsx');
-    expect(src).toContain("import { isBuyerDevPreview } from '@/lib/devPreview';");
+    expect(src).toContain("import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';");
     expect(src).toContain('if (!id || isBuyerDevPreview()) return;');
     expect(src).toContain('const devPreview = isBuyerDevPreview();');
     expect(src).toContain('devPreview ? Promise.resolve([]) : getSavedItems(),');

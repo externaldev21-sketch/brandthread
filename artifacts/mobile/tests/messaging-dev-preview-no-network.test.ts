@@ -30,7 +30,7 @@ describe('messaging screens never hit the real API in dev-preview, however Clerk
 
   it('(buyer)/inbox: isBuyerDevPreview() gates the conversations list load, story tray, suggested people and compose directory', () => {
     const src = read('app/(buyer)/inbox.tsx');
-    expect(src).toContain("import { isBuyerDevPreview } from '@/lib/devPreview';");
+    expect(src).toContain("import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';");
     expect(src).toContain('if (!userId || isBuyerDevPreview()) {');
     // loadStoryTray and loadSuggested each have their own identical guard.
     expect(src.match(/if \(!userId \|\| isBuyerDevPreview\(\)\) {/g)?.length).toBeGreaterThanOrEqual(3);

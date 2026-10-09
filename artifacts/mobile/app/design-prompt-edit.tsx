@@ -21,7 +21,8 @@ import {
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
-import { applyPromptEdit } from '@/services/designService';
+import { applyPromptEdit, getProjects } from '@/services/designService';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import type { AIGenerationResult } from '@/services/designTypes';
 import { radius } from '@/constants/radii';
 
@@ -72,14 +73,21 @@ export default function DesignPromptEditScreen() {
     }
   }
 
-  function chooseFromRecent() {
+  async function chooseFromRecent() {
+    // Demo keeps its sample list; real sellers see their own projects that have an image.
+    const rows = isPreviewDemoMode()
+      ? RECENT_PROJECTS.map((p) => ({ text: p, uri: `mock://project/${p.replace(/\s/g, '-').toLowerCase()}` }))
+      : (await getProjects().catch(() => []))
+        .filter((p) => !!p.thumbnail)
+        .slice(0, 6)
+        .map((p) => ({ text: p.name, uri: p.thumbnail as string }));
     Alert.alert(
       'Recent Projects',
-      'Choose a project to edit',
+      rows.length > 0 ? 'Choose a project to edit' : 'No projects to edit yet.',
       [
-        ...RECENT_PROJECTS.map((p) => ({
-          text: p,
-          onPress: () => setImageUri(`mock://project/${p.replace(/\s/g, '-').toLowerCase()}`),
+        ...rows.map((r) => ({
+          text: r.text,
+          onPress: () => setImageUri(r.uri),
         })),
         { text: 'Cancel', style: 'cancel' as const },
       ],

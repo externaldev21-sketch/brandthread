@@ -17,6 +17,7 @@ import { ListRow } from '@/components/ui/ListRow';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { LiveCohostCandidate, LiveCohostPerson } from '@/lib/live/moderationTypes';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 
 const DEMO_CANDIDATES: LiveCohostCandidate[] = [
   { userId: 'demo-1', username: 'atelier.nord', displayName: 'Atelier Nord', avatarUrl: null, followed: true },
@@ -33,7 +34,7 @@ export default function LiveCohostScreen() {
   const insets = useSafeAreaInsets();
   const api = useApi();
   const params = useLocalSearchParams<{ streamId?: string; demo?: string }>();
-  const demo = params.demo === '1';
+  const demo = isPreviewDemoMode();
   const streamId = params.streamId ? String(params.streamId) : '';
   const live = !demo && !!streamId;
 

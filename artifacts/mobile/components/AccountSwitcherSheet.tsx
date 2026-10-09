@@ -39,7 +39,7 @@ import { useApi } from '@/hooks/useApi';
 import { SPACING } from '@/constants/spacing';
 import { TYPE_SCALE } from '@/constants/typography';
 import { FONT } from '@/lib/theme';
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { useRole } from '@/contexts/RoleContext';
 import {
   MAX_ACCOUNTS_MESSAGE, getHandle, getDisplayName, resolveAccountTypeLabel, isAtAccountCap,
@@ -117,7 +117,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
     };
   });
 
-  const accounts = isPreview ? previewAccounts : realAccounts;
+  const accounts = isPreview ? (isPreviewDemoMode() ? previewAccounts : []) : realAccounts;
   const atCap = !isPreview && isAtAccountCap(activeSessions.length);
 
   async function handleSwitch(account: AccountRow) {
