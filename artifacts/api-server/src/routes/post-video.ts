@@ -10,8 +10,18 @@ import { eq, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import { cappedUnknown, jsonList, jsonValue, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handlers validate clips, speeds, filters and overlays.
+const composeVideoBody = looseBody({
+  clips:        jsonList(100, 20_000),
+  trimStart:    cappedUnknown(64),
+  trimEnd:      cappedUnknown(64),
+  textOverlays: jsonValue(500_000),
+});
+const videoThumbnailBody = looseBody({ mediaPath: cappedUnknown(4_096), offset: cappedUnknown(64) });
 const storage = new ObjectStorageService();
 const exec = promisify(execFile);
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
@@ -366,7 +376,7 @@ router.post(
   },
 );
 
-router.post("/compose-video", requireAuth, async (req, res) => {
+router.post("/compose-video", requireAuth, validateBody(composeVideoBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller or buyer account required" });
   const body = req.body as {
@@ -574,7 +584,7 @@ router.post("/compose-video", requireAuth, async (req, res) => {
 // offset, without re-encoding the whole clip. Used by the "choose cover
 // frame" step in create-post.tsx, which previously had no way to pick a
 // frame other than whatever the fixed offset in compose-video produced.
-router.post("/compose-video/thumbnail", requireAuth, async (req, res) => {
+router.post("/compose-video/thumbnail", requireAuth, validateBody(videoThumbnailBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller or buyer account required" });
   const { mediaPath, offset } = req.body as { mediaPath?: string; offset?: number };

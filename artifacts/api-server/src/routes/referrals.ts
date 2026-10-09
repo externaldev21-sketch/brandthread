@@ -29,8 +29,12 @@ import {
   normalizeInviteCode,
 } from "../lib/referrals/policy";
 import { redeemAdminInviteCode } from "../lib/admin/inviteCodes";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler normalises and looks up the code.
+const applyReferralBody = looseBody({ code: cappedUnknown(200), expectedClerkId: cappedUnknown(200) });
 
 const rewardTerms = {
   inviteeRewardCents: REFERRAL_INVITEE_REWARD_CENTS,
@@ -196,7 +200,7 @@ router.get("/stats", async (req, res) => {
 // ─── POST /api/referrals/apply ────────────────────────────────────────────────
 // Record the referral relationship. Safe to call at any point after signup;
 // idempotent — returns 409 if this user was already attributed.
-router.post("/apply", async (req, res) => {
+router.post("/apply", validateBody(applyReferralBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { code, expectedClerkId } = req.body as { code?: string; expectedClerkId?: string };
 

@@ -16,8 +16,13 @@ import { aiUsageEvents, db, orders, reports, users } from "@workspace/db";
 import { actorOf, recordAdminAction } from "../../lib/admin/audit";
 import { deriveSellerVerified } from "../../lib/sellerEligibility";
 import { bodyString, likePattern, pageParams, queryString } from "./util";
+import { cappedUnknown, looseBody, validateBody } from "../../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handlers keep their boolean / slicing rules.
+const verifyUserBody = looseBody({ verified: cappedUnknown(10) });
+const suspendUserBody = looseBody({ reason: cappedUnknown(20_000) });
 
 function publicUser(u: typeof users.$inferSelect) {
   return {
@@ -105,7 +110,7 @@ router.get("/:clerkId", async (req, res) => {
   }
 });
 
-router.post("/:clerkId/verify", async (req, res) => {
+router.post("/:clerkId/verify", validateBody(verifyUserBody), async (req, res) => {
   const clerkId = String(req.params.clerkId);
   const verified = (req.body as { verified?: unknown } | undefined)?.verified;
   if (typeof verified !== "boolean") return res.status(400).json({ error: "verified must be true or false" });
@@ -135,7 +140,7 @@ router.post("/:clerkId/verify", async (req, res) => {
   }
 });
 
-router.post("/:clerkId/suspend", async (req, res) => {
+router.post("/:clerkId/suspend", validateBody(suspendUserBody), async (req, res) => {
   const clerkId = String(req.params.clerkId);
   const actor = actorOf(req);
   const reason = bodyString(req.body, "reason", 500);

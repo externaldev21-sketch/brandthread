@@ -23,10 +23,16 @@ import { evaluateContent } from "../lib/contentModerator";
 import { ensureStoryReplyConversation } from "../lib/storyMentions";
 import { notifyStoryQuestionAnswer } from "../lib/activityEvents";
 import { QUESTION_ANSWER_MAX, withStickerState } from "../lib/storyStickers";
+import { cappedUnknown, looseBody, optNumberish, validateBody } from "../middlewares/bodySchemas";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const router = Router();
+
+// Shape + size guards; the handlers keep option-range and QUESTION_ANSWER_MAX checks.
+const pollVoteBody = looseBody({ overlayId: cappedUnknown(200), optionIndex: optNumberish });
+const questionAnswerBody = looseBody({ overlayId: cappedUnknown(200), answer: cappedUnknown(5_000) });
+const questionReplyBody = looseBody({ userId: cappedUnknown(200) });
 router.use(requireAuth);
 router.param("id", (_req, _res, next, value) => {
   if (!UUID_RE.test(String(value))) { next("route"); return; }
@@ -91,7 +97,7 @@ async function stateFor(row: StoryRow, viewerId: string) {
 }
 
 // ─── Poll ─────────────────────────────────────────────────────────────────────
-router.post("/stories/:id/poll-vote", async (req, res) => {
+router.post("/stories/:id/poll-vote", validateBody(pollVoteBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const row = await loadLiveStory(String(req.params.id));
   if (!row || !(await viewerMayOpen(myId, row))) { gone(res); return; }
@@ -116,7 +122,7 @@ router.post("/stories/:id/poll-vote", async (req, res) => {
 });
 
 // ─── Question ─────────────────────────────────────────────────────────────────
-router.post("/stories/:id/question-answer", rateLimit("messaging"), async (req, res) => {
+router.post("/stories/:id/question-answer", rateLimit("messaging"), validateBody(questionAnswerBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const restriction = await publishingRestriction(myId);
   if (restriction) { res.status(restriction.status).json(restriction.body); return; }
@@ -180,7 +186,7 @@ router.get("/stories/:id/question-answers", async (req, res) => {
   res.json({ storyId: row.id, questions });
 });
 
-router.post("/stories/:id/question-reply-conversation", rateLimit("messaging"), async (req, res) => {
+router.post("/stories/:id/question-reply-conversation", rateLimit("messaging"), validateBody(questionReplyBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const restriction = await publishingRestriction(myId);
   if (restriction) { res.status(restriction.status).json(restriction.body); return; }

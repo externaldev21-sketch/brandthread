@@ -49,8 +49,44 @@ import {
   optionalViewerId,
   publishingRestriction,
 } from "../lib/safety";
+import { cappedList, cappedUnknown, jsonList, jsonValue, LIMITS, looseBody, optBoolish, optId, optText, validateBody } from "../middlewares/bodySchemas";
+import { z } from "@workspace/api-zod";
 
 const router = Router();
+
+// ── Request body schemas ─────────────────────────────────────────────────────
+// Shape + size guards only; the handlers keep their own business rules and
+// friendlier messages (surface, buyer rules, object paths, visibility keys).
+const postMediaFields = {
+  mediaUrl:         optText(LIMITS.url),
+  thumbnailUrl:     optText(LIMITS.url),
+  mediaPath:        optText(LIMITS.url),
+  thumbnailPath:    optText(LIMITS.url),
+  mediaPaths:       cappedList(100, LIMITS.url),
+  mediaUrls:        cappedList(100, LIMITS.url),
+  slides:           jsonList(100, 10_000),
+  slideOverlays:    jsonValue(500_000),
+  mediaType:        optText(40),
+  aspectRatio:      optText(20),
+  surface:          optText(40),
+  caption:          cappedUnknown(LIMITS.caption),
+  hashtags:         cappedList(200),
+  styleTags:        cappedList(200),
+  sound:            jsonValue(20_000),
+  visibility:       jsonValue(2_000),
+  taggedProductIds: cappedList(500),
+  isDraft:          optBoolish,
+  scheduledAt:      cappedUnknown(100),
+  placeId:          optId,
+  location:         jsonValue(5_000),
+};
+const createPostBody = looseBody({ ...postMediaFields, quotedPostId: optId });
+const updatePostBody = looseBody({ ...postMediaFields, postStatus: optText(40) });
+const schedulePostBody = looseBody({ scheduledAt: postMediaFields.scheduledAt });
+const interactBody = looseBody({
+  type:  optText(40),
+  value: z.union([z.string().max(LIMITS.shortText), z.number()]).nullish(),
+});
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const POST_STATUSES = ["draft", "scheduled", "published", "archived", "deleted"] as const;
@@ -600,7 +636,7 @@ router.get("/feed", requireAuth, async (req, res) => {
 // feed means a buyer post can never surface there no matter what fields are
 // set on it, but we additionally hard-block video/product-tagging for buyers
 // below so the write path itself can't be used to fake a Thread post.
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, validateBody(createPostBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
 
   const [poster] = await db
@@ -1086,7 +1122,7 @@ router.get("/mine", requireAuth, async (req, res) => {
 });
 
 // ─── PATCH /api/posts/:id ────────────────────────────────────────────────────
-router.patch("/:id", requireAuth, async (req, res) => {
+router.patch("/:id", requireAuth, validateBody(updatePostBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const id = req.params.id;
   if (typeof id !== "string" || !UUID_RE.test(id)) {
@@ -1375,7 +1411,7 @@ async function loadOwnedPost(req: any, res: any) {
 }
 
 // POST /api/posts/:id/schedule { scheduledAt } — draft or scheduled -> scheduled (also reschedules)
-router.post("/:id/schedule", requireAuth, async (req, res) => {
+router.post("/:id/schedule", requireAuth, validateBody(schedulePostBody), async (req, res) => {
   const ctx = await loadOwnedPost(req, res);
   if (!ctx) return;
   const { clerkId, posterType, existing } = ctx;
@@ -1838,7 +1874,7 @@ router.get("/:id/quotes", async (req, res) => {
 });
 
 // ─── POST /api/posts/:id/interact ────────────────────────────────────────────
-router.post("/:id/interact", requireAuth, rateLimit("post-interact"), async (req, res) => {
+router.post("/:id/interact", requireAuth, rateLimit("post-interact"), validateBody(interactBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { id } = req.params;
   if (typeof id !== "string" || !UUID_RE.test(id)) {

@@ -15,13 +15,17 @@ import { db, waitlistEntries, products, productVariants, notificationsFeed, push
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { productThumbnail } from "../lib/activityEvents";
+import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handlers require productId themselves.
+const waitlistBody = looseBody({ productId: cappedUnknown(200), variantId: cappedUnknown(200) });
 router.use(requireAuth);
 
 // ── POST /api/waitlist/join ───────────────────────────────────────────────────
 
-router.post("/join", async (req, res) => {
+router.post("/join", validateBody(waitlistBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { productId, variantId } = req.body as { productId?: string; variantId?: string };
 
@@ -64,7 +68,7 @@ router.post("/join", async (req, res) => {
 
 // ── DELETE /api/waitlist/leave ────────────────────────────────────────────────
 
-router.delete("/leave", async (req, res) => {
+router.delete("/leave", validateBody(waitlistBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   // Accept both query params (from mobile DELETE) and body (from web)
   const productId = (req.query.productId ?? req.body?.productId) as string | undefined;

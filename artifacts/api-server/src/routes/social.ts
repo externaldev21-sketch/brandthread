@@ -43,6 +43,7 @@ import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { followingSortDirection } from "../lib/followingSort";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
 import { viewerCanSeeContent } from "../lib/privateAccount";
+import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, validateBody } from "../middlewares/bodySchemas";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -60,6 +61,19 @@ function relevanceScore(column: any, term: string) {
 }
 
 const router = Router();
+
+// ── Request body schemas ─────────────────────────────────────────────────────
+// Shape + size guards; handlers keep their own required-field / enum checks.
+const userIdBody = looseBody({ userId: cappedUnknown(200) });
+const seeLessBody = looseBody({ type: cappedUnknown(100), actorId: cappedUnknown(200) });
+const createStoryBody = looseBody({
+  media:           jsonList(100, 2_000_000),
+  originalStoryId: cappedUnknown(200),
+  repliesDisabled: optBoolish,
+  privacy:         jsonValue(2_000),
+});
+const storyLikeBody = looseBody({ liked: optBoolish });
+const createNoteBody = looseBody({ text: cappedUnknown(2_000) });
 router.use(requireAuth);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -252,7 +266,7 @@ async function buildBuyerPosts(
 }
 
 // ─── POST /api/social/follow ──────────────────────────────────────────────────
-router.post("/follow", rateLimit("follow"), async (req, res) => {
+router.post("/follow", rateLimit("follow"), validateBody(userIdBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { userId } = req.body as { userId?: string };
   if (!userId || typeof userId !== "string") {
@@ -451,7 +465,7 @@ router.delete("/followers/:userId", rateLimit("follow"), async (req, res) => {
 // devices — not just client-side row hiding. Body: exactly one of
 // { type: string } (mute a whole notification type, e.g. "new_follower") or
 // { actorId: string } (mute everything from one person).
-router.post("/see-less", async (req, res) => {
+router.post("/see-less", validateBody(seeLessBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { type, actorId } = req.body as { type?: string; actorId?: string };
   if ((!type && !actorId) || (type && actorId)) {
@@ -1120,7 +1134,7 @@ const MAX_STORY_MEDIA_ITEMS = 20;
 const STORY_LIST_CAP = 100;
 
 // ─── POST /api/social/stories — create a story ───────────────────────────────
-router.post("/stories", async (req, res) => {
+router.post("/stories", validateBody(createStoryBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { media: rawMedia, repliesDisabled, privacy, originalStoryId } = req.body as {
     media:              any[];
@@ -1456,7 +1470,7 @@ router.delete("/stories/:id", async (req, res) => {
 });
 
 // ─── POST /api/social/stories/:id/like — toggle like ─────────────────────────
-router.post("/stories/:id/like", async (req, res) => {
+router.post("/stories/:id/like", validateBody(storyLikeBody), async (req, res) => {
   const myId    = (req as any).clerkUserId as string;
   const storyId = req.params.id;
 
@@ -1555,7 +1569,7 @@ function buildNoteView(row: typeof notes.$inferSelect) {
 }
 
 // ─── POST /api/social/notes — post/replace my own note ───────────────────────
-router.post("/notes", async (req, res) => {
+router.post("/notes", validateBody(createNoteBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { text: rawText } = req.body as { text?: string };
   const text = typeof rawText === "string" ? rawText.trim() : "";
@@ -1638,7 +1652,7 @@ router.get("/notes/following", async (req, res) => {
 // ─── Block CRUD ───────────────────────────────────────────────────────────────
 
 // POST /api/social/block — block a user; also removes any mutual follows
-router.post("/block", async (req, res) => {
+router.post("/block", validateBody(userIdBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { userId: rawUserId } = req.body as { userId?: string };
   if (!rawUserId || typeof rawUserId !== "string") {

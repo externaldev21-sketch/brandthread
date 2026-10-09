@@ -8,8 +8,18 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
+import { looseBody, optText, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler trims and requires subject/body/email/name.
+const supportTicketBody = looseBody({
+  subject:  optText(2_000),
+  body:     optText(50_000),
+  category: optText(100),
+  email:    optText(500),
+  name:     optText(500),
+});
 
 // ─── Startup migration ────────────────────────────────────────────────────────
 (async () => {
@@ -34,7 +44,7 @@ const router = Router();
 })();
 
 // ─── POST /api/support/tickets ────────────────────────────────────────────────
-router.post("/tickets", requireAuth, async (req, res) => {
+router.post("/tickets", requireAuth, validateBody(supportTicketBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { subject, body, category, email, name } = req.body as {
     subject?: string;

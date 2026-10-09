@@ -28,8 +28,17 @@ import {
 } from "../lib/slideValidation";
 import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MAX_SLIDES_BY_SURFACE, isPostSurface } from "../lib/postLimits";
+import { cappedUnknown, jsonList, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler validates each slide and overlay itself.
+const composeSlideshowBody = looseBody({
+  slides:      jsonList(100, 200_000),
+  aspectRatio: cappedUnknown(20),
+  surface:     cappedUnknown(40),
+  coverIndex:  cappedUnknown(64),
+});
 const storage = new ObjectStorageService();
 const exec = promisify(execFile);
 
@@ -188,7 +197,7 @@ router.post(
 // Accepts ordered slide object paths with per-slide text overlays.
 // Uses FFmpeg to render each still with overlays → portrait JPEG → upload.
 // Returns ordered rendered paths + preview URLs + thumbnail.
-router.post("/compose-slideshow", requireAuth, async (req, res) => {
+router.post("/compose-slideshow", requireAuth, validateBody(composeSlideshowBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!(await isSeller(clerkId))) {
     return res.status(403).json({ error: "Seller or buyer account required" });

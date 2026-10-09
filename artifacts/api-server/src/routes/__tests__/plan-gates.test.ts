@@ -58,7 +58,7 @@ describe("paid route mounts", () => {
     expect(liveSource).toContain('router.get("/feed", async');
     expect(liveSource).toContain('router.get("/active", async');
     expect(liveSource).toContain('router.post("/:id/join", requireAuth, async');
-    expect(liveSource).toContain('router.post("/:id/comment", requireAuth, async');
+    expect(liveSource).toContain('router.post("/:id/comment", requireAuth, validateBody(liveCommentBody), async');
   });
 
   it("gates seller manufacturer actions without blocking manufacturer onboarding", () => {

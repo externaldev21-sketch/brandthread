@@ -24,8 +24,20 @@ import {
   resolveReportTarget,
 } from "../lib/reportTargets";
 import { isAgentUserId } from "../lib/brandthreadAgent";
+import { cappedUnknown, LIMITS, looseBody, validateBody } from "../middlewares/bodySchemas";
+import { z } from "@workspace/api-zod";
 
 const router = Router();
+
+// Shape + size guards; the handler normalises targetType / reason itself.
+const createReportBody = looseBody({
+  targetType:  cappedUnknown(100),
+  targetId:    cappedUnknown(500),
+  reason:      cappedUnknown(100),
+  note:        cappedUnknown(LIMITS.reason),
+  description: cappedUnknown(LIMITS.reason),
+});
+const reportStatusBody = looseBody({ status: z.enum(["pending", "reviewed", "actioned", "dismissed"]) });
 router.use(requireAuth);
 
 export const MAX_REPORT_NOTE_LENGTH = 1000;
@@ -37,7 +49,7 @@ function serializeReportForClient(report: typeof reports.$inferSelect) {
 }
 
 // POST /api/reports
-router.post("/", rateLimit("report"), async (req, res) => {
+router.post("/", rateLimit("report"), validateBody(createReportBody), async (req, res) => {
   const reporterId = (req as any).clerkUserId as string;
   const body = (req.body ?? {}) as {
     targetType?: unknown; targetId?: unknown; reason?: unknown;
@@ -197,7 +209,7 @@ router.get("/", requireModerator, async (req, res) => {
 });
 
 // PATCH /api/reports/:id/status — moderators only (legacy)
-router.patch("/:id/status", requireModerator, async (req, res) => {
+router.patch("/:id/status", requireModerator, validateBody(reportStatusBody), async (req, res) => {
   const reportId = String(req.params.id);
   const { status } = req.body as { status: string };
   const VALID = ["pending", "reviewed", "actioned", "dismissed"];

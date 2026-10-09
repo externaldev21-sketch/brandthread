@@ -16,8 +16,19 @@ import { db, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { channelView, parseChannelKey, channelPrefKey } from "../lib/notificationChannels";
+import { cappedUnknown, jsonValue, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler keeps its per-key / enum / boolean checks.
+const updateNotificationPrefsBody = looseBody({
+  digest:          cappedUnknown(40),
+  categories:      jsonValue(20_000),
+  channels:        jsonValue(50_000),
+  pushEnabled:     cappedUnknown(10),
+  promotionalPush: cappedUnknown(10),
+  quietHours:      jsonValue(1_000),
+});
 router.use(requireAuth);
 
 const VALID_DIGEST = ["realtime", "daily"] as const;
@@ -102,7 +113,7 @@ router.get("/", async (req, res) => {
 });
 
 // ── PUT /api/seller/notification-prefs ───────────────────────────────────────
-router.put("/", async (req, res) => {
+router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { digest, categories, channels, pushEnabled, promotionalPush, quietHours } = req.body as {
     digest?: string;

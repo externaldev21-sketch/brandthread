@@ -42,8 +42,16 @@ import {
   publishingRestriction,
   type ProfileSummary,
 } from "../lib/safety";
+import { cappedUnknown, LIMITS, looseBody, optBoolish, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
+
+// Shape + size guards; the handler trims and enforces MAX_COMMENT_LENGTH itself.
+const createCommentBody = looseBody({
+  body:     cappedUnknown(LIMITS.comment),
+  parentId: cappedUnknown(200),
+});
+const likeCommentBody = looseBody({ liked: optBoolish });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MAX_COMMENT_LENGTH = 1000;
@@ -373,7 +381,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
 });
 
 // ─── POST /api/posts/:postId/comments ────────────────────────────────────────
-router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, res) => {
+router.post("/:postId/comments", requireAuth, rateLimit("comment"), validateBody(createCommentBody), async (req, res) => {
   const authorId = (req as any).clerkUserId as string;
   const postId = String(req.params.postId);
   if (!UUID_RE.test(postId)) return res.status(404).json({ error: "Post not found" });
@@ -588,7 +596,7 @@ router.delete("/:postId/comments/:commentId/pin", requireAuth, async (req, res) 
 });
 
 // ─── POST /api/posts/:postId/comments/:commentId/like ────────────────────────
-router.post("/:postId/comments/:commentId/like", requireAuth, async (req, res) => {
+router.post("/:postId/comments/:commentId/like", requireAuth, validateBody(likeCommentBody), async (req, res) => {
   const viewerId = (req as any).clerkUserId as string;
   const postId = String(req.params.postId);
   const commentId = String(req.params.commentId);
