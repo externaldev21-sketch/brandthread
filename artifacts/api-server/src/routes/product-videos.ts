@@ -38,6 +38,7 @@ import {
   isSupportedProductVideo,
   productVideoDurationError,
 } from "../lib/productVideo";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 export interface ProductVideoProcessor {
   probeDuration(path: string): Promise<number>;
@@ -197,6 +198,7 @@ export function createProductVideosRouter({
   router.post(
     "/:productId",
     requireRole("manager"),
+    acceptUploadSession({ allowedTypes: [...PRODUCT_VIDEO_TYPES], maxBytes: PRODUCT_VIDEO_MAX_UPLOAD_BYTES }),
     express.raw({ type: [...PRODUCT_VIDEO_TYPES], limit: PRODUCT_VIDEO_MAX_UPLOAD_BYTES }),
     async (req, res) => {
       const ownerId = (req as any).clerkUserId as string;

@@ -3,11 +3,13 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { consumeRateLimitRedis } from "../lib/rateLimitStore";
 import type { Request, RequestHandler } from "express";
+import { UPLOAD_SESSION_MAX_CHUNKS } from "../lib/uploadSessions";
 
 export type RateLimitPolicyName =
   | "authentication"
   | "asset-upload"
   | "upload"
+  | "upload-chunk"
   | "checkout"
   | "webhook"
   | "expensive"
@@ -85,6 +87,17 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     windowMs: 60_000,
     ipLimit: scaled(150),
     message: "Too many uploads. Please wait a minute and try again.",
+  },
+  "upload-chunk": {
+    id: "upload-chunk",
+    // Chunk PUTs of resumable upload sessions (lib/uploadSessions.ts) have
+    // their own bucket so one large video does not exhaust "upload". Sized
+    // for three max-size (1 GB / 8 MB = 128 chunk) sessions, retries included,
+    // per 10 minutes; open sessions per person are capped separately.
+    limit: scaled(UPLOAD_SESSION_MAX_CHUNKS * 3),
+    windowMs: 10 * 60_000,
+    ipLimit: scaled(UPLOAD_SESSION_MAX_CHUNKS * 12),
+    message: "Too many upload parts. Please wait a few minutes and try again.",
   },
   checkout: {
     id: "checkout",
@@ -227,6 +240,10 @@ const EXPENSIVE_PATH =
 // a new upload endpoint is covered the day it ships.
 const UPLOAD_PATH = /\/(?:upload|upload-media|upload-photo|images\/upload|avatar\/upload|logo\/upload|banner\/upload|media)(?:\/|$)/;
 const UPLOAD_CONTENT_TYPE = /^(?:image|video|audio)\/|^application\/(?:pdf|octet-stream)\b/i;
+// Resumable sessions: chunk PUTs use "upload-chunk"; creating a session and
+// handing a finished one to its route (X-Upload-Id) count as one "upload".
+const UPLOAD_CHUNK_PATH = /\/(?:upload-sessions|posts\/uploads)\/[^/]+\/chunks\/[^/]+$/;
+const UPLOAD_SESSION_CREATE_PATH = /\/(?:upload-sessions|posts\/uploads)\/?$/;
 const AUTH_PATH = /\/auth(?:\/|$)/;
 const CHECKOUT_PATH = /\/(?:guest\/checkout|buyer\/checkout|checkout)(?:\/|$)/;
 const WEBHOOK_PATH = /\/webhooks(?:\/|$)/;
@@ -269,14 +286,17 @@ export function rateLimitPolicyFor(
   path: string,
   authenticated: boolean,
   contentType?: string,
+  uploadHandoff = false,
 ): RateLimitPolicy | null {
   if (WEBHOOK_PATH.test(path)) return RATE_LIMIT_POLICIES.webhook;
   if (AUTH_PATH.test(path)) return RATE_LIMIT_POLICIES.authentication;
   if (CHECKOUT_PATH.test(path)) return RATE_LIMIT_POLICIES.checkout;
   if (EXPENSIVE_PATH.test(path)) return RATE_LIMIT_POLICIES.expensive;
+  if (method === "PUT" && UPLOAD_CHUNK_PATH.test(path)) return RATE_LIMIT_POLICIES["upload-chunk"];
   if (
     (method === "POST" || method === "PUT") &&
-    (UPLOAD_PATH.test(path) || (contentType && UPLOAD_CONTENT_TYPE.test(contentType)))
+    (uploadHandoff || (method === "POST" && UPLOAD_SESSION_CREATE_PATH.test(path)) ||
+      UPLOAD_PATH.test(path) || (contentType && UPLOAD_CONTENT_TYPE.test(contentType)))
   ) {
     return RATE_LIMIT_POLICIES.upload;
   }
@@ -359,7 +379,7 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
     const userId = authenticatedUserId(req);
     const policy = explicitPolicy
       ? RATE_LIMIT_POLICIES[explicitPolicy]
-      : rateLimitPolicyFor(req.method, req.path, Boolean(userId), req.headers["content-type"]);
+      : rateLimitPolicyFor(req.method, req.path, Boolean(userId), req.headers["content-type"], Boolean(req.headers["x-upload-id"]));
     if (!policy) {
       next();
       return;

@@ -56,7 +56,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
-import { remoteVideoUri, withVideoCaching } from '@/lib/videoPreload';
+import { FIRST_FRAME_FALLBACK_MS, pickPlaybackUri, remoteVideoUri, shouldRevealVideo, withVideoCaching } from '@/lib/videoPreload';
 import { useFeedVideoPreload } from '@/hooks/useFeedVideoPreload';
 import { mark as perfMark } from '@/lib/perf';
 import { getLiveDirectory, useOpenLive } from '@/lib/live/useLiveDirectory';
@@ -1223,8 +1223,20 @@ function LiveVideoVisual({
   // iPad, or a wide clip on a phone, is never cropped to a sliver.
   const [videoAspect, setVideoAspect] = useState(9 / 16);
   const [progress, setProgress] = useState(0);
-  const showPoster = Boolean(posterSource || posterUri) && !(hasStarted && readyToPlay);
-  const showFallbackCover = !showPoster && !(hasStarted && readyToPlay);
+  // The poster (or fallback cover) stays up until the video has actually
+  // painted its first frame (VideoView onFirstFrameRender), so a swipe never
+  // flashes black between poster and video. A player that is preloaded as the
+  // next page renders that frame while hidden, so revealing it is instant.
+  const [firstFrameRendered, setFirstFrameRendered] = useState(false);
+  const [firstFrameTimedOut, setFirstFrameTimedOut] = useState(false);
+  React.useEffect(() => {
+    if (!(hasStarted && readyToPlay) || firstFrameRendered) return undefined;
+    const timer = setTimeout(() => setFirstFrameTimedOut(true), FIRST_FRAME_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [hasStarted, readyToPlay, firstFrameRendered]);
+  const videoVisible = shouldRevealVideo({ hasStarted, readyToPlay, firstFrameRendered, firstFrameTimedOut });
+  const showPoster = Boolean(posterSource || posterUri) && !videoVisible;
+  const showFallbackCover = !showPoster && !videoVisible;
   // Fit/crop math runs against the full-bleed frame's aspect (the whole
   // page — see immersiveFrameHeight) against FULL_PAGE_COVER_CROP_THRESHOLD,
   // so a clip only ever crops its sides, never its top/head, exactly as PR
@@ -1342,6 +1354,7 @@ function LiveVideoVisual({
           style={[StyleSheet.absoluteFill, styles.videoFill, (showPoster || showFallbackCover) && { opacity: 0 }]}
           contentFit={fit}
           nativeControls={false}
+          onFirstFrameRender={() => setFirstFrameRendered(true)}
         />
         <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none">
           <FontAwesome name="play" size={56} color={ON_DARK} />
@@ -1913,7 +1926,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     initials: post.authorInitials,
     verified: false,
     mediaUris: post.mediaUris,
-    videoSource: post.contentType === 'video' ? post.mediaUris[0] : undefined,
+    videoSource: post.contentType === 'video' ? pickPlaybackUri(post.hlsUrl, post.mediaUris[0], Platform.OS !== 'web') : undefined,
     videoPosterUri: post.thumbnailUri,
     contentType: post.contentType === 'video' || post.contentType === 'slideshow' ? post.contentType : 'photo',
     caption: post.caption,

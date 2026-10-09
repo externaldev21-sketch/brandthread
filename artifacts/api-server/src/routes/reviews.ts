@@ -20,6 +20,7 @@ import {
   MAX_REVIEW_PHOTO_BYTES, REVIEW_REPLY_MAX, normalizeReviewBody, parseFitNote,
   reviewExtras, reviewPhotoPrefix, validateReviewPhotos,
 } from "../lib/reviewContent";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 // ─── Startup safety net — these columns now ship in migration 113 ─────────────
 // Kept (IF NOT EXISTS, harmless) so a database that has not run 113 yet still
@@ -155,6 +156,7 @@ router.get("/seller/:sellerId", async (req, res) => {
 router.post(
   "/photos",
   requireAuth,
+  acceptUploadSession({ allowedTypes: ["image/*"], maxBytes: MAX_REVIEW_PHOTO_BYTES }),
   express.raw({ type: "image/*", limit: MAX_REVIEW_PHOTO_BYTES }),
   async (req, res): Promise<void> => {
     const buyerId = (req as any).clerkUserId as string;

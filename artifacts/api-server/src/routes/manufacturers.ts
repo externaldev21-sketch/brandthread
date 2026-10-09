@@ -37,6 +37,7 @@ import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
 import { findCountry, isValidTimeZone, validateTransition } from "@workspace/manufacturer-flow";
 import { afterStageChange, attachOrderSnapshots, postThreadSystemMessage } from "../lib/manufacturerOrders";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -1002,6 +1003,7 @@ router.get("/me", async (req, res) => {
 router.post(
   "/me/photos",
   requireAuth,
+  acceptUploadSession({ allowedTypes: ["image/jpeg", "image/png", "image/webp"], maxBytes: MAX_PROFILE_IMAGE_BYTES }),
   express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: MAX_PROFILE_IMAGE_BYTES }),
   async (req, res) => {
     try {
@@ -1674,6 +1676,7 @@ async function uploadThreadAttachment(req: express.Request, res: express.Respons
 router.post(
   "/threads/:threadId/attachments",
   ...requireGrowthSeller,
+  acceptUploadSession({ allowedTypes: ["image/*", "application/pdf"], maxBytes: MAX_MESSAGE_ATTACHMENT_BYTES }),
   express.raw({ type: ["image/*", "application/pdf"], limit: MAX_MESSAGE_ATTACHMENT_BYTES }),
   async (req, res) => uploadThreadAttachment(req, res, "seller"),
 );
@@ -1681,6 +1684,7 @@ router.post(
 router.post(
   "/me/threads/:threadId/attachments",
   requireAuth,
+  acceptUploadSession({ allowedTypes: ["image/*", "application/pdf"], maxBytes: MAX_MESSAGE_ATTACHMENT_BYTES }),
   express.raw({ type: ["image/*", "application/pdf"], limit: MAX_MESSAGE_ATTACHMENT_BYTES }),
   async (req, res) => uploadThreadAttachment(req, res, "manufacturer"),
 );

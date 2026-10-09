@@ -673,9 +673,16 @@ export const posts = pgTable('posts', {
   // stays 'quote' so readers can tell "original gone" from "not a quote".
   quotedPostId: uuid('quoted_post_id'),
   repostKind: text('repost_kind'), // null | 'quote'
+  // Adaptive streaming copy of a video post (migration 270). Only written when
+  // the Mux integration is configured (MUX_* env); the feed plays the HLS URL
+  // when present and the original MP4 otherwise.
+  videoHlsUrl: text('video_hls_url'),
+  videoMuxAssetId: text('video_mux_asset_id'),
+  videoHlsStatus: text('video_hls_status'), // null | 'pending' | 'ready' | 'errored'
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
+  muxAssetIdx: index('posts_video_mux_asset_idx').on(table.videoMuxAssetId).where(sql`${table.videoMuxAssetId} IS NOT NULL`),
   quotedPostFk: foreignKey({ columns: [table.quotedPostId], foreignColumns: [table.id], name: 'posts_quoted_post_id_fkey' }).onDelete('set null'),
   quotedPostIdx: index('posts_quoted_post_idx').on(table.quotedPostId).where(sql`${table.quotedPostId} IS NOT NULL`),
   userCreatedPublishedIdx: index('posts_user_created_published_idx')

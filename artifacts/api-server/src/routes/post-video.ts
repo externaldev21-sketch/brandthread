@@ -10,6 +10,7 @@ import { eq, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const router = Router();
 const storage = new ObjectStorageService();
@@ -340,6 +341,7 @@ function buildDrawtextFilter(
 router.post(
   "/video-clips",
   requireAuth,
+  acceptUploadSession({ allowedTypes: [...VIDEO_TYPES], maxBytes: MAX_CLIP_BYTES }),
   express.raw({ type: [...VIDEO_TYPES], limit: MAX_CLIP_BYTES }),
   async (req, res) => {
     const clerkId = (req as any).clerkUserId as string;

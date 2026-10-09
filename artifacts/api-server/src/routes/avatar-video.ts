@@ -37,6 +37,7 @@ import {
   AVATAR_VIDEO_MAX_UPLOAD_BYTES,
   avatarVideoDurationError,
 } from "../lib/avatarVideo";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
 
@@ -130,6 +131,7 @@ export function createAvatarVideoRouter({
   router.post(
     "/avatar-video",
     requireAuth,
+    acceptUploadSession({ allowedTypes: [...VIDEO_TYPES], maxBytes: AVATAR_VIDEO_MAX_UPLOAD_BYTES }),
     express.raw({ type: [...VIDEO_TYPES], limit: AVATAR_VIDEO_MAX_UPLOAD_BYTES }),
     async (req, res) => {
       const clerkId = (req as any).clerkUserId as string;
