@@ -50,7 +50,19 @@ const SCREENS = {
   },
   checkout: { target: '/thread-checkout?source=cart' },
   orders: { target: '/(buyer)/orders' },
+  'order-actions': { target: '/buyer-order-detail?id=order_demo_1', after: async (page) => { await page.mouse.move(195, 420); await page.mouse.wheel(0, 2400); } },
   search: { target: '/buyer-search' },
+  'search-focused': { target: '/buyer-search', after: async (page) => { await page.getByPlaceholder('Search').first().click(); } },
+  'search-results': {
+    target: '/buyer-search',
+    after: async (page) => {
+      const input = page.getByPlaceholder('Search').first();
+      await input.click();
+      await input.fill('hoodie');
+      await page.waitForTimeout(500);
+      await input.press('Enter');
+    },
+  },
   discover: { target: '/(buyer)/discover' },
   following: { target: '/(buyer)/following' },
 };
