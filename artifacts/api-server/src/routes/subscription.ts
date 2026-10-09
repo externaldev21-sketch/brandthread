@@ -28,6 +28,7 @@ import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/
 import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
 import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
 import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
+import { cancellationDetailsFor, isCancelReasonId } from "../lib/cancelReasons";
 
 const router = Router();
 router.use(requireAuth);
@@ -476,11 +477,20 @@ async function setCancelAtPeriodEnd(req: any, res: any, cancel: boolean): Promis
       res.status(409).json({ error: "This subscription has already ended.", code: "SUBSCRIPTION_ENDED" });
       return;
     }
+    // Optional "main reason" from the in-app cancel flow → Stripe's own
+    // cancellation feedback. Unknown reasons are ignored, never an error.
+    const details = cancel ? cancellationDetailsFor(req.body?.reason, req.body?.comment) : null;
     const updated = sub.cancel_at_period_end === cancel
       ? sub
       : await (stripe.subscriptions.update as any)(user.subscriptionId, {
           cancel_at_period_end: cancel,
-          metadata: { ...(sub.metadata ?? {}), clerkUserId, cancelledInApp: cancel ? "true" : "false" },
+          ...(details ? { cancellation_details: details } : {}),
+          metadata: {
+            ...(sub.metadata ?? {}),
+            clerkUserId,
+            cancelledInApp: cancel ? "true" : "false",
+            cancelReason: cancel && isCancelReasonId(req.body?.reason) ? req.body.reason : "",
+          },
         });
     const periodEnd = updated.current_period_end ? new Date(updated.current_period_end * 1000) : null;
     req.log?.info?.({ clerkUserId, cancel }, "Seller subscription cancel_at_period_end changed");

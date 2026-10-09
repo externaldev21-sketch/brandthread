@@ -30,6 +30,7 @@ const {
           invoices,
           checkout,
           portal: subscriptionPortal,
+          perks: vi.fn(async () => ({ plans: [], currentPlan: null, hasAdvancedAnalytics: false })),
         },
       },
     },
@@ -208,6 +209,23 @@ vi.mock('@/lib/theme', () => ({
     label: { fontSize: 11, fontFamily: 'Inter_600SemiBold', lineHeight: 14 },
   },
 }));
+
+// The billing screen's plan sheets and shared buttons are covered by
+// app/billing-plan.test.tsx; here they only need to render inertly.
+vi.mock('@/components/billing/PlanSheets', () => ({
+  ChangePlanSheet: () => null,
+  CancelPlanSheet: () => null,
+  PlanFeaturesSheet: () => null,
+  PlanOptionCard: () => null,
+}));
+
+vi.mock('@/components/ui', () => ({
+  Button: ({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) =>
+    React.createElement('Button', { testID, onPress }, label),
+  SkeletonBlock: () => null,
+  SkeletonLine: () => null,
+}));
+
 
 vi.mock('@/lib/growthTools', () => ({
   GROWTH_EXTRAS: [],

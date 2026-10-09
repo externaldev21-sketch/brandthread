@@ -61,6 +61,10 @@ export type PlanPerksPayload = {
   monthlyAiCredits: number | null;
   unlimitedAiCredits: boolean;
   advancedAnalytics: boolean;
+  /** Live product cap from planCatalogue; null when unlimited. */
+  productLimit: number | null;
+  /** Team seats from planCatalogue; null when unlimited. */
+  teamSeats: number | null;
 };
 
 export function buildPlanPerks(): PlanPerksPayload[] {
@@ -72,5 +76,7 @@ export function buildPlanPerks(): PlanPerksPayload[] {
     monthlyAiCredits: monthlyAiCreditsForPlan(planId),
     unlimitedAiCredits: monthlyAiCreditsForPlan(planId) === null,
     advancedAnalytics: PLAN_PERKS[planId].advancedAnalytics,
+    productLimit: PLAN_CATALOGUE[planId].limits.products,
+    teamSeats: PLAN_CATALOGUE[planId].limits.teamSeats,
   }));
 }

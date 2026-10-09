@@ -2474,14 +2474,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         /** Create a Stripe Checkout Session in subscription mode.
          *  Returns { url } for the mobile client to open in the system browser. */
         checkout: (planId: 'starter' | 'growth' | 'pro') =>
-          post<{ url: string }>('/api/seller/subscription/checkout', { planId }),
+          post<{ url: string; /** True when an active plan was switched in place (prorated) — no checkout page to open. */ updated?: boolean }>('/api/seller/subscription/checkout', { planId }),
         /** Create a Stripe Billing Portal session so the seller can manage their
          *  payment method, view invoices, or cancel. Returns { url }. */
         portal: () =>
           post<{ url: string }>('/api/seller/subscription/portal', {}),
         /** Cancel at the end of the paid period (Stripe plans only). */
-        cancel: () =>
-          post<{ status: string; cancelAtPeriodEnd: boolean; endsAt: string | null }>('/api/seller/subscription/cancel', {}),
+        cancel: (feedback?: { reason?: string; comment?: string }) =>
+          post<{ status: string; cancelAtPeriodEnd: boolean; endsAt: string | null }>('/api/seller/subscription/cancel', feedback ?? {}),
         /** Undo a pending cancellation. */
         resume: () =>
           post<{ status: string; cancelAtPeriodEnd: boolean; endsAt: string | null }>('/api/seller/subscription/resume', {}),
