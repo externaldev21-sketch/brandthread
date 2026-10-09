@@ -10,7 +10,9 @@
  * Mobbin reference: Stripe Dashboard "Home" KPI + chart layout
  * (https://mobbin.com/screens/f972bbd5-699d-42c3-942e-1cf9f3d25eda) informed
  * the stat-row-above-chart hierarchy and the muted axis labels; Shopify
- * Analytics for the Reports rows below the chart.
+ * Analytics for the Reports rows below the chart and for key metrics that
+ * open their report (Visits → Audience, Revenue → Product stats). Every
+ * report is one route, app/analytics-reports.tsx (?report=…).
  */
 import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
@@ -180,12 +182,29 @@ export default function AnalyticsScreen() {
           <SellerDashboardRangePills range={range} onRangeChange={setRange} theme={theme} />
 
           {/* ── Summary stats ──────────────────────────────────────────────── */}
+          {/* Each key metric opens its report (Shopify Analytics). */}
           <View style={s.statsRow}>
-            <View style={{ flex: 1, minWidth: 0 }}>
+            <TouchableOpacity
+              style={{ flex: 1, minWidth: 0 }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityHint="Opens the Audience report"
+              testID="analytics-metric-visits"
+              onPress={() => router.push('/analytics-reports?report=audience' as never)}
+            >
               <StatTile label="Visits" value={summary.visits.toLocaleString()} changePct={summary.visitsChangePct} />
-            </View>
+            </TouchableOpacity>
             <View ref={revenueTileRef} onLayout={revenueTileOnLayout} collapsable={false} style={{ flex: 1 }}>
-              <StatTile label="Revenue" value={displayRevenue} changePct={summary.revenueChangePct} featured />
+              <TouchableOpacity
+                style={{ flex: 1 }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityHint="Opens the Product stats report"
+                testID="analytics-metric-revenue"
+                onPress={() => router.push('/analytics-reports?report=product-stats' as never)}
+              >
+                <StatTile label="Revenue" value={displayRevenue} changePct={summary.revenueChangePct} featured />
+              </TouchableOpacity>
             </View>
           </View>
 

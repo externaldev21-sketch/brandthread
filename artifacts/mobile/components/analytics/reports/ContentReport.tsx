@@ -26,7 +26,7 @@ function sortPosts(posts: ContentPost[], sort: Sort): ContentPost[] {
   return [...posts].sort((a, b) => b[key] - a[key] || b.views - a.views);
 }
 
-export default function AnalyticsContentScreen() {
+export default function ContentReport() {
   const colors = useColors();
   const router = useRouter();
   const s = React.useMemo(() => styles(colors), [colors]);

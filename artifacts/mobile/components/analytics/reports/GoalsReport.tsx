@@ -57,7 +57,7 @@ function GoalCard({ goal, onEdit }: { goal: Goal; onEdit: () => void }) {
   );
 }
 
-export default function AnalyticsGoalsScreen() {
+export default function GoalsReport() {
   const colors = useColors();
   const s = React.useMemo(() => styles(colors), [colors]);
   const { data: goals, loading, error, reload, setData } = useSellerInsight(() => getGoals(), []);

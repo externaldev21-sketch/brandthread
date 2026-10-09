@@ -7,15 +7,18 @@ import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { Card, CardDivider, SectionTitle } from '@/components/analytics/AnalyticsKit';
 
-/** Mobbin reference: Shopify Analytics "Reports" rows above the overview. */
+/**
+ * Mobbin reference: Shopify Analytics "Reports" rows above the overview.
+ * Every row opens its report on the one Reports route (app/analytics-reports).
+ */
 export const ANALYTICS_REPORTS: { label: string; icon: keyof typeof Feather.glyphMap; href: string; badge?: string }[] = [
-  { label: 'Product stats', icon: 'shopping-bag', href: '/analytics-product-stats' },
-  { label: 'Threads and videos', icon: 'play-circle', href: '/analytics-content' },
-  { label: 'Audience', icon: 'users', href: '/analytics-audience' },
-  { label: 'Goals', icon: 'target', href: '/analytics-goals' },
-  { label: 'Export', icon: 'download', href: '/analytics-export' },
-  { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-advanced', badge: 'PRO' },
-  { label: 'Customer cohorts and lifetime value', icon: 'users', href: '/analytics-cohorts', badge: 'PRO' },
+  { label: 'Product stats', icon: 'shopping-bag', href: '/analytics-reports?report=product-stats' },
+  { label: 'Threads and videos', icon: 'play-circle', href: '/analytics-reports?report=content' },
+  { label: 'Audience', icon: 'users', href: '/analytics-reports?report=audience' },
+  { label: 'Goals', icon: 'target', href: '/analytics-reports?report=goals' },
+  { label: 'Export', icon: 'download', href: '/analytics-reports?report=export' },
+  { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-reports?report=advanced', badge: 'PRO' },
+  { label: 'Customer cohorts and lifetime value', icon: 'users', href: '/analytics-reports?report=cohorts', badge: 'PRO' },
 ];
 
 /** Entry points to the seller reports; appended to the Analytics tab. */
@@ -39,7 +42,7 @@ export function AnalyticsReportsList() {
               style={s.row}
               accessibilityRole="button"
               accessibilityLabel={r.badge ? `${r.label}, ${r.badge}` : r.label}
-              testID={`report-${r.href.replace('/analytics-', '')}`}
+              testID={`report-${r.href.split('report=')[1]}`}
               onPress={() => { Haptics.selectionAsync(); router.push(r.href as never); }}
             >
               <Feather name={r.icon} size={18} color={colors.foreground} />

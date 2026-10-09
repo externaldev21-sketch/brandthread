@@ -66,9 +66,7 @@ function hasBannedWording(source: string): boolean {
 
 // Generated from the state of the tree when this lint was added. Rewrite the
 // copy to be factual (what's true right now, not a promise about later),
-// then delete the file's line here in the same change. See app/analytics-
-// store.tsx / analytics-content.tsx / analytics-marketing.tsx /
-// analytics-production.tsx / analytics-profit.tsx for the pattern.
+// then delete the file's line here in the same change.
 const COMING_SOON_ALLOWLIST = new Set([
   'app/(buyer)/inbox.tsx',
   'app/(tabs)/feed.tsx',
