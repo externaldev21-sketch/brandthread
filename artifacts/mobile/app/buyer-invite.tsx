@@ -51,7 +51,7 @@ type Stats = {
 const DEMO_INVITE: InviteData = {
   code: 'K7M2QP',
   link: 'https://brandthread.app/invite/K7M2QP',
-  shareText: 'Join Brandthread with my link and get $10 Thread Cash.',
+  shareText: 'Join Brandthread with my link and get $10 Thread Cash after your first order of $10 or more.',
 };
 const DEMO_STATS: Stats = {
   total: 3, pointsEarned: 1500, clicks: 12, earnedCents: 1000, pendingCents: 2000,

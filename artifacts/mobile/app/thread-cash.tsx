@@ -1,6 +1,6 @@
 /**
  * Thread Cash wallet — balance, streak, history, and the rules.
- * Thread Cash is a platform-funded reward credit: it can't be cashed out,
+ * Thread Cash rewards are platform-funded credit: they can't be cashed out,
  * withdrawn, or converted to money — only spent toward purchases in the app.
  *
  * Visual layer only. Balance math, streak math, and the history/rules copy
@@ -224,7 +224,7 @@ export default function ThreadCashScreen() {
                 </Text>
               )}
               <Text style={styles.balanceHint}>
-                Thread Cash isn't money — it can't be cashed out or transferred for cash. Use it toward purchases in the app.
+                Thread Cash rewards aren't money — they can't be cashed out or transferred for cash. Use them toward purchases in the app.
               </Text>
             </BrandthreadCard>
 
@@ -346,7 +346,7 @@ export default function ThreadCashScreen() {
               {[
                 'Keep the app open for a few active minutes a day to earn Thread Cash and build your streak',
                 'Miss a calendar day and your streak resets to day 1 — no grace period',
-                "Thread Cash is not money: it can't be withdrawn, cashed out, or sent as cash",
+                "Thread Cash rewards and Thread Cash from friends aren't money: they can't be withdrawn, cashed out, or sent as cash",
                 status?.config.expiryDays
                   ? `Thread Cash expires ${status.config.expiryDays} days after it's earned`
                   : "Thread Cash doesn’t expire",
