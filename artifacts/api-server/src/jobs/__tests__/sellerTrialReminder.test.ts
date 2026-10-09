@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildTrialReminderMessage,
   isDayFourOfFive,
-  isTrialReminderDay,
   isPendingTrialReminderDeliverable,
   isReminderWindowOpen,
 } from "../sellerTrialReminder";
@@ -48,18 +47,5 @@ describe("seller trial day-four reminder", () => {
     expect(isPendingTrialReminderDeliverable({ ...base, sellerStatus: "trialing" })).toBe(true);
     expect(isPendingTrialReminderDeliverable({ ...base, sellerStatus: "canceled" })).toBe(false);
     expect(isPendingTrialReminderDeliverable({ ...base, sellerStatus: "trialing", subscriptionPreference: false })).toBe(false);
-  });
-});
-
-describe("7-day trial reminder (SELLER_TRIAL_DAYS)", () => {
-  const start = new Date("2026-03-01T00:00:00.000Z");
-  const end = new Date("2026-03-08T00:00:00.000Z");
-
-  it("fires on day 6 of 7 only: the day before the first charge", () => {
-    expect(isTrialReminderDay(start, end, new Date("2026-03-06T12:00:00.000Z"))).toBe(true);
-    expect(isTrialReminderDay(start, end, new Date("2026-03-04T12:00:00.000Z"))).toBe(false);
-    expect(isTrialReminderDay(start, end, new Date("2026-03-07T12:00:00.000Z"))).toBe(false);
-    expect(isReminderWindowOpen(start, end, new Date("2026-03-07T12:00:00.000Z"))).toBe(true);
-    expect(isReminderWindowOpen(start, end, new Date("2026-03-08T00:00:00.000Z"))).toBe(false);
   });
 });

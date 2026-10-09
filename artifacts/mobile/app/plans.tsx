@@ -7,7 +7,7 @@
  *   Pro     $199/mo  — everything in Growth + unlimited team, advanced analytics, white-glove
  *
  * Platform commission on sales depends on the plan (GET /seller/subscription/perks).
- * Every new subscription starts with a 7-day free trial (card required upfront).
+ * Every new subscription starts with a 5-day free trial (card required upfront).
  *
  * The recommended tier is personalized based on the seller's brand-stage answer from onboarding.
  *
@@ -57,7 +57,7 @@ import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { track } from '@/lib/analytics';
-import { recommendSellerPlan, SELLER_PLANS, SELLER_TRIAL_DAYS, type SellerPlanDefinition } from '@/lib/sellerPlans';
+import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
 import { displayPriceFor } from '@/lib/sellerPlansDisplay';
 import { commissionSummary, wantsProHighlight, DEMO_PERKS, type PerksResponse } from '@/lib/proPerks';
 import { isPreviewDemoMode, isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
@@ -83,13 +83,14 @@ const BENEFIT_BULLETS = [
   'Grow with live shopping and promotion tools',
 ];
 
-// ─── Trial timeline steps (Blinkist-style compact vertical timeline). The
-//     reminder the day before billing is sent by the server (seller trial
-//     reminder job, "Trial reminders" toggle in Notification Settings). ─────
+// ─── Trial timeline steps (Blinkist-style compact vertical timeline). Day 4's
+//     reminder is label-only: no local/scheduled-notification system exists
+//     in this app today (only the server-driven "Trial reminders" toggle in
+//     Notification Settings) — see the PR description. ────────────────────
 const TRIAL_STEPS: TrialTimelineStep[] = [
   { key: 'today', label: 'Today', detail: 'Full access unlocked', icon: 'unlock' },
-  { key: 'reminder', label: `Day ${SELLER_TRIAL_DAYS - 1}`, detail: "We remind you before your trial ends", icon: 'bell' },
-  { key: 'billing', label: `Day ${SELLER_TRIAL_DAYS}`, detail: 'Billing starts', icon: 'credit-card' },
+  { key: 'day4',  label: 'Day 4', detail: "We remind you before your trial ends", icon: 'bell' },
+  { key: 'day5',  label: 'Day 5', detail: 'Billing starts', icon: 'credit-card' },
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -211,7 +212,7 @@ export default function PlansScreen() {
               } else {
                 setCurrentPlanId(status.plan ?? null);
                 setAwaitingReturn(false);
-                Alert.alert('Plan updated', `You're now on the ${capitalize(status.plan)} plan — enjoy your ${SELLER_TRIAL_DAYS}-day free trial!`);
+                Alert.alert('Plan updated', `You're now on the ${capitalize(status.plan)} plan — enjoy your 5-day free trial!`);
               }
               return;
             }
@@ -464,7 +465,7 @@ export default function PlansScreen() {
               : isCurrentSelected
                 ? 'Current plan'
                 : hasRealTrialOffer
-                  ? `Start my ${SELLER_TRIAL_DAYS}-day free trial`
+                  ? 'Start my 5-day free trial'
                   : `Choose ${selectedPlan.name}`
           }
           onPress={() => handleSelect(selectedPlan)}
@@ -475,7 +476,7 @@ export default function PlansScreen() {
           subtext="No commitment. Cancel anytime."
           billingLine={
             hasRealTrialOffer && !selectedPricing.failed
-              ? `Free for ${SELLER_TRIAL_DAYS} days, then ${selectedPricing.priceLabel ?? selectedPlan.priceLabel}/month`
+              ? `Free for 5 days, then ${selectedPricing.priceLabel ?? selectedPlan.priceLabel}/month`
               : null
           }
         />

@@ -91,7 +91,6 @@ import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
-import { SELLER_TRIAL_DAYS } from "../lib/planCatalogue";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1505,7 +1504,7 @@ export async function handleSubscriptionTrialWillEnd(sub: any, eventId: string):
   }
 
   // Stripe's trial_will_end event is normally emitted three days before the
-  // end of the trial. The day-before reminder is sent by the scheduled
+  // end of the trial. The trial reminder is sent by the scheduled
   // worker from the persisted trial window; do not send this early event in
   // production or it would violate the one-reminder contract. The fallback
   // keeps compatibility with legacy webhook payloads that lack trial_start.
@@ -1548,7 +1547,7 @@ export async function handleSubscriptionTrialWillEnd(sub: any, eventId: string):
   try {
     await sendPushToUser(seller.clerkId, {
       title: "Your free trial ends soon",
-      body: `Your ${SELLER_TRIAL_DAYS}-day trial ends in 3 days — you'll be charged ${amount} on ${trialEnd} unless you cancel.`,
+      body: `Your free trial ends in 3 days — you'll be charged ${amount} on ${trialEnd} unless you cancel.`,
       data: {
         notificationId: stableNotificationId("subscription-trial-ending", sub.id, seller.clerkId),
         type: "subscription_trial_will_end",

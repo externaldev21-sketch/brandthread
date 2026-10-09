@@ -1,9 +1,9 @@
 /**
- * Seller trial reminder, the day before the trial ends (day 6 of 7).
+ * Day-four seller trial reminder.
  *
  * Event creation is deliberately separate from delivery draining. Creation is
- * strictly that day; a leased event can still be drained on the last day
- * after a late-day provider failure, while every drain rechecks the live trial.
+ * strict day four only; a leased event can still be drained on day five after
+ * a late-day provider failure, while every drain rechecks the live trial.
  */
 import { and, eq, gte, isNull, lte, or, sql, count } from "drizzle-orm";
 import {
@@ -16,11 +16,9 @@ import {
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
-import { PLAN_CATALOGUE, SELLER_TRIAL_DAYS, type SellerPlanId } from "../lib/planCatalogue";
+import { PLAN_CATALOGUE, type SellerPlanId } from "../lib/planCatalogue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Trials started before the move to SELLER_TRIAL_DAYS still get their reminder. */
-const LEGACY_TRIAL_DAYS = 5;
 const INTERVAL_MS = 60 * 60 * 1000;
 const CLAIM_LEASE_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -36,7 +34,7 @@ function entitledFeatures(plan: string | null): string[] {
   const planId = (plan && plan in PLAN_CATALOGUE ? plan : "starter") as SellerPlanId;
   if (planId === "pro") return ["your storefront", "unlimited products", "advanced analytics", "priority support"];
   if (planId === "growth") return ["your storefront", "unlimited products", "AI Design Studio", "manufacturer tools"];
-  return ["your storefront", `up to ${PLAN_CATALOGUE.starter.limits.products} products`, "AI store builder", "standard checkout"];
+  return ["your storefront", "up to 25 products", "AI store builder", "standard checkout"];
 }
 
 export function buildTrialReminderMessage(input: {
@@ -62,33 +60,18 @@ export function buildTrialReminderMessage(input: {
   return { title: `Your free trial ends on ${ends}`, body, usedFeatures, entitledFeatures: entitled };
 }
 
-/** Whole days in a trial window (SELLER_TRIAL_DAYS, or a legacy 5-day trial still running). */
-function trialLengthDays(start: Date, end: Date): number | null {
-  const ms = end.getTime() - start.getTime();
-  if (ms % DAY_MS !== 0) return null;
-  const days = ms / DAY_MS;
-  return days === SELLER_TRIAL_DAYS || days === LEGACY_TRIAL_DAYS ? days : null;
-}
-
-/**
- * The trial's second-to-last 24-hour day, strictly: day 6 of the 7-day trial
- * (day 4 of a legacy 5-day trial), so the reminder lands a day before the
- * first charge.
- */
-export function isTrialReminderDay(start: Date, end: Date, now: Date): boolean {
-  const days = trialLengthDays(start, end);
+/** A Stripe 5-day trial's fourth 24-hour day, strictly. */
+export function isDayFourOfFive(start: Date, end: Date, now: Date): boolean {
   const elapsed = now.getTime() - start.getTime();
-  return days !== null && elapsed >= (days - 2) * DAY_MS && elapsed < (days - 1) * DAY_MS;
+  return end.getTime() - start.getTime() === 5 * DAY_MS
+    && elapsed >= 3 * DAY_MS && elapsed < 4 * DAY_MS;
 }
 
-/** @deprecated Kept for older imports; the trial is SELLER_TRIAL_DAYS long now. */
-export const isDayFourOfFive = isTrialReminderDay;
-
-/** The event may be drained on the reminder day or the still-valid last day. */
+/** The event may be drained during day four or the still-valid day five. */
 export function isReminderWindowOpen(start: Date, end: Date, now: Date): boolean {
-  const days = trialLengthDays(start, end);
   const elapsed = now.getTime() - start.getTime();
-  return days !== null && elapsed >= (days - 2) * DAY_MS && elapsed < days * DAY_MS;
+  return end.getTime() - start.getTime() === 5 * DAY_MS
+    && elapsed >= 3 * DAY_MS && elapsed < 5 * DAY_MS;
 }
 
 export function isPendingTrialReminderDeliverable(input: {
@@ -134,7 +117,7 @@ async function createEligibleEvents(now: Date): Promise<void> {
     gte(users.subscriptionTrialEndsAt, now),
   ));
   for (const seller of eligible) {
-    if (!seller.trialStartedAt || !seller.trialEndsAt || !isTrialReminderDay(seller.trialStartedAt, seller.trialEndsAt, now)) continue;
+    if (!seller.trialStartedAt || !seller.trialEndsAt || !isDayFourOfFive(seller.trialStartedAt, seller.trialEndsAt, now)) continue;
     await db.insert(sellerTrialReminderEvents).values({
       sellerId: seller.clerkId,
       trialEndAt: seller.trialEndsAt,
@@ -194,7 +177,7 @@ async function drainEvents(now: Date): Promise<void> {
             ? "Seller disabled subscription trial reminders"
             : now.getTime() >= event.trialEndAt.getTime()
               ? "Trial ended before reminder delivery"
-              : "Reminder was outside the trial reminder window",
+              : "Reminder was not in the strict five-day trial window",
       );
       continue;
     }
