@@ -13,12 +13,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { FS } from '@/lib/theme';
 import { useApi } from '@/lib/api';
-import { StatusBadge } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
 import { useUser } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { usePreviewDemoMode } from '@/hooks/usePreviewDemoMode';
+import { getPreviewCustomerDetail } from '@/lib/previewCustomers';
+import { ordersLabel } from '@/lib/sellerCustomers';
+import { TYPE_SCALE } from '@/constants/typography';
+import { radius } from '@/constants/radii';
 
 type Customer = {
   id: string;
@@ -40,16 +45,25 @@ type Order = {
   createdAt: string;
   trackingNumber?: string;
   carrier?: string;
+  itemCount?: number;
 };
 
-const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error' | 'neutral' | 'info'> = {
-  delivered:  'success',
-  fulfilled:  'success',
-  shipped:    'info',
-  processing: 'warning',
-  pending:    'neutral',
-  cancelled:  'error',
+// Shopify order-history chips ("Fulfilled", "Partially refunded"), in silver.
+const STATUS_LABEL: Record<string, string> = {
+  delivered:  'Delivered',
+  fulfilled:  'Fulfilled',
+  shipped:    'Shipped',
+  processing: 'Unfulfilled',
+  pending:    'Unfulfilled',
+  cancelled:  'Cancelled',
 };
+
+function orderMetaLine(name: string | undefined, order: Order): string {
+  const date = new Date(order.createdAt);
+  const when = `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase()}`;
+  const items = order.itemCount ? `${order.itemCount} item${order.itemCount === 1 ? '' : 's'}` : null;
+  return [name, items, when].filter(Boolean).join(' • ');
+}
 
 function cents(c: number) {
   return formatCents(c);
@@ -67,6 +81,10 @@ export default function CustomerOrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestGeneration = useRef(0);
+  // Seller web preview can't call the API (lib/api.ts rejects every request
+  // there): &demo=1 reads the demo customer behind the demo Orders tab.
+  const [isPreviewMode] = useState(() => isSellerDevPreview());
+  const previewDemo = usePreviewDemoMode();
 
   useEffect(() => {
     requestGeneration.current += 1;
@@ -77,6 +95,14 @@ export default function CustomerOrdersScreen() {
   }, [clerkLoaded, user?.id, customerId]);
 
   const load = useCallback(async () => {
+    if (isPreviewMode) {
+      const detail = customerId ? getPreviewCustomerDetail(String(customerId), previewDemo) : null;
+      setCustomer(detail ? (detail.customer as Customer) : null);
+      setOrders(detail ? detail.orders : []);
+      setError(detail ? null : 'unavailable');
+      setLoading(false);
+      return;
+    }
     if (!customerId || !clerkLoaded || !user?.id) return;
     const generation = ++requestGeneration.current;
     try {
@@ -94,9 +120,10 @@ export default function CustomerOrdersScreen() {
     } finally {
       if (requestGeneration.current === generation) setLoading(false);
     }
-  }, [api, customerId, clerkLoaded, user?.id]);
+  }, [api, customerId, clerkLoaded, user?.id, isPreviewMode, previewDemo]);
 
   useFocusEffect(useCallback(() => {
+    if (isPreviewMode) { void load(); return; }
     if (!clerkLoaded || !user?.id || !customerId) {
       setCustomer(null);
       setOrders([]);
@@ -105,7 +132,7 @@ export default function CustomerOrdersScreen() {
     }
     setLoading(true);
     load();
-  }, [load, clerkLoaded, user?.id, customerId]));
+  }, [load, clerkLoaded, user?.id, customerId, isPreviewMode]));
 
   return (
     <View style={s.root}>
@@ -184,8 +211,12 @@ export default function CustomerOrdersScreen() {
             </View>
           )}
 
-          {/* Orders list */}
-          <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>Order History</Text>
+          {/* Order history — Shopify: "Order history / N orders", then rows of
+              "#1001 … $24.99", "Name • 1 item • date", status chip. */}
+          <View>
+            <Text style={[TYPE_SCALE.headline, { color: colors.foreground }]}>Order history</Text>
+            <Text style={[TYPE_SCALE.footnote, { color: colors.mutedForeground, marginTop: 2 }]}>{ordersLabel(orders.length)}</Text>
+          </View>
           {orders.length === 0 ? (
             <View style={[s.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather name="inbox" size={28} color={colors.mutedForeground} />
@@ -194,32 +225,32 @@ export default function CustomerOrdersScreen() {
           ) : (
             <View style={[s.orderList, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {orders.map((order, i) => (
-                <View
+                <TouchableOpacity
                   key={order.id}
-                  style={[s.orderRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+                  activeOpacity={0.7}
+                  onPress={() => router.push(`/order-detail?id=${encodeURIComponent(order.id)}` as never)}
+                  style={[s.orderRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Order ${order.orderNumber}`}
                 >
-                  <View style={s.orderLeft}>
-                    <Text style={[s.orderNum, { color: colors.foreground }]}>#{order.orderNumber}</Text>
-                    <Text style={[s.orderDate, { color: colors.mutedForeground }]}>
-                      {new Date(order.createdAt).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric',
-                      })}
+                  <View style={s.orderTop}>
+                    <Text style={[TYPE_SCALE.headline, { color: colors.foreground }]} numberOfLines={1}>#{order.orderNumber}</Text>
+                    <Text style={[TYPE_SCALE.body, { color: colors.foreground }]}>{cents(order.totalCents)}</Text>
+                  </View>
+                  <Text style={[TYPE_SCALE.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    {orderMetaLine(customer?.name, order)}
+                  </Text>
+                  {order.trackingNumber ? (
+                    <Text style={[TYPE_SCALE.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      {order.carrier ? `${order.carrier} • ` : ''}{order.trackingNumber}
                     </Text>
-                    {order.trackingNumber ? (
-                      <Text style={[s.trackingText, { color: colors.mutedForeground }]}>
-                        {order.carrier ? `${order.carrier}: ` : ''}
-                        {order.trackingNumber}
-                      </Text>
-                    ) : null}
+                  ) : null}
+                  <View style={[s.statusChip, { borderColor: colors.border }]}>
+                    <Text style={[TYPE_SCALE.caption, { color: order.status === 'cancelled' ? colors.mutedForeground : colors.foreground }]}>
+                      {STATUS_LABEL[order.status] ?? order.status}
+                    </Text>
                   </View>
-                  <View style={s.orderRight}>
-                    <Text style={[s.orderTotal, { color: colors.foreground }]}>{cents(order.totalCents)}</Text>
-                    <StatusBadge
-                      label={order.status}
-                      variant={STATUS_VARIANT[order.status] ?? 'neutral'}
-                    />
-                  </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -252,15 +283,10 @@ const s = StyleSheet.create({
   tagText:      { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   notes:        { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
 
-  sectionTitle: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 },
   emptyCard:    { borderRadius: 14, borderWidth: 1, padding: 32, alignItems: 'center', gap: 8 },
   emptyText:    { fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
   orderList:    { borderRadius: 14, borderWidth: 1 },
-  orderRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', padding: 14, gap: 12 },
-  orderLeft:    { flex: 1, gap: 3 },
-  orderNum:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  orderDate:    { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  trackingText: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', fontStyle: 'italic' },
-  orderRight:   { alignItems: 'flex-end', gap: 6 },
-  orderTotal:   { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
+  orderRow:     { padding: 14, gap: 4 },
+  orderTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  statusChip:   { alignSelf: 'flex-start', borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 3, marginTop: 4 },
 });

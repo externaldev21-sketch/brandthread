@@ -1406,7 +1406,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="design-canvas"    options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="manufacturer"     options={{ headerShown: false }} />
         <Stack.Screen name="finance" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
-        <Stack.Screen name="customers"        options={{ headerShown: false }} />
+        <Stack.Screen name="customers" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="shipping"         options={{ headerShown: false }} />
         <Stack.Screen name="team"             options={{ headerShown: false }} />
         <Stack.Screen name="team-invite"      options={{ headerShown: false }} />

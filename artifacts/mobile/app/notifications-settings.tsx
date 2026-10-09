@@ -33,7 +33,7 @@ const SELLER_ROWS: NotifRow[] = [
   { key: 'customer_messages',      icon: 'message-circle', label: 'Customer messages',      description: 'Messages from customers' },
   { key: 'disputes',               icon: 'alert-triangle', label: 'Disputes',               description: 'Disputes and case updates' },
   { key: 'inventory_alerts',       icon: 'archive',        label: 'Inventory alerts',       description: 'Low and out of stock' },
-  { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
+  { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'From brands you follow' },
   { key: 'subscription_trial',     icon: 'clock',          label: 'Trial reminders',        description: 'Before your trial converts' },
 ];
 

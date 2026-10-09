@@ -34,9 +34,9 @@ describe('seller screens make no protected API call when signed out / Clerk not 
     before(s, 'async function handleQuickArchive(product: Product)', 'if (previewOnly)', 'await ');
   });
 
-  it('discounts.tsx: preview waits for a loaded session before reading or writing', () => {
+  it('discounts.tsx: the seller preview reads and writes locally, never the API', () => {
     const s = read('app/discounts.tsx');
-    expect(s).toContain('const previewOnly = isPreviewMode && (!authLoaded || !isSignedIn || !userId);');
+    expect(s).toContain('const [previewOnly] = useState(() => isSellerDevPreview());');
     before(s, 'const loadDiscounts = useCallback', 'if (previewOnly)', 'api.');
     expect(s).not.toContain('isPreviewMode && !userId');
   });
