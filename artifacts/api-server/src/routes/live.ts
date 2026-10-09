@@ -33,7 +33,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { evaluateContent } from "../lib/contentModerator";
-import { isBlockedEitherWay, optionalViewerId, publishingRestriction } from "../lib/safety";
+import { authorInGoodStanding, isBlockedEitherWay, notBlockedWith, optionalViewerId, publishingRestriction } from "../lib/safety";
 import { rankLiveFeed } from "../lib/liveFeed";
 import { logger } from "../lib/logger";
 import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
@@ -165,7 +165,8 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
 });
 
 // ─── GET /api/live/active ─────────────────────────────────────────────────────
-router.get("/active", async (_req, res) => {
+router.get("/active", async (req, res) => {
+  const viewerId = optionalViewerId(req);
   try {
     const rows = await db.execute(sql`
       SELECT ls.id, ls.seller_id, ls.channel_name, ls.title, ls.viewer_count,
@@ -174,6 +175,8 @@ router.get("/active", async (_req, res) => {
       FROM live_streams ls
       LEFT JOIN users u ON u.clerk_id = ls.seller_id
       WHERE ls.status = 'live'
+        AND ${authorInGoodStanding(sql`ls.seller_id`)}
+        ${viewerId ? sql`AND ${notBlockedWith(viewerId, sql`ls.seller_id`)}` : sql``}
       ORDER BY ls.viewer_count DESC, ls.started_at ASC
       LIMIT 20
     `);

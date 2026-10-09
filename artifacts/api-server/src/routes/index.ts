@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
 import healthRouter from "./health";
-import { responseCache, invalidateResponseCache } from "../middlewares/responseCache";
+import { responseCache, invalidateResponseCache, bumpResponseCacheGeneration } from "../middlewares/responseCache";
 import authRouter from "./auth";
 import ageRouter from "./age";
 import productsRouter from "./products";
@@ -177,17 +177,30 @@ router.use("/public/featured", featuredPublicRouter); // admin-curated Discover 
 // Shared response cache for the public read paths that dominate traffic. A no-op
 // unless REDIS_URL is set. Registered before the routers so a hit never reaches
 // them. See docs/scale/CACHE.md for keys, TTLs and invalidation.
-router.get("/public/search", responseCache({ name: "search", ttlSeconds: 30, scope: "viewer-blocks" }));
+router.get("/public/search", responseCache({ name: "search", ttlSeconds: 30, scope: "viewer-blocks", generational: true }));
 router.get("/public/profiles/:username", responseCache({ name: "profile", ttlSeconds: 20, scope: "viewer-blocks" }));
 router.get("/public/products/:id", responseCache({ name: "product", ttlSeconds: 15, scope: "anon", idKey: (req) => String(req.params.id) }));
-// A seller edit or delete drops the cached product page immediately.
+// A seller edit or delete drops the cached product page immediately, and any
+// product write (publish, edit, delete) starts a fresh search generation so
+// the change is searchable on the very next request.
 router.use("/products", (req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") { next(); return; }
   const id = /^\/([0-9a-f-]{36})(\/|$)/i.exec(req.path)?.[1];
-  if (id && req.method !== "GET" && req.method !== "HEAD") {
-    res.once("finish", () => { if (res.statusCode < 400) void invalidateResponseCache("product", id); });
-  }
+  res.once("finish", () => {
+    if (res.statusCode >= 400) return;
+    if (id) void invalidateResponseCache("product", id);
+    void bumpResponseCacheGeneration("search");
+  });
   next();
 });
+// Bulk edits and imports change what search returns too.
+const bumpSearchOnWrite: import("express").RequestHandler = (req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.once("finish", () => { if (res.statusCode < 400) void bumpResponseCacheGeneration("search"); });
+  }
+  next();
+};
+router.use(["/product-bulk", "/shopify-imports", "/product-import", "/product-launches"], bumpSearchOnWrite);
 router.use("/public",          publicRouter);
 router.use("/public",          sharePreviewRouter); // /posts/:id/share-preview, /stores/:slug/share-preview (OG data)
 router.use("/public",          discoveryRouter); // /categories, /trending/products, /trending/brands

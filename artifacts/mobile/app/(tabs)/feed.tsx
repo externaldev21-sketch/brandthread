@@ -75,7 +75,7 @@ import { FeedGestureGuide } from '@/components/FeedGestureGuide';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
-import { getCachedFeedPosts, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
+import { getCachedFeedPosts, getFollowGraphVersion, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
 import { useCommentCountDelta } from '@/lib/commentCountBus';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
@@ -2335,6 +2335,20 @@ export default function FeedScreen({
     const unsub = subscribeSocial(() => { void loadFeed(); });
     return unsub;
   }, [loadFeed]);
+
+  // Following someone (from a profile, search, Activity…) puts their posts in
+  // Following right away: when the viewer comes back to the Following tab
+  // after the follow graph changed, refresh it in place. For You picks the
+  // change up on its next load (the server dropped its cached ranking).
+  const followGraphSeenRef = useRef(getFollowGraphVersion());
+  const feedScreenFocused = useIsFocused();
+  useEffect(() => {
+    if (!feedScreenFocused) return;
+    const version = getFollowGraphVersion();
+    if (version === followGraphSeenRef.current) return;
+    followGraphSeenRef.current = version;
+    if (feedTab === 'following' && !creatorSource) void loadFeed();
+  }, [feedScreenFocused, feedTab, creatorSource, loadFeed]);
 
   // Last cart count this screen knows about — lets a refocus tell "the buyer
   // added something elsewhere" (product page Add to bag, Saved → Add to

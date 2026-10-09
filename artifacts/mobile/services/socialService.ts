@@ -10,7 +10,7 @@ import { fetchSponsoredSlots } from '@/services/sponsoredService';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
-import { purgeAuthorFromFeedPostsCache } from '@/lib/feedPostsCache';
+import { noteFollowGraphChanged, purgeAuthorFromFeedPostsCache } from '@/lib/feedPostsCache';
 import { queryClient } from '@/lib/queryClient';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
 import type {
@@ -999,6 +999,7 @@ export async function setSellerFollowing(
     state = { isFollowing: following };
   }
   if (canUsePreviewFollow(sellerId)) setPreviewFollowing(sellerId, state?.isFollowing ?? following);
+  noteFollowGraphChanged();
   // Every screen showing this seller's follower count (or the viewer's
   // following count) updates from the server-confirmed state.
   emitProfileEvent({
@@ -1644,6 +1645,7 @@ export async function blockUser(params: { userId: string; name: string; handle: 
 }
 export async function unblockUser(userId: string): Promise<void> {
   await serviceRequest(`/api/social/block/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+  noteFollowGraphChanged();
   const k = K();
   const blocks = await getBlockedUsers(k);
   await save(k.blocks, blocks.filter(b => b.blockedUserId !== userId)); notify();

@@ -10,6 +10,7 @@ import { db, follows, productLaunchAlerts, productLaunches, products } from "@wo
 import type { DbExecutor } from "./money/ledger";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
+import { bumpResponseCacheGeneration } from "../middlewares/responseCache";
 
 export function isProductLive(
   launch: { launchAt: Date; launchedAt: Date | null } | null | undefined,
@@ -74,6 +75,8 @@ export async function runProductLaunches(now: Date = new Date()): Promise<{ laun
       logger.error({ err, productId, job: "productLaunches" }, "Launch notifications failed");
     }
   }
+  // A launched product becomes searchable now, not when the cached page expires.
+  if (launched > 0) await bumpResponseCacheGeneration("search").catch(() => undefined);
   return { launched, notified };
 }
 
