@@ -153,7 +153,7 @@ export default function AdminPromotionsScreen() {
               </View>
 
               {item.state === 'rejected' && (
-                <Text style={s.meta}>{item.rejectionReason} · Refund {item.refundStatus === 'refunded' ? 'sent' : item.refundStatus === 'failed' ? 'failed, reject again to retry' : 'pending'}</Text>
+                <Text style={s.meta}>{item.rejectionReason} · Refund {item.refundStatus === 'refunded' ? 'sent' : item.refundStatus === 'credited' ? 'returned as store credit' : item.refundStatus === 'failed' ? 'failed, reject again to retry' : 'pending'}</Text>
               )}
 
               {item.state === 'in_review' && rejecting !== item.id && (

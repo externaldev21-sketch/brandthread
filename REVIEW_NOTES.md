@@ -47,7 +47,12 @@ The production backend uses live Stripe keys, so test card numbers are
 rejected. You can open the checkout and payment sheet without paying. The buyer
 account already has 5 past orders (delivered, shipped, processing, cancelled)
 under Profile, Orders, so order detail, tracking and reviews can be reviewed
-without a new purchase. No charge is made unless a real card is used. Seller subscription plans use in-app purchase.
+without a new purchase. No charge is made unless a real card is used.
+
+Every digital purchase in the iOS app uses in-app purchase: seller subscription
+plans, Boost, Create ad, Featured on Discover and AI credit packs. If a paid
+promotion is rejected in our review or cancelled before it runs, the purchase
+is returned to the seller as credit for their next promotion.
 
 ## User-generated content and moderation (Guideline 1.2)
 

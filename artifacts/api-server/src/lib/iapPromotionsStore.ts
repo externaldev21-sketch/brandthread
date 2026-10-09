@@ -3,9 +3,10 @@
  * Kept apart from iapPromotions.ts so the rules there stay DB-free.
  */
 import { ReplitConnectors } from "@replit/connectors-sdk";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { adCampaigns, boosts, db, iapPromotionPurchases, posts } from "@workspace/db";
+import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { adCampaigns, boosts, db, featuredSlots, iapPromotionPurchases, posts } from "@workspace/db";
 import { checkPostMediaEligibility, estimateBoostReach } from "../routes/boosts";
+import { confirmFeaturedSlotPaidById } from "../routes/featured-slots";
 import {
   findPurchaseInPayload,
   type ActivateResult,
@@ -15,6 +16,12 @@ import {
 } from "./iapPromotions";
 
 const AD_CAMPAIGN_BUDGET_MIN_CENTS = 500;
+/**
+ * A purchase only becomes reusable credit once its own grant attempt has had
+ * time to finish, so a credit can never be spent while the webhook / verify
+ * call for that same transaction is still activating something with it.
+ */
+export const CREDIT_SETTLE_MS = 5 * 60_000;
 
 function toRow(r: typeof iapPromotionPurchases.$inferSelect): PurchaseRow {
   return {
@@ -31,7 +38,7 @@ function toRow(r: typeof iapPromotionPurchases.$inferSelect): PurchaseRow {
 async function activateBoost(id: string, paidAt: Date): Promise<ActivateResult> {
   const [boost] = await db.select().from(boosts).where(eq(boosts.id, id)).limit(1);
   if (!boost) return "ineligible";
-  if (boost.status === "active") return "already_active";
+  if (boost.status === "active" || boost.status === "in_review") return "already_active";
   if (boost.status !== "pending_payment" && boost.status !== "failed") return "ineligible";
 
   const [post] = await db.select({
@@ -47,6 +54,13 @@ async function activateBoost(id: string, paidAt: Date): Promise<ActivateResult> 
     visibility: post.visibility as { isPublic?: boolean } | null,
   });
   if (!eligibility.eligible) return "ineligible";
+
+  // Same review gate as the Stripe rail: paid, but nothing serves until approved.
+  if (boost.reviewStatus !== "approved") {
+    const [inReview] = await db.update(boosts).set({ status: "in_review", paidAt })
+      .where(and(eq(boosts.id, id), inArray(boosts.status, ["pending_payment", "failed"]))).returning({ id: boosts.id });
+    return inReview ? "activated" : "already_active";
+  }
 
   const [updated] = await db.update(boosts).set({
     status: "active",
@@ -83,6 +97,13 @@ async function activateCampaign(id: string, paidAt: Date): Promise<ActivateResul
   return updated ? "activated" : "already_active";
 }
 
+async function activateFeatured(id: string, paidAt: Date): Promise<ActivateResult> {
+  const result = await confirmFeaturedSlotPaidById(id, paidAt);
+  if (!result) return "ineligible";
+  if (result.transitioned) return "activated";
+  return result.slot.status === "in_review" || result.slot.status === "approved" ? "already_active" : "ineligible";
+}
+
 export const drizzlePromoStore: PromoStore = {
   async claimPurchase(row) {
     const [inserted] = await db.insert(iapPromotionPurchases).values({
@@ -100,6 +121,14 @@ export const drizzlePromoStore: PromoStore = {
   },
 
   async findTarget(kind, ownerId, explicitId) {
+    if (kind === "featured_slot") {
+      const where = explicitId
+        ? and(eq(featuredSlots.id, explicitId), eq(featuredSlots.sellerId, ownerId))
+        : and(eq(featuredSlots.sellerId, ownerId), eq(featuredSlots.status, "pending_payment"));
+      const [row] = await db.select({ id: featuredSlots.id, budgetCents: featuredSlots.priceCents })
+        .from(featuredSlots).where(where).orderBy(desc(featuredSlots.createdAt)).limit(1);
+      return row ?? null;
+    }
     if (kind === "boost") {
       const where = explicitId
         ? and(eq(boosts.id, explicitId), eq(boosts.sellerId, ownerId))
@@ -116,14 +145,65 @@ export const drizzlePromoStore: PromoStore = {
     return row ?? null;
   },
 
-  activate: (kind, targetId, paidAt) => (kind === "boost" ? activateBoost(targetId, paidAt) : activateCampaign(targetId, paidAt)),
+  activate: (kind, targetId, paidAt) => (
+    kind === "boost" ? activateBoost(targetId, paidAt)
+      : kind === "featured_slot" ? activateFeatured(targetId, paidAt)
+        : activateCampaign(targetId, paidAt)),
 
   async markGranted(transactionId, targetId, at) {
     await db.update(iapPromotionPurchases)
       .set({ targetId, grantedAt: at })
       .where(and(eq(iapPromotionPurchases.transactionId, transactionId), sql`${iapPromotionPurchases.grantedAt} IS NULL`));
   },
+
+  async claimCredit(appUserId, kind, amountCents, targetId, at) {
+    const settledBefore = new Date(at.getTime() - CREDIT_SETTLE_MS);
+    const [row] = await db.update(iapPromotionPurchases)
+      .set({ targetId, grantedAt: at })
+      .where(sql`${iapPromotionPurchases.id} = (
+        SELECT id FROM iap_promotion_purchases
+        WHERE app_user_id = ${appUserId} AND kind = ${kind} AND amount_cents = ${amountCents}
+          AND granted_at IS NULL AND created_at < ${settledBefore}
+        ORDER BY created_at ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )`)
+      .returning({ transactionId: iapPromotionPurchases.transactionId });
+    return row?.transactionId ?? null;
+  },
+
+  async releaseCredit(transactionId) {
+    await db.update(iapPromotionPurchases)
+      .set({ targetId: null, grantedAt: null })
+      .where(eq(iapPromotionPurchases.transactionId, transactionId));
+  },
 };
+
+/** Unspent store purchases (credit) a user can apply to their next promotion. */
+export async function listPromotionCredits(appUserId: string, now = new Date()) {
+  return db.select({
+    kind: iapPromotionPurchases.kind,
+    amountCents: iapPromotionPurchases.amountCents,
+    productId: iapPromotionPurchases.productId,
+  }).from(iapPromotionPurchases).where(and(
+    eq(iapPromotionPurchases.appUserId, appUserId),
+    isNull(iapPromotionPurchases.grantedAt),
+    lt(iapPromotionPurchases.createdAt, new Date(now.getTime() - CREDIT_SETTLE_MS)),
+  )).orderBy(iapPromotionPurchases.createdAt);
+}
+
+/**
+ * A boost / campaign / Featured slot paid through the store was rejected or
+ * withdrawn before it ran: the store charge goes back to the seller as credit
+ * (Apple / Google own refunds). Returns false when no store purchase funded it.
+ */
+export async function releasePromotionCreditForTarget(kind: "boost" | "ad_campaign" | "featured_slot", targetId: string): Promise<boolean> {
+  const released = await db.update(iapPromotionPurchases)
+    .set({ targetId: null, grantedAt: null })
+    .where(and(eq(iapPromotionPurchases.kind, kind), eq(iapPromotionPurchases.targetId, targetId)))
+    .returning({ id: iapPromotionPurchases.id });
+  return released.length > 0;
+}
 
 /**
  * Reads the customer's purchases from RevenueCat (server-side, through the

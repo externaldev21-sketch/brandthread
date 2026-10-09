@@ -1,11 +1,11 @@
 /**
- * Native (iOS / Android) rail for Boost and Create-ad (App Store 3.1.1).
+ * Native (iOS / Android) rail for Boost, Create-ad and Featured (App Store 3.1.1).
  *
  * On a native build, paid promotion is bought as a RevenueCat consumable
  * through the store's own purchase sheet; Stripe Checkout stays on web. The
- * rail is OFF unless EXPO_PUBLIC_IAP_PROMOTIONS=1 is set in the build (after
- * the store products below exist), so nothing changes or crashes until Dev
- * flips it. Product ids mirror artifacts/api-server/src/lib/iapPromotions.ts.
+ * rail is ON for every native build; only EXPO_PUBLIC_IAP_PROMOTIONS=0 turns it
+ * off (never for a store build). Product ids mirror
+ * artifacts/api-server/src/lib/iapPromotions.ts.
  */
 import { Platform } from 'react-native';
 
@@ -23,6 +23,11 @@ export function promoProductId(kind: PromoKind, cents: number): string {
   return `${PREFIX[kind]}${Math.round(cents / 100)}`;
 }
 
+/** Featured on Discover is sold per length: "brandthread_featured_7d". */
+export function featuredProductId(durationDays: number): string {
+  return `brandthread_featured_${durationDays}d`;
+}
+
 /** Closest sellable tier to a chosen budget (ties round up). */
 export function nearestPromoTierCents(cents: number): number {
   let best: number = IAP_PROMO_TIERS_CENTS[0];
@@ -38,7 +43,23 @@ export function nativePromotionsEnabled(
   os: string = Platform.OS,
   flag: string | undefined = process.env.EXPO_PUBLIC_IAP_PROMOTIONS,
 ): boolean {
-  return (os === 'ios' || os === 'android') && flag === '1';
+  return (os === 'ios' || os === 'android') && flag !== '0';
+}
+
+/**
+ * Pays with an unspent store purchase of the same amount (a promotion that was
+ * rejected, withdrawn or could not be applied) before charging again. Returns
+ * that purchase's transaction id, or null when there is no credit. Never throws.
+ */
+export async function applyStoreCredit(
+  apply: () => Promise<{ status: string; transactionId?: string }>,
+): Promise<string | null> {
+  try {
+    const result = await apply();
+    return result.status === 'granted' && result.transactionId ? result.transactionId : null;
+  } catch {
+    return null;
+  }
 }
 
 /** True when the store purchase sheet was dismissed by the user (not an error). */

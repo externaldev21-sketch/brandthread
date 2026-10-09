@@ -56,7 +56,7 @@ import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/hooks/useApi';
 import { useRevenueCat } from '@/lib/revenueCat';
 import {
-  confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled,
+  applyStoreCredit, confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled,
   nearestPromoTierCents, promoProductId,
 } from '@/lib/iapPromotions';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -252,7 +252,7 @@ export default function CreateAdScreen() {
   const api       = useApi();
   const { purchaseConsumable } = useRevenueCat();
   // Native iOS/Android buys the ad through the store (Guideline 3.1.1);
-  // web keeps Stripe Checkout. Off unless EXPO_PUBLIC_IAP_PROMOTIONS=1.
+  // web keeps Stripe Checkout. On for every native build.
   const nativeRail = nativePromotionsEnabled();
   const { theme } = useAppTheme();
   const colors    = useColors();
@@ -579,7 +579,8 @@ export default function CreateAdScreen() {
     if (nativeRail) {
       setPaying(true);
       try {
-        const { transactionId } = await purchaseConsumable(promoProductId('ad_campaign', chargeCents));
+        const credit = await applyStoreCredit(() => api.adCampaigns.iapApplyCredit(campaign.id));
+        const { transactionId } = credit ? { transactionId: credit } : await purchaseConsumable(promoProductId('ad_campaign', chargeCents));
         await verifyPayment(campaign.id, transactionId);
       } catch (e: any) {
         if (!isPurchaseCancelled(e)) {

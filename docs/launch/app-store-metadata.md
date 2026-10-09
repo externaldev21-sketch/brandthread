@@ -103,11 +103,11 @@ reviewer notes field):
 > 2. **Seller subscription plans** (Settings → Plan & subscription, and the in-app
 >    paywall) — Apple/Google in-app purchase via RevenueCat. This is the only path to
 >    unlock premium seller tools.
-> 3. **Post boost / ad promotion** (seller Studio → Boost, and Create ad) — currently
->    Stripe Checkout. **We're aware this is a digital, in-app-consumed feature and are
->    migrating it to in-app purchase before wide release; please flag if this blocks
->    approval of this build** rather than rejecting outright, so we can coordinate the
->    fix. (Internal tracking: `docs/launch/app-store-readiness.md` row 10.)
+> 3. **Boost, Create ad and Featured on Discover** (seller Studio → Boost) — Apple/Google
+>    in-app purchase (consumables) via RevenueCat. AI credit packs use in-app purchase too.
+>
+> The full reviewer notes live in `REVIEW_NOTES.md` at the repo root; paste that file, not
+> this summary.
 >
 > **Demo accounts:** see the "Demo accounts for reviewers" section below — a buyer and a
 > seller account are provided with instructions for reaching checkout, messaging, live

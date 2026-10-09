@@ -4,19 +4,32 @@ vi.mock('react-native', () => ({ Platform: { OS: 'web' } }));
 
 import {
   IAP_PROMO_TIERS_CENTS,
+  applyStoreCredit,
   confirmNativePromotion,
+  featuredProductId,
   nativePromotionsEnabled,
   nearestPromoTierCents,
   promoProductId,
 } from './iapPromotions';
 
 describe('native promotion rail', () => {
-  it('is off on web and whenever the flag is unset', () => {
+  it('is on for every native build by default and never on web', () => {
     expect(nativePromotionsEnabled('web', '1')).toBe(false);
-    expect(nativePromotionsEnabled('ios', undefined)).toBe(false);
-    expect(nativePromotionsEnabled('ios', '0')).toBe(false);
+    expect(nativePromotionsEnabled('web', undefined)).toBe(false);
+    expect(nativePromotionsEnabled('ios', undefined)).toBe(true);
     expect(nativePromotionsEnabled('ios', '1')).toBe(true);
-    expect(nativePromotionsEnabled('android', '1')).toBe(true);
+    expect(nativePromotionsEnabled('android', undefined)).toBe(true);
+    expect(nativePromotionsEnabled('ios', '0')).toBe(false);
+  });
+
+  it('names Featured products by length', () => {
+    expect(featuredProductId(7)).toBe('brandthread_featured_7d');
+  });
+
+  it('uses store credit only when the server granted it', async () => {
+    expect(await applyStoreCredit(async () => ({ status: 'granted', transactionId: 'tx_1' }))).toBe('tx_1');
+    expect(await applyStoreCredit(async () => ({ status: 'already_active', transactionId: 'tx_1' }))).toBeNull();
+    expect(await applyStoreCredit(async () => { throw new Error('404 no_credit'); })).toBeNull();
   });
 
   it('maps budgets to the product ids Dev creates in the stores', () => {
