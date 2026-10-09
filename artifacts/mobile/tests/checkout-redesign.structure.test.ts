@@ -201,11 +201,13 @@ describe('order confirmation actions', () => {
 describe('cart matches the flat checkout', () => {
   const cart = read('app/(buyer)/cart.tsx');
 
-  it('has no card containers, only checkout sections and hairlines', () => {
+  it('has no card containers, only flat SSENSE rows and hairlines', () => {
+    const bag = read('components/bag/BagParts.tsx');
     expect(cart).not.toMatch(/<Card\b/);
-    expect(cart).toContain("import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives'");
-    expect(cart).toContain('<CheckoutSection first={first}');
-    expect(cart).toContain('<CheckoutSection title="Order summary"');
+    expect(bag).not.toMatch(/<Card\b/);
+    expect(cart).toContain('<BagItemRow');
+    expect(cart).toContain('<BagTotals');
+    expect(bag).toContain('StyleSheet.hairlineWidth');
     expect(cart).not.toMatch(/cardGlass|cardElevatedGlass, borderBottomWidth/);
     expect(cart).toContain('backgroundColor: theme.background');
     expect(cart).not.toContain('opacity: 0.06');

@@ -1,534 +1,51 @@
 /**
- * Brandthread Buyer Cart Screen
- * Multi-seller cart with save-for-later, summary, and checkout entry.
- *
- * Improvements:
- * - Per-row pending affordances (spinner overlay) for qty/remove/save actions
- * - Inline unavailable/low-stock warnings backed by actual CartItem data
- * - Consistent monochrome Woven design-system tokens throughout
+ * Brandthread bag — SSENSE's Shopping bag flow 1:1, reskinned
+ * (https://mobbin.com/flows/b906e342-83ab-4424-bf3b-59514df7dc6d; parts in
+ * components/bag/BagParts.tsx). Size and quantity change in place; shipping
+ * shows the sellers' real rates; "Go to checkout" checks out every available
+ * line as one session (one payment per seller, as before).
  */
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
-import {
-  View, Text, ScrollView, StyleSheet,
-  ActivityIndicator, Alert, TextInput, TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, TextInput, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Header, StickyFooter } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot,
+  getCartForScreen, updateCartItemQuantity, removeCartItem, restoreCartSnapshot,
   saveForLater, moveToCart, removeSavedItem,
   groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
+  estimateGroupShipping, totalShippingEstimate, replaceCartItemVariant, type ShippingEstimate,
 } from '@/services/cartService';
+import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
 import {
-  Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
-} from '@/services/cartTypes';
+  BAG_BAR_HEIGHT, BagCheckoutBar, BagColumns, BagEmpty, BagHeader, BagItemRow, BagTotals, toNewArrivals,
+  type BagLineBusy, type NewArrival,
+} from '@/components/bag/BagParts';
+import { Cart, CartItem, SavedCartItem, CheckoutLoyaltyRedemption, BuyerProduct, BuyerProductVariant } from '@/services/cartTypes';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
-import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
-// Same flat-black language as the one-page checkout: sections on pure black,
-// uppercase labels, 1px hairlines. No card containers.
-import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { isPreviewCheckoutGroup } from '@/lib/previewCheckout';
-import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 import { useApi } from '@/hooks/useApi';
-import SwipeableActions, { type SwipeAction } from '@/components/SwipeableActions';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
-import {
-  FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
-} from '@/lib/theme';
+import { goBackOr } from '@/lib/navigation/goBackOr';
+import { savedProducts } from '@/lib/saved/savedProducts';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import {
-  BrandedLoader, PressableScale, useUndoToast,
-} from '@/components/BrandthreadUI';
-import {
-  Button, ErrorState, QuantityStepper, StickyBottomCTA, ThemedRefreshControl,
-} from '@/components/ui';
-import { RADII, radius } from '@/constants/radii';
-import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
-
+import { BrandedLoader, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+import { Button, ErrorState, ThemedRefreshControl } from '@/components/ui';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
-import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtPrice = formatCents;
 
-// Sticky checkout bar's own fixed height (excluding the safe-area padding,
-// which is added separately wherever this is used) — StickyFooter's
-// paddingTop (SP.sm) plus the Checkout pill's height (COMP.buttonH), the
-// tallest thing in that row. Used to size the scroll content's own bottom
-// padding so the last line of content always clears the bar, instead of a
-// guessed magic number.
-const STICKY_BAR_CONTENT_HEIGHT = SP.sm + COMP.buttonH;
-
-// ─── Row pending state tracker ────────────────────────────────────────────────
-// Tracks which action is in-flight per item ID so the row can show a localized
-// spinner without blocking the whole cart.
-type RowPendingAction = 'qty_dec' | 'qty_inc' | 'remove' | 'save';
-
-const HIT_SLOP_8 = { top: 8, bottom: 8, left: 8, right: 8 };
-
-// ─── Quantity Row ─────────────────────────────────────────────────────────────
-
-function QuantityControl({
-  value, max, onDec, onInc, onRemove, pendingDec, pendingInc, itemLabel, testID,
-}: {
-  value: number;
-  max: number;
-  onDec: () => void;
-  onInc: () => void;
-  /** At qty 1 the − becomes a trash and removes the line (same flow + Undo as Remove). */
-  onRemove: () => void;
-  pendingDec?: boolean;
-  pendingInc?: boolean;
-  itemLabel: string;
-  testID?: string;
-}) {
-  const { theme } = useAppTheme();
-  const busy = pendingDec || pendingInc;
-  const handleChange = useCallback((next: number) => (next > value ? onInc() : onDec()), [value, onInc, onDec]);
-  return (
-    <View style={{ opacity: busy ? 0.5 : 1, flexDirection: 'row', alignItems: 'center', gap: SP.xs }}>
-      <QuantityStepper
-        value={value}
-        min={1}
-        max={Math.max(max, 1)}
-        disabled={busy}
-        onChange={handleChange}
-        onRemoveAtMin={onRemove}
-        itemLabel={itemLabel}
-        testID={testID}
-      />
-      {busy && <ActivityIndicator size="small" color={theme.text} style={{ marginLeft: 2 }} />}
-    </View>
-  );
-}
-
-// ─── Cart Item Row ─────────────────────────────────────────────────────────────
-
-function CartItemRow({
-  item, pendingAction, selected, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
-}: {
-  item: CartItem;
-  pendingAction?: RowPendingAction;
-  selected: boolean;
-  onToggleSelect: () => void;
-  onQtyDec: () => void;
-  onQtyInc: () => void;
-  onRemove: () => void;
-  onSaveForLater: () => void;
-  onEditVariant: () => void;
-}) {
-  const { theme } = useAppTheme();
-  const ir = useMemo(() => makeItemRowStyles(theme), [theme]);
-  const lineTotal = item.priceCents * item.quantity;
-  const hasDiscount = item.compareAtPriceCents && item.compareAtPriceCents > item.priceCents;
-  const isRowBusy = pendingAction === 'remove' || pendingAction === 'save';
-
-  // Low stock: warn at ≤ 3 units
-  const isLowStock = item.isAvailable && item.maxQuantity > 0 && item.maxQuantity <= 3;
-  // Very low: highlight differently at 1
-  const isCriticalStock = item.isAvailable && item.maxQuantity === 1;
-
-  // Swipe left to reveal Save for later + Remove — Mobbin: ZARA iOS shopping
-  // bag (row swiped left → SAVE / DELETE side by side). Same shared
-  // SwipeableActions as Activity rows; both actions run the exact handlers
-  // the row's own Save / Remove buttons use (same API, same undo toast).
-  // Monochrome: Save on a light-gray tint of the card (ZARA's dark SAVE), Remove
-  // white with a black trash (the screen's one solid "act" color, like the
-  // Checkout pill) — no red.
-  const swipeActions = useMemo<SwipeAction[]>(() => [
-    {
-      key: 'save',
-      icon: 'bookmark',
-      color: 'rgba(255,255,255,0.14)',
-      iconColor: theme.text,
-      accessibilityLabel: `Save ${item.productName} for later`,
-      onPress: onSaveForLater,
-    },
-    {
-      key: 'remove',
-      icon: 'trash-2',
-      color: '#FFFFFF',
-      iconColor: '#000000',
-      accessibilityLabel: `Remove ${item.productName} from cart`,
-      onPress: onRemove,
-    },
-  ], [item.productName, onRemove, onSaveForLater, theme.text]);
-
-  return (
-    <View style={ir.swipeBleed} testID={`cart-row-${item.id}`}>
-    <SwipeableActions actions={swipeActions} disabled={isRowBusy}>
-    <View style={[ir.root, ir.swipeFront, isRowBusy && ir.rowBusy]}>
-      {/* Pending overlay for remove/save */}
-      {isRowBusy && (
-        <View style={ir.busyOverlay} pointerEvents="none">
-          <ActivityIndicator size="small" color={theme.muted} />
-        </View>
-      )}
-
-      <PressableScale
-        style={ir.checkbox}
-        onPress={onToggleSelect}
-        disabled={isRowBusy}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: selected, disabled: isRowBusy }}
-        accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${item.productName} for checkout`}
-      >
-        <View style={[ir.checkboxBox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
-          {selected && <Feather name="check" size={12} color={theme.onAccent} />}
-        </View>
-      </PressableScale>
-
-      {/* Dev's line-item spec (Ulta Beauty bag; Amazon / Zalando for the
-          qty and remove pattern): a bigger 3:4 image, never cropped; name
-          with the price right-aligned on the title row; size + edit; the
-          stepper on its own row; one quiet grey text row at the bottom. No
-          purchase control on the line: checkout is per seller group (under
-          the group subtotal) and the main Checkout bar. */}
-      <View style={ir.img}>
-        {item.imageUri
-          ? <CachedImage source={{ uri: item.imageUri }} style={ir.productImage} contentFit="contain" recyclingKey={item.imageUri} />
-          : <Feather name="image" size={ICON.md} color={theme.muted} />}
-      </View>
-
-      <View style={ir.col}>
-        <View style={ir.titleRow}>
-          <Text style={ir.name} numberOfLines={3}>{item.productName}</Text>
-          <View style={ir.priceBlock}>
-            <Text style={[ir.price, hasDiscount ? ir.priceDiscounted : undefined]}>{fmtPrice(lineTotal)}</Text>
-            {hasDiscount && (
-              <Text style={ir.comparePrice}>{fmtPrice(item.compareAtPriceCents! * item.quantity)}</Text>
-            )}
-          </View>
-        </View>
-        <PressableScale
-          style={ir.variantRow}
-          onPress={onEditVariant}
-          disabled={isRowBusy}
-          noMinHeight
-          hitSlop={HIT_SLOP_8}
-          accessibilityLabel={`Change options for ${item.productName}. Current: ${item.variantTitle}`}
-        >
-          <Text style={ir.variant}>{item.variantTitle}</Text>
-          <Feather name="edit-2" size={12} color={theme.muted} />
-        </PressableScale>
-
-        {item.isPreOrder && (
-          <View style={ir.preOrderBadge}>
-            <Feather name="clock" size={10} color={theme.secondary} />
-            <Text style={[ir.preOrderText, { color: theme.secondary }]}>
-              Pre-order{item.preOrderEstShipDate ? ` · est. ${new Date(item.preOrderEstShipDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : ''}
-            </Text>
-          </View>
-        )}
-
-        {/* Unavailable warning — prominent, backed by CartItem.isAvailable */}
-        {!item.isAvailable && (
-          <View style={ir.unavailBadge} accessibilityRole="alert">
-             <Feather name="alert-circle" size={11} color={theme.error} />
-            <Text style={ir.unavailText}>{item.unavailableReason ?? 'Unavailable — remove or save for later'}</Text>
-          </View>
-        )}
-
-        {/* Low stock warning — inline, only when actually available */}
-        {isLowStock && (
-          <View style={[ir.stockWarnRow, isCriticalStock && ir.stockWarnCritical]}>
-             <Feather name="alert-triangle" size={10} color={theme.warning} />
-            <Text style={[ir.stockWarn, isCriticalStock && ir.stockWarnCriticalText]}>
-              {isCriticalStock ? 'Last one left!' : `Only ${item.maxQuantity} left`}
-            </Text>
-          </View>
-        )}
-
-        {/* Qty on its own row. At 1 the − is a trash (QuantityStepper's
-            onRemoveAtMin): the same remove flow + Undo as the text link. */}
-        <View style={ir.qtyRow}>
-          <QuantityControl
-            value={item.quantity}
-            max={item.maxQuantity}
-            onDec={onQtyDec}
-            onInc={onQtyInc}
-            onRemove={onRemove}
-            itemLabel={item.productName}
-            testID={`cart-qty-${item.id}`}
-            pendingDec={pendingAction === 'qty_dec'}
-            pendingInc={pendingAction === 'qty_inc'}
-          />
-        </View>
-
-        {/* One quiet text row, left-aligned, grey 13pt (never red: red is
-            LIVE and end-call only), well away from any primary button. */}
-        <View style={ir.textActions}>
-          <PressableScale
-            style={ir.textAction}
-            onPress={onSaveForLater}
-            disabled={isRowBusy}
-            noMinHeight
-            rippleEnabled={false}
-            accessibilityLabel={`Save ${item.productName} for later`}
-            accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'save' }}
-            testID={`cart-save-${item.id}`}
-          >
-            <Text style={ir.textActionLabel}>Save for later</Text>
-          </PressableScale>
-          <Text style={ir.textActionDot} importantForAccessibility="no" accessibilityElementsHidden>·</Text>
-          <PressableScale
-            style={ir.textAction}
-            onPress={onRemove}
-            disabled={isRowBusy}
-            noMinHeight
-            rippleEnabled={false}
-            accessibilityLabel={`Remove ${item.productName} from cart`}
-            accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'remove' }}
-            testID={`cart-remove-${item.id}`}
-          >
-            <Text style={ir.textActionLabel}>Remove</Text>
-          </PressableScale>
-        </View>
-      </View>
-    </View>
-    </SwipeableActions>
-    </View>
-  );
-}
-
-const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
-  root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm, alignItems: 'flex-start' },
-  rowBusy: { opacity: 0.7 },
-  // The swipe row spans the full screen width (edge to edge, cancelling the
-  // list's 16pt gutter) so the revealed actions sit flush with the screen
-  // edge; the row pads itself back in, so at rest nothing moves. Opaque black
-  // (the page color) so the actions never show through at rest (web).
-  swipeBleed: { marginHorizontal: -SP.md },
-  swipeFront: { paddingHorizontal: SP.md, backgroundColor: theme.background },
-  checkbox: { width: COMP.minTouchTarget, height: 72, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
-  checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  busyOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 10, alignItems: 'center', justifyContent: 'center',
-  },
-  // 3:4 and `contain`: the whole product shows, never cropped.
-  img: {
-    width: 84, height: 112, borderRadius: RADII.card,
-    backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,
-    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-  },
-  productImage: { width: '100%', height: '100%' },
-  // Root gap (8) + this margin (8) = the 16pt gutter between image and text.
-  col: { flex: 1, minWidth: 0, marginLeft: SP.sm },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
-  name: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: theme.text, flex: 1, minWidth: 0 },
-  // 28pt + 8pt hitSlop above and below = a 44pt target.
-  variantRow: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, alignSelf: 'flex-start', marginTop: 2 },
-  variant: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
-  preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  preOrderText: { fontSize: FS.xs, fontFamily: FONT.medium },
-  unavailBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: `${theme.error}26`, borderRadius: RADIUS.pill,
-    paddingHorizontal: 8, paddingVertical: 3,
-    alignSelf: 'flex-start', marginBottom: 4,
-  },
-  unavailText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, flex: 1, flexShrink: 1 },
-  stockWarnRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4,
-    backgroundColor: `${theme.warning}26`, borderRadius: RADIUS.pill,
-    paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start',
-  },
-  stockWarnCritical: { backgroundColor: `${theme.error}26` },
-  stockWarn: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
-  stockWarnCriticalText: { color: theme.error },
-  priceBlock: { alignItems: 'flex-end' },
-  comparePrice: { fontSize: FS.meta, ...TABULAR_NUMS, fontFamily: FONT.medium, color: theme.subtle, textDecorationLine: 'line-through' },
-  price: { fontSize: FS.md, ...TABULAR_NUMS, fontFamily: FONT.bold, color: theme.text },
-  priceDiscounted: { color: theme.success },
-  qtyRow: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
-  // Grey 13pt text links, each a 44pt-tall target, left-aligned.
-  textActions: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginLeft: -SP.xs },
-  textAction: { height: 44, justifyContent: 'center', paddingHorizontal: SP.xs },
-  textActionLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-  textActionDot: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.subtle, marginHorizontal: 2 },
-});
-
-
-// ─── Seller Group ─────────────────────────────────────────────────────────────
-
-function SellerGroup({
-  group, first, pendingByItemId, selectedIds, checkingOut, checkoutDisabled, onCheckoutGroup, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
-}: {
-  group: CartSellerGroup;
-  /** The first section has no hairline above it. */
-  first: boolean;
-  pendingByItemId: Record<string, RowPendingAction>;
-  selectedIds: Set<string>;
-  /** This seller's own checkout is starting. */
-  checkingOut: boolean;
-  /** Another checkout is already starting. */
-  checkoutDisabled: boolean;
-  onCheckoutGroup: (sellerId: string) => void;
-  onToggleSelect: (itemId: string) => void;
-  onQtyDec: (itemId: string) => void;
-  onQtyInc: (itemId: string) => void;
-  onRemove: (itemId: string) => void;
-  onSaveForLater: (itemId: string) => void;
-  onEditVariant: (item: CartItem) => void;
-}) {
-  const { theme } = useAppTheme();
-  const sg = useMemo(() => makeSellerGroupStyles(theme), [theme]);
-  const router = useRouter();
-  const openStore = useCallback(
-    () => router.push(('/seller-profile?id=' + encodeURIComponent(group.sellerId)) as never),
-    [router, group.sellerId],
-  );
-  const checkoutThisSeller = useCallback(() => onCheckoutGroup(group.sellerId), [onCheckoutGroup, group.sellerId]);
-  const hasAvailable = group.items.some(item => item.isAvailable);
-  return (
-    <CheckoutSection first={first} testID={`cart-seller-${group.sellerId}`}>
-      {/* Seller header — avatar, name, and a chevron to the store (the
-          whole row is the tap target, not a separate "Visit store" button).
-          Same per-seller grouping as checkout: both come from
-          groupCartBySeller (checkout's deliveryGroups are built from it in
-          createCheckoutSession), so a cart section = one checkout payment.
-          Only the lines below are swipeable/steppable — never this header. */}
-      <PressableScale
-        style={sg.sellerRow}
-        onPress={openStore}
-        testID={`cart-seller-header-${group.sellerId}`}
-        accessibilityRole="button"
-        accessibilityLabel={`Visit ${group.sellerName}'s store`}
-        noMinHeight
-      >
-        <View style={[sg.avatar, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
-          {group.sellerAvatarUri ? (
-            <CachedImage source={{ uri: group.sellerAvatarUri }} style={sg.avatarImage} contentFit="cover" recyclingKey={group.sellerAvatarUri} />
-          ) : (
-            <Text style={[sg.avatarText, { color: theme.accentLight }]}>{group.sellerInitial}</Text>
-          )}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={sg.sellerName}>{group.sellerName}</Text>
-          <Text style={sg.sellerHandle}>{group.sellerHandle}</Text>
-        </View>
-        <Feather name="chevron-right" size={18} color={theme.muted} />
-      </PressableScale>
-
-      {/* Items */}
-      {group.items.map((item, idx) => (
-        <View key={item.id}>
-          {idx > 0 && <View style={sg.divider} />}
-          <SellerGroupLine
-            item={item}
-            pendingAction={pendingByItemId[item.id]}
-            selected={selectedIds.has(item.id)}
-            onToggleSelect={onToggleSelect}
-            onQtyDec={onQtyDec}
-            onQtyInc={onQtyInc}
-            onRemove={onRemove}
-            onSaveForLater={onSaveForLater}
-            onEditVariant={onEditVariant}
-          />
-        </View>
-      ))}
-
-      {/* Group footer */}
-      <View style={sg.footer}>
-        <View style={sg.footerRow}>
-        <Feather name="truck" size={12} color={theme.muted} />
-          <Text style={sg.footerText}>{group.fulfillmentEstimate}</Text>
-        </View>
-        {group.hasPreOrder && (
-          <View style={sg.footerRow}>
-            <Feather name="clock" size={12} color={theme.secondary} />
-            <Text style={[sg.footerText, { color: theme.secondary }]}>Contains pre-order items</Text>
-          </View>
-        )}
-        <Text style={sg.groupSubtotal}>Group subtotal: {fmtPrice(group.subtotalCents)}</Text>
-        {/* The only per-line purchase path now: this seller's items, as one
-            payment (a cart section = one checkout delivery group). */}
-        <Button
-          label={`Checkout from ${group.sellerName}`}
-          variant="secondary"
-          fullWidth
-          loading={checkingOut}
-          disabled={!hasAvailable || checkoutDisabled}
-          onPress={checkoutThisSeller}
-          accessibilityHint={`Checks out only ${group.sellerName}'s items, ${fmtPrice(group.subtotalCents)}`}
-          style={sg.groupCheckout}
-          testID={`cart-group-checkout-${group.sellerId}`}
-        />
-      </View>
-    </CheckoutSection>
-  );
-}
-
-/**
- * One line inside a seller section: binds the section's id-based handlers to
- * this line with stable callbacks (no inline arrows reaching the row's
- * PressableScale buttons).
- */
-function SellerGroupLine({
-  item, pendingAction, selected,
-  onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
-}: {
-  item: CartItem;
-  pendingAction?: RowPendingAction;
-  selected: boolean;
-  onToggleSelect: (itemId: string) => void;
-  onQtyDec: (itemId: string) => void;
-  onQtyInc: (itemId: string) => void;
-  onRemove: (itemId: string) => void;
-  onSaveForLater: (itemId: string) => void;
-  onEditVariant: (item: CartItem) => void;
-}) {
-  const id = item.id;
-  const toggle = useCallback(() => onToggleSelect(id), [onToggleSelect, id]);
-  const dec = useCallback(() => onQtyDec(id), [onQtyDec, id]);
-  const inc = useCallback(() => onQtyInc(id), [onQtyInc, id]);
-  const remove = useCallback(() => onRemove(id), [onRemove, id]);
-  const save = useCallback(() => onSaveForLater(id), [onSaveForLater, id]);
-  const edit = useCallback(() => onEditVariant(item), [onEditVariant, item]);
-  return (
-    <CartItemRow
-      item={item}
-      pendingAction={pendingAction}
-      selected={selected}
-      onToggleSelect={toggle}
-      onQtyDec={dec}
-      onQtyInc={inc}
-      onRemove={remove}
-      onSaveForLater={save}
-      onEditVariant={edit}
-    />
-  );
-}
-
-const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
-  sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  avatar: { width: 38, height: 38, borderRadius: RADII.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarImage: { width: '100%', height: '100%' },
-  avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
-  sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-  sellerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
-  // The checkout's hairline (theme.borderSubtle), between lines and above the footer.
-  divider: { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
-  footer: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
-  footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  footerText: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
-  groupSubtotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 4 },
-  groupCheckout: { marginTop: SP.sm },
-});
-
-// ─── Saved for Later ──────────────────────────────────────────────────────────
+type RowPendingAction = NonNullable<BagLineBusy>;
 
 function SavedItemRow({ item, onMove, onRemove }: {
   item: SavedCartItem;
@@ -540,7 +57,7 @@ function SavedItemRow({ item, onMove, onRemove }: {
   return (
     <View style={si.root}>
       <View style={si.img}>
-        <Feather name="bookmark" size={ICON.md} color={theme.muted} />
+        <Feather name="bookmark" size={20} color={theme.muted} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={si.name} numberOfLines={1}>{item.productName}</Text>
@@ -583,58 +100,6 @@ const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
 
 // ─── Order summary ─────────────────────────────────────────────────────────────
 
-function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrder }: {
-  subtotal: number; discountTotal: number; shipping: number; tax: number; total: number; hasPreOrder: boolean;
-}) {
-  const { theme } = useAppTheme();
-  const sum = useMemo(() => makeSummaryStyles(theme), [theme]);
-  function Row({ label, value, accent, small }: { label: string; value: string; accent?: string; small?: boolean }) {
-    return (
-      <View style={sum.row}>
-        <Text style={[sum.label, small && sum.labelSm]}>{label}</Text>
-        <Text style={[sum.value, small && sum.valueSm, !!accent && { color: accent }]}>{value}</Text>
-      </View>
-    );
-  }
-  return (
-    <CheckoutSection title="Order summary" testID="cart-order-summary">
-      <Row label="Subtotal" value={fmtPrice(subtotal)} />
-      <Row label="Discounts" value={discountTotal > 0 ? `–${fmtPrice(discountTotal)}` : fmtPrice(0)} accent={discountTotal > 0 ? theme.success : undefined} />
-      <Row label="Shipping & fees" value={fmtPrice(shipping)} small />
-      <Row label="Est. tax" value={fmtPrice(tax)} small />
-      <View style={sum.divider} />
-      <View style={sum.totalRow}>
-        <Text style={sum.totalLabel}>Total</Text>
-        <Text style={sum.totalValue}>{fmtPrice(total)}</Text>
-      </View>
-      <Text style={sum.note}>Shipping and tax are estimated. Final amount calculated at checkout.</Text>
-      {hasPreOrder && (
-        <View style={sum.preOrderNote}>
-          <Feather name="clock" size={12} color={theme.secondary} />
-          <Text style={[sum.preOrderNoteText, { color: theme.secondary }]}>Pre-order items will ship after production. Items may ship separately.</Text>
-        </View>
-      )}
-    </CheckoutSection>
-  );
-}
-
-const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
-  label: { ...TYPE.body, color: theme.muted },
-  labelSm: { fontSize: FS.sm },
-  value: { ...TYPE.bodyMedium, ...TABULAR_NUMS, fontFamily: FONT.semibold, color: theme.text },
-  valueSm: { fontSize: FS.sm },
-  divider: { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.sm },
-  totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SP.xs },
-  totalLabel: { ...TYPE.subheading, color: theme.text },
-  totalValue: { ...TYPE.subheading, ...TABULAR_NUMS, color: theme.text },
-  note: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.subtle, marginTop: SP.sm },
-  preOrderNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: SP.sm },
-  preOrderNoteText: { fontSize: FS.meta, fontFamily: FONT.medium, flex: 1 },
-});
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
 export default function CartScreen() {
   const scrollResetRef = useScrollReset<ScrollView>();
   // Cart is a pushed screen reached from the feed's cart icon or Shop the
@@ -644,6 +109,7 @@ export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeScreenStyles(theme), [theme]);
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const { push } = useThreadPull();
   const api = useApi();
@@ -651,6 +117,9 @@ export default function CartScreen() {
   const { showUndo } = useUndoToast();
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
+  const [shippingEstimates, setShippingEstimates] = useState<Record<string, ShippingEstimate | null>>({});
+  // The line whose size/qty is being changed in the inline picker.
+  const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   const [loading, setLoading] = useState(true);
   /** True only when we couldn't confirm the cart is really empty (see getCartForScreen). */
   const [loadError, setLoadError] = useState(false);
@@ -660,22 +129,6 @@ export default function CartScreen() {
   const [redeemingPoints, setRedeemingPoints] = useState(false);
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // THREAD CASH HOOK POINT — see components/thread-cash/UseThreadCashCard.tsx.
-  const threadCashCheckoutEnabled = useFeatureFlag('threadCashCheckoutDiscount');
-  const [threadCashRedemption, setThreadCashRedemption] = useState<CheckoutThreadCashRedemption | null>(null);
-
-  // Which lines are included in "Checkout selected" / a per-item Buy. New
-  // items default to selected — buyers opt OUT, they never have to opt in
-  // just to check out everything.
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const knownItemIdsRef = useRef<Set<string>>(new Set());
-  const [checkingOutSellerId, setCheckingOutSellerId] = useState<string | null>(null);
-
-  // Header "Edit" toggle — reuses the existing per-item selection checkboxes
-  // to drive a bulk "Remove selected" action instead of adding a second,
-  // parallel selection model.
-  const [editMode, setEditMode] = useState(false);
-  const [removingSelected, setRemovingSelected] = useState(false);
 
   // Per-row pending actions: itemId → action
   const [pendingByItemId, setPendingByItemId] = useState<Record<string, RowPendingAction>>({});
@@ -690,17 +143,6 @@ export default function CartScreen() {
       const { cart: nextCart, loadError: nextLoadError } = await getCartForScreen();
       setCart(nextCart);
       setLoadError(nextLoadError);
-      setSelectedIds(prev => {
-        const next = new Set<string>();
-        for (const item of nextCart.items) {
-          // A brand-new line (never seen before) defaults to selected; a line
-          // the buyer already saw keeps whatever they chose, including "off".
-          const isNew = !knownItemIdsRef.current.has(item.id);
-          if (isNew || prev.has(item.id)) next.add(item.id);
-        }
-        knownItemIdsRef.current = new Set(nextCart.items.map(i => i.id));
-        return next;
-      });
       const pendingCheckout = await getCheckoutSession();
       if (
         pendingCheckout?.loyaltyRedemption &&
@@ -742,7 +184,19 @@ export default function CartScreen() {
 
   const groups = groupCartBySeller(cart.items);
   const hasPreOrder = cart.items.some(i => i.isPreOrder);
-  const summary = calculateCartSummary(cart.items);
+  // Real shipping per seller group (the rate checkout will charge).
+  const groupsKey = groups.map(g => `${g.sellerId}:${g.subtotalCents}`).join('|');
+  useEffect(() => {
+    if (!groupsKey) return undefined;
+    let active = true;
+    const current = groupCartBySeller(cart.items);
+    void Promise.all(current.map(async g => [g.sellerId, await estimateGroupShipping(g.sellerId, g.subtotalCents)] as const))
+      .then(entries => { if (active) setShippingEstimates(Object.fromEntries(entries)); });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupsKey]);
+  const shippingTotal = totalShippingEstimate(groups.map(g => g.sellerId), shippingEstimates);
+  const summary = calculateCartSummary(cart.items, 0, shippingTotal ?? 0);
   const requestedPoints = Math.floor(Number(pointsInput));
   const maxRedeemablePoints = Math.min(
     loyaltyBalance,
@@ -751,27 +205,9 @@ export default function CartScreen() {
   const loyaltyPreviewCents = Number.isFinite(requestedPoints) && requestedPoints >= 100
     ? Math.min(requestedPoints, maxRedeemablePoints)
     : 0;
-  const rewardsAppliedCents = (loyaltyRedemption?.discountCents ?? 0) + (threadCashRedemption?.discountCents ?? 0);
+  const rewardsAppliedCents = loyaltyRedemption?.discountCents ?? 0;
   const displayedDiscount = summary.discountTotalCents + rewardsAppliedCents;
   const displayedTotal = Math.max(0, summary.totalCents - rewardsAppliedCents);
-
-  const selectedItems = cart.items.filter(i => selectedIds.has(i.id));
-  const allSelected = cart.items.length > 0 && selectedItems.length === cart.items.length;
-  const selectedSummary = calculateCartSummary(selectedItems);
-  const selectedDisplayedTotal = allSelected ? displayedTotal : selectedSummary.totalCents;
-
-  function toggleSelect(itemId: string) {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    Haptics.selectionAsync();
-    setSelectedIds(allSelected ? new Set() : new Set(cart.items.map(i => i.id)));
-  }
 
   async function handleQtyDec(itemId: string) {
     if (pendingByItemId[itemId]) return;
@@ -851,22 +287,19 @@ export default function CartScreen() {
     setCart(newCart);
   }
 
-  async function handleRemoveSelected() {
-    if (selectedIds.size === 0 || removingSelected) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setRemovingSelected(true);
-    try {
-      const newCart = await removeCartItems([...selectedIds]);
-      setCart(newCart);
-      setSelectedIds(new Set());
-      setEditMode(false);
-    } finally {
-      setRemovingSelected(false);
-    }
+  function handleEditVariant(item: CartItem) {
+    setEditingItem(item);
   }
 
-  function handleEditVariant(item: CartItem) {
-    push(('/thread-product-detail?productId=' + item.productId + '&editVariantId=' + item.variantId + '&editCartItemId=' + item.id) as never);
+  async function handleConfirmVariant(product: BuyerProduct, variant: BuyerProductVariant, quantity: number) {
+    if (!editingItem) return;
+    const result = await replaceCartItemVariant(editingItem.id, product, variant, quantity);
+    if (!result.success) {
+      Alert.alert('Couldn’t update this item', result.message ?? 'Try again.');
+      return;
+    }
+    setCart(result.cart);
+    setEditingItem(null);
   }
 
   async function handleApplyPoints() {
@@ -946,8 +379,7 @@ export default function CartScreen() {
       // only honor it when this checkout actually covers the whole cart.
       const checkingOutFullCart = items.length === cart.items.length;
       const loyaltyToApply = checkingOutFullCart ? (loyaltyRedemption ?? undefined) : undefined;
-      const threadCashToApply = checkingOutFullCart ? (threadCashRedemption ?? undefined) : undefined;
-      if ((loyaltyToApply || threadCashToApply) && currentGroups.length !== 1) {
+      if (loyaltyToApply && currentGroups.length !== 1) {
         Alert.alert('Rewards need one store', 'Remove items from other sellers before continuing with this rewards discount.');
         setBusy(false);
         return;
@@ -980,7 +412,7 @@ export default function CartScreen() {
       // a single-item Buy, a "checkout selected" subset, and "checkout all"
       // from ever forcing the buyer to purchase (or clear out) more than
       // they chose; buyer-checkout.tsx removes only these items on success.
-      await createCheckoutSession(cart, true, items, loyaltyToApply, threadCashToApply);
+      await createCheckoutSession(cart, true, items, loyaltyToApply);
       push(('/thread-checkout?source=cart') as never);
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
@@ -988,22 +420,48 @@ export default function CartScreen() {
     setBusy(false);
   }
 
-  async function handleCheckoutSelected() {
-    await startCheckout(selectedItems);
+  async function handleMoveToSaves(itemId: string) {
+    if (pendingByItemId[itemId]) return;
+    const item = cart.items.find(i => i.id === itemId);
+    if (!item) return;
+    // Signed out there are no Saves yet; keep the line on this device instead.
+    if (!savedProducts.isSignedIn()) { await handleSaveForLater(itemId); return; }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const snapshot = cart;
+    setPending(itemId, 'save');
+    try {
+      if (!savedProducts.has(item.productId)) {
+        const result = await savedProducts.toggle({
+          productId: item.productId, title: item.productName, brand: item.sellerName, priceCents: item.priceCents,
+        });
+        if (!result.ok) {
+          Alert.alert('Couldn’t move to saves', 'Check your connection and try again.');
+          return;
+        }
+      }
+      setCart(await removeCartItem(itemId));
+      showUndo({
+        message: 'Moved to saves',
+        undo: async () => setCart(await restoreCartSnapshot(snapshot)),
+      });
+    } finally {
+      clearPending(itemId);
+    }
   }
 
-  // "Checkout from {Seller}": that seller's available lines as one payment.
-  async function handleCheckoutGroup(sellerId: string) {
-    if (checkingOutSellerId) return;
-    const items = cart.items.filter(item => item.sellerId === sellerId && item.isAvailable);
-    if (items.length === 0) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await startCheckout(items, { onBusy: busy => setCheckingOutSellerId(busy ? sellerId : null) });
-  }
+  const loadNewArrivals = useCallback(async (): Promise<NewArrival[]> => {
+    if (isBuyerDevPreview() && !isSignedIn) return [];
+    return toNewArrivals(await api.publicProducts.list({ limit: 12 }));
+  }, [api, isSignedIn]);
+
+  const availableItems = cart.items.filter(item => item.isAvailable);
+  const itemCount = cart.items.reduce((sum, i) => sum + i.quantity, 0);
+  const closeBag = () => goBackOr(router, '/(buyer)');
 
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.background }}>
+        <BagHeader topInset={headerTopInset} onClose={closeBag} />
         <BrandedLoader label="Gathering your picks…" />
       </View>
     );
@@ -1014,221 +472,107 @@ export default function CartScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Pushed-screen header: back chevron + "Cart (N)" + Edit, matching
-          every other stack screen (not the tab-root large-title header) —
-          this is a screen reached from the feed's cart icon or Shop the
-          Post, never its own tab (see BUYER_TAB_BAR_HIDDEN_ROUTES). */}
-      <Header
-        title={`Cart${hasItems ? ` (${cart.items.reduce((sum, i) => sum + i.quantity, 0)})` : ''}`}
-        showBack
-        // Over the page's pure black (no second, lighter band).
-        transparent
-        rightElement={hasItems ? (
-          <TouchableOpacity
-            onPress={() => { Haptics.selectionAsync(); setEditMode(e => !e); }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel={editMode ? 'Done editing cart' : 'Edit cart'}
-            // Header's compact row already contributes SP.sm (8pt) of its own
-            // paddingHorizontal; this adds the remaining 8pt so Edit's right
-            // inset totals 16pt — the same as the back chevron's left inset.
-            style={s.editBtn}
-          >
-            <Text style={[s.editText, { color: theme.accentLight }]}>{editMode ? 'Done' : 'Edit'}</Text>
-          </TouchableOpacity>
-        ) : undefined}
-      />
+      <BagHeader topInset={headerTopInset} onClose={closeBag} />
 
-      {!hasItems && !hasSaved && !loadError ? (
-        // Monochrome empty state (Threads/Instagram-style plain icon-in-circle,
-        // not the shared BrandthreadUI EmptyState's colored gradient
-        // illustration) at the requested 120pt circle / 52pt CTA sizing.
-        <View style={[s.emptyWrap, { flex: 1 }]}>
-          <View style={[s.emptyIconCircle, { backgroundColor: theme.cardElevatedGlass, borderColor: theme.border }]}>
-            <ThreadIllustration motif="hanger" size={52} color={theme.muted} strokeWidth={4.5} />
-          </View>
-          <Text style={[s.emptyTitle, { color: theme.text }]}>Your cart is empty</Text>
-          <Text style={[s.emptyDescription, { color: theme.muted }]}>Tap Shop on a post you love to add it here.</Text>
-          <Button
-            label="Continue shopping"
-            icon="compass"
-            onPress={() => router.navigate('/(buyer)/discover' as never)}
-            style={s.emptyCta}
-            accessibilityHint="Opens Discover to browse products"
-          />
-        </View>
-      ) : !hasItems && !hasSaved && loadError ? (
+      {!hasItems && loadError ? (
         <ErrorState
-          message="Couldn’t load your cart. Check your connection and try again."
+          message="Couldn’t load your bag."
           onRetry={() => { setLoading(true); void load(); }}
           style={{ flex: 1, justifyContent: 'center' }}
         />
       ) : (
         <>
-          {hasItems && editMode && (
-            <View style={s.editBar}>
-              <Text style={s.editBarText}>
-                {selectedItems.length > 0 ? `${selectedItems.length} selected` : 'Select items to remove'}
-              </Text>
-              <Button
-                label="Remove"
-                size="compact"
-                // Monochrome: red is for LIVE and end-call only. Same grey
-                // secondary treatment as the row and swipe Remove actions.
-                variant="secondary"
-                onPress={handleRemoveSelected}
-                loading={removingSelected}
-                disabled={selectedItems.length === 0}
-                accessibilityHint="Removes the selected items from your cart"
-              />
-            </View>
-          )}
-          {hasItems && (
-            <PressableScale
-              style={s.selectAllRow}
-              onPress={toggleSelectAll}
-              accessibilityRole="checkbox"
-              accessibilityLabel={allSelected ? 'All items selected' : `${selectedItems.length} of ${cart.items.length} selected`}
-              accessibilityState={{ checked: allSelected }}
-            >
-              <View style={[s.selectAllBox, allSelected && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
-                {allSelected && <Feather name="check" size={12} color={theme.onAccent} />}
-              </View>
-              <Text style={s.selectAllText}>
-                {allSelected ? 'All items selected' : `${selectedItems.length} of ${cart.items.length} selected`}
-              </Text>
-            </PressableScale>
-          )}
           <ScrollView
             ref={scrollResetRef}
             showsVerticalScrollIndicator={false}
-            refreshControl={
-              <ThemedRefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-              />
-            }
+            keyboardShouldPersistTaps="handled"
+            refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
             contentContainerStyle={{
               paddingHorizontal: SP.md,
-              paddingTop: SP.sm,
-              // Sticky bar's own height + the safe-area inset it pads by +
-              // 16pt breathing room, so the last line of content (the saved-
-              // for-later hint) is never left peeking out from behind the
-              // bar — no floating tab bar to clear on this pushed screen.
-              paddingBottom: STICKY_BAR_CONTENT_HEIGHT + insets.bottom + SP.md,
+              paddingBottom: (hasItems ? BAG_BAR_HEIGHT : 0) + insets.bottom + SP.lg,
             }}
           >
-            {/* Seller groups */}
-            {groups.map((group, index) => (
-              <SellerGroup
-                key={group.sellerId}
-                group={group}
-                first={index === 0}
-                pendingByItemId={pendingByItemId}
-                selectedIds={selectedIds}
-                checkingOut={checkingOutSellerId === group.sellerId}
-                checkoutDisabled={!!checkingOutSellerId && checkingOutSellerId !== group.sellerId}
-                onCheckoutGroup={handleCheckoutGroup}
-                onToggleSelect={toggleSelect}
-                onQtyDec={handleQtyDec}
-                onQtyInc={handleQtyInc}
-                onRemove={handleRemove}
-                onSaveForLater={handleSaveForLater}
-                onEditVariant={handleEditVariant}
-              />
-            ))}
-
-            {/* Summary */}
-            {hasItems && (
+            {hasItems ? (
               <>
-              {groups.length > 1 && (
-                <View style={s.multiSellerNotice}>
-                  <Feather name="layers" size={15} color={theme.muted} style={{ marginTop: 2 }} />
-                  <Text style={[s.multiSellerText, { color: theme.muted }]}>Items from {groups.length} sellers ship separately, each with its own delivery estimate.</Text>
-                </View>
-              )}
-              {isSignedIn && (
-              <View style={s.loyaltyCard}>
-                <View style={s.loyaltyHeading}>
-                  <View style={s.loyaltyIcon}>
-                    <Feather name="gift" size={15} color={theme.text} />
-                  </View>
-                  <View style={{ flex: 1 }}>
+                <BagColumns count={itemCount} />
+                {cart.items.map(item => (
+                  <BagItemRow
+                    key={item.id}
+                    item={item}
+                    busy={pendingByItemId[item.id]}
+                    onOpen={() => push({ pathname: '/thread-product-detail' as any, params: { productId: item.productId, src: 'cart' } } as never)}
+                    onChangeSize={() => handleEditVariant(item)}
+                    onQtyDec={() => handleQtyDec(item.id)}
+                    onQtyInc={() => handleQtyInc(item.id)}
+                    onMoveToSaves={() => handleMoveToSaves(item.id)}
+                    onRemove={() => handleRemove(item.id)}
+                  />
+                ))}
+
+                {/* Points sit where SSENSE puts its promo line, only when the buyer has some. */}
+                {isSignedIn && loyaltyBalance > 0 && (
+                  <View style={s.loyaltyCard}>
                     <Text style={s.loyaltyTitle}>Use points</Text>
                     <Text style={s.loyaltySub}>
                       {loyaltyBalance.toLocaleString()} points available · 100 points = $1.00
                     </Text>
-                  </View>
-                </View>
-                {loyaltyRedemption ? (
-                  <View style={s.appliedPoints}>
-                    <View style={{ flex: 1 }}>
+                    {loyaltyRedemption ? (
                       <Text style={s.appliedPointsTitle}>
-                        {loyaltyRedemption.pointsUsed.toLocaleString()} points applied
+                        {loyaltyRedemption.pointsUsed.toLocaleString()} points applied · −{fmtPrice(loyaltyRedemption.discountCents)}
                       </Text>
-                      <Text style={s.appliedPointsSub}>
-                         −{fmtPrice(loyaltyRedemption.discountCents)} at secure checkout
+                    ) : (
+                      <View style={s.pointsRow}>
+                        <TextInput
+                          value={pointsInput}
+                          onChangeText={setPointsInput}
+                          keyboardType="number-pad"
+                          placeholder="Points to use"
+                          placeholderTextColor={theme.subtle}
+                          style={s.pointsInput}
+                          accessibilityLabel="Loyalty points to use"
+                        />
+                        <Button
+                          label="Apply"
+                          size="small"
+                          variant="secondary"
+                          onPress={handleApplyPoints}
+                          loading={redeemingPoints}
+                          disabled={groups.length !== 1}
+                          accessibilityHint="Applies loyalty points to this order"
+                        />
+                      </View>
+                    )}
+                    {!loyaltyRedemption && (
+                      <Text style={s.pointsPreview}>
+                        {groups.length !== 1
+                          ? 'Points apply to one seller at a time.'
+                          : loyaltyPreviewCents > 0
+                            ? `You'll save ${fmtPrice(loyaltyPreviewCents)} at checkout.`
+                            : `Use up to ${maxRedeemablePoints.toLocaleString()} points on this order.`}
                       </Text>
-                    </View>
-                    <Feather name="check-circle" size={19} color={theme.success} />
+                    )}
                   </View>
-                ) : (
-                  <>
-                    <View style={s.pointsRow}>
-                      <TextInput
-                        value={pointsInput}
-                        onChangeText={setPointsInput}
-                        keyboardType="number-pad"
-                        placeholder="Points to use"
-                        placeholderTextColor={theme.subtle}
-                        style={s.pointsInput}
-                        accessibilityLabel="Loyalty points to use"
-                      />
-                      <Button
-                        label="Apply"
-                        size="small"
-                        variant="secondary"
-                        onPress={handleApplyPoints}
-                        loading={redeemingPoints}
-                        disabled={groups.length !== 1}
-                        accessibilityHint="Applies loyalty points to this order"
-                      />
-                    </View>
-                    <Text style={s.pointsPreview}>
-                      {groups.length !== 1
-                        ? 'Rewards apply to one seller checkout at a time.'
-                        : loyaltyPreviewCents > 0
-                          ? `You'll save ${fmtPrice(loyaltyPreviewCents)} at checkout.`
-                          : `Use up to ${maxRedeemablePoints.toLocaleString()} points on this order.`}
-                    </Text>
-                  </>
                 )}
-              </View>
-              )}
-              {/* THREAD CASH HOOK POINT: self-contained card, only visible behind
-                  the 'threadCashCheckoutDiscount' flag (default OFF). See
-                  components/thread-cash/UseThreadCashCard.tsx and
-                  docs/payments/thread-cash-checkout-todo.md. */}
-              {isSignedIn && groups.length === 1 && threadCashCheckoutEnabled && (
-                <UseThreadCashCard
-                  maxDiscountCents={Math.max(0, summary.subtotalCents + summary.shippingTotalCents - 1)}
-                  redemption={threadCashRedemption}
-                  onApply={setThreadCashRedemption}
-                  onRemove={() => setThreadCashRedemption(null)}
+
+                <BagTotals
+                  itemCount={itemCount}
+                  subtotalCents={summary.subtotalCents}
+                  discountCents={displayedDiscount}
+                  shippingCents={shippingTotal}
+                  totalCents={displayedTotal}
+                  hasPreOrder={hasPreOrder}
                 />
-              )}
-              <SummaryCard
-                subtotal={summary.subtotalCents}
-                discountTotal={displayedDiscount}
-                shipping={summary.shippingTotalCents}
-                tax={summary.taxTotalCents}
-                total={displayedTotal}
-                hasPreOrder={hasPreOrder}
-              />
               </>
+            ) : (
+              <BagEmpty
+                loadArrivals={loadNewArrivals}
+                onShopNow={() => router.navigate('/(buyer)/discover' as never)}
+                onViewAll={() => router.navigate('/(buyer)/discover' as never)}
+                onOpenProduct={(productId) => push({ pathname: '/thread-product-detail' as any, params: { productId, src: 'cart' } } as never)}
+              />
             )}
 
-            {/* Saved for later */}
+            {/* Lines kept on this device from before Saves existed (or while signed out). */}
             {hasSaved && (
               <View style={s.savedSection}>
                 <Text style={s.savedTitle}>Saved for later ({cart.savedItems.length})</Text>
@@ -1246,113 +590,43 @@ export default function CartScreen() {
                 </View>
               </View>
             )}
-
-            {!hasSaved && (
-              <Text style={s.savedHint}>Products you save for later will appear here.</Text>
-            )}
-
-            <RecentlyViewedRow style={{ marginTop: SP.xl }} />
           </ScrollView>
 
-          {/* Sticky checkout bar — total on the left, a white "Checkout" pill
-              on the right, pinned above the home indicator. This is a pushed
-              screen with the floating tab bar hidden (see
-              BUYER_TAB_BAR_HIDDEN_ROUTES), so it pads by insets.bottom + 8,
-              not the tab bar's occupied height. */}
           {hasItems && (
-            <StickyFooter style={{ paddingBottom: insets.bottom + 8, backgroundColor: theme.background, borderTopColor: theme.borderSubtle }}>
-              <View style={s.checkoutBarRow}>
-                <View>
-                  <Text style={s.checkoutSummaryLabel}>
-                    {allSelected ? 'Total' : `${selectedItems.length} selected`}
-                  </Text>
-                  <Text style={s.checkoutSummaryAmount}>{fmtPrice(selectedDisplayedTotal)}</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={handleCheckoutSelected}
-                  disabled={selectedItems.length === 0 || validating}
-                  activeOpacity={0.85}
-                  style={[s.checkoutPill, (selectedItems.length === 0 || validating) && { opacity: 0.5 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Checkout"
-                  accessibilityHint="Reviews shipping and opens secure payment"
-                >
-                  {validating ? (
-                    <ActivityIndicator size="small" color="#000000" />
-                  ) : (
-                    <Text style={s.checkoutPillText}>Checkout</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </StickyFooter>
+            <BagCheckoutBar
+              totalCents={displayedTotal}
+              bottomInset={insets.bottom}
+              busy={validating}
+              disabled={availableItems.length === 0 || validating}
+              onCheckout={() => { void startCheckout(availableItems); }}
+            />
           )}
         </>
       )}
-      <FirstRunTip
-        id="buyer-cart"
-        variant="anchored"
-        contentReady={!loading}
-        anchored={{ steps: BUYER_CART_STEPS }}
-      />
+      {/* Change size / qty in place (no trip back to the product page). */}
+      {editingItem && (
+        <VariantPickerSheet
+          productId={editingItem.productId}
+          initialVariantId={editingItem.variantId}
+          initialQuantity={editingItem.quantity}
+          confirmVerb="Update"
+          onClose={() => setEditingItem(null)}
+          onConfirm={handleConfirmVariant}
+        />
+      )}
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
-  emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.sm },
-  emptyIconCircle: {
-    width: 120, height: 120, borderRadius: 60, borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm,
-  },
-  emptyTitle: { fontSize: FS.lg, fontFamily: FONT.bold, textAlign: 'center' },
-  emptyDescription: { fontSize: FS.base, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 21, maxWidth: 280 },
-  emptyCta: { marginTop: SP.md },
-  editBtn: { paddingRight: SP.sm },
-  editText: { fontSize: FS.sm, fontFamily: FONT.semibold },
-  editBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.borderSubtle,
-  },
-  editBarText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-  selectAllRow: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingBottom: SP.xs,
-  },
-  selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  selectAllText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-  // Same label + hairline as a checkout section (CheckoutPrimitives).
-  savedSection: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingTop: 14, marginBottom: SP.md },
-  savedTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: SP.sm + 4 },
-  divider: { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
-  multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingVertical: 14 },
-  multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
-  loyaltyCard: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingVertical: 14 },
-  loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
-  loyaltySub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
-  pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
-  // The checkout's dark field with a hairline border.
-  pointsInput: { flex: 1, height: 48, borderRadius: 12, backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, paddingHorizontal: 14 },
-  pointsPreview: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
-  appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.success}26`, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
-  appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
-  appliedPointsSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
-  savedHint: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
-  // Sticky checkout bar: total on the left, a white pill on the right —
-  // Nike Bag / TikTok Shop checkout-bar reference, forced white/black
-  // regardless of theme so it reads as the one fixed "pay" affordance.
-  checkoutBarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  checkoutSummaryLabel: { ...TYPE_SCALE.footnote, color: theme.muted },
-  checkoutSummaryAmount: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
-  checkoutPill: {
-    minWidth: 132, minHeight: COMP.buttonH,
-    borderRadius: radius.md, backgroundColor: '#FFFFFF',
-    alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: SP.lg,
-  },
-  checkoutPillText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#000000' },
+  savedSection: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, paddingTop: 14, marginTop: SP.md, marginBottom: SP.md },
+  savedTitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.sm },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: SP.xs },
+  loyaltyCard: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border, paddingVertical: 14, gap: SP.xs },
+  loyaltyTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+  loyaltySub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: SP.xs },
+  pointsInput: { flex: 1, height: 44, borderRadius: RADIUS.md, backgroundColor: '#1C1C1E', color: theme.text, fontFamily: FONT.regular, paddingHorizontal: 14 },
+  pointsPreview: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 17 },
+  appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
 });

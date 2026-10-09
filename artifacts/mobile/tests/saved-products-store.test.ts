@@ -189,9 +189,8 @@ describe('save heart wiring', () => {
     }
   });
 
-  it('shows Recently viewed on Discover below the grid, cart usage untouched', () => {
+  it('shows Recently viewed on Discover below the grid', () => {
     expect(read('app/(buyer)/discover.tsx')).toContain('<RecentlyViewedRow');
-    expect(read('app/(buyer)/cart.tsx')).toContain('<RecentlyViewedRow style={{ marginTop: SP.xl }} />');
   });
 
   it('mounts the heart host once at the root', () => {
