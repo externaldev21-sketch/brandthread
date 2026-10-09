@@ -103,6 +103,10 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 
+vi.mock('@/components/ui/EmptyState', () => {
+  const ReactActual = require('react') as typeof import('react');
+  return { EmptyState: (props: any) => ReactActual.createElement('View', { testID: 'one-line-empty' }, ReactActual.createElement('Text', null, props.title)) };
+});
 vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ userId: 'buyer-1', isSignedIn: true }),
 }));

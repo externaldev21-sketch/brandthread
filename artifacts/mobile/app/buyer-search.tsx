@@ -61,6 +61,7 @@ import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProd
 import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { EmptyState as OneLineEmptyState } from '@/components/ui/EmptyState';
 import { FilterSheet } from '@/components/search/FilterSheet';
 import { countActiveFilters, filtersToApiOptions, type SearchFacets, type SearchFilters } from '@/lib/searchFilters';
 
@@ -470,27 +471,17 @@ export default function BuyerSearchScreen() {
   ));
 
   function renderNoResults() {
+    // One line + one action (BRANDTHREAD_DESIGN.md "Copy").
     if (activeFilterCount > 0 && activeTab === 'products') {
       return (
         <View testID="buyer-search-no-results">
-          <EmptyState
-            icon="sliders"
-            title="No products match these filters"
-            description="Try removing a filter to see more."
-            action={{ label: 'Clear filters', icon: 'x-circle', onPress: () => setFilters({}) }}
-          />
+          <OneLineEmptyState title="No products match these filters." action={{ label: 'Clear filters', onPress: () => setFilters({}) }} />
         </View>
       );
     }
     return (
       <View testID="buyer-search-no-results">
-        <EmptyState
-          icon="search"
-          illustration="search"
-          title={`No results for "${trimmedQuery}"`}
-          description="Try a different spelling or a broader term."
-          action={{ label: 'Clear search', icon: 'x-circle', onPress: handleCancel }}
-        />
+        <OneLineEmptyState title={`No results for "${trimmedQuery}".`} action={{ label: 'Clear search', onPress: handleCancel }} />
       </View>
     );
   }
@@ -641,7 +632,7 @@ export default function BuyerSearchScreen() {
       if (tagRows.length === 0) {
         return (
           <View testID="buyer-search-tags-empty">
-            <EmptyState icon="hash" title="No tags found" description="Try a different search term." />
+            <OneLineEmptyState title="No tags found." />
           </View>
         );
       }
