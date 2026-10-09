@@ -166,7 +166,7 @@ function IsolatedStackScene({
     && (!presentation || presentation === 'card');
   const bottomClearance = useSceneBottomClearance(barFloatsOverScene);
   return (
-    <View style={{ flex: 1, backgroundColor: palette.background ?? '#0A0A0B' }}>
+    <View style={{ flex: 1, backgroundColor: palette.background ?? '#000000' }}>
       <View style={{ flex: 1, marginBottom: bottomClearance }} testID={bottomClearance > 0 ? 'scene-bottom-clearance' : undefined}>
         {children}
       </View>
@@ -182,7 +182,7 @@ function IsolatedStackScene({
 function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
   const { theme, isHydrated } = useAppTheme();
   const palette = theme as typeof theme & Record<string, any>;
-  const background = palette.background ?? '#0A0A0B';
+  const background = palette.background ?? '#000000';
   const heroGradient = (palette.heroGradient ?? [background, palette.surface ?? background]) as [string, string, ...string[]];
 
   // Without this, the native root window/root view's background stays the
@@ -556,13 +556,13 @@ if (Platform.OS !== 'web') {
 SplashScreen.preventAutoHideAsync();
 
 // Paint the native root window the same dark default as app.json's splash
-// background (#0A0A0B) immediately at module load — before RuntimeThemeShell
+// background (#000000) immediately at module load — before RuntimeThemeShell
 // mounts and corrects it to the user's actual persisted theme (see its
 // SystemUI.setBackgroundColorAsync effect below). Without this, the very
 // first native frames before React renders anything can show through as the
 // OS default background (white), which reads as a white flash on launch.
 if (Platform.OS !== 'web') {
-  SystemUI.setBackgroundColorAsync('#0A0A0B').catch(() => {});
+  SystemUI.setBackgroundColorAsync('#000000').catch(() => {});
 }
 
 // On web, the document body is white by default — paint it dark immediately
@@ -570,7 +570,7 @@ if (Platform.OS !== 'web') {
 // screen, then correct it to the user's actual persisted theme (falls back
 // to the same dark default) as soon as it's known, ahead of React mounting.
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
-  document.body.style.backgroundColor = '#0A0A0B';
+  document.body.style.backgroundColor = '#000000';
   peekPersistedTheme(AsyncStorage)
     .then((persisted) => { document.body.style.backgroundColor = persisted.background; })
     .catch(() => {});
