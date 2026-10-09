@@ -291,7 +291,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   lowStockText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
   optionSection: { marginBottom: SP.lg },
   optionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
-  optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, textTransform: 'uppercase', letterSpacing: 0.4 },
+  optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, },
   optionSelected: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.accentLight },
   optionRequired: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.error },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
