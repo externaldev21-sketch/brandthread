@@ -3,7 +3,7 @@
  * redemptions, and the reserve/consume/release checkout dance must all
  * behave exactly like the loyalty-points equivalents they're modeled on.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
 import { db, threadCashEntries, threadCashStreaks } from "@workspace/db";
 import {
@@ -15,8 +15,16 @@ import {
   refundThreadCashSpend,
   reserveThreadCashRedemption,
 } from "../../lib/threadCash/wallet";
+import { allowThreadCashRewards, seedRewardsGmv, testDeviceId } from "../../testUtils/threadCashRewards";
 
 const testBuyerIds: string[] = [];
+
+let restoreEnv: () => void;
+beforeAll(async () => {
+  restoreEnv = allowThreadCashRewards();
+  await seedRewardsGmv();
+});
+afterAll(() => restoreEnv());
 
 afterEach(async () => {
   while (testBuyerIds.length > 0) {
@@ -31,10 +39,11 @@ describe("daily check-in award", () => {
     const buyerId = `thread-cash-test-${crypto.randomUUID()}`;
     testBuyerIds.push(buyerId);
     const localDate = "2025-06-01";
+    const deviceId = testDeviceId();
 
     const results = await Promise.all(
       Array.from({ length: 5 }, () =>
-        awardDailyCheckInOnce({ buyerId, localDate, earnedCents: 10, streakBonusCents: 0 })),
+        awardDailyCheckInOnce({ buyerId, localDate, earnedCents: 10, streakBonusCents: 0, deviceId })),
     );
 
     expect(results.filter((r) => r.created)).toHaveLength(1);
@@ -46,7 +55,7 @@ describe("daily check-in award", () => {
     const buyerId = `thread-cash-test-${crypto.randomUUID()}`;
     testBuyerIds.push(buyerId);
 
-    await awardDailyCheckInOnce({ buyerId, localDate: "2025-06-07", earnedCents: 10, streakBonusCents: 100 });
+    await awardDailyCheckInOnce({ buyerId, localDate: "2025-06-07", earnedCents: 10, streakBonusCents: 100, deviceId: testDeviceId() });
 
     const rows = await db.select().from(threadCashEntries).where(eq(threadCashEntries.buyerId, buyerId));
     expect(rows).toHaveLength(2);
@@ -59,8 +68,8 @@ describe("daily check-in award", () => {
     const buyerId = `thread-cash-test-${crypto.randomUUID()}`;
     testBuyerIds.push(buyerId);
 
-    await awardDailyCheckInOnce({ buyerId, localDate: "2025-06-01", earnedCents: 10, streakBonusCents: 0 });
-    await awardDailyCheckInOnce({ buyerId, localDate: "2025-06-02", earnedCents: 10, streakBonusCents: 0 });
+    await awardDailyCheckInOnce({ buyerId, localDate: "2025-06-01", earnedCents: 10, streakBonusCents: 0, deviceId: testDeviceId() });
+    await awardDailyCheckInOnce({ buyerId, localDate: "2025-06-02", earnedCents: 10, streakBonusCents: 0, deviceId: testDeviceId() });
 
     const balance = await getBalanceCents(db, buyerId);
     expect(balance).toBe(20);

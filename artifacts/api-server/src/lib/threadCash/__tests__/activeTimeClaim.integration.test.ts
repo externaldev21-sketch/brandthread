@@ -7,7 +7,7 @@
  * over into a new week — the same math as the old check-in path, since
  * awardDailyActiveTimeClaimOnce reuses it.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, threadCashEntries, threadCashHeartbeats, threadCashStreaks } from "@workspace/db";
 import {
@@ -19,6 +19,14 @@ import {
   recordThreadCashHeartbeat,
 } from "../wallet";
 import { DEFAULT_THREAD_CASH_CONFIG, computeCheckIn, EMPTY_STREAK_STATE, type StreakState } from "../streaks";
+import { allowThreadCashRewards, seedRewardsGmv, testDeviceId } from "../../../testUtils/threadCashRewards";
+
+let restoreEnv: () => void;
+beforeAll(async () => {
+  restoreEnv = allowThreadCashRewards();
+  await seedRewardsGmv();
+});
+afterAll(() => restoreEnv());
 
 const testBuyerIds: string[] = [];
 
@@ -67,7 +75,7 @@ describe("awardDailyActiveTimeClaimOnce — abuse gates", () => {
     for (let i = 0; i < MIN_HEARTBEATS_FOR_DAILY_CLAIM + 2; i++) {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
-    await expect(awardDailyActiveTimeClaimOnce({
+    await expect(awardDailyActiveTimeClaimOnce({ deviceId: testDeviceId(),
       buyerId, localDate, earnedCents: 10, streakBonusCents: 0,
       activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM - 1,
     })).rejects.toBeInstanceOf(ThreadCashError);
@@ -80,7 +88,7 @@ describe("awardDailyActiveTimeClaimOnce — abuse gates", () => {
     for (let i = 0; i < MIN_HEARTBEATS_FOR_DAILY_CLAIM - 2; i++) {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
-    await expect(awardDailyActiveTimeClaimOnce({
+    await expect(awardDailyActiveTimeClaimOnce({ deviceId: testDeviceId(),
       buyerId, localDate, earnedCents: 10, streakBonusCents: 0,
       activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
     })).rejects.toBeInstanceOf(ThreadCashError);
@@ -93,7 +101,7 @@ describe("awardDailyActiveTimeClaimOnce — abuse gates", () => {
     for (let i = 0; i < MIN_HEARTBEATS_FOR_DAILY_CLAIM; i++) {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
-    const { created } = await awardDailyActiveTimeClaimOnce({
+    const { created } = await awardDailyActiveTimeClaimOnce({ deviceId: testDeviceId(),
       buyerId, localDate, earnedCents: 10, streakBonusCents: 0,
       activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
     });
@@ -110,7 +118,7 @@ describe("awardDailyActiveTimeClaimOnce — idempotency", () => {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
     const results = await Promise.all(
-      Array.from({ length: 5 }, () => awardDailyActiveTimeClaimOnce({
+      Array.from({ length: 5 }, () => awardDailyActiveTimeClaimOnce({ deviceId: testDeviceId(),
         buyerId, localDate, earnedCents: 10, streakBonusCents: 0,
         activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
       })),
@@ -125,10 +133,10 @@ describe("awardDailyActiveTimeClaimOnce — idempotency", () => {
     for (let i = 0; i < MIN_HEARTBEATS_FOR_DAILY_CLAIM; i++) {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
-    const first = await awardDailyActiveTimeClaimOnce({
+    const first = await awardDailyActiveTimeClaimOnce({ deviceId: testDeviceId(),
       buyerId, localDate, earnedCents: 10, streakBonusCents: 0, activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
     });
-    const second = await awardDailyActiveTimeClaimOnce({
+    const second = await awardDailyActiveTimeClaimOnce({ deviceId: testDeviceId(),
       buyerId, localDate, earnedCents: 10, streakBonusCents: 0, activeSeconds: MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM,
     });
     expect(first.created).toBe(true);
@@ -146,7 +154,7 @@ describe("streak reset and week rollover through the active-time path", () => {
       await recordThreadCashHeartbeat(buyerId, localDate, MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM);
     }
     const result = computeCheckIn(state, config, new Date(`${dateIso}T12:00:00Z`), "UTC");
-    await awardDailyActiveTimeClaimOnce({
+    await awardDailyActiveTimeClaimOnce({ deviceId: testDeviceId(),
       buyerId,
       localDate: result.state.lastCheckInDate!,
       earnedCents: result.earnedCents,

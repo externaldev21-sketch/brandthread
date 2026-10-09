@@ -119,7 +119,7 @@ router.get("/code", async (req, res) => {
     link,
     terms: rewardTerms,
     /** Pre-composed share text — mobile client can pass directly to Share API */
-    shareText: `${senderName} invited you to Brandthread. Join with my link and get $10 Thread Cash.\n\nUse invite code ${code} or tap: ${link}`,
+    shareText: `${senderName} invited you to Brandthread. Join with my link and get $10 Thread Cash after your first order of $10 or more.\n\nUse invite code ${code} or tap: ${link}`,
   });
 });
 

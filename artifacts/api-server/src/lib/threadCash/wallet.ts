@@ -10,14 +10,21 @@
  * amount and have it credited.
  */
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 import {
-  blocks, db, follows, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks,
+  blocks, db, follows, orders, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks,
   threadCashTransfers, users,
 } from "@workspace/db";
 import { DEFAULT_THREAD_CASH_CONFIG, type ThreadCashConfig } from "./streaks";
+import { rewardsPolicy, type ThreadCashRewardsPolicy } from "./rewardsConfig";
+import { assertThreadCashEarnAllowed, claimDeviceReward, reserveRewardsBudget } from "./earnGate";
+import { postRewardIssued, postThreadCashSpendReturned, postThreadCashSpent } from "./liability";
 import { activeExpiryDays, redemptionCapViolation } from "./rules";
 import { postDueExpiries } from "./expiry";
+import {
+  FUNDING_SHIFT_SOURCE, entrySplit, getFundingBalances, insertCreditRows, insertDebitEntry, insertRestoreEntry,
+  splitPromoFirst, type FundingSplit,
+} from "./funding";
 
 /** A transfer sits unclaimed for this long before it expires back to the sender. */
 export const THREAD_CASH_TRANSFER_EXPIRY_DAYS = 14;
@@ -40,10 +47,29 @@ function isUniqueViolation(error: any): boolean {
   return error?.code === "23505" || error?.cause?.code === "23505";
 }
 
+/**
+ * thread_cash_config, bounded by the env rewards policy (./rewardsConfig.ts):
+ * the row can tighten a limit but never loosen one past the policy — reward
+ * credit always expires (90 days by default), the streak bonus is capped,
+ * and peer sends keep the policy's age gate and daily caps.
+ */
+export function applyRewardsPolicy(config: ThreadCashConfig, policy: ThreadCashRewardsPolicy = rewardsPolicy()): ThreadCashConfig {
+  const rowExpiry = typeof config.expiryDays === "number" && config.expiryDays > 0 ? config.expiryDays : null;
+  return {
+    ...config,
+    streakBonusCents: Math.min(config.streakBonusCents, policy.streakBonusMaxCents),
+    expiryDays: Math.min(rowExpiry ?? policy.rewardExpiryDays, policy.rewardExpiryDays),
+    dailySendCapCents: Math.min(config.dailySendCapCents, policy.sendDailyCapCents),
+    dailyReceiveCapCents: Math.min(config.dailyReceiveCapCents, policy.receiveDailyCapCents),
+    minAccountAgeHoursForSend: Math.max(config.minAccountAgeHoursForSend, policy.sendMinAccountAgeDays * 24),
+    maxCheckInsPerDevicePerDay: Math.min(config.maxCheckInsPerDevicePerDay, policy.deviceMaxAccountsPerDay),
+  };
+}
+
 export async function getThreadCashConfig(executor: DbExecutor = db): Promise<ThreadCashConfig> {
   const [row] = await executor.select().from(threadCashConfig).where(eq(threadCashConfig.id, "default")).limit(1);
-  if (!row) return DEFAULT_THREAD_CASH_CONFIG;
-  return {
+  if (!row) return applyRewardsPolicy(DEFAULT_THREAD_CASH_CONFIG);
+  return applyRewardsPolicy({
     dailyAmountCents: row.dailyAmountCents,
     streakBonusCents: row.streakBonusCents,
     streakBonusDays: row.streakBonusDays,
@@ -54,7 +80,7 @@ export async function getThreadCashConfig(executor: DbExecutor = db): Promise<Th
     dailyReceiveCapCents: row.dailyReceiveCapCents,
     minAccountAgeHoursForSend: row.minAccountAgeHoursForSend,
     maxCheckInsPerDevicePerDay: row.maxCheckInsPerDevicePerDay,
-  };
+  });
 }
 
 export async function getBalanceCents(executor: DbExecutor, buyerId: string): Promise<number> {
@@ -63,6 +89,26 @@ export async function getBalanceCents(executor: DbExecutor, buyerId: string): Pr
     .from(threadCashEntries)
     .where(eq(threadCashEntries.buyerId, buyerId));
   return Number(row?.total ?? 0);
+}
+
+/**
+ * The part of a balance that may be cashed out to real money: PAID-funded
+ * Thread Cash received as Live gifts, less paid money already cashed out or
+ * spent, capped at the balance. Promo credit — check-in, streak, referral,
+ * refund and promo credit, and anything a buyer relayed from it — and every
+ * peer send are spendable in the app but never cashable
+ * (lib/threadCash/funding.ts). Only money a person actually paid in is
+ * withdrawable.
+ */
+export async function getCashableBalanceCents(executor: DbExecutor, userId: string): Promise<number> {
+  return (await getFundingBalances(executor, userId)).cashableCents;
+}
+
+/** The one lock every balance-reducing write for a user takes, so no two of
+ *  them (send, live gift, redemption, cash-out) can pass a balance check
+ *  concurrently. */
+export function balanceLockKey(userId: string): string {
+  return `thread-cash-balance:${userId}`;
 }
 
 /** Whether a moderator-controlled feature flag is enabled (safe default: off). */
@@ -100,6 +146,33 @@ type CheckInAward = {
 };
 
 /**
+ * Inserts one day's reward rows after the per-device cap and the monthly
+ * budget (lib/threadCash/earnGate.ts) admit them, and books each on the
+ * money ledger as a marketing expense owed to the buyer. Called inside the
+ * award transaction, after the buyer's own locks; the budget lock is last.
+ */
+async function insertDailyRewardRows(tx: DbExecutor, award: CheckInAward, dailyNote: string): Promise<void> {
+  await claimDeviceReward(tx, { buyerId: award.buyerId, deviceId: award.deviceId, localDate: award.localDate });
+  await reserveRewardsBudget(tx, award.earnedCents + Math.max(0, award.streakBonusCents));
+  const rows: Array<{ source: string; amountCents: number; note: string }> = [
+    { source: "daily_checkin", amountCents: award.earnedCents, note: dailyNote },
+  ];
+  if (award.streakBonusCents > 0) {
+    rows.push({ source: "streak_bonus", amountCents: award.streakBonusCents, note: `Streak bonus (${award.localDate})` });
+  }
+  for (const row of rows) {
+    const [entry] = await tx.insert(threadCashEntries).values({
+      buyerId: award.buyerId,
+      amountCents: row.amountCents,
+      source: row.source,
+      referenceId: award.localDate,
+      note: row.note,
+    }).returning({ id: threadCashEntries.id });
+    await postRewardIssued(tx, { entryId: entry.id, buyerId: award.buyerId, amountCents: row.amountCents, source: row.source });
+  }
+}
+
+/**
  * Awards one day's Thread Cash (and streak bonus, if any) exactly once per
  * buyer-local calendar date. The unique index on
  * (buyer_id, reference_id) WHERE source = 'daily_checkin' is the ultimate
@@ -108,6 +181,8 @@ type CheckInAward = {
 export async function awardDailyCheckInOnce(
   award: CheckInAward,
 ): Promise<{ created: boolean }> {
+  // Server-side kill switch, before any lock is taken (reads flags on the pool).
+  await assertThreadCashEarnAllowed();
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-checkin:${award.buyerId}:${award.localDate}`}))`);
     await assertThreadCashNotFrozen(tx, award.buyerId);
@@ -145,22 +220,7 @@ export async function awardDailyCheckInOnce(
       }
     }
 
-    await tx.insert(threadCashEntries).values({
-      buyerId: award.buyerId,
-      amountCents: award.earnedCents,
-      source: "daily_checkin",
-      referenceId: award.localDate,
-      note: `Daily check-in (${award.localDate})`,
-    });
-    if (award.streakBonusCents > 0) {
-      await tx.insert(threadCashEntries).values({
-        buyerId: award.buyerId,
-        amountCents: award.streakBonusCents,
-        source: "streak_bonus",
-        referenceId: award.localDate,
-        note: `Streak bonus (${award.localDate})`,
-      });
-    }
+    await insertDailyRewardRows(tx, award, `Daily check-in (${award.localDate})`);
     return { created: true };
   });
 }
@@ -229,6 +289,7 @@ export async function awardDailyActiveTimeClaimOnce(
       "THREAD_CASH_NOT_ENOUGH_ACTIVE_TIME",
     );
   }
+  await assertThreadCashEarnAllowed();
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-checkin:${award.buyerId}:${award.localDate}`}))`);
     await assertThreadCashNotFrozen(tx, award.buyerId);
@@ -272,22 +333,7 @@ export async function awardDailyActiveTimeClaimOnce(
       }
     }
 
-    await tx.insert(threadCashEntries).values({
-      buyerId: award.buyerId,
-      amountCents: award.earnedCents,
-      source: "daily_checkin",
-      referenceId: award.localDate,
-      note: `Daily Thread Cash (${award.localDate})`,
-    });
-    if (award.streakBonusCents > 0) {
-      await tx.insert(threadCashEntries).values({
-        buyerId: award.buyerId,
-        amountCents: award.streakBonusCents,
-        source: "streak_bonus",
-        referenceId: award.localDate,
-        note: `Streak bonus (${award.localDate})`,
-      });
-    }
+    await insertDailyRewardRows(tx, award, `Daily Thread Cash (${award.localDate})`);
     return { created: true };
   });
 }
@@ -296,7 +342,8 @@ export async function getHistory(buyerId: string, limit = 50) {
   return db
     .select()
     .from(threadCashEntries)
-    .where(eq(threadCashEntries.buyerId, buyerId))
+    // funding_shift rows only record which funds an entry used; never shown.
+    .where(and(eq(threadCashEntries.buyerId, buyerId), sql`${threadCashEntries.source} <> ${FUNDING_SHIFT_SOURCE}`))
     .orderBy(desc(threadCashEntries.createdAt))
     .limit(limit);
 }
@@ -354,14 +401,15 @@ export async function redeemThreadCash(
         throw new ThreadCashError(`Insufficient Thread Cash. You have $${(balance / 100).toFixed(2)}.`, 400, "INSUFFICIENT_THREAD_CASH");
       }
       const token = `TCASH-${buyerId.slice(-6).toUpperCase()}-${randomUUID().toUpperCase()}`;
-      await tx.insert(threadCashEntries).values({
+      // Promo credit is spent before paid Thread Cash (lib/threadCash/funding.ts).
+      const split = splitPromoFirst(amountCents, await getFundingBalances(tx, buyerId));
+      await insertDebitEntry(tx, {
         buyerId,
-        amountCents: -amountCents,
         source: "redemption",
         referenceId: token,
         idempotencyKey,
         note: `Redeemed $${(amountCents / 100).toFixed(2)} Thread Cash`,
-      });
+      }, amountCents, split);
       return { token, discountCents: amountCents };
     });
   } catch (error: any) {
@@ -479,10 +527,12 @@ export async function consumeThreadCashRedemption(
       eq(threadCashEntries.checkoutSessionId, checkoutRecordId),
       isNull(threadCashEntries.usedAt),
     ))
-    .returning({ id: threadCashEntries.id });
+    .returning({ id: threadCashEntries.id, amountCents: threadCashEntries.amountCents });
   if (!consumed) {
     throw new ThreadCashError("The Thread Cash discount could not be finalized for this order.", 409, "THREAD_CASH_TOKEN_NOT_RESERVED");
   }
+  // Spent: no longer owed to the buyer; Brandthread funds the seller's top-up.
+  await postThreadCashSpent(transaction, { orderId, amountCents: -consumed.amountCents });
 }
 
 /**
@@ -525,7 +575,9 @@ export async function cancelThreadCashRedemption(
     }
 
     const [redemption] = await tx.select({
+      id: threadCashEntries.id,
       amountCents: threadCashEntries.amountCents,
+      funding: threadCashEntries.funding,
       checkoutSessionId: threadCashEntries.checkoutSessionId,
       usedAt: threadCashEntries.usedAt,
     })
@@ -560,14 +612,14 @@ export async function cancelThreadCashRedemption(
         isNull(threadCashEntries.usedAt),
         isNull(threadCashEntries.checkoutSessionId),
       ));
-    await tx.insert(threadCashEntries).values({
+    // Back to exactly the funds the redemption used (promo stays promo).
+    await insertRestoreEntry(tx, {
       buyerId,
-      amountCents: returnedCents,
       source: "redemption_cancelled",
       referenceId: normalizedToken,
       idempotencyKey: cancelKey,
       note: `Returned $${(returnedCents / 100).toFixed(2)} Thread Cash from checkout`,
-    });
+    }, await entrySplit(tx, redemption));
     return { returnedCents, balanceCents: await getBalanceCents(tx, buyerId) };
   });
 }
@@ -635,14 +687,28 @@ export async function refundThreadCashSpend(
     .limit(1);
   if (existing) return { created: false };
 
-  await transaction.insert(threadCashEntries).values({
+  // Returned as the funds the order's redemption used — paid money first, so
+  // a refund never turns a buyer's paid Thread Cash into promo credit. With
+  // no paid funds involved (every order today) it is promo, as before.
+  const [redemption] = await transaction
+    .select({ id: threadCashEntries.id, amountCents: threadCashEntries.amountCents, funding: threadCashEntries.funding })
+    .from(threadCashEntries)
+    .where(and(
+      eq(threadCashEntries.buyerId, buyerId),
+      eq(threadCashEntries.source, "redemption"),
+      eq(threadCashEntries.usedOrderId, orderId),
+    ))
+    .limit(1);
+  const spent: FundingSplit = redemption ? await entrySplit(transaction, redemption) : { promoCents: amountCents, paidCents: 0 };
+  const paidCents = Math.min(amountCents, spent.paidCents);
+  await insertRestoreEntry(transaction, {
     buyerId,
-    amountCents,
     source: "refund_credit",
     referenceId,
     note: `Thread Cash returned from refunded order ${orderId}`,
     usedOrderId: orderId,
-  });
+  }, { promoCents: amountCents - paidCents, paidCents });
+  await postThreadCashSpendReturned(transaction, { orderId, amountCents });
   return { created: true };
 }
 
@@ -685,7 +751,7 @@ async function sendableBalanceCents(executor: DbExecutor, buyerId: string): Prom
     .select({
       balance: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}), 0)`,
       received: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.source} = 'send_received'), 0)`,
-      spent: sql<string>`COALESCE(SUM(-${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.amountCents} < 0), 0)`,
+      spent: sql<string>`COALESCE(SUM(-${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.amountCents} < 0 AND ${threadCashEntries.source} <> 'funding_shift'), 0)`,
     })
     .from(threadCashEntries)
     .where(eq(threadCashEntries.buyerId, buyerId));
@@ -694,6 +760,16 @@ async function sendableBalanceCents(executor: DbExecutor, buyerId: string): Prom
   const spent = Number(row?.spent ?? 0);
   const heldReceived = Math.max(0, received - spent);
   return Math.max(0, balance - heldReceived);
+}
+
+/** Whether the user has at least one paid order that was not cancelled or refunded. */
+async function hasPaidOrder(executor: DbExecutor, buyerId: string): Promise<boolean> {
+  const [row] = await executor.select({ id: orders.id }).from(orders).where(and(
+    eq(orders.buyerId, buyerId),
+    isNotNull(orders.paidAt),
+    notInArray(orders.status, ["cancelled", "refunded", "refund_pending"]),
+  )).limit(1);
+  return !!row;
 }
 
 async function rollingWindowCents(
@@ -788,6 +864,15 @@ export async function sendThreadCash(
           "THREAD_CASH_ACCOUNT_TOO_NEW",
         );
       }
+      // Only a real customer can send: a farm of fresh alt accounts with no
+      // purchase can't relay their sign-up/check-in credit to one wallet.
+      if (!(await hasPaidOrder(tx, senderId))) {
+        throw new ThreadCashError(
+          "You can send Thread Cash after your first order.",
+          403,
+          "THREAD_CASH_SENDER_NO_PAID_ORDER",
+        );
+      }
 
       const sendable = await sendableBalanceCents(tx, senderId);
       if (amountCents > sendable) {
@@ -804,7 +889,18 @@ export async function sendThreadCash(
       if (sentToday + amountCents > config.dailySendCapCents) {
         throw new ThreadCashError("You've reached today's Thread Cash sending limit.", 400, "THREAD_CASH_DAILY_SEND_CAP");
       }
-      const receivedTodayByRecipient = await rollingWindowCents(tx, recipientId, "send_received");
+      // Every send addressed to the recipient in the window, claimed or still
+      // pending — counting only claimed ones would let several senders queue
+      // past the cap and have it all claimed at once.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-send-receive:${recipientId}`}))`);
+      const [inbound] = await tx.select({ total: sql<string>`COALESCE(SUM(${threadCashTransfers.amountCents}), 0)` })
+        .from(threadCashTransfers)
+        .where(and(
+          eq(threadCashTransfers.recipientId, recipientId),
+          inArray(threadCashTransfers.status, ["pending", "claimed"]),
+          gt(threadCashTransfers.createdAt, sql`now() - interval '24 hours'`),
+        ));
+      const receivedTodayByRecipient = Number(inbound?.total ?? 0);
       if (receivedTodayByRecipient + amountCents > config.dailyReceiveCapCents) {
         throw new ThreadCashError("This person has reached today's Thread Cash receiving limit.", 400, "THREAD_CASH_DAILY_RECEIVE_CAP");
       }
@@ -820,13 +916,13 @@ export async function sendThreadCash(
         expiresAt: new Date(Date.now() + THREAD_CASH_TRANSFER_EXPIRY_DAYS * 86_400_000),
       }).returning({ id: threadCashTransfers.id });
 
-      await tx.insert(threadCashEntries).values({
+      // Promo first; the recipient later receives the same funding mix.
+      await insertDebitEntry(tx, {
         buyerId: senderId,
-        amountCents: -amountCents,
         source: "send_sent",
         referenceId: transfer.id,
         note: note ? `Sent $${(amountCents / 100).toFixed(2)} Thread Cash: ${note}` : `Sent $${(amountCents / 100).toFixed(2)} Thread Cash`,
-      });
+      }, amountCents, splitPromoFirst(amountCents, await getFundingBalances(tx, senderId)));
       return { transferId: transfer.id };
     });
   } catch (error: any) {
@@ -868,11 +964,18 @@ export async function sendLiveGift(
   }
 
   async function lookupByKey(executor: DbExecutor): Promise<{ giftId: string } | null> {
-    const [row] = await executor.select({ id: threadCashEntries.id })
+    const [row] = await executor.select({ id: threadCashEntries.id, buyerId: threadCashEntries.buyerId })
       .from(threadCashEntries)
       .where(and(eq(threadCashEntries.idempotencyKey, idempotencyKey), eq(threadCashEntries.source, "live_gift_sent")))
       .limit(1);
-    return row ? { giftId: row.id } : null;
+    if (!row) return null;
+    // Keys are unique across ALL entries; a key another user (or another
+    // kind of write) already used must never read back as this gift
+    // succeeding — that would report "sent" with nothing debited.
+    if (row.buyerId !== buyerId) {
+      throw new ThreadCashError("This request key was already used. Try again.", 409, "THREAD_CASH_IDEMPOTENCY_KEY_REUSED");
+    }
+    return { giftId: row.id };
   }
 
   try {
@@ -909,27 +1012,35 @@ export async function sendLiveGift(
       if (sentTodayFriends + sentTodayGifts + amountCents > config.dailySendCapCents) {
         throw new ThreadCashError("You've reached today's Thread Cash sending limit.", 400, "THREAD_CASH_DAILY_SEND_CAP");
       }
+      // The receive cap is per SELLER across every sender, so it must be
+      // checked under a seller-scoped lock too — the buyer lock alone lets
+      // two different buyers gifting at once both pass it. Lock order is
+      // always buyer-balance → seller-receive (receive locks are never held
+      // while taking a balance lock), so this can't deadlock.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-gift-receive:${sellerId}`}))`);
       const receivedTodayBySeller = await liveGiftRollingWindowCents(tx, sellerId, "received");
       if (receivedTodayBySeller + amountCents > config.dailyReceiveCapCents) {
         throw new ThreadCashError("This seller has reached today's Thread Cash receiving limit.", 400, "THREAD_CASH_DAILY_RECEIVE_CAP");
       }
 
-      const [debit] = await tx.insert(threadCashEntries).values({
+      // Promo first: a buyer's promo credit is gifted before any paid
+      // Thread Cash, and the seller receives exactly that mix — promo stays
+      // promo (spendable, never withdrawable); only the paid part is cashable.
+      const split = splitPromoFirst(amountCents, await getFundingBalances(tx, buyerId));
+      const debit = await insertDebitEntry(tx, {
         buyerId,
-        amountCents: -amountCents,
         source: "live_gift_sent",
         referenceId: streamId,
         idempotencyKey,
         note: `Sent $${(amountCents / 100).toFixed(2)} Thread Cash in a live`,
-      }).returning({ id: threadCashEntries.id });
+      }, amountCents, split);
 
-      await tx.insert(threadCashEntries).values({
+      await insertCreditRows(tx, {
         buyerId: sellerId,
-        amountCents,
         source: "live_gift",
         referenceId: streamId,
         note: `Received $${(amountCents / 100).toFixed(2)} Thread Cash gift in a live`,
-      });
+      }, split);
 
       return { giftId: debit.id };
     });
@@ -978,13 +1089,12 @@ export async function claimThreadCash(transferId: string, claimerId: string): Pr
     if (!claimed) {
       throw new ThreadCashError("This Thread Cash send has already been claimed or is no longer available.", 409, "THREAD_CASH_TRANSFER_NOT_PENDING");
     }
-    await tx.insert(threadCashEntries).values({
+    await insertCreditRows(tx, {
       buyerId: claimerId,
-      amountCents: transfer.amountCents,
       source: "send_received",
       referenceId: transferId,
       note: `Received $${(transfer.amountCents / 100).toFixed(2)} Thread Cash`,
-    });
+    }, await sentSplit(tx, transfer));
     return { amountCents: transfer.amountCents };
   });
 }
@@ -1005,13 +1115,12 @@ export async function cancelThreadCash(transferId: string, senderId: string): Pr
     if (!cancelled) {
       throw new ThreadCashError("This Thread Cash send can no longer be cancelled.", 409, "THREAD_CASH_TRANSFER_NOT_PENDING");
     }
-    await tx.insert(threadCashEntries).values({
+    await insertRestoreEntry(tx, {
       buyerId: senderId,
-      amountCents: transfer.amountCents,
       source: "send_cancelled",
       referenceId: transferId,
       note: `Cancelled Thread Cash send of $${(transfer.amountCents / 100).toFixed(2)}`,
-    });
+    }, await sentSplit(tx, transfer));
   });
 }
 
@@ -1021,14 +1130,26 @@ async function expireOneTransfer(tx: DbExecutor, transfer: typeof threadCashTran
     .where(and(eq(threadCashTransfers.id, transfer.id), eq(threadCashTransfers.status, "pending")))
     .returning({ id: threadCashTransfers.id });
   if (!expired) return false;
-  await tx.insert(threadCashEntries).values({
+  await insertRestoreEntry(tx, {
     buyerId: transfer.senderId,
-    amountCents: transfer.amountCents,
     source: "send_expired",
     referenceId: transfer.id,
     note: `Thread Cash send of $${(transfer.amountCents / 100).toFixed(2)} expired and was returned`,
-  });
+  }, await sentSplit(tx, transfer));
   return true;
+}
+
+/** The funds a send debited from its sender (what the recipient or a refund gets). */
+async function sentSplit(tx: DbExecutor, transfer: typeof threadCashTransfers.$inferSelect): Promise<FundingSplit> {
+  const [debit] = await tx.select({ id: threadCashEntries.id, amountCents: threadCashEntries.amountCents, funding: threadCashEntries.funding })
+    .from(threadCashEntries)
+    .where(and(
+      eq(threadCashEntries.buyerId, transfer.senderId),
+      eq(threadCashEntries.source, "send_sent"),
+      eq(threadCashEntries.referenceId, transfer.id),
+    ))
+    .limit(1);
+  return debit ? entrySplit(tx, debit) : { promoCents: transfer.amountCents, paidCents: 0 };
 }
 
 /**

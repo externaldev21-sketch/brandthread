@@ -1,6 +1,12 @@
 /**
  * Referral attribution + Thread Cash rewards (DB side). Policy lives in ./policy.
  *
+ * Both credits — the friend's and the inviter's — are paid only once the
+ * friend completes a real first paid order (qualifyReferralForOrder), never
+ * on sign-up: a sign-up alone costs nothing to fake. They pass the same
+ * kill switch and monthly budget as every other reward
+ * (lib/threadCash/earnGate.ts) and are booked on the money ledger.
+ *
  * Every cash credit carries the idempotency key `referral:<inviteeId>:<role>`
  * (unique partial index on thread_cash_entries), so a retried request, a
  * redelivered Stripe webhook or a concurrent apply can never pay twice.
@@ -9,6 +15,8 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, orders, referrals, threadCashEntries, users } from "@workspace/db";
 import { awardLoyaltyPointsOnce } from "../../routes/loyalty";
 import { assertThreadCashNotFrozen, ThreadCashError } from "../threadCash/wallet";
+import { reserveRewardsBudget, threadCashEarnPauseReason } from "../threadCash/earnGate";
+import { postRewardIssued } from "../threadCash/liability";
 import { logger } from "../logger";
 import { notifyReferralReward } from "../activityEvents";
 import {
@@ -41,11 +49,14 @@ export async function creditReferralCash(
       amountCents: input.amountCents,
       source: "referral",
       referenceId: input.inviteeId,
-      note: input.role === "invitee" ? "Referral welcome credit" : "Referral reward — friend's first order",
+      note: input.role === "invitee" ? "Referral welcome credit — your first order" : "Referral reward — friend's first order",
       idempotencyKey: referralIdempotencyKey(input.inviteeId, input.role),
     })
     .onConflictDoNothing()
     .returning({ id: threadCashEntries.id });
+  if (row) {
+    await postRewardIssued(executor, { entryId: row.id, buyerId: input.buyerId, amountCents: input.amountCents, source: "referral" });
+  }
   return row?.id ?? null;
 }
 
@@ -88,9 +99,10 @@ export async function applyReferralCode(input: {
     return { ok: false, status: 409, error: "Invite codes are for new customers.", code: "NOT_NEW_CUSTOMER" };
   }
 
-  // Attribution, loyalty points and the invitee's cash commit together. The
-  // unique invitee row plus the idempotency keys make retries and concurrent
-  // applies safe.
+  // Attribution and loyalty points commit together. The unique invitee row
+  // plus the idempotency keys make retries and concurrent applies safe. The
+  // invitee's Thread Cash waits for their first paid order
+  // (qualifyReferralForOrder), like the inviter's.
   const applied = await db.transaction(async (tx) => {
     const [created] = await tx.insert(referrals).values({
       inviterId: inviter.clerkId,
@@ -113,18 +125,8 @@ export async function applyReferralCode(input: {
       note: "Referral bonus — friend joined",
     }, tx);
 
-    const entryId = await creditReferralCash(tx, {
-      buyerId: inviteeId,
-      inviteeId,
-      role: "invitee",
-      amountCents: REFERRAL_INVITEE_REWARD_CENTS,
-    });
-    if (entryId) {
-      await tx.update(referrals)
-        .set({ inviteeRewardCents: REFERRAL_INVITEE_REWARD_CENTS, inviteeRewardEntryId: entryId })
-        .where(eq(referrals.id, created.id));
-    }
-    return { inviteeRewardCents: entryId ? REFERRAL_INVITEE_REWARD_CENTS : 0 };
+    // Nothing credited yet: the welcome credit is paid with the first order.
+    return { inviteeRewardCents: 0 };
   });
 
   if (!applied) return { ok: false, status: 409, error: "Referral already recorded.", code: "ALREADY_APPLIED" };
@@ -154,6 +156,9 @@ export async function qualifyReferralForOrder(orderId: string): Promise<QualifyR
     .limit(1);
   if (!order?.buyerId) return { rewarded: false, reason: "no_buyer" };
   const inviteeId = order.buyerId;
+  // Kill switch (fails closed). The referral stays pending, so a later paid
+  // order can still qualify it once rewards are back on.
+  if (await threadCashEarnPauseReason()) return { rewarded: false, reason: "earn_paused" };
 
   const result = await db.transaction(async (tx): Promise<QualifyResult> => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`referral-qualify:${inviteeId}`}))`);
@@ -188,6 +193,28 @@ export async function qualifyReferralForOrder(orderId: string): Promise<QualifyR
     if (decision.action === "skip") return { rewarded: false, reason: decision.reason };
 
     const now = new Date();
+    // The friend's welcome credit is paid with this first paid order too,
+    // even when the inviter has hit the cap. Both credits draw on the month's
+    // rewards budget; when it is spent the referral stays pending.
+    const inviterCents = decision.action === "reward" ? decision.amountCents : 0;
+    try {
+      await reserveRewardsBudget(tx, REFERRAL_INVITEE_REWARD_CENTS + inviterCents, now);
+    } catch (err) {
+      if (err instanceof ThreadCashError) return { rewarded: false, reason: "budget_exhausted" };
+      throw err;
+    }
+    const inviteeEntryId = await creditReferralCash(tx, {
+      buyerId: inviteeId,
+      inviteeId,
+      role: "invitee",
+      amountCents: REFERRAL_INVITEE_REWARD_CENTS,
+    });
+    if (inviteeEntryId) {
+      await tx.update(referrals)
+        .set({ inviteeRewardCents: REFERRAL_INVITEE_REWARD_CENTS, inviteeRewardEntryId: inviteeEntryId })
+        .where(eq(referrals.id, referral.id));
+    }
+
     if (decision.action === "cap") {
       await tx.update(referrals)
         .set({ status: "capped", qualifiedAt: now, qualifyingOrderId: orderId })

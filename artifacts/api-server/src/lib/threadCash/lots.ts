@@ -11,7 +11,7 @@
  *
  * Pure functions only; expiry.ts does the I/O.
  */
-import { CASH_OUT_SOURCES, computeExpiresAt, isExpiringCreditSource } from "./rules";
+import { CASH_OUT_SOURCES, computeExpiresAt, isExpiringCredit } from "./rules";
 
 export type LedgerEntryLike = {
   id: string;
@@ -19,6 +19,8 @@ export type LedgerEntryLike = {
   source: string;
   referenceId: string | null;
   createdAt: Date;
+  /** 'promo' | 'paid' (thread_cash_entries.funding); absent = decide by source. */
+  funding?: string | null;
 };
 
 export type Lot = {
@@ -80,7 +82,7 @@ export function replayLots(entries: LedgerEntryLike[], expiryDays: number | null
         entryId: entry.id,
         source: entry.source,
         earnedAt: entry.createdAt,
-        expiresAt: isExpiringCreditSource(entry.source) ? computeExpiresAt(entry.createdAt, expiryDays) : null,
+        expiresAt: isExpiringCredit(entry.source, entry.funding) ? computeExpiresAt(entry.createdAt, expiryDays) : null,
         originalCents: entry.amountCents,
         remainingCents: entry.amountCents,
       });

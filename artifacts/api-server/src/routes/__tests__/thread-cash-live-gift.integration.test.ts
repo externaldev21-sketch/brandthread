@@ -5,9 +5,9 @@
  * credit in one transaction, using the `live_gift` source cashOut.ts expects.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
-import { blocks, db, follows, liveStreams, threadCashConfig, threadCashEntries, users } from "@workspace/db";
-import { getBalanceCents, sendLiveGift } from "../../lib/threadCash/wallet";
+import { and, eq } from "drizzle-orm";
+import { blocks, db, follows, liveStreams, threadCashEntries, users } from "@workspace/db";
+import { getBalanceCents, getCashableBalanceCents, getThreadCashConfig, sendLiveGift } from "../../lib/threadCash/wallet";
 
 const testUserIds: string[] = [];
 const testStreamIds: string[] = [];
@@ -80,12 +80,37 @@ describe("sendLiveGift", () => {
     await sendLiveGift(buyer, seller, stream, 150, crypto.randomUUID());
 
     const [debit] = await db.select().from(threadCashEntries)
-      .where(eq(threadCashEntries.buyerId, buyer)).limit(1);
+      .where(and(eq(threadCashEntries.buyerId, buyer), eq(threadCashEntries.source, "live_gift_sent"))).limit(1);
     expect(debit).toMatchObject({ amountCents: -150, source: "live_gift_sent", referenceId: stream });
 
     const [credit] = await db.select().from(threadCashEntries)
       .where(eq(threadCashEntries.buyerId, seller)).limit(1);
     expect(credit).toMatchObject({ amountCents: 150, source: "live_gift", referenceId: stream });
+  });
+
+  it("a gift of reward credit stays promo: the seller can spend it but never cash it out", async () => {
+    const buyer = await makeUser();
+    const seller = await makeUser();
+    const stream = await makeStream(seller);
+    await grant(buyer, 500); // a check-in reward
+
+    await sendLiveGift(buyer, seller, stream, 400, crypto.randomUUID());
+    const [credit] = await db.select().from(threadCashEntries).where(eq(threadCashEntries.buyerId, seller));
+    expect(credit).toMatchObject({ source: "live_gift", funding: "promo", amountCents: 400 });
+    expect(await getBalanceCents(db, seller)).toBe(400);
+    expect(await getCashableBalanceCents(db, seller)).toBe(0);
+  });
+
+  it("a gift of paid Thread Cash is the one thing the seller can cash out", async () => {
+    const buyer = await makeUser();
+    const seller = await makeUser();
+    const stream = await makeStream(seller);
+    await db.insert(threadCashEntries).values({
+      buyerId: buyer, amountCents: 300, source: "purchase", funding: "paid", referenceId: crypto.randomUUID(),
+    });
+
+    await sendLiveGift(buyer, seller, stream, 300, crypto.randomUUID());
+    expect(await getCashableBalanceCents(db, seller)).toBe(300);
   });
 
   it("rejects gifting yourself", async () => {
@@ -155,8 +180,8 @@ describe("sendLiveGift", () => {
     const buyer = await makeUser();
     const seller = await makeUser();
     const stream = await makeStream(seller);
-    const [config] = await db.select().from(threadCashConfig).limit(1);
-    const cap = config?.dailySendCapCents ?? 2000;
+    // The effective cap: thread_cash_config bounded by the env policy.
+    const cap = (await getThreadCashConfig()).dailySendCapCents;
     await grant(buyer, cap * 3);
 
     await sendLiveGift(buyer, seller, stream, cap, crypto.randomUUID());
@@ -166,16 +191,22 @@ describe("sendLiveGift", () => {
   });
 
   it("enforces the daily receive cap on the seller", async () => {
-    const buyer = await makeUser();
     const seller = await makeUser();
     const stream = await makeStream(seller);
-    const [config] = await db.select().from(threadCashConfig).limit(1);
-    const cap = config?.dailyReceiveCapCents ?? 5000;
-    await grant(buyer, cap * 3);
-
-    await sendLiveGift(buyer, seller, stream, cap, crypto.randomUUID());
+    const { dailyReceiveCapCents: cap, dailySendCapCents: perSender } = await getThreadCashConfig();
+    // Several buyers, each within their own send cap, fill the seller's receive cap.
+    let left = cap;
+    while (left > 0) {
+      const buyer = await makeUser();
+      const amount = Math.min(left, perSender);
+      await grant(buyer, amount);
+      await sendLiveGift(buyer, seller, stream, amount, crypto.randomUUID());
+      left -= amount;
+    }
+    const last = await makeUser();
+    await grant(last, 100);
     await expect(
-      sendLiveGift(buyer, seller, stream, 1, crypto.randomUUID()),
+      sendLiveGift(last, seller, stream, 1, crypto.randomUUID()),
     ).rejects.toMatchObject({ code: "THREAD_CASH_DAILY_RECEIVE_CAP" });
   });
 });

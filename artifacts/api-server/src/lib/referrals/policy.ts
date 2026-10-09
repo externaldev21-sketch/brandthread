@@ -2,8 +2,9 @@
  * Referral program policy: "Give $10, get $10" in Thread Cash.
  *
  * Timing (the ONE wording every surface must use):
- *   - Your friend gets $10 Thread Cash when they join with your link or code.
- *   - You get $10 Thread Cash when your friend completes their first order of
+ *   - Your friend gets $10 Thread Cash when they complete their first order
+ *     of $10 or more after joining with your link or code (never on sign-up).
+ *   - You get $10 Thread Cash when your friend completes that first order of
  *     $10 or more.
  *   - You still earn 500 loyalty points when your friend joins (unchanged).
  *

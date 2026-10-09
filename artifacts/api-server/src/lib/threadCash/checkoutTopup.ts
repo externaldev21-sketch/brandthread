@@ -8,8 +8,12 @@
  * buyer's ACTUAL (discounted) Stripe charge correctly. What is missing is
  * the gap between that reduced charge and the full price: this module tops
  * the seller up for exactly that gap with a supplemental Stripe Transfer,
- * for destination-charge (in-stock) orders only, funded from Brandthread's
- * own balance and recorded as a platform expense in the ledger.
+ * funded from Brandthread's own balance and recorded as a platform expense
+ * in the ledger:
+ *   - destination charges (PAYOUT_MODE=immediate): right after the order;
+ *   - transfer charges (hold-until-delivered, the default): when the order's
+ *     own payout transfer goes out (cartTransfers.settleTransferOrder), so the
+ *     top-up honours the same hold as the rest of the seller's money.
  *
  * Idempotent and safe to call on every webhook delivery for an order,
  * including retries of an already-processed one: it does nothing once
@@ -31,12 +35,14 @@ export async function applyThreadCashSellerTopup(
     id: orders.id,
     ownerId: orders.ownerId,
     chargeModel: orders.chargeModel,
+    fundsState: orders.fundsState,
     threadCashAppliedCents: orders.threadCashAppliedCents,
     stripeThreadCashTransferId: orders.stripeThreadCashTransferId,
   }).from(orders).where(eq(orders.id, orderId)).limit(1);
 
   if (!order) return;
-  if (order.chargeModel !== "destination") return;
+  const releasedTransferOrder = order.chargeModel === "transfer" && order.fundsState === "released";
+  if (order.chargeModel !== "destination" && !releasedTransferOrder) return;
   if (!order.threadCashAppliedCents || order.threadCashAppliedCents < 1) return;
   if (order.stripeThreadCashTransferId) return; // already topped up
   if (!stripeClient) {
@@ -84,4 +90,27 @@ export async function applyThreadCashSellerTopup(
       ],
     });
   });
+}
+
+/**
+ * Retries top-ups that should have gone out but didn't (Stripe down, seller
+ * account not ready). A hold-mode order is released by a sweep days after
+ * payment, long after any webhook redelivery could retry its top-up.
+ * Idempotent: applyThreadCashSellerTopup no-ops once the transfer is recorded.
+ */
+export async function sweepThreadCashSellerTopups(
+  stripeClient: StripeLike | null,
+  options: { now?: Date; limit?: number } = {},
+): Promise<number> {
+  const since = new Date((options.now ?? new Date()).getTime() - 60 * 86_400_000);
+  const due = await db.select({ id: orders.id }).from(orders).where(sql`
+    ${orders.threadCashAppliedCents} > 0
+    AND ${orders.stripeThreadCashTransferId} IS NULL
+    AND ${orders.status} NOT IN ('cancelled', 'refunded', 'refund_pending')
+    AND ${orders.paidAt} >= ${since}
+    AND (${orders.chargeModel} = 'destination'
+      OR (${orders.chargeModel} = 'transfer' AND ${orders.fundsState} = 'released'))
+  `).limit(options.limit ?? 100);
+  for (const { id } of due) await applyThreadCashSellerTopup(stripeClient, id);
+  return due.length;
 }
