@@ -26,8 +26,9 @@ export interface CartLiveFields {
 /** `null` = never tracked (a bag cached before this flag existed). */
 export type CartDirtyState = '1' | '0' | null;
 
-export const OUT_OF_STOCK_REASON = 'Out of stock — remove or save for later';
-export const NO_LONGER_AVAILABLE_REASON = 'No longer available — remove or save for later';
+// Short, one-line copy (same words the server sends in `unavailableReason`).
+export const OUT_OF_STOCK_REASON = 'Out of stock';
+export const NO_LONGER_AVAILABLE_REASON = 'No longer available';
 
 const isCents = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v);
 
