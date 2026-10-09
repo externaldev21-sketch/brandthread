@@ -30,6 +30,7 @@ import { logger } from "../lib/logger";
 import { publishNotification } from "../routes/notifications-feed";
 import { sendAbandonedCartEmail, type EmailLineItem } from "../lib/brandthreadEmail";
 import { isChannelEnabledForUser } from "../lib/notificationChannels";
+import { scheduleJob } from "./runner";
 
 export const PUSH_REMINDER_AFTER_MS = 60 * 60 * 1000;
 export const EMAIL_REMINDER_AFTER_MS = 24 * 60 * 60 * 1000;
@@ -154,11 +155,5 @@ export async function runCartReminders(now: Date = new Date()): Promise<{ pushed
 }
 
 export function startAbandonedCartJob(): void {
-  // Run once shortly after startup (in case of server restart)
-  setTimeout(() => void runCartReminders(), 5 * 60 * 1000);
-
-  // Then run on the recurring interval
-  setInterval(() => void runCartReminders(), INTERVAL_MS);
-
-  logger.info({ job: "abandonedCartRecovery", intervalMs: INTERVAL_MS }, "Abandoned cart recovery job scheduled");
+  scheduleJob("abandonedCartRecovery", () => runCartReminders(), { intervalMs: INTERVAL_MS, initialDelayMs: 5 * 60 * 1000 });
 }

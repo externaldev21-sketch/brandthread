@@ -1,6 +1,7 @@
 import { logger } from "../lib/logger";
 import { runAutoRefundSweep, runDeadlineWarnings } from "../lib/delivery/autoRefund";
 import { pollShippedOrders, syncOrderTracking } from "../lib/delivery/trackingSync";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 10 * 60 * 1000;
 let running = false;
@@ -32,7 +33,5 @@ export async function runDeliveryDeadlinesJob(now = new Date()): Promise<void> {
 }
 
 export function startDeliveryDeadlinesJob(): void {
-  void runDeliveryDeadlinesJob();
-  setInterval(() => void runDeliveryDeadlinesJob(), INTERVAL_MS).unref?.();
-  logger.info({ job: "deliveryDeadlines", intervalMs: INTERVAL_MS }, "Delivery deadlines job scheduled");
+  scheduleJob("deliveryDeadlines", () => runDeliveryDeadlinesJob(), { intervalMs: INTERVAL_MS, initialDelayMs: 0 });
 }

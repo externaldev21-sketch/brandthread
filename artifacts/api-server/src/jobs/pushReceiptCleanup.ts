@@ -9,6 +9,7 @@
  */
 import { logger } from "../lib/logger";
 import { reconcilePushReceipts } from "../lib/push";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 30 * 60 * 1000;
 
@@ -24,7 +25,5 @@ export async function runPushReceiptCleanup(): Promise<void> {
 }
 
 export function startPushReceiptCleanupJob(): void {
-  setTimeout(() => { void runPushReceiptCleanup(); }, 5 * 60 * 1000);
-  setInterval(() => { void runPushReceiptCleanup(); }, INTERVAL_MS);
-  logger.info({ job: "pushReceiptCleanup", intervalMs: INTERVAL_MS }, "Push receipt cleanup job scheduled");
+  scheduleJob("pushReceiptCleanup", () => runPushReceiptCleanup(), { intervalMs: INTERVAL_MS, initialDelayMs: 5 * 60 * 1000 });
 }

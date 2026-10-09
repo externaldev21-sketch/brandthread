@@ -6,6 +6,7 @@ import {
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 5 * 60 * 1000;
 const CLAIM_TTL_MS = 10 * 60 * 1000;
@@ -81,15 +82,5 @@ export async function runDesignStudioObjectCleanup(
 }
 
 export function startDesignStudioObjectCleanupJob(): void {
-  setTimeout(() => {
-    void runDesignStudioObjectCleanup().catch(err =>
-      logger.error({ err, job: "designStudioObjectCleanup" }, "Design Studio cleanup job failed"),
-    );
-  }, 30_000);
-  setInterval(() => {
-    void runDesignStudioObjectCleanup().catch(err =>
-      logger.error({ err, job: "designStudioObjectCleanup" }, "Design Studio cleanup job failed"),
-    );
-  }, INTERVAL_MS);
-  logger.info({ job: "designStudioObjectCleanup", intervalMs: INTERVAL_MS }, "Design Studio cleanup job scheduled");
+  scheduleJob("designStudioObjectCleanup", () => runDesignStudioObjectCleanup(), { intervalMs: INTERVAL_MS, initialDelayMs: 30_000 });
 }

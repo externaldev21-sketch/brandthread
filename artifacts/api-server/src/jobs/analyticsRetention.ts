@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { scheduleJob } from "./runner";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INTERVAL_MS = DAY_MS;
@@ -29,9 +30,5 @@ export async function runAnalyticsRetention(now = new Date()): Promise<number> {
 }
 
 export function startAnalyticsRetentionJob(): void {
-  const run = () => void runAnalyticsRetention().catch((err) =>
-    logger.error({ err, job: "analyticsRetention" }, "Analytics retention job failed"));
-  setTimeout(run, 120_000);
-  setInterval(run, INTERVAL_MS).unref?.();
-  logger.info({ job: "analyticsRetention", intervalMs: INTERVAL_MS }, "Analytics retention job scheduled");
+  scheduleJob("analyticsRetention", () => runAnalyticsRetention(), { intervalMs: INTERVAL_MS, initialDelayMs: 120_000 });
 }

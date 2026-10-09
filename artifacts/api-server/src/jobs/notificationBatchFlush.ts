@@ -10,6 +10,7 @@ import { and, eq, lte } from "drizzle-orm";
 import { db, notificationBatchQueue } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { publishNotification } from "../routes/notifications-feed";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 5 * 60 * 1000;
 // A window stays open this long after its first event, collecting further
@@ -73,7 +74,5 @@ export async function runNotificationBatchFlush(now = new Date()): Promise<{ flu
 }
 
 export function startNotificationBatchFlushJob(): void {
-  setTimeout(() => { void runNotificationBatchFlush(); }, 60 * 1000);
-  setInterval(() => { void runNotificationBatchFlush(); }, INTERVAL_MS);
-  logger.info({ job: "notificationBatchFlush", intervalMs: INTERVAL_MS }, "Notification batch flush job scheduled");
+  scheduleJob("notificationBatchFlush", () => runNotificationBatchFlush(), { intervalMs: INTERVAL_MS, initialDelayMs: 60 * 1000 });
 }

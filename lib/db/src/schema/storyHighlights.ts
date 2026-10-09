@@ -8,8 +8,10 @@
  *   highlight survives the story's 24 h expiry. The story row is hard-deleted
  *   by the cleanup job, so `story_id` is a plain column, not a foreign key.
  * - `story_archive`: author-only copy of a story written when it expires
- *   (the cleanup job never deletes the media objects), so past stories can
- *   still be added to a highlight.
+ *   (its media objects are kept), so past stories can still be added to a
+ *   highlight.
+ * - `story_media_cleanup`: object paths the story cleanup job may delete once
+ *   nothing references them any more (migration 437).
  */
 import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
@@ -63,4 +65,15 @@ export const storyArchive = pgTable('story_archive', {
   archivedAt:      timestamp('archived_at').defaultNow().notNull(),
 }, (t) => ({
   authorIdx: index('story_archive_author_idx').on(t.authorId, t.storyCreatedAt),
+}));
+
+export const storyMediaCleanup = pgTable('story_media_cleanup', {
+  objectPath:    text('object_path').primaryKey(),
+  attemptCount:  integer('attempt_count').notNull().default(0),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).defaultNow().notNull(),
+  claimedAt:     timestamp('claimed_at', { withTimezone: true }),
+  lastError:     text('last_error'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  dueIdx: index('story_media_cleanup_due_idx').on(t.nextAttemptAt),
 }));

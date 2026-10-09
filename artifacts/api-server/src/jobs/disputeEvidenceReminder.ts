@@ -5,10 +5,10 @@
  */
 import { and, eq, gt, inArray, isNull, lte } from "drizzle-orm";
 import { db, disputes, disputeEvents, orders } from "@workspace/db";
-import { logger } from "../lib/logger";
 import { publishNotification } from "../routes/notifications-feed";
 import { EVIDENCE_REMINDER_LEAD_MS } from "../lib/disputes/notifications";
 import { runDisputeEvidenceReminder as runReminder, type ReminderDeps } from "../lib/disputes/reminder";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 30 * 60 * 1000;
 
@@ -57,7 +57,5 @@ export function runDisputeEvidenceReminder(now = new Date()): Promise<number> {
 }
 
 export function startDisputeEvidenceReminderJob(): void {
-  setTimeout(() => { void runDisputeEvidenceReminder(); }, 2 * 60 * 1000);
-  setInterval(() => { void runDisputeEvidenceReminder(); }, INTERVAL_MS);
-  logger.info({ job: "disputeEvidenceReminder", intervalMs: INTERVAL_MS }, "Dispute evidence reminder job scheduled");
+  scheduleJob("disputeEvidenceReminder", () => runDisputeEvidenceReminder(), { intervalMs: INTERVAL_MS, initialDelayMs: 2 * 60 * 1000 });
 }

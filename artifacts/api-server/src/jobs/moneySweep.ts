@@ -1,5 +1,6 @@
 import { logger } from "../lib/logger";
 import { runMoneySweep } from "../lib/money/dropLifecycle";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 5 * 60 * 1000;
 let running = false;
@@ -26,7 +27,5 @@ export async function runMoneySweepJob(now = new Date()): Promise<void> {
 }
 
 export function startMoneySweepJob(): void {
-  void runMoneySweepJob();
-  setInterval(() => void runMoneySweepJob(), INTERVAL_MS).unref?.();
-  logger.info({ job: "moneySweep", intervalMs: INTERVAL_MS }, "Money sweep job scheduled");
+  scheduleJob("moneySweep", () => runMoneySweepJob(), { intervalMs: INTERVAL_MS, initialDelayMs: 0 });
 }

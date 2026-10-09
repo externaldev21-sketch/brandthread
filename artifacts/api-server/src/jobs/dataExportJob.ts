@@ -13,6 +13,7 @@ import {
   statusAfterFailure,
   type DataExportStatus,
 } from "../lib/dataExportJobs";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 60 * 1000;
 const MAX_JOBS_PER_TICK = 5;
@@ -184,15 +185,5 @@ export function kickDataExportJobs(): void {
 }
 
 export function startDataExportJob(): void {
-  setTimeout(() => {
-    void runDataExportJobs().catch((err) =>
-      logger.error({ err, job: "dataExport" }, "Data export job failed"),
-    );
-  }, 20_000);
-  setInterval(() => {
-    void runDataExportJobs().catch((err) =>
-      logger.error({ err, job: "dataExport" }, "Data export job failed"),
-    );
-  }, INTERVAL_MS).unref?.();
-  logger.info({ job: "dataExport", intervalMs: INTERVAL_MS }, "Data export job scheduled");
+  scheduleJob("dataExport", () => runDataExportJobs(), { intervalMs: INTERVAL_MS, initialDelayMs: 20_000 });
 }

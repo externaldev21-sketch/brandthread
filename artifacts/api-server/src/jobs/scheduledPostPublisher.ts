@@ -1,5 +1,6 @@
 import { logger } from "../lib/logger";
 import { publishDuePosts } from "../lib/postPublish";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 60 * 1000;
 
@@ -21,7 +22,5 @@ export async function runScheduledPostPublisher(now = new Date()): Promise<numbe
 }
 
 export function startScheduledPostPublisherJob(): void {
-  setTimeout(() => void runScheduledPostPublisher(), 15_000).unref?.();
-  setInterval(() => void runScheduledPostPublisher(), INTERVAL_MS).unref?.();
-  logger.info({ job: "scheduledPostPublisher", intervalMs: INTERVAL_MS }, "Scheduled post publisher scheduled");
+  scheduleJob("scheduledPostPublisher", () => runScheduledPostPublisher(), { intervalMs: INTERVAL_MS, initialDelayMs: 15_000 });
 }
