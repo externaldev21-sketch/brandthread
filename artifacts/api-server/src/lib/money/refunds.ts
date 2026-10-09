@@ -1,6 +1,7 @@
 /**
  * Refunds — the ONE path every buyer refund takes (buyer cancellation, seller
- * cancellation, approved return, failed drop, oversold order).
+ * cancellation, seller partial/goodwill refund, approved return, failed drop,
+ * oversold order).
  *
  * Three phases, so money is never lost between Stripe and the database:
  *  A. (DB) lock the order, validate the amount against what is still
@@ -45,7 +46,7 @@ import { restoreGiftCardsOnFullRefund } from "../giftCards/payout";
 
 export type RefundReason =
   | "buyer_cancelled" | "seller_cancelled" | "return_approved" | "drop_failed" | "oversold"
-  | "not_delivered";
+  | "not_delivered" | "seller_refund";
 
 type StripeLike = Pick<Stripe, "refunds" | "transfers" | "applicationFees">;
 
