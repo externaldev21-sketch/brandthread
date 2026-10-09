@@ -40,7 +40,7 @@ import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ON_DARK, RADIUS, SP, ICON } from '@/lib/theme';
 import { RADII, radius } from '@/constants/radii';
-import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { prefetchImage } from '@/lib/prefetch';
 import { useApi } from '@/lib/api';
 import { useReportSheet } from '@/components/safety/ReportSheet';
@@ -304,7 +304,7 @@ export default function StoryMentionViewerScreen() {
     if (!current) return;
     const id = current.storyId;
     const wasLiked = likedNow(current);
-    hapticLight();
+    haptics.light();
     if (!wasLiked) {
       heartPop.setValue(0.75);
       Animated.timing(heartPop, { toValue: 1, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -355,7 +355,6 @@ export default function StoryMentionViewerScreen() {
         await sendMessage(conv.conversationId, message, attachment);
       }
       setText('');
-      hapticSuccessAction();
       showToast('Sent');
     } catch (err) {
       if (err instanceof ApiError && (err.status === 404 || err.status === 410)) {
@@ -370,7 +369,6 @@ export default function StoryMentionViewerScreen() {
 
   const addToStory = useCallback(() => {
     if (!current || currentUnavailable) return;
-    hapticLight();
     router.push(reshareEditorHref({
       storyId: current.storyId,
       imageUrl: slide?.imageUri ?? current.thumbnailUrl,

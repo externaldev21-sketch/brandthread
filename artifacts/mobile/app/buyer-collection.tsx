@@ -11,7 +11,7 @@ import {
   Modal, TextInput, ActivityIndicator, Share,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -174,7 +174,7 @@ export default function BuyerCollection() {
       <TouchableOpacity
         style={styles.tile}
         onPress={() => openItem(item)}
-        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); removeItem(item); }}
+        onLongPress={() => { haptics.rigid(); removeItem(item); }}
         activeOpacity={0.85}
       >
         <View style={styles.tileImageWrap}>

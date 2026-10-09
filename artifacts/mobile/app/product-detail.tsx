@@ -14,7 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -131,7 +131,7 @@ export default function ProductDetailScreen() {
   }, [activeTab, id, analyticsRetry, userId]);
 
   const handleTabPress = useCallback((tab: Tab, index: number) => {
-    Haptics.selectionAsync();
+    haptics.selection();
     setActiveTab(tab);
   }, []);
 
@@ -155,7 +155,7 @@ export default function ProductDetailScreen() {
       <View style={[s.root, { paddingTop: headerTopInset }]}>
         <View style={s.header}>
           <PressableScale
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+            onPress={() => { goBackOr(router); }}
             style={s.backBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Back"
@@ -184,7 +184,7 @@ export default function ProductDetailScreen() {
       <View style={s.header}>
         {/* Fix 3: back button uses goBackOr(router) */}
         <PressableScale
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+          onPress={() => { goBackOr(router); }}
           style={s.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel="Back"
@@ -197,7 +197,7 @@ export default function ProductDetailScreen() {
         <View style={s.headerRight}>
           {/* Fix 7: edit button navigates to /add-product with editId param */}
           <PressableScale
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/add-product?editId=' + id) as never); }}
+            onPress={() => { router.push(('/add-product?editId=' + id) as never); }}
             style={s.headerBtn}
             accessibilityLabel={`Edit ${product.name}`}
           >
@@ -205,7 +205,6 @@ export default function ProductDetailScreen() {
           </PressableScale>
           <PressableScale
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               Alert.alert('Product Options', '', [
                 { text: product.status === 'active' ? 'Archive' : 'Publish', onPress: () => {
                   if (product.status === 'active') {
@@ -300,7 +299,7 @@ export default function ProductDetailScreen() {
       {/* ── Floating Action Button ── */}
       <PressableScale accessibilityLabel="Edit product"
         style={[s.fab, { bottom: insets.bottom + SP.lg }]}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/add-product?editId=' + id) as never); }}
+        onPress={() => { router.push(('/add-product?editId=' + id) as never); }}
       >
         <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabGrad}>
           <Feather name="edit-2" size={ICON.md} color={theme.onAccent} />
@@ -1328,7 +1327,7 @@ function StoreTab({
 
           {/* Description accordion */}
           <PressableScale
-            onPress={() => { Haptics.selectionAsync(); setDescOpen(o => !o); }}
+            onPress={() => { setDescOpen(o => !o); }}
             style={st.descHeader}
             accessibilityLabel="Description"
             accessibilityState={{ expanded: descOpen }}

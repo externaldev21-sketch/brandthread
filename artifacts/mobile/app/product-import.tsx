@@ -7,7 +7,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 
@@ -153,7 +153,7 @@ export default function ProductImportScreen() {
   }
 
   function selectMethod(method: 'csv' | 'shopify' | 'manual') {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     setSelectedMethod(prev => (prev === method ? null : method));
   }
 
@@ -196,7 +196,7 @@ export default function ProductImportScreen() {
 
   return (
     <View style={s.screen}>
-      <Header title="Import Products" dividerVariant="none" onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }} />
+      <Header title="Import Products" dividerVariant="none" onBack={() => { goBackOr(router); }} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -255,7 +255,7 @@ export default function ProductImportScreen() {
         {/* ── METHOD B: Shopify transfer (routes to the working transfer flow in Store Builder) ── */}
         <GradientCard
           style={s.methodCard}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/store-builder' as never); }}
+          onPress={() => { router.push('/store-builder' as never); }}
         >
           <View style={s.methodRow}>
             <View style={[s.methodIconWrap, { backgroundColor: GOLD + '22' }]}>
@@ -275,7 +275,6 @@ export default function ProductImportScreen() {
             style={s.methodCard}
             onPress={() => {
               if (!providers.etsy.enabled || etsyBusy || reviewBusy) return;
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               if (providers.etsy.connected) void startReview({ kind: 'etsy' });
               else void connectEtsy();
             }}

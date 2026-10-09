@@ -24,7 +24,7 @@ import { BottomSheet, Chip, ListRow } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { hapticDestructiveConfirm, hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
@@ -314,7 +314,6 @@ export default function BuyerNotifications() {
   }
 
   const handleTap = async (notif: Notification) => {
-    hapticPrimaryAction();
     void captureNotificationEvent(api, user?.id, {
       notificationId: notif.id,
       eventType: 'tap',
@@ -328,7 +327,7 @@ export default function BuyerNotifications() {
   };
 
   const handleLongPress = (notif: Notification) => {
-    hapticToggle();
+    haptics.rigid();
     setOptionsFor(notif);
   };
 
@@ -371,7 +370,7 @@ export default function BuyerNotifications() {
         text: 'Clear',
         style: 'destructive',
         onPress: async () => {
-          hapticDestructiveConfirm();
+          haptics.warning();
           await clearAllReadNotifications();
           await loadNotifs();
         },
@@ -381,7 +380,6 @@ export default function BuyerNotifications() {
   };
 
   const toggleRead = async (notif: Notification) => {
-    hapticToggle();
     if (notif.isRead) {
       await markNotificationUnread(notif.id);
     } else {

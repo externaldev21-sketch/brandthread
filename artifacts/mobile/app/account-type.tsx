@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PillButton, PressableScale, Reveal, StepHeadline, StepSub, StitchAccent } from '@/components/onboarding/OnboardingUI';
 import { RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
@@ -94,7 +94,7 @@ export function AccountTypeStep({
                 accessibilityState={{ selected: isSelected }}
                 onPress={() => {
                   onSelect(c.type);
-                  Haptics.selectionAsync();
+                  haptics.selection();
                 }}
                 style={[
                   styles.card,

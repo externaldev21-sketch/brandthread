@@ -35,7 +35,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { hapticLight } from '@/lib/haptics';
 import {
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
@@ -242,7 +241,7 @@ function PublicProfileLanding({
             {/* Primary: Open / Join */}
             <PressableScale
               style={styles.primaryBtn}
-              onPress={() => { hapticLight(); onJoin(); }}
+              onPress={() => { onJoin(); }}
               accessibilityRole="button"
               accessibilityLabel="Join Brandthread to view this profile"
               activeOpacity={0.85}
@@ -253,7 +252,7 @@ function PublicProfileLanding({
             {/* Secondary: Sign in */}
             <PressableScale
               style={styles.secondaryBtn}
-              onPress={() => { hapticLight(); onSignIn(); }}
+              onPress={() => { onSignIn(); }}
               accessibilityRole="button"
               accessibilityLabel="Sign in to Brandthread"
               activeOpacity={0.85}
@@ -381,7 +380,7 @@ export default function PublicProfileRoute() {
   if (state.kind === 'not_found') {
     return (
       <View style={styles.root}>
-        <ScreenHeader title="Profile" onBack={() => { hapticLight(); goBackOr(router); }} />
+        <ScreenHeader title="Profile" onBack={() => { goBackOr(router); }} />
         <View style={styles.center}>
           <View style={styles.iconBox}>
             <Feather name="user-x" size={40} color={theme.muted} />
@@ -394,7 +393,7 @@ export default function PublicProfileRoute() {
           </Text>
           <PressableScale
             style={styles.homeBtn}
-            onPress={() => { hapticLight(); router.replace('/' as never); }}
+            onPress={() => { router.replace('/' as never); }}
             accessibilityRole="button"
             accessibilityLabel="Go to Brandthread home"
           >
@@ -409,14 +408,14 @@ export default function PublicProfileRoute() {
   if (state.kind === 'error') {
     return (
       <View style={styles.root}>
-        <ScreenHeader title="Profile" onBack={() => { hapticLight(); goBackOr(router); }} />
+        <ScreenHeader title="Profile" onBack={() => { goBackOr(router); }} />
         <View style={styles.center}>
           <Feather name="wifi-off" size={40} color={theme.muted} />
           <Text style={styles.notFoundTitle}>Couldn't load this profile</Text>
           <Text style={styles.notFoundDesc}>{state.message}</Text>
           <PressableScale
             style={styles.retryBtn}
-            onPress={() => { hapticLight(); load(); }}
+            onPress={() => { load(); }}
             accessibilityRole="button"
             accessibilityLabel="Retry"
           >

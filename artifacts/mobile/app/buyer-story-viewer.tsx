@@ -25,7 +25,7 @@ import {
 } from '@/lib/theme';
 import { RADII, radius } from '@/constants/radii';
 import { AppleEmoji } from '@/components/ui/AppleEmoji';
-import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
@@ -362,7 +362,6 @@ export default function BuyerStoryViewer() {
         await sendMessage(conv.id, text, attachment);
       }
       if (!override) setInputText('');
-      hapticSuccessAction();
     } catch {
       Alert.alert('Couldn’t send reply', 'Try again.');
     } finally {
@@ -371,7 +370,7 @@ export default function BuyerStoryViewer() {
   };
 
   const sendQuickReaction = (emoji: string) => {
-    hapticLight();
+    haptics.light();
     void handleSendReply(emoji);
   };
 
@@ -500,14 +499,13 @@ export default function BuyerStoryViewer() {
     router.push(mentionProfileHref(p) as never);
   };
   const openOriginal = (originalId: string) => {
-    hapticLight();
     router.push(`/buyer-story-viewer?storyId=${encodeURIComponent(originalId)}&allStoryIds=${encodeURIComponent(originalId)}` as never);
   };
 
   // ── Interactive sticker actions ──────────────────────────────────────────
   const stickerActions = {
     vote: async (sid: string, overlayId: string, optionIndex: number) => {
-      hapticLight();
+      haptics.selection();
       try {
         return (await api.social.pollVote(sid, overlayId, optionIndex)).stickerState;
       } catch (err) {
@@ -518,7 +516,6 @@ export default function BuyerStoryViewer() {
       }
     },
     answer: async (sid: string, overlayId: string, text: string) => {
-      hapticLight();
       try {
         return (await api.social.questionAnswer(sid, overlayId, text)).stickerState;
       } catch (err) {
@@ -528,17 +525,14 @@ export default function BuyerStoryViewer() {
         throw err;
       }
     },
-    notify: async (dropId: string) => { hapticLight(); await api.publicDrops.subscribe(dropId); },
+    notify: async (dropId: string) => { haptics.light(); await api.publicDrops.subscribe(dropId); },
     openProduct: (productId: string, name: string) => {
-      hapticLight();
       router.push(`/thread-product-detail?productId=${encodeURIComponent(productId)}&productName=${encodeURIComponent(name)}` as never);
     },
     openDrop: (dropId: string, name: string) => {
-      hapticLight();
       router.push(`/buyer-drop-detail?dropId=${encodeURIComponent(dropId)}&dropName=${encodeURIComponent(name)}` as never);
     },
     openResponses: async (sid: string) => {
-      hapticLight();
       setResponsesOpen(true);
       if (isPreviewStickerStory(sid)) {
         setResponses({ questions: [{ overlayId: 'question', prompt: 'What should we drop next?', answers: PREVIEW_STICKER_ANSWERS }] });
@@ -631,7 +625,6 @@ export default function BuyerStoryViewer() {
                   { left: overlay.x, top: overlay.y, opacity: pressed ? 0.82 : 1 },
                 ]}
                 onPress={() => {
-                  hapticLight();
                   const url = overlay.linkUrl ?? '';
                   if (url) Linking.openURL(url).catch(() => {});
                 }}
@@ -699,7 +692,7 @@ export default function BuyerStoryViewer() {
       {/* MENTIONS + RESHARE CARD — above the tap zones so a tagged sticker (or the
           44pt square around a tiny/invisible one) and the reshare credit are tappable. */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 6 }]} pointerEvents="box-none">
-        <ViewerMentionStickers overlays={currentSlide.overlays ?? []} onTap={(t) => { hapticLight(); setMentionTap(t); }} />
+        <ViewerMentionStickers overlays={currentSlide.overlays ?? []} onTap={(t) => setMentionTap(t)} />
         {/* Interactive stickers: poll, question, product link, drop countdown. */}
         <ViewerStickerLayer
           key={currentStory.id}
@@ -782,7 +775,6 @@ export default function BuyerStoryViewer() {
           <Pressable
             style={({ pressed }) => [styles.productTag, { opacity: pressed ? 0.8 : 1 }]}
             onPress={() => {
-              hapticLight();
               Alert.alert(currentSlide.productTagName ?? 'Product', undefined, [
                 {
                   text: 'Shop',
@@ -864,7 +856,7 @@ export default function BuyerStoryViewer() {
       {slidePeople.length > 0 && !replyFocused ? (
         <Pressable
           style={[styles.taggedChip, { bottom: insets.bottom + SP.md + 44 + SP.md + SP.sm }]}
-          onPress={() => { hapticLight(); setTaggedSheetOpen(true); }}
+          onPress={() => setTaggedSheetOpen(true)}
           accessibilityRole="button"
           accessibilityLabel={`Tagged people, ${slidePeople.length}`}
           testID="story-tagged-chip"
@@ -884,7 +876,7 @@ export default function BuyerStoryViewer() {
           <View style={styles.ownStoryBar}>
             <PressableScale
               style={styles.seenByRow}
-              onPress={() => { hapticLight(); openViewersModal(); }}
+              onPress={() => openViewersModal()}
               accessibilityRole="button"
               accessibilityLabel={`Seen by ${seenByCount}`}
             >
@@ -909,7 +901,6 @@ export default function BuyerStoryViewer() {
             <View style={{ flex: 1 }} />
             <PressableScale
               onPress={() => {
-                hapticLight();
                 setIsPaused(true);
                 Share.share({ message: `Check out my story on Brandthread` })
                   .catch(() => {})
@@ -923,7 +914,6 @@ export default function BuyerStoryViewer() {
             </PressableScale>
             <PressableScale
               onPress={() => {
-                hapticLight();
                 setIsPaused(true);
                 Alert.alert('Your story', undefined, [
                   ...(slidePeople.length > 0 ? [{
@@ -942,7 +932,7 @@ export default function BuyerStoryViewer() {
                         const perm = await MediaLibrary.requestPermissionsAsync();
                         if (!perm.granted || !currentSlide?.imageUri) throw new Error('permission');
                         await MediaLibrary.createAssetAsync(currentSlide.imageUri);
-                        hapticSuccessAction();
+                        haptics.success();
                       } catch {
                         Alert.alert('Couldn’t save', 'Check your photo library permission and try again.');
                       } finally {
@@ -1022,7 +1012,7 @@ export default function BuyerStoryViewer() {
               rightAccessory={(
                 <>
                   <PressableScale
-                    onPress={() => { hapticLight(); handleLike(); }}
+                    onPress={() => { haptics.light(); handleLike(); }}
                     style={styles.likeBtn}
                     accessibilityRole="button"
                     accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
@@ -1042,7 +1032,6 @@ export default function BuyerStoryViewer() {
                   </PressableScale>
                   <PressableScale
                     onPress={() => {
-                      hapticLight();
                       setIsPaused(true);
                       Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
                         .catch(() => {})

@@ -24,7 +24,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
-import * as Haptics from 'expo-haptics';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -45,7 +44,7 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { FONT, GRID_MAX_WIDTH, SP } from '@/lib/theme';
-import { hapticPrimaryAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { RADII, radius } from '@/constants/radii';
 import { CachedImage } from '@/components/CachedImage';
@@ -184,7 +183,6 @@ export function DiscoverPager() {
 
   // ─ Shared scroll position — drives everything below via worklets ──────────
   const scrollX = useSharedValue(0);
-  const lastHapticIndex = useRef(0);
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
@@ -195,10 +193,6 @@ export function DiscoverPager() {
     const index = Math.round(event.nativeEvent.contentOffset.x / snapInterval);
     const clamped = Math.max(0, Math.min(items.length - 1, index));
     setActiveIndex(clamped);
-    if (clamped !== lastHapticIndex.current) {
-      lastHapticIndex.current = clamped;
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
   }, [items.length, snapInterval]);
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
@@ -229,7 +223,7 @@ export function DiscoverPager() {
         );
         void getCartFlightVector(startX, startY, target); // computed for the caller's fly-animation layer
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.light();
       // A real confirmation beyond just the cart badge count changing.
       if (addedToastTimer.current) clearTimeout(addedToastTimer.current);
       setAddedToast({ visible: true, message: `Added ${product.name} to your bag` });
@@ -528,7 +522,7 @@ function DiscoverCard({
           </View>
         )}
         <PressableScale
-          onPress={() => { hapticPrimaryAction(); onBrandPress(); }}
+          onPress={() => { onBrandPress(); }}
           accessibilityLabel={`View ${item.brandName}'s shop`}
         >
           <View style={styles.brandInner}>
@@ -578,7 +572,6 @@ function DiscoverCard({
             style={[styles.secondaryBtn, { borderColor: '#FFFFFF55' }]}
             accessibilityLabel="Add to cart"
             onPress={() => {
-              hapticPrimaryAction();
               priceRef.current?.measureInWindow((x, y) => onAddToCart(x, y));
             }}
           >
@@ -593,7 +586,7 @@ function DiscoverCard({
           <PressableScale
             style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
             accessibilityLabel="Buy now"
-            onPress={() => { hapticPrimaryAction(); onBuyNow(); }}
+            onPress={() => { onBuyNow(); }}
           >
             <Text style={[styles.primaryBtnText, { color: theme.onAccent }]}>Buy Now</Text>
           </PressableScale>

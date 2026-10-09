@@ -9,7 +9,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -62,7 +62,7 @@ function ChipGroup({
       {options.map(opt => (
         <TouchableOpacity
           key={opt}
-          onPress={() => { Haptics.selectionAsync(); onChange(opt); }}
+          onPress={() => { haptics.selection(); onChange(opt); }}
           style={[chipStyles.chip, value === opt && chipStyles.active]}
         >
           <Text style={[chipStyles.label, value === opt && chipStyles.activeLabel]}>
@@ -261,7 +261,6 @@ export default function StoreEditor() {
   }
 
   async function handleUndo() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const s = await undoLastAction();
     setStore(s);
     setUndoAvailable(s.undoStack.length > 0);
@@ -269,7 +268,6 @@ export default function StoreEditor() {
   }
 
   async function handleRedo() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const s = await redoLastAction();
     setStore(s);
     setUndoAvailable(s.undoStack.length > 0);
@@ -282,7 +280,6 @@ export default function StoreEditor() {
   }
 
   async function handleDuplicate(id: string) {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const s = await duplicateSection(id);
     setStore(s);
   }
@@ -324,12 +321,12 @@ export default function StoreEditor() {
   }
 
   async function handleSaveDraft() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSavingStatus('saving');
     try {
       const s = await saveDraft();
       setStore(s);
       setSavingStatus('saved');
+      haptics.success();
     } catch {
       setSavingStatus('failed');
     }
@@ -372,7 +369,6 @@ export default function StoreEditor() {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponderCapture: (_e, g) => Math.abs(g.dy) > 4,
       onPanResponderGrant: () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         dragY.setValue(0);
         setDraggingId(id);
         dragStartIndex.current = displayOrder.indexOf(id);
@@ -1027,7 +1023,6 @@ export default function StoreEditor() {
               ) : (
                 <TouchableOpacity
                   onPress={() => {
-                    Haptics.selectionAsync();
                     setInlineHeadingDraft(section.settings.heading ?? '');
                     setInlineEditingId(section.id);
                   }}
@@ -1040,7 +1035,6 @@ export default function StoreEditor() {
           </View>
           <TouchableOpacity
             onPress={() => {
-              Haptics.selectionAsync();
               if (isActive) {
                 setActiveSection(null);
               } else {
@@ -1218,7 +1212,7 @@ export default function StoreEditor() {
         {TABS.map(tab => (
           <TouchableOpacity
             key={tab.value}
-            onPress={() => { Haptics.selectionAsync(); setMode(tab.value); }}
+            onPress={() => { haptics.selection(); setMode(tab.value); }}
             style={[styles.tab, mode === tab.value && styles.tabActive]}
           >
             <Text style={[styles.tabLabel, mode === tab.value && styles.tabLabelActive]}>

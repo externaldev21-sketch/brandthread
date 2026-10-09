@@ -4,7 +4,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
@@ -63,12 +63,7 @@ export default function BillingScreen() {
     };
   }, [api]);
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
   async function openBillingPortal() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       if (Platform.OS !== 'web') {
         if (!managementURL) throw new Error('Subscription management is not available yet.');
@@ -103,7 +98,6 @@ export default function BillingScreen() {
   }
 
   function exportBills() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
      const text = bills.map(b => `${b.date} — ${b.note}: ${formatCents(b.amountCents, b.currency)} (${b.status})`).join('\n');
     Share.share({ message: `Billing History\n\n${text}` });
   }
@@ -218,7 +212,7 @@ export default function BillingScreen() {
               {(['all', 'paid', 'unpaid'] as BillFilter[]).map((f) => (
                 <TouchableOpacity
                   key={f}
-                  onPress={() => { haptic(); setFilter(f); }}
+                  onPress={() => { haptics.selection(); setFilter(f); }}
                   style={[styles.filterTab, { backgroundColor: filter === f ? colors.card : 'transparent' }]}
                   activeOpacity={0.7}
                 >

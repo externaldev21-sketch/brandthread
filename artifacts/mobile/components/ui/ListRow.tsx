@@ -10,7 +10,6 @@ import React from 'react';
 import { Animated, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { hapticLight } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
@@ -83,7 +82,7 @@ export function ListRow({
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={() => { hapticLight(); onPress?.(); }}
+      onPress={() => { onPress?.(); }}
       onPressIn={() => Animated.timing(highlight, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       onPressOut={() => Animated.timing(highlight, { toValue: 0, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       testID={testID}

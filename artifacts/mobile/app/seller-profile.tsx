@@ -54,7 +54,7 @@ import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { ListRow } from '@/components/ui/ListRow';
-import { hapticLight, hapticMedium, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
   ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
@@ -382,7 +382,6 @@ export default function SellerProfileScreen() {
   const handleShare = useCallback(() => {
     if (!seller) return;
     if (isOwner) {
-      hapticLight();
       setShareSheetVisible(true);
       return;
     }
@@ -409,7 +408,6 @@ export default function SellerProfileScreen() {
       return;
     }
     if (!requireSignIn()) return;
-    hapticMedium();
     router.push(messageSellerHref({
       sellerId: seller.sellerId,
       sellerName: seller.brandName,
@@ -419,7 +417,6 @@ export default function SellerProfileScreen() {
   }, [router, seller, requireSignIn]);
 
   const handleOpenInbox = useCallback(() => {
-    hapticLight();
     router.push((isOwner ? '/seller-inbox' : '/(buyer)/inbox') as never);
   }, [isOwner, router]);
 
@@ -481,7 +478,7 @@ export default function SellerProfileScreen() {
   const handleTileLongPress = useCallback((item: ProfileGridItem) => {
     if (!isOwner) return;
     const post = videos.posts.find((candidate) => candidate.id === item.id) ?? null;
-    if (post) { hapticMedium(); setSelectedPost(post); }
+    if (post) { haptics.rigid(); setSelectedPost(post); }
   }, [isOwner, videos.posts]);
 
   const handleCopyPostLink = useCallback(async (post: SellerThreadPost) => {
@@ -489,7 +486,6 @@ export default function SellerProfileScreen() {
     const url = profileUrl ? `${profileUrl}?post=${encodeURIComponent(post.id)}` : null;
     if (!url) { Alert.alert('Couldn’t copy link', 'Try again.'); return; }
     await Clipboard.setStringAsync(url);
-    hapticSuccessAction();
     setSnackbar('Link copied');
   }, [seller]);
 
@@ -708,7 +704,7 @@ export default function SellerProfileScreen() {
             ) : null}
             <ProfileGlassButton
               icon="more-horizontal"
-              onPress={() => { hapticLight(); setMenuOpen(true); }}
+              onPress={() => { setMenuOpen(true); }}
               accessibilityLabel="More options"
               testID="seller-profile-more"
             />
@@ -723,7 +719,7 @@ export default function SellerProfileScreen() {
         tabs={{
           items: CONTENT_TAB_ITEMS,
           active: activeTab,
-          onChange: (key) => { hapticLight(); setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
+          onChange: (key) => { setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
         }}
         data={gridData}
         renderItem={renderTile}
@@ -806,7 +802,7 @@ export default function SellerProfileScreen() {
 function SheetRow({ icon, label, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
   const { theme } = useAppTheme();
   return (
-    <PressableScale style={sheetRowStyles.row} onPress={() => { hapticMedium(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
+    <PressableScale style={sheetRowStyles.row} onPress={() => { onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
       <Feather name={icon} size={18} color={theme.text} />
       <Text style={[sheetRowStyles.label, { color: theme.text }]}>{label}</Text>
       <Feather name="chevron-right" size={16} color={theme.muted} />

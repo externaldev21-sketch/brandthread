@@ -4,7 +4,6 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 
 const STRIPE_TAX_REGISTRATIONS_URL = 'https://dashboard.stripe.com/tax/registrations';
@@ -37,10 +36,6 @@ export default function TaxesDutiesScreen() {
   }, []);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
-
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
 
   const handleToggleTax = async (next: boolean) => {
     const previous = stripeTaxEnabled;
@@ -78,7 +73,6 @@ export default function TaxesDutiesScreen() {
   };
 
   const openStripeTaxRegistrations = async () => {
-    haptic();
     try {
       const supported = await Linking.canOpenURL(STRIPE_TAX_REGISTRATIONS_URL);
       if (supported) {

@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { WebView } from 'react-native-webview';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -171,7 +171,7 @@ export default function StorePreview() {
     <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
       <View style={styles.bar}>
         <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+          onPress={() => { goBackOr(router); }}
           style={styles.closeBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel="Close preview"
@@ -183,7 +183,7 @@ export default function StorePreview() {
           {(['mobile', 'desktop'] as DeviceMode[]).map((mode) => (
             <TouchableOpacity
               key={mode}
-              onPress={() => { Haptics.selectionAsync(); setDevice(mode); }}
+              onPress={() => { haptics.selection(); setDevice(mode); }}
               style={[styles.deviceBtn, device === mode && styles.deviceBtnActive]}
               accessibilityLabel={mode === 'mobile' ? 'Mobile preview' : 'Desktop preview'}
               accessibilityRole="button"

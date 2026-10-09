@@ -20,7 +20,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
 import { StockEditorSheet } from '@/components/products/StockEditorSheet';
@@ -401,7 +401,7 @@ function SortModal({
           <PressableScale
             key={key}
             style={[sh.sortOption, current === key && sh.sortOptionActive]}
-            onPress={() => { hapticToggle(); onSelect(key); onClose(); }}
+            onPress={() => { haptics.selection(); onSelect(key); onClose(); }}
             accessibilityLabel={label}
             accessibilityState={{ selected: current === key }}
           >
@@ -707,7 +707,6 @@ export default function ProductsScreen() {
       showPreviewOnlyFeedback();
       return;
     }
-    hapticPrimaryAction();
     setActionProduct(product);
     setActionSheetVisible(true);
   }, [previewOnly, showPreviewOnlyFeedback]);
@@ -717,7 +716,6 @@ export default function ProductsScreen() {
       showPreviewOnlyFeedback();
       return;
     }
-    hapticPrimaryAction();
     setStockEditProduct(product);
     setStockEditVisible(true);
   }, [previewOnly, showPreviewOnlyFeedback]);
@@ -836,10 +834,10 @@ export default function ProductsScreen() {
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchPlaceholder="Search products…"
-        onFilterPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
+        onFilterPress={() => setFilterModalVisible(true)}
         hasActiveFilter={hasActiveFilter}
         filterAccessibilityLabel={filter !== 'all' ? `Filter: ${filter}` : 'Filter products'}
-        onSortPress={() => { hapticPrimaryAction(); setSortModalVisible(true); }}
+        onSortPress={() => setSortModalVisible(true)}
         sortAccessibilityLabel={`Sort: ${currentSortLabel}`}
         chips={filterPills.map(pill => ({
           key: pill.value,

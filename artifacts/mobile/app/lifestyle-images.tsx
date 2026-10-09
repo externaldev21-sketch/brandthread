@@ -19,7 +19,7 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
@@ -68,7 +68,7 @@ export default function LifestyleImagesScreen() {
       if (!fileUri) return;
       const outcome = await saveImageToMediaLibrary(fileUri);
       if (outcome === 'saved') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         Alert.alert('Saved', 'Saved to Photos.');
       } else if (outcome === 'denied') {
         Alert.alert('Permission required', 'Allow photo library access to save this image.');
@@ -118,7 +118,7 @@ export default function LifestyleImagesScreen() {
       };
       const updated = await updateProduct(product.id, { media: [...existing, newMedia] });
       if (updated) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         Alert.alert('Added', `Added to "${product.name ?? 'product'}" media gallery.`);
       } else {
         Alert.alert("Couldn't update product", 'Try again.');
@@ -144,7 +144,6 @@ export default function LifestyleImagesScreen() {
       base64: true,
     });
     if (result.canceled) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const picked: Photo[] = result.assets
       .filter((a) => !!a.base64)
       .slice(0, MAX_PHOTOS - current.length)
@@ -171,13 +170,11 @@ export default function LifestyleImagesScreen() {
 
   function goToProductStep() {
     if (referencePhotos.length === 0) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setStep('product');
   }
 
   async function generate() {
     if (productPhotos.length === 0 || loading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setResultB64(null);
     setStep('result');
@@ -198,7 +195,6 @@ export default function LifestyleImagesScreen() {
   }
 
   function startOver() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setStep('reference');
     setReferencePhotos([]);
     setProductPhotos([]);

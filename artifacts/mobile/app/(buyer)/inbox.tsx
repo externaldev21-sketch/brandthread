@@ -40,7 +40,7 @@ import { useInboxCommunities } from '@/lib/communities/useCommunityInbox';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { getLiveDirectory } from '@/lib/live/useLiveDirectory';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import {
   isPreviewInboxEnabled, isPreviewConversationId, getPreviewConversations,
   subscribePreviewTyping, setPreviewConversationPinned,
@@ -623,7 +623,6 @@ export default function InboxScreen() {
   function openConversation(conv: Conversation) {
     // Don't open request conversations inline — user must accept first
     if (conv.isRequest) return;
-    hapticPrimaryAction();
     markReadSafely(conv.id);
     router.push(`/buyer-conversation?id=${conv.id}` as never);
   }
@@ -646,7 +645,6 @@ export default function InboxScreen() {
   function openStoryViewerFor(authorId: string) {
     const idx = storyQueue.findIndex(q => q.authorId === authorId);
     if (idx < 0) return;
-    hapticPrimaryAction();
     // Optimistic "seen" — the real seen flag is authoritative on next
     // load (trackStoryView / api.social.viewStory), but this keeps the
     // tray from flashing a person back into the unseen group before that
@@ -658,7 +656,6 @@ export default function InboxScreen() {
   }
 
   function openMyStorySlot() {
-    hapticPrimaryAction();
     if (myStoryId) {
       openStoryViewerFor('me');
     } else {
@@ -671,7 +668,6 @@ export default function InboxScreen() {
   // replacing an existing note, matching Instagram's own "tap your note to
   // edit it" behavior.
   function openNoteCompose() {
-    hapticPrimaryAction();
     setNoteComposeText(myNote?.text ?? '');
     setNoteComposeVisible(true);
   }
@@ -684,7 +680,6 @@ export default function InboxScreen() {
   async function submitNote() {
     const text = noteComposeText.trim();
     if (!text || noteComposeSaving) return;
-    hapticPrimaryAction();
     setNoteComposeSaving(true);
     try {
       if (!userId && isPreviewNotesEnabled()) {
@@ -693,6 +688,7 @@ export default function InboxScreen() {
         const posted = await postNote(text);
         setMyNote(posted);
       }
+      haptics.success();
       closeNoteCompose();
     } catch {
       Alert.alert('Couldn’t post your note', 'Please try again.');
@@ -707,7 +703,6 @@ export default function InboxScreen() {
   // per the Instagram-style request flow, the sender shouldn't see a read
   // receipt until the recipient actually accepts.
   function openRequestConversation(conv: Conversation) {
-    hapticPrimaryAction();
     router.push(`/buyer-conversation?id=${conv.id}` as never);
   }
 
@@ -717,7 +712,7 @@ export default function InboxScreen() {
   // still cancel it in time.
   function deleteRequestConversation(conv: Conversation) {
     const participant = getParticipant(conv);
-    hapticDestructiveConfirm();
+    haptics.warning();
     // The undo window (`pendingDeleteIds`, subscribed above) only hides the
     // row for ~4s — once it commits for real, `conversations` state itself
     // has to drop the row too, or it silently reappears (see the doc comment
@@ -738,7 +733,7 @@ export default function InboxScreen() {
 
   function deleteAllRequests() {
     if (requestConvs.length === 0) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     const ids = requestConvs.map(c => c.id);
     ids.forEach(id => scheduleDeleteConversationRequest(id, api, () => {
       setConversations(prev => prev.filter(c => c.id !== id));
@@ -759,7 +754,7 @@ export default function InboxScreen() {
       confirmLabel: 'Block',
     });
     if (!confirmed) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     try {
       await blockConversationRequestUser(conv.id, participant);
       setConversations(prev => prev.filter(c => c.id !== conv.id));
@@ -770,7 +765,7 @@ export default function InboxScreen() {
   }
 
   function longPressConversation(conv: Conversation) {
-    hapticDestructiveConfirm();
+    haptics.rigid();
     // Alert.alert() with a button array is a silent no-op on web — this left
     // the row long-press menu completely dead in the web preview. See
     // components/ui/ActionSheet.tsx's header comment.
@@ -1036,7 +1031,6 @@ export default function InboxScreen() {
   // pattern as startConversationWith in the compose sheet.
   async function messageSuggested(person: SuggestedPerson) {
     if (messagingSuggestedId) return;
-    hapticPrimaryAction();
     setMessagingSuggestedId(person.userId);
     try {
       const conv = await createOrGetConversation({
@@ -1059,7 +1053,6 @@ export default function InboxScreen() {
   }
 
   function dismissSuggested(person: SuggestedPerson) {
-    hapticDestructiveConfirm();
     // Optimistic, local-first removal — a real dismiss endpoint exists
     // (activityService.dismissSuggestedPerson), so tell the backend too, but
     // don't block or roll back the UI on a failed request.
@@ -1247,7 +1240,7 @@ export default function InboxScreen() {
       <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
         <CommunityInboxRow
           community={item.community}
-          onPress={() => { hapticPrimaryAction(); router.push(`/community-chat?id=${encodeURIComponent(item.community.id)}` as never); }}
+          onPress={() => { router.push(`/community-chat?id=${encodeURIComponent(item.community.id)}` as never); }}
           onToggleMute={() => toggleCommunityMute(item.community)}
         />
       </AnimatedEntrance>

@@ -22,7 +22,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { PressableScale, SheetHandle, HapticSwitch } from '@/components/BrandthreadUI';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { radius } from '@/constants/radii';
@@ -52,7 +52,6 @@ export function SettingsProfileCard({
     <PressableScale
       style={s.profileCard}
       onPress={() => {
-        hapticLight();
         onPress();
       }}
       accessibilityLabel="Edit profile"
@@ -222,7 +221,6 @@ export function SettingsRow({
     <TouchableOpacity
       activeOpacity={0.65}
       onPress={() => {
-        hapticLight();
         onPress();
       }}
       accessibilityRole="button"
@@ -291,7 +289,7 @@ export function ConfirmSheet({
           <PressableScale
             style={[s.sheetConfirmBtn, { backgroundColor: destructive ? colors.destructive : colors.primary }]}
             onPress={() => {
-              hapticSelection();
+              if (destructive) haptics.warning();
               onConfirm();
             }}
             disabled={loading}

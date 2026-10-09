@@ -23,7 +23,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { hapticLight } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { ListRow } from '@/components/ui/ListRow';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -67,7 +67,7 @@ export function OptionSheet({ visible, onClose, title, description, options, sel
               title={opt.label}
               subtitle={opt.description}
               right={opt.id === selectedId ? <Feather name="check" size={18} color={palette.accent} /> : undefined}
-              onPress={() => { hapticLight(); onSelect(opt.id); }}
+              onPress={() => { haptics.selection(); onSelect(opt.id); }}
               testID={`${testID ?? 'option-sheet'}-${opt.id}`}
             />
             {i < options.length - 1 && <View style={[styles.divider, { backgroundColor: palette.border }]} />}

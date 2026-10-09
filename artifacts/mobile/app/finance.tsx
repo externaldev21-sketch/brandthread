@@ -19,7 +19,6 @@ import { zeroFinanceSummary } from '@/lib/financeSummary';
 import { getPreviewFinanceDemo } from '@/lib/previewFinance';
 import type { FinanceTransactionRow } from '@/lib/previewFinance';
 import { TABULAR_NUMS } from '@/constants/typography';
-import { hapticPrimaryAction } from '@/lib/haptics';
 import { RetryRow } from '@/components/ui/RetryRow';
 
 function fmtDate(iso: string | number) {
@@ -183,7 +182,7 @@ export default function FinanceScreen() {
       {subStatus && (
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => { hapticPrimaryAction(); router.push('/subscription' as any); }}
+          onPress={() => router.push('/subscription' as any)}
           style={[styles.subCard, { borderColor: colors.border, backgroundColor: colors.card }]}
         >
           <View style={styles.subCardLeft}>
@@ -315,7 +314,7 @@ export default function FinanceScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Documents</Text>
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {documents.map((item, i) => (
-              <TouchableOpacity key={item.label} onPress={() => { hapticPrimaryAction(); item.onPress(); }} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+              <TouchableOpacity key={item.label} onPress={() => item.onPress()} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.docIcon, { backgroundColor: colors.secondary }]}>
                   <Feather name={item.icon} size={15} color={colors.mutedForeground} />
                 </View>

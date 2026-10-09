@@ -11,7 +11,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, RADIUS, ON_DARK_MUTED } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { LIVE_CHAT_VISIBLE, formatViewerCount } from '@/lib/live/liveOrdering';
 import type { LiveChatMessage, LiveHost, LiveProduct, LiveViewerAvatar } from '@/lib/live/types';
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
@@ -76,7 +76,7 @@ export function LiveHostPill({
         </Pressable>
       </View>
       <Pressable
-        onPress={() => { hapticSelection(); onFollow(); }}
+        onPress={() => { haptics.light(); onFollow(); }}
         style={[styles.followBtn, following && styles.followBtnOn]}
         accessibilityRole="button"
         accessibilityState={{ selected: following }}
@@ -219,7 +219,7 @@ export function LivePinnedProductCard({
         </View>
       </Pressable>
       <Pressable
-        onPress={() => { hapticLight(); onBuy(); }}
+        onPress={() => onBuy()}
         style={styles.buyBtn}
         accessibilityRole="button"
         accessibilityLabel={`Buy ${product.name}`}
@@ -263,7 +263,7 @@ export function LiveRail({
   const likeRef = useRef<View>(null);
   const pop = useRef(new Animated.Value(1)).current;
   const handleLike = () => {
-    hapticLight();
+    haptics.light();
     pop.setValue(0.75);
     Animated.timing(pop, { toValue: 1, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
     likeRef.current?.measureInWindow?.((x, y, w) => onLike({ x: x + w / 2, y }));

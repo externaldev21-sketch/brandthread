@@ -8,7 +8,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList,
   ActivityIndicator, Alert, Image, Linking, } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/hooks/useApi';
@@ -77,7 +77,6 @@ export default function ShopifyImportScreen() {
       Alert.alert('Enter your store', 'Enter your Shopify store domain, e.g. my-brand.myshopify.com');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setConnecting(true);
     try {
       const { authorizeUrl } = await api.shopify.connectStart(shopDomain.trim(), 'import');
@@ -105,16 +104,15 @@ export default function ShopifyImportScreen() {
       Alert.alert('Select products', 'Choose at least one product to import.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setImporting(true);
     setSummary(null);
     try {
       const result = await api.shopify.importProducts([...selected], publishActive ? 'active' : 'draft');
       setSummary(result);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       await loadProducts();
     } catch (err: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       Alert.alert('Import failed', String(err?.message ?? 'Please try again.'));
     } finally {
       setImporting(false);

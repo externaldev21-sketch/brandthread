@@ -15,7 +15,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
@@ -78,12 +78,10 @@ export default function TechPackGeneratorScreen() {
   const stepIndex = STEPS.indexOf(step);
 
   function goNext() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const idx = STEPS.indexOf(step);
     if (idx < STEPS.length - 1) setStep(STEPS[idx + 1]);
   }
   function goBack() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const idx = STEPS.indexOf(step);
     if (idx > 0) setStep(STEPS[idx - 1]);
   }
@@ -103,7 +101,6 @@ export default function TechPackGeneratorScreen() {
       base64: true,
     });
     if (result.canceled) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const picked: Photo[] = result.assets
       .filter((a) => !!a.base64)
       .slice(0, MAX_PHOTOS - photos.length)
@@ -163,7 +160,6 @@ export default function TechPackGeneratorScreen() {
 
   async function generate() {
     if (loading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setPdfBase64(null);
     setStep('result');
@@ -190,6 +186,7 @@ export default function TechPackGeneratorScreen() {
       if (result?.pdf_base64) {
         setPdfBase64(result.pdf_base64);
         setPdfFilename(result.filename || 'tech-pack.pdf');
+        haptics.success();
       } else {
         Alert.alert('Generation failed', 'Could not generate the tech pack. Please try again.');
       }
@@ -230,7 +227,6 @@ export default function TechPackGeneratorScreen() {
   }
 
   function startOver() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setStep('info');
     setProductName('');
     setBrandName('');

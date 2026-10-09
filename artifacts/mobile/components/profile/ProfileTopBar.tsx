@@ -11,7 +11,6 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { hapticLight } from '@/lib/haptics';
 import { FONT, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { InteractionLayer } from './ProfileControls';
@@ -33,7 +32,7 @@ export function ProfileAccountSwitcher({
   return (
     <PressableScale
       style={styles.switcher}
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => { onPress(); }}
       activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -71,7 +70,7 @@ export function ProfileTopBarIcon({
   const { theme } = useAppTheme();
   return (
     <Pressable
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => { onPress(); }}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}

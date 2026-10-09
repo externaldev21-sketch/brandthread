@@ -1,7 +1,7 @@
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { REPLY_THRESHOLD, clampSwipeTravel, nextCrossedState, shouldClaimSwipe } from '@/lib/swipeToReply';
 
 interface SwipeToReplyBubbleProps {
@@ -53,7 +53,7 @@ export function SwipeToReplyBubble({
       translateX.setValue(clampSwipeTravel(dx));
       const { crossed, fireHaptic } = nextCrossedState(dx, crossedRef.current);
       crossedRef.current = crossed;
-      if (fireHaptic) hapticSelection();
+      if (fireHaptic) haptics.selection();
     },
     onPanResponderRelease: () => {
       const crossed = crossedRef.current;

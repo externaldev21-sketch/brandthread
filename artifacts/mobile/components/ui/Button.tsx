@@ -21,7 +21,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
-import { hapticLight, hapticWarning } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { COMP, FONT, RED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -103,8 +103,7 @@ export function Button({
 
   const handlePress = (event: GestureResponderEvent) => {
     if (isDisabled) return;
-    if (variant === 'destructive') hapticWarning();
-    else hapticLight();
+    if (variant === 'destructive') haptics.warning();
     onPress(event);
   };
 

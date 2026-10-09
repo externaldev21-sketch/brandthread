@@ -7,7 +7,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import { Glass } from '@/components/ui/Glass';
@@ -120,7 +120,7 @@ export function SellerDashboardChart({
   const handleIndexChange = useCallback((index: number) => {
     if (lastHapticIndex.current !== index) {
       lastHapticIndex.current = index;
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      haptics.selection();
     }
     setTooltipIndex(index);
     onScrub(index);

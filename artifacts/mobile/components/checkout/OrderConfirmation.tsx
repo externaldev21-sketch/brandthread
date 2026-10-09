@@ -22,7 +22,6 @@ import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button, SuccessCheck } from '@/components/ui';
@@ -126,7 +125,6 @@ function SellerProductsCarousel({ sellerId, sellerName }: { sellerId: string; se
               key={product.id}
               style={styles.moreTile}
               onPress={() => {
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push({ pathname: '/buyer-product-detail' as any, params: { productId: product.id } });
               }}
               accessibilityRole="button"
@@ -221,7 +219,6 @@ export function OrderConfirmation({
 
   function messageSeller() {
     if (!firstGroup) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const initials = firstGroup.sellerName.split(/\s+/).map(word => word[0] ?? '').slice(0, 2).join('').toUpperCase();
     router.push((
       '/buyer-conversation?participantId=' + encodeURIComponent(firstGroup.sellerId)

@@ -51,7 +51,7 @@ import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 import type { ThreadComment } from '@/lib/safetyTypes';
-import { hapticSelection, hapticLight, hapticSuccess, hapticError, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { bumpCommentCount } from '@/lib/commentCountBus';
 import { buildPreviewComments, previewNotificationComments, PREVIEW_MENTION_PEOPLE } from '@/lib/previewComments';
 import { MentionText } from '@/components/social/MentionText';
@@ -345,7 +345,7 @@ function CommentRow({
           {!isPending && !comment.pendingReview && (
             <PressableScale
               style={s.replyBtn}
-              onPress={() => { hapticLight(); onReply(comment); }}
+              onPress={() => onReply(comment)}
               accessibilityRole="button"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               noMinHeight
@@ -380,7 +380,7 @@ function ViewRepliesButton({ count, expanded, onToggle }: { count: number; expan
   return (
     <PressableScale
       style={s.viewRepliesRow}
-      onPress={() => { hapticLight(); onToggle(); }}
+      onPress={() => onToggle()}
       accessibilityRole="button"
       accessibilityLabel={expanded ? 'Hide replies' : `View ${count} ${count === 1 ? 'reply' : 'replies'}`}
       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -440,7 +440,7 @@ function CommentActionsSheet({
   }) => (
     <PressableScale
       style={s.sheetOption}
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => onPress()}
       accessibilityRole="button"
       activeOpacity={0.75}
     >
@@ -500,14 +500,14 @@ function CommentActionsSheet({
             <PressableScale
               style={[s.confirmPrimary, { backgroundColor: theme.error }, busy && { opacity: 0.6 }]}
               disabled={busy}
-              onPress={() => { hapticDestructiveConfirm(); run(step === 'confirm-block' ? onBlock : onDelete); }}
+              onPress={() => { haptics.warning(); run(step === 'confirm-block' ? onBlock : onDelete); }}
               accessibilityRole="button"
             >
               {busy
                 ? <InlineSpinner style={{ paddingVertical: 0 }} />
                 : <Text style={s.confirmPrimaryText}>{step === 'confirm-block' ? 'Block' : 'Delete'}</Text>}
             </PressableScale>
-            <PressableScale style={s.confirmSecondary} onPress={() => { hapticLight(); setStep('menu'); }} accessibilityRole="button">
+            <PressableScale style={s.confirmSecondary} onPress={() => setStep('menu')} accessibilityRole="button">
               <Text style={s.confirmSecondaryText}>Cancel</Text>
             </PressableScale>
           </View>
@@ -799,7 +799,7 @@ export default function BuyerPostCommentsScreen() {
 
   const handleLike = async (comment: Row) => {
     const liked = !comment.likedByMe;
-    hapticSelection();
+    haptics.light();
     // Optimistic update
     setCommentsSynced(prev => prev.map(c => c.id === comment.id
       ? { ...c, likedByMe: liked, likesCount: Math.max(0, c.likesCount + (liked ? 1 : -1)) }
@@ -837,7 +837,7 @@ export default function BuyerPostCommentsScreen() {
     try {
       await api.social.block(comment.author.userId);
       setActionsFor(null);
-      hapticSuccess();
+      haptics.success();
       showToast(`${comment.author.name} is blocked`);
       await load();
     } catch (error) {
@@ -883,7 +883,7 @@ export default function BuyerPostCommentsScreen() {
     }
     try {
       if (pin) await api.comments.pin(postId, comment.id); else await api.comments.unpin(postId, comment.id);
-      hapticSuccess();
+      haptics.success();
       showToast(pin ? 'Comment pinned' : 'Comment unpinned');
       await load();
     } catch (error) {
@@ -892,7 +892,6 @@ export default function BuyerPostCommentsScreen() {
   };
 
   const handlePressMention = (mention: CommentMentionRef) => {
-    hapticLight();
     router.push({
       pathname: '/buyer-other-profile' as never,
       params: { userId: mention.userId, handle: `@${mention.handle}` },
@@ -950,7 +949,7 @@ export default function BuyerPostCommentsScreen() {
       const finalized: Row = { ...optimistic, id: `preview-comment-${postId}-posted-${Date.now()}` };
       setCommentsSynced(prev => prev.map(c => (c.id === optimistic.id ? finalized : c)));
       bumpCommentCount(postId, 1);
-      hapticSuccess();
+      haptics.success();
       setSending(false);
       return;
     }
@@ -965,7 +964,7 @@ export default function BuyerPostCommentsScreen() {
       setCommentsSynced(prev => prev.filter(c => c.id !== optimistic.id));
       await load();
       bumpCommentCount(postId, 1);
-      hapticSuccess();
+      haptics.success();
     } catch (error) {
       // Remove optimistic item, keep the draft for editing, show inline error
       setCommentsSynced(prev => prev.filter(c => c.id !== optimistic.id));
@@ -977,7 +976,7 @@ export default function BuyerPostCommentsScreen() {
           ? apiErrorMessage(error, 'This comment can’t be posted.')
           : 'Could not post comment. Tap to retry.',
       );
-      hapticError();
+      haptics.error();
     } finally {
       setSending(false);
     }
@@ -1120,7 +1119,7 @@ export default function BuyerPostCommentsScreen() {
         <PressableScale
           style={s.backdrop}
           activeOpacity={1}
-          onPress={() => { hapticLight(); goBackOr(router); }}
+          onPress={() => goBackOr(router)}
           accessibilityRole="button"
           accessibilityLabel="Close comments"
           noMinHeight
@@ -1146,7 +1145,7 @@ export default function BuyerPostCommentsScreen() {
             </Text>
             <PressableScale
               style={s.headerSide}
-              onPress={() => { hapticLight(); goBackOr(router); }}
+              onPress={() => goBackOr(router)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel="Close comments"
@@ -1204,12 +1203,12 @@ export default function BuyerPostCommentsScreen() {
           ListFooterComponent={!loading ? (
             <View style={s.listFooter}>
               {meta.nextCursor ? (
-                <PressableScale style={s.loadMore} onPress={() => { hapticLight(); loadMore(); }} disabled={loadingMore} accessibilityRole="button">
+                <PressableScale style={s.loadMore} onPress={() => loadMore()} disabled={loadingMore} accessibilityRole="button">
                   {loadingMore ? <InlineSpinner style={{ paddingVertical: 0 }} /> : <Text style={s.loadMoreText}>View older comments</Text>}
                 </PressableScale>
               ) : null}
               {meta.hiddenByMutedWords > 0 ? (
-                <PressableScale style={s.mutedNote} onPress={() => { hapticLight(); router.push('/muted-words' as never); }} accessibilityRole="button">
+                <PressableScale style={s.mutedNote} onPress={() => router.push('/muted-words' as never)} accessibilityRole="button">
                   <Feather name="volume-x" size={12} color={SUBTLE} />
                   <Text style={s.mutedNoteText}>
                     {meta.hiddenByMutedWords} hidden by your muted words · <Text style={{ textDecorationLine: 'underline' }}>Manage</Text>
@@ -1230,14 +1229,14 @@ export default function BuyerPostCommentsScreen() {
 
         <View style={[s.inputWrap, composerLocked && { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
           {sendError ? (
-            <PressableScale style={s.sendErrorBanner} onPress={() => { hapticLight(); setSendError(null); }} accessibilityRole="alert">
+            <PressableScale style={s.sendErrorBanner} onPress={() => setSendError(null)} accessibilityRole="alert">
               <Feather name="alert-circle" size={12} color={theme.error} />
               <Text style={s.sendErrorText} numberOfLines={3}>{sendError}</Text>
               <Feather name="x" size={12} color={theme.error} />
             </PressableScale>
           ) : null}
           {heldNotice ? (
-            <PressableScale style={s.heldBanner} onPress={() => { hapticLight(); setHeldNotice(null); }} accessibilityRole="alert">
+            <PressableScale style={s.heldBanner} onPress={() => setHeldNotice(null)} accessibilityRole="alert">
               <Feather name="eye-off" size={12} color={theme.warning} />
               <Text style={s.heldBannerText} numberOfLines={2}>{heldNotice}</Text>
               <Feather name="x" size={12} color={MUTED} />
@@ -1249,7 +1248,7 @@ export default function BuyerPostCommentsScreen() {
                 Replying to <Text style={[s.replyingName, { color: theme.text }]}>{replyingTo.author.name}</Text>
               </Text>
               <PressableScale
-                onPress={() => { hapticLight(); handleCancelReply(); }}
+                onPress={() => handleCancelReply()}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 accessibilityRole="button"
                 accessibilityLabel="Cancel reply"
@@ -1266,7 +1265,7 @@ export default function BuyerPostCommentsScreen() {
               ) : meta.commentsDisabled ? (
                 <Text style={s.lockedText}>Comments are turned off for this post.</Text>
               ) : (
-                <PressableScale onPress={() => { hapticLight(); router.push('/sign-in' as never); }} accessibilityRole="button">
+                <PressableScale onPress={() => router.push('/sign-in' as never)} accessibilityRole="button">
                   <Text style={s.lockedText}>
                     <Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Sign in</Text> to join the conversation.
                   </Text>
@@ -1284,7 +1283,7 @@ export default function BuyerPostCommentsScreen() {
                 enabled={!isPreviewPost}
                 demoPeople={isPreviewPost ? PREVIEW_MENTION_PEOPLE : undefined}
                 onPick={(person) => {
-                  hapticSelection();
+                  haptics.selection();
                   setInputText(value => insertMentionHandle(value, person.username ?? person.handle));
                   inputRef.current?.focus();
                 }}
@@ -1298,7 +1297,6 @@ export default function BuyerPostCommentsScreen() {
                     key={emoji}
                     style={s.emojiBtn}
                     onPress={() => {
-                      hapticLight();
                       setInputText(value => `${value}${emoji}`);
                       inputRef.current?.focus();
                     }}
@@ -1327,7 +1325,7 @@ export default function BuyerPostCommentsScreen() {
                   <>
                     <PressableScale
                       style={s.inputTool}
-                      onPress={() => { hapticLight(); inputRef.current?.focus(); }}
+                      onPress={() => inputRef.current?.focus()}
                       accessibilityRole="button"
                       accessibilityLabel="Emoji"
                     >
@@ -1336,7 +1334,6 @@ export default function BuyerPostCommentsScreen() {
                     <PressableScale
                       style={s.inputTool}
                       onPress={() => {
-                        hapticLight();
                         setInputText(value => value.endsWith(' ') || !value ? `${value}@` : `${value} @`);
                         inputRef.current?.focus();
                       }}

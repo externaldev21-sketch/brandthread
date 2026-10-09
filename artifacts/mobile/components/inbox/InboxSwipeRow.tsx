@@ -1,7 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP } from '@/lib/theme';
 
@@ -55,7 +54,6 @@ export default function InboxSwipeRow({ children, actions, rowId, disabled = fal
   };
 
   const runAction = async (action: InboxSwipeAction) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     reset();
     await action.onPress();
   };

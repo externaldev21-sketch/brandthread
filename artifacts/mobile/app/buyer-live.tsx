@@ -33,7 +33,7 @@ import { apiErrorMessage, confirmBlock, reportHref } from '@/lib/safety';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { hapticLight, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import Composer from '@/components/ui/Composer';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
@@ -427,7 +427,7 @@ function BuyerLiveNativeScreen() {
         setCheckoutError(verification?.declineReason ?? 'Payment is still pending. Please check your orders shortly.');
         return;
       }
-      hapticSuccessAction();
+      haptics.success();
       setOrderSnackbar(verification.orderNumber
         ? `Order ${verification.orderNumber} confirmed`
         : 'Order confirmed');
@@ -540,7 +540,7 @@ function BuyerLiveNativeScreen() {
             {productTags.map(tag => (
               <PressableScale
                 key={tag.productId}
-                onPress={() => { hapticLight(); openPurchase(tag); }}
+                onPress={() => { openPurchase(tag); }}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
@@ -586,7 +586,7 @@ function BuyerLiveNativeScreen() {
           overMedia
           value={commentText}
           onChangeText={setCommentText}
-          onSend={() => { hapticLight(); sendComment(); }}
+          onSend={() => { sendComment(); }}
           placeholder="Add a comment…"
           accessibilityLabel="Add a comment"
           hideTabBar={false}
@@ -606,7 +606,7 @@ function BuyerLiveNativeScreen() {
               <Text style={s.purchaseTitle} numberOfLines={1}>{purchaseTag.productName}</Text>
             </View>
             <PressableScale
-              onPress={() => { hapticLight(); setPurchaseTag(null); }}
+              onPress={() => { setPurchaseTag(null); }}
               style={s.purchaseClose}
               hitSlop={6}
               accessibilityRole="button"
@@ -638,7 +638,7 @@ function BuyerLiveNativeScreen() {
                     <PressableScale
                       key={variant.id}
                       disabled={!available}
-                      onPress={() => { hapticLight(); setSelectedVariantId(variant.id); }}
+                      onPress={() => { haptics.selection(); setSelectedVariantId(variant.id); }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: selectedVariantId === variant.id, disabled: !available }}
                       style={[
@@ -664,7 +664,7 @@ function BuyerLiveNativeScreen() {
               </View>
               {checkoutError ? <Text style={s.checkoutError}>{checkoutError}</Text> : null}
               <PressableScale
-                onPress={() => { hapticPrimaryAction(); checkoutInStream(); }}
+                onPress={() => { checkoutInStream(); }}
                 disabled={checkoutBusy || !!purchaseProduct?.sellerVacationMode}
                 accessibilityRole="button"
                 style={[s.buyNowButton, { backgroundColor: PURPLE }, (checkoutBusy || purchaseProduct?.sellerVacationMode) && s.buyNowDisabled]}

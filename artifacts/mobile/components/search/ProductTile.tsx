@@ -4,7 +4,6 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { SaveHeart } from '@/components/SaveHeart';
-import { hapticPrimaryAction } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -42,7 +41,7 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
   return (
     <View style={{ width }}>
     <Pressable
-      onPress={() => { hapticPrimaryAction(); onPress(); }}
+      onPress={() => onPress()}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"

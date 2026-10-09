@@ -46,7 +46,6 @@ import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './_layout';
 import { useApi } from '@/lib/api';
@@ -222,12 +221,7 @@ export default function PlansScreen() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
   async function handleSelect(plan: SellerPlanDefinition) {
-    haptic();
     if (currentRole && currentRole !== 'owner') {
       Alert.alert('Only the store owner can do this');
       return;
@@ -316,7 +310,6 @@ export default function PlansScreen() {
   /** X (settings) / "Not now" (onboarding) — opens the exit drawer instead
    *  of leaving immediately. */
   function requestExit() {
-    haptic();
     exitHandledRef.current = false;
     setExitDrawerVisible(true);
   }
@@ -405,7 +398,7 @@ export default function PlansScreen() {
       <ScreenHeader
         title={isOnboarding ? 'Choose your plan' : 'Subscription plans'}
         variant="push"
-        onBack={() => { haptic(); goBackOr(router, isOnboarding ? '/onboarding' : '/(tabs)'); }}
+        onBack={() => { goBackOr(router, isOnboarding ? '/onboarding' : '/(tabs)'); }}
         backAccessibilityLabel="Back to previous page"
         backTestID="seller-plans-back"
         actions={[{ icon: 'x', onPress: requestExit, accessibilityLabel: 'Close subscription plans' }]}
@@ -507,14 +500,14 @@ export default function PlansScreen() {
           <View style={styles.legalLinksRow}>
             <Text
               style={styles.legalLink}
-              onPress={() => { haptic(); router.push('/terms' as never); }}
+              onPress={() => { router.push('/terms' as never); }}
             >
               Terms of Use
             </Text>
             <Text style={styles.legalLinkDivider}>·</Text>
             <Text
               style={styles.legalLink}
-              onPress={() => { haptic(); router.push('/privacy' as never); }}
+              onPress={() => { router.push('/privacy' as never); }}
             >
               Privacy Policy
             </Text>

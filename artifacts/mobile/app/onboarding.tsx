@@ -43,7 +43,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
 import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
@@ -264,7 +264,7 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
       ]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
     >
       <Text style={ssc.emoji}>{emoji}</Text>
       <Text style={[ssc.chipText, selected && { color: theme.text }]}>{label}</Text>
@@ -286,7 +286,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
       style={[sc.chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.text, borderWidth: 1 }]}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
     >
       <Text style={[sc.chipText, selected && { color: theme.text }]}>{label}</Text>
       {selected && <Feather name="check" size={13} color={theme.text} />}
@@ -307,7 +307,7 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
       style={[sr.row, selected && { borderColor: theme.text, borderWidth: 1 }]}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
     >
       <StitchAccent active={selected} color={theme.text} style={sr.stitch} />
       <View style={{ flex: 1 }}>
@@ -570,7 +570,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
           <ThreadLogoStitch
             size={124}
             color={theme.text}
-            onStitched={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
+            onStitched={() => { haptics.success(); }}
           />
         </View>
 
@@ -1778,7 +1778,7 @@ function SellerPreviewStep({
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
                 accessibilityLabel={`${preset.name} storefront theme`}
-                onPress={() => { Haptics.selectionAsync(); onSelectTheme(preset.id); }}
+                onPress={() => { haptics.selection(); onSelectTheme(preset.id); }}
               >
                 <LinearGradient colors={preset.heroGradient} style={spreview.themeSwatch}>
                   <View style={[spreview.themeDot, { backgroundColor: preset.accent }]} />
@@ -2212,21 +2212,18 @@ export default function OnboardingScreen() {
   }
 
   function goNext(overrideStep?: number) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const next = overrideStep ?? step + 1;
     transitionTo(next, 1);
   }
 
   function goBack() {
     if (!canGoBack(step)) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     transitionTo(step - 1, -1);
   }
 
   function continueFromAccountType() {
     if (!selectedFlow) return;
     const initiatedAt = performance.now();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     // A session is already active here in two cases: this flow's own sign-up
     // just verified (isSignedIn flipped true, but a remount lost `flow` and
     // routed back through AccountType to re-pick it), or a signed-in user is

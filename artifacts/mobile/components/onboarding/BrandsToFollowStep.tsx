@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { discoverBrands, type DiscoverBrand } from '@/services/discoverService';
 import { setSellerFollowing } from '@/services/socialService';
@@ -46,7 +46,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
 
   async function toggleFollow(brand: DiscoverBrand) {
     const next = !following[brand.sellerId];
-    Haptics.selectionAsync();
+    haptics.light();
     // Optimistic — the follow API itself is the source of truth; on failure
     // we revert the toggle rather than losing the app to an inconsistent state.
     setFollowing((prev) => ({ ...prev, [brand.sellerId]: next }));
@@ -61,7 +61,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
   }
 
   async function followAll() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     const toFollow = brands.filter((b) => !following[b.sellerId]);
     setFollowing((prev) => {
       const next = { ...prev };

@@ -22,7 +22,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type HashtagPostItem } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { formatCompactCount } from '@/lib/compactFormat';
-import { hapticSelection, hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { normalizeTag } from '@/lib/hashtagText';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -126,11 +126,11 @@ export default function HashtagScreen() {
   }, [api, tag, sort, cursor, loadingMore, loading, preview]);
 
   const toggleFollow = useCallback(async () => {
-    if (preview) { setIsFollowing((v) => !v); hapticToggle(); return; }
+    if (preview) { setIsFollowing((v) => !v); haptics.light(); return; }
     if (!isSignedIn) { router.push('/sign-in' as never); return; }
     const next = !isFollowing;
     setIsFollowing(next);
-    hapticToggle();
+    haptics.light();
     try {
       if (next) await api.hashtags.follow(tag); else await api.hashtags.unfollow(tag);
     } catch {
@@ -139,7 +139,6 @@ export default function HashtagScreen() {
   }, [api, tag, isFollowing, isSignedIn, preview, router]);
 
   const openPost = useCallback((item: ProfileGridItem) => {
-    hapticSelection();
     router.push(`/buyer-post-viewer?postId=${encodeURIComponent(item.id)}` as never);
   }, [router]);
 
@@ -182,7 +181,7 @@ export default function HashtagScreen() {
             <TouchableOpacity
               key={key}
               style={styles.tab}
-              onPress={() => { if (!active) { hapticSelection(); setSort(key); } }}
+              onPress={() => { if (!active) { haptics.selection(); setSort(key); } }}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={key === 'top' ? 'Top posts' : 'Recent posts'}

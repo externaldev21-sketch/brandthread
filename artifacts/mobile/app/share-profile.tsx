@@ -22,7 +22,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useAuth, useUser } from '@clerk/expo';
@@ -123,7 +122,6 @@ export default function ShareProfileScreen() {
 
   const handleCopy = useCallback(async () => {
     if (!canonicalUrl) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     try {
       if (Platform.OS === 'web') {
         if (navigator?.clipboard?.writeText) {
@@ -142,7 +140,6 @@ export default function ShareProfileScreen() {
 
   const handleShare = useCallback(async () => {
     if (!canonicalUrl || !profile) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const name = profile.displayName || 'me';
     const message = `Find ${name} on Brandthread: ${canonicalUrl}`;
     try {

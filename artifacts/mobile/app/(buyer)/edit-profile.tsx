@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAuth } from '@clerk/expo';
 import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
@@ -214,7 +214,6 @@ export default function BuyerEditProfileScreen() {
     setAvatarError(null);
     setAvatarUploading(true);
     setAvatarProgress(0);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const previousUri = avatarUri;
     const previousVideoUri = avatarVideoUri;
     setAvatarUri(asset.uri); // optimistic local preview while it uploads
@@ -243,7 +242,7 @@ export default function BuyerEditProfileScreen() {
       setAvatarUri(finalUri);
       setLoadedProfile(prev => ({ ...prev, avatarUri: finalUri, avatarVideoUri: '' }));
       await saveBuyerProfile({ ...loadedProfile, avatarUri: finalUri, avatarVideoUri: '' });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       showToast('Photo updated');
     } catch {
       setAvatarUri(previousUri);
@@ -272,7 +271,6 @@ export default function BuyerEditProfileScreen() {
     setAvatarError(null);
     setAvatarUploading(true);
     setAvatarProgress(0);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const previousUri = avatarUri;
     const previousVideoUri = avatarVideoUri;
     setAvatarVideoUri(asset.uri); // optimistic local preview (loops immediately) while it uploads
@@ -299,7 +297,7 @@ export default function BuyerEditProfileScreen() {
       setAvatarVideoUri(finalVideoUri);
       setLoadedProfile(prev => ({ ...prev, avatarUri: finalPosterUri, avatarVideoUri: finalVideoUri }));
       await saveBuyerProfile({ ...loadedProfile, avatarUri: finalPosterUri, avatarVideoUri: finalVideoUri });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       showToast('Profile video updated');
     } catch {
       setAvatarUri(previousUri);
@@ -390,14 +388,14 @@ export default function BuyerEditProfileScreen() {
   async function handleSave() {
     if (saving || avatarUploading) return;
     if (!validate()) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.warning();
       return;
     }
     const rawUsername = fields.username.trim().toLowerCase();
     if (rawUsername !== initial.username.trim().toLowerCase()) {
       const available = await checkUsernameAvailability(rawUsername);
       if (!available) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        haptics.warning();
         return;
       }
     }
@@ -448,7 +446,7 @@ export default function BuyerEditProfileScreen() {
         }),
       ]);
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setInitial(fields);
       setLoadedProfile(cleanedFields);
       showToast('Profile updated');
@@ -677,7 +675,7 @@ export default function BuyerEditProfileScreen() {
             <TouchableOpacity
               style={styles.row}
               activeOpacity={0.7}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setGenderPickerOpen(true); }}
+              onPress={() => { setGenderPickerOpen(true); }}
             >
               <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Gender</Text>
               <Text style={[styles.chevronLabel, { color: theme.muted }]}>{extra.gender || 'Add'}</Text>

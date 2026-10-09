@@ -69,7 +69,7 @@ import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-c
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
-import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import {
   isPreviewActivityEnabled, getVisiblePreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri,
   isPreviewActivityId, markPreviewActivityDismissed,
@@ -1035,7 +1035,6 @@ export default function ActivityCenterScreen() {
     setFollowOverrides((prev) => ({ ...prev, [userId]: next }));
     try {
       await setSellerFollowing(userId, next);
-      if (next) hapticSuccessAction();
     } catch {
       setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
       Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
@@ -1053,7 +1052,6 @@ export default function ActivityCenterScreen() {
     if (!userId) return;
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
     if (!currentlyFollowing) {
-      hapticPrimaryAction();
       void setFollowingPerson(userId, true);
       return;
     }
@@ -1092,7 +1090,7 @@ export default function ActivityCenterScreen() {
   const handleBlockFromMenu = useCallback(async (row: ActivityRow) => {
     const actor = row.actors[0];
     if (!actor?.id) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     try {
       await blockUser({ userId: actor.id, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' });
       setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
@@ -1130,7 +1128,7 @@ export default function ActivityCenterScreen() {
     const row = removeFollowerTarget;
     const actor = row?.actors[0];
     if (!row || !actor?.id) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     setRemovingFollower(true);
     try {
       await removeFollower(actor.id);
@@ -1145,7 +1143,6 @@ export default function ActivityCenterScreen() {
   }, [removeFollowerTarget, showToast]);
 
   const handleMarkAll = useCallback(async () => {
-    hapticPrimaryAction();
     const previous = itemsRef.current;
     const previousDots = dotIdsRef.current;
     // Dots, rows and (via markAllActivityRead's change broadcast) the bell/
@@ -1162,11 +1159,10 @@ export default function ActivityCenterScreen() {
   }, []);
 
   const handleSuggestedFollow = useCallback(async (person: SuggestedPerson) => {
-    hapticPrimaryAction();
+    haptics.light();
     setSuggestedFollowState((prev) => ({ ...prev, [person.userId]: 'pending' }));
     try {
       await setSellerFollowing(person.userId, true);
-      hapticSuccessAction();
       setSuggestedFollowState((prev) => ({ ...prev, [person.userId]: 'done' }));
     } catch {
       setSuggestedFollowState((prev) => {

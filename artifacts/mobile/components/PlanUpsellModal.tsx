@@ -17,7 +17,6 @@ import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -59,12 +58,10 @@ export default function PlanUpsellModal({
   const planPrice = Platform.OS === 'web' ? plan.priceLabel : nativePackage?.product.priceString;
 
   function handleUpgrade() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onUpgrade();
   }
 
   function handleClose() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onClose();
   }
 

@@ -20,7 +20,7 @@ import { Feather } from '@expo/vector-icons';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, PressableScale, SearchBar } from '@/components/BrandthreadUI';
-import { hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 
 export interface SellerListHeaderAction {
   icon: keyof typeof Feather.glyphMap;
@@ -99,7 +99,6 @@ export function SellerListHeader({
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
 
   function openTitleMenu() {
-    hapticSelection();
     titleWrapRef.current?.measureInWindow((x, y, _width, height) => {
       setMenuAnchor({ x, y: y + height + 6 });
     });
@@ -170,7 +169,7 @@ export function SellerListHeader({
                   key={option.key}
                   style={s.titleMenuRow}
                   onPress={() => {
-                    hapticSelection();
+                    haptics.selection();
                     closeTitleMenu();
                     option.onSelect();
                   }}

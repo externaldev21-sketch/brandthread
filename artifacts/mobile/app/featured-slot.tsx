@@ -13,7 +13,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
@@ -91,7 +91,7 @@ export default function FeaturedSlotScreen() {
     setBusy(true);
     try {
       const slot = await api.featuredSlots.verify(id);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       if (slot.displayState === 'in_review') {
         Alert.alert('In review', "Payment confirmed. We'll review your brand before it goes live, and refund you in full if it isn't approved.");
       }
@@ -123,7 +123,6 @@ export default function FeaturedSlotScreen() {
 
   async function pay() {
     if (!option || !canCallApi) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setBusy(true);
     try {
       const slot = await api.featuredSlots.reserve(option.durationDays);

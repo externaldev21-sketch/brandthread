@@ -5,7 +5,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FS } from '@/lib/theme';
@@ -62,7 +62,6 @@ export default function BrandScreen() {
   const [selectedLogo, setSelectedLogo] = useState<number | null>(null);
 
   async function handleGenerateLogo() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLogoGenerating(true);
     setSelectedLogo(null);
     setLogoImages([]);
@@ -96,12 +95,11 @@ export default function BrandScreen() {
   const completionPct = Math.round((doneCount / totalCount) * 100);
 
   function toggleCheck(i: number) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     setChecklist(prev => prev.map((v, idx) => idx === i ? !v : v));
   }
 
   function handleGenerateNames() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsGenerating(true);
     setTimeout(() => {
       setSuggestedNames(generateBrandNames(5));
@@ -166,7 +164,7 @@ export default function BrandScreen() {
               style={[styles.namePill, { backgroundColor: colors.secondary, borderColor: colors.border }]}
               activeOpacity={0.7}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                haptics.selection();
                 setNameInput(name);
               }}
             >
@@ -192,7 +190,7 @@ export default function BrandScreen() {
           {LOGO_STYLES.map((s) => (
             <TouchableOpacity
               key={s}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLogoStyle(s); }}
+              onPress={() => { haptics.selection(); setLogoStyle(s); }}
               activeOpacity={0.7}
               style={[styles.styleChip, {
                 backgroundColor: logoStyle === s ? colors.primary : colors.secondary,
@@ -228,7 +226,7 @@ export default function BrandScreen() {
                   <TouchableOpacity
                     key={i}
                     activeOpacity={0.85}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedLogo(i); }}
+                    onPress={() => { haptics.selection(); setSelectedLogo(i); }}
                     style={[styles.logoCard, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border, borderWidth: isSelected ? 2 : 1 }]}
                   >
                     <Image
@@ -250,7 +248,7 @@ export default function BrandScreen() {
               <TouchableOpacity
                 style={[styles.generateBtn, { backgroundColor: theme.accentDim, marginTop: 8 }]}
                 activeOpacity={0.8}
-                onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)}
+                onPress={() => {}}
               >
                 <Feather name="download" size={15} color={colors.success} />
                 <Text style={[styles.generateText, { color: colors.success }]}>Use this logo</Text>

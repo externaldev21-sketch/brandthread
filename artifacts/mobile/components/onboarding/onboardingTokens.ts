@@ -5,9 +5,8 @@
  * working and the thread stays the theme's own near-white `text` color.
  */
 import { useCallback } from 'react';
-import { Platform, type TextStyle } from 'react-native';
+import { type TextStyle } from 'react-native';
 import { Easing, useReducedMotion } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 
 /** Brandthread type scale for the onboarding flow (Inter). */
 export const TYPE = {
@@ -48,19 +47,14 @@ export const MOTION = {
 export const THREAD = { stroke: 1.5, glow: 6, glowOpacity: 0.09 } as const;
 
 /**
- * Reduced-motion flag plus a "stitch landed" haptic tick. The tick is a
- * no-op under Reduce Motion (the stitch it pairs with doesn't animate) and
- * on web, where expo-haptics has no engine.
+ * Reduced-motion flag plus the `stitchTick` / `lightTap` hooks, which now
+ * play nothing (kept so existing callers compile).
  */
 export function useOnboardingMotion() {
   const reduceMotion = useReducedMotion();
-  const stitchTick = useCallback(() => {
-    if (reduceMotion || Platform.OS === 'web') return;
-    Haptics.selectionAsync().catch(() => {});
-  }, [reduceMotion]);
-  const lightTap = useCallback(() => {
-    if (Platform.OS === 'web') return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-  }, []);
+  // Both stay as no-ops so callers keep working: per lib/haptics.ts, an
+  // animation landing and a plain button tap play no haptic.
+  const stitchTick = useCallback(() => {}, []);
+  const lightTap = useCallback(() => {}, []);
   return { reduceMotion, stitchTick, lightTap };
 }

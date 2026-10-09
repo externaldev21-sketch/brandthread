@@ -41,7 +41,6 @@ import { DiscoverSearchHeader } from '@/components/discover/DiscoverSearchHeader
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { ThemedRefreshControl } from '@/components/ui';
-import { hapticLight } from '@/lib/haptics';
 import { isPreviewCatalogEnabled, getPreviewCatalog, getPreviewCatalogByDemand } from '@/lib/previewCatalog';
 import type { EditorialTileItem } from '@/components/discover/EditorialTile';
 import { DiscoverFilterRow, type DiscoverFilterKey } from '@/components/discover/DiscoverFilterRow';
@@ -254,7 +253,6 @@ export default function DiscoverScreen() {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    hapticLight();
     forYouLimit.current = 30;
     fitsLimit.current = 30;
     Promise.all([
@@ -266,7 +264,6 @@ export default function DiscoverScreen() {
   }, [filter, shelves.reload, fetchJustDropped, fetchHighDemand, fetchPeople, fetchForYou, fetchFits, fetchBrands, fetchDrops]);
 
   function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
-    hapticLight();
     setViewer({ posts: allPosts, startIndex: flatIndex });
   }
 

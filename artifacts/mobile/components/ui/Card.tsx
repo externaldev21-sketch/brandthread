@@ -8,7 +8,6 @@
 import React from 'react';
 import { Animated, Pressable, StyleProp, View, ViewStyle } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { hapticLight } from '@/lib/haptics';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
@@ -45,7 +44,7 @@ export function Card({ children, onPress, elevated = false, style, testID, acces
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => { onPress(); }}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       testID={testID}

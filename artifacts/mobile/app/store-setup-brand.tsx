@@ -20,7 +20,7 @@ import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { cropToRect } from '@/lib/storeBrandImage';
 import { greyHex, STORE_ACCENT_COLORS } from '@/lib/storeSetup';
-import { hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -132,7 +132,7 @@ export default function StoreSetupBrandScreen() {
           {busy ? <Text style={[styles.meta, { color: theme.muted }]}>{`Uploading ${progress[slot]}%`}</Text> : null}
         </View>
         <Pressable
-          onPress={() => { hapticSelection(); void pick(slot); }}
+          onPress={() => { void pick(slot); }}
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel={uri ? `Change ${label.toLowerCase()}` : emptyLabel}
@@ -185,7 +185,7 @@ export default function StoreSetupBrandScreen() {
               return (
                 <Pressable
                   key={color}
-                  onPress={() => { hapticSelection(); setAccent(selected ? null : color); setSaveError(null); }}
+                  onPress={() => { haptics.selection(); setAccent(selected ? null : color); setSaveError(null); }}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
                   accessibilityLabel={`Accent ${color}`}

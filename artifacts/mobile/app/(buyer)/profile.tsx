@@ -26,7 +26,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
-import { hapticLight, hapticMedium, hapticSelection, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS, ICON, OVERLAY } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import {
@@ -199,7 +199,7 @@ function CompactWalletChip({ balanceLabel, onPress, onLongPress, theme }: {
 }) {
   return (
     <PressableScale
-      onPress={() => { hapticSelection(); onPress(); }}
+      onPress={onPress}
       onLongPress={onLongPress}
       accessibilityRole="button"
       accessibilityLabel={`Thread Cash wallet, ${balanceLabel}`}
@@ -559,22 +559,18 @@ export default function ProfileScreen() {
   // file's header comment for why (the old translucent sheet had no
   // backdrop dim and no reliable way to close).
   const handleMenu = () => {
-    hapticLight();
     router.push('/buyer-settings-menu' as any);
   };
 
   const handleShareProfile = () => {
-    hapticLight();
     setShareSheetOpen(true);
   };
 
   const handleTabPress = useCallback((tab: string) => {
-    hapticSelection();
     setActiveTab(tab as Tab);
   }, []);
 
   const handleOrdersPress = useCallback((order: BuyerOrderView) => {
-    hapticSelection();
     router.push(`/buyer-order-detail?id=${order.id}` as never);
   }, [router]);
 
@@ -582,7 +578,7 @@ export default function ProfileScreen() {
   const handlePostLongPress = useCallback((item: ProfileGridItem) => {
     const post = posts.find((candidate) => candidate.id === item.id);
     if (!post) return;
-    hapticMedium();
+    haptics.rigid();
     setPostSheet(post);
   }, [posts]);
 
@@ -604,7 +600,7 @@ export default function ProfileScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          hapticDestructiveConfirm();
+          haptics.warning();
           setPosts(prev => prev.filter(item => item.id !== post.id));
           try { await deletePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert("Couldn't delete post", 'Try again.'); }
         },
@@ -645,7 +641,6 @@ export default function ProfileScreen() {
   // posts, starting at the tapped one.
   const handlePostTap = useCallback((item: ProfileGridItem) => {
     if (!user?.id) return;
-    hapticSelection();
     router.push(profileVideosHref({ source: 'creator', id: user.id, startPostId: item.id, title: displayName }) as never);
   }, [displayName, router, user?.id]);
 
@@ -654,7 +649,6 @@ export default function ProfileScreen() {
   }, [router]);
 
   const handleDraftsTilePress = useCallback(() => {
-    hapticSelection();
     router.push('/buyer-drafts' as never);
   }, [router]);
 
@@ -741,7 +735,6 @@ export default function ProfileScreen() {
           width={layout.tileWidth}
           height={layout.tileHeight}
           onPress={() => {
-            hapticSelection();
             router.push(taggedItemHref({ id: item.item.id, source: item.source, authorId: item.authorId, authorName: item.authorName }) as never);
           }}
         />
@@ -813,7 +806,7 @@ export default function ProfileScreen() {
     <>
       <ProfileAccountSwitcher
         label={displayHandle || displayName}
-        onPress={() => { hapticLight(); setAccountSwitcherOpen(true); }}
+        onPress={() => { setAccountSwitcherOpen(true); }}
         overMedia={hasCover}
         accessibilityLabel="Switch account"
         testID="buyer-profile-account-switcher"
@@ -830,7 +823,7 @@ export default function ProfileScreen() {
         <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
         <ProfileTopBarIcon
           name="more-horizontal"
-          onPress={() => { hapticLight(); setMenuOpen(true); }}
+          onPress={() => { setMenuOpen(true); }}
           accessibilityLabel="Profile options"
           testID="buyer-profile-more"
         />
@@ -860,14 +853,13 @@ export default function ProfileScreen() {
             hasActiveStory={hasActiveStory}
             accessibilityLabel={hasActiveStory ? 'View your story' : 'Create a story'}
             onPress={() => {
-              hapticSelection();
               if (hasActiveStory) {
                 router.push({ pathname: '/buyer-story-viewer' as any, params: { storyId: myStoryIds[0], allStoryIds: myStoryIds.join(',') } });
               } else {
                 router.push('/buyer-story-create' as any);
               }
             }}
-            onPressBadge={() => { hapticSelection(); router.push('/buyer-story-create' as any); }}
+            onPressBadge={() => { router.push('/buyer-story-create' as any); }}
           />
         )}
         name={displayName}
@@ -926,9 +918,8 @@ export default function ProfileScreen() {
       <View style={styles.highlightsWrap} testID="profile-highlights">
         <ProfileStoriesRow
           items={highlightItems}
-          onNew={() => { hapticSelection(); router.push('/buyer-highlights-manager?create=1' as any); }}
+          onNew={() => { router.push('/buyer-highlights-manager?create=1' as any); }}
           onPressItem={(item) => {
-            hapticSelection();
             // Tapping one of my highlights opens it in the manager, where its
             // name, cover and saved stories are edited.
             router.push(`/buyer-highlights-manager?edit=${encodeURIComponent(item.id)}` as any);

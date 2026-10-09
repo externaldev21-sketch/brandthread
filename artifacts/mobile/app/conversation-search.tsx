@@ -13,7 +13,6 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { hapticPrimaryAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { isPreviewConversationId, getPreviewMessages } from '@/lib/previewInbox';
 import { searchConversationMessages } from '@/services/socialService';
@@ -61,7 +60,7 @@ export default function ConversationSearchScreen() {
     <View style={[s.root, { backgroundColor: theme.background }]}>
       <View style={[s.header, { paddingTop: headerTopPad + SP.xs, borderBottomColor: theme.border }]}>
         <PressableScale rippleEnabled={false}
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
+          onPress={() => { goBackOr(router); }}
           style={s.roundBtn}
           testID="conversation-search-back"
           accessibilityRole="button"

@@ -6,7 +6,7 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FS } from '@/lib/theme';
@@ -49,16 +49,15 @@ export default function KlaviyoIntegrationScreen() {
       Alert.alert('Enter your API key', 'Paste the Private API Key from your Klaviyo account settings.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setConnecting(true);
     try {
       const res = await api.integrations.klaviyoConnect(apiKey.trim());
       setStatus(res);
       setApiKey('');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       Alert.alert('Connected', 'Your existing Klaviyo email & SMS subscribers are now synced.');
     } catch (err: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       const msg = String(err?.message ?? '');
       Alert.alert(
         'Connection failed',
@@ -72,7 +71,6 @@ export default function KlaviyoIntegrationScreen() {
   }
 
   async function handleSync() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSyncing(true);
     try {
       const res = await api.integrations.klaviyoSync();

@@ -39,7 +39,7 @@ import { ResponsiveContainer, useGridColumns } from '@/components/layout';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { ProductTile } from '@/components/search/ProductTile';
@@ -231,7 +231,6 @@ export default function BuyerSearchScreen() {
   useEffect(() => { loadRecent(); }, [loadRecent]);
 
   function removeRecent(term: string) {
-    hapticSelection();
     setRecentSearches((current) => current.filter((t) => t !== term));
     api.public.removeRecent(term).catch(() => {});
   }
@@ -295,7 +294,6 @@ export default function BuyerSearchScreen() {
   }, [serverTags, videoResults, trimmedQuery]);
 
   function openHashtag(tag: string) {
-    hapticPrimaryAction();
     router.push(hashtagHref(normalizeTag(tag)) as never);
   }
 
@@ -312,7 +310,6 @@ export default function BuyerSearchScreen() {
   }, [gridWidth]);
 
   function goToBrand(sellerId?: string) {
-    hapticPrimaryAction();
     if (sellerId) router.push({ pathname: '/seller-profile' as any, params: { sellerId, src: 'search' } });
   }
 
@@ -321,12 +318,10 @@ export default function BuyerSearchScreen() {
   }
 
   function goToVideo(video: VideoResult) {
-    hapticPrimaryAction();
     router.push({ pathname: '/buyer-other-profile' as any, params: { userId: video.authorId, postId: video.postId } });
   }
 
   function handleResultPress(r: ProductResult | BrandResult) {
-    hapticPrimaryAction();
     if (r.kind === 'brand' && (r as any).sellerId) {
       goToBrand((r as any).sellerId);
     } else if (r.kind === 'product' && (r as any).productId) {
@@ -335,7 +330,6 @@ export default function BuyerSearchScreen() {
   }
 
   function handlePersonPress(p: SearchPerson) {
-    hapticPrimaryAction();
     if (p.accountType === 'seller') {
       router.push({ pathname: '/seller-profile' as any, params: { sellerId: p.userId, src: 'search' } });
     } else {
@@ -356,7 +350,6 @@ export default function BuyerSearchScreen() {
       else requested = (await api.social.follow(person.userId))?.status === 'requested';
       // A private account only received a follow request — not following yet.
       setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing && !requested } : p)));
-      hapticPrimaryAction();
     } catch {
       // Keep previous state on failure.
     } finally {
@@ -391,7 +384,6 @@ export default function BuyerSearchScreen() {
   }
 
   function handleCancel() {
-    hapticSelection();
     setQuery('');
     setSubmitted(false);
     setFieldFocused(false);
@@ -516,7 +508,7 @@ export default function BuyerSearchScreen() {
           <TouchableOpacity
             key={row.key}
             style={styles.suggestionRow}
-            onPress={() => { hapticSelection(); row.onSubmit(); }}
+            onPress={() => row.onSubmit()}
             accessibilityRole="button"
           >
             {row.avatar ? (
@@ -579,7 +571,7 @@ export default function BuyerSearchScreen() {
           <View style={styles.filterRow}>
             <TouchableOpacity
               style={styles.filterButton}
-              onPress={() => { hapticSelection(); setFilterSheetOpen(true); }}
+              onPress={() => setFilterSheetOpen(true)}
               accessibilityRole="button"
               accessibilityLabel={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : 'Filters'}
               testID="buyer-search-filter-button"
@@ -594,7 +586,7 @@ export default function BuyerSearchScreen() {
             </TouchableOpacity>
             {activeFilterCount > 0 && (
               <TouchableOpacity
-                onPress={() => { hapticSelection(); setFilters({}); }}
+                onPress={() => { haptics.selection(); setFilters({}); }}
                 accessibilityRole="button"
                 accessibilityLabel="Clear all filters"
                 hitSlop={12}
@@ -688,7 +680,7 @@ export default function BuyerSearchScreen() {
           />
           {query.length > 0 && (
             <TouchableOpacity
-              onPress={() => { hapticSelection(); setQuery(''); setSubmitted(false); inputRef.current?.focus(); }}
+              onPress={() => { setQuery(''); setSubmitted(false); inputRef.current?.focus(); }}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 2 }}

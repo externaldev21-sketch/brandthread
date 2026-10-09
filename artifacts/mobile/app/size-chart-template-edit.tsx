@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { Header } from '@/components/layout';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
@@ -107,7 +106,6 @@ export default function SizeChartTemplateEditScreen() {
 
   async function save() {
     if (!name.trim()) { Alert.alert('Name this size chart'); return; }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       let templateId = id;

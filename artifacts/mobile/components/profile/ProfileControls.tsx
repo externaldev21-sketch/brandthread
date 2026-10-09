@@ -14,7 +14,7 @@ import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { SHOP_PILL_HEIGHT } from './profileLayout';
 import { radius } from '@/constants/radii';
 
@@ -88,8 +88,8 @@ export function ProfileButton({
   return (
     <View style={[styles.buttonWrap, style]}>
       <PressableScale
-        onPress={() => { hapticLight(); onPress(); }}
-        onLongPress={onLongPress ? () => { hapticLight(); onLongPress(); } : undefined}
+        onPress={() => onPress()}
+        onLongPress={onLongPress ? () => { haptics.rigid(); onLongPress(); } : undefined}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
@@ -146,8 +146,8 @@ export function ProfileEditMessagesRow({
           PressableScale, carries the flex. Same 39pt height. */}
       <View style={styles.editBtnWrap}>
         <PressableScale
-          onPress={() => { hapticLight(); onEdit(); }}
-          onLongPress={onEditLongPress ? () => { hapticLight(); onEditLongPress(); } : undefined}
+          onPress={() => onEdit()}
+          onLongPress={onEditLongPress ? () => { haptics.rigid(); onEditLongPress(); } : undefined}
           accessibilityRole="button"
           accessibilityLabel="Edit profile"
           accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
@@ -173,7 +173,7 @@ export function ProfileEditMessagesRow({
           relies on) gives the flex to an element that actually gets it. */}
       <View style={styles.messagesBtnWrap}>
         <PressableScale
-          onPress={() => { hapticLight(); onMessages(); }}
+          onPress={() => onMessages()}
           accessibilityRole="button"
           accessibilityLabel={unreadCount > 0 ? `Messages, ${unreadCount} unread` : 'Messages'}
           accessibilityHint="Opens your buyer messages"
@@ -217,7 +217,7 @@ export function ProfileGlassButton({
   const { theme } = useAppTheme();
   return (
     <PressableScale
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => onPress()}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
@@ -247,7 +247,7 @@ export function ProfileWalletChip({ balanceLabel, onPress }: { balanceLabel: str
   const { theme } = useAppTheme();
   return (
     <PressableScale
-      onPress={() => { hapticSelection(); onPress(); }}
+      onPress={() => onPress()}
       accessibilityRole="button"
       accessibilityLabel={`Thread Cash wallet, ${balanceLabel}`}
       testID="profile-wallet-chip"
@@ -301,7 +301,7 @@ export function ProfileStatsRow({ stats, loading }: { stats: ProfileStat[]; load
               <View style={styles.statSlot}>
                 <PressableScale
                   style={styles.statCell}
-                  onPress={() => { hapticSelection(); stat.onPress?.(); }}
+                  onPress={() => stat.onPress?.()}
                   accessibilityRole="button"
                   accessibilityLabel={stat.accessibilityLabel ?? `${stat.value} ${stat.label}`}
                   testID={`profile-stat-${stat.key}`}
@@ -402,7 +402,7 @@ export function ProfileTabs({
           <View key={tab.key} style={styles.flexCell}>
             <PressableScale
               style={iconOnly ? styles.tabIconOnly : styles.tab}
-              onPress={() => { hapticSelection(); onChange(tab.key); }}
+              onPress={() => { haptics.selection(); onChange(tab.key); }}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               accessibilityLabel={`${tab.label} tab`}
@@ -520,7 +520,7 @@ export function ShopPill({
   return (
     <Animated.View pointerEvents="box-none" style={[floating ? [styles.pillWrap, { bottom }] : styles.pillInline, riseStyle]}>
       <PressableScale
-        onPress={() => { hapticLight(); onPress(); }}
+        onPress={() => onPress()}
         accessibilityRole="button"
         accessibilityLabel={sublabel ? `${label}, ${sublabel}` : label}
         testID={testID}

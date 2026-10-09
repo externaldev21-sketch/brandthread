@@ -9,7 +9,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/hooks/useApi';
@@ -41,7 +40,6 @@ export default function ShopifyFulfillmentScreen() {
   useEffect(() => { load(); }, [load]);
 
   async function handleToggle(value: boolean) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setBusy(true);
     try {
       if (!value) {

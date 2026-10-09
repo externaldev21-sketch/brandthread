@@ -14,7 +14,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { getPreviewManufacturers } from '@/lib/previewManufacturers';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -82,7 +82,7 @@ export default function RfqPostScreen() {
   });
 
   const toggle = (id: string) => {
-    Haptics.selectionAsync();
+    haptics.selection();
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) { next.delete(id); return next; }
@@ -112,7 +112,7 @@ export default function RfqPostScreen() {
         deadline: deadline.trim() ? new Date(deadline.trim()).toISOString() : undefined,
         manufacturerIds: [...selected],
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       router.replace(`/rfq-compare?rfqId=${rfq.id}` as never);
     } catch (e: any) {
       Alert.alert('Could not post RFQ', e?.message ?? 'Please try again.');

@@ -24,7 +24,7 @@ import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
-import { hapticLight, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { useJoinedCommunities } from '@/lib/communities/useCommunityClient';
 
@@ -60,7 +60,7 @@ export default function BuyerSettingsMenuScreen() {
         text: 'Sign out',
         style: 'destructive',
         onPress: async () => {
-          hapticDestructiveConfirm();
+          haptics.warning();
           try { await signOut(); } catch {}
           router.replace('/sign-in' as never);
         },
@@ -73,7 +73,7 @@ export default function BuyerSettingsMenuScreen() {
       title: 'Your account',
       rows: [
         { key: 'edit-profile', icon: 'edit-3', label: 'Edit profile', onPress: () => router.push('/(buyer)/edit-profile') },
-        { key: 'share-profile', icon: 'share-2', label: 'Share profile', onPress: () => { hapticLight(); setShareSheetOpen(true); } },
+        { key: 'share-profile', icon: 'share-2', label: 'Share profile', onPress: () => { setShareSheetOpen(true); } },
         { key: 'qr-code', icon: 'grid', label: 'QR code', onPress: () => router.push('/buyer-qr-code' as any) },
       ],
     },
@@ -158,7 +158,7 @@ export default function BuyerSettingsMenuScreen() {
             {section.rows.map((row, i) => (
               <Pressable
                 key={row.key}
-                onPress={() => { hapticLight(); row.onPress(); }}
+                onPress={() => { row.onPress(); }}
                 style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}
                 accessibilityRole="button"
                 accessibilityLabel={row.value ? `${row.label}, ${row.value}` : row.label}

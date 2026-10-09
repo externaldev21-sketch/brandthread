@@ -28,7 +28,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { FIT_OPTIONS, MAX_REVIEW_PHOTOS, addReviewPhotos, type FitOption } from '@/lib/reviewDisplay';
 import { getPreviewBuyerOrder } from '@/lib/previewOrders';
@@ -215,7 +215,7 @@ function StarRating({ rating, size = 36, interactive = true, onRate }: {
         <TouchableOpacity
           key={n}
           onPress={interactive && onRate ? () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            haptics.selection();
             onRate(n);
           } : undefined}
           disabled={!interactive || !onRate}
@@ -711,7 +711,6 @@ export default function BuyerOrderDetailScreen() {
   function handleCopyTracking() {
     if (!order?.trackingNumber) return;
     Clipboard.setStringAsync(order.trackingNumber);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setTrackingCopied(true);
     setTimeout(() => setTrackingCopied(false), 2000);
   }
@@ -720,7 +719,6 @@ export default function BuyerOrderDetailScreen() {
     if (!order?.trackingNumber) return;
     // Prefer the server's carrier link; fall back to the generic builder.
     const url = safeTrackingUrl(order.delivery?.trackingUrl) ?? carrierTrackingUrl(order.trackingCarrier, order.trackingNumber);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Linking.openURL(url).catch(() => {
       Alert.alert("Couldn't open tracking", 'Try again in a moment.');
     });
@@ -732,13 +730,13 @@ export default function BuyerOrderDetailScreen() {
     try {
       const res = await api.buyer.orders.confirmReceipt(order.id);
       const delivery = mapDelivery(res?.delivery);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setShowReceiptSheet(false);
       if (delivery) setOrder(prev => (prev ? { ...prev, status: 'delivered', fulfillmentStatus: 'fulfilled', delivery } : prev));
       // Re-read so the status, steps and review prompt all come from the server.
       loadBuyerOrder(order.id).then(row => setOrder(adaptOrderDetail(row))).catch(() => {});
     } catch (err: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       setShowReceiptSheet(false);
       const code = err?.code;
       Alert.alert(
@@ -754,7 +752,6 @@ export default function BuyerOrderDetailScreen() {
 
   function handleContactSeller() {
     if (!order) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const initials = order.sellerName.split(/\s+/).map(w => w[0] ?? '').slice(0, 2).join('').toUpperCase();
     router.push((
       '/buyer-conversation?participantId=' + encodeURIComponent(order.sellerId) +
@@ -773,13 +770,11 @@ export default function BuyerOrderDetailScreen() {
 
   function handleViewSeller() {
     if (!order?.sellerId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(profileHref({ userId: order.sellerId, accountType: 'seller' }) as never);
   }
 
   function handleViewProduct(productId: string | null | undefined) {
     if (!productId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(productDetailHref(productId) as never);
   }
 
@@ -813,7 +808,7 @@ export default function BuyerOrderDetailScreen() {
       });
       setReviewSubmitted(true);
       setShowReviewSheet(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
     } catch (err: any) {
       Alert.alert('Error', "Couldn't post your review. Try again.");
     } finally {
@@ -848,14 +843,14 @@ export default function BuyerOrderDetailScreen() {
     try {
       const result = await api.buyer.orders.cancel(order.id);
       if (result.cancelled) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         const msg = result.refunded
           ? 'Your order has been cancelled and a full refund has been issued. It may take 5–10 business days to appear on your statement.'
           : 'Your order has been cancelled.';
         Alert.alert('Order Cancelled', msg, [{ text: 'OK', onPress: () => goBackOr(router, '/(buyer)/orders') }]);
       }
     } catch (err: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       Alert.alert('Cannot Cancel', "This order can't be cancelled now. Message the seller for help.");
     } finally {
       setCancelling(false);
@@ -994,7 +989,7 @@ export default function BuyerOrderDetailScreen() {
                 onCopyTracking={handleCopyTracking}
                 trackingCopied={trackingCopied}
                 onOpenTracking={handleTrackOnCarrier}
-                onConfirmReceipt={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowReceiptSheet(true); }}
+                onConfirmReceipt={() => { setShowReceiptSheet(true); }}
               />
             ) : null}
           </View>
@@ -1220,7 +1215,7 @@ export default function BuyerOrderDetailScreen() {
             <SecondaryButton
               label={cancelling ? 'Cancelling…' : 'Cancel Order'}
               icon="x-circle"
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowCancelModal(true); }}
+              onPress={() => { haptics.warning(); setShowCancelModal(true); }}
               accent={theme.error}
               disabled={cancelling}
             />
@@ -1229,7 +1224,7 @@ export default function BuyerOrderDetailScreen() {
             <SecondaryButton
               label={returnRequest ? 'View Return' : 'Request Return'}
               icon="refresh-ccw"
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleRequestReturn(); }}
+              onPress={() => { handleRequestReturn(); }}
             />
           ) : null}
           <SecondaryButton label="Report a Problem" icon="alert-circle" onPress={handleReportProblem} accent={theme.error} />
@@ -1261,7 +1256,6 @@ export default function BuyerOrderDetailScreen() {
           <TouchableOpacity
             style={styles.reviewCTA}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setShowReviewSheet(true);
             }}
             activeOpacity={0.8}

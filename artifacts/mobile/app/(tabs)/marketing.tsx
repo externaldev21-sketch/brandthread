@@ -7,7 +7,6 @@ import { EmptyState, IconButton, PressableScale } from '@/components/Brandthread
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { FS, FONT, SP, COMP, ICON } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
@@ -112,7 +111,6 @@ export default function MarketingScreen() {
   );
 
   const copyDiscountCode = useCallback(async (code: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(code);
   }, []);
 
@@ -123,7 +121,7 @@ export default function MarketingScreen() {
       onBack={() => router.push('/(tabs)/more' as never)}
       rightElement={(
         <PressableScale
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/analytics' as never); }}
+          onPress={() => { router.push('/(tabs)/analytics' as never); }}
           accessibilityRole="button"
           accessibilityLabel="View analytics"
         >
@@ -158,7 +156,6 @@ export default function MarketingScreen() {
         style={[styles.klaviyoBtn, { backgroundColor: klaviyo?.connected ? colors.card : colors.primary, borderColor: colors.border, borderWidth: klaviyo?.connected ? 1 : 0 }]}
         activeOpacity={0.85}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           router.push('/integrations/klaviyo' as never);
         }}
       >
@@ -172,7 +169,7 @@ export default function MarketingScreen() {
       <SectionHeader
         title="Campaigns"
         action="New +"
-        onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/design-campaign' as never); }}
+        onAction={() => { router.push('/design-campaign' as never); }}
       />
       {campaignsError ? (
         <View style={styles.emptyFlat}>
@@ -186,7 +183,6 @@ export default function MarketingScreen() {
           description="Create a Meta ad to put your products in front of new buyers."
           style={styles.emptyFlat}
           action={{ label: 'Create a campaign', icon: 'plus', onPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push('/design-campaign' as never);
           } }}
         />
@@ -220,7 +216,7 @@ export default function MarketingScreen() {
       <SectionHeader
         title="Discount Codes"
         action="New +"
-        onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/discounts' as never); }}
+        onAction={() => { router.push('/discounts' as never); }}
       />
       {discountsError ? (
         <View style={styles.emptyFlat}>
@@ -234,7 +230,6 @@ export default function MarketingScreen() {
           description="Codes give buyers a reason to check out now instead of later."
           style={styles.emptyFlat}
           action={{ label: 'Create a discount', icon: 'plus', onPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push('/discounts' as never);
           } }}
         />
@@ -268,7 +263,7 @@ export default function MarketingScreen() {
       <SectionHeader title="Referral Program" />
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/buyer-invite' as never); }}
+        onPress={() => { router.push('/buyer-invite' as never); }}
         style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
       >
         <Feather name="share-2" size={24} color={colors.primary} />
@@ -297,7 +292,7 @@ export default function MarketingScreen() {
       <SectionHeader title="Email" />
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/email-campaigns' as never); }}
+        onPress={() => { router.push('/email-campaigns' as never); }}
         accessibilityRole="button"
         accessibilityLabel="Email campaigns and audience"
         style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -314,7 +309,7 @@ export default function MarketingScreen() {
       <SectionHeader title="Reach your followers" />
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/seller-push-broadcast' as never); }}
+        onPress={() => { router.push('/seller-push-broadcast' as never); }}
         style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         accessibilityRole="button"
         accessibilityLabel="Follower push"
@@ -328,7 +323,7 @@ export default function MarketingScreen() {
       </TouchableOpacity>
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/seller-giveaways' as never); }}
+        onPress={() => { router.push('/seller-giveaways' as never); }}
         style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         accessibilityRole="button"
         accessibilityLabel="Giveaways"

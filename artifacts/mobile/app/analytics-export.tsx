@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -35,7 +35,7 @@ export default function AnalyticsExportScreen() {
   const [picked, setPicked] = useState<ExportSectionKey[]>(['orders', 'products', 'analytics']);
   const [busy, setBusy] = useState(false);
 
-  const toggle = (k: ExportSectionKey) => { Haptics.selectionAsync(); setPicked(p => (p.includes(k) ? p.filter(x => x !== k) : [...p, k])); };
+  const toggle = (k: ExportSectionKey) => { haptics.selection(); setPicked(p => (p.includes(k) ? p.filter(x => x !== k) : [...p, k])); };
 
   async function onExport() {
     if (previewMode()) { Alert.alert('Preview', 'Exports are generated for signed-in sellers.'); return; }

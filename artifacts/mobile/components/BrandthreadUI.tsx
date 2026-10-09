@@ -16,7 +16,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import Svg, { Line as SvgLine } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import {
   BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED,
   SURFACE_GLASS, CARD_GLASS, CARD_ELEVATED_GLASS, SKELETON_GLASS,
@@ -29,7 +28,7 @@ import {
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
-import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { undoExpiresAt } from '@/lib/undoRecovery';
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
@@ -345,7 +344,7 @@ export function BrandthreadHeader({
       <View style={hdrS.left}>
         {onBack && (
           <PressableScale
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onBack(); }}
+            onPress={() => { onBack(); }}
             style={[hdrS.back, { backgroundColor: colors.card, borderColor: colors.border }]}
             accessibilityLabel="Back"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -478,7 +477,6 @@ export function PrimaryButton({
     <PressableScale
       onPress={() => {
         if (disabled || loading) return;
-        hapticMedium();
         onPress();
       }}
       accessibilityLabel={label}
@@ -544,7 +542,6 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
     <PressableScale
       onPress={() => {
         if (disabled) return;
-        hapticLight();
         onPress();
       }}
       accessibilityLabel={label}
@@ -583,7 +580,6 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
     <PressableScale
       onPress={() => {
         if (disabled) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
       accessibilityLabel={label}
@@ -616,7 +612,7 @@ export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, b
   const label = accessibilityLabel ?? `${iconAccessibilityLabel(name)}${badgeCount ? `, ${badgeCount} notifications` : ''}`;
   return (
     <PressableScale
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => { onPress(); }}
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
       style={[ibS.root, { backgroundColor: palette.card, borderColor: palette.border }, style]}
@@ -710,7 +706,7 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
   const palette = useColors();
   return (
     <PressableScale
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
       accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
       accessibilityState={{ selected: active }}
       style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accent, borderColor: theme.accent }]]}
@@ -816,7 +812,7 @@ export function EmptyState({
       )}
       {action && actionVariant === 'pill' && (
         <PressableScale
-          onPress={() => { hapticLight(); action.onPress(); }}
+          onPress={() => { action.onPress(); }}
           accessibilityRole="button"
           accessibilityLabel={action.label}
           style={[esS.pill, { backgroundColor: theme.text }]}
@@ -983,7 +979,7 @@ export function QuickActionCard({ icon, label, onPress, accent, badge, style }: 
   const resolvedAccent = accent ?? theme.accent;
   return (
     <PressableScale
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+      onPress={() => { onPress(); }}
       style={[qaS.root, { backgroundColor: theme.card, borderColor: theme.border }, style]}
       testID={`quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
@@ -1199,7 +1195,7 @@ export function NavigationCard({ icon, label, description, onPress, accent, badg
   const resolvedAccent = accent ?? theme.accent;
   return (
     <PressableScale
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => { onPress(); }}
       accessibilityLabel={description ? `${label}. ${description}` : label}
       accessibilityHint="Opens this section"
       style={[ncS.root, { backgroundColor: theme.card, borderColor: theme.border }, style]}
@@ -1391,7 +1387,7 @@ export function HapticSwitch({
 
   function handlePress() {
     if (disabled) return;
-    hapticSelection();
+    haptics.selection();
     onValueChange?.(!on);
   }
 

@@ -19,7 +19,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetHandle, PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { hapticLight } from '@/lib/haptics';
 
 export type ActionSheetButton = {
   text: string;
@@ -67,7 +66,6 @@ export function ActionSheetHost() {
               key={`${btn.text}-${i}`}
               style={styles.row}
               onPress={() => {
-                hapticLight();
                 close();
                 // Let the sheet's own close animation start before the
                 // action runs (matches native action-sheet feel).

@@ -12,7 +12,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
-import { hapticToggle, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -66,7 +66,7 @@ export function Chip({
       accessibilityLabel={accessibilityLabel ?? (count !== undefined ? `${label}, ${count}` : label)}
       accessibilityState={{ selected, disabled: !!disabled }}
       disabled={disabled}
-      onPress={() => { hapticToggle(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       testID={testID}
@@ -96,7 +96,7 @@ export function Chip({
         )}
         {onRemove && (
           <Pressable
-            onPress={() => { hapticSelection(); onRemove(); }}
+            onPress={() => { onRemove(); }}
             hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
             accessibilityRole="button"
             accessibilityLabel={removeAccessibilityLabel ?? `Remove ${label}`}

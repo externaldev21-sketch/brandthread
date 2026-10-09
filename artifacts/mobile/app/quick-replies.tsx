@@ -18,7 +18,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/layout';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { apiErrorMessage } from '@/lib/safety';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -58,9 +58,9 @@ export default function QuickRepliesScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const openNew = () => { hapticLight(); setError(null); setDraft({ id: null, title: '', body: '', shortcut: '' }); };
+  const openNew = () => { setError(null); setDraft({ id: null, title: '', body: '', shortcut: '' }); };
   const openEdit = (r: SellerQuickReply) => {
-    hapticLight(); setError(null);
+    setError(null);
     setDraft({ id: r.id, title: r.title, body: r.body, shortcut: (r.shortcut ?? '').replace(/^\//, '') });
   };
 
@@ -85,7 +85,7 @@ export default function QuickRepliesScreen() {
           : await api.seller.quickReplies.create(payload);
         setItems((cur) => (draft.id ? cur.map((r) => (r.id === saved.id ? saved : r)) : [...cur, saved]));
       }
-      hapticSuccess();
+      haptics.success();
       setDraft(null);
     } catch (e) {
       setError(apiErrorMessage(e, 'Could not save this quick reply.'));

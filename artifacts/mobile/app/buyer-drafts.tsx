@@ -12,7 +12,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { hapticSelection } from '@/lib/haptics';
 import { getMyPosts } from '@/services/socialService';
 import type { BuyerPost } from '@/services/socialTypes';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
@@ -46,7 +45,6 @@ export default function BuyerDraftsScreen() {
   const items: ProfileGridItem[] = drafts.map(gridItemFromBuyerPost);
 
   const handlePress = useCallback((item: ProfileGridItem) => {
-    hapticSelection();
     router.push((`/create-post?accountType=buyer&editId=` + encodeURIComponent(item.id)) as never);
   }, [router]);
 

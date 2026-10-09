@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -42,7 +42,6 @@ export default function ForgotPasswordScreen() {
   // ─── Send reset code ─────────────────────────────────────────────────────────
   async function handleSendCode() {
     if (!email.trim() || isFetching) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setError('');
     try {
@@ -58,7 +57,6 @@ export default function ForgotPasswordScreen() {
   // ─── Verify code + set new password ──────────────────────────────────────────
   async function handleReset() {
     if (!code || !password || isFetching) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setError('');
     try {
@@ -68,6 +66,7 @@ export default function ForgotPasswordScreen() {
         newPassword: password,
       });
       setStep('done');
+      haptics.success();
     } catch (e: any) {
       setError(mapError(e));
     } finally {
@@ -93,7 +92,6 @@ export default function ForgotPasswordScreen() {
             <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button"
               style={s.backBtn}
               onPress={() => {
-                Haptics.selectionAsync();
                 step === 'code' ? setStep('email') : goBackOr(router, '/sign-in');
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -158,7 +156,7 @@ export default function ForgotPasswordScreen() {
 
               <TouchableOpacity
                 style={s.secondaryBtn}
-                onPress={() => { Haptics.selectionAsync(); goBackOr(router, '/sign-in'); }}
+                onPress={() => { goBackOr(router, '/sign-in'); }}
                 activeOpacity={0.85}
               >
                 <Text style={s.secondaryBtnText}>Back to sign in</Text>
@@ -276,7 +274,7 @@ export default function ForgotPasswordScreen() {
 
               <TouchableOpacity
                 style={s.primaryWrap}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.replace('/sign-in' as never); }}
+                onPress={() => { router.replace('/sign-in' as never); }}
                 activeOpacity={0.88}
               >
                 <LinearGradient

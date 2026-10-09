@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -108,11 +108,10 @@ export function VariantPickerSheet({
     if (!product) return;
     if (!allSelected || !variant || !variant.isAvailable) {
       setTouched(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      haptics.warning();
       return;
     }
     setConfirming(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       await onConfirm(product, variant, quantity);
     } finally {
@@ -187,7 +186,7 @@ export function VariantPickerSheet({
                           return (
                             <TouchableOpacity
                               key={val.id}
-                              onPress={() => { if (available) { Haptics.selectionAsync().catch(() => {}); setSelections(prev => ({ ...prev, [option.id]: val.id })); } }}
+                              onPress={() => { if (available) { haptics.selection(); setSelections(prev => ({ ...prev, [option.id]: val.id })); } }}
                               style={[s.colorSwatch, selected && s.colorSwatchSelected, !available && s.chipUnavail]}
                               accessibilityRole="radio"
                               accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}

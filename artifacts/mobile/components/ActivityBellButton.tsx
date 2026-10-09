@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS } from '@/lib/theme';
@@ -87,7 +86,6 @@ export default function ActivityBellButton({
       activeOpacity={0.7}
       hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         router.push('/activity-center' as never);
       }}
       accessibilityRole="button"
