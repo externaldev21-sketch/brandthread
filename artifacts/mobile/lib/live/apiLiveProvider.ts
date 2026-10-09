@@ -12,13 +12,16 @@
  *    neither of which is configured. Streams therefore carry
  *    `{ kind: 'rtc', vendor: 'agora' }` and the pager shows the poster with
  *    an "Open player" hand-off to the existing /buyer-live Agora screen.
- *  - Realtime transport. The repo has no websocket/realtime layer, so
- *    `subscribe` polls every few seconds (same cadence buyer-live uses).
+ *  - Realtime transport: `subscribe` joins the stream's `/ws/live` room
+ *    (api-server ws/liveHub.ts) for chat, viewer counts and the pinned
+ *    product, and falls back to the previous 3s poll only while the socket
+ *    is down (see lib/live/liveRoomSocket.ts).
  *  - Like counts: no counter exists, so `sendLike` is a no-op.
  *  - Scheduled lives / reminders are real (routes/live-commerce.ts); see
  *    lib/live/liveCommerce.ts.
  */
 import { serviceRequest } from '@/lib/serviceConfig';
+import { openLiveRoomSocket } from './liveRoomSocket';
 import { setSellerFollowing } from '@/services/socialService';
 import type {
   LiveChatMessage, LiveHost, LiveProduct, LiveStream, LiveStreamProvider, SuggestedCreator,
@@ -29,6 +32,7 @@ import {
 } from './liveCommerce';
 
 const POLL_MS = 3000;
+const LIVE_SAFETY_POLL_MS = 15_000;
 const MONO = ['#1F1F1F', '#3A3A3A', '#555555', '#2B2B2B', '#474747'];
 
 function colorFor(id: string): string {
@@ -181,9 +185,43 @@ export function createApiLiveProvider(): LiveStreamProvider {
           if (!stopped && (e?.status === 404 || e?.status === 410)) listener({ type: 'ended', streamId });
         }
       }
-      const timer = setInterval(poll, POLL_MS);
+      // Live chat, viewer counts and the pinned product arrive over the
+      // stream's socket; `poll` runs every 3s only while it is down, plus
+      // once on every (re)connect to catch up, and every 15s as a safety net
+      // for the end of the stream.
+      const seen = new Set<string>();
+      let timer: ReturnType<typeof setInterval> | null = setInterval(poll, POLL_MS);
       void poll();
-      return () => { stopped = true; clearInterval(timer); };
+      const room = openLiveRoomSocket(streamId, {
+        onConnected() {
+          if (timer) clearInterval(timer);
+          timer = setInterval(poll, LIVE_SAFETY_POLL_MS);
+          void poll();
+        },
+        onDisconnected() {
+          if (stopped) return;
+          if (timer) clearInterval(timer);
+          timer = setInterval(poll, POLL_MS);
+        },
+        onEvent(event) {
+          if (stopped) return;
+          if (event.type === 'comment' && event.comment) {
+            const msg = chatFromRow(event.comment);
+            if (seen.has(msg.id)) return;
+            seen.add(msg.id);
+            if (msg.at > new Date(since).getTime()) since = new Date(msg.at).toISOString();
+            listener({ type: 'chat', streamId, messages: [msg] });
+          } else if (event.type === 'viewerCount' && typeof event.count === 'number') {
+            listener({ type: 'viewers', streamId, viewerCount: event.count });
+          } else if (event.type === 'pinned') {
+            lastPinned = event.productId ?? null;
+            listener({ type: 'pinned', streamId, productId: lastPinned });
+          } else if (event.type === 'ended') {
+            listener({ type: 'ended', streamId });
+          }
+        },
+      });
+      return () => { stopped = true; if (timer) clearInterval(timer); room.close(); };
     },
 
     async sendChat(streamId, text) {
