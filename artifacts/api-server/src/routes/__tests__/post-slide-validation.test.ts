@@ -36,6 +36,7 @@ const state = vi.hoisted(() => ({
   } as Record<string, unknown>,
   setVisibilityCalls: 0,
   setVisibilityError: null as Error | null,
+  postingBuckets: new Map<string, number>(),
 }));
 
 vi.mock("../../middlewares/requireAuth", () => ({
@@ -98,6 +99,16 @@ vi.mock("@workspace/db", () => {
       insert: () => chainInsert,
       update: () => chainUpdate,
       delete: () => chainDelete,
+      // The posting route now uses a fail-closed SQL quota store. Model that
+      // dependency instead of letting a missing execute() produce 503 before
+      // these focused validation assertions can reach the handler.
+      execute: async (query: { s?: string[]; v?: unknown[] }) => {
+        if (!query.s?.join("").includes("INSERT INTO rate_limit_buckets")) return { rows: [] };
+        const key = String(query.v?.[0]);
+        const count = (state.postingBuckets.get(key) ?? 0) + 1;
+        state.postingBuckets.set(key, count);
+        return { rows: [{ request_count: count, expires_at: new Date(Date.now() + Number(query.v?.[1])) }] };
+      },
     },
     posts: col,
     users: col,
@@ -208,6 +219,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
+  state.postingBuckets.clear();
   state.setVisibilityCalls = 0;
   state.setVisibilityError = null;
   state.insertedPost = { id: TEST_POST_ID, mediaPaths: [], slideOverlays: [], postStatus: "draft" };
