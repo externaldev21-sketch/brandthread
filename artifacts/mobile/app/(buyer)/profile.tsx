@@ -78,6 +78,7 @@ import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/Pro
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
+import { useScreenInteractive } from '@/lib/perf';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -359,6 +360,7 @@ export default function ProfileScreen() {
   const [avatarVideoUri, setAvatarVideoUri] = useState<string | null>(null);
   const [myOrders, setMyOrders] = useState<BuyerOrderView[]>([]);
   const [loading, setLoading] = useState(true);
+  useScreenInteractive('profile', !loading);
   const [loadError, setLoadError] = useState(false);
   const [threadCashBalanceCents, setThreadCashBalanceCents] = useState(0);
   const [threadCashStreak, setThreadCashStreak] = useState<ThreadCashStreakState | null>(null);

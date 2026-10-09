@@ -57,6 +57,7 @@ import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
+import { useScreenInteractive } from '@/lib/perf';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -652,6 +653,7 @@ export default function CartScreen() {
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
   const [loading, setLoading] = useState(true);
+  useScreenInteractive('bag', !loading);
   /** True only when we couldn't confirm the cart is really empty (see getCartForScreen). */
   const [loadError, setLoadError] = useState(false);
   const [validating, setValidating] = useState(false);

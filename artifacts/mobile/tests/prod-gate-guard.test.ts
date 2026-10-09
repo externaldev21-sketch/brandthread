@@ -20,6 +20,7 @@ const GATED_ENV_VARS = [
   'EXPO_PUBLIC_BT_GROWTH_BYPASS',
   'EXPO_PUBLIC_DEV_BYPASS_ROLE',
   'EXPO_PUBLIC_DEV_PREVIEW',
+  'EXPO_PUBLIC_PERF_MARKS',
 ];
 
 /** The one place allowed to read them, plus the `__DEV__`-guarded role bypass. */
@@ -82,6 +83,8 @@ describe('production-gated flags are referenced only through lib/buildFlags.ts',
     expect(src).toMatch(/ENABLE_TEST_SUBSCRIPTION_BYPASS\s*=\s*\n?\s*__DEV__\s*&&/);
     expect(src).toMatch(/REVENUECAT_TEST_API_KEY[^=]*=\s*__DEV__\s*\n?\s*\?/);
     expect(src).toMatch(/GROWTH_UI_BYPASS\s*=\s*\n?\s*__DEV__\s*\|\|\s*\(!IS_PROD_NATIVE/);
+    // Perf marks are off in release unless the build opted in explicitly.
+    expect(src).toMatch(/PERF_MARKS\s*=\s*__DEV__\s*\|\|\s*process\.env\.EXPO_PUBLIC_PERF_MARKS\s*===\s*'1'/);
   });
 
   it('the screenshot/preview-only query params are read only inside preview gates', () => {

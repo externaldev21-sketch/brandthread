@@ -12,6 +12,7 @@ import { SP, RADIUS, SCREEN_BG } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_DASHBOARD_STEPS } from '@/lib/firstRunTips/content';
+import { useScreenInteractive } from '@/lib/perf';
 
 const DEFAULT_SETUP: SetupState = {
   started: false,
@@ -38,6 +39,7 @@ export default function SellerHomeScreen() {
   const api = useApi();
 
   const [loading, setLoading] = useState(true);
+  useScreenInteractive('seller-dashboard', !loading);
   const [setupState, setSetupState] = useState<SetupState>(DEFAULT_SETUP);
 
   const loadSetup = useCallback(async () => {

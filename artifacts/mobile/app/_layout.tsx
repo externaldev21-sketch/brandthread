@@ -3,7 +3,7 @@ import { AffiliateRefCapture } from '@/components/AffiliateRefCapture';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
-import { recordNavigationStart } from '@/lib/perf';
+import { recordNavigationStart, recordShellInteractive } from '@/lib/perf';
 import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { isAccessCleared } from '@/lib/accessGate';
@@ -1204,10 +1204,13 @@ function RootLayoutNav() {
   const pathname = segments.join('/');
 
   useEffect(() => {
-    if (!__DEV__) return;
+    // No-op outside dev / perf builds (lib/perf.ts).
     recordNavigationStart(pathname || '/', queryClient);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  // Cold-start fallback reading: the navigator has painted and settled.
+  useEffect(() => runAfterFirstPaint(recordShellInteractive), []);
 
   useEffect(() => {
     return runAfterFirstPaint(() => { void flushNotificationEvents(api, userId); });
