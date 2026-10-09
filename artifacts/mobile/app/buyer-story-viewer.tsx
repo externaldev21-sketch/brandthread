@@ -13,6 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useIsFocused } from 'expo-router';
+import { useAppActive } from '@/hooks/useAppActive';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -402,19 +404,34 @@ export default function BuyerStoryViewer() {
     applyNav(navPrevUser(storyIdx));
   }, [storyIdx, applyNav]);
 
+  // JS-driven (a few 3pt bars) so the value can be read back: pausing keeps
+  // the bar where it is and resuming runs only the remaining time — the same
+  // as the mention viewer. Leaving the screen or backgrounding the app pauses
+  // it too.
+  const progressValue = useRef(0);
   useEffect(() => {
-    progress.setValue(0);
-    if (isPaused || overlayPaused || showGestureGuide || !currentSlide) return;
+    const id = progress.addListener(({ value }) => { progressValue.current = value; });
+    return () => progress.removeListener(id);
+  }, [progress]);
+  const slideKey = `${storyIdx}:${slideIdx}`;
+  useEffect(() => { progress.setValue(0); progressValue.current = 0; }, [progress, slideKey]);
+  const advanceRef = useRef(advanceSlide);
+  advanceRef.current = advanceSlide;
+  const screenFocused = useIsFocused();
+  const appActive = useAppActive();
+  const playbackHeld = isPaused || overlayPaused || showGestureGuide || !screenFocused || !appActive;
+  useEffect(() => {
+    if (playbackHeld || !currentSlide) return;
     const dur = currentSlide.duration * 1000;
     const anim = Animated.timing(progress, {
       toValue: 1,
-      duration: dur,
-      useNativeDriver: true,
+      duration: Math.max(0, (1 - progressValue.current) * dur),
+      useNativeDriver: false,
       easing: Easing.linear,
     });
-    anim.start(({ finished }) => { if (finished) advanceSlide(); });
-    return () => progress.stopAnimation();
-  }, [storyIdx, slideIdx, isPaused, overlayPaused, showGestureGuide]);
+    anim.start(({ finished }) => { if (finished) advanceRef.current(); });
+    return () => anim.stop();
+  }, [progress, slideKey, playbackHeld, !!currentSlide]);
 
   // Preload the next story's first slide so swiping/advancing to it feels instant.
   useEffect(() => {
@@ -434,6 +451,10 @@ export default function BuyerStoryViewer() {
   const dragScale = dragY.interpolate({ inputRange: [0, H], outputRange: [1, 0.82], extrapolate: 'clamp' });
   const dragOpacity = dragY.interpolate({ inputRange: [0, H * 0.6], outputRange: [1, 0.4], extrapolate: 'clamp' });
 
+  // The responder is created once, so it reads the latest handlers from a
+  // ref (otherwise every swipe would act on the first story's index).
+  const gestureRef = useRef({ goToNextUser, goToPrevUser });
+  gestureRef.current = { goToNextUser, goToPrevUser };
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
@@ -457,8 +478,8 @@ export default function BuyerStoryViewer() {
           return;
         }
         switch (gesture) {
-          case 'next-user': goToNextUser(); break;
-          case 'prev-user': goToPrevUser(); break;
+          case 'next-user': gestureRef.current.goToNextUser(); break;
+          case 'prev-user': gestureRef.current.goToPrevUser(); break;
           case 'close': goBackOr(router); break;
         }
       },
@@ -603,7 +624,7 @@ export default function BuyerStoryViewer() {
             </Text>
           </View>
         ) : currentSlide.imageUri && currentSlide.type === 'video' ? (
-          <StorySlideVideo uri={currentSlide.imageUri} paused={isPaused || overlayPaused} />
+          <StorySlideVideo uri={currentSlide.imageUri} paused={playbackHeld} />
         ) : currentSlide.imageUri ? (
           <CachedImage
             source={{ uri: currentSlide.imageUri }}
