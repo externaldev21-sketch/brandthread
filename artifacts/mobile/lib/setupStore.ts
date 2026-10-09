@@ -59,13 +59,6 @@ const DEFAULT_TASKS: Omit<SetupTask, 'completed' | 'skipped'>[] = [
     route: '/seller-verification',
   },
   {
-    id: 'connect_payments',
-    label: 'Set up payments',
-    description: 'Link Stripe Connect so you can receive payouts',
-    icon: 'credit-card',
-    route: '/payouts',
-  },
-  {
     id: 'first_product',
     label: 'Add your first product',
     description: 'Create a product and add it to your catalog',
@@ -99,6 +92,13 @@ const DEFAULT_TASKS: Omit<SetupTask, 'completed' | 'skipped'>[] = [
     description: 'Make your store live and visible to buyers',
     icon: 'upload-cloud',
     route: '/store-publish',
+  },
+  {
+    id: 'connect_payments',
+    label: 'Set up payments',
+    description: 'Link Stripe Connect so you can receive payouts',
+    icon: 'credit-card',
+    route: '/payouts',
   },
   {
     id: 'first_post',

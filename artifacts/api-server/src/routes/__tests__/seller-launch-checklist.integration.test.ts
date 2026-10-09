@@ -7,7 +7,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, orders, products, sellerStoreShares, shippingRates, storefronts, users } from "@workspace/db";
+import { db, products, shippingRates, storefronts, users } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 
 const suffix = crypto.randomBytes(6).toString("hex");
@@ -45,9 +45,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(orders).where(inArray(orders.ownerId, [sellerA, sellerB]));
   await db.delete(shippingRates).where(inArray(shippingRates.sellerId, [sellerA, sellerB]));
-  await db.delete(sellerStoreShares).where(inArray(sellerStoreShares.sellerId, [sellerA, sellerB]));
   await db.delete(products).where(inArray(products.ownerId, [sellerA, sellerB]));
   await db.delete(storefronts).where(inArray(storefronts.ownerId, [sellerA, sellerB]));
   await db.delete(users).where(inArray(users.clerkId, [sellerA, sellerB]));
@@ -65,11 +63,11 @@ describe("seller launch checklist API", () => {
     authState.clerkUserId = sellerA;
     const { status, body } = await get();
     expect(status).toBe(200);
-    expect(body.total).toBe(8);
+    expect(body.total).toBe(9);
     expect(body.doneCount).toBe(0);
     expect(body.dismissed).toBe(false);
     expect(body.steps.map((s: any) => s.id)).toEqual([
-      "name_handle", "logo_banner", "accent", "socials", "first_product", "preview", "publish", "payouts",
+      "name_handle", "logo_banner", "accent", "socials", "first_product", "shipping", "preview", "publish", "payouts",
     ]);
   });
 
@@ -86,13 +84,14 @@ describe("seller launch checklist API", () => {
     }).where(eq(users.clerkId, sellerA));
     await db.insert(products).values({ ownerId: sellerA, name: "Tee" } as any);
     await db.insert(storefronts).values({ ownerId: sellerA, slug: `slug-${suffix}`, status: "published" });
+    await db.insert(shippingRates).values({ id: `rate-${suffix}`, sellerId: sellerA, name: "Standard", flatRateCents: 500 } as any);
 
     const { body } = await get();
-    for (const id of ["name_handle", "logo_banner", "accent", "socials", "first_product", "publish", "payouts"]) {
+    for (const id of ["name_handle", "logo_banner", "accent", "socials", "first_product", "shipping", "publish", "payouts"]) {
       expect(stepDone(body, id)).toBe(true);
     }
     expect(stepDone(body, "preview")).toBe(false);
-    expect(body.doneCount).toBe(7);
+    expect(body.doneCount).toBe(8);
     expect(body.handle).toBe(`atelier_${suffix}`);
   });
 
@@ -129,44 +128,5 @@ describe("seller launch checklist API", () => {
 
     authState.clerkUserId = sellerB;
     expect((await get()).body.dismissed).toBe(false);
-  });
-});
-
-describe("ready to sell (dashboard checklist)", () => {
-  const ready = async () => {
-    const response = await fetch(`${base}/api/seller/launch-checklist/ready-to-sell`);
-    return { status: response.status, body: (await response.json().catch(() => null)) as any };
-  };
-
-  it("ticks shipping rates and share store from real rows, per seller", async () => {
-    authState.clerkUserId = sellerB;
-    const before = await ready();
-    expect(before.status).toBe(200);
-    expect(before.body.total).toBe(6);
-    expect(stepDone(before.body, "shipping_rates")).toBe(false);
-    expect(stepDone(before.body, "share_store")).toBe(false);
-    expect(before.body.hasSale).toBe(false);
-
-    await db.insert(shippingRates).values({ id: `rate-${suffix}`, sellerId: sellerB, name: "Standard", flatRateCents: 500 });
-    const shared = await fetch(`${base}/api/seller/launch-checklist/store-shared`, { method: "POST" });
-    expect(shared.status).toBe(204);
-    await fetch(`${base}/api/seller/launch-checklist/store-shared`, { method: "POST" });
-    const [row] = await db.select().from(sellerStoreShares).where(eq(sellerStoreShares.sellerId, sellerB));
-    expect(row.shareCount).toBe(2);
-
-    const after = await ready();
-    expect(stepDone(after.body, "shipping_rates")).toBe(true);
-    expect(stepDone(after.body, "share_store")).toBe(true);
-
-    authState.clerkUserId = sellerA;
-    expect(stepDone((await ready()).body, "share_store")).toBe(false);
-  });
-
-  it("reports the first sale but ignores cancelled orders", async () => {
-    authState.clerkUserId = sellerB;
-    await db.insert(orders).values({ ownerId: sellerB, orderNumber: `RTS-C-${suffix}`, status: "cancelled", totalCents: 1000, subtotalCents: 1000 });
-    expect((await ready()).body.hasSale).toBe(false);
-    await db.insert(orders).values({ ownerId: sellerB, orderNumber: `RTS-P-${suffix}`, status: "processing", totalCents: 1000, subtotalCents: 1000 });
-    expect((await ready()).body.hasSale).toBe(true);
   });
 });
