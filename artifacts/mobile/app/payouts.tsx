@@ -177,7 +177,6 @@ function PayoutsScreenContent() {
     void refreshConnectStatus();
   }, [api, isPreview, refreshConnectStatus]);
 
-  useEffect(() => { load(); }, [load]);
 
   function handleCashedOut(result: { threadCashCents: number; payoutCents: number; feeCents: number }) {
     setCashOutVisible(false);
@@ -186,9 +185,11 @@ function PayoutsScreenContent() {
     Alert.alert('Cashed out', `${formatCents(result.threadCashCents)} Thread Cash moved to your payout balance as ${formatCents(result.payoutCents)}.`);
   }
 
+  // Load on every focus (first mount included): the balance and history are
+  // fresh whenever the seller comes back, the way Thread Cash above refreshes.
   useFocusEffect(useCallback(() => {
-    void refreshConnectStatus();
-  }, [refreshConnectStatus]));
+    void load();
+  }, [load]));
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -265,6 +266,14 @@ function PayoutsScreenContent() {
         }]}
       />
 
+      {/* One scroll for the whole page (Shopify payouts): the balance, tabs
+          and list move together, so nothing is squeezed above the tab bar. */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: tabBarMetrics.occupiedHeight + SP.md }}
+        showsVerticalScrollIndicator={false}
+        testID="seller-payouts-scroll"
+      >
       <SellerThreadCashCard
         balanceCents={threadCash.balanceCents}
         loading={threadCash.loading}
@@ -323,14 +332,7 @@ function PayoutsScreenContent() {
       </View>
 
       {activeTab === 'payouts' ? (
-        <ScrollView
-          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
-          contentContainerStyle={[
-            styles.list,
-            { paddingBottom: SP.md },
-            payouts.length === 0 && { flexGrow: 1, justifyContent: 'center' },
-          ]}
-        >
+        <View style={[styles.list, payouts.length === 0 && { paddingTop: SP.lg }]}>
           {loading && !isPreview ? (
             <View style={{ gap: 10 }}>
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
@@ -371,12 +373,9 @@ function PayoutsScreenContent() {
               );
             })
           )}
-        </ScrollView>
+        </View>
       ) : (
-        <ScrollView
-          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
-          contentContainerStyle={[styles.list, { paddingBottom: SP.md }]}
-        >
+        <View style={styles.list}>
            <View style={styles.bankCard}>
              <Feather name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
@@ -535,8 +534,9 @@ function PayoutsScreenContent() {
                </View>
              );
            })()}
-        </ScrollView>
+        </View>
       )}
+      </ScrollView>
     </View>
   );
 }
