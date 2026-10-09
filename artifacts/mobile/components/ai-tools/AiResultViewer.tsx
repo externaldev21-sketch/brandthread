@@ -8,7 +8,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Image } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Glass } from '@/components/ui/Glass';
@@ -60,9 +60,10 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
           renderItem={({ item }) => (
             <View style={{ width: SW, height: SH, alignItems: 'center', justifyContent: 'center' }}>
               <Image
+                cachePolicy="memory-disk"
                 source={{ uri: showBefore && item.id === current.id ? item.sourceUri : item.imageUri }}
                 style={s.image}
-                resizeMode="contain"
+                contentFit="contain"
               />
             </View>
           )}

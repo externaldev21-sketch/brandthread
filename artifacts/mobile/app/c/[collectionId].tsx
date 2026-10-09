@@ -8,7 +8,8 @@
  * Server returns 404 for anything not explicitly marked public.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
@@ -129,7 +130,7 @@ export default function PublicCollectionScreen() {
         </View>
 
         {collection.coverImageUrl ? (
-          <Image source={{ uri: collection.coverImageUrl }} style={styles.cover} />
+          <Image cachePolicy="memory-disk" source={{ uri: collection.coverImageUrl }} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]}>
             <Feather name="folder" size={36} color={MUTED} />
@@ -152,7 +153,7 @@ export default function PublicCollectionScreen() {
             renderItem={({ item }) => (
               <View style={styles.tile}>
                 {item.image ? (
-                  <Image source={{ uri: item.image }} style={styles.tileImage} />
+                  <Image cachePolicy="memory-disk" source={{ uri: item.image }} style={styles.tileImage} />
                 ) : (
                   <View style={[styles.tileImage, styles.coverPlaceholder]}>
                     <Feather name="shopping-bag" size={20} color={MUTED} />

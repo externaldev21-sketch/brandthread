@@ -6,7 +6,8 @@
  * Activity (lib/uploadLiveActivity.ts) is driven from, not a forked model.
  */
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
@@ -63,7 +64,7 @@ export function UploadProgressPill({ topInset }: { topInset: number }) {
       >
         <Glass variant="regular" tint="dark" radius={radius.sm} style={StyleSheet.absoluteFill} />
         {entry.thumbnailUri ? (
-          <Image source={{ uri: entry.thumbnailUri }} style={styles.thumb} />
+          <Image cachePolicy="memory-disk" source={{ uri: entry.thumbnailUri }} style={styles.thumb} />
         ) : (
           <View style={[styles.thumb, styles.thumbFallback]}>
             <Feather name="image" size={14} color="#fff" />

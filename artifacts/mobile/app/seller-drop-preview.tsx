@@ -10,7 +10,8 @@
  * this against buyer-drop-detail.tsx's rendering.
  */
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -106,7 +107,7 @@ export default function SellerDropPreview() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
         <View style={styles.hero}>
           {heroUri ? (
-            <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <Image cachePolicy="memory-disk" source={{ uri: heroUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <LinearGradient colors={[theme.cardElevated, theme.background]} style={StyleSheet.absoluteFill} />
           )}
@@ -145,7 +146,7 @@ export default function SellerDropPreview() {
             {products.map(p => (
               <View key={p.id} style={[styles.tile, { backgroundColor: theme.card }]}>
                 {p.images?.[0] ? (
-                  <Image source={{ uri: p.images[0] }} style={styles.tileImage} resizeMode="cover" />
+                  <Image cachePolicy="memory-disk" source={{ uri: p.images[0] }} style={styles.tileImage} contentFit="cover" />
                 ) : (
                   <View style={[styles.tileImage, { alignItems: 'center', justifyContent: 'center' }]}>
                     <Feather name="image" size={22} color={theme.muted} />

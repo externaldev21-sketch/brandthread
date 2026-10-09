@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Image, Platform, Text } from 'react-native';
+import { Platform, Text } from 'react-native';
+import { Image } from 'expo-image';
 
 /**
  * One consistent emoji glyph across iOS, Android and web.
@@ -34,6 +35,7 @@ export function AppleEmoji({ emoji, size = 24 }: { emoji: string; size?: number 
 
   return (
     <Image
+      cachePolicy="memory-disk"
       source={{ uri: `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${codepoint}.png` }}
       style={{ width: size, height: size }}
       onError={() => setFailed(true)}

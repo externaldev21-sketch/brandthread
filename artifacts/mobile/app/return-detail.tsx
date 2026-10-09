@@ -28,7 +28,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { View, Text, ScrollView, StyleSheet, TextInput, Image, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
@@ -288,7 +289,7 @@ export default function ReturnDetailScreen() {
           {view.evidenceUrls.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false} style={{ marginTop: SP.sm }}>
               {view.evidenceUrls.map((uri, i) => (
-                <Image key={`${uri}-${i}`} source={{ uri }} style={s.photo} accessibilityLabel={`Return photo ${i + 1}`} />
+                <Image cachePolicy="memory-disk" key={`${uri}-${i}`} source={{ uri }} style={s.photo} accessibilityLabel={`Return photo ${i + 1}`} />
               ))}
             </ScrollView>
           ) : (

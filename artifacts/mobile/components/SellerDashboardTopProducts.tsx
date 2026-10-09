@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -38,7 +39,7 @@ export function SellerDashboardTopProducts({
             accessibilityLabel={`${product.name}: ${product.unitsSold} sold, ${formatCents(product.revenueCents)}`}
           >
             {product.imageUrl ? (
-              <Image source={{ uri: product.imageUrl }} style={styles.thumb} />
+              <Image cachePolicy="memory-disk" source={{ uri: product.imageUrl }} style={styles.thumb} />
             ) : (
               <View style={[styles.thumb, styles.thumbPlaceholder, { backgroundColor: theme.cardElevated }]}>
                 <Text style={[styles.thumbLetter, { color: theme.subtle }]}>{product.name.charAt(0).toUpperCase()}</Text>

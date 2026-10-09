@@ -8,7 +8,8 @@
  * shared-components ask.
  */
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { BORDER, CARD, FG, MUTED, RADIUS } from '@/lib/theme';
 
@@ -27,7 +28,7 @@ export function ReferencePhotoTiles({ uris, max, onAdd, onRemove, label = 'refer
     <View style={s.grid}>
       {uris.map((uri, idx) => (
         <View key={`${uri}-${idx}`} style={s.tile}>
-          <Image source={{ uri }} style={s.thumb} resizeMode="cover" />
+          <Image cachePolicy="memory-disk" source={{ uri }} style={s.thumb} contentFit="cover" />
           <TouchableOpacity
             style={s.removeBtn}
             onPress={() => onRemove(idx)}

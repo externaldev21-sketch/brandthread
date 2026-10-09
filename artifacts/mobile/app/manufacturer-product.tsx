@@ -4,7 +4,8 @@
  * Params: manufacturerId, productId
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -50,7 +51,7 @@ export default function ManufacturerProductScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
           {product.images.length > 0 ? (
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={s.gallery}>
-              {product.images.map((uri, index) => <Image key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />)}
+              {product.images.map((uri, index) => <Image cachePolicy="memory-disk" key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />)}
             </ScrollView>
           ) : (
             <View style={[s.gallery, s.galleryFallback]}><Feather name="package" size={ICON.xxl} color={theme.subtle} /></View>

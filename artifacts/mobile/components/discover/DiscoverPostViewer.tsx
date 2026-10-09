@@ -6,7 +6,8 @@
  * scope this PR covers.
  */
 import React, { useState } from 'react';
-import { Dimensions, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
@@ -80,7 +81,7 @@ function ViewerPage({
       <View style={[styles.bottomWrap, { paddingBottom: insets.bottom + SP.xl }]}>
         <PressableScale onPress={() => onOpenProfile(post)} style={styles.authorRow}>
           {post.authorAvatarUrl ? (
-            <Image source={{ uri: post.authorAvatarUrl }} style={styles.avatar} />
+            <Image cachePolicy="memory-disk" source={{ uri: post.authorAvatarUrl }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, { backgroundColor: post.authorColor }]}>
               <Text style={styles.avatarInitials}>{post.authorInitials}</Text>

@@ -4,7 +4,8 @@
  * test send, send now or schedule. Route: /email-campaign-compose?id=
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -217,7 +218,7 @@ export default function EmailCampaignComposeScreen() {
         <Heading>Preview</Heading>
         <View style={[st.preview, { borderColor: c.border }]}>
           <Text style={[st.pvStore, { color: c.foreground }]}>{mode === 'demo' ? DEMO_SETTINGS.defaultFromName : 'Your store'}</Text>
-          {fullBody.imageUrl ? <Image source={{ uri: fullBody.imageUrl }} style={st.pvImage} resizeMode="cover" /> : null}
+          {fullBody.imageUrl ? <Image cachePolicy="memory-disk" source={{ uri: fullBody.imageUrl }} style={st.pvImage} contentFit="cover" /> : null}
           {fullBody.headline ? <Text style={[st.pvHead, { color: c.foreground }]}>{fullBody.headline}</Text> : null}
           {fullBody.text ? <Text style={[st.pvText, { color: c.foreground }]}>{fullBody.text}</Text> : null}
           {selected.length > 0 && (
@@ -225,7 +226,7 @@ export default function EmailCampaignComposeScreen() {
               {selected.map((p) => (
                 <View key={p.id} style={{ flex: 1 }}>
                   <View style={[st.pvThumb, { backgroundColor: c.secondary }]}>
-                    {p.image ? <Image source={{ uri: p.image }} style={{ flex: 1 }} resizeMode="cover" /> : null}
+                    {p.image ? <Image cachePolicy="memory-disk" source={{ uri: p.image }} style={{ flex: 1 }} contentFit="cover" /> : null}
                   </View>
                   <Text numberOfLines={2} style={{ color: c.foreground, fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 6 }}>{p.name}</Text>
                   {p.priceCents != null && <Text style={{ color: c.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm }}>${(p.priceCents / 100).toFixed(2)}</Text>}

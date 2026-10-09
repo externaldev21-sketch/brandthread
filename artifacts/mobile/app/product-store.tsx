@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, Dimensions, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -303,9 +304,10 @@ export default function ProductStoreScreen() {
         <View style={[s.galleryWrap, { width: SCREEN_W, height: GALLERY_H }]}>
           {coverMedia ? (
             <Image
+              cachePolicy="memory-disk"
               source={{ uri: coverMedia.uri }}
               style={s.galleryImage}
-              resizeMode="cover"
+              contentFit="cover"
             />
           ) : (
             <LinearGradient
