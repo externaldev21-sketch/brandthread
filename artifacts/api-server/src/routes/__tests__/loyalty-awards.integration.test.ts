@@ -332,7 +332,10 @@ describe("paid cart checkout rewards", () => {
       .where(eq(sellerTaxLedger.orderId, order.id));
     expect(afterRefund).toHaveLength(1);
     expect(afterRefund[0]?.grossPaymentCents).toBe(11_250);
-  });
+    // Two paid-event deliveries and a refund read use real PostgreSQL.
+    // Allow bounded I/O latency during concurrent builds without weakening
+    // any tax, shipping, guest ownership, or exactly-once ledger assertion.
+  }, 20_000);
 
   it("awards floor(totalCents / 100) once through the paid Checkout Session handler", async () => {
     const fixture = await seedPaidCartFixture({ stock: 2, totalCents: 12_399 });
