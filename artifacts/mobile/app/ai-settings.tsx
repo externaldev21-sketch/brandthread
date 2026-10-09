@@ -289,12 +289,6 @@ export default function AiSettingsScreen() {
             onValueChange={v => update(s => ({ ...s, brandMemoryEnabled: v }))}
             colors={colors}
           />
-          <RowDivider colors={colors} />
-          <NavRow
-            label="Manage Brand Memory"
-            onPress={() => router.push('/ai-brand-memory')}
-            colors={colors}
-          />
         </SettingSection>
 
         {/* Section: Data Sources */}
