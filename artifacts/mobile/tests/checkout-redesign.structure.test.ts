@@ -92,7 +92,8 @@ describe('checkout screen structure', () => {
     expect(primitives).toContain('bg: theme.background');
     const themeCtx = read('contexts/AppThemeContext.tsx');
     expect(themeCtx).toContain("const MONOCHROME = palette('#000000', '#000000', '#000000', '#FFFFFF'");
-    expect(primitives).toContain("textTransform: 'uppercase'");
+    // Section labels are sentence case (BRANDTHREAD_DESIGN.md: no all-caps labels).
+    expect(primitives).not.toContain("textTransform: 'uppercase'");
     // Contact, shipping and payment all live on this one screen: no address sheet, no second screen.
     expect(screen).toContain('<ContactSection');
     expect(screen).toContain('<ShippingSection');
@@ -101,7 +102,8 @@ describe('checkout screen structure', () => {
   });
 
   it('renders the price breakdown exactly once and puts the live total in the Pay button', () => {
-    expect(screen.match(/<OrderSummarySection\b/g)).toHaveLength(1);
+    // GOAT Order review: one Total block (components/checkout/OrderReview.tsx).
+    expect(screen.match(/<ReviewTotals\b/g)).toHaveLength(1);
     expect(screen).toContain('`Pay ${formatCents(totals.totalCents)}`');
   });
 
@@ -119,7 +121,11 @@ describe('checkout screen structure', () => {
   });
 
   it('uses a plain terms line with links instead of a terms checkbox', () => {
-    expect(screen).toContain('<CheckoutTermsLine />');
+    // GOAT's legal line: Buyer Protection Policy + Returns Policy links, no checkbox.
+    expect(screen).toContain('<ReviewLegal ');
+    const legal = read('components/checkout/OrderReview.tsx');
+    expect(legal).toContain('LEGAL_DOCUMENTS.terms.route');
+    expect(legal).toContain("LEGAL_DOCUMENTS['refund-policy'].route");
     expect(screen).toContain('withoutImplicitTermsAck(');
     const terms = read('components/checkout/CheckoutTermsLine.tsx');
     expect(terms).toContain("link('Terms of Service', LEGAL_DOCUMENTS.terms.route)");
