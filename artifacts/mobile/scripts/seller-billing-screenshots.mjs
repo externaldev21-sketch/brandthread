@@ -5,7 +5,7 @@
  * plus a text-fit audit. Point it at a web export (the harness's
  * buildPreviewWeb) so the same script captures "before" (dev) and "after".
  *
- *   node scripts/seller-screens-screenshots.mjs --build=<dir> --out=<dir> [--only=a,b] [--modes=fresh,demo]
+ *   node scripts/seller-billing-screenshots.mjs --build=<dir> --out=<dir> [--only=a,b] [--modes=fresh,demo]
  */
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
