@@ -82,6 +82,8 @@ import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost
 import { Snackbar } from '@/components/ui/Snackbar';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 import { radius } from '@/constants/radii';
+import { applyReadReceipt, mergeIncomingMessage, TYPING_TTL_MS, useRealtimeConnected, useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
+import { useIsFocused } from '@react-navigation/native';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -417,6 +419,59 @@ export default function SellerConversationScreen() {
     const generation = ++generationRef.current;
     consecutiveFailuresRef.current = 0;
     loadAll(generation);
+  }, [api, id, loadAll]));
+
+  // Realtime (lib/realtime/messagesSocket.ts → api-server ws/messagesHub.ts):
+  // the buyer's messages, read receipts, typing and reaction/settings changes
+  // arrive the moment they happen. Not for a seeded preview thread.
+  const realtimeConnected = useRealtimeConnected();
+  const isFocused = useIsFocused();
+  const otherTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useRealtimeEvents((event) => {
+    if (!id || !('conversationId' in event) || event.conversationId !== id) return;
+    if (event.type === 'message.created') {
+      const incoming = event.message as unknown as Msg;
+      setMessages((prev) => mergeIncomingMessage(prev, incoming));
+      if (incoming.fromId !== myId) {
+        if (otherTypingTimerRef.current) { clearTimeout(otherTypingTimerRef.current); otherTypingTimerRef.current = null; }
+        setConv((prev) => (prev ? { ...prev, otherTyping: false } : prev));
+        if (isFocused && !conv?.isRequest) api.conversations.markRead(id).catch(() => {});
+      }
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    } else if (event.type === 'message.read') {
+      setMessages((prev) => applyReadReceipt(prev, event.readerId, event.readAt));
+    } else if (event.type === 'typing') {
+      if (otherTypingTimerRef.current) { clearTimeout(otherTypingTimerRef.current); otherTypingTimerRef.current = null; }
+      setConv((prev) => (prev ? { ...prev, otherTyping: event.typing } : prev));
+      if (event.typing) {
+        otherTypingTimerRef.current = setTimeout(() => {
+          otherTypingTimerRef.current = null;
+          setConv((prev) => (prev ? { ...prev, otherTyping: false } : prev));
+        }, TYPING_TTL_MS);
+      }
+    } else if (event.type === 'conversation.updated') {
+      if (event.reason === 'deleted') return;
+      void loadMessages(generationRef.current);
+      if (event.reason === 'accepted' || event.reason === 'settings') {
+        api.conversations.get(id).then((fresh: ConvView) => {
+          setConv((prev) => (prev ? { ...prev, ...fresh } : prev));
+        }).catch(() => {});
+      }
+    }
+  }, !!id && !isSellerPreviewConversationId(id));
+  useEffect(() => () => {
+    if (otherTypingTimerRef.current) clearTimeout(otherTypingTimerRef.current);
+  }, []);
+
+  // Fallback while the socket is down: the previous 15s message poll. It
+  // stands down while realtime is connected; reconnecting triggers one
+  // catch-up fetch.
+  useFocusEffect(useCallback(() => {
+    const generation = generationRef.current;
+    if (realtimeConnected) {
+      void loadMessages(generation);
+      return;
+    }
     pollRef.current = setInterval(() => loadMessages(generation), 15_000);
     return () => {
       if (pollRef.current !== null) {
@@ -424,7 +479,7 @@ export default function SellerConversationScreen() {
         pollRef.current = null;
       }
     };
-  }, [api, id, loadAll, loadMessages]));
+  }, [loadMessages, realtimeConnected]));
 
   // "X is typing…" needs a tighter cadence than the 15s message poll above
   // to read as live — same 3s cadence app/buyer-conversation.tsx's identical
@@ -433,14 +488,14 @@ export default function SellerConversationScreen() {
   // this screen. Skipped for a seeded preview thread (no real backend/
   // counterpart to poll).
   useFocusEffect(useCallback(() => {
-    if (!id || isSellerPreviewConversationId(id)) return;
+    if (!id || isSellerPreviewConversationId(id) || realtimeConnected) return;
     const interval = setInterval(() => {
       api.conversations.get(id).then((fresh: { otherTyping?: boolean }) => {
         setConv((prev) => (prev ? { ...prev, otherTyping: fresh?.otherTyping } : prev));
       }).catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
-  }, [api, id]));
+  }, [api, id, realtimeConnected]));
 
   useEffect(() => () => {
     if (typingClearTimerRef.current) clearTimeout(typingClearTimerRef.current);

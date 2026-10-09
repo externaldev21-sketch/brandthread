@@ -29,6 +29,7 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
+import { emitToUsers } from "../ws/messagesHub";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { maybeSendAwayAutoReply } from "../lib/awayAutoReply";
 import { isFollowedBy, shouldRouteToRequests } from "../lib/conversationRouting";
@@ -42,6 +43,21 @@ import {
 import { IMMUTABLE_PUBLIC_CACHE_CONTROL, normalizeUploadedImage } from "../lib/productImageResize";
 
 const router = Router();
+
+/**
+ * Everyone in the conversation (for realtime fan-out after a committed write).
+ * Best-effort: a failure here returns [] — realtime must never fail the write.
+ */
+async function conversationMemberIds(conversationId: string): Promise<string[]> {
+  try {
+    const rows = await db.select({ userId: conversationParticipants.userId })
+      .from(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId));
+    return Array.isArray(rows) ? rows.map((r) => r.userId) : [];
+  } catch {
+    return [];
+  }
+}
 router.use(requireAuth);
 
 // Attachment types a message may carry. "product"/"order" get extra
@@ -892,6 +908,10 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   const adapted = adaptMessage(msg, [], replyPreview);
   await enrichProductAttachments([adapted]);
   await enrichOrderAttachments([adapted]);
+  // Realtime: the other side (and my other devices) get the message now;
+  // recipients' unread badges moved.
+  emitToUsers([userId, ...otherIds], { type: "message.created", conversationId: id, message: adapted as unknown as Record<string, unknown> });
+  emitToUsers(otherIds, { type: "badges.changed" });
   return res.status(201).json(adapted);
 });
 
@@ -946,6 +966,7 @@ router.put("/:id/messages/:messageId/reactions", async (req, res) => {
     })();
   }
 
+  emitToUsers(await conversationMemberIds(id), { type: "conversation.updated", conversationId: id, reason: "reaction" });
   return res.status(200).json({
     userId:       reaction.userId,
     userName:     membership.name,
@@ -973,6 +994,7 @@ router.delete("/:id/messages/:messageId/reactions", async (req, res) => {
   await db.delete(messageReactions)
     .where(and(eq(messageReactions.messageId, messageId), eq(messageReactions.userId, userId)));
 
+  emitToUsers(await conversationMemberIds(id), { type: "conversation.updated", conversationId: id, reason: "reaction" });
   return res.json({ ok: true });
 });
 
@@ -1004,6 +1026,10 @@ router.patch("/:id/read", async (req, res) => {
       .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`)),
   ]);
 
+  // Realtime read receipt for the other side; my own badge moved everywhere I'm signed in.
+  const memberIds = await conversationMemberIds(id);
+  emitToUsers(memberIds.filter((m) => m !== userId), { type: "message.read", conversationId: id, readerId: userId, readAt: readAt.toISOString() });
+  emitToUsers([userId], { type: "badges.changed" });
   return res.json({ ok: true });
 });
 
@@ -1033,6 +1059,8 @@ router.patch("/:id/typing", rateLimit("mutation"), async (req, res) => {
     .set({ typingUntil })
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
 
+  const memberIds = await conversationMemberIds(id);
+  emitToUsers(memberIds.filter((m) => m !== userId), { type: "typing", conversationId: id, userId, typing });
   return res.json({ ok: true });
 });
 
@@ -1152,6 +1180,9 @@ async function insertSystemMessage(conversationId: string, actorId: string, titl
   await db.update(conversations)
     .set({ lastMessage: "Chat settings changed", lastMessageAt: new Date(), updatedAt: new Date() })
     .where(eq(conversations.id, conversationId));
+  // Theme / disappearing changes are conversation-level: the other side sees
+  // the system line and the new setting right away.
+  emitToUsers(await conversationMemberIds(conversationId), { type: "conversation.updated", conversationId, reason: "settings" });
   return msg;
 }
 
@@ -1229,6 +1260,7 @@ router.patch("/:id/accept", async (req, res) => {
     .where(eq(conversationParticipants.conversationId, id));
   const [updated] = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
 
+  emitToUsers(parts.map((p) => p.userId), { type: "conversation.updated", conversationId: id, reason: "accepted" });
   return res.json(buildConversationView(updated, parts, userId));
 });
 
@@ -1328,8 +1360,11 @@ router.delete("/:id", async (req, res) => {
 
   if (!isMember) return res.status(404).json({ error: "Conversation not found" });
 
+  const memberIds = await conversationMemberIds(id);
   // Hard-delete: cascade removes participants + messages
   await db.delete(conversations).where(eq(conversations.id, id));
+  emitToUsers(memberIds, { type: "conversation.updated", conversationId: id, reason: "deleted" });
+  emitToUsers(memberIds, { type: "badges.changed" });
   return res.json({ ok: true });
 });
 

@@ -93,6 +93,8 @@ import {
   sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
 import { radius } from '@/constants/radii';
+import { applyReadReceipt, mergeIncomingMessage, TYPING_TTL_MS, useRealtimeConnected, useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
+import { useIsFocused } from '@react-navigation/native';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
  *  the preview seed (lib/previewInboxData.ts) and the api-server system
@@ -513,29 +515,74 @@ export default function BuyerConversationScreen() {
     return unsub;
   }, [conv?.id]);
 
-  // No websocket/realtime layer exists for this conversation yet, so a
-  // reaction or reply added by the other participant only appears once we
-  // refetch. Poll at a light cadence while the screen is focused — mirrors
-  // the refetch-on-local-change pattern `subscribeSocial` already uses.
-  // Skipped for a seeded preview thread (no real backend to poll).
+  // Realtime (lib/realtime/messagesSocket.ts → api-server ws/messagesHub.ts):
+  // new messages, read receipts, typing and reaction/settings changes arrive
+  // the moment they happen. Skipped for a seeded preview thread (no backend).
+  const realtimeConnected = useRealtimeConnected();
+  const isFocused = useIsFocused();
+  const otherTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLiveConv = !!conv?.id && !isPreviewConversationId(conv.id);
+  useRealtimeEvents((event) => {
+    if (!conv?.id || !('conversationId' in event) || event.conversationId !== conv.id) return;
+    if (event.type === 'message.created') {
+      const incoming = event.message as unknown as Message;
+      setMessages((prev) => mergeIncomingMessage(prev, incoming));
+      if (incoming.fromId !== myId && incoming.fromId !== MY_USER_ID) {
+        // Their message ends their typing bubble.
+        if (otherTypingTimerRef.current) { clearTimeout(otherTypingTimerRef.current); otherTypingTimerRef.current = null; }
+        setConv((prev) => (prev && prev.id === conv.id ? { ...prev, otherTyping: false } : prev));
+        // Reading it live counts as read (never for a pending request — see loadData).
+        if (isFocused && !conv.isRequest) markConversationRead(conv.id).catch(() => {});
+      }
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    } else if (event.type === 'message.read') {
+      setMessages((prev) => applyReadReceipt(prev, event.readerId, event.readAt));
+    } else if (event.type === 'typing') {
+      if (conv.isOfficial) return;
+      if (otherTypingTimerRef.current) { clearTimeout(otherTypingTimerRef.current); otherTypingTimerRef.current = null; }
+      setConv((prev) => (prev && prev.id === conv.id ? { ...prev, otherTyping: event.typing } : prev));
+      if (event.typing) {
+        otherTypingTimerRef.current = setTimeout(() => {
+          otherTypingTimerRef.current = null;
+          setConv((prev) => (prev && prev.id === conv.id ? { ...prev, otherTyping: false } : prev));
+        }, TYPING_TTL_MS);
+      }
+    } else if (event.type === 'conversation.updated') {
+      if (event.reason === 'deleted') return;
+      getMessages(conv.id).then(setMessages).catch(() => {});
+      if (event.reason === 'accepted' || event.reason === 'settings') {
+        getConversation(conv.id).then((fresh) => {
+          if (fresh) setConv((prev) => (prev && prev.id === fresh.id ? { ...prev, ...fresh } : prev));
+        }).catch(() => {});
+      }
+    }
+  }, isLiveConv);
+  useEffect(() => () => {
+    if (otherTypingTimerRef.current) clearTimeout(otherTypingTimerRef.current);
+  }, []);
+
+  // Fallback while the socket is down: the previous light polls (12s for
+  // messages, 3s for "typing…"). They stand down while realtime is
+  // connected; reconnecting triggers one catch-up fetch.
   useFocusEffect(useCallback(() => {
     if (!conv?.id || isPreviewConversationId(conv.id)) return;
+    if (realtimeConnected) {
+      getMessages(conv.id).then(setMessages).catch(() => {});
+      return;
+    }
     const interval = setInterval(() => {
       getMessages(conv.id).then(setMessages).catch(() => {});
     }, 12000);
     return () => clearInterval(interval);
-  }, [conv?.id]));
+  }, [conv?.id, realtimeConnected]));
 
-  // The "X is typing…" signal (conv.otherTyping) needs a noticeably tighter
-  // cadence than the 12s message poll above to read as live — same 3s
-  // cadence lib/live/apiLiveProvider.ts already uses for live-chat polling.
   // Merges just otherTyping into the existing conv object rather than
   // replacing it wholesale, so it never clobbers an in-flight local update
   // (e.g. the optimistic theme/disappearing toggles elsewhere in this file).
   // Skipped for the agent thread (its own agentTyping is client-driven, see
   // sendToAgent) and for a seeded preview thread (no real backend to poll).
   useFocusEffect(useCallback(() => {
-    if (!conv?.id || isPreviewConversationId(conv.id) || conv.isOfficial) return;
+    if (!conv?.id || isPreviewConversationId(conv.id) || conv.isOfficial || realtimeConnected) return;
     const interval = setInterval(() => {
       getConversation(conv.id).then((fresh) => {
         if (!fresh) return;
@@ -543,7 +590,7 @@ export default function BuyerConversationScreen() {
       }).catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
-  }, [conv?.id, conv?.isOfficial]));
+  }, [conv?.id, conv?.isOfficial, realtimeConnected]));
 
   // Scroll to end after messages load — unless there's an unread divider we
   // still need to scroll to first (handled by the effect below).
