@@ -585,13 +585,15 @@ function FilterSheet({
  * selection state are unchanged.
  */
 const OrderListRow = React.memo(function OrderListRow({
-  order, isLast, selected, selectionMode, actions,
+  order, isLast, selected, selectionMode, actions, current = false,
 }: {
   order: Order;
   isLast: boolean;
   selected: boolean;
   selectionMode: boolean;
   actions: OrderRowActions;
+  /** iPad split: the order shown in the detail pane (white outline, like Shopify iPad's selected row). */
+  current?: boolean;
 }) {
   const { theme } = useAppTheme();
   // Orders are automatic (paid orders arrive as "To ship"), so the only useful
@@ -609,16 +611,18 @@ const OrderListRow = React.memo(function OrderListRow({
       disabled={selectionMode}
       accessibilityLabel={`${swipeAction.label} order ${order.orderNumber}`}
     >
-      <OrderRow
-        order={order}
-        selected={selected}
-        selectionMode={selectionMode}
-        onPress={() => actions.press(order)}
-        onPressIn={() => actions.pressIn(order)}
-        onLongPress={() => actions.longPress(order.id)}
-        onShip={() => actions.ship(order.id)}
-        isLast={isLast}
-      />
+      <View style={current ? { borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: theme.text } : undefined} accessibilityState={current ? { selected: true } : undefined}>
+        <OrderRow
+          order={order}
+          selected={selected}
+          selectionMode={selectionMode}
+          onPress={() => actions.press(order)}
+          onPressIn={() => actions.pressIn(order)}
+          onLongPress={() => actions.longPress(order.id)}
+          onShip={() => actions.ship(order.id)}
+          isLast={isLast}
+        />
+      </View>
     </SwipeActionRow>
   );
 });
@@ -685,7 +689,7 @@ export default function OrdersScreen() {
   const { width: windowWidth, isTablet } = useResponsive();
   // Not inside the web preview's centred 640pt column (components/web/WebAppShell).
   const isWebShell = useIsWebShell();
-  const splitView = isTablet && !isWebShell && windowWidth >= SPLIT_MIN_WIDTH;
+  const splitCapable = isTablet && !isWebShell && windowWidth >= SPLIT_MIN_WIDTH;
   const [splitOrderId, setSplitOrderId] = useState<string | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -693,8 +697,6 @@ export default function OrdersScreen() {
   // Extra centering padding beyond each row's own SP.md gutter — 0 on phone,
   // grows on iPad so the list doesn't stretch edge to edge.
   const centeredPad = Math.max(0, useCenteredContentPadding() - SP.md);
-  // In the split the list owns a fixed column, so no tablet centring inside it.
-  const listSidePad = splitView ? 0 : centeredPad;
   const tabBarMetrics = useTabBarMetrics();
 
   const api = useApi();
@@ -721,6 +723,10 @@ export default function OrdersScreen() {
   })();
 
   const [orders, setOrders] = useState<OrderListOrder[]>([]);
+  // Split only once there are orders; with none, the list's empty state keeps the full width.
+  const splitView = splitCapable && orders.length > 0;
+  // In the split the list owns a fixed column, so no tablet centring inside it.
+  const listSidePad = splitView ? 0 : centeredPad;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatesPaused, setUpdatesPaused] = useState(false);
@@ -1082,9 +1088,10 @@ export default function OrdersScreen() {
         selected={selectedIdSet.has(item.order.id)}
         selectionMode={selectionMode}
         actions={rowActions}
+        current={splitView && item.order.id === (splitOrderId ?? orders[0]?.id)}
       />
     );
-  }, [s, selectedIdSet, selectionMode, rowActions]);
+  }, [s, selectedIdSet, selectionMode, rowActions, splitView, splitOrderId, orders]);
 
   const keyExtractor = useCallback((row: OrderListItem) => row.key, []);
   const getItemType = useCallback((row: OrderListItem) => row.type, []);
