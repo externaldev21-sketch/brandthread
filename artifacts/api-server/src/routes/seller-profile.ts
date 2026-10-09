@@ -11,7 +11,7 @@ import { z } from "@workspace/api-zod";
 import { bodyObject, validateInput } from "../lib/commerceValidation";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
-import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
+import { isUsernameUniqueViolation } from "../lib/dbErrors";
 import {
   normalizeSocialLink,
   normalizeStoreAccent,
@@ -351,7 +351,7 @@ router.put("/identity", validateInput({ body: identityBody }), async (req, res):
     res.json(updated);
   } catch (err) {
     // The pre-check races with concurrent claims; the unique index decides.
-    if (isUniqueViolation(err) && violatedConstraint(err) === "users_username_ci_unique") {
+    if (isUsernameUniqueViolation(err)) {
       res.status(409).json({ error: "That handle is already taken.", code: "USERNAME_TAKEN", field: "handle" });
       return;
     }

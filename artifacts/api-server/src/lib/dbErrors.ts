@@ -9,3 +9,15 @@ export function violatedConstraint(error: unknown): string | undefined {
   const err = error as { constraint?: string; cause?: { constraint?: string } } | null | undefined;
   return err?.constraint ?? err?.cause?.constraint;
 }
+
+/**
+ * A unique violation on a users.username index: the case-insensitive
+ * `users_username_ci_unique` (migration 109) or the plain unique constraint
+ * drizzle declares on the column (`users_username_unique` / legacy
+ * `users_username_key`), whichever Postgres happens to check first.
+ */
+export function isUsernameUniqueViolation(error: unknown): boolean {
+  if (!isUniqueViolation(error)) return false;
+  const constraint = violatedConstraint(error);
+  return typeof constraint === "string" && /^users_username/.test(constraint);
+}

@@ -3,6 +3,7 @@
  * No DB / network access, so it is unit-testable without a database — the
  * routes in routes/conversations.ts load the rows and feed them in here.
  */
+import { resolveDmMediaRef, type DmMediaContext } from "./dmMedia";
 
 // ── Upload limits ────────────────────────────────────────────────────────────
 
@@ -101,20 +102,54 @@ export function magicBytesMatch(mime: string, b: Uint8Array): boolean {
 
 // ── Media attachment shape ───────────────────────────────────────────────────
 
-export type MediaAttachmentCheck = { ok: true } | { ok: false; error: string };
+export type MediaAttachmentCheck =
+  | {
+      ok: true;
+      /** What to store for `uri` (canonical private path, or the legacy URL unchanged). */
+      uri?: string;
+      /** What to store for `meta.photoUris` (same normalization), when present. */
+      photoUris?: string;
+    }
+  | { ok: false; error: string };
 
-/** image/video/voice attachments: https uri (ours when a bucket is configured) + sane duration. */
+/** A multi-photo message carries its photos in meta.photoUris (a JSON string array). */
+const MAX_PHOTO_URIS = 10;
+
+/**
+ * image/video/voice attachments: an upload-media reference (the canonical
+ * private path, our signed URL for it, or a legacy public bucket URL) + sane
+ * duration. `ctx` may be a bare bucket id (legacy callers) or the full
+ * DmMediaContext; the normalized values to store are returned.
+ */
 export function validateMediaAttachment(
   att: { type?: string; uri?: unknown; meta?: Record<string, unknown> | null },
-  bucketId: string,
+  ctx: string | DmMediaContext,
 ): MediaAttachmentCheck {
   if (att.type !== "image" && att.type !== "video" && att.type !== "voice") return { ok: true };
+  const context: DmMediaContext = typeof ctx === "string" ? { bucketId: ctx, privateDir: "", cdnBase: null } : ctx;
   const uri = att.uri;
-  if (typeof uri !== "string" || !/^https:\/\//i.test(uri)) {
+  if (typeof uri !== "string" || !(/^https:\/\//i.test(uri) || uri.startsWith("/"))) {
     return { ok: false, error: `${att.type} attachment requires an uploaded https uri.` };
   }
-  if (bucketId && !uri.startsWith(`https://storage.googleapis.com/${bucketId}/`)) {
+  const ref = resolveDmMediaRef(uri, context);
+  if (!ref.ok) {
     return { ok: false, error: `${att.type} attachment must be uploaded through upload-media.` };
+  }
+  let photoUris: string | undefined;
+  const rawPhotos = att.meta?.photoUris;
+  if (rawPhotos != null && rawPhotos !== "") {
+    let list: unknown;
+    try { list = typeof rawPhotos === "string" ? JSON.parse(rawPhotos) : rawPhotos; } catch { list = null; }
+    if (!Array.isArray(list) || list.length > MAX_PHOTO_URIS) {
+      return { ok: false, error: "Invalid photo list." };
+    }
+    const normalized: string[] = [];
+    for (const item of list) {
+      const r = resolveDmMediaRef(item, context);
+      if (!r.ok) return { ok: false, error: `${att.type} attachment must be uploaded through upload-media.` };
+      normalized.push(r.value);
+    }
+    photoUris = JSON.stringify(normalized);
   }
   if (att.type === "voice" || att.type === "video") {
     const raw = att.meta?.duration;
@@ -132,7 +167,7 @@ export function validateMediaAttachment(
       }
     }
   }
-  return { ok: true };
+  return { ok: true, uri: ref.value, ...(photoUris !== undefined ? { photoUris } : {}) };
 }
 
 // ── Shared entity access ─────────────────────────────────────────────────────

@@ -226,6 +226,16 @@ export function createProductVideosRouter({
         const renderedError = productVideoDurationError(renderedSeconds);
         if (renderedError) return res.status(400).json({ error: renderedError, code: "video_too_long" });
 
+        // Automatic frame screening before anything is stored or made public
+        // (off when the AI integration env is missing; a screening outage
+        // never blocks the upload). No held state here, so flagged is refused.
+        const { screenVideo, MEDIA_REJECTED_MESSAGE } = await import("../lib/mediaModeration");
+        const screened = await screenVideo({ buffer: bytes });
+        if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
+          void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId, surface: "product_video", verdict: { ...screened, verdict: "reject" } })).catch(() => {});
+          return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
+        }
+
         const videoPath = await storage.createObjectEntityFromBuffer(await fs.readFile(output), "video/mp4");
         created.push(videoPath);
         const posterPath = await storage.createObjectEntityFromBuffer(await fs.readFile(poster), "image/jpeg");

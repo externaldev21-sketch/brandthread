@@ -3,6 +3,9 @@ import {
   follows, posts, savedItems, buyerAddresses, blocks,
 } from "@workspace/db";
 import { eq, inArray, or, asc } from "drizzle-orm";
+import { signDmMessageMedia } from "./dmMedia";
+
+const DM_MEDIA_EXPORT_URL_TTL_SEC = 7 * 24 * 60 * 60;
 
 export const INSTANT_EXPORT_CATEGORIES = ["profile", "orders", "messages"] as const;
 export const EMAIL_EXPORT_CATEGORIES = [
@@ -91,6 +94,10 @@ export async function buildAccountDataExport(
           createdAt: messages.createdAt,
         }).from(messages).where(inArray(messages.conversationId, conversationIds)).orderBy(asc(messages.createdAt))
       : [];
+    // Private DM media is exported as signed URLs (the account is a participant
+    // of every conversation listed); 7 days, the longest a signed URL can live,
+    // so an emailed export is still usable after it is downloaded.
+    await signDmMessageMedia(messageRows, { ttlSec: DM_MEDIA_EXPORT_URL_TTL_SEC });
     result.messages = { conversations: conversationRows, messages: messageRows };
   }
 
