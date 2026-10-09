@@ -53,7 +53,12 @@ export function splitFullName(fullName: string): { firstName: string; lastName: 
   return { firstName: clean.slice(0, space), lastName: clean.slice(space + 1) };
 }
 
-export function ShippingSection({
+/**
+ * Memoized: on the checkout screen, typing in the contact fields (or any other
+ * state change elsewhere) doesn't re-render the address form unless its own
+ * props changed.
+ */
+export const ShippingSection = React.memo(function ShippingSection({
   address, onChange, savedAddresses, onSelectSaved, canSaveAddresses, showErrors,
 }: {
   address: CheckoutAddressDraft;
@@ -215,7 +220,7 @@ export function ShippingSection({
       {!hasSaved || usingNew ? form : null}
     </CheckoutSection>
   );
-}
+});
 
 function makeStyles(ck: CheckoutColors) {
   return StyleSheet.create({

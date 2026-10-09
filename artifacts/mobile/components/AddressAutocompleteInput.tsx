@@ -29,7 +29,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 
 import { useApi } from '@/hooks/useApi';
-import { useDeferredTextInput } from '@/hooks/useDeferredTextInput';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -86,9 +85,6 @@ export function AddressAutocompleteInput({
   const [query, setQuery] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const requestGeneration = useRef(0);
-  // The field draws each keystroke itself; the checkout screen that owns
-  // `value` re-renders in a transition (see useDeferredTextInput).
-  const field = useDeferredTextInput(value, onChangeText);
 
   useEffect(() => {
     const trimmed = query?.trim() ?? '';
@@ -120,7 +116,7 @@ export function AddressAutocompleteInput({
   function handleChangeText(text: string) {
     setResolveError(null);
     setQuery(text);
-    field.onChangeText(text);
+    onChangeText(text);
   }
 
   function retry() {
@@ -159,7 +155,7 @@ export function AddressAutocompleteInput({
       <View style={styles.inputWrap}>
         <Feather name="search" size={17} color={theme.muted} />
         <TextInput
-          value={field.text}
+          value={value}
           onChangeText={handleChangeText}
           placeholder="Start typing your address"
           placeholderTextColor={theme.subtle}

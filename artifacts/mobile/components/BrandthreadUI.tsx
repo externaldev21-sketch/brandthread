@@ -41,7 +41,6 @@ import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { EmptyStateBadge, EMPTY_STATE_BADGE_SIZE } from '@/components/layout/EmptyStateBadge';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { useDeferredTextInput } from '@/hooks/useDeferredTextInput';
 import { useFocusedAnimationLoop } from '@/lib/useFocusedAnimationLoop';
 import { radius } from '@/constants/radii';
 
@@ -1094,17 +1093,14 @@ export function FormInput({
 }: FormInputProps) {
   const [focused, setFocused] = useState(false);
   const { theme } = useAppTheme();
-  // The field draws each keystroke itself; the owning form re-renders in a
-  // transition so a heavy form never makes typing lag.
-  const field = useDeferredTextInput(value, onChange);
   return (
     <View style={[fiS.wrap, style]}>
       {label && <Text style={[fiS.label, { color: theme.muted }]}>{label}</Text>}
       <View style={[fiS.inputRow, { backgroundColor: theme.card, borderColor: theme.border }, focused && [fiS.focusedRow, { borderColor: theme.accent }], !!error && { borderColor: theme.error }, multiline && fiS.multilineRow]}>
         <TextInput
           style={[fiS.input, { color: theme.text }, multiline && fiS.multilineInput, WEB_INPUT_RESET]}
-          value={field.text}
-          onChangeText={field.onChangeText}
+          value={value}
+          onChangeText={onChange}
           placeholder={placeholder}
           placeholderTextColor={SUBTLE}
           multiline={multiline}

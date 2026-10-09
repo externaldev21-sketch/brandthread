@@ -22,7 +22,6 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { COMP, FONT, FS, SP } from '@/lib/theme';
-import { useDeferredTextInput } from '@/hooks/useDeferredTextInput';
 
 /** The checkout's palette, derived from the active app theme. */
 export function useCheckoutColors() {
@@ -196,16 +195,13 @@ export function CheckoutField({
   const [focused, setFocused] = useState(false);
   const [blurred, setBlurred] = useState(false);
   const visibleError = error && (showError || blurred) ? error : undefined;
-  // Typing is drawn by the field itself; the checkout screen re-renders in a
-  // transition, so the big screen never makes a keystroke lag.
-  const field = useDeferredTextInput(value, onChangeText);
   return (
     <View style={[styles.field, style]}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         {...inputProps}
-        value={field.text}
-        onChangeText={field.onChangeText}
+        value={value}
+        onChangeText={onChangeText}
         onFocus={(event) => { setFocused(true); inputProps.onFocus?.(event); }}
         onBlur={(event) => { setFocused(false); setBlurred(true); inputProps.onBlur?.(event); }}
         placeholderTextColor={ck.subtle}
