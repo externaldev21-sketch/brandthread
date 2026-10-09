@@ -32,6 +32,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, count, gte, desc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { scheduleJob } from "./runner";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -413,11 +414,6 @@ export function isCacheFresh(computedAt: Date): boolean {
 // ─── Scheduler ───────────────────────────────────────────────────────────────
 
 export function startTrendingJob(): void {
-  // Run 2 minutes after startup (warms the cache on fresh deploys / restarts).
-  setTimeout(() => computeTrendingForToday(), 2 * 60 * 1000);
-
-  // Then recompute every 24 h.
-  setInterval(() => computeTrendingForToday(), INTERVAL_24H_MS);
-
-  logger.info({ job: "computeTrending", intervalMs: INTERVAL_24H_MS, initialDelayMs: 2 * 60 * 1000 }, "Trending job scheduled");
+  // Run 2 minutes after startup (warms the cache on fresh deploys / restarts), then every 24 h.
+  scheduleJob("computeTrending", () => computeTrendingForToday(), { intervalMs: INTERVAL_24H_MS, initialDelayMs: 2 * 60 * 1000 });
 }

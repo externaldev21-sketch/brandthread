@@ -65,6 +65,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, count, gte, sql, isNull } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { scheduleJob } from "./runner";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -553,14 +554,6 @@ export function isSellerRankingCacheFresh(computedAt: Date): boolean {
 // ─── Scheduler ───────────────────────────────────────────────────────────────
 
 export function startSellerRankingJob(): void {
-  // Run 2 minutes after startup (warms the cache on fresh deploys / restarts).
-  setTimeout(() => computeSellerRankingForToday(), 2 * 60 * 1000);
-
-  // Then recompute every 24 h.
-  setInterval(() => computeSellerRankingForToday(), INTERVAL_24H_MS);
-
-  logger.info(
-    { job: "computeSellerRanking", intervalMs: INTERVAL_24H_MS, initialDelayMs: 2 * 60 * 1000 },
-    "Seller ranking job scheduled",
-  );
+  // Run 2 minutes after startup (warms the cache on fresh deploys / restarts), then every 24 h.
+  scheduleJob("computeSellerRanking", () => computeSellerRankingForToday(), { intervalMs: INTERVAL_24H_MS, initialDelayMs: 2 * 60 * 1000 });
 }

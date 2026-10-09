@@ -6,6 +6,7 @@
 import { logger } from "../lib/logger";
 import { getEmailProvider } from "../lib/emailMarketing/provider";
 import { processDueCampaigns } from "../lib/emailMarketing/sender";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 60_000;
 let running = false;
@@ -23,6 +24,5 @@ export async function runEmailCampaignJob(): Promise<void> {
 }
 
 export function startEmailCampaignJob(): void {
-  const timer = setInterval(() => { void runEmailCampaignJob(); }, INTERVAL_MS);
-  timer.unref?.();
+  scheduleJob("emailCampaigns", () => runEmailCampaignJob(), { intervalMs: INTERVAL_MS });
 }

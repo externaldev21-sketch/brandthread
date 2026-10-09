@@ -1,5 +1,6 @@
 import { logger } from "../lib/logger";
 import { runProductLaunches } from "../lib/productLaunch";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 60 * 1000;
 
@@ -15,7 +16,5 @@ export async function runProductLaunchJob(now = new Date()): Promise<void> {
 }
 
 export function startProductLaunchJob(): void {
-  void runProductLaunchJob();
-  setInterval(() => void runProductLaunchJob(), INTERVAL_MS);
-  logger.info({ job: "productLaunches", intervalMs: INTERVAL_MS }, "Product launch job scheduled");
+  scheduleJob("productLaunches", () => runProductLaunchJob(), { intervalMs: INTERVAL_MS, initialDelayMs: 0 });
 }

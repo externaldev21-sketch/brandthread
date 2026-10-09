@@ -1,5 +1,5 @@
-import { logger } from "../lib/logger";
 import { pollStoppingRecordings } from "../lib/liveReplay";
+import { scheduleJob } from "./runner";
 
 /**
  * Agora Cloud Recording finishes uploading to the storage bucket some time
@@ -15,15 +15,5 @@ import { pollStoppingRecordings } from "../lib/liveReplay";
 const INTERVAL_MS = 20_000;
 
 export function startLiveRecordingFinalizeJob(): void {
-  setTimeout(() => {
-    void pollStoppingRecordings().catch((err) =>
-      logger.error({ err, job: "liveRecordingFinalize" }, "Live recording finalize job failed"),
-    );
-  }, 10_000);
-  setInterval(() => {
-    void pollStoppingRecordings().catch((err) =>
-      logger.error({ err, job: "liveRecordingFinalize" }, "Live recording finalize job failed"),
-    );
-  }, INTERVAL_MS).unref?.();
-  logger.info({ job: "liveRecordingFinalize", intervalMs: INTERVAL_MS }, "Live recording finalize job scheduled");
+  scheduleJob("liveRecordingFinalize", () => pollStoppingRecordings(), { intervalMs: INTERVAL_MS, initialDelayMs: 10_000 });
 }
