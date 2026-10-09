@@ -1473,6 +1473,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="content" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="ai-helper" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="notification-settings-page" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="notification-channels" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="help"             options={{ headerShown: false }} />
         <Stack.Screen name="bg-removal"       options={{ headerShown: false }} />

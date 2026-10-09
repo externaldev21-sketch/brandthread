@@ -74,7 +74,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Notifications',
     items: [
-      { label: 'Notifications', description: 'Manage push notification preferences', aliases: ['alerts', 'push'], icon: 'bell', route: '/push-notifications', audience: 'buyer' },
+      { label: 'Notifications', description: 'Manage push notification preferences', aliases: ['alerts', 'push'], icon: 'bell', route: '/notifications-settings', audience: 'buyer' },
     ],
   },
   {

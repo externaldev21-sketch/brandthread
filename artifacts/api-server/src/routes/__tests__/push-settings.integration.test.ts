@@ -95,11 +95,11 @@ describe("push settings + multi-account push", () => {
   });
 
   it("returns the Instagram-style settings for the account type", async () => {
-    const buyer = await (await as(A, "/api/notification-prefs")).json();
+    const buyer = await (await as(A, "/api/notification-prefs")).json() as any;
     expect(buyer.pausedUntil).toBeNull();
     expect(buyer.pushTypes).toMatchObject({ likes: "everyone", comments: "everyone", shipped: "everyone", delivered: "everyone" });
     expect(buyer.pushTypes.new_orders).toBeUndefined();
-    const seller = await (await as(B, "/api/notification-prefs")).json();
+    const seller = await (await as(B, "/api/notification-prefs")).json() as any;
     expect(seller.pushTypes).toMatchObject({ new_orders: "everyone", payouts: "everyone", reviews: "everyone", manufacturer_messages: "everyone" });
     expect(seller.pushTypes.shipped).toBeUndefined();
   });
@@ -110,7 +110,7 @@ describe("push settings + multi-account push", () => {
     expect((await as(A, "/api/notification-prefs", { method: "PUT", body: JSON.stringify({ pushTypes: { payouts: "off" } }) })).status).toBe(400); // seller-only
     expect((await as(A, "/api/notification-prefs", { method: "PUT", body: JSON.stringify({ pause: { minutes: 7 } }) })).status).toBe(400);
 
-    const saved = await (await as(A, "/api/notification-prefs", { method: "PUT", body: JSON.stringify({ pushTypes: { likes: "following", messages: "off" }, pause: { minutes: 60 } }) })).json();
+    const saved = await (await as(A, "/api/notification-prefs", { method: "PUT", body: JSON.stringify({ pushTypes: { likes: "following", messages: "off" }, pause: { minutes: 60 } }) })).json() as any;
     expect(saved.pushTypes).toMatchObject({ likes: "following", messages: "off" });
     const until = new Date(saved.pausedUntil).getTime();
     expect(until).toBeGreaterThan(Date.now() + 59 * 60_000);
@@ -118,8 +118,17 @@ describe("push settings + multi-account push", () => {
     // Booleans stay booleans in `categories` (pushType:* values aren't leaked there).
     expect(Object.values(saved.categories).every((v) => typeof v === "boolean")).toBe(true);
 
-    const resumed = await (await as(A, "/api/notification-prefs", { method: "PUT", body: JSON.stringify({ pause: null }) })).json();
+    const resumed = await (await as(A, "/api/notification-prefs", { method: "PUT", body: JSON.stringify({ pause: null }) })).json() as any;
     expect(resumed.pausedUntil).toBeNull();
+  });
+
+  it("turning a type on clears the old coarse switch that would still block it", async () => {
+    await as(A, "/api/notification-prefs", { method: "PUT", body: JSON.stringify({ categories: { order_updates: false } }) });
+    await as(A, "/api/push/register", { method: "POST", body: JSON.stringify({ token: DEVICE, platform: "ios" }) });
+    expect(await sendPushToUser(A, { title: "s", body: "", data: { type: "order_shipped" } }, "order")).toBe(false);
+    const saved = await (await as(A, "/api/notification-prefs", { method: "PUT", body: JSON.stringify({ pushTypes: { shipped: "everyone" } }) })).json() as any;
+    expect(saved.categories.order_updates).toBe(true);
+    expect(await sendPushToUser(A, { title: "s", body: "", data: { type: "order_shipped" } }, "order")).toBe(true);
   });
 
   it("Pause all stops pushes until it ends", async () => {

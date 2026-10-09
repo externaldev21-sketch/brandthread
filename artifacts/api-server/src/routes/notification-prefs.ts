@@ -21,6 +21,7 @@ import { db, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { channelView, parseChannelKey, channelPrefKey } from "../lib/notificationChannels";
+import { preferenceKey } from "../lib/push";
 import { PAUSE_DURATIONS_MINUTES, PUSH_TYPE_PREF_PREFIX, isPushPaused, isValidValueFor, pushTypeDefByKey, pushTypeView } from "../lib/pushTypes";
 
 const router = Router();
@@ -215,6 +216,12 @@ router.put("/", async (req, res) => {
         return res.status(400).json({ error: `Invalid notification setting: ${key}` });
       }
       patch[`${PUSH_TYPE_PREF_PREFIX}${key}`] = value;
+      // The per-type pages replace the old coarse switches. Turning a type on
+      // must not stay blocked by a coarse switch that has no screen any more.
+      if (value !== "off") {
+        const coarse = preferenceKey(current.accountType, def.category);
+        if (coarse) patch[coarse] = true;
+      }
     }
     for (const [key, value] of Object.entries(categories ?? {})) {
       if (!allowed.has(key) || typeof value !== "boolean") {

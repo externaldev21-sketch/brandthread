@@ -16,6 +16,8 @@ export type PushTypeValue = "off" | "following" | "everyone";
 
 export interface PushTypeDef {
   key: string;
+  /** The coarse push category (lib/push.ts PushEventCategory) these types belong to. */
+  category: "social" | "message" | "live" | "order" | "return" | "payout";
   /** Allows "From profiles I follow" in addition to Off / On. */
   audience: boolean;
   /** Only shown to / applied for this account type. */
@@ -26,30 +28,30 @@ export interface PushTypeDef {
 
 export const PUSH_TYPE_DEFS: readonly PushTypeDef[] = [
   // Posts, stories and comments
-  { key: "likes", audience: true, types: ["post_like", "post_liked", "like", "story_like", "comment_like", "post_save"] },
-  { key: "comments", audience: true, types: ["post_comment", "comment_reply"] },
-  { key: "mentions", audience: true, types: ["mention", "story_mention", "post_tag", "comment_mention"] },
-  { key: "reposts", audience: false, types: ["repost", "story_reshare", "post_share", "quote_post"] },
+  { key: "likes", category: "social", audience: true, types: ["post_like", "post_liked", "like", "story_like", "comment_like", "post_save"] },
+  { key: "comments", category: "social", audience: true, types: ["post_comment", "comment_reply"] },
+  { key: "mentions", category: "social", audience: true, types: ["mention", "story_mention", "post_tag", "comment_mention"] },
+  { key: "reposts", category: "social", audience: false, types: ["repost", "story_reshare", "post_share", "quote_post"] },
   // Following and followers
-  { key: "new_followers", audience: false, types: ["new_follower", "follow_request"] },
-  { key: "accepted_follow_requests", audience: false, types: ["follow_request_accepted"] },
+  { key: "new_followers", category: "social", audience: false, types: ["new_follower", "follow_request"] },
+  { key: "accepted_follow_requests", category: "social", audience: false, types: ["follow_request_accepted"] },
   // Messages
-  { key: "messages", audience: false, types: ["new_friend_message", "new_order_message", "new_message", "story_reply"] },
-  { key: "message_reactions", audience: false, types: ["message_reaction"] },
-  { key: "manufacturer_messages", audience: false, role: "seller", types: ["manufacturer_message"] },
+  { key: "messages", category: "message", audience: false, types: ["new_friend_message", "new_order_message", "new_message", "story_reply"] },
+  { key: "message_reactions", category: "message", audience: false, types: ["message_reaction"] },
+  { key: "manufacturer_messages", category: "message", audience: false, role: "seller", types: ["manufacturer_message"] },
   // Calls
-  { key: "calls", audience: false, types: ["manufacturer_call_started", "incoming_call"] },
-  { key: "missed_calls", audience: false, types: ["missed_call", "manufacturer_call_missed"] },
+  { key: "calls", category: "message", audience: false, types: ["manufacturer_call_started", "incoming_call"] },
+  { key: "missed_calls", category: "message", audience: false, types: ["missed_call", "manufacturer_call_missed"] },
   // Live
-  { key: "live", audience: false, types: ["live_started", "live_reminder"] },
+  { key: "live", category: "live", audience: false, types: ["live_started", "live_reminder"] },
   // Orders and shopping
-  { key: "new_orders", audience: false, role: "seller", types: ["new_order_received"] },
-  { key: "order_updates", audience: false, role: "buyer", types: ["order_confirmed", "order_preparing", "order_exception", "order_returned_to_sender"] },
-  { key: "shipped", audience: false, role: "buyer", types: ["order_shipped", "order_out_for_delivery"] },
-  { key: "delivered", audience: false, role: "buyer", types: ["order_delivered"] },
-  { key: "returns_refunds", audience: false, types: ["return_requested", "return_request_received", "return_approved", "return_denied", "return_refunded", "order_auto_refunded", "order_auto_refunded_seller", "order_cancelled", "order_cancelled_by_buyer", "refund"] },
-  { key: "payouts", audience: false, role: "seller", types: ["payout_sent"] },
-  { key: "reviews", audience: false, role: "seller", types: ["new_review"] },
+  { key: "new_orders", category: "order", audience: false, role: "seller", types: ["new_order_received"] },
+  { key: "order_updates", category: "order", audience: false, role: "buyer", types: ["order_confirmed", "order_preparing", "order_exception", "order_returned_to_sender"] },
+  { key: "shipped", category: "order", audience: false, role: "buyer", types: ["order_shipped", "order_out_for_delivery"] },
+  { key: "delivered", category: "order", audience: false, role: "buyer", types: ["order_delivered"] },
+  { key: "returns_refunds", category: "return", audience: false, types: ["return_requested", "return_request_received", "return_approved", "return_denied", "return_refunded", "order_auto_refunded", "order_auto_refunded_seller", "order_cancelled", "order_cancelled_by_buyer", "refund"] },
+  { key: "payouts", category: "payout", audience: false, role: "seller", types: ["payout_sent"] },
+  { key: "reviews", category: "social", audience: false, role: "seller", types: ["new_review"] },
 ];
 
 const DEF_BY_KEY = new Map(PUSH_TYPE_DEFS.map((d) => [d.key, d]));
