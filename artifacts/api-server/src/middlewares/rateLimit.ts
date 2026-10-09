@@ -26,7 +26,10 @@ export type RateLimitPolicyName =
   | "gift-card-lookup"
   | "access-code"
   | "access-waitlist"
-  | "contact-match";
+  | "contact-match"
+  | "post-create"
+  | "review"
+  | "money-transfer";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -219,6 +222,32 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     windowMs: 60 * 60_000,
     message: "You've checked contacts a lot. Please try again later.",
   },
+  "post-create": {
+    id: "post-create",
+    // Publishing posts/threads. A real creator posts a handful an hour; a
+    // script filling feeds with spam hits this long before the mutation cap.
+    limit: scaled(15),
+    windowMs: 10 * 60_000,
+    ipLimit: scaled(60),
+    message: "You're posting a lot. Please wait a few minutes and try again.",
+  },
+  review: {
+    id: "review",
+    // Writing reviews and seller replies to reviews.
+    limit: scaled(10),
+    windowMs: 10 * 60_000,
+    ipLimit: scaled(40),
+    message: "Too many reviews submitted. Please wait a few minutes and try again.",
+  },
+  "money-transfer": {
+    id: "money-transfer",
+    // Thread Cash sends and cash-outs. Each is also idempotent per request,
+    // this bounds a compromised session draining a balance in a loop.
+    limit: scaled(20),
+    windowMs: 10 * 60_000,
+    ipLimit: scaled(60),
+    message: "Too many transfers. Please wait a few minutes and try again.",
+  },
 };
 
 const EXPENSIVE_PATH =
@@ -230,6 +259,12 @@ const UPLOAD_CONTENT_TYPE = /^(?:image|video|audio)\/|^application\/(?:pdf|octet
 const AUTH_PATH = /\/auth(?:\/|$)/;
 const CHECKOUT_PATH = /\/(?:guest\/checkout|buyer\/checkout|checkout)(?:\/|$)/;
 const WEBHOOK_PATH = /\/webhooks(?:\/|$)/;
+// Thread Cash sends and cash-outs move a balance to someone else or to a bank.
+const MONEY_TRANSFER_PATH = /\/thread-cash\/(?:send|cash-out)\/?$/;
+// Publishing a post/thread (POST /posts, not the per-post sub-routes).
+const POST_CREATE_PATH = /\/posts\/?$/;
+// Writing a review or a seller's reply to one.
+const REVIEW_WRITE_PATH = /\/reviews(?:\/[^/]+\/reply)?\/?$/;
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export function normalizeClientIp(value: string | undefined): string {
@@ -280,6 +315,11 @@ export function rateLimitPolicyFor(
   ) {
     return RATE_LIMIT_POLICIES.upload;
   }
+  if (method === "POST" && MONEY_TRANSFER_PATH.test(path)) {
+    return RATE_LIMIT_POLICIES["money-transfer"];
+  }
+  if (method === "POST" && POST_CREATE_PATH.test(path)) return RATE_LIMIT_POLICIES["post-create"];
+  if (method === "POST" && REVIEW_WRITE_PATH.test(path)) return RATE_LIMIT_POLICIES.review;
   if (MUTATION_METHODS.has(method)) return RATE_LIMIT_POLICIES.mutation;
   if (authenticated && (method === "GET" || method === "HEAD")) {
     return RATE_LIMIT_POLICIES["authenticated-read"];
