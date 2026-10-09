@@ -246,6 +246,17 @@ describe("abuse-prone write policies", () => {
     expect(rateLimitPolicyFor("GET", "/api/v1/thread-cash/send", true)?.id).toBe("authenticated-read");
   });
 
+  it("routes post creation and review writes to their own buckets", () => {
+    expect(rateLimitPolicyFor("POST", "/api/v1/posts", true)?.id).toBe("post-create");
+    expect(rateLimitPolicyFor("POST", "/api/posts/", true)?.id).toBe("post-create");
+    expect(rateLimitPolicyFor("POST", "/api/v1/posts/abc/interact", true)?.id).toBe("mutation");
+    expect(rateLimitPolicyFor("PATCH", "/api/v1/posts/abc", true)?.id).toBe("mutation");
+    expect(rateLimitPolicyFor("POST", "/api/v1/reviews", true)?.id).toBe("review");
+    expect(rateLimitPolicyFor("POST", "/api/v1/reviews/r1/reply", true)?.id).toBe("review");
+    expect(rateLimitPolicyFor("PUT", "/api/v1/reviews/r1/helpful", true)?.id).toBe("mutation");
+    expect(rateLimitPolicyFor("POST", "/api/v1/reviews/photos", true, "image/jpeg")?.id).toBe("upload");
+  });
+
   it("caps post creation, reviews and Thread Cash transfers per account and per IP", () => {
     expect(RATE_LIMIT_POLICIES["post-create"]).toMatchObject({ limit: 15, windowMs: 10 * 60_000, ipLimit: 60 });
     expect(RATE_LIMIT_POLICIES.review).toMatchObject({ limit: 10, windowMs: 10 * 60_000, ipLimit: 40 });

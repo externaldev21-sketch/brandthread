@@ -261,6 +261,10 @@ const CHECKOUT_PATH = /\/(?:guest\/checkout|buyer\/checkout|checkout)(?:\/|$)/;
 const WEBHOOK_PATH = /\/webhooks(?:\/|$)/;
 // Thread Cash sends and cash-outs move a balance to someone else or to a bank.
 const MONEY_TRANSFER_PATH = /\/thread-cash\/(?:send|cash-out)\/?$/;
+// Publishing a post/thread (POST /posts, not the per-post sub-routes).
+const POST_CREATE_PATH = /\/posts\/?$/;
+// Writing a review or a seller's reply to one.
+const REVIEW_WRITE_PATH = /\/reviews(?:\/[^/]+\/reply)?\/?$/;
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export function normalizeClientIp(value: string | undefined): string {
@@ -314,6 +318,8 @@ export function rateLimitPolicyFor(
   if (method === "POST" && MONEY_TRANSFER_PATH.test(path)) {
     return RATE_LIMIT_POLICIES["money-transfer"];
   }
+  if (method === "POST" && POST_CREATE_PATH.test(path)) return RATE_LIMIT_POLICIES["post-create"];
+  if (method === "POST" && REVIEW_WRITE_PATH.test(path)) return RATE_LIMIT_POLICIES.review;
   if (MUTATION_METHODS.has(method)) return RATE_LIMIT_POLICIES.mutation;
   if (authenticated && (method === "GET" || method === "HEAD")) {
     return RATE_LIMIT_POLICIES["authenticated-read"];
