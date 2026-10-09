@@ -212,6 +212,7 @@ router.get("/for-you", requireAuth, async (req, res) => {
         thumbnailUrl: post.thumbnailUrl,
         mediaUrls: post.mediaUrls,
         mediaType: post.mediaType,
+        videoHlsUrl: post.videoHlsUrl ?? null,
         aspectRatio: post.aspectRatio,
         caption: post.caption,
         hashtags: post.hashtags,

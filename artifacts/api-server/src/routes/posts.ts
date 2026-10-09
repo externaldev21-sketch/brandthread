@@ -27,6 +27,7 @@ import { validateSlideOverlays } from "../lib/slideValidation";
 import { notifyPostLike, notifyPostShare, notifyRepost } from "../lib/activityEvents";
 import { MAX_DRAFTS_PER_USER, onPostPublished, scheduleWindowError } from "../lib/postPublish";
 import { scheduleAutoCaptions } from "../lib/captions";
+import { scheduleHlsTranscode, scheduleMuxAssetRemoval } from "../lib/muxVideo";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -1031,6 +1032,10 @@ router.post("/", requireAuth, async (req, res) => {
   if (post.mediaType === "video" && postStatus === "published" && !captionHeld) {
     scheduleAutoCaptions(post.id);
   }
+  // HLS streaming copy: additive, fire-and-forget, no-op unless MUX_* env is set.
+  if (post.mediaType === "video" && postStatus === "published" && !postHeld) {
+    scheduleHlsTranscode(post.id, singleVideo ? slideRecords[0].path : mediaPath);
+  }
 
   return res.status(201).json({
     ...withQuote,
@@ -1458,6 +1463,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
     .where(and(eq(posts.id, id), eq(posts.userId, clerkId)))
     .returning({ id: posts.id });
   if (!deleted) return res.status(404).json({ error: "Post not found" });
+  scheduleMuxAssetRemoval(existing.videoMuxAssetId);
 
   // Fire-and-forget: clean up all composed slide media paths
   const slidePaths = [
