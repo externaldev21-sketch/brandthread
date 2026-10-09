@@ -1622,8 +1622,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     logo: {
       generate: (brandName: string, style: string) => postExpensive<any>('/api/logo/generate', { brandName, style }),
-      onboardingSample: (brandName: string, style: string) =>
-        postExpensive<{ b64_json: string }>('/api/onboarding-sample/logo', { brandName, style }),
+      onboardingSample: (brandName: string, style: string, deviceId?: string) =>
+        postExpensive<{ b64_json: string }>('/api/onboarding-sample/logo', { brandName, style, ...(deviceId ? { deviceId } : {}) }),
     },
     mockup: {
       generate: (
