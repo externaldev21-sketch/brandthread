@@ -15,7 +15,10 @@
  *  - Fail-open: any store error is treated as a miss.
  *
  * Invalidation: TTL expiry, plus invalidateResponseCache(name, id) for entries
- * keyed by an id (see `idKey`).
+ * keyed by an id (see `idKey`), plus bumpResponseCacheGeneration(name) for
+ * URL-keyed entries that opt into `generational` (a new product must show in
+ * search on the next request, not after the TTL). Blocking or unblocking clears
+ * the "has any blocks" memo for both people (forgetViewerBlocksMemo).
  */
 import { createHash } from "node:crypto";
 import type { Request, RequestHandler, Response } from "express";
@@ -36,6 +39,8 @@ export type ResponseCacheOptions = {
   idKey?: (req: Request) => string | undefined;
   /** Bypass the cache for a request. */
   skip?: (req: Request) => boolean;
+  /** Key entries by a namespace generation so bumpResponseCacheGeneration(name) drops them all at once. */
+  generational?: boolean;
 };
 
 type Stored = { status: 200; body: unknown; cacheControl?: string };
@@ -63,9 +68,15 @@ function viewerIdOf(req: Request): string | null {
   try { return getAuth(req).userId ?? null; } catch { return null; }
 }
 
+const blocksMemoKey = (viewerId: string) => `rc:hasblocks:${viewerId}`;
+const generationKey = (name: string) => `rc:gen:${name}`;
+// Generations outlive any entry's TTL; if one expires, the namespace simply
+// restarts at "0", whose entries are long gone by then.
+const GENERATION_TTL_SECONDS = 7 * 24 * 60 * 60;
+
 async function hasBlocks(viewerId: string): Promise<boolean> {
   const store = getCacheStore();
-  const memoKey = `rc:hasblocks:${viewerId}`;
+  const memoKey = blocksMemoKey(viewerId);
   const memo = store ? await store.get(memoKey) : null;
   if (memo !== null) return memo === "1";
   const rows = (await db.execute(sql`
@@ -82,6 +93,17 @@ async function scopeIdFor(scope: Scope, req: Request): Promise<string> {
   return (await hasBlocks(viewer)) ? `u:${viewer}` : "all";
 }
 
+/** A block or unblock changes which entry these viewers must read; drop their memo. */
+export async function forgetViewerBlocksMemo(...viewerIds: string[]): Promise<void> {
+  if (viewerIds.length === 0) return;
+  await getCacheStore()?.del(...viewerIds.map(blocksMemoKey));
+}
+
+/** Drop every entry of a `generational` namespace (e.g. "search" after a product goes live). */
+export async function bumpResponseCacheGeneration(name: string): Promise<void> {
+  await getCacheStore()?.set(generationKey(name), `${Date.now()}`, GENERATION_TTL_SECONDS);
+}
+
 /** Drop an id-keyed entry (e.g. after a product edit) so the next read is fresh. */
 export async function invalidateResponseCache(name: string, id: string): Promise<void> {
   await getCacheStore()?.del(`rc:${name}:${id}`);
@@ -95,7 +117,9 @@ export function responseCache(opts: ResponseCacheOptions): RequestHandler {
 
     let key: string;
     try {
-      key = cacheKeyFor(opts, req, await scopeIdFor(opts.scope, req));
+      let scopeId = await scopeIdFor(opts.scope, req);
+      if (opts.generational) scopeId = `${scopeId}:g${(await store.get(generationKey(opts.name))) ?? "0"}`;
+      key = cacheKeyFor(opts, req, scopeId);
     } catch {
       next();
       return;

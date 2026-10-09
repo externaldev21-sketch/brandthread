@@ -22,7 +22,7 @@ describe('highlights wiring', () => {
   it('the story viewer plays a highlight without like / view / reply side effects', () => {
     const src = read('app/buyer-story-viewer.tsx');
     expect(src).toContain('api.social.highlight(String(highlightId))');
-    expect(src).toMatch(/if \(storyId && !highlightId\)/); // no view tracking on highlight items
+    expect(src).toMatch(/!myUserId \|\| highlightId \|\|/); // no view tracking on highlight items
     expect(src).toContain('isHighlight ? null');
   });
 

@@ -236,15 +236,22 @@ export default function BuyerStoryViewer() {
 
   useEffect(() => {
     loadStories();
-    if (storyId && !highlightId) {
-      trackStoryView(storyId).catch(() => {});
-      // Also record view server-side (fire-and-forget)
-      api.social.viewStory(storyId).catch(() => {});
-    }
     if (myUserId) {
       shouldShowStoryGestureGuide(myUserId).then(show => { if (show) setShowGestureGuide(true); });
     }
   }, []);
+
+  // Every story actually shown counts as seen on the server (once per story),
+  // not just the one the viewer was opened on, so the tray's seen ring matches
+  // on every device once the viewer has watched an author's whole reel.
+  const recordedViewsRef = useRef(new Set<string>());
+  useEffect(() => {
+    const id = currentStory?.id;
+    if (!id || !myUserId || highlightId || recordedViewsRef.current.has(id)) return;
+    if (currentStory.authorId === myUserId || currentStory.authorId === 'me') return;
+    recordedViewsRef.current.add(id);
+    trackStoryView(id).catch(() => { recordedViewsRef.current.delete(id); });
+  }, [currentStory?.id, currentStory?.authorId, myUserId, highlightId]);
 
   // Seed like state from server story data
   useEffect(() => {

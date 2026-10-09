@@ -27,6 +27,7 @@ import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { serveSponsoredSlots } from "../lib/promotions/sponsoredService";
 import { injectSponsored } from "../lib/promotions/sponsored";
+import { blockedUserIds } from "../lib/safety";
 
 const router = Router();
 
@@ -179,13 +180,14 @@ router.get("/for-you", requireAuth, async (req, res) => {
     const postById = new Map(postRows.map((p) => [p.id, p]));
     const liveById = new Map(liveRows.map((l) => [l.id, l]));
 
-    // Blocked-seller filtering already happened during candidate generation
-    // in computeForYouRankingForUser (via the `blocks` table), so this page
-    // hydration doesn't need to re-check it.
+    // Candidate generation already dropped blocked sellers, and a block clears
+    // the cached ranking (lib/relationshipCaches.ts). Re-checking here is one
+    // indexed query and keeps a block made by the *other* side mid-page honest.
+    const blockedIds = await blockedUserIds(userId);
     const rawItems = slice.map((item) => {
       if (item.isLive) {
         const stream = liveById.get(item.liveStreamId!);
-        if (!stream) return null;
+        if (!stream || blockedIds.has(stream.sellerId)) return null;
         const seller = sellerById.get(stream.sellerId);
         return {
           type: "live" as const,
@@ -202,7 +204,7 @@ router.get("/for-you", requireAuth, async (req, res) => {
         };
       }
       const post = postById.get(item.postId);
-      if (!post) return null;
+      if (!post || blockedIds.has(post.userId)) return null;
       const seller = sellerById.get(post.userId);
       return {
         type: "post" as const,
