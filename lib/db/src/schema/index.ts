@@ -1454,6 +1454,15 @@ export const buyerPreferences = pgTable('buyer_preferences', {
   updatedAt:         timestamp('updated_at').defaultNow().notNull(),
 });
 
+// ─── Account settings (follow the account across devices) ────────────────────
+// One row per Clerk user. `settings` is a shallow object of allowlisted keys
+// (see artifacts/api-server/src/lib/userSettings.ts); PATCH merges key-by-key.
+export const userSettings = pgTable('user_settings', {
+  userId:    text('user_id').primaryKey(), // Clerk user ID
+  settings:  jsonb('settings').$type<Record<string, unknown>>().notNull().default({}),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ─── Legal acceptance history ────────────────────────────────────────────────
 // One row per (account, legal document set version) the person agreed to, at
 // sign-up or from the "updated terms" prompt. users.terms_version /
