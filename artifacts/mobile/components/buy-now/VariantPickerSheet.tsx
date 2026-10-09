@@ -55,10 +55,16 @@ function isVariantComboAvailable(
 }
 
 export function VariantPickerSheet({
-  productId, initialProduct, onClose, onConfirm,
+  productId, initialProduct, initialVariantId, initialQuantity, confirmVerb = 'Add to bag', onClose, onConfirm,
 }: {
   productId: string;
   initialProduct?: BuyerProduct;
+  /** Editing an existing line (the bag): start on its current variant… */
+  initialVariantId?: string;
+  /** …and quantity. */
+  initialQuantity?: number;
+  /** Verb on the confirm button ("Add to bag", "Update"). */
+  confirmVerb?: string;
   onClose: () => void;
   onConfirm: (product: BuyerProduct, variant: BuyerProductVariant, quantity: number) => void | Promise<void>;
 }) {
@@ -69,7 +75,7 @@ export function VariantPickerSheet({
   const [loading, setLoading] = useState(!initialProduct);
   const [error, setError] = useState('');
   const [selections, setSelections] = useState<Record<string, string>>({});
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(Math.max(1, initialQuantity ?? 1));
   const [confirming, setConfirming] = useState(false);
   const [touched, setTouched] = useState(false);
 
@@ -80,6 +86,11 @@ export function VariantPickerSheet({
       const p = await getBuyerProduct(productId);
       if (!p) { setError('Product not found.'); return; }
       setProduct(p);
+      const current = initialVariantId ? p.variants.find(v => v.id === initialVariantId) : undefined;
+      if (current) {
+        setSelections(Object.fromEntries(current.optionValues.map(ov => [ov.optionId, ov.valueId])));
+        return;
+      }
       // Only auto-fill when there's exactly one variant — nothing to
       // actually choose. With more than one, the buyer must explicitly pick
       // a size/color before "Add to cart" is enabled; pre-selecting the
@@ -94,7 +105,7 @@ export function VariantPickerSheet({
     } finally {
       setLoading(false);
     }
-  }, [productId]);
+  }, [productId, initialVariantId]);
 
   useEffect(() => { if (!initialProduct) load(); }, [initialProduct, load]);
 
@@ -124,7 +135,7 @@ export function VariantPickerSheet({
     : !allSelected ? 'Select options'
     : !variant ? 'Unavailable combination'
     : !variant.isAvailable ? 'Out of stock'
-    : `Add to bag · ${formatCents(price * quantity)}`;
+    : `${confirmVerb} · ${formatCents(price * quantity)}`;
 
   return (
     <Modal transparent animationType="slide" visible onRequestClose={onClose}>
@@ -280,7 +291,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   lowStockText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
   optionSection: { marginBottom: SP.lg },
   optionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
-  optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, textTransform: 'uppercase', letterSpacing: 0.4 },
+  optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, },
   optionSelected: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.accentLight },
   optionRequired: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.error },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

@@ -37,8 +37,9 @@ describe('screens behind the floating buyer bar', () => {
     expect(cart).not.toContain('useBuyerTabBarInset');
     expect(cart).toContain("import { useSafeAreaInsets } from 'react-native-safe-area-context';");
     expect(cart).toContain('const insets = useSafeAreaInsets();');
-    // (Flat, theme-following fill + hairline since the checkout follow-up.)
-    expect(cart).toContain('<StickyFooter style={{ paddingBottom: insets.bottom + 8, backgroundColor: theme.background, borderTopColor: theme.borderSubtle }}>');
+    // SSENSE bag: the sticky "Total estimate / Go to checkout" bar pads by the safe-area inset.
+    expect(cart).toContain('bottomInset={insets.bottom}');
+    expect(read('components/bag/BagParts.tsx')).toContain('paddingBottom: bottomInset + SP.sm');
 
     const tabBar = read('components/buyer-nav/BuyerTabBar.tsx');
     expect(tabBar).toContain("BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile', 'cart']);");

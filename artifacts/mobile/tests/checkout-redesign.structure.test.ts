@@ -92,7 +92,8 @@ describe('checkout screen structure', () => {
     expect(primitives).toContain('bg: theme.background');
     const themeCtx = read('contexts/AppThemeContext.tsx');
     expect(themeCtx).toContain("const MONOCHROME = palette('#000000', '#000000', '#000000', '#FFFFFF'");
-    expect(primitives).toContain("textTransform: 'uppercase'");
+    // Section labels are sentence case (BRANDTHREAD_DESIGN.md: no all-caps labels).
+    expect(primitives).not.toContain("textTransform: 'uppercase'");
     // Contact, shipping and payment all live on this one screen: no address sheet, no second screen.
     expect(screen).toContain('<ContactSection');
     expect(screen).toContain('<ShippingSection');
@@ -201,11 +202,13 @@ describe('order confirmation actions', () => {
 describe('cart matches the flat checkout', () => {
   const cart = read('app/(buyer)/cart.tsx');
 
-  it('has no card containers, only checkout sections and hairlines', () => {
+  it('has no card containers, only flat SSENSE rows and hairlines', () => {
+    const bag = read('components/bag/BagParts.tsx');
     expect(cart).not.toMatch(/<Card\b/);
-    expect(cart).toContain("import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives'");
-    expect(cart).toContain('<CheckoutSection first={first}');
-    expect(cart).toContain('<CheckoutSection title="Order summary"');
+    expect(bag).not.toMatch(/<Card\b/);
+    expect(cart).toContain('<BagItemRow');
+    expect(cart).toContain('<BagTotals');
+    expect(bag).toContain('StyleSheet.hairlineWidth');
     expect(cart).not.toMatch(/cardGlass|cardElevatedGlass, borderBottomWidth/);
     expect(cart).toContain('backgroundColor: theme.background');
     expect(cart).not.toContain('opacity: 0.06');

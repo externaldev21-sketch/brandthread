@@ -596,6 +596,44 @@ async function fetchShippingRateDetails(
   };
 }
 
+export interface ShippingEstimate {
+  amountCents: number;
+  name: string;
+}
+
+/**
+ * The bag's shipping estimate for one seller group — the same public rate
+ * checkout charges (GET /api/shipping-rates/calculate). null when the seller
+ * has no rate or the request fails; the bag then says it's calculated at
+ * checkout instead of showing $0.
+ */
+export async function estimateGroupShipping(sellerId: string, subtotalCents: number): Promise<ShippingEstimate | null> {
+  try {
+    const rate = await fetchShippingRateDetails(sellerId, subtotalCents);
+    return { amountCents: rate.amountCents, name: rate.name };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Total shipping across seller groups, or null while any group's estimate is
+ * missing (unknown, still loading, or failed) — a partial sum would
+ * understate the total.
+ */
+export function totalShippingEstimate(
+  sellerIds: string[],
+  estimates: Record<string, ShippingEstimate | null | undefined>,
+): number | null {
+  let total = 0;
+  for (const id of sellerIds) {
+    const estimate = estimates[id];
+    if (!estimate) return null;
+    total += estimate.amountCents;
+  }
+  return total;
+}
+
 // ─── Cart validation ──────────────────────────────────────────────────────────
 
 export async function validateCart(items: CartItem[], discountCodes: string[] = [], liveStreamId?: string | null): Promise<CartValidationResult> {
