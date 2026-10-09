@@ -27,8 +27,8 @@ import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-c
 import { getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
-// Preview role only (never any __DEV__ build): demo shows the sample balance, fresh shows the empty one.
-const isPreviewRole = () => isBuyerDevPreview() || isSellerDevPreview();
+// Dev preview role only (not every __DEV__ build): demo shows the sample balance, fresh shows the empty one.
+const isPreviewRole = () => __DEV__ && (isBuyerDevPreview() || isSellerDevPreview());
 import { hapticLight } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 

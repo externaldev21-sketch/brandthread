@@ -2454,7 +2454,7 @@ export default function FeedScreen({
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
     if (!userId && guestMutedPhrases === null) return [];
-    const previewPosts = isPreviewDemoMode() && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you'
+    const previewPosts = __DEV__ && isPreviewDemoMode() && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you'
       ? FASHION_PREVIEW_POSTS
       : [];
     const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts]
@@ -2598,7 +2598,7 @@ export default function FeedScreen({
     // preview content), showing that bundled poster would be actively
     // wrong, so render nothing and let the existing `FeedSkeleton` cover
     // this brief window instead.
-    const previewEligible = isPreviewDemoMode() && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you';
+    const previewEligible = __DEV__ && isPreviewDemoMode() && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you';
     if (!previewEligible) return null;
     return FASHION_PREVIEW_POSTER_SOURCES[0] ?? (FASHION_PREVIEW_POSTER_URIS[0] ? { uri: FASHION_PREVIEW_POSTER_URIS[0] } : null);
   }, [firstContentItem, isCreatorFeed, buyerMode, showFashionPreview, feedTab]);
