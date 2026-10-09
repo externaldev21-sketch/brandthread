@@ -11,7 +11,7 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { View, Text, ScrollView, StyleSheet, Alert, TextInput, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CachedImage } from '@/components/CachedImage';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
@@ -57,7 +57,7 @@ function SavedItemRow({ item, onMove, onRemove }: {
   return (
     <View style={si.root}>
       <View style={si.img}>
-        <Feather name="bookmark" size={20} color={theme.muted} />
+        <Icon name="bookmark" size={20} color={theme.muted} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={si.name} numberOfLines={1}>{item.productName}</Text>

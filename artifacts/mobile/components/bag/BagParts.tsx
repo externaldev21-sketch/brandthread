@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { Button, QuantityStepper } from '@/components/ui';
@@ -96,7 +96,7 @@ export function BagItemRow({
         <Pressable onPress={onOpen} style={s.image} accessibilityRole="button" accessibilityLabel={`Open ${item.productName}`}>
           {item.imageUri
             ? <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="contain" recyclingKey={item.imageUri} />
-            : <Feather name="image" size={20} color={theme.muted} />}
+            : <Icon name="image" size={20} color={theme.muted} />}
         </Pressable>
         <View style={s.desc}>
           <Text style={s.brand} numberOfLines={1}>{item.sellerName}</Text>
@@ -112,7 +112,7 @@ export function BagItemRow({
               testID={`cart-size-${item.id}`}
             >
               <Text style={s.meta}>{item.variantTitle}</Text>
-              <Feather name="chevron-down" size={14} color={theme.muted} />
+              <Icon name="chevron-down" size={17} color={theme.muted} />
             </Pressable>
           )}
           {item.isPreOrder && <Text style={s.meta}>Pre-order</Text>}
