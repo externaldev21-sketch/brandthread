@@ -249,4 +249,21 @@ describe("photo upload", () => {
     const { objectPath } = await ok.json() as { objectPath: string };
     expect(objectPath.startsWith(`/objects/reviews/${BUYER.replace(/[^A-Za-z0-9_-]/g, "_")}/`)).toBe(true);
   });
+
+  it("screens the photo before storing it: flagged → 422, provider outage still uploads", async () => {
+    const { setMediaModerationProvider } = await import("../../lib/mediaModeration");
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]);
+    const post = () => fetch(`${base}/api/reviews/photos`, { method: "POST", headers: { "Content-Type": "image/jpeg", "x-test-user": BUYER }, body: jpeg });
+    try {
+      setMediaModerationProvider(async () => ({ flags: { sexual: true }, scores: { sexual: 0.9 } }));
+      const flagged = await post();
+      expect(flagged.status).toBe(422);
+      expect(await flagged.json()).toMatchObject({ code: "IMAGE_REJECTED" });
+      // Unverified (provider down / unconfigured) never blocks the upload.
+      setMediaModerationProvider(async () => { throw new Error("provider down"); });
+      expect((await post()).status).toBe(201);
+    } finally {
+      setMediaModerationProvider();
+    }
+  });
 });

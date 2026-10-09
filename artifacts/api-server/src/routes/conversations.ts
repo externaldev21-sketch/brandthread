@@ -39,7 +39,10 @@ import { enrichOrderAttachments } from "../lib/orderAttachmentInfo";
 import {
   checkUpload, validateMediaAttachment, decideOrderShare, decidePostShare, decideProductShare,
 } from "../lib/dmAttachmentPolicy";
-import { IMMUTABLE_PUBLIC_CACHE_CONTROL, normalizeUploadedImage } from "../lib/productImageResize";
+import { normalizeUploadedImage } from "../lib/productImageResize";
+import {
+  DM_MEDIA_OBJECT_PREFIX, DM_MEDIA_SIGNED_URL_TTL_SEC, dmMediaContextFromEnv, signDmMediaPath, signDmMessageMedia,
+} from "../lib/dmMedia";
 
 const router = Router();
 router.use(requireAuth);
@@ -607,6 +610,8 @@ router.get("/:id/messages", async (req, res) => {
   // Order cards (item 71): always show the CURRENT status/tracking, not the
   // value cached at send time — see lib/orderAttachmentInfo.ts.
   await enrichOrderAttachments(adapted);
+  // Private DM media → short-lived signed URLs (participants only: checked above).
+  await signDmMessageMedia(adapted);
   return res.json(adapted);
 });
 
@@ -728,6 +733,7 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   }
 
   const attachmentsToValidate = [...new Set([primaryAttachment, ...attachmentItems].filter((a) => a != null))];
+  const dmMediaContext = dmMediaContextFromEnv();
   for (const item of attachmentsToValidate) {
     const att = item as {
       type?: string;
@@ -736,8 +742,11 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       uri?: string;
       meta?: { productId?: string; orderId?: string; postId?: string };
     };
-    const mediaCheck = validateMediaAttachment(att as any, (process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "").trim());
+    const mediaCheck = validateMediaAttachment(att as any, dmMediaContext);
     if (!mediaCheck.ok) return res.status(400).json({ error: mediaCheck.error });
+    // Store the canonical private object path, never a (expiring) signed URL.
+    if (mediaCheck.uri !== undefined) att.uri = mediaCheck.uri;
+    if (mediaCheck.photoUris !== undefined) (att as any).meta = { ...(att.meta ?? {}), photoUris: mediaCheck.photoUris };
     const allowedTypes = MESSAGE_ATTACHMENT_TYPES;
     if (!att.type || !allowedTypes.includes(att.type)) {
       return res.status(400).json({ error: "Invalid attachment type." });
@@ -892,6 +901,7 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   const adapted = adaptMessage(msg, [], replyPreview);
   await enrichProductAttachments([adapted]);
   await enrichOrderAttachments([adapted]);
+  await signDmMessageMedia([adapted]);
   return res.status(201).json(adapted);
 });
 
@@ -1234,7 +1244,11 @@ router.patch("/:id/accept", async (req, res) => {
 
 // ─── POST /api/conversations/upload-media ────────────────────────────────────
 // Accept a base64-encoded image/video/audio and store it in object storage.
-// Returns { url } — a publicly-accessible URL for use in message attachments.
+// The object is stored PRIVATE at /objects/messaging/<uid>/<uuid>.<ext> (never
+// made public). Returns { url, objectPath }: `url` is a short-lived signed URL
+// the client can display right away and send back as the attachment uri (the
+// message route normalizes it to `objectPath` before storing); every read
+// path re-signs it for participants only.
 //
 // mimeType and extension are attacker-controlled input: the extension is
 // never taken from the request (it previously allowed arbitrary characters,
@@ -1246,8 +1260,7 @@ router.post("/upload-media", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { data, mimeType = "image/jpeg" } = req.body ?? {};
 
-  const BUCKET_ID = (process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "").trim();
-  if (!BUCKET_ID) {
+  if (!(process.env.PRIVATE_OBJECT_DIR ?? "").trim()) {
     return res.status(503).json({ error: "Object storage not configured" });
   }
 
@@ -1275,10 +1288,12 @@ router.post("/upload-media", async (req, res) => {
   const ext = check.ext;
 
   const { randomUUID } = await import("crypto");
-  const filename = `messaging/${userId}/${randomUUID()}.${ext}`;
+  const objectPath = `${DM_MEDIA_OBJECT_PREFIX}${userId}/${randomUUID()}.${ext}`;
 
+  let stored = false;
   try {
-    const { objectStorageClient } = await import("../lib/objectStorage");
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    const objectStorage = new ObjectStorageService();
     const raw = buffer;
 
     // Automatic screening (off when the AI integration env is missing). A DM
@@ -1298,19 +1313,20 @@ router.post("/upload-media", async (req, res) => {
     // Images are downscaled and stripped of EXIF/GPS (after screening, which sees the original bytes);
     // video and audio are stored as sent.
     const isImage = normalizedMimeType.startsWith("image/");
-    const stored = isImage ? await normalizeUploadedImage(raw, normalizedMimeType) : { buffer: raw, contentType: normalizedMimeType };
-    const bucket = objectStorageClient.bucket(BUCKET_ID);
-    const file   = bucket.file(filename);
-    // Object keys are random UUIDs and never rewritten, so images can be cached forever.
-    await file.save(stored.buffer, {
-      contentType: stored.contentType,
-      resumable: false,
-      ...(isImage ? { metadata: { cacheControl: IMMUTABLE_PUBLIC_CACHE_CONTROL } } : {}),
+    const normalized = isImage ? await normalizeUploadedImage(raw, normalizedMimeType) : { buffer: raw, contentType: normalizedMimeType };
+    // Private object: only reachable through a signed URL handed to participants.
+    await objectStorage.createObjectEntityFromBuffer(normalized.buffer, normalized.contentType, objectPath, {
+      cacheControl: `private, max-age=${DM_MEDIA_SIGNED_URL_TTL_SEC}`,
     });
-    await file.makePublic();
-    const url = `https://storage.googleapis.com/${BUCKET_ID}/${filename}`;
-    return res.json({ url });
+    stored = true;
+    const url = await signDmMediaPath(objectPath);
+    if (!url) throw new Error("Could not sign uploaded DM media");
+    return res.json({ url, objectPath });
   } catch (err: any) {
+    if (stored) {
+      const { ObjectStorageService } = await import("../lib/objectStorage");
+      await new ObjectStorageService().deleteObjectEntity(objectPath).catch(() => {});
+    }
     req.log.error({ err, userId }, "Failed to upload conversation media");
     return res.status(500).json({ error: "Upload failed" });
   }

@@ -3,6 +3,7 @@ import {
   checkUpload, validateMediaAttachment, decideOrderShare, decidePostShare, decideProductShare,
   MAX_UPLOAD_BYTES, MAX_VOICE_SECONDS,
 } from "../dmAttachmentPolicy";
+import { resolveDmMediaRef, type DmMediaContext } from "../dmMedia";
 
 const bytes = (...head: number[]) => Uint8Array.from([...head, ...new Array(32).fill(0)]);
 const ftyp = () => Uint8Array.from([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x4d, 0x34, 0x41, 0x20, 0, 0, 0, 0]);
@@ -64,6 +65,46 @@ describe("validateMediaAttachment", () => {
   it("caps video duration", () => {
     expect(validateMediaAttachment({ type: "video", uri: good, meta: { duration: "60" } }, bucket).ok).toBe(true);
     expect(validateMediaAttachment({ type: "video", uri: good, meta: { duration: "600" } }, bucket).ok).toBe(false);
+  });
+});
+
+describe("DM media refs (private uploads)", () => {
+  const ctx: DmMediaContext = { bucketId: "b1", privateDir: "/b1/.private", cdnBase: null };
+  const path = "/objects/messaging/user_2abc/0f8fad5b-d9cb-469f-a165-70867728950e.jpg";
+  const signed = `https://storage.googleapis.com/b1/.private/messaging/user_2abc/0f8fad5b-d9cb-469f-a165-70867728950e.jpg?X-Goog-Signature=abc`;
+
+  it("normalizes our signed URL (storage host or CDN) to the canonical path", () => {
+    expect(resolveDmMediaRef(signed, ctx)).toEqual({ ok: true, kind: "canonical", value: path });
+    const cdn = { ...ctx, cdnBase: "https://cdn.example.com/media" };
+    expect(resolveDmMediaRef(`https://cdn.example.com/media/b1/.private/messaging/user_2abc/0f8fad5b-d9cb-469f-a165-70867728950e.jpg?sig=1`, cdn))
+      .toEqual({ ok: true, kind: "canonical", value: path });
+    expect(resolveDmMediaRef(path, ctx)).toEqual({ ok: true, kind: "canonical", value: path });
+  });
+
+  it("keeps legacy public bucket URLs as-is", () => {
+    const legacy = "https://storage.googleapis.com/b1/messaging/u/x.jpg";
+    expect(resolveDmMediaRef(legacy, ctx)).toEqual({ ok: true, kind: "legacy", value: legacy });
+  });
+
+  it("refuses other private objects, path tricks and foreign hosts", () => {
+    for (const uri of [
+      "/objects/uploads/abc",
+      "/objects/messaging/u/../../uploads/x.jpg",
+      "https://storage.googleapis.com/b1/.private/uploads/abc?X-Goog-Signature=x",
+      "https://storage.googleapis.com/b1/.private/messaging/u/not-a-uuid.jpg?X-Goog-Signature=x",
+      "https://storage.googleapis.com/b1/other.jpg?X-Goog-Signature=x",
+      "https://storage.googleapis.com/b2/messaging/u/x.jpg",
+      "https://evil.example/b1/.private/messaging/user_2abc/0f8fad5b-d9cb-469f-a165-70867728950e.jpg",
+    ]) {
+      expect(resolveDmMediaRef(uri, ctx).ok, uri).toBe(false);
+    }
+  });
+
+  it("validateMediaAttachment returns the canonical uri and photoUris to store", () => {
+    const r = validateMediaAttachment({ type: "image", uri: signed, meta: { photoUris: JSON.stringify([signed, path]) } }, ctx);
+    expect(r).toEqual({ ok: true, uri: path, photoUris: JSON.stringify([path, path]) });
+    expect(validateMediaAttachment({ type: "image", uri: signed, meta: { photoUris: JSON.stringify(["https://evil.example/x.jpg"]) } }, ctx).ok).toBe(false);
+    expect(validateMediaAttachment({ type: "image", uri: signed, meta: { photoUris: "not json" } }, ctx).ok).toBe(false);
   });
 });
 
