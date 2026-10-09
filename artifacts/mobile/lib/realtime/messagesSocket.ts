@@ -13,10 +13,14 @@
  * Never connects signed out or in the signed-out dev previews — the hub is a
  * protected endpoint.
  */
-import { AppState } from 'react-native';
-import { API_BASE_URL } from '@/lib/api';
 import { getServiceToken, onServicesConfigured } from '@/lib/serviceConfig';
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+
+// Kept dependency-light on purpose: services (activityService) import this
+// module, so react-native and the preview flags are required lazily and the
+// API base is read the same way lib/api.ts reads it.
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ??
+  (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : '');
 
 export type RealtimeEvent =
   | { type: 'ready' }
@@ -83,6 +87,7 @@ export function isRealtimeConnected(): boolean {
 
 function previewMode(): boolean {
   try {
+    const { isBuyerDevPreview, isSellerDevPreview } = require('../devPreview') as typeof import('../devPreview');
     return isBuyerDevPreview() || isSellerDevPreview();
   } catch {
     return false;
@@ -155,6 +160,7 @@ function wireOnce(): void {
   onServicesConfigured(() => { if (listeners.size > 0) reconnectNow(); });
   // Phones drop sockets in the background; come back connected.
   try {
+    const { AppState } = require('react-native') as typeof import('react-native');
     AppState.addEventListener('change', (state) => {
       if (state === 'active' && listeners.size > 0 && !connected) reconnectNow();
     });
