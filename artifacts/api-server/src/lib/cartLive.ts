@@ -18,6 +18,7 @@
 import { db, products, productVariants } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import { applySalesToVariants } from "./pricing/salesRuntime";
+import { isProductAvailable } from "./productVisibility";
 
 export type CartLiveReason = "out_of_stock" | "unavailable" | null;
 
@@ -56,7 +57,7 @@ export function computeCartLive(
     priceCents: snapshotPrice ?? 0, compareAtPriceCents: null, stock: 0,
     available: false, reason: "unavailable", priceChanged: false,
   });
-  if (!product || product.deletedAt || product.status !== "active") return gone();
+  if (!product || !isProductAvailable(product)) return gone();
 
   let priceCents: number;
   let compareAtPriceCents: number | null;

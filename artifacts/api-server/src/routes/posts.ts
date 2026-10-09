@@ -12,7 +12,7 @@ import {
   db, posts, postTaggedProducts, products, productVariants, users, interactions, follows, boosts, blocks,
   savedItems, orders,
 } from "@workspace/db";
-import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
+import { eq, and, inArray, count, sql, desc, lte, lt, gte, or, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import postVideoRouter, {
@@ -31,6 +31,7 @@ import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { taggedProductVisibleTo } from "../lib/productVisibility";
 import { screenText, MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import {
   isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs, signedUrlForObjectPath,
@@ -316,7 +317,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[], viewerId: stri
       images: products.images,
     }).from(postTaggedProducts)
       .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-      .where(inArray(postTaggedProducts.postId, postIds))
+      .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(viewerId)))
       .orderBy(postTaggedProducts.position),
     db.select({ postId: interactions.postId, cnt: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "like")))
@@ -470,7 +471,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         })
         .from(postTaggedProducts)
         .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-        .where(inArray(postTaggedProducts.postId, postIds))
+        .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(clerkId)))
         .orderBy(postTaggedProducts.position),
 
       db
@@ -1014,7 +1015,7 @@ router.post("/", requireAuth, async (req, res) => {
       const sellerProds = await db
         .select({ id: products.id, name: products.name, images: products.images })
         .from(products)
-        .where(and(inArray(products.id, validIds), eq(products.ownerId, clerkId)));
+        .where(and(inArray(products.id, validIds), eq(products.ownerId, clerkId), isNull(products.deletedAt)));
 
       if (sellerProds.length > 0) {
         await db.insert(postTaggedProducts).values(
@@ -1330,7 +1331,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
         const validIds = (taggedProductIds as string[]).filter((productId) => UUID_RE.test(productId));
         const ownedProducts = validIds.length > 0
           ? await tx.select({ id: products.id }).from(products)
-            .where(and(inArray(products.id, validIds), eq(products.ownerId, clerkId)))
+            .where(and(inArray(products.id, validIds), eq(products.ownerId, clerkId), isNull(products.deletedAt)))
           : [];
         await tx.delete(postTaggedProducts).where(eq(postTaggedProducts.postId, id));
         if (ownedProducts.length > 0) {
@@ -1754,7 +1755,7 @@ router.get("/:id", async (req, res) => {
       images:    products.images,
     }).from(postTaggedProducts)
       .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-      .where(eq(postTaggedProducts.postId, id))
+      .where(and(eq(postTaggedProducts.postId, id), taggedProductVisibleTo(viewerId)))
       .orderBy(postTaggedProducts.position),
     db.select({ count: count() }).from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, "like"))),

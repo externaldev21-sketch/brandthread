@@ -35,6 +35,7 @@ import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { evaluateContent } from "../lib/contentModerator";
 import { isBlockedEitherWay, optionalViewerId, publishingRestriction } from "../lib/safety";
 import { rankLiveFeed } from "../lib/liveFeed";
+import { filterLiveStreamProductTags } from "../lib/productVisibility";
 import { logger } from "../lib/logger";
 import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
 import { markScheduledLiveStarted } from "../lib/scheduledLives";
@@ -177,7 +178,7 @@ router.get("/active", async (_req, res) => {
       ORDER BY ls.viewer_count DESC, ls.started_at ASC
       LIMIT 20
     `);
-    return res.json({ streams: rows.rows });
+    return res.json({ streams: await filterLiveStreamProductTags(rows.rows as any[], null) });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
@@ -210,7 +211,7 @@ router.get("/feed", async (req, res) => {
       ORDER BY ls.viewer_count DESC
       LIMIT 200
     `);
-    return res.json({ streams: rankLiveFeed(rows.rows as any[]) });
+    return res.json({ streams: rankLiveFeed(await filterLiveStreamProductTags(rows.rows as any[], viewerId)) });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
@@ -247,7 +248,7 @@ router.get("/:id", async (req, res) => {
       recording_resource_id, recording_sid, recording_status, recording_error,
       recording_uid, recording_started_at, recording_stopped_at,
       ...publicRow
-    } = row;
+    } = (await filterLiveStreamProductTags([row], viewerId))[0];
 
     return res.json({
       stream: {

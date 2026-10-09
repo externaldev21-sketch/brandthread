@@ -123,6 +123,11 @@ describe("GET /api/buyer/cart live fields", () => {
     expect(byVar(ids.activeVar).live).toEqual({ priceCents: 2500, compareAtPriceCents: null, stock: 8, available: true, reason: null, priceChanged: false });
     expect(byVar(ids.lowVar).live).toMatchObject({ priceCents: 2700, stock: 1, available: true, priceChanged: true });
     expect(byVar(ids.soldOutVar).live).toMatchObject({ stock: 0, available: false, reason: "out_of_stock" });
+    // Top-level flags (shared with the delete-cascade contract) follow `live`.
+    expect(byVar(ids.soldOutVar)).toMatchObject({ unavailable: true, isAvailable: false, unavailableReason: "Out of stock" });
+    expect(byVar(ids.deletedVar)).toMatchObject({ unavailable: true, isAvailable: false, unavailableReason: "No longer available" });
+    expect(byVar(ids.activeVar).unavailable).toBeUndefined();
+    expect(byVar(ids.activeVar).isAvailable).toBe(true);
     expect(byVar(ids.draftVar).live).toMatchObject({ available: false, reason: "unavailable", stock: 0 });
     expect(byVar(ids.deletedVar).live).toMatchObject({ available: false, reason: "unavailable", stock: 0 });
     expect(body.items.find((i: any) => i.productId === ids.noVariants).live).toMatchObject({ available: false, reason: "unavailable" });
@@ -146,11 +151,20 @@ describe("GET /api/buyer/cart live fields", () => {
     await db.update(productVariants).set({ stock: 8, priceCents: 2500 }).where(eq(productVariants.id, ids.activeVar));
   });
 
-  it("never stores `live` from a client payload", async () => {
-    const tampered = { ...line(ids.active, ids.activeVar, 2500), live: { available: true, stock: 999 } };
-    await call("POST", "/api/buyer/cart/sync", { items: [tampered] });
+  it("never stores `live` / `unavailable` from a client payload, and clears stale flags on read", async () => {
+    const stale = {
+      ...line(ids.active, ids.activeVar, 2500, { isAvailable: false, unavailableReason: "Out of stock" }),
+      live: { available: true, stock: 999 }, unavailable: true,
+    };
+    await call("POST", "/api/buyer/cart/sync", { items: [stale] });
     const [row] = await db.select().from(cartItems).where(eq(cartItems.userId, BUYER));
     expect((row.itemData as any).live).toBeUndefined();
+    expect((row.itemData as any).unavailable).toBeUndefined();
+    const body = await (await call("GET", "/api/buyer/cart")).json() as any;
+    expect(body.items[0]).toMatchObject({ isAvailable: true });
+    expect(body.items[0].unavailable).toBeUndefined();
+    expect(body.items[0].unavailableReason).toBeUndefined();
+    expect(body.items[0].live.stock).toBe(8);
   });
 
   it("returns an empty bag for a buyer with no lines, and only the caller's lines", async () => {

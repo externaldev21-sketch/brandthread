@@ -51,10 +51,12 @@ function readLive(raw: unknown): CartLiveFields | null {
  * - stock → maxQuantity (the bag's "Only N left" / stepper cap)
  * - current price (sale included) → priceCents / compareAtPriceCents
  * A line without `live` (older server, catalog read failed) and a dev-web
- * preview product are returned untouched apart from dropping `live`.
+ * preview product are returned untouched apart from dropping `live` /
+ * `unavailable` (server-side flags stay as sent: isAvailable, unavailableReason).
  */
-export function applyLiveFields<T extends CartItem | SavedCartItem>(line: T & { live?: unknown }): T {
-  const { live: rawLive, ...rest } = line;
+export function applyLiveFields<T extends CartItem | SavedCartItem>(line: T & { live?: unknown; unavailable?: unknown }): T {
+  // `unavailable` is the server's read-only mirror of isAvailable; never cached.
+  const { live: rawLive, unavailable: _unavailable, ...rest } = line;
   const item = rest as unknown as T;
   const live = readLive(rawLive);
   if (!live || isPreviewProductId(item.productId)) return item;

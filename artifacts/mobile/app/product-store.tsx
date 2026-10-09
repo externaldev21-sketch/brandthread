@@ -102,6 +102,17 @@ export default function ProductStoreScreen() {
       ?.catch(() => {});
   }, []);
 
+  // Real review rollup for this product; the stars row hides until it has reviews.
+  const [reviewSummary, setReviewSummary] = useState<{ avgRating: number; totalCount: number } | null>(null);
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    api.reviews.forProduct(id)
+      .then((r) => { if (!cancelled) setReviewSummary({ avgRating: Number(r?.avgRating ?? 0), totalCount: Number(r?.totalCount ?? 0) }); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [id]);
+
   // Selected option values: { [optionId]: valueId }
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
 
@@ -404,7 +415,9 @@ export default function ProductStoreScreen() {
           </View>
 
           {/* Stars */}
-          <StarRow rating={4.8} count={23} styles={s} theme={theme} />
+          {reviewSummary && reviewSummary.totalCount > 0 && (
+            <StarRow rating={reviewSummary.avgRating} count={reviewSummary.totalCount} styles={s} theme={theme} />
+          )}
         </View>
 
         {/* 5. Variant selector */}

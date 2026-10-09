@@ -18,9 +18,10 @@ const live = (over: Partial<CartLiveFields> = {}): CartLiveFields => ({
 const cart = (items: CartItem[] = [], savedItems: SavedCartItem[] = []): Cart => ({ id: 'c1', items, savedItems, updatedAt: '' });
 
 describe('applyLiveFields', () => {
-  it('drops `live` and keeps the rest of the line', () => {
-    const out = applyLiveFields({ ...item(), live: live() });
+  it('drops `live` / `unavailable` and keeps the rest of the line', () => {
+    const out = applyLiveFields({ ...item(), live: live(), unavailable: true });
     expect('live' in out).toBe(false);
+    expect('unavailable' in out).toBe(false);
     expect(out).toMatchObject({ id: 'line-1', variantTitle: 'M', isAvailable: true, maxQuantity: 8, priceCents: 2500 });
     expect(out.unavailableReason).toBeUndefined();
   });
@@ -53,6 +54,12 @@ describe('applyLiveFields', () => {
   it('leaves a line without (valid) live fields untouched', () => {
     expect(applyLiveFields(item({ maxQuantity: 7 }))).toEqual(item({ maxQuantity: 7 }));
     expect(applyLiveFields({ ...item(), live: { nonsense: true } })).toEqual(item());
+  });
+
+  it('keeps the server\'s availability flags on a line without live fields', () => {
+    const out = applyLiveFields({ ...item({ isAvailable: false, unavailableReason: 'No longer available' }), unavailable: true });
+    expect(out).toMatchObject({ isAvailable: false, unavailableReason: 'No longer available' });
+    expect('unavailable' in out).toBe(false);
   });
 
   it('never touches a dev-web preview product', () => {
