@@ -43,7 +43,7 @@ import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
-import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, ICON, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useScrollReset } from '@/hooks/useScrollReset';
