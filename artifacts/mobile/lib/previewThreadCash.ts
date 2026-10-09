@@ -33,10 +33,10 @@ export const PREVIEW_THREAD_CASH_STATUS: ThreadCashStatus = {
   balanceCents: 1845,
   config: {
     dailyAmountCents: 10,
-    streakBonusCents: 100,
+    streakBonusCents: 25,
     streakBonusDays: 7,
     graceHours: 20,
-    expiryDays: 180,
+    expiryDays: 90,
     maxRedemptionPerOrderCents: 2000,
   },
   streak: {
