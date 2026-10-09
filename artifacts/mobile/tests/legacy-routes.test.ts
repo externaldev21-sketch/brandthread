@@ -90,6 +90,14 @@ describe('legacy route map', () => {
     for (const r of LEGACY_ROUTES) expect(doc, `${r.from} missing from docs/route-map.md`).toContain(`\`${r.from}\``);
   });
 
+  it('the root stack registers no screen that was removed', () => {
+    const layout = readFileSync(path.join(ROOT, 'app', '_layout.tsx'), 'utf8');
+    const names = [...layout.matchAll(/<Stack\.Screen\b[^>]*\bname="([^"]+)"/g)].map((m) => m[1]);
+    expect(names.length).toBeGreaterThan(50);
+    const missing = names.filter((n) => !n.startsWith('+') && !routeExists(`/${n.replace(/(^|\/)index$/, '')}`));
+    expect(missing).toEqual([]);
+  });
+
   it('+not-found applies the map before showing "doesn\'t exist"', () => {
     const src = readFileSync(path.join(ROOT, 'app', '+not-found.tsx'), 'utf8');
     expect(src).toContain('resolveLegacyRoute');
