@@ -16,8 +16,7 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Header } from '@/components/layout';
-import { SkeletonBlock, SkeletonLine, ThemedRefreshControl } from '@/components/ui';
-import { EmptyState } from '@/components/layout/EmptyState';
+import { EmptyState, SkeletonBlock, SkeletonLine, ThemedRefreshControl } from '@/components/ui';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -306,13 +305,12 @@ export default function FollowingScreen() {
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />}
         >
           {loadError ? (
-            <EmptyState variant="error" icon="wifi-off" message="Couldn't load drops." actionLabel="Retry" onAction={() => loadDrops()} />
+            <EmptyState title="Couldn't load drops." action={{ label: 'Retry', onPress: () => loadDrops() }} testID="following-error" />
           ) : (
             <EmptyState
-              icon="heart"
-              message="Follow brands to see their drops here."
-              actionLabel="Discover brands"
-              onAction={() => router.navigate('/(buyer)/discover' as never)}
+              title="Drops from brands you follow show up here."
+              action={{ label: 'Discover brands', onPress: () => router.navigate('/(buyer)/discover' as never) }}
+              testID="following-empty"
             />
           )}
         </ScrollView>

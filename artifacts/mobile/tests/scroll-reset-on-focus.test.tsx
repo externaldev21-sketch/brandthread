@@ -244,11 +244,8 @@ vi.mock('@/components/ui', () => {
     SkeletonBlock: () => ReactActual.createElement('View', { testID: 'skeleton-block' }),
     SkeletonLine: () => ReactActual.createElement('View', { testID: 'skeleton-line' }),
     ThemedRefreshControl: (props: any) => ReactActual.createElement('RefreshControl', props),
+    EmptyState: (props: any) => ReactActual.createElement('View', { testID: 'empty-state', ...props }),
   };
-});
-vi.mock('@/components/layout/EmptyState', () => {
-  const ReactActual = require('react') as typeof import('react');
-  return { EmptyState: (props: any) => ReactActual.createElement('View', { testID: 'empty-state', ...props }) };
 });
 vi.mock('@/hooks/useColors', () => ({
   useColors: () => ({
