@@ -2,7 +2,15 @@
  * Automatic non-delivery refunds and seller deadline warnings.
  *
  * runAutoRefundSweep refunds the items that were not delivered by their
- * deadline, through the ONE refund path every buyer refund takes
+ * deadline AND have a "not delivered" signal (autoRefundableItemSql):
+ *   - never shipped: no tracking number, or no carrier scan at all (a label
+ *     or a typed number the carrier never scanned is not a shipment);
+ *   - the carrier says it failed: exception / returned to sender;
+ *   - the buyer told us it never arrived (a "not received" return request).
+ * A parcel the carrier scanned in transit that simply has no delivered scan
+ * (unknown carrier, local delivery, guest buyer…) is NOT refunded by
+ * default: the buyer has to say it didn't arrive.
+ * Refunds go through the ONE refund path every buyer refund takes
  * (lib/money/refunds.ts), so it inherits its guarantees:
  *   - idempotent: the refund key is deterministic per (order, item set) and
  *     becomes a Stripe idempotency key, so a re-run, a retry after a crash
@@ -18,13 +26,13 @@
  * arrived minutes ago is never refunded.
  */
 import crypto from "node:crypto";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql, type SQL } from "drizzle-orm";
 import { db, orderItems, orders } from "@workspace/db";
 import { logger } from "../logger";
 import { refundOrder, RefundError } from "../money/refunds";
 import { reversePurchasePointsOnce } from "../../routes/loyalty";
 import {
-  AUTO_REFUND_REASON, autoRefundEnabled, deliveryWindowDays, dueWarningLevel, undeliveredRefundCents,
+  AUTO_REFUND_REASON, autoRefundEnabled, deliveryWindowDays, dueWarningLevel, undeliveredRefundCents, windowDaysBetween,
 } from "./policy";
 import { finalizeIfAllDelivered, refreshOrderDeadline } from "./deliveryState";
 import { notifyAutoRefunded, notifySellerDeadlineWarning } from "./notifications";
@@ -43,6 +51,51 @@ export function refundRetryDelayMs(attemptsSoFar: number): number {
 export function autoRefundKey(orderId: string, itemIds: string[]): string {
   const digest = crypto.createHash("sha1").update([...itemIds].sort().join(",")).digest("hex").slice(0, 16);
   return `auto-refund/${orderId}/${digest}`;
+}
+
+/** Carrier statuses that mean the parcel will not arrive. */
+export const CARRIER_FAILURE_STATUSES = ["exception", "returned_to_sender"] as const;
+/** Carrier statuses that only a physical scan produces (PRE_TRANSIT / "accepted" is just label data). */
+export const CARRIER_SCAN_STATUSES = ["in_transit", "out_for_delivery", "delivered"] as const;
+
+const inList = (values: readonly string[]) => sql.join(values.map((v) => sql`${v}`), sql`, `);
+
+/**
+ * SQL predicate: item `i` of order `o` is overdue and may be refunded
+ * without being asked. Its tracking is the item's own number, else the
+ * order's when no item carries one (deliveryState.effectiveTrackingNumber).
+ */
+export function autoRefundableItemSql(now: Date): SQL {
+  const tracking = sql`COALESCE(i.tracking_number, CASE WHEN NOT EXISTS (
+    SELECT 1 FROM order_items j WHERE j.order_id = o.id AND j.tracking_number IS NOT NULL) THEN o.tracking_number END)`;
+  const status = sql`CASE WHEN i.tracking_number IS NOT NULL THEN i.tracking_status ELSE o.tracking_status END`;
+  return sql`(
+    i.delivered_at IS NULL AND i.refunded_at IS NULL AND i.deliver_by < ${now}
+    AND (
+      ${tracking} IS NULL
+      OR ${status} IN (${inList(CARRIER_FAILURE_STATUSES)})
+      OR (
+        ${status} IS DISTINCT FROM 'in_transit' AND ${status} IS DISTINCT FROM 'out_for_delivery'
+        AND NOT EXISTS (
+          SELECT 1 FROM order_tracking_events e
+          WHERE e.order_id = o.id AND e.tracking_number = ${tracking} AND e.status IN (${inList(CARRIER_SCAN_STATUSES)})
+        )
+      )
+      OR EXISTS (
+        SELECT 1 FROM returns r
+        WHERE r.order_id = o.id AND r.status IN ('pending', 'approved') AND ${notReceivedReasonSql(sql`r.reason`)}
+      )
+    )
+  )`;
+}
+
+/**
+ * A buyer's "not received" claim is a return request with that reason
+ * (POST /api/returns, reason "Order not received" from the app's refund
+ * request screen, or "not_received").
+ */
+export function notReceivedReasonSql(reason: SQL): SQL {
+  return sql`(lower(${reason}) LIKE '%not received%' OR lower(${reason}) LIKE '%not_received%' OR lower(${reason}) LIKE '%never arrived%')`;
 }
 
 export type AutoRefundSummary = {
@@ -82,7 +135,7 @@ export async function runAutoRefundSweep(deps: AutoRefundDeps = {}): Promise<Aut
       AND (o.auto_refund_next_attempt_at IS NULL OR o.auto_refund_next_attempt_at <= ${now})
       AND EXISTS (
         SELECT 1 FROM order_items i
-        WHERE i.order_id = o.id AND i.delivered_at IS NULL AND i.refunded_at IS NULL AND i.deliver_by < ${now}
+        WHERE i.order_id = o.id AND ${autoRefundableItemSql(now)}
       )
     ORDER BY o.deliver_by
     LIMIT ${deps.limit ?? 100}
@@ -110,7 +163,11 @@ async function refundOverdueItems(orderId: string, now: Date, deps: AutoRefundDe
   if (!order || order.disputePausedAt || ["cancelled", "delivered"].includes(order.status)) return "skipped";
 
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-  const overdue = items.filter((i) => !i.deliveredAt && !i.refundedAt && i.deliverBy && i.deliverBy < now);
+  const eligible = new Set(rows<{ id: string }>(await db.execute(sql`
+    SELECT i.id FROM order_items i JOIN orders o ON o.id = i.order_id
+    WHERE i.order_id = ${orderId}::uuid AND ${autoRefundableItemSql(now)}
+  `)).map((row) => row.id));
+  const overdue = items.filter((i) => eligible.has(i.id));
   if (overdue.length === 0) return "skipped";
   const live = items.filter((i) => !i.refundedAt);
   const isFull = overdue.length === live.length;
@@ -125,7 +182,11 @@ async function refundOverdueItems(orderId: string, now: Date, deps: AutoRefundDe
   });
   if (amount <= 0) return "skipped";
 
-  const windowDays = deliveryWindowDays(overdue.every((i) => i.isPreorder));
+  // Pre-order deadlines follow the promised ship date, so say the real window.
+  const latestDeadline = new Date(Math.max(...overdue.map((i) => i.deliverBy!.valueOf())));
+  const windowDays = order.paidAt
+    ? windowDaysBetween(order.paidAt, latestDeadline)
+    : deliveryWindowDays(overdue.every((i) => i.isPreorder));
   const overdueIds = overdue.map((i) => i.id);
   const result = await refundOrder({
     orderId,
@@ -171,6 +232,13 @@ async function refundOverdueItems(orderId: string, now: Date, deps: AutoRefundDe
       }).where(eq(orders.id, orderId));
       await refreshOrderDeadline(tx, orderId);
       await finalizeIfAllDelivered(tx, orderId);
+      if (isFull) {
+        // The buyer's "not received" claim is answered by this refund.
+        await tx.execute(sql`
+          UPDATE returns r SET status = 'refunded', refund_amount_cents = ${amountCents}, updated_at = now()
+          WHERE r.order_id = ${orderId}::uuid AND r.status IN ('pending', 'approved') AND ${notReceivedReasonSql(sql`r.reason`)}
+        `);
+      }
       if (locked.buyer_id) {
         await reversePurchasePointsOnce({
           buyerId: locked.buyer_id,
