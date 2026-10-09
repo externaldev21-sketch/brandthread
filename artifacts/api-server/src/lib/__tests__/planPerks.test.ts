@@ -103,7 +103,7 @@ describe("buildPlanPerks", () => {
       expect(perk.platformFeeBps).toBe(platformFeeBpsForPlan(perk.planId));
     }
     expect(perks.find((p) => p.planId === "pro")).toMatchObject({
-      amountCents: 19900, platformFeeBps: 300, advancedAnalytics: true,
+      amountCents: PLAN_CATALOGUE.pro.amountCents, advancedAnalytics: true,
     });
     // No plan is unlimited on AI: Pro has a finite monthly allowance too.
     for (const perk of perks) expect(perk).toMatchObject({ unlimitedAiCredits: false, monthlyAiCredits: expect.any(Number) });

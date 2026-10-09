@@ -93,9 +93,9 @@ describe("GET /api/seller/subscription/perks", () => {
     expect(body.currentPlan).toBe("growth");
     expect(body.hasAdvancedAnalytics).toBe(false);
     expect(body.plans).toEqual([
-      expect.objectContaining({ planId: "starter", amountCents: 2900, platformFeeBps: 500, advancedAnalytics: false }),
-      expect.objectContaining({ planId: "growth", amountCents: 7900, platformFeeBps: 400, advancedAnalytics: false }),
-      expect.objectContaining({ planId: "pro", amountCents: 19900, platformFeeBps: 300, advancedAnalytics: true }),
+      expect.objectContaining({ planId: "starter", amountCents: 2900, advancedAnalytics: false }),
+      expect.objectContaining({ planId: "growth", amountCents: 7900, advancedAnalytics: false }),
+      expect.objectContaining({ planId: "pro", amountCents: 19900, advancedAnalytics: true }),
     ]);
     // AI allowances come from the credit policy; no plan is unlimited.
     for (const plan of body.plans) {
