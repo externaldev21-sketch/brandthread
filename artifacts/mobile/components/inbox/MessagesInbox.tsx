@@ -600,7 +600,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         setConversations(relevant);
         // An unread thread from a buyer is the moment to ask for push.
         if (relevant.some(c => c.unreadCount > 0 && c.participants.some(p => p.userId !== userId && p.accountType === 'buyer'))) {
-          void requestContextualPushPermission(userId, api);
+          void requestContextualPushPermission(userId, api, 'message');
         }
         return;
       }

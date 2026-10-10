@@ -61,6 +61,7 @@ import type {
   Conversation, Message, MessageAttachment, ConversationParticipant, ReactionType,
 } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import * as ImagePicker from 'expo-image-picker';
 import {
   useAudioPlayer,
@@ -1609,6 +1610,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     setIsSending(true);
     try {
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
+      if (userId) void requestContextualPushPermission(userId, api, 'message');
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
       listScroll.requestScrollToEnd();

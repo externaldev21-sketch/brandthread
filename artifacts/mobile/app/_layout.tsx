@@ -88,6 +88,7 @@ import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
 import { ActionSheetHost } from '@/components/ui/ActionSheet';
 import { AppAlertHost } from '@/components/ui/AppAlertHost';
+import { PushPrePromptHost } from '@/components/PushPrePromptHost';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
@@ -1353,6 +1354,7 @@ function RootLayoutNav() {
       <NetworkNoticeBanner />
       <OfflineBanner />
       <ActionSheetHost />
+      <PushPrePromptHost />
       <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
           <AppStack />

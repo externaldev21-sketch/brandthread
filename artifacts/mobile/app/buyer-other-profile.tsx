@@ -257,7 +257,7 @@ export default function BuyerOtherProfileScreen() {
         hapticLight();
         return;
       }
-      if (!wasFollowing) void requestContextualPushPermission(currentUserId, api);
+      if (!wasFollowing) void requestContextualPushPermission(currentUserId, api, 'follow');
       const confirmedCount = typeof result?.followersCount === 'number' ? result.followersCount : undefined;
       if (confirmedCount != null) {
         setProfile(prev => prev ? { ...prev, followersCount: confirmedCount } : prev);
