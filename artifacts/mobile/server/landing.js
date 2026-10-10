@@ -10,6 +10,8 @@ const fs = require('fs');
 const path = require('path');
 
 const LANDING_FILE = 'landing.html';
+// Public seller pricing (scripts/pricing-page.js), the same for everyone.
+const PRICING_FILE = 'pricing.html';
 // Campaign tags that never change what the app does.
 const MARKETING_PARAMS = /^(utm_[a-z_]+|fbclid|gclid|ttclid|msclkid|ref)$/i;
 
@@ -59,4 +61,24 @@ function shouldServeLanding({ method = 'GET', pathname, searchParams, headers = 
   return !hasClerkSession(headers.cookie);
 }
 
-module.exports = { LANDING_FILE, hasClerkSession, landingPathFor, parseCookies, shouldServeLanding };
+function pricingPathFor(staticRoot) {
+  return path.join(staticRoot, PRICING_FILE);
+}
+
+/** GET/HEAD /pricing serves the static pricing page whenever it was built. */
+function shouldServePricing({ method = 'GET', pathname, staticRoot }) {
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  if (!/^\/pricing\/?$/.test(pathname)) return false;
+  return fs.existsSync(pricingPathFor(staticRoot));
+}
+
+module.exports = {
+  LANDING_FILE,
+  PRICING_FILE,
+  hasClerkSession,
+  landingPathFor,
+  parseCookies,
+  pricingPathFor,
+  shouldServeLanding,
+  shouldServePricing,
+};

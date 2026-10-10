@@ -8,7 +8,11 @@
  * "/welcome". The Expo app itself is not touched.
  */
 
+const { PRICING_CSS, PRICING_PATH, renderLandingPricingSection, renderPricingHtml, trialDateScript } = require('./pricing-page');
+
 const CANONICAL_ORIGIN = 'https://brandthread.app';
+// Written next to landing.html; server/serve.js serves it at /pricing.
+const PRICING_FILE = 'pricing.html';
 const LOGO_URL = `${CANONICAL_ORIGIN}/brandthread-logo.png`;
 const TITLE = 'Brandthread | Shop, sell & design streetwear';
 const DESCRIPTION =
@@ -180,11 +184,23 @@ h2{font-size:32px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 `.trim();
 
+// Pricing section additions (scripts/pricing-page.js). The header link only
+// shows where the header has room, so the existing phone header is unchanged.
+const LANDING_PRICING_CSS = `
+${PRICING_CSS}
+.nav a.text.pricing-link{display:none}
+@media (min-width:640px){.nav a.text.pricing-link{display:inline}}
+`.trim();
+
 function badge(url, small, label) {
   return `<li><a class="badge" href="${escapeHtml(url)}" rel="noopener"><small>${small}</small><strong>${label}</strong></a></li>`;
 }
 
-function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null } = {}) {
+/**
+ * `pricing` is the catalogue from scripts/plan-catalogue.js. Without it the
+ * page renders exactly as before (no pricing section, link or script).
+ */
+function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null, pricing = null } = {}) {
   const appStore = resolveStoreUrl(appStoreUrl, 'appStore');
   const playStore = resolveStoreUrl(playStoreUrl, 'playStore');
   const badges = [
@@ -219,7 +235,7 @@ function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null } = {}) {
 <meta name="twitter:description" content="${DESCRIPTION}" />
 <meta name="twitter:image" content="${LOGO_URL}" />
 <script type="application/ld+json">${ld}</script>
-<style>${CSS}</style>
+<style>${CSS}${pricing ? `\n${LANDING_PRICING_CSS}` : ''}</style>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -227,7 +243,7 @@ function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null } = {}) {
   <div class="wrap bar">
     <a class="brand" href="/welcome" aria-label="Brandthread home"><img src="/brandthread-logo.png" alt="" width="36" height="36" /><span>Brandthread</span></a>
     <nav class="nav" aria-label="Account">
-      <a class="text" href="${ROUTES.signIn}">Log in</a>
+      ${pricing ? `<a class="text pricing-link" href="${PRICING_PATH}">Pricing</a>\n      ` : ''}<a class="text" href="${ROUTES.signIn}">Log in</a>
       <a class="btn solid small" href="${ROUTES.signUp}" data-flow="seller">Start selling</a>
     </nav>
   </div>
@@ -275,7 +291,7 @@ function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null } = {}) {
     </div>
   </section>
 
-  <section class="final" aria-labelledby="final-title">
+  ${pricing ? `${renderLandingPricingSection(pricing)}\n\n  ` : ''}<section class="final" aria-labelledby="final-title">
     <div class="wrap">
       <h2 id="final-title">Discover what is next.</h2>
       <p class="sub">Your data is never sold, and account deletion is always one tap away in Settings.</p>
@@ -294,7 +310,7 @@ function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null } = {}) {
       <a href="${ROUTES.privacy}">Privacy</a>
       <a href="${ROUTES.terms}">Terms</a>
       <a href="${ROUTES.guidelines}">Community guidelines</a>
-      <a href="${ROUTES.support}">Support</a>
+      <a href="${ROUTES.support}">Support</a>${pricing ? `\n      <a href="${PRICING_PATH}">Pricing</a>` : ''}
     </nav>
   </div>
 </footer>
@@ -306,7 +322,7 @@ function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null } = {}) {
       try{localStorage.setItem(${JSON.stringify(PENDING_FLOW_KEY)},this.getAttribute('data-flow'));}catch(e){}
     });
   }
-})();
+})();${pricing ? `\n${trialDateScript(pricing)}` : ''}
 </script>
 </body>
 </html>
@@ -328,16 +344,37 @@ function writeLandingPage(outputDir, projectRoot, env = process.env) {
     const source = path.join(projectRoot, 'node_modules', '@expo-google-fonts', 'inter', fontDirs[weight], file);
     if (fs.existsSync(source)) fs.copyFileSync(source, path.join(fontOut, file));
   }
+  // Plan prices, fees and trial terms come from the app/server catalogue.
+  // If it cannot be read the landing page ships without pricing (and no
+  // /pricing page) rather than with a wrong number.
+  let pricing = null;
+  try {
+    pricing = require('./plan-catalogue').loadPlanCatalogue();
+  } catch (err) {
+    console.warn(`Pricing skipped: ${err && err.message ? err.message : err}`);
+  }
   const html = renderLandingHtml({
     appStoreUrl: env.EXPO_PUBLIC_APP_STORE_URL,
     playStoreUrl: env.EXPO_PUBLIC_PLAY_STORE_URL,
+    pricing,
   });
   fs.writeFileSync(path.join(outputDir, 'landing.html'), html);
+  const pricingFile = path.join(outputDir, PRICING_FILE);
+  if (pricing) {
+    fs.writeFileSync(pricingFile, renderPricingHtml(pricing, {
+      CANONICAL_ORIGIN, LOGO_URL, BASE_CSS: CSS, ROUTES, PENDING_FLOW_KEY,
+    }));
+  } else {
+    fs.rmSync(pricingFile, { force: true });
+  }
   return html;
 }
 
 module.exports = {
   writeLandingPage,
+  BASE_CSS: CSS,
+  LOGO_URL,
+  PRICING_FILE,
   CANONICAL_ORIGIN,
   DESCRIPTION,
   FONT_FILES,
