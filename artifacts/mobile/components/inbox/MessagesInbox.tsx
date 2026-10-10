@@ -55,6 +55,7 @@ import { NOTE_MAX_CHARS } from '@/services/socialTypes';
 import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from '@/services/activityService';
 import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
+import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRow';
@@ -676,6 +677,9 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     const unsub = subscribeSocial(() => { loadData(); loadSuggested(); loadStoryTray(); loadNotesTray(); });
     return unsub;
   }, [loadData, loadSuggested, loadStoryTray, loadNotesTray]);
+  useRealtimeEvents(event => {
+    if (event.type === 'message.created' || event.type === 'message.read' || event.type === 'conversation.updated' || event.type === 'badges.changed') void loadData();
+  }, !!userId && !isPreviewSession());
 
   useEffect(() => subscribeConversationReadFailure(conversationId => {
     localReadClaims.current.delete(conversationId);

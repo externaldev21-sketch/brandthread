@@ -10,6 +10,7 @@
  * pub/sub so the bell badges and the older notifications screen stay in sync.
  */
 import { serviceRequest } from '@/lib/serviceConfig';
+import { isRealtimeConnected, subscribeRealtime, subscribeRealtimeStatus } from '@/lib/realtime/messagesSocket';
 import { subscribeSocial } from '@/services/socialService';
 import { ACTIVITY_PAGE_SIZE, type ActivityFilter, type ActivityItem } from '@/lib/activity';
 import {
@@ -183,7 +184,7 @@ export async function dismissSuggestedPerson(userId: string): Promise<void> {
   emitChange();
 }
 
-// ─── Realtime (short polling while a screen is focused) ──────────────────────
+// ─── Realtime ────────────────────────────────────────────────────────────────
 //
 // Polls the tiny `/unread-count` endpoint every ~1.5s while a screen is
 // focused, and only fires `onChange` when the count or latest event actually
@@ -192,6 +193,11 @@ export async function dismissSuggestedPerson(userId: string): Promise<void> {
 // connected the poll relaxes to a 15s safety net.
 const REALTIME_SAFETY_POLL_MS = 15_000;
 
+// The messages socket (lib/realtime/messagesSocket.ts) sends `badges.changed`
+// the moment an Activity row lands or is read anywhere; that triggers one
+// fetch of the tiny `/unread-count` endpoint. The ~1.5s short poll only runs
+// while the socket is down (plus a 60s safety tick while it is up).
+// `onChange` fires only when the count or latest event actually moved.
 export interface ActivityRealtimeHandle {
   stop(): void;
 }
@@ -205,6 +211,12 @@ export function watchActivityRealtime(
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   let inFlight = false;
+  const RECONCILE_MS = 60_000;
+  const schedule = () => {
+    if (stopped) return;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(tick, isRealtimeConnected() ? RECONCILE_MS : isUserEventsConnected() ? Math.max(intervalMs, REALTIME_SAFETY_POLL_MS) : intervalMs);
+  };
   const tick = async () => {
     if (stopped || inFlight) return;
     inFlight = true;
@@ -224,15 +236,18 @@ export function watchActivityRealtime(
       // A failed poll just tries again next tick.
     } finally {
       inFlight = false;
-      // With the realtime socket up, the server pushes `activity.updated` the
-      // moment a row lands, so the poll only needs to be a slow safety net.
-      if (!stopped) timer = setTimeout(tick, isUserEventsConnected() ? Math.max(intervalMs, REALTIME_SAFETY_POLL_MS) : intervalMs);
+      schedule();
     }
   };
 
   const unsubscribeRealtime = subscribeUserEvents((event) => {
     if (event.type === 'activity.updated' || (event.type === 'conversation.updated' && event.reason === 'message')) void tick();
   });
+  const offEvents = subscribeRealtime((event) => {
+    if (event.type === 'badges.changed') void tick();
+  });
+  // Dropped → back to the short poll; reconnected → one catch-up fetch.
+  const offStatus = subscribeRealtimeStatus(() => { void tick(); });
 
   void tick();
   return {
@@ -240,6 +255,8 @@ export function watchActivityRealtime(
       stopped = true;
       if (timer) clearTimeout(timer);
       unsubscribeRealtime();
+      offEvents();
+      offStatus();
     },
   };
 }

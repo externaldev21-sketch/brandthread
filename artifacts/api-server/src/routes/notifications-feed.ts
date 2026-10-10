@@ -19,6 +19,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { isChannelEnabledForUser } from "../lib/notificationChannels";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
+import { emitToUsers } from "../ws/messagesHub";
 import {
   normalizePushEventCategory,
   sendPushToUser,
@@ -304,6 +305,7 @@ buyerRouter.patch("/read-all", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   await db.update(notificationsFeed).set({ isRead: true })
     .where(eq(notificationsFeed.userId, userId));
+  emitToUsers([userId], { type: "badges.changed" });
   return res.json({ ok: true });
 });
 
@@ -311,6 +313,7 @@ buyerRouter.patch("/:id/read", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   await db.update(notificationsFeed).set({ isRead: true })
     .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));
+  emitToUsers([userId], { type: "badges.changed" });
   return res.json({ ok: true });
 });
 
@@ -318,6 +321,7 @@ buyerRouter.delete("/:id", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   await db.delete(notificationsFeed)
     .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));
+  emitToUsers([userId], { type: "badges.changed" });
   return res.json({ ok: true });
 });
 
@@ -434,6 +438,9 @@ export async function publishNotification(n: PublishInput): Promise<void> {
     // boundary for webhook retries.
     .onConflictDoNothing()
     .returning({ id: notificationsFeed.id });
+
+  // A new Activity row moves the recipient's bell / tab badges right away.
+  if (notification && !isMuted) emitToUsers([n.userId], { type: "badges.changed" });
 
   // Do not send a second push when the in-app notification already existed,
   // and don't push a muted ("see less") event either — it's still visible if
