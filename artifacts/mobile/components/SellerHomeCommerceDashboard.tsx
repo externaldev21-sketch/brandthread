@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -80,6 +79,8 @@ import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProdu
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
+import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
+import { getReadyRows } from '@/lib/launchChecklist';
 import {
   BG,
   FG,
@@ -91,6 +92,7 @@ import {
   SCREEN_BG,
   SP,
 } from '@/lib/theme';
+import { Icon } from '@/components/ui/Icon';
 
 type MetricKey = 'sales' | 'orders' | 'visitors' | 'conversion' | 'aov';
 
@@ -650,6 +652,14 @@ export default function SellerHomeCommerceDashboard({
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
   const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
+  // Shopify's "Get ready to sell" (LaunchChecklistCard) takes the hero's
+  // place until the first sale; from then on it stays below as before.
+  const { checklist: launchChecklist } = useLaunchChecklist();
+  const readyToSellOpen = Boolean(
+    launchChecklist && !launchChecklist.dismissed
+      && getReadyRows(launchChecklist).some((row) => !row.done),
+  );
+  const showReadyToSell = newSeller && readyToSellOpen;
   const actionCounts: DashboardActionCounts | null = actionInputs ? {
     toShip: actionInputs.toShip,
     toAnswer: actionInputs.unreadMessages,
@@ -758,7 +768,7 @@ export default function SellerHomeCommerceDashboard({
                   <Text style={[styles.storeUrlText, { color: theme.muted }]} numberOfLines={1} ellipsizeMode="middle">
                     {middleTruncate(storeUrl.replace(/^https?:\/\//, ''))}
                   </Text>
-                  <Feather name={storeUrlCopied ? 'check' : 'copy'} size={13} color={theme.muted} />
+                  <Icon name={storeUrlCopied ? 'check' : 'copy'} size={13} color={theme.muted} />
                 </TouchableOpacity>
               )}
             </View>
@@ -773,7 +783,7 @@ export default function SellerHomeCommerceDashboard({
 
           {!data && analyticsError ? (
             <View style={styles.errorBanner} testID="seller-dashboard-error">
-              <Feather name="alert-circle" size={16} color={theme.error} />
+              <Icon name="alert-circle" size={16} color={theme.error} />
               <Text style={[styles.errorText, { color: theme.error }]}>Couldn’t load your dashboard.</Text>
               <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel="Retry loading the dashboard">
                 <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
@@ -787,6 +797,12 @@ export default function SellerHomeCommerceDashboard({
             </View>
           ) : (
             <>
+              {showReadyToSell ? (
+                <View style={styles.readyToSell}>
+                  <LaunchChecklistCard />
+                </View>
+              ) : (
+              <>
               {/* ── Hero + scrubbable chart ────────────────────────────── */}
               <PressableScale onPress={() => setMetric('sales')} style={styles.heroWrap} accessibilityRole="button" accessibilityLabel="Show Total sales in the chart">
                 <Text style={[styles.heroLabel, { color: theme.muted }]}>
@@ -811,7 +827,9 @@ export default function SellerHomeCommerceDashboard({
                   <Text
                     style={[
                       styles.heroDelta,
-                      { color: deltaLine.direction === 'flat' ? theme.muted : theme.text },
+                      // Delta in silver for up, down and flat alike — the
+                      // arrow carries the direction, the hero number the weight.
+                      { color: theme.muted },
                     ]}
                   >
                     {deltaLine.direction === 'up' ? '↑ ' : deltaLine.direction === 'down' ? '↓ ' : ''}
@@ -836,6 +854,8 @@ export default function SellerHomeCommerceDashboard({
                 emptyMessage={EMPTY_CHART_MESSAGE[range]}
                 showNowMarker={range === 'today'}
               />
+              </>
+              )}
 
               {/* ── Stat tile grid ───────────────────────────────────────── */}
               {!newSeller && (
@@ -885,13 +905,13 @@ export default function SellerHomeCommerceDashboard({
                   <Text style={[styles.threadCashValue, { color: THREAD_CASH_GREEN_MID }]}>
                     {threadCash.loading ? '···' : formatCents(threadCash.balanceCents ?? 0)}
                   </Text>
-                  <Feather name="chevron-right" size={16} color={theme.subtle} />
+                  <Icon name="chevron-right" size={16} color={theme.subtle} />
                 </TouchableOpacity>
               )}
 
               {/* ── Action needed / top products / recent orders, or the new-seller setup card ── */}
               <View style={isTablet ? styles.tabletRow : undefined}>
-                {newSeller ? (
+                {showReadyToSell ? null : newSeller ? (
                   <View style={[isTablet && styles.tabletRowItem, styles.section]}>
                     <SellerDashboardSetupCard
                       theme={theme}
@@ -908,7 +928,7 @@ export default function SellerHomeCommerceDashboard({
 
                 {!newSeller && secondaryError && (
                   <View style={[isTablet && styles.tabletRowItem, styles.errorBanner]}>
-                    <Feather name="alert-circle" size={16} color={theme.error} />
+                    <Icon name="alert-circle" size={16} color={theme.error} />
                     <Text style={[styles.errorText, { color: theme.error }]}>Some dashboard data couldn’t load.</Text>
                     <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel="Retry loading dashboard data">
                       <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
@@ -962,7 +982,7 @@ export default function SellerHomeCommerceDashboard({
           {/* ── Setup checklist: "Continue setup" banner opens the guided
               walkthrough sheet, which owns the full task list — no separate
               inline checklist duplicated here. ──────────────────────────── */}
-          {!setupComplete && setupState.walkthroughShown && (
+          {!showReadyToSell && !setupComplete && setupState.walkthroughShown && (
             <View style={styles.section}>
               <SetupContinueBanner
                 percent={setupPercent}
@@ -972,7 +992,8 @@ export default function SellerHomeCommerceDashboard({
             </View>
           )}
 
-          <LaunchChecklistCard />
+          {/* One setup list at a time: Get ready to sell replaces it for a new seller. */}
+          {!showReadyToSell && <LaunchChecklistCard />}
         </ResponsiveContainer>
         <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
       </ScrollView>
@@ -998,6 +1019,7 @@ export { DASHBOARD_RANGES };
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
+  readyToSell: { marginTop: SP.sm },
   // flex: 1 on the ScrollView itself is required on iOS so the layout engine
   // gives it a bounded height and allows inner content to scroll correctly.
   scrollView: { flex: 1 },
@@ -1034,8 +1056,6 @@ const styles = StyleSheet.create({
   heroLabel: {
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
   },
   heroValue: {
     fontFamily: FONT.bold,
@@ -1070,7 +1090,7 @@ const styles = StyleSheet.create({
     paddingTop: SP.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  balanceLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.6 },
+  balanceLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, },
   balanceValue: { fontFamily: FONT.bold, fontSize: FS.lg, marginTop: 2, fontVariant: ['tabular-nums'] },
   withdrawButton: {
     minHeight: 44,
@@ -1101,8 +1121,6 @@ const styles = StyleSheet.create({
     color: MUTED,
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
   },
   setupList: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   setupCard: {

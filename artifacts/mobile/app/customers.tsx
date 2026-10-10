@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/layout';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -272,44 +272,44 @@ export default function CustomersScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
+  backText: { fontSize: 15, fontFamily: FONT.medium },
+  pageTitle: { fontSize: 28, fontFamily: FONT.bold, marginBottom: 4 },
+  pageSubtitle: { fontSize: 13, fontFamily: FONT.regular, marginBottom: 20 },
   statsRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
   stat: { flex: 1, borderRadius: 12, padding: 10, borderWidth: 1, alignItems: 'center', gap: 3 },
-  statVal: { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
+  statVal: { fontSize: FS.sm, fontFamily: FONT.bold },
+  statLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   // 44x44: matches ScreenHeader's own actionBtn convention and the minimum
   // comfortable touch target (was 36x36 with only hitSlop making up the
   // difference, which the audit can't verify from the DOM).
   analyticsBtnHdr: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   loyaltyCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 16 },
   loyaltyLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  loyaltyTitle: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
-  loyaltySub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  loyaltyTitle: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  loyaltySub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   loyaltyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
-  loyaltyBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  loyaltyBtnText: { fontSize: 13, fontFamily: FONT.semibold },
   searchWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, marginBottom: 12 },
-  searchInput: { flex: 1, fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
+  searchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular },
   segments: { marginBottom: 16 },
   sortRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   segChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
-  segText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  segText: { fontSize: 13, fontFamily: FONT.medium },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   custRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
+  avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   custInfo: { flex: 1, gap: 2 },
-  custName: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
-  custEmail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  custOrders: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  custName: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  custEmail: { fontSize: 11, fontFamily: FONT.regular },
+  custOrders: { fontSize: 11, fontFamily: FONT.regular },
   custRight: { alignItems: 'flex-end', justifyContent: 'center' },
   tagsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   tagChip:   { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
-  tagText:   { fontSize: FS.xs, fontFamily: 'Inter_600SemiBold' },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+  tagText:   { fontSize: FS.xs, fontFamily: FONT.semibold },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
   rewardRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   rewardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  rewardLabel: { flex: 1, fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
-  rewardVal: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  rewardLabel: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular },
+  rewardVal: { fontSize: 13, fontFamily: FONT.medium },
 });

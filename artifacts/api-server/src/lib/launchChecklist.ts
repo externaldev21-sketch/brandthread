@@ -10,6 +10,7 @@ export const LAUNCH_STEP_IDS = [
   "accent",
   "socials",
   "first_product",
+  "shipping",
   "preview",
   "publish",
   "payouts",
@@ -25,6 +26,8 @@ export interface LaunchChecklistInput {
   storeAccentColor: string | null;
   socialLinks: Record<string, unknown> | null;
   productCount: number;
+  /** At least one shipping zone or shipping rate exists. */
+  shippingConfigured: boolean;
   storePreviewedAt: Date | null;
   storePublished: boolean;
   stripeAccountStatus: string | null;
@@ -55,6 +58,7 @@ export function deriveLaunchChecklist(input: LaunchChecklistInput): LaunchCheckl
     accent: filled(input.storeAccentColor),
     socials: hasSocial(input.socialLinks),
     first_product: input.productCount > 0,
+    shipping: input.shippingConfigured,
     preview: input.storePreviewedAt != null,
     publish: input.storePublished,
     payouts: input.stripeAccountStatus === "active",
