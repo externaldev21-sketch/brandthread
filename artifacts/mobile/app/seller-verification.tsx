@@ -10,7 +10,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -120,7 +119,6 @@ export default function SellerVerificationScreen() {
   }, [loading, loadStatus]));
 
   async function handleStart() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setStarting(true);
     try {
       const result = await (api as any).seller.verification.start();
@@ -309,7 +307,7 @@ export default function SellerVerificationScreen() {
             <>
               <SecondaryButton
                 label={loading ? 'Checking…' : 'Check status'}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); loadStatus(); }}
+                onPress={() => { loadStatus(); }}
               />
               <Text style={s.pendingHint}>
                 Stripe will notify us automatically when the review is complete.

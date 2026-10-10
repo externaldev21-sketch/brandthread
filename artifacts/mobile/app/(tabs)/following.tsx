@@ -17,7 +17,6 @@ import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Header } from '@/components/layout';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
-import { hapticPrimaryAction } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
@@ -133,7 +132,7 @@ function DropCard({ drop, onPress }: { drop: DropItem; onPress: () => void }) {
         <Text style={[TYPE_SCALE.callout, c.desc, { color: palette.mutedForeground }]} numberOfLines={2}>{drop.desc}</Text>
         <PressableScale
           style={[c.shopBtn, { backgroundColor: color }]}
-          onPress={() => { hapticPrimaryAction(); onPress(); }}
+          onPress={() => { onPress(); }}
         >
           <Feather name="shopping-bag" size={14} color="#FFF" />
           <Text style={[TYPE_SCALE.callout, c.shopBtnText]}>{live ? 'Shop drop' : 'View drop'}</Text>
@@ -263,7 +262,6 @@ export default function FollowingScreen() {
                 key={brand.id}
                 style={s.avatarItem}
                 onPress={() => {
-                  hapticPrimaryAction();
                   const drop = drops.find(d => d.id === brand.id);
                   if (drop) {
                     router.push((`/buyer-drop-detail?dropId=${drop.id}&dropName=${encodeURIComponent(drop.name)}`) as never);
@@ -311,7 +309,6 @@ export default function FollowingScreen() {
             <DropCard
               drop={item}
               onPress={() => {
-                hapticPrimaryAction();
                 router.push((`/buyer-drop-detail?dropId=${item.id}&dropName=${encodeURIComponent(item.name)}`) as never);
               }}
             />

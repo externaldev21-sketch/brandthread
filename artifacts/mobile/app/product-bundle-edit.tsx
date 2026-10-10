@@ -19,7 +19,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
@@ -106,7 +106,6 @@ export default function ProductBundleEditScreen() {
       Alert.alert('Save first', 'Save the bundle details before adding products.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const item = await (api as any).bundles.addItem(bundleId, {
         productId: product.id,
@@ -126,7 +125,6 @@ export default function ProductBundleEditScreen() {
 
   async function removeItem(itemId: string) {
     if (!bundleId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await (api as any).bundles.removeItem(bundleId, itemId);
     setItems(prev => prev.filter(i => i.id !== itemId));
   }
@@ -141,7 +139,6 @@ export default function ProductBundleEditScreen() {
       return;
     }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       if (isNew) {
@@ -161,7 +158,7 @@ export default function ProductBundleEditScreen() {
           compareAtCents,
           status:           isActive ? 'active' : 'draft',
         });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         Alert.alert('Saved', 'Bundle updated successfully.');
       }
     } catch { Alert.alert('Error', 'Could not save bundle.'); }
@@ -263,7 +260,7 @@ export default function ProductBundleEditScreen() {
           <Text style={s.sectionTitle}>Products in bundle</Text>
           <TouchableOpacity
             style={s.addItemBtn}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerOpen(o => !o); }}
+            onPress={() => { setPickerOpen(o => !o); }}
             activeOpacity={0.7}
           >
             <Feather name="plus" size={14} color={PURPLE_LIGHT} />

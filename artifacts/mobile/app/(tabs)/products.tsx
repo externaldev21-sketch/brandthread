@@ -20,7 +20,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
 import { StockEditorSheet } from '@/components/products/StockEditorSheet';
@@ -35,6 +35,7 @@ import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
+import { openPullDownMenu } from '@/lib/contextMenu';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -401,7 +402,7 @@ function SortModal({
           <PressableScale
             key={key}
             style={[sh.sortOption, current === key && sh.sortOptionActive]}
-            onPress={() => { hapticToggle(); onSelect(key); onClose(); }}
+            onPress={() => { haptics.selection(); onSelect(key); onClose(); }}
             accessibilityLabel={label}
             accessibilityState={{ selected: current === key }}
           >
@@ -707,7 +708,6 @@ export default function ProductsScreen() {
       showPreviewOnlyFeedback();
       return;
     }
-    hapticPrimaryAction();
     setActionProduct(product);
     setActionSheetVisible(true);
   }, [previewOnly, showPreviewOnlyFeedback]);
@@ -717,7 +717,6 @@ export default function ProductsScreen() {
       showPreviewOnlyFeedback();
       return;
     }
-    hapticPrimaryAction();
     setStockEditProduct(product);
     setStockEditVisible(true);
   }, [previewOnly, showPreviewOnlyFeedback]);
@@ -820,15 +819,14 @@ export default function ProductsScreen() {
           },
           {
             icon: 'more-horizontal',
-            onPress: () => showActionSheet('Products', 'Choose an action', [
-              { text: 'Select products', onPress: () => router.push('/products-bulk-edit' as never) },
-              { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
-              { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
-              { text: 'Export products', onPress: () => { void handleExportProducts(); } },
-              { text: 'Scheduled launches', onPress: () => router.push('/product-launches' as never) },
-              { text: 'Waitlist demand', onPress: () => router.push('/waitlist-demand' as never) },
-              { text: 'Size charts', onPress: () => router.push('/size-chart-templates' as never) },
-              { text: 'Cancel', style: 'cancel' },
+            onPress: (event?: unknown) => openPullDownMenu(event, [
+              { label: 'Select products', icon: 'check-square', onPress: () => router.push('/products-bulk-edit' as never) },
+              { label: 'Import products (CSV)', icon: 'file-text', onPress: () => router.push('/product-import' as never) },
+              { label: 'Import from Shopify', icon: 'shopping-bag', onPress: () => router.push('/shopify-import' as never) },
+              { label: 'Export products', icon: 'download', onPress: () => { void handleExportProducts(); } },
+              { label: 'Scheduled launches', icon: 'calendar', onPress: () => router.push('/product-launches' as never) },
+              { label: 'Waitlist demand', icon: 'users', onPress: () => router.push('/waitlist-demand' as never) },
+              { label: 'Size charts', icon: 'maximize-2', onPress: () => router.push('/size-chart-templates' as never) },
             ]),
             accessibilityLabel: 'More product actions',
           },
@@ -836,10 +834,10 @@ export default function ProductsScreen() {
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchPlaceholder="Search products…"
-        onFilterPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
+        onFilterPress={() => setFilterModalVisible(true)}
         hasActiveFilter={hasActiveFilter}
         filterAccessibilityLabel={filter !== 'all' ? `Filter: ${filter}` : 'Filter products'}
-        onSortPress={() => { hapticPrimaryAction(); setSortModalVisible(true); }}
+        onSortPress={() => setSortModalVisible(true)}
         sortAccessibilityLabel={`Sort: ${currentSortLabel}`}
         chips={filterPills.map(pill => ({
           key: pill.value,

@@ -5,7 +5,7 @@
 import { useCallback, useState } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { confirmSamplePayment, createSampleCheckoutSession } from '@/services/manufacturerService';
 import { payOrderCard, type OrderCardSnapshot, type PayOutcome } from '@/services/manufacturerOrderFlow';
 
@@ -24,7 +24,7 @@ export function useOrderCardPayment(onSettled?: () => void) {
         openCheckout: (url, returnUrl) => WebBrowser.openAuthSessionAsync(url, returnUrl),
         confirmPayment: confirmSamplePayment,
       });
-      if (result.status === 'paid') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (result.status === 'paid') haptics.success();
       setOutcome({ orderId: order.id, result });
       return result;
     } finally {

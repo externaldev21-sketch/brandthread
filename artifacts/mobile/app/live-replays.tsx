@@ -22,7 +22,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type LiveReplay } from '@/lib/api';
 import { formatReplayDuration } from '@/lib/liveReplayFormat';
 import { FONT, FS, SP } from '@/lib/theme';
-import { hapticLight } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 
 const COLUMNS = 3;
 const GAP = 2;
@@ -80,7 +80,6 @@ export default function LiveReplaysScreen() {
   }, [api]);
 
   const openManage = useCallback((replay: LiveReplay) => {
-    hapticLight();
     const hidden = replay.visibility === 'hidden';
     showActionSheet(replay.title, undefined, [
       {
@@ -132,7 +131,7 @@ export default function LiveReplaysScreen() {
               <View style={styles.cell}>
                 <Pressable
                   onPress={() => openReplay(item)}
-                  onLongPress={item.isOwner ? () => openManage(item) : undefined}
+                  onLongPress={item.isOwner ? () => { haptics.rigid(); openManage(item); } : undefined}
                   accessibilityRole="button"
                   accessibilityLabel={`Play replay ${item.title}`}
                   testID={`live-replay-tile-${item.streamId}`}

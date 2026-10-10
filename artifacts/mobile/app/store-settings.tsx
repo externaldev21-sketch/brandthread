@@ -13,7 +13,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListRow } from '@/components/ui/ListRow';
-import { hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { getStorefront, updateSettings } from '@/services/storeService';
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
 import { radius } from '@/constants/radii';
@@ -238,7 +238,7 @@ export default function StoreSettingsScreen() {
                 <PressableScale
                   key={opt.value}
                   onPress={() => {
-                    hapticToggle();
+                    haptics.selection();
                     patch({ storeStatus: opt.value, passwordProtected: opt.value === 'password_protected' });
                   }}
                   accessibilityRole="button"

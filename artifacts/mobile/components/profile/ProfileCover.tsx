@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -121,7 +121,6 @@ export function useProfileCover({ own, cover, userId }: { own: boolean; cover: C
   }, [handlePicked]);
 
   const startAdd = useCallback(() => {
-    hapticLight();
     if (Platform.OS === 'web') { void pickFrom('library'); return; }
     Alert.alert('Add cover video', 'Up to 25 seconds. It plays muted on a loop.', [
       { text: 'Choose from library', onPress: () => { void pickFrom('library'); } },
@@ -151,8 +150,8 @@ export function useProfileCover({ own, cover, userId }: { own: boolean; cover: C
     coachmarkVisible,
     dismissCoachmark,
     startAdd,
-    pickFromLibrary: () => { hapticLight(); void pickFrom('library'); },
-    openManage: () => { hapticSelection(); setManageOpen(true); },
+    pickFromLibrary: () => { void pickFrom('library'); },
+    openManage: () => { setManageOpen(true); },
     manageOpen,
     closeManage: () => setManageOpen(false),
     changeFromManage: () => { setManageOpen(false); startAdd(); },
@@ -314,7 +313,7 @@ export function CoverTrimSheet({
           return (
             <PressableScale
               key={length}
-              onPress={() => { hapticSelection(); setTrim((prev) => clampTrim(prev.start, length, total)); }}
+              onPress={() => { haptics.selection(); setTrim((prev) => clampTrim(prev.start, length, total)); }}
               accessibilityRole="button"
               accessibilityState={{ selected }}
               accessibilityLabel={`${length} seconds`}

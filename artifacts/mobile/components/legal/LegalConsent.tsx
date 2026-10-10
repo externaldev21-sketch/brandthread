@@ -8,8 +8,9 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT } from '@/lib/theme';
 
 export function LegalConsent({
   checked,
@@ -39,7 +40,7 @@ export function LegalConsent({
   return (
     <View style={style}>
       <Pressable
-        onPress={() => { Haptics.selectionAsync(); onChange(!checked); }}
+        onPress={() => { haptics.selection(); onChange(!checked); }}
         style={styles.row}
         accessibilityRole="checkbox"
         accessibilityState={{ checked }}
@@ -95,13 +96,13 @@ export function LegalContinueNotice({ style }: { style?: StyleProp<TextStyle> })
 }
 
 const styles = StyleSheet.create({
-  notice: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  notice: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 4 },
   box: {
     width: 22, height: 22, borderRadius: 11, borderWidth: 1.5,
     alignItems: 'center', justifyContent: 'center', marginTop: 0,
   },
-  text: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19 },
-  link: { fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline' },
-  error: { fontFamily: 'Inter_500Medium', fontSize: 12, marginTop: 6, marginLeft: 34 },
+  text: { flex: 1, fontFamily: FONT.regular, fontSize: 13, lineHeight: 19 },
+  link: { fontFamily: FONT.semibold, textDecorationLine: 'underline' },
+  error: { fontFamily: FONT.medium, fontSize: 12, marginTop: 6, marginLeft: 34 },
 });

@@ -11,7 +11,6 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getStoreAnalytics, getFilterState } from '@/services/analyticsService';
 import { StoreAnalytics, StoreFunnelStep, AnalyticsFilterState } from '@/services/analyticsTypes';
@@ -88,7 +87,7 @@ export default function AnalyticsStoreScreen() {
     <View style={{ flex: 1 }}>
       <ScreenHeader
         title="Store Analytics"
-        rightElement={<HeaderPillButton label="Edit Store" onPress={() => { Haptics.selectionAsync(); router.push('/store-builder' as never); }} />}
+        rightElement={<HeaderPillButton label="Edit Store" onPress={() => { router.push('/store-builder' as never); }} />}
       />
       {loading ? (
         <AnalyticsSkeleton kpiCount={3} listRows={4} />
@@ -156,7 +155,7 @@ export default function AnalyticsStoreScreen() {
               <View key={sec.sectionKey}>
                 {i > 0 && <CardDivider />}
                 <TouchableOpacity
-                  onPress={() => { Haptics.selectionAsync(); router.push('/store-sections' as never); }}
+                  onPress={() => { router.push('/store-sections' as never); }}
                   style={s.secRow}
                   activeOpacity={0.8}
                 >

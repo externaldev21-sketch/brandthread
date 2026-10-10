@@ -11,7 +11,7 @@ import { LayoutChangeEvent, Pressable, StyleProp, StyleSheet, Text, View, ViewSt
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
-import { hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, ON_DARK_MUTED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -137,7 +137,7 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
             accessibilityRole="tab"
             accessibilityLabel={option.label}
             accessibilityState={{ selected }}
-            onPress={() => { if (!selected) { hapticToggle(); onChange(option.id); } }}
+            onPress={() => { if (!selected) { haptics.selection(); onChange(option.id); } }}
             style={[styles.segment, size === 'compact' && styles.segmentCompact]}
             testID={testID ? `${testID}-${option.id}` : undefined}
           >
@@ -270,7 +270,7 @@ function UnderlineTabs({
             key={option.id}
             option={option}
             selected={selected}
-            onPress={() => { if (!selected) { hapticToggle(); onChange(option.id); } }}
+            onPress={() => { if (!selected) { haptics.selection(); onChange(option.id); } }}
             onLabelRef={(node) => { textRefs.current[option.id] = node; }}
             onLabelLayout={() => handleTabLayout(option.id)}
             testID={testID ? `${testID}-${option.id}` : undefined}

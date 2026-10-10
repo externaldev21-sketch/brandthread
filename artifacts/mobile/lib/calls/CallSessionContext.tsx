@@ -17,7 +17,6 @@
 import React, {
   createContext, useCallback, useContext, useMemo, useRef, useState,
 } from 'react';
-import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { createPreviewCallProvider, schedulePreviewIncomingTimeout } from './previewCallProvider';
 import type {
   CallEndReason, CallLogEntry, CallProvider, CallSession, StartCallInput,
@@ -95,7 +94,6 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
     setSession((prev) => {
       if (!prev || prev.callId !== callId) return prev;
       const next = { ...prev, ...patch };
-      if (patch.status === 'connected' && prev.status !== 'connected') hapticSuccessAction();
       if (patch.status === 'ended') {
         teardownSubscription();
         appendLog(next);
@@ -106,7 +104,6 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
 
   const startCall = useCallback(async (input: StartCallInput) => {
     if (sessionRef.current && sessionRef.current.status !== 'ended') return; // one call at a time
-    hapticPrimaryAction();
     const { callId } = await provider.start(input);
     const next: CallSession = {
       callId,
@@ -159,7 +156,6 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   const acceptCall = useCallback(async () => {
     const s = sessionRef.current;
     if (!s || s.status !== 'incoming') return;
-    hapticSuccessAction();
     incomingTimeoutRef.current?.();
     incomingTimeoutRef.current = null;
     await provider.accept(s.callId);
@@ -170,7 +166,6 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   const declineOrEndCall = useCallback(async () => {
     const s = sessionRef.current;
     if (!s || s.status === 'ended') return;
-    hapticDestructiveConfirm();
     const reason: CallEndReason = s.status === 'incoming' ? 'declined'
       : s.status === 'outgoing' ? 'cancelled'
       : 'hangup';

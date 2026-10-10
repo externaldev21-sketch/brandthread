@@ -72,7 +72,7 @@ const s = StyleSheet.create({
   title: { fontFamily: FONT.bold, fontSize: FS.lg },
   center: { height: 96, alignItems: 'center', justifyContent: 'center' },
   empty: { fontFamily: FONT.regular, fontSize: FS.sm, paddingVertical: 24, textAlign: 'center' },
-  prompt: { fontFamily: FONT.semibold, fontSize: FS.meta, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 },
+  prompt: { fontFamily: FONT.semibold, fontSize: FS.meta, marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
   answer: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },

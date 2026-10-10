@@ -44,10 +44,10 @@ describe('Scrubbable video progress bar', () => {
     expect(feed).toContain('thumbScale');
   });
 
-  it('gives haptic feedback on grab and release, plus a tick every few percent while dragging', () => {
-    expect(feed).toMatch(/onPanResponderGrant: \(evt\) => \{\s*setDragging\(true\);[\s\S]*?hapticLight\(\);/);
-    expect(feed).toMatch(/onPanResponderRelease: \(\) => \{\s*setDragging\(false\);\s*hapticLight\(\);/);
-    expect(feed).toContain('hapticSelection();');
+  it('ticks a selection haptic every few percent while dragging (no impact on grab/release, per the haptics map)', () => {
+    expect(feed).toMatch(/onPanResponderGrant: \(evt\) => \{\s*setDragging\(true\);/);
+    expect(feed).toMatch(/onPanResponderRelease: \(\) => \{\s*setDragging\(false\);/);
+    expect(feed).toContain('haptics.selection();');
   });
 
   it('pauses the real player for the duration of the drag and resumes on release unless the post was already paused', () => {
@@ -108,7 +108,7 @@ describe('Feed page/video container sizing (web all-black bug)', () => {
     // added in the feed rebuild), so it's no longer a single-line literal —
     // assert on the pieces instead of one exact contiguous string.
     expect(feed).toMatch(/<Pressable[\s\S]*?onPressIn=\{handlePressIn\} onPressOut=\{handlePressOut\} style=\{\{ width: pageWidth, height: pageHeight \}\}>/);
-    expect(feed).toContain('onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setMenuOpen(true); }}');
+    expect(feed).toContain('onLongPress={() => { haptics.rigid(); setMenuOpen(true); }}');
     expect(feed).toContain('<View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>');
   });
 

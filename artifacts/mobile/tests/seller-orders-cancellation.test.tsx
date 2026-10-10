@@ -84,8 +84,8 @@ vi.mock('@/components/BrandthreadUI', () => {
   return Object.fromEntries(components.map(name => [name, nativeComponent(name)]));
 });
 
-vi.mock('@/components/SwipeActionRow', () => ({
-  default: nativeComponent('SwipeActionRow'),
+vi.mock('@/components/ui/SwipeRow', () => ({
+  default: nativeComponent('SwipeRow'),
 }));
 
 vi.mock('@/contexts/AppThemeContext', () => ({

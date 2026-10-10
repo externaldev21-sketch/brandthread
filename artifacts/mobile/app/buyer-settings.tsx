@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
-import { hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { BUYER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
 import { SettingsProfileCard, SettingsSearchBar, ConfirmSheet } from '@/components/settings/SettingsKit';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -58,10 +58,10 @@ export default function BuyerSettingsScreen() {
   }
 
   async function confirmSignOut() {
+    haptics.warning();
     setSigningOut(true);
     try {
       await signOut();
-      hapticSuccess();
       router.replace('/sign-in' as never);
     } finally {
       setSigningOut(false);

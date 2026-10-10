@@ -4,7 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
-import { hapticPrimaryAction } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -29,7 +28,7 @@ export function VideoTile({ item, width, onPress }: {
 
   return (
     <Pressable
-      onPress={() => { hapticPrimaryAction(); onPress(); }}
+      onPress={() => onPress()}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"

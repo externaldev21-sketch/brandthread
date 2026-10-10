@@ -10,7 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
@@ -86,7 +86,6 @@ export default function AccountTypeSettingsScreen() {
 
   async function handleSave() {
     if (!selectedType || !isDirty) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       `Switch to ${accountInfo[selectedType].title}?`,
       'Switching account type will change the features available to you. You can switch back at any time.',
@@ -148,7 +147,7 @@ export default function AccountTypeSettingsScreen() {
                 key={type}
                 style={[s.typeCard, isSelected && { borderColor: info.color, backgroundColor: info.color + '0D' }]}
                 activeOpacity={0.8}
-                onPress={() => { Haptics.selectionAsync(); setSelectedType(type); }}
+                onPress={() => { haptics.selection(); setSelectedType(type); }}
               >
                 <View style={s.typeCardTop}>
                   <View style={[s.typeIconWrap, { backgroundColor: info.color + '22' }]}>

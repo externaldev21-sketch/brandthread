@@ -5,7 +5,6 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { FONT } from '@/lib/theme';
 
@@ -24,10 +23,6 @@ export default function GeneralSettingsScreen() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [api]);
-
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
 
   const hasBusinessDetails = !!profile?.brandName;
 
@@ -52,7 +47,7 @@ export default function GeneralSettingsScreen() {
             </View>
           ) : hasBusinessDetails ? (
             <TouchableOpacity
-              onPress={() => { haptic(); router.push('/edit-profile' as never); }}
+              onPress={() => { router.push('/edit-profile' as never); }}
               activeOpacity={0.7}
               style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
@@ -68,7 +63,7 @@ export default function GeneralSettingsScreen() {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              onPress={() => { haptic(); router.push('/edit-profile' as never); }}
+              onPress={() => { router.push('/edit-profile' as never); }}
               activeOpacity={0.7}
               style={[styles.card, styles.rowBetween, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
@@ -84,9 +79,9 @@ export default function GeneralSettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Resources</Text>
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ExternalRow icon="git-merge" label="Change log" onPress={() => { haptic(); Linking.openURL('https://brandthread.app/changelog'); }} colors={colors} />
-            <ExternalRow icon="help-circle" label="Brandthread Help Center" onPress={() => { haptic(); router.push('/help' as never); }} colors={colors} />
-            <ExternalRow icon="code" label="Hire a Brandthread Partner" onPress={() => { haptic(); router.push('/freelancer-jobs' as never); }} colors={colors} last />
+            <ExternalRow icon="git-merge" label="Change log" onPress={() => { Linking.openURL('https://brandthread.app/changelog'); }} colors={colors} />
+            <ExternalRow icon="help-circle" label="Brandthread Help Center" onPress={() => { router.push('/help' as never); }} colors={colors} />
+            <ExternalRow icon="code" label="Hire a Brandthread Partner" onPress={() => { router.push('/freelancer-jobs' as never); }} colors={colors} last />
           </View>
         </View>
       </ScrollView>

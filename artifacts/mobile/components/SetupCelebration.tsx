@@ -7,7 +7,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Modal, View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -26,7 +26,7 @@ export default function SetupCelebration({
 
   useEffect(() => {
     if (!visible) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    haptics.success();
     scale.setValue(0.6);
     opacity.setValue(0);
     Animated.parallel([

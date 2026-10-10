@@ -22,7 +22,7 @@ import { CachedImage } from '@/components/CachedImage';
 import MediaViewer from '@/components/chat/MediaViewer';
 import VideoMessageViewer from '@/components/chat/VideoMessageViewer';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { hapticPrimaryAction, hapticSelection, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -496,7 +496,7 @@ export default function SellerConversationScreen() {
   }
 
   function insertQuickReply(reply: SellerQuickReply) {
-    hapticSelection();
+    haptics.selection();
     handleChangeText(text.trim() ? `${text.trimEnd()} ${reply.body}` : reply.body);
     setShowQuickReplies(false);
   }
@@ -684,7 +684,6 @@ export default function SellerConversationScreen() {
 
   function openBuyerContext() {
     if (!other) return;
-    hapticPrimaryAction();
     setShowBuyerContext(true);
     if (buyerOrders === null && !loadingBuyerOrders) void loadBuyerOrders();
   }
@@ -697,12 +696,11 @@ export default function SellerConversationScreen() {
 
   async function handleAcceptRequest() {
     if (!id || !conv || requestActionLoading) return;
-    hapticPrimaryAction();
     setRequestActionLoading(true);
     const previousConv = conv;
     try {
       await acceptSellerConversationRequest(id, api);
-      hapticSuccessAction();
+      haptics.success();
       setConv({ ...previousConv, isRequest: false });
       // Composer takes the bottom panel's place the instant isRequestMode
       // flips false — hand it the keyboard right away, matching
@@ -719,7 +717,7 @@ export default function SellerConversationScreen() {
 
   function handleDeleteRequest() {
     if (!id) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     const conversationId = id;
     const name = displayName;
     scheduleDeleteSellerConversationRequest(conversationId, api);
@@ -742,7 +740,7 @@ export default function SellerConversationScreen() {
       confirmLabel: 'Block',
     });
     if (!confirmed) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     try {
       await blockSellerConversationRequestUser(id, other);
       goBackOr(router);
@@ -769,7 +767,7 @@ export default function SellerConversationScreen() {
   async function handleQuickToggleDisappearing() {
     if (!id || !conv) return;
     const next = !conv.disappearingEnabled;
-    hapticSelection();
+    haptics.selection();
     try {
       const result = await api.conversations.setDisappearing(id, next);
       setConv((prev) => prev ? { ...prev, disappearingEnabled: next } : prev);
@@ -869,7 +867,6 @@ export default function SellerConversationScreen() {
   // buyer screen's identical-looking mic button.
   async function handleVoiceRecorded(result: { uri: string; durationSec: number; waveform: number[] }) {
     if (!id) return;
-    hapticSuccessAction();
     const attachment: MsgAttachment = {
       type: 'voice',
       uri: result.uri,
@@ -1157,7 +1154,7 @@ export default function SellerConversationScreen() {
   }
 
   function openReactionOverlay(msg: Msg) {
-    hapticSelection();
+    haptics.rigid();
     const node = bubbleAnchorRefs.current[msg.id];
     if (!node) { setActiveSheetMsg(msg); return; }
     node.measureInWindow((x, y, width, height) => {
@@ -1171,7 +1168,7 @@ export default function SellerConversationScreen() {
    *  directly (this screen doesn't go through services/socialService). */
   async function handleReact(msg: Msg, type: ReactionType) {
     if (!id) return;
-    hapticSelection();
+    haptics.light();
     const prevMessages = messages;
     const { next, isToggleOff } = applyOptimisticReaction(msg.reactions ?? [], myId, user?.fullName || user?.username || 'You', type);
     setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, reactions: next } : m)));
@@ -1186,7 +1183,6 @@ export default function SellerConversationScreen() {
   function sheetCopy() {
     if (activeSheetMsg?.text) {
       Clipboard.setStringAsync(activeSheetMsg.text);
-      hapticSuccessAction();
     }
     closeMessageSheet();
   }
@@ -1589,7 +1585,7 @@ export default function SellerConversationScreen() {
       <View style={[s.header, { paddingTop: headerTopInset + SP.sm, paddingRight: SP.md + insets.right }]}>
         <View style={s.headerLeftGroup}>
           <PressableScale
-            onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
+            onPress={() => { goBackOr(router); }}
             style={s.headerBack}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
@@ -1607,7 +1603,7 @@ export default function SellerConversationScreen() {
             <PressableScale
               style={s.headerCenterRow}
               disabled={!other || !id}
-              onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+              onPress={() => { openChatDetails(); }}
               testID="seller-conversation-header-name"
               accessibilityRole="button"
               accessibilityLabel={`${displayName} — chat details`}
@@ -1642,7 +1638,7 @@ export default function SellerConversationScreen() {
             <>
               <PressableScale
                 style={s.headerCallBtn}
-                onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+                onPress={() => { handleStartCall('voice'); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
                 accessibilityLabel="Voice call"
@@ -1651,7 +1647,7 @@ export default function SellerConversationScreen() {
               </PressableScale>
               <PressableScale
                 style={s.headerCallBtn}
-                onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
+                onPress={() => { handleStartCall('video'); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
                 accessibilityLabel="Video call"
@@ -1675,7 +1671,8 @@ export default function SellerConversationScreen() {
           {other ? (
             <PressableScale
               style={s.headerCallBtn}
-              onPress={() => { hapticPrimaryAction(); openConversationOptions({
+              onPress={(event) => { openConversationOptions({
+                event,
                 router,
                 social: api.social,
                 counterpart: { userId: other.userId, name: other.name },
@@ -1711,7 +1708,6 @@ export default function SellerConversationScreen() {
           <PressableScale
             style={s.requestProfilePill}
             onPress={() => {
-              hapticPrimaryAction();
               const qs = new URLSearchParams({
                 userId: other.userId, name: other.name,
                 handle: other.handle ?? '', initials: other.initials ?? '',
@@ -1844,7 +1840,7 @@ export default function SellerConversationScreen() {
           testID="seller-conversation"
           value={text}
           onChangeText={handleChangeText}
-          onSend={() => { hapticPrimaryAction(); handleSend(); }}
+          onSend={() => { handleSend(); }}
           canSend={canSend}
           placeholder="Message…"
           inputRef={textInputRef}
@@ -1852,7 +1848,7 @@ export default function SellerConversationScreen() {
           leftAccessory={
             <PressableScale
               style={s.cameraCircleBtn}
-              onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
+              onPress={() => { setShowMediaSheet(true); }}
               disabled={isUploading || isSending}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="seller-conversation-attach"
@@ -1869,7 +1865,7 @@ export default function SellerConversationScreen() {
             {/* Products / posts / files picker */}
             <PressableScale
               style={s.accBtn}
-              onPress={() => { hapticPrimaryAction(); openAttachPicker(); }}
+              onPress={() => { openAttachPicker(); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="seller-conversation-attach-picker"
               accessibilityRole="button"
@@ -2258,7 +2254,6 @@ export default function SellerConversationScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`${row.orderNumber}, ${orderStatusBadgeLabel(uiStatus)}, ${formatCents(row.totalCents)}`}
                     onPress={() => {
-                      hapticSelection();
                       setShowBuyerContext(false);
                       router.push(('/order-detail?id=' + row.id) as never);
                     }}
@@ -2351,7 +2346,7 @@ export default function SellerConversationScreen() {
           if (!other?.userId) return;
           try {
             await api.social.follow(other.userId);
-            hapticSuccessAction();
+            haptics.light();
           } catch {
             // Best-effort — the composer button stays disabled until the
             // next mutual-follow check confirms it either way.

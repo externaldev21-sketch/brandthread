@@ -22,16 +22,21 @@ const root = path.resolve(__dirname, '..');
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 describe('Messages "Options" menus use showActionSheet, not the dead-on-web Alert.alert', () => {
+  // The header "..." menus are now the UIMenu-style pull-down and the row
+  // long-press is the long-press preview menu (lib/contextMenu.ts, rendered
+  // by ContextMenuHost on every platform, web included).
   it('buyer-conversation.tsx header "..." menu (openOptions)', () => {
     const src = read('app/buyer-conversation.tsx');
-    const fn = src.slice(src.indexOf('function openOptions()'), src.indexOf('function openOptions()') + 800);
-    expect(fn).toContain("showActionSheet('Options'");
+    const fn = src.slice(src.indexOf('function openOptions('), src.indexOf('function openOptions(') + 1200);
+    expect(fn).toContain('openPullDownMenu(event');
     expect(fn).not.toMatch(/Alert\.alert\(\s*'Options'/);
   });
 
   it('(buyer)/inbox.tsx row long-press menu (longPressConversation)', () => {
     const src = read('app/(buyer)/inbox.tsx');
-    const fn = src.slice(src.indexOf('function longPressConversation'), src.indexOf('function longPressConversation') + 600);
+    const fn = src.slice(src.indexOf('function longPressConversation'), src.indexOf('function longPressConversation') + 1800);
+    expect(fn).toContain('openContextMenu({');
+    // Fallback when the menu host isn't mounted stays web-safe.
     expect(fn).toContain("showActionSheet('Options'");
     expect(fn).not.toMatch(/Alert\.alert\(\s*'Options'/);
   });
@@ -45,7 +50,7 @@ describe('Messages "Options" menus use showActionSheet, not the dead-on-web Aler
 
   it('seller conversation header "..." menu (DmSafety.openConversationOptions)', () => {
     const src = read('components/safety/DmSafety.tsx');
-    expect(src).toContain('showActionSheet(counterpart.name');
+    expect(src).toContain('openPullDownMenu(event');
     expect(src).not.toMatch(/Alert\.alert\(\s*(counterpart\.name|'Message')/);
     expect(src).not.toMatch(/import \{ Alert,/);
   });

@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { radius, nestedRadius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 type Mode = 'buyer' | 'seller';
 
@@ -27,7 +28,7 @@ export default function ModeSwitcher({ currentMode }: ModeSwitcherProps) {
 
   const switchTo = async (mode: Mode) => {
     if (mode === currentMode) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     await AsyncStorage.setItem('active_mode', mode);
     Animated.spring(slideAnim, {
       toValue: mode === 'seller' ? 1 : 0,
@@ -106,7 +107,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   optionText: {
     fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: FONT.semibold,
     color: theme.muted,
   },
   optionTextActive: {

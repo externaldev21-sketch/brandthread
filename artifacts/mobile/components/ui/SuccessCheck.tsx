@@ -32,7 +32,7 @@ import Animated, {
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 
 export interface SuccessCheckProps {
   size?: number;
@@ -54,7 +54,7 @@ function FilledSuccessCheck({ size, iconSize, haptic, testID }: { size: number; 
   const scale = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
-    if (haptic) hapticSuccessAction();
+    if (haptic) haptics.success();
     RNAnimated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }).start();
     // Only ever plays once per mount — a success moment is shown, then dismissed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,7 +100,7 @@ function DrawnSuccessCheck({ size, haptic, testID }: { size: number; haptic: boo
   const scale = useSharedValue(reduceMotion ? 1 : 0.94);
 
   useEffect(() => {
-    if (haptic) hapticSuccessAction();
+    if (haptic) haptics.success();
     if (reduceMotion) return;
     ring.value = withTiming(1, { duration: RING_MS, easing: EASE });
     scale.value = withTiming(1, { duration: RING_MS, easing: EASE });

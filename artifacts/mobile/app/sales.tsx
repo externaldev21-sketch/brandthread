@@ -15,7 +15,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -168,7 +168,6 @@ export default function SalesScreen() {
     if (start && end && end <= start) { Alert.alert('Invalid dates', 'The end date must be after the start date.'); return; }
     if (previewOnly) { Alert.alert('Sign in required', 'Sign in to your seller account to create sales.'); return; }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       const payload = {
@@ -187,7 +186,7 @@ export default function SalesScreen() {
         const created = await api.sales.create(payload);
         setSales(prev => [normalizeSale(created), ...prev]);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setShowModal(false);
     } catch (err: any) {
       Alert.alert("Couldn't save the sale", err?.message ?? 'Try again.');
@@ -197,7 +196,7 @@ export default function SalesScreen() {
   }
 
   async function togglePause(x: Sale) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     const nextActive = !x.active;
     setSales(prev => prev.map(r => r.id === x.id ? { ...r, active: nextActive, status: nextActive ? 'live' : 'paused' } : r));
     try { await api.sales.update(x.id, { active: nextActive }); }
@@ -220,7 +219,7 @@ export default function SalesScreen() {
   const Seg = ({ on, label, onPress, flex = true }: { on: boolean; label: string; onPress: () => void; flex?: boolean }) => (
     <TouchableOpacity
       style={[s.seg, flex && { flex: 1 }, on && { backgroundColor: theme.accent, borderColor: theme.accent }]}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
       accessibilityRole="button" accessibilityState={{ selected: on }}
     >
       <Text style={[s.segText, on && { color: theme.onAccent }]}>{label}</Text>
@@ -356,7 +355,7 @@ export default function SalesScreen() {
             ) : products.map(p => {
               const on = selectedProductIds.includes(p.id);
               return (
-                <TouchableOpacity key={p.id} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedProductIds(prev => on ? prev.filter(id => id !== p.id) : [...prev, p.id]); }}>
+                <TouchableOpacity key={p.id} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { haptics.selection(); setSelectedProductIds(prev => on ? prev.filter(id => id !== p.id) : [...prev, p.id]); }}>
                   <Text style={s.pickName}>{p.name}</Text>
                   <Feather name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
                 </TouchableOpacity>
@@ -375,7 +374,7 @@ export default function SalesScreen() {
             ) : collections.map(c => {
               const on = collection === c;
               return (
-                <TouchableOpacity key={c} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCollection(c); setShowCollectionPicker(false); }}>
+                <TouchableOpacity key={c} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { haptics.selection(); setCollection(c); setShowCollectionPicker(false); }}>
                   <Text style={s.pickName}>{c}</Text>
                   <Feather name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
                 </TouchableOpacity>

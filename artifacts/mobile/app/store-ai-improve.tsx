@@ -5,7 +5,6 @@ import {
   StyleSheet, Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -103,7 +102,6 @@ export default function StoreAiImproveScreen() {
   };
 
   const handleDismiss = async (sug: StoreAISuggestion) => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     await dismissAISuggestion(sug.id);
     await load();
   };

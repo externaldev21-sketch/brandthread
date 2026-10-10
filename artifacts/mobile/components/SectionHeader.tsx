@@ -5,6 +5,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { Icon } from '@/components/ui/Icon';
 
 /**
  * NOTE: for new screens, prefer the `SectionHeader` exported from

@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { hapticLight } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 
 function Row({
   icon, label, onPress, theme,
@@ -29,7 +29,7 @@ function Row({
 }) {
   return (
     <Pressable
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => { onPress(); }}
       style={styles.row}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -51,7 +51,7 @@ function ToggleRow({
 }) {
   return (
     <Pressable
-      onPress={() => { hapticLight(); onToggle(); }}
+      onPress={() => { haptics.selection(); onToggle(); }}
       style={styles.row}
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}

@@ -37,6 +37,9 @@ vi.mock('@/components/CachedImage', () => ({ CachedImage: nativeComponent('Cache
 vi.mock('@/components/ui/ErrorState', () => ({ ErrorState: nativeComponent('ErrorState') }));
 vi.mock('@/components/ui/QuantityStepper', () => ({ QuantityStepper: nativeComponent('QuantityStepper') }));
 vi.mock('@/components/ui/Chip', () => ({ Chip: nativeComponent('Chip') }));
+vi.mock('@/components/ui/BottomSheet', () => ({
+  useSheetTransition: () => ({ modalVisible: true, sheetStyle: {}, backdropStyle: {}, panGesture: {}, onSheetLayout: () => {} }),
+}));
 vi.mock('@/services/cartService', () => ({ getBuyerProduct: vi.fn() }));
 
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';

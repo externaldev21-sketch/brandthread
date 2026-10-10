@@ -10,7 +10,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -50,7 +50,7 @@ export default function AccessCodeScreen() {
     setError(null);
     try {
       await api.access.redeem(value);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      haptics.success();
       markAccessCleared(userId);
       router.replace('/onboarding' as never);
     } catch (err) {
@@ -68,7 +68,7 @@ export default function AccessCodeScreen() {
     setError(null);
     try {
       await api.access.joinWaitlist(value);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      haptics.success();
       setMode('joined');
     } catch (err) {
       setError(apiErrorMessage(err, 'We couldn’t add you right now. Try again.'));
