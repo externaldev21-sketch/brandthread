@@ -24,6 +24,9 @@ import type { TabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
 import { Glass } from '@/components/ui/Glass';
 import { radius, nestedRadius } from '@/constants/radii';
+import {
+  MAX_STRETCH_SLOTS, WEB_NAV_AFTER_PRESS_MS, currentStretch, planGlide,
+} from '@/components/tab-bar/pillGlide';
 
 
 /**
@@ -43,10 +46,18 @@ const POP_UP = { mass: 0.5, stiffness: 650, damping: 14 } as const;
 const POP_SETTLE = { mass: 0.6, stiffness: 300, damping: 12 } as const;
 // Pill glide between tabs, and the selected icon's pop — one spring drives
 // both so they read as a single coordinated motion instead of two out-of-sync
-// ones. `overshootClamping` keeps it from ever ringing past its target (the
-// "FEEL 10x better" pass's own gate rules out bounce/overshoot on the pill),
-// while still settling briskly.
-export const INDICATOR_SPRING = { mass: 1, stiffness: 220, damping: 20, overshootClamping: true } as const;
+// ones. Critically damped (damping 70 ≈ 2·√1200) so it can never ring past
+// its target, and stiff enough to be front-loaded: ~30% of the way there on
+// the second frame, ~90% by ~115ms, landed by ~215ms. The previous
+// under-damped 220/20 spring (clamped at the target) only covered 3% in its
+// first frame and 50% at ~100ms, then hit the target at full speed — a slow
+// start and an abrupt stop, which is what read as a laggy, glitchy glide.
+// `energyThreshold` ends the spring once it's within ~1% of the slot (well
+// under a pixel for a one-tab move) instead of letting an invisible
+// sub-pixel tail keep the pill's style worklet running for another ~170ms.
+export const INDICATOR_SPRING = {
+  mass: 1, stiffness: 1200, damping: 70, overshootClamping: true, energyThreshold: 1e-4,
+} as const;
 const REDUCED_MOTION = { duration: 160 } as const;
 
 // Wraps Pressable so it can take a Reanimated-driven `style` (the buyer bar's
@@ -54,6 +65,13 @@ const REDUCED_MOTION = { duration: 160 } as const;
 // every prior call site that never passes an animated style renders exactly
 // as before, since a plain style array works on an animated component too.
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// react-native-web's Pressable holds `onPressIn` back 50ms by default (to
+// tell a tap from a scroll), so on web the pill and pop only started once
+// that timer fired or the finger lifted. The tab bar never scrolls, so its
+// slots fire press-in on the same frame as touch-down. Native Pressable
+// already defaults to no press-in delay.
+const NO_PRESS_IN_DELAY = (Platform.OS === 'web' ? { delayPressIn: 0 } : {}) as object;
 
 // ─── Glass surface ────────────────────────────────────────────────────────────
 
@@ -272,6 +290,7 @@ export function TabBarSlot({
       onPressOut={onPressOut}
       testID={testID}
       hitSlop={hitSlop}
+      {...NO_PRESS_IN_DELAY}
       style={[styles.slot, { width, height, pointerEvents: hidden ? 'none' : 'auto' }, animatedStyle]}
     >
       <Animated.View
@@ -338,6 +357,7 @@ export function TabBarCircle({
       onPressOut={onPressOut}
       testID={testID}
       hitSlop={hitSlop}
+      {...NO_PRESS_IN_DELAY}
       style={[TAB_BAR_SHADOW, { width: size, height: size, borderRadius: radius.bar }, animatedStyle]}
     >
       <TabBarGlass theme={theme} radius={radius.bar} animatedStyle={glassAnimatedStyle} />
@@ -393,9 +413,36 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean)
   // would no longer line up once the capsule has resized.
   const x = useSharedValue(restingX);
   const target = useSharedValue(restingX);
+  // Where the current glide started from and how far (in slot units) the
+  // pill stretches at the middle of it — see TabBarIndicator's stretch.
+  const origin = useSharedValue(restingX);
+  const peakStretch = useSharedValue(0);
   const opacity = useSharedValue(shown ? 1 : 0);
   const committedIndex = useRef(restingX);
   const committedShown = useRef(shown);
+  const pressedAt = useRef(0);
+
+  const glideTo = useCallback((index: number) => {
+    if (reduceMotion) {
+      target.set(index);
+      origin.set(index);
+      peakStretch.set(0);
+      x.set(index);
+      return;
+    }
+    const next = planGlide(x.get(), index, { origin: origin.get(), target: target.get(), peak: peakStretch.get() });
+    target.set(index);
+    origin.set(next.origin);
+    peakStretch.set(next.peak);
+    x.set(withSpring(index, INDICATOR_SPRING));
+  }, [reduceMotion, x, target, origin, peakStretch]);
+
+  const jumpTo = useCallback((index: number) => {
+    target.set(index);
+    origin.set(index);
+    peakStretch.set(0);
+    x.set(index);
+  }, [x, target, origin, peakStretch]);
 
   useEffect(() => {
     opacity.set(withTiming(shown ? 1 : 0, { duration: 180 }));
@@ -404,23 +451,22 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean)
       // place — only a move between tabs glides.
       committedShown.current = shown;
       committedIndex.current = restingX;
-      target.set(restingX);
-      x.set(restingX);
+      jumpTo(restingX);
       return;
     }
     if (committedIndex.current === restingX) return;
     committedIndex.current = restingX;
-    target.set(restingX);
-    x.set(reduceMotion ? restingX : withSpring(restingX, INDICATOR_SPRING));
-  }, [shown, restingX, reduceMotion, x, target, opacity]);
+    glideTo(restingX);
+  }, [shown, restingX, glideTo, jumpTo, opacity]);
 
   const press = useCallback((index: number) => {
+    // Only a press that actually moves the pill holds navigation back.
+    pressedAt.current = index !== committedIndex.current || !committedShown.current ? Date.now() : 0;
     committedShown.current = true;
     committedIndex.current = index;
     opacity.set(withTiming(1, { duration: 180 }));
-    target.set(index);
-    x.set(reduceMotion ? index : withSpring(index, INDICATOR_SPRING));
-  }, [reduceMotion, x, target, opacity]);
+    glideTo(index);
+  }, [glideTo, opacity]);
 
   /** For a side circle (e.g. buyer Profile) that isn't one of the pill's own
    *  slots — hides the pill the instant that circle is pressed. */
@@ -429,7 +475,28 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean)
     opacity.set(withTiming(0, { duration: 180 }));
   }, [opacity]);
 
-  return { x, target, opacity, press, hide };
+  /**
+   * Runs a tab bar's navigation call. On web, Reanimated animates on the
+   * same main thread that renders the next tab, so dispatching the switch
+   * the moment the finger lifts froze the pill mid-glide for as long as that
+   * render took (80–650ms measured in the web preview). There it waits until
+   * the pill is ~95% of the way to its slot (`WEB_NAV_AFTER_PRESS_MS` after
+   * the press-in, usually only a few frames after the finger lifts), so the
+   * glide completes and the new screen appears as it lands. On iOS/Android
+   * the pill runs on the UI thread and can't be blocked by the JS render, so
+   * navigation stays immediate.
+   */
+  const afterGlide = useCallback((navigate: () => void) => {
+    if (Platform.OS !== 'web' || reduceMotion) {
+      navigate();
+      return;
+    }
+    const wait = WEB_NAV_AFTER_PRESS_MS - (Date.now() - pressedAt.current);
+    if (wait <= 0) navigate();
+    else setTimeout(navigate, wait);
+  }, [reduceMotion]);
+
+  return { x, target, origin, peakStretch, opacity, press, hide, afterGlide };
 }
 
 /**
@@ -448,10 +515,12 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean)
  * layout property — animated on every capsule-mode transition frame too).
  */
 export function TabBarIndicator({
-  x, target, opacity, metrics, theme,
+  x, target, origin, peakStretch, opacity, metrics, theme,
 }: {
   x: SharedValue<number>;
   target: SharedValue<number>;
+  origin: SharedValue<number>;
+  peakStretch: SharedValue<number>;
   opacity: SharedValue<number>;
   metrics: TabBarMetrics;
   theme: AppThemePreset;
@@ -462,14 +531,12 @@ export function TabBarIndicator({
     const baseWidth = metrics.indicatorWidth;
     const capsuleHeight = metrics.capsuleHeight;
     const indicatorHeight = metrics.indicatorHeight;
-    const maxStretch = itemWidth * 0.55;
+    const maxStretch = itemWidth * MAX_STRETCH_SLOTS;
 
-    const distanceUnits = Math.abs(target.value - x.value);
-    const distance = distanceUnits * itemWidth;
-    const stretch = Math.min(distance * 0.45, maxStretch);
+    const stretch = currentStretch(x.value, origin.value, target.value, peakStretch.value) * itemWidth;
     const width = baseWidth + stretch;
     // The leading edge reaches ahead toward the destination tab.
-    const direction = target.value >= x.value ? 1 : -1;
+    const direction = target.value >= origin.value ? 1 : -1;
     const center = (x.value + 0.5) * itemWidth + (direction * stretch) / 2;
     return {
       opacity: opacity.value,
