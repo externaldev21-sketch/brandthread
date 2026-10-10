@@ -1297,8 +1297,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       addVariant:     (id: string, body: unknown) => post(`/api/products/${id}/variants`, body),
       updateVariant:  (id: string, vId: string, body: unknown) => patch(`/api/products/${id}/variants/${vId}`, body),
       /** Bulk-import products from a rows array. Returns { successCount, failCount, errors }. */
-      import: (rows: Array<{ name: string; description?: string; category?: string; price?: string }>) =>
-        post<{ successCount: number; failCount: number; errors?: string[] }>('/api/products/import', { rows }),
+      import: (rows: Array<{ name: string; description?: string; category?: string; price?: string; stock?: string }>, opts?: { defaultStock?: string | number }) =>
+        post<{ successCount: number; failCount: number; zeroStockCount?: number; errors?: string[] }>('/api/products/import', { rows, ...(opts?.defaultStock !== undefined ? { defaultStock: opts.defaultStock } : {}) }),
       /** Upload one product photo and return the URL to store in `images`. */
       uploadImage: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ objectPath: string }>('/api/products/images', image, getToken, getCacheScope),

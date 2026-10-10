@@ -24,6 +24,7 @@ import {
 import { formatCents } from '@/lib/money';
 import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
+import { readSellerPolicies, readSellerShipping } from '@/lib/productTrust';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
@@ -143,8 +144,9 @@ function adaptApiProduct(row: any): BuyerProduct {
     preOrderEstShipDate: row.preOrderEstShipDate
       ? new Date(row.preOrderEstShipDate).toISOString()
       : undefined,
-    cancellationPolicy: 'All sales final unless the item arrives damaged.',
-    refundPolicy: 'Contact seller within 7 days of delivery for returns.',
+    // The seller's own policies ('' when they wrote none — never invented terms).
+    ...readSellerPolicies(row),
+    sellerShipping: readSellerShipping(row),
     options,
     variants,
     isActive: row.status ? row.status === 'active' : true,

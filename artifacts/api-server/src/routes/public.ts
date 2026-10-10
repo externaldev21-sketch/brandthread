@@ -32,6 +32,7 @@ import {
 } from "../lib/pagination";
 import { setPublicCacheHeaders, setViewerScopedCacheHeaders } from "../lib/httpCache";
 import { applySalesToVariants } from "../lib/pricing/salesRuntime";
+import { loadPublicProductTrust } from "../lib/publicProductTrust";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -487,6 +488,8 @@ router.get("/products/:id", async (req, res) => {
       sellerVacationMessage: vacation.active ? vacation.message : null,
       sellerVacationUntil: vacation.until?.toISOString() ?? null,
       claimedUnits: Math.max(0, Number(claimedRow?.claimedUnits ?? 0)),
+      // Seller's own return/cancellation policy + domestic shipping summary (null when unset).
+      ...(await loadPublicProductTrust(product.ownerId)),
       variants: variants.map(toPublicVariant),
     });
   } catch (err) {

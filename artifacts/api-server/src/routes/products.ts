@@ -14,6 +14,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { parseDefaultStock, resolveRowStock } from "../lib/productImport/bulkRows";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -587,11 +588,14 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
 });
 
 // POST /api/products/import — CSV bulk product import
-// Body: { rows: Array<{ name: string, description?: string, category?: string, price: string, sku?: string, images?: string, tags?: string }> }
+// Body: { rows: Array<{ name: string, description?: string, category?: string, price: string, sku?: string, images?: string, tags?: string, stock?: string }>, defaultStock?: number }
+// Stock: the row's stock/quantity/qty/inventory column, else defaultStock, else 0.
+// Response includes zeroStockCount (imported products with no sellable stock) so the client can prompt.
 // Limits: max 100 rows per call
 router.post("/import", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { rows } = req.body;
+  const defaultStock = parseDefaultStock(req.body?.defaultStock);
 
   if (!Array.isArray(rows) || rows.length === 0) {
     res.status(400).json({ error: "rows array required" }); return;
@@ -603,7 +607,7 @@ router.post("/import", requireRole("manager"), async (req, res) => {
   const results: { success: boolean; name: string; productId?: string; error?: string }[] = [];
   const validRows: Array<{
     name: string; priceCents: number; category: string; description: string;
-    sku: string | null; images: string[]; tags: string[];
+    sku: string | null; images: string[]; tags: string[]; stock: number;
   }> = [];
 
   for (const row of rows) {
@@ -619,14 +623,16 @@ router.post("/import", requireRole("manager"), async (req, res) => {
     const images = String(row.images ?? '').split('|').map((s: string) => s.trim()).filter(Boolean);
     const tags = String(row.tags ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
 
-    validRows.push({ name, priceCents, category, description: description ?? '', sku, images, tags });
+    const stock = resolveRowStock(row, defaultStock);
+
+    validRows.push({ name, priceCents, category, description: description ?? '', sku, images, tags, stock });
   }
 
   const access = await getProductAccess(req, res);
   if (!access) return;
   const inserted = await db.transaction(async (tx) => {
     if (!await hasProductCapacity(tx, ownerId, access.limits.products, validRows.length)) return null;
-    const created: Array<{ name: string; productId: string }> = [];
+    const created: Array<{ name: string; productId: string; stock: number }> = [];
     for (const row of validRows) {
       const [product] = await tx.insert(products).values({
         id: crypto.randomUUID(),
@@ -645,11 +651,12 @@ router.post("/import", requireRole("manager"), async (req, res) => {
           productId: product.id,
           sku: row.sku ?? (row.name.replace(/\s+/g, '-').toUpperCase() + '-DEFAULT'),
           priceCents: row.priceCents,
-          stock: 0,
+          stock: row.stock,
           lowStockThreshold: 5,
         });
       }
-      created.push({ name: row.name, productId: product.id });
+      // No variant (price 0) means nothing is sellable yet either.
+      created.push({ name: row.name, productId: product.id, stock: row.priceCents > 0 ? row.stock : 0 });
     }
     return created;
   });
@@ -662,7 +669,8 @@ router.post("/import", requireRole("manager"), async (req, res) => {
     });
     return;
   }
-  results.push(...inserted.map((row) => ({ success: true, ...row })));
+  results.push(...inserted.map(({ name, productId }) => ({ success: true, name, productId })));
+  const zeroStockCount = inserted.filter((row) => row.stock <= 0).length;
 
   const successCount = results.filter(r => r.success).length;
 
@@ -675,7 +683,7 @@ router.post("/import", requireRole("manager"), async (req, res) => {
     );
   }
 
-  res.status(201).json({ successCount, failCount: results.length - successCount, results });
+  res.status(201).json({ successCount, failCount: results.length - successCount, zeroStockCount, results });
 });
 
 export default router;
