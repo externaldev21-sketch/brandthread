@@ -58,7 +58,7 @@ export interface HighlightPickerStory {
   storyId: string; thumbnailUrl: string | null; slides: number;
   visibility: 'public' | 'friends' | 'close_friends'; createdAt: number; live: boolean;
 }
-import type { BulkPriceRequest, BulkPriceResult, BulkProductList, ProductSeoDetail, ProductSeoInput } from '@/lib/productBulk';
+import type { BulkPriceRequest, BulkPriceResult, BulkProductList, BulkStockRequest, BulkStockResult, ProductSeoDetail, ProductSeoInput } from '@/lib/productBulk';
 import type { InteractionSettings, InteractionSettingsPatch, PendingTag } from '@/lib/interactionSettings';
 import type {
   AcceptOfferResult, BuyerOffer, ConversionTrackingView, PostPurchaseOfferResponse, PostPurchaseOfferSettings,
@@ -69,6 +69,7 @@ import type { RemixCheck, RemixClip } from '@/lib/remix';
 import type { DmCallDto, DmCallRtcDto } from '@/lib/calls/dmCallClient';
 import { isPublicApiRequest, signedOutErrorBody } from '@/lib/signedOutApiPolicy';
 import type { LiveAnalytics, LiveAnalyticsListItem } from '@/lib/live/liveAnalytics';
+import type { OrderRefundsResponse, SellerRefundRequest, SellerRefundResponse } from '@/lib/sellerRefund';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -1628,6 +1629,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         return get<BulkProductList>(`/api/product-bulk/products${s ? `?${s}` : ''}`);
       },
       price: (body: BulkPriceRequest) => post<BulkPriceResult>('/api/product-bulk/price', body),
+      /** Set / add / remove stock on every variant of the selected products. */
+      stock: (body: BulkStockRequest) => post<BulkStockResult>('/api/product-bulk/stock', body),
       status: (body: { productIds: string[]; status: 'active' | 'draft' | 'archived' }) =>
         post<{ status: string; updated: string[]; unchanged: string[] }>('/api/product-bulk/status', body),
       duplicate: (body: { productIds: string[]; copyInventory?: boolean }) =>
@@ -1666,6 +1669,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Persist the seller's pick/pack checklist state for the fulfillment wizard. */
       updateFulfillmentChecklist: (id: string, body: { isPicked?: boolean; isPacked?: boolean }) =>
         patch(`/api/orders/${id}/fulfillment-checklist`, body),
+      /** Refund part or all of what is left without cancelling the order. */
+      refund: (id: string, body: SellerRefundRequest) =>
+        post<SellerRefundResponse>(`/api/orders/${id}/refund`, body),
+      /** Refunds already issued on this order and what can still be refunded. */
+      refunds: (id: string) => get<OrderRefundsResponse>(`/api/orders/${id}/refunds`),
     },
     packagePresets: {
       list:   () => get<{ presets: any[] }>('/api/package-presets'),
@@ -2829,6 +2837,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           renewsOn: string | null;    // e.g. "Aug 14, 2026"
           amountCents: number;        // monthly charge in cents (0 for starter)
           paymentMethodLabel: string | null; // e.g. "Visa ···4242"
+          /** True after an in-app cancel: the plan ends on renewsOn. */
+          cancelAtPeriodEnd?: boolean;
           effectiveProvider: 'stripe' | 'revenuecat' | 'none';
         }>('/api/seller/subscription/status'),
         /** What each plan includes (price, commission, AI credits, advanced analytics) plus the caller's plan. */
@@ -2854,6 +2864,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
          *  payment method, view invoices, or cancel. Returns { url }. */
         portal: () =>
           post<{ url: string }>('/api/seller/subscription/portal', {}),
+        /** Cancel at the end of the paid period (Stripe plans only). */
+        cancel: () =>
+          post<{ status: string; cancelAtPeriodEnd: boolean; endsAt: string | null }>('/api/seller/subscription/cancel', {}),
+        /** Undo a pending cancellation. */
+        resume: () =>
+          post<{ status: string; cancelAtPeriodEnd: boolean; endsAt: string | null }>('/api/seller/subscription/resume', {}),
         /** Server verifies the current RevenueCat customer; no plan is client supplied. */
         syncNative: () => post<{
           plan: string;

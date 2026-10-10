@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPriceChange, bulkErrorMessage, priceRangeLabel } from './productBulk';
+import { buildPriceChange, buildStockChange, bulkErrorMessage, priceRangeLabel } from './productBulk';
 
 describe('buildPriceChange', () => {
   it('converts percent to basis points', () => {
@@ -33,5 +33,21 @@ describe('priceRangeLabel', () => {
     expect(priceRangeLabel(1000, 1000, fmt)).toBe('$10.00');
     expect(priceRangeLabel(1000, 2000, fmt)).toBe('$10.00 – $20.00');
     expect(priceRangeLabel(null, null, fmt)).toBe('No price');
+  });
+});
+
+describe('buildStockChange', () => {
+  it('builds set / add / remove from whole numbers', () => {
+    expect(buildStockChange('set', '0')).toEqual({ mode: 'set', value: 0 });
+    expect(buildStockChange('add', ' 12 ')).toEqual({ mode: 'add', value: 12 });
+    expect(buildStockChange('remove', '3')).toEqual({ mode: 'remove', value: 3 });
+  });
+
+  it('refuses empty, fractional, negative, no-op and huge quantities', () => {
+    expect(buildStockChange('set', '')).toBeNull();
+    expect(buildStockChange('set', '1.5')).toBeNull();
+    expect(buildStockChange('set', '-2')).toBeNull();
+    expect(buildStockChange('add', '0')).toBeNull();
+    expect(buildStockChange('set', '1000001')).toBeNull();
   });
 });

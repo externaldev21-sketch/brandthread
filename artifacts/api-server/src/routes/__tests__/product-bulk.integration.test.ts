@@ -1,5 +1,5 @@
 /**
- * Integration tests for /api/product-bulk — price, status and duplicate.
+ * Integration tests for /api/product-bulk — price, stock, status and duplicate.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
@@ -12,6 +12,9 @@ import { eq, inArray } from "drizzle-orm";
 const state = vi.hoisted(() => ({
   limit: null as number | null,
   priceDrops: [] as any[],
+  stockAlerts: [] as any[],
+  restocks: [] as any[],
+  stockRules: [] as string[],
   activity: [] as string[],
 }));
 
@@ -31,6 +34,11 @@ vi.mock("../../lib/planAccess", async (orig) => ({
 }));
 vi.mock("../../lib/stockNotifications", () => ({
   notifyPriceDrop: async (input: unknown) => { state.priceDrops.push(input); },
+  notifyStockLevelChanged: async (input: unknown) => { state.stockAlerts.push(input); },
+  notifyBackInStock: async (input: unknown) => { state.restocks.push(input); },
+}));
+vi.mock("../../lib/stockRules", () => ({
+  afterStockChange: async (productId: string) => { state.stockRules.push(productId); return "none"; },
 }));
 vi.mock("../../lib/activityEvents", () => ({ notifyNewProduct: async () => undefined }));
 vi.mock("../../lib/activityLog", () => ({
@@ -69,6 +77,8 @@ async function seed(owner: string, name: string, opts: {
 }
 const prices = async (id: string) =>
   (await db.select({ p: productVariants.priceCents }).from(productVariants).where(eq(productVariants.productId, id))).map((r) => r.p).sort();
+const stocks = async (id: string) =>
+  (await db.select({ s: productVariants.stock }).from(productVariants).where(eq(productVariants.productId, id))).map((r) => r.s).sort((x, y) => x - y);
 const statusOf = async (id: string) => (await db.select({ s: products.status }).from(products).where(eq(products.id, id)))[0].s;
 
 beforeAll(async () => {
@@ -84,6 +94,9 @@ beforeAll(async () => {
 beforeEach(() => {
   state.limit = null;
   state.priceDrops.length = 0;
+  state.stockAlerts.length = 0;
+  state.restocks.length = 0;
+  state.stockRules.length = 0;
   state.activity.length = 0;
 });
 
@@ -301,5 +314,58 @@ describe("GET /products", () => {
     expect(search.body.items.map((i: any) => i.name)).toEqual(["Zebra Jacket"]);
     const bySku = await call(owner, `/products?q=ZJ-B-${suffix}`);
     expect(bySku.body.items).toHaveLength(1);
+  });
+});
+
+describe("POST /stock", () => {
+  it("previews the new totals without writing", async () => {
+    const id = await seed(seller, "Stock Preview", { variants: [
+      { sku: `SP-A-${suffix}`, priceCents: 1000, stock: 2 }, { sku: `SP-B-${suffix}`, priceCents: 1000, stock: 10 },
+    ] });
+    const { status, body } = await call(seller, "/stock", "POST", {
+      productIds: [id], change: { mode: "remove", value: 4 }, preview: true,
+    });
+    expect(status).toBe(200);
+    expect(body.items[0]).toMatchObject({ beforeTotal: 12, afterTotal: 6, outAfter: 1, changed: true });
+    expect(await stocks(id)).toEqual([2, 10]);
+    expect(state.activity).toHaveLength(0);
+    expect(state.stockRules).toHaveLength(0);
+  });
+
+  it("sets stock on every variant, alerts, runs sold-out rules and logs", async () => {
+    const a = await seed(seller, "Stock A", { variants: [
+      { sku: `SA-A-${suffix}`, priceCents: 1000, stock: 0 }, { sku: `SA-B-${suffix}`, priceCents: 1000, stock: 9 },
+    ] });
+    const b = await seed(seller, "Stock B", { variants: [{ sku: `SB-${suffix}`, priceCents: 1000, stock: 1 }] });
+    const { status, body } = await call(seller, "/stock", "POST", {
+      productIds: [a, b], change: { mode: "set", value: 3 },
+    });
+    expect(status).toBe(200);
+    expect(body.summary).toMatchObject({ products: 2, changedProducts: 2, variants: 3, lowAfter: 3 });
+    expect(await stocks(a)).toEqual([3, 3]);
+    expect(await stocks(b)).toEqual([3]);
+    expect(state.stockAlerts).toHaveLength(3);
+    expect(state.restocks.filter((r) => r.previousStock === 0)).toHaveLength(1);
+    expect(state.stockRules.sort()).toEqual([a, b].sort());
+    expect(state.activity).toHaveLength(2);
+  });
+
+  it("adds stock and never removes below zero", async () => {
+    const id = await seed(seller, "Stock Add", { variants: [{ sku: `SAD-${suffix}`, priceCents: 1000, stock: 4 }] });
+    await call(seller, "/stock", "POST", { productIds: [id], change: { mode: "add", value: 6 } });
+    expect(await stocks(id)).toEqual([10]);
+    await call(seller, "/stock", "POST", { productIds: [id], change: { mode: "remove", value: 50 } });
+    expect(await stocks(id)).toEqual([0]);
+  });
+
+  it("refuses invalid changes and other sellers' products without writing anything", async () => {
+    const mine = await seed(seller, "Stock Mine", { variants: [{ sku: `SM-${suffix}`, priceCents: 1000, stock: 5 }] });
+    const theirs = await seed(other, "Stock Theirs", { variants: [{ sku: `ST-${suffix}`, priceCents: 1000, stock: 5 }] });
+    const bad = await call(seller, "/stock", "POST", { productIds: [mine], change: { mode: "set", value: -1 } });
+    expect(bad.status).toBe(400);
+    const mixed = await call(seller, "/stock", "POST", { productIds: [mine, theirs], change: { mode: "set", value: 1 } });
+    expect(mixed.status).toBe(404);
+    expect(await stocks(mine)).toEqual([5]);
+    expect(await stocks(theirs)).toEqual([5]);
   });
 });

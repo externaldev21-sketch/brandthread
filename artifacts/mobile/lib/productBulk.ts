@@ -82,6 +82,62 @@ export interface ProductSeoDetail {
   limits: { title: number; description: number; handle: number };
 }
 
+export type BulkStockChange = { mode: 'set' | 'add' | 'remove'; value: number };
+
+export interface BulkStockRequest {
+  productIds: string[];
+  change: BulkStockChange;
+  preview?: boolean;
+}
+
+export interface BulkStockVariant {
+  variantId: string;
+  sku: string;
+  before: number;
+  after: number;
+  lowStockThreshold: number;
+}
+
+export interface BulkStockItem {
+  productId: string;
+  name: string;
+  status: string;
+  image: string | null;
+  skipped: string | null;
+  changed: boolean;
+  beforeTotal: number | null;
+  afterTotal: number | null;
+  /** Variants at or under their low-stock threshold after the change. */
+  lowAfter: number;
+  outAfter: number;
+  variants: BulkStockVariant[];
+}
+
+export interface BulkStockResult {
+  preview: boolean;
+  summary: {
+    products: number; changedProducts: number; skippedProducts: number; variants: number;
+    lowAfter: number; outAfter: number;
+  };
+  items: BulkStockItem[];
+}
+
+export const STOCK_EDIT_MODES: Array<{ key: BulkStockChange['mode']; label: string }> = [
+  { key: 'set', label: 'Set to' },
+  { key: 'add', label: 'Add' },
+  { key: 'remove', label: 'Remove' },
+];
+
+/** Turn the typed quantity into a server request. Null when the input is unusable. */
+export function buildStockChange(mode: BulkStockChange['mode'], input: string): BulkStockChange | null {
+  const text = input.trim();
+  if (!/^\d{1,7}$/.test(text)) return null;
+  const value = Number(text);
+  if (value > 1_000_000) return null;
+  if (mode !== 'set' && value === 0) return null;
+  return { mode, value };
+}
+
 export type PriceEditMode = 'set' | 'percent_down' | 'percent_up' | 'amount_down' | 'amount_up';
 
 export const PRICE_EDIT_MODES: Array<{ key: PriceEditMode; label: string; unit: '$' | '%' }> = [
