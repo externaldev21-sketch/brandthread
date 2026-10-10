@@ -42,7 +42,9 @@ const ROUTE_METADATA = {
     description: 'Brandthread’s refund policy: cancelling orders, requesting returns, automatic refunds for failed drops, and payment disputes.',
   },
 };
-const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/community-guidelines', '/seller-agreement', '/refund-policy'];
+// '/pricing' is the static page from scripts/pricing-page.js (served by
+// server/serve.js), listed here so it is in the sitemap.
+const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/community-guidelines', '/seller-agreement', '/refund-policy', '/pricing'];
 
 function domainFromEnvironment() {
   const isPublishedBuild =
