@@ -75,6 +75,29 @@ function whenConfigured(timeoutMs = 8_000): Promise<void> {
 export function configureServices(getToken: GetToken): void {
   _getToken = getToken;
   _resolveConfigured?.();
+  for (const fn of [..._configListeners]) { try { fn(); } catch { /* one listener must not break another */ } }
+}
+
+const _configListeners = new Set<() => void>();
+
+/**
+ * Called every time auth is re-wired (sign-in, sign-out, account switch), so
+ * long-lived connections (the realtime messages socket) reconnect as the
+ * account that is now active.
+ */
+export function onServicesConfigured(fn: () => void): () => void {
+  _configListeners.add(fn);
+  return () => { _configListeners.delete(fn); };
+}
+
+/** The active session token, or null when signed out / not configured yet. */
+export async function getServiceToken(): Promise<string | null> {
+  if (!_getToken) return null;
+  try {
+    return await _getToken();
+  } catch {
+    return null;
+  }
 }
 
 /**

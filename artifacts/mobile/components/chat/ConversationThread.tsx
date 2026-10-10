@@ -56,6 +56,8 @@ import {
 } from '@/services/socialService';
 import { clientIdFromOutboxMessageId, discardOutboxMessage, enqueueOutboxMessage, isOutboxMessageId, mergeOutboxIntoThread, outboxEntryToMessage, retryOutboxMessage, subscribeOutboxEvents, type OutboxEntry } from '@/lib/messageOutbox';
 import { useMessageOutbox } from '@/hooks/useMessageOutbox';
+import { applyReadReceipt, mergeIncomingMessage, TYPING_TTL_MS, useRealtimeConnected, useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
+import { useIsFocused } from '@react-navigation/native';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
@@ -422,6 +424,29 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // has no real cancel/abort — this only makes the UI stop listening to it.
   const mediaUploadTokenRef = useRef(0);
   // Real-time "X is typing…": true once we've told the server we're
+  const focused = useIsFocused();
+  const realtimeConnected = useRealtimeConnected();
+  const otherTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useRealtimeEvents(event => {
+    if (!conv || event.conversationId !== conv.id) return;
+    if (event.type === 'message.created') {
+      setMessages(prev => mergeIncomingMessage(prev, event.message as unknown as Message));
+      void markConversationRead(conv.id);
+      listScroll.requestScrollToEnd();
+    } else if (event.type === 'message.reaction') {
+      setMessages(prev => prev.map(msg => msg.id === event.messageId ? { ...msg, reactions: event.reactions as Message['reactions'] } : msg));
+    } else if (event.type === 'message.read') {
+      setMessages(prev => applyReadReceipt(prev, event.readerId, event.readAt));
+    } else if (event.type === 'typing' && !conv.isOfficial) {
+      if (otherTypingTimerRef.current) clearTimeout(otherTypingTimerRef.current);
+      setConv(prev => prev && prev.id === conv.id ? { ...prev, otherTyping: event.typing } : prev);
+      if (event.typing) otherTypingTimerRef.current = setTimeout(() => setConv(prev => prev && prev.id === conv.id ? { ...prev, otherTyping: false } : prev), TYPING_TTL_MS);
+    } else if (event.type === 'conversation.updated' && event.reason !== 'deleted') {
+      void getMessages(conv.id).then(setMessages).catch(() => {});
+      if (event.reason === 'accepted' || event.reason === 'settings') void getConversation(conv.id).then(fresh => { if (fresh) setConv(prev => prev && prev.id === fresh.id ? { ...prev, ...fresh } : prev); }).catch(() => {});
+    }
+  }, focused && !!conv?.id && !isPreviewId(conv.id) && !!userId);
+  useEffect(() => () => { if (otherTypingTimerRef.current) clearTimeout(otherTypingTimerRef.current); }, []);
   // composing (PATCH /api/conversations/:id/typing), so handleChangeText
   // doesn't re-send it on every keystroke, and a timer that clears it after
   // a pause, since the server-side window (8s) is a safety net, not the UX.
@@ -616,11 +641,15 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // Skipped for a seeded preview thread (no real backend to poll).
   useFocusEffect(useCallback(() => {
     if (!conv?.id || isPreviewId(conv.id)) return;
+    if (realtimeConnected) {
+      void getMessages(conv.id).then(setMessages).catch(() => {});
+      return;
+    }
     const interval = setInterval(() => {
       getMessages(conv.id).then(setMessages).catch(() => {});
     }, 12000);
     return () => clearInterval(interval);
-  }, [conv?.id]));
+  }, [conv?.id, realtimeConnected]));
 
   // The "X is typing…" signal (conv.otherTyping) needs a noticeably tighter
   // cadence than the 12s message poll above to read as live — same 3s
@@ -631,7 +660,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // Skipped for the agent thread (its own agentTyping is client-driven, see
   // sendToAgent) and for a seeded preview thread (no real backend to poll).
   useFocusEffect(useCallback(() => {
-    if (!conv?.id || isPreviewId(conv.id) || conv.isOfficial) return;
+    if (!conv?.id || isPreviewId(conv.id) || conv.isOfficial || realtimeConnected) return;
     const interval = setInterval(() => {
       getConversation(conv.id).then((fresh) => {
         if (!fresh) return;
@@ -639,7 +668,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       }).catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
-  }, [conv?.id, conv?.isOfficial]));
+  }, [conv?.id, conv?.isOfficial, realtimeConnected]));
 
   // Scroll to end after messages load — unless there's an unread divider we
   // still need to scroll to first (handled by the effect below).

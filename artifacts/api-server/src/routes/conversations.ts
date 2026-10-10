@@ -30,6 +30,7 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
+import { emitToUsers } from "../ws/messagesHub";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { maybeSendAwayAutoReply } from "../lib/awayAutoReply";
 import { isFollowedBy, shouldRouteToRequests } from "../lib/conversationRouting";
@@ -79,6 +80,20 @@ const pinBody = looseBody({ pinned: optBoolish });
 const nicknameBody = looseBody({ targetUserId: cappedUnknown(200), nickname: optText(1_000) });
 const themeBody = looseBody({ themeId: cappedUnknown(100) });
 const disappearingBody = looseBody({ enabled: optBoolish });
+/**
+ * Everyone in the conversation (for realtime fan-out after a committed write).
+ * Best-effort: a failure here returns [] — realtime must never fail the write.
+ */
+async function conversationMemberIds(conversationId: string): Promise<string[]> {
+  try {
+    const rows = await db.select({ userId: conversationParticipants.userId })
+      .from(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId));
+    return Array.isArray(rows) ? rows.map((r) => r.userId) : [];
+  } catch {
+    return [];
+  }
+}
 router.use(requireAuth);
 
 // Attachment types a message may carry. "product"/"order" get extra
@@ -1017,7 +1032,10 @@ router.post("/:id/messages", rateLimit("messaging"), validateBody(sendMessageBod
     })();
   }
 
-  return res.status(201).json(await adaptStoredMessage(msg));
+  const adapted = await adaptStoredMessage(msg);
+  emitToUsers([userId, ...otherIds], { type: "message.created", conversationId: id, message: adapted as unknown as Record<string, unknown> });
+  emitToUsers(otherIds, { type: "badges.changed" });
+  return res.status(201).json(adapted);
 });
 
 async function findMessageByClientId(conversationId: string, senderId: string, clientMessageId: string) {
@@ -1094,6 +1112,7 @@ router.put("/:id/messages/:messageId/reactions", validateBody(reactionBody), asy
     })();
   }
 
+  emitToUsers(await conversationMemberIds(id), { type: "conversation.updated", conversationId: id, reason: "reaction" });
   return res.status(200).json({
     userId:       reaction.userId,
     userName:     membership.name,
@@ -1121,6 +1140,7 @@ router.delete("/:id/messages/:messageId/reactions", async (req, res) => {
   await db.delete(messageReactions)
     .where(and(eq(messageReactions.messageId, messageId), eq(messageReactions.userId, userId)));
 
+  emitToUsers(await conversationMemberIds(id), { type: "conversation.updated", conversationId: id, reason: "reaction" });
   return res.json({ ok: true });
 });
 
@@ -1163,12 +1183,19 @@ router.patch("/:id/read", async (req, res) => {
       )),
   ]);
 
+<<<<<<< HEAD
   // The sender's ticks flip to "Seen" now, not on their next poll.
   const readers = await db.select({ userId: conversationParticipants.userId }).from(conversationParticipants)
     .where(eq(conversationParticipants.conversationId, id));
   emitToUsers(readers.map((r) => r.userId), { type: "conversation.updated", conversationId: id, reason: "read" });
   emitToUsers([userId], { type: "activity.updated" });
 
+=======
+  // Realtime read receipt for the other side; my own badge moved everywhere I'm signed in.
+  const memberIds = await conversationMemberIds(id);
+  emitToUsers(memberIds.filter((m) => m !== userId), { type: "message.read", conversationId: id, readerId: userId, readAt: readAt.toISOString() });
+  emitToUsers([userId], { type: "badges.changed" });
+>>>>>>> origin/approved-pr-780
   return res.json({ ok: true });
 });
 
@@ -1198,10 +1225,15 @@ router.patch("/:id/typing", rateLimit("mutation"), validateBody(typingBody), asy
     .set({ typingUntil })
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
 
+<<<<<<< HEAD
   const others = await db.select({ userId: conversationParticipants.userId }).from(conversationParticipants)
     .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`));
   emitToUsers(others.map((o) => o.userId), { type: "conversation.updated", conversationId: id, reason: "typing" });
 
+=======
+  const memberIds = await conversationMemberIds(id);
+  emitToUsers(memberIds.filter((m) => m !== userId), { type: "typing", conversationId: id, userId, typing });
+>>>>>>> origin/approved-pr-780
   return res.json({ ok: true });
 });
 
@@ -1321,6 +1353,9 @@ async function insertSystemMessage(conversationId: string, actorId: string, titl
   await db.update(conversations)
     .set({ lastMessage: "Chat settings changed", lastMessageAt: new Date(), updatedAt: new Date() })
     .where(eq(conversations.id, conversationId));
+  // Theme / disappearing changes are conversation-level: the other side sees
+  // the system line and the new setting right away.
+  emitToUsers(await conversationMemberIds(conversationId), { type: "conversation.updated", conversationId, reason: "settings" });
   return msg;
 }
 
@@ -1536,6 +1571,7 @@ router.delete("/:id", async (req, res) => {
 
   if (!isMember) return res.status(404).json({ error: "Conversation not found" });
 
+<<<<<<< HEAD
   const now = new Date();
   await db.update(conversationParticipants)
     .set({ hiddenAt: now, historyClearedAt: now, unreadCount: 0, archivedAt: null, pinnedAt: null })
@@ -1552,6 +1588,13 @@ router.delete("/:id", async (req, res) => {
     await db.delete(conversations).where(eq(conversations.id, id));
   }
   emitToUsers([userId], { type: "conversation.updated", conversationId: id, reason: "deleted" });
+=======
+  const memberIds = await conversationMemberIds(id);
+  // Hard-delete: cascade removes participants + messages
+  await db.delete(conversations).where(eq(conversations.id, id));
+  emitToUsers(memberIds, { type: "conversation.updated", conversationId: id, reason: "deleted" });
+  emitToUsers(memberIds, { type: "badges.changed" });
+>>>>>>> origin/approved-pr-780
   return res.json({ ok: true });
 });
 
