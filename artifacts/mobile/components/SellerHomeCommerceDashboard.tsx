@@ -33,6 +33,7 @@ import {
 } from '@/lib/setupStore';
 import { withOrigin } from '@/lib/navigation/flowOrigin';
 import { useStoreLink } from '@/hooks/useStoreLink';
+import { navigateOrShareStore } from '@/lib/shareStoreSheet';
 import { middleTruncate } from '@/lib/middleTruncate';
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
 import SetupContinueBanner from '@/components/SetupContinueBanner';
@@ -756,9 +757,9 @@ export default function SellerHomeCommerceDashboard({
                 </TouchableOpacity>
               )}
             </View>
-            {/* Share store — opens the one Share store sheet (app/share-store.tsx). */}
+            {/* Share store — opens the one Share store sheet (components/store/ShareStoreSheet). */}
             <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); nav('/share-store'); }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); navigateOrShareStore('/share-store', nav); }}
               style={styles.topBarShare}
               hitSlop={4}
               accessibilityRole="button"

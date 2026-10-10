@@ -24,11 +24,13 @@ interface StoreLinkCardProps {
   showSaveQr?: boolean;
   /** Link + Copy / Share only — no QR or store name (the publish sheet). */
   compact?: boolean;
+  /** Replaces the system share sheet (the publish sheet opens the Share store sheet). */
+  onShare?: () => void;
   testID?: string;
 }
 
 export function StoreLinkCard({
-  link, qrSize = 184, showSaveQr = true, compact = false, testID = 'store-link-card',
+  link, qrSize = 184, showSaveQr = true, compact = false, onShare, testID = 'store-link-card',
 }: StoreLinkCardProps) {
   const { theme } = useAppTheme();
   const router = useRouter();
@@ -95,7 +97,7 @@ export function StoreLinkCard({
         <View style={styles.pairItem}>
           <Button
             label="Share"
-            onPress={() => { void link.share(); }}
+            onPress={() => { if (onShare) onShare(); else void link.share(); }}
             fullWidth
             testID={`${testID}-share`}
           />

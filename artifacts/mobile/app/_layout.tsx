@@ -73,6 +73,7 @@ import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
 import { ReportSheetProvider } from '@/components/safety/ReportSheet';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { SaveHeartHost } from '@/components/SaveHeartHost';
+import { ShareStoreSheetHost } from '@/components/store/ShareStoreSheetHost';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
@@ -1735,6 +1736,7 @@ function RootLayout() {
                                     </ReportSheetProvider>
                                     <GlobalCallOverlay />
                                     <SaveHeartHost />
+                                    <ShareStoreSheetHost />
                                   </FirstRunTipsProvider>
                                 </CallSessionProvider>
                               </ThreadPullProvider>
