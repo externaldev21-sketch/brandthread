@@ -24,6 +24,7 @@ import {
   resolveReportTarget,
 } from "../lib/reportTargets";
 import { isAgentUserId } from "../lib/brandthreadAgent";
+import { notifyModerators } from "../lib/moderation/alerts";
 
 const router = Router();
 router.use(requireAuth);
@@ -171,6 +172,8 @@ router.post("/", rateLimit("report"), async (req, res) => {
     if (targetType === "community") {
       await db.update(communities).set({ reportCount: sql`${communities.reportCount} + 1` }).where(eq(communities.id, target.targetId));
     }
+    // BT-369: a person has to see it, not just the queue.
+    notifyModerators(report);
 
     return res.status(201).json(serializeReportForClient(report));
   } catch (err) {

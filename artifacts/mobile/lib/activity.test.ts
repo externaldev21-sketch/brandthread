@@ -310,6 +310,8 @@ describe('classification and routing', () => {
         .toBe('/buyer-post-comments?postId=p1');
     }
     // A like never carries a comment: it opens the post itself.
+    expect(activityHref(item({ type: 'freelancer_job_delivered', targetType: 'freelancer_job', targetId: 'j1' })))
+      .toBe('/freelancer-jobs');
     expect(activityHref(item({ type: 'post_like', targetType: 'post', targetId: 'p1', commentId: 'c9' })))
       .toBe('/buyer-post-viewer?postId=p1');
   });

@@ -1450,6 +1450,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="quote-compare"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="sample-detail"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="production-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="cancel-request"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="manufacturer-messages" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="invite-manufacturer"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="shipping-label"      options={{ headerShown: false, animation: 'ios_from_right' }} />

@@ -343,7 +343,7 @@ router.post("/:id/accept", async (req, res) => {
 
 const evidenceStorage = new ObjectStorageService();
 
-function uploadDeps(log: any): UploadDeps {
+export function uploadDeps(log: any): UploadDeps {
   return {
     storage: {
       async save(bytes, contentType, ownerId) {

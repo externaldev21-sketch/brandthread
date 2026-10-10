@@ -654,6 +654,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return id ? `/dispute-detail?disputeId=${q(id)}` : '/disputes';
     case 'payout':
       return '/payouts';
+    case 'freelancer_job':
+      return '/freelancer-jobs';
     case 'subscription_invoice':
       return '/subscription';
     default:

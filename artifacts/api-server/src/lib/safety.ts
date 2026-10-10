@@ -11,6 +11,8 @@ import { getAuth } from "@clerk/express";
 import { and, eq, inArray, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { blocks, db, mutedWords, reports, users } from "@workspace/db";
 import type { ModerationCategory } from "./contentModerator";
+import { randomUUID } from "node:crypto";
+import { notifyModerators } from "./moderation/alerts";
 
 /** Signed-in viewer on routes that also serve signed-out visitors. */
 export function optionalViewerId(req: Request): string | null {
@@ -138,7 +140,9 @@ export async function enqueueAutoFilterReport(input: {
   category: ModerationCategory;
   label?: string | null;
 }): Promise<void> {
+  const id = randomUUID();
   await db.insert(reports).values({
+    id,
     reporterId: "system:auto-filter",
     source: "auto_filter",
     targetType: input.targetType,
@@ -149,6 +153,7 @@ export async function enqueueAutoFilterReport(input: {
     reason: autoFilterReason(input.category),
     description: "Held automatically by the content filter until reviewed.",
   });
+  notifyModerators({ id, targetType: input.targetType, reason: autoFilterReason(input.category), contentExcerpt: input.excerpt.slice(0, 200), source: "auto_filter" });
 }
 
 /** Map filter categories onto the member-facing report reasons. */

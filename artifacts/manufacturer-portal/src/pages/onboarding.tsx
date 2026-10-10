@@ -14,11 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TimeZoneSelect, browserTimeZone } from "@/components/time-zone-select";
 import { cn } from "@/lib/utils";
 import { errorMessage, useApiRequest } from "@/lib/api";
 import { clearInvite, pendingInvite } from "@/lib/invite";
+import { MANUFACTURER_TERMS_VERSION } from "@/pages/manufacturer-terms";
 
 const SPECIALTIES = ["Cut & Sew", "Knitwear", "Denim", "Activewear", "Outerwear", "Swimwear", "Leather Goods", "Wovens", "Accessories", "Screen Printing", "Embroidery"];
 const MAX_PHOTOS = 8;
@@ -89,6 +91,7 @@ export default function Onboarding() {
   const [uploading, setUploading] = useState(0);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [form, setForm] = useState<Form>({
     businessName: "", country: "", city: "", specialty: "", yearsInBusiness: "",
     moq: "100", priceRange: "", sampleTurnaround: "", bulkTurnaround: "", description: "",
@@ -144,6 +147,7 @@ export default function Onboarding() {
       contactPhone: form.contactPhone.trim() || undefined,
       website: form.website.trim() || undefined,
       timeZone: form.timeZone,
+      acceptedTermsVersion: agreedToTerms ? MANUFACTURER_TERMS_VERSION : undefined,
     };
     const done = (thread?: string | null) => {
       clearInvite();
@@ -308,7 +312,7 @@ export default function Onboarding() {
                   <Field label="Business email" error={errors.contactEmail} htmlFor="email">
                     <Input id="email" type="email" value={form.contactEmail} onChange={(event) => set("contactEmail", event.target.value)} className="h-12 bg-secondary/50" />
                   </Field>
-                  <Field label="Phone / WhatsApp" htmlFor="phone" hint="Optional. Include your country code.">
+                  <Field label="Phone / WhatsApp" htmlFor="phone" hint="Needed for verification. Include your country code.">
                     <Input id="phone" type="tel" value={form.contactPhone} onChange={(event) => set("contactPhone", event.target.value)} placeholder="+84 …" className="h-12 bg-secondary/50" />
                   </Field>
                 </div>
@@ -325,7 +329,7 @@ export default function Onboarding() {
                   <p className="mt-1 text-muted-foreground">
                     {isInvited
                       ? `Your profile will be private — only ${inviteInfo.data?.sellerName} can see it.`
-                      : "Your listing goes live in the public directory as soon as you confirm. No approval wait."}
+                      : "Your listing appears in the public directory once your profile is verified."}
                   </p>
                 </div>
                 <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
@@ -342,6 +346,13 @@ export default function Onboarding() {
                 <div className="flex items-start gap-3 rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
                   {isInvited ? <Lock className="mt-0.5 h-4 w-4 shrink-0" /> : <Eye className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
                   <p>Next you'll add factory photos. {isInvited ? "You can choose to join the public directory later from your profile." : "Listings with photos get far more requests."}</p>
+                </div>
+                <div className="space-y-2" data-testid="panel-manufacturer-terms">
+                  <label htmlFor="agree-terms" className="flex cursor-pointer items-start gap-3 text-sm">
+                    <Checkbox id="agree-terms" checked={agreedToTerms} onCheckedChange={(value) => setAgreedToTerms(value === true)} className="mt-0.5" data-testid="checkbox-manufacturer-terms" />
+                    <span>I agree to the Manufacturer Terms. Free to join. 5% + processing on paid orders.</span>
+                  </label>
+                  <a href={`${import.meta.env.BASE_URL}terms`} target="_blank" rel="noreferrer" className="ml-7 inline-block text-sm underline underline-offset-2" data-testid="link-manufacturer-terms">View Manufacturer Terms</a>
                 </div>
                 {submitError && <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{submitError}</p>}
               </section>
@@ -378,11 +389,11 @@ export default function Onboarding() {
               <section className="space-y-8 text-center">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-primary"><CheckCircle2 className="h-8 w-8" /></div>
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight" data-testid="text-onboarding-done">{threadId ? `You're connected with ${inviteInfo.data?.sellerName ?? "your seller"}` : "You're live in the directory"}</h1>
+                  <h1 className="text-3xl font-bold tracking-tight" data-testid="text-onboarding-done">{threadId ? `You're connected with ${inviteInfo.data?.sellerName ?? "your seller"}` : "Your profile is ready"}</h1>
                   <p className="mx-auto mt-2 max-w-lg text-muted-foreground">
                     {threadId
                       ? "Your private conversation is ready. Say hello, ask for the tech pack, and send a sample card when you've priced it."
-                      : "Brands can find you right now. One last thing: verify your payout account so sellers can pay your order cards."}
+                      : "Brands can find you once your email, phone and payouts are verified. Set up payouts next so sellers can pay your order cards."}
                   </p>
                 </div>
                 <div className="mx-auto grid max-w-lg gap-3 text-left">
@@ -409,9 +420,9 @@ export default function Onboarding() {
           </Button>
           {step < 3 && <Button onClick={next} className="h-12 gap-2 px-8 font-semibold" data-testid="button-onboarding-next">Continue <ArrowRight className="h-4 w-4" /></Button>}
           {step === 3 && (
-            <Button onClick={submit} disabled={pending} className="h-12 gap-2 px-8 font-semibold shadow-lg shadow-primary/20" data-testid="button-onboarding-submit">
+            <Button onClick={submit} disabled={pending || !agreedToTerms} className="h-12 gap-2 px-8 font-semibold shadow-lg shadow-primary/20" data-testid="button-onboarding-submit">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              {pending ? "Creating profile…" : isInvited ? "Create private profile" : "Go live"}
+              {pending ? "Creating profile…" : isInvited ? "Create private profile" : "Create profile"}
             </Button>
           )}
           {step === 4 && (
