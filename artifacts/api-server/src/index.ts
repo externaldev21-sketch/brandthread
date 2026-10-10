@@ -27,11 +27,13 @@ import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
 import { startThreadCashExpiryJob } from "./jobs/threadCashExpiry";
 import { startScheduledLiveReminderJob } from "./jobs/scheduledLiveReminders";
 import { startEmailCampaignJob } from "./jobs/emailCampaigns";
+import { startPayoutReviewJob } from "./jobs/payoutReview";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
 import { startCommunityPushJob } from "./lib/communityPush";
 import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
+import { startFreelancerAutoReleaseJob } from "./jobs/freelancerAutoRelease";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
 
@@ -98,6 +100,8 @@ const server = app.listen(port, (err) => {
   startEmailCampaignJob();
   startCommunityPushJob();
   startScheduledPostPublisherJob();
+  startPayoutReviewJob();
+  startFreelancerAutoReleaseJob();
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────

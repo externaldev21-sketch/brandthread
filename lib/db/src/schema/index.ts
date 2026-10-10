@@ -26,6 +26,7 @@ export * from './productBulkSeo';
 export * from './promotions';
 export * from './sellerPushGiveaways';
 export * from './admin';
+export * from './adminMoney';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { places } from './places';
 import { relations, sql } from 'drizzle-orm';
@@ -2075,10 +2076,18 @@ export const disputes = pgTable('disputes', {
   customerClaim:          text('customer_claim').notNull().default(''),
   /** Set once evidence is sent to Stripe for review (migration 114); Stripe allows one submission. */
   evidenceSubmittedAt:    timestamp('evidence_submitted_at'),
+  /** B2B chargebacks (migration 452): the sample/bulk card or freelancer job disputed. */
+  sampleOrderId:          uuid('sample_order_id'),
+  freelancerJobId:        uuid('freelancer_job_id'),
+  /** Recovered from the payee by transfer reversal when a B2B dispute is lost. */
+  clawbackCents:          integer('clawback_cents').notNull().default(0),
+  stripeTransferReversalId: text('stripe_transfer_reversal_id'),
   createdAt:              timestamp('created_at').defaultNow().notNull(),
   updatedAt:              timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   orderIdx: index('disputes_order_idx').on(table.orderId),
+  sampleOrderIdx: index('disputes_sample_order_idx').on(table.sampleOrderId),
+  freelancerJobIdx: index('disputes_freelancer_job_idx').on(table.freelancerJobId),
 }));
 
 export const DISPUTE_EVENT_KINDS = [

@@ -519,7 +519,7 @@ export default function ManufacturerProfileScreen() {
               </View>
             )}
             {!m.email && !m.website && !m.phone && (
-              <Text style={s.noContact}>No contact information available.</Text>
+              <Text style={s.noContact}>{m.contactHidden ? 'Contact details are shared after your first paid order.' : 'No contact information available.'}</Text>
             )}
           </SectionCard>
         </View>

@@ -13,6 +13,7 @@ import { requireStripe } from "../lib/stripe";
 import { getWebOrigin } from "../lib/webOrigin";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
 import { findCountry } from "@workspace/manufacturer-flow";
+import { applyNewAccountPayoutDelay } from "../lib/admin/payoutControls";
 
 const router = Router();
 
@@ -145,6 +146,8 @@ router.post("/onboard", async (req, res) => {
         .update(manufacturers)
         .set({ stripeAccountId, stripeAccountStatus: "pending", updatedAt: new Date() })
         .where(eq(manufacturers.id, mfr.id));
+      // New accounts start with a payout delay (BT-471); never blocks onboarding.
+      await applyNewAccountPayoutDelay({ partyType: "manufacturer", partyId: mfr.id, stripeAccountId, client: stripe, log: req.log });
     }
 
     const accountLink = await stripe.accountLinks.create({

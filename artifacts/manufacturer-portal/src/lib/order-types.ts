@@ -14,6 +14,10 @@ export type OrderCardSnapshot = {
   manufacturerPayoutReady: boolean;
   revision: number;
   updatedAt: string;
+  /** Paid-card refunds and seller cancel requests (older servers omit these). */
+  refundedCents?: number;
+  cancelRequestState?: "none" | "requested" | "declined" | "approved" | string;
+  cancelRequestReason?: string | null;
 };
 
 export type TimelineStep = {

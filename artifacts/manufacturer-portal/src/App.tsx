@@ -10,6 +10,7 @@ import { Route, Switch, Router as WouterRouter, Redirect, useLocation } from 'wo
 import Landing from '@/pages/landing';
 import Onboarding from '@/pages/onboarding';
 import Join from '@/pages/join';
+import ManufacturerTerms from '@/pages/manufacturer-terms';
 import Dashboard from '@/pages/dashboard';
 import Orders from '@/pages/orders';
 import Messages from '@/pages/messages';
@@ -226,6 +227,8 @@ function AppRouter() {
 
             {/* Shareable signup link (public listing or ?invite=<token>) */}
             <Route path="/join" component={Join} />
+            {/* Manufacturer Terms (public; linked from the signup checkbox) */}
+            <Route path="/terms" component={ManufacturerTerms} />
 
             {/* Onboarding — requires auth */}
             <Route path="/onboard">

@@ -19,12 +19,23 @@ type Executor = {
  * twice) never adds a second row and keeps the original timestamp and source.
  *
  * Returns false when the account doesn't exist yet (nothing is written).
+ *
+ * `updateAccountTerms: false` records a separate agreement (for example the
+ * Manufacturer Terms) in the history only: users.terms_version keeps tracking
+ * the member Terms, and no users row is required.
  */
 export async function recordLegalAcceptance(
   executor: Executor,
-  input: { clerkId: string; version: string; source?: LegalAcceptanceSource; acceptedAt?: Date },
+  input: { clerkId: string; version: string; source?: LegalAcceptanceSource; acceptedAt?: Date; updateAccountTerms?: boolean },
 ): Promise<boolean> {
   const acceptedAt = input.acceptedAt ?? new Date();
+  if (input.updateAccountTerms === false) {
+    await executor
+      .insert(legalAcceptances)
+      .values({ clerkId: input.clerkId, version: input.version, source: input.source ?? "signup", acceptedAt })
+      .onConflictDoNothing({ target: [legalAcceptances.clerkId, legalAcceptances.version] });
+    return true;
+  }
   const rows: Array<{ id: unknown }> = await executor
     .update(users)
     .set({ termsAcceptedAt: acceptedAt, termsVersion: input.version, updatedAt: acceptedAt })

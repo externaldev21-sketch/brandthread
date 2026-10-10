@@ -131,6 +131,10 @@ export function createNotificationResponseHandler(
       router.push('/payouts');
       return;
     }
+    if (data?.targetType === 'freelancer_job') {
+      router.push('/freelancer-jobs');
+      return;
+    }
     // Social pushes (likes, comments, replies, mentions, reposts, story likes,
     // follows, Thread Cash) open the same exact destination the Activity row
     // does — the post, the comment itself, the story, the profile — instead
