@@ -17,6 +17,8 @@ import {
 import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader, StatusBadge } from '@/components/BrandthreadUI';
 import { getStorefront, updateDomain } from '@/services/storeService';
 import { useApi } from '@/lib/api';
+import type { StoreAddress } from '@/lib/storeAddress.types';
+import { isBuyerDevPreview as isBuyerPreview, isSellerDevPreview as isSellerPreview } from '@/lib/devPreview';
 import { StoreDomain } from '@/services/storeTypes';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
@@ -36,6 +38,14 @@ export default function StoreDomainScreen() {
   const [subdomainInput, setSubdomainInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState<string | null>(null);
+  // What the server says is actually switched on (BT-307/317/318): nothing is
+  // shown as live or verified until it really serves the store.
+  const [address, setAddress] = useState<StoreAddress | null>(null);
+  const hosting = {
+    subdomainsLive: address?.subdomainsLive === true,
+    customDomainsLive: address?.customDomainsLive === true,
+    cnameTarget: address?.cnameTarget ?? null,
+  };
 
   const leaveSetupDestination = () => {
     // Pop to the exact screen underneath (dashboard / setup checklist / tab);
@@ -44,7 +54,19 @@ export default function StoreDomainScreen() {
   };
 
   const load = useCallback(async () => {
-    const s = await getStorefront();
+    const storefrontRead = getStorefront();
+    // The server's address wins over the copy saved on this device. Never
+    // asked for in the signed-out web preview (protected endpoint).
+    const addressRequest: Promise<StoreAddress | null> = isSellerPreview() || isBuyerPreview()
+      ? Promise.resolve(null)
+      : (api as any).store.address().catch(() => null);
+    void addressRequest.then(async (a) => {
+      if (!a) return;
+      await storefrontRead;
+      setAddress(a);
+      if (a.slug) setSubdomainInput(a.slug);
+    });
+    const s = await storefrontRead;
     const localDomains = s.domains;
 
     // Merge: local BT subdomain + real API custom domains
@@ -81,11 +103,14 @@ export default function StoreDomainScreen() {
     if (!btDomain) return;
     setSaving(true);
     try {
-      await updateDomain(btDomain.id, { subdomain: subdomainInput, verificationStatus: 'verified' });
+      // Saved on the server (it was only ever written to this device and
+      // marked verified locally, BT-317). Status comes from the server.
+      const saved: StoreAddress = await (api as any).store.updateSlug(subdomainInput);
+      await updateDomain(btDomain.id, { subdomain: saved.slug ?? subdomainInput });
       await load();
-      Alert.alert('Saved', 'Subdomain updated.');
-    } catch {
-      Alert.alert('Error', 'Failed to update subdomain.');
+      Alert.alert('Saved', 'Store address updated.');
+    } catch (e: any) {
+      Alert.alert("Couldn't save", e?.message || 'Try again.');
     } finally {
       setSaving(false);
     }
@@ -114,7 +139,11 @@ export default function StoreDomainScreen() {
       }
       await completeSetupTaskWhen('connect_domain', verifiedDomain?.verified === true);
       await load();
-      Alert.alert('Verified ✓', 'Your domain is verified and SSL is being issued.');
+      // Only the TXT record is checked; the domain serves the store once the
+      // CNAME points at our host (BT-318).
+      Alert.alert('DNS verified', hosting.cnameTarget
+        ? `Point a CNAME for ${verifiedDomain?.domain ?? 'your domain'} to ${hosting.cnameTarget} to finish connecting it.`
+        : 'Your TXT record is in place.');
     } catch {
       Alert.alert('Not verified yet', 'DNS changes can take up to 48 hours to propagate. Check your registrar and try again.');
     } finally {
@@ -164,11 +193,13 @@ export default function StoreDomainScreen() {
               />
               <Text style={dm.urlSuffix}>.brandthread.app</Text>
             </View>
-            {subdomainInput ? (
+            {hosting.subdomainsLive && subdomainInput ? (
               <Text style={dm.urlPreview}>https://{subdomainInput}.brandthread.app</Text>
+            ) : address?.liveUrl ? (
+              <Text style={dm.urlPreview}>Store link: {address.liveUrl.replace(/^https:\/\//, '')}</Text>
             ) : null}
             <View style={dm.badgeRow}>
-              {verificationBadge(btDomain.verificationStatus)}
+              {hosting.subdomainsLive ? <StatusBadge label="Live" variant="success" small /> : null}
               {btDomain.isPrimary && <StatusBadge label="★ Primary" variant="purple" small />}
             </View>
             <PrimaryButton label={saving ? 'Saving...' : 'Save Subdomain'} onPress={handleSaveSubdomain} loading={saving} small />
@@ -176,7 +207,7 @@ export default function StoreDomainScreen() {
         )}
 
         {/* Custom Domains */}
-        <SectionHeader title="CUSTOM DOMAIN" style={dm.sh} />
+        {(hosting.customDomainsLive || customDomains.length > 0) && <SectionHeader title="CUSTOM DOMAIN" style={dm.sh} />}
         {customDomains.map(cd => (
           <BrandthreadCard key={cd.id} style={dm.card}>
             <View style={dm.domainRow}>
@@ -184,12 +215,9 @@ export default function StoreDomainScreen() {
               {cd.isPrimary && <StatusBadge label="★ Primary" variant="purple" small />}
             </View>
             <View style={dm.badgeRow}>
-              {verificationBadge(cd.verificationStatus)}
-              <StatusBadge
-                label={cd.sslStatus === 'active' ? 'SSL Active' : 'SSL Pending'}
-                variant={cd.sslStatus === 'active' ? 'success' : 'warning'}
-                small
-              />
+              {cd.verificationStatus === 'verified'
+                ? <StatusBadge label="DNS verified" variant="neutral" small />
+                : verificationBadge(cd.verificationStatus)}
             </View>
 
             {cd.verificationStatus === 'pending' && (
@@ -205,10 +233,12 @@ export default function StoreDomainScreen() {
                     <Text style={[dm.dnsHost, { color: CYAN, flexWrap: 'wrap', flex: 1 }]}>{cd.dnsToken}</Text>
                   </View>
                 ) : null}
-                <View style={dm.dnsRow}>
-                  <Text style={dm.dnsType}>CNAME</Text>
-                  <Text style={dm.dnsHost}>www → cname.brandthread.app</Text>
-                </View>
+                {hosting.cnameTarget ? (
+                  <View style={dm.dnsRow}>
+                    <Text style={dm.dnsType}>CNAME</Text>
+                    <Text style={dm.dnsHost}>{cd.customDomain} → {hosting.cnameTarget}</Text>
+                  </View>
+                ) : null}
                 <Text style={dm.dnsNote}>DNS changes can take up to 48 hours to propagate.</Text>
                 <SecondaryButton
                   label={verifying === cd.id ? 'Checking...' : 'Verify DNS'}
@@ -220,7 +250,7 @@ export default function StoreDomainScreen() {
               </BrandthreadCard>
             )}
 
-            {cd.verificationStatus === 'verified' && (
+            {cd.verificationStatus === 'verified' && hosting.customDomainsLive && (
               <BrandthreadCard style={[dm.dnsCard, { borderColor: SUCCESS, backgroundColor: SUCCESS_DIM }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
                   <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
@@ -243,7 +273,8 @@ export default function StoreDomainScreen() {
           </BrandthreadCard>
         ))}
 
-        {!adding ? (
+        {hosting.customDomainsLive ? (
+        !adding ? (
           <TouchableOpacity style={dm.addDomainBtn} onPress={() => setAdding(true)}>
             <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={dm.addDomainText}>+ Connect Custom Domain</Text>
@@ -269,7 +300,8 @@ export default function StoreDomainScreen() {
               <PrimaryButton label="Add Domain" small onPress={handleConnectDomain} disabled={!newDomain.trim()} style={{ flex: 1 }} />
             </View>
           </BrandthreadCard>
-        )}
+        )
+        ) : null}
       </ScrollView>
     </View>
   );

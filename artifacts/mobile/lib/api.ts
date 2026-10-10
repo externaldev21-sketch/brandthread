@@ -3489,6 +3489,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       domains:    () => get<any[]>('/api/store/domains'),
       addDomain:  (domain: string) => post<any>('/api/store/domains', { domain }),
       verifyDomain: (domainId: string) => post<any>(`/api/store/domains/${encodeURIComponent(domainId)}/verify`, {}),
+      /** The store's address and what is switched on (BT-307/317/318). */
+      address:    () => get<import('./storeAddress.types').StoreAddress>('/api/store/address'),
+      /** Change the store's subdomain on the server. */
+      updateSlug: (slug: string) => patch<import('./storeAddress.types').StoreAddress>('/api/store/slug', { slug }),
       deleteDomain: (domainId: string) => del<any>(`/api/store/domains/${encodeURIComponent(domainId)}`),
       // AI generation
       generate:   (answers: Record<string, unknown>) => post<any>('/api/store/ai/generate', { answers }),
