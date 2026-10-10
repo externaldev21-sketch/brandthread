@@ -9,7 +9,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, TextInput, StyleSheet, Platform, Pressable } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { PrimaryButton } from '@/components/BrandthreadUI';
@@ -64,7 +64,7 @@ export function JobNoteSheet({
             accessibilityLabel="Close"
             style={styles.close}
           >
-            <Feather name="x" size={24} color={theme.text} />
+            <Icon name="x" size={24} color={theme.text} />
           </Pressable>
           <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
           <View style={styles.close} />
