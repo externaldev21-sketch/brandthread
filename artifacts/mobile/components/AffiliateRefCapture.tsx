@@ -6,6 +6,7 @@ import { useApi } from '@/lib/api';
 import {
   affiliateVisitorId, clearPendingAffiliateCode, parseAffiliateCode, readPendingAffiliateCode, savePendingAffiliateCode,
 } from '@/lib/affiliateRef';
+import { DeferredInviteCapture } from '@/components/DeferredInviteCapture';
 
 /**
  * Renders nothing. Watches for a creator's ?aff=CODE link, records the click,
@@ -50,5 +51,6 @@ export function AffiliateRefCapture() {
     return () => { cancelled = true; };
   }, [isSignedIn, userId, url, api]);
 
-  return null;
+  // Install-time invite codes ride along with the other link capture (BT-312).
+  return <DeferredInviteCapture />;
 }

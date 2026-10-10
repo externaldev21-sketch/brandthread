@@ -19,6 +19,7 @@ import { startPlatformBalanceJob } from "./jobs/platformBalance";
 import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
 import { startAdCampaignLifecycleJob } from "./jobs/adCampaignLifecycle";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
+import { startSellerReferralsJob } from "./jobs/sellerReferrals";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
 import { startAnalyticsRetentionJob } from "./jobs/analyticsRetention";
 import { startAccountPurgeJob } from "./jobs/accountPurge";
@@ -113,6 +114,7 @@ const server = app.listen(port, (err) => {
   startPlatformBalanceJob();
   startAffiliatePayoutsJob();
   startAdCampaignLifecycleJob();
+  startSellerReferralsJob();
   startDeliveryDeadlinesJob();
   startStoryCleanupJob();
   startAnalyticsRetentionJob();
