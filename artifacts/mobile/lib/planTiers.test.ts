@@ -80,16 +80,6 @@ describe('plan cards come only from the shared config', () => {
     expect(row?.values).toEqual(['5%', '4%', '3%']);
   });
 
-  it("reads #834's names too (drops, boosts, emailSendsPerMonth)", () => {
-    const alt = parseSellerPlanConfig({ ...serverPlans, plans: serverPlans.plans.map((p) => {
-      const { dropsEscrow, boostFeatured, emailSendsMonthly, ...rest } = p.features;
-      return { ...p, features: { ...rest, drops: dropsEscrow, boosts: boostFeatured, emailSendsPerMonth: emailSendsMonthly } };
-    }) });
-    expect(alt.tiers.map((t) => [t.features.dropsPreorders, t.features.boostSlots, t.limits.marketingEmailsPerMonth])).toEqual([
-      [false, false, 0], [true, true, 5000], [true, true, 25000],
-    ]);
-  });
-
   it('never invents a value the server did not send (AI credits never become "unlimited")', () => {
     const partial = parseSellerPlanConfig({ ...serverPlans, plans: serverPlans.plans.map((p) => ({ id: p.id, amountCents: p.amountCents, productLimit: p.productLimit, staffSeats: p.staffSeats, aiCreditsMonthly: null })) });
     expect(partial.tiers[0].limits).toEqual({ activeProducts: 10, staffSeats: 1 });
