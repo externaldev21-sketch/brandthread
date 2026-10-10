@@ -12,7 +12,7 @@ const GATED_SCREENS = [
   'app/store-domain.tsx',            // custom domain
   'app/email-campaign-compose.tsx',  // email marketing
   'app/rfq-post.tsx',                // Manufacturer Hub RFQs
-  'app/analytics-export.tsx',        // analytics export (Pro)
+  'components/analytics/reports/ExportReport.tsx', // canonical analytics export (Pro)
 ];
 
 describe('plan upgrade prompts', () => {
@@ -22,9 +22,9 @@ describe('plan upgrade prompts', () => {
 
   it('labels the analytics reports with the plan that unlocks them', () => {
     const list = read('components/analytics/AnalyticsReportsList.tsx');
-    expect(list).toContain("href: '/analytics-advanced', badge: 'GROWTH'");
-    expect(list).toContain("href: '/analytics-cohorts', badge: 'GROWTH'");
-    expect(list).toContain("href: '/analytics-export', badge: 'PRO'");
-    expect(read('app/analytics-advanced.tsx')).toContain("plan === 'pro' || plan === 'growth'");
+    expect(list).toContain("href: '/analytics-reports?report=advanced', badge: 'GROWTH'");
+    expect(list).toContain("href: '/analytics-reports?report=cohorts', badge: 'GROWTH'");
+    expect(list).toContain("href: '/analytics-reports?report=export', badge: 'PRO'");
+    expect(read('components/analytics/reports/AdvancedReport.tsx')).toContain("plan === 'pro' || plan === 'growth'");
   });
 });

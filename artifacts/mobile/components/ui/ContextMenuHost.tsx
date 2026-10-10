@@ -13,6 +13,7 @@
  * Tapping outside dismisses.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
@@ -103,6 +104,7 @@ function MenuRows({ items, onPick, compact }: { items: MenuItem[]; onPick: (item
 function PreviewMenu({ req }: { req: ContextMenuRequest }) {
   const { theme } = useAppTheme();
   const surface = menuSurface(theme);
+  const topInset = useHeaderTopInset();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
@@ -134,7 +136,7 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
         <View style={[StyleSheet.absoluteFill, styles.previewScrim, { backgroundColor: `${theme.background}73` }]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={() => close()} accessibilityRole="button" accessibilityLabel="Close menu" />
       </Animated.View>
-      <View pointerEvents="box-none" style={[styles.previewColumn, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+      <View pointerEvents="box-none" style={[styles.previewColumn, { paddingTop: topInset + 24, paddingBottom: insets.bottom + 24 }]}>
         <Animated.View {...a11yModalProps()} style={{ width: cardWidth, opacity: anim, transform: [{ scale }] }}>
           <Pressable
             onPress={req.onPreviewPress ? () => close(req.onPreviewPress) : undefined}

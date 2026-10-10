@@ -1,7 +1,11 @@
 import React from 'react';
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof import('@tanstack/react-query')>()),
-  useQueryClient: () => ({ getQueryData: () => undefined, setQueryData: vi.fn() }),
+  useQueryClient: () => ({
+    getQueryData: () => undefined,
+    setQueryData: vi.fn(),
+    fetchQuery: ({ queryFn }: { queryFn: () => Promise<unknown> }) => queryFn(),
+  }),
 }));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
   liveText: {
-    fontSize: 11, letterSpacing: 0.6, fontFamily: FONT.bold, color: TEXT_SECONDARY,
+    fontSize: 11, fontFamily: FONT.bold, color: TEXT_SECONDARY,
   },
   liveTextActive: { color: ON_DARK },
   searchRow: {

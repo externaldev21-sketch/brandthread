@@ -38,3 +38,9 @@ When an incoming PR is based on a single-commit snapshot of earlier local integr
 **Why:** The snapshot and original local commits can contain equivalent earlier work without equivalent ancestry. Ordinary three-way merging then presents hundreds of conflicts that would otherwise revert newer local repairs.
 
 **How to apply:** Identify the incoming PR's own base, compare its changed paths against conflict paths, and preserve the current version for verified snapshot-only conflicts. Manually combine actual overlapping PR edits with current behavior; then verify the requested head is a true ancestor of the completed merge.
+
+Explicitly excluded work must also be excluded from the ancestry of every approved head. Hold a dependent head that contains excluded work rather than merging it and trying to remove selected files afterward.
+
+**Why:** An approved head can include an unapproved visual change through its parent history. Resolving file conflicts does not remove that ancestry or make the exclusion true.
+
+**How to apply:** Fetch the excluded ref read-only when needed, check each requested head with `git merge-base --is-ancestor`, and request a clean replacement head for any dependent PR.

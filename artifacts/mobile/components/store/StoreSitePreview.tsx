@@ -9,7 +9,8 @@
  * rasterising it, so text and edges stay crisp.
  */
 import React from 'react';
-import { Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { FontAwesome6 } from '@expo/vector-icons';
 
 import { Icon } from '@/components/ui/Icon';

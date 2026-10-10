@@ -80,7 +80,8 @@ function usesSharedHeader(full: string, visiting = new Set<string>()): boolean {
 
 function isRedirectOnly(source: string): boolean {
   return /<Redirect\b/.test(source) || /router\.(replace|push)\(/.test(source)
-    && !/<[A-Z][A-Za-z0-9]*(?:\s|\/?>)/.test(source);
+    && (!/<[A-Z][A-Za-z0-9]*(?:\s|\/?>)/.test(source)
+      || /return\s+<View\b[^;]*\/>;\s*}/.test(source));
 }
 
 function walk(dir: string, filter: (full: string, entry: string) => boolean, out: string[] = []): string[] {
@@ -117,7 +118,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/(tabs)/feed.tsx',
   'app/(tabs)/index.tsx',
   'app/(tabs)/more.tsx',
-  'app/(tabs)/orders.tsx',
   'app/(tabs)/products.tsx',
   'app/(tabs)/profile.tsx',
   'app/account-type.tsx',
@@ -126,8 +126,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   // Renders the shared components/chat/ConversationThread.tsx (own chat header).
   'app/buyer-conversation.tsx',
   'app/buyer-live.tsx',
-  'app/buyer-other-profile.tsx',
-  'app/buyer-post-comments.tsx',
   'app/buyer-product-detail.tsx',
   'app/buyer-story-create.tsx',
   'app/buyer-story-viewer.tsx',

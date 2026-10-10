@@ -10,7 +10,6 @@ import { useApi } from '@/lib/api';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { saveImageToCameraRoll } from '@/lib/aiToolMedia';
-import { storeQrDataUri } from '@/lib/storeQr';
 import { sellerStoreLink } from '@/lib/storeShare';
 
 export interface StoreLinkState {
@@ -102,6 +101,7 @@ export function useStoreLink(): StoreLinkState {
 
   const saveQr = useCallback(async () => {
     if (!url) return;
+    const { storeQrDataUri } = await import('@/lib/storeQr');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const result = await saveImageToCameraRoll(storeQrDataUri(url), 'brandthread-store-qr');
     if (result.ok) {

@@ -269,7 +269,7 @@ export default function MoreScreen() {
                 accessibilityState={{ expanded: !!isOpen }}
               >
                 <View style={styles.sectionHeaderLeft}>
-                  <Icon name={icon} size={13} color={theme.subtle} style={styles.sectionIcon} />
+                  <Icon name={icon} size={13} color={theme.subtle} />
                   <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
                 </View>
                 <Icon

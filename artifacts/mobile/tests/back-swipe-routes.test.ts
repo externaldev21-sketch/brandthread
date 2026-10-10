@@ -15,6 +15,7 @@ const ALLOWED_NO_GESTURE = new Set([
   'thread-explainer', // first-run explainer
   'thread-checkout', // full-screen checkout cover over the Shop sheet
   'seller-live', // a live broadcast must be ended explicitly
+  'store-design', // editor drafts must leave through Cancel or Save
 ]);
 
 describe('interactive back-swipe on pushed screens', () => {

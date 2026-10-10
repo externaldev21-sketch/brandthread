@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('react-native', () => ({
+vi.mock('react-native', async importOriginal => ({
+  ...(await importOriginal<typeof import('react-native')>()),
   ActivityIndicator: () => null,
   Alert: { alert: vi.fn() },
   Modal: () => null,
@@ -36,7 +37,8 @@ vi.mock('@/components/BrandthreadUI', () => ({
 }));
 vi.mock('@/lib/api', () => ({ useApi: vi.fn() }));
 vi.mock('@/lib/money', () => ({ formatCents: (cents: number) => `$${cents / 100}` }));
-vi.mock('@/lib/theme', () => ({
+vi.mock('@/lib/theme', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/theme')>()),
   BG: '#07070F',
   SCREEN_BG: 'transparent',
   SURFACE: '#0D0D17',

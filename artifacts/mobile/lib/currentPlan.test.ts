@@ -17,7 +17,7 @@ describe('currentPlanSummary (QA-0093 / QA-0166)', () => {
 
   it('falls back to the plan list price when the charge is unknown', () => {
     expect(currentPlanSummary({ plan: 'starter', status: 'trialing', amountCents: 0 }))
-      .toMatchObject({ name: 'Starter', priceLabel: '$29/mo', statusLabel: 'Trial' });
+      .toMatchObject({ name: 'Starter', priceLabel: '$19.99/mo', statusLabel: 'Trial' });
   });
 
   it('treats only real subscription states as subscribed', () => {

@@ -252,7 +252,7 @@ export default function DeleteAccountScreen() {
                   subtitle={`${otherHandle} keeps working with your login.`}
                   subtitleNumberOfLines={2}
                   onPress={() => setScope('profile')}
-                  right={scope === 'profile' ? <Feather name="check" size={20} color={theme.text} /> : undefined}
+                  right={scope === 'profile' ? <Icon name="check" size={20} color={theme.text} /> : undefined}
                   divider
                   testID="delete-scope-profile"
                 />
@@ -261,7 +261,7 @@ export default function DeleteAccountScreen() {
                   subtitle={`Deletes ${thisHandle}, ${otherHandle} and the login they share.`}
                   subtitleNumberOfLines={2}
                   onPress={() => setScope('login')}
-                  right={scope === 'login' ? <Feather name="check" size={20} color={theme.text} /> : undefined}
+                  right={scope === 'login' ? <Icon name="check" size={20} color={theme.text} /> : undefined}
                   testID="delete-scope-login"
                 />
               </View>

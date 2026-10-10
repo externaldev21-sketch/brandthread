@@ -594,7 +594,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
     color: TEXT_SECONDARY,
-    letterSpacing: 0.5,
     marginBottom: SP.xs,
   },
   headerHeading: {

@@ -24,9 +24,9 @@ describe('seller plan recommendations', () => {
 
   it('keeps public names and monthly prices in one catalogue', () => {
     expect(SELLER_PLANS.map(({ id, name, priceLabel }) => ({ id, name, priceLabel }))).toEqual([
-      { id: 'starter', name: 'Starter', priceLabel: '$29' },
-      { id: 'growth', name: 'Growth', priceLabel: '$79' },
-      { id: 'pro', name: 'Pro', priceLabel: '$199' },
+      { id: 'starter', name: 'Starter', priceLabel: '$19.99' },
+      { id: 'growth', name: 'Growth', priceLabel: '$49' },
+      { id: 'pro', name: 'Pro', priceLabel: '$129' },
     ]);
   });
 
@@ -34,7 +34,7 @@ describe('seller plan recommendations', () => {
     expect(getSellerPlan('scale')).toMatchObject({
       id: 'pro',
       name: 'Pro',
-      priceLabel: '$199',
+      priceLabel: '$129',
     });
   });
 });

@@ -133,7 +133,6 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
   });
 
   const accounts = isPreview ? (isPreviewDemoMode() ? previewAccounts : []) : realAccounts;
-  const accounts = isPreview ? previewAccounts : realAccounts;
   const sameLoginNotOnDevice = isPreview ? [] : profilesMissingFromDevice(linked.data?.profiles, activeSessions);
   const currentLinkedRole = linked.data?.profiles.find((p) => p.isCurrent)?.role ?? (role === 'seller' ? 'seller' : 'buyer');
   const addRole = otherRole(currentLinkedRole);
@@ -141,7 +140,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
 
   async function handleSwitchSameLogin(clerkId: string) {
     if (switchingId || loggingOutId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.light();
     setSwitchingId(clerkId);
     try {
       await linked.activateProfile(clerkId);
@@ -154,7 +153,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
   }
 
   function handleAddSameLogin() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     setShowAddAccount(false);
     onClose();
     router.push(`/account-type-settings?add=${addRole}` as never);
@@ -362,7 +361,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
                 onPress={() => handleSwitchSameLogin(profile.clerkId)}
                 testID={`account-switcher-row-${profile.clerkId}`}
                 right={switchingId === profile.clerkId
-                  ? <Feather name="loader" size={18} color={colors.mutedForeground} />
+                  ? <Icon name="loader" size={18} color={colors.mutedForeground} />
                   : undefined}
               />
             ))}

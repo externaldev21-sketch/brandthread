@@ -316,6 +316,7 @@ vi.mock('@/services/cartService', () => ({
   addToCart: addToCartMock,
   createBuyNowSession: createBuyNowSessionMock,
   getCart: getCartMock,
+  warmCart: vi.fn().mockResolvedValue(undefined),
   replaceCartItemVariant: vi.fn(),
 }));
 

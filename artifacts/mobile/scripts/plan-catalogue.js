@@ -37,6 +37,11 @@ const DEFAULT_REMINDER_DAYS_BEFORE = 2;
 // Imports that only matter at request time (database access). Their exports
 // are never called while reading the constant tables.
 const RUNTIME_ONLY_IMPORTS = new Set(['./nativeEntitlements']);
+// This export is pure model-selection metadata (no client, credentials, or
+// provider calls). It prices the AI credit catalogue at build time.
+const BUILD_SAFE_WORKSPACE_IMPORTS = {
+  '@workspace/integrations-openai-ai-server/image-model': path.join(REPO_ROOT, 'lib/integrations-openai-ai-server/src/image/model.ts'),
+};
 
 function resolveTs(fromFile, specifier) {
   const base = path.resolve(path.dirname(fromFile), specifier);
@@ -58,6 +63,7 @@ function loadTsModule(file, cache = new Map()) {
   cache.set(file, mod);
   const localRequire = (specifier) => {
     if (RUNTIME_ONLY_IMPORTS.has(specifier)) return {};
+    if (BUILD_SAFE_WORKSPACE_IMPORTS[specifier]) return loadTsModule(BUILD_SAFE_WORKSPACE_IMPORTS[specifier], cache);
     if (!specifier.startsWith('.')) throw new Error(`plan-catalogue: ${file} imports ${specifier}, which is not read at build time`);
     return loadTsModule(resolveTs(file, specifier), cache);
   };

@@ -17,7 +17,7 @@ import {
   READY_TO_SELL_STEPS, READY_TO_SELL_SUBTITLE, READY_TO_SELL_TITLE, completedLabel,
   type ReadyToSellResponse,
 } from '@/lib/readyToSell';
-import { SELLER_PLANS } from '@/lib/sellerPlans';
+import { SELLER_PLANS, SELLER_TRIAL_DAYS } from '@/lib/sellerPlans';
 
 interface Props {
   data: ReadyToSellResponse;
@@ -69,7 +69,7 @@ export function ReadyToSellChecklist({ data, hasPlan, onOpen, testID = 'ready-to
 
       {hasPlan === false ? (
         <View style={[styles.plan, { backgroundColor: theme.surface }]} testID={`${testID}-plan`}>
-          <Text style={[styles.planTitle, { color: theme.text }]}>Start your 5-day free trial</Text>
+          <Text style={[styles.planTitle, { color: theme.text }]}>{`Start your ${SELLER_TRIAL_DAYS}-day free trial`}</Text>
           <Text style={[styles.planBody, { color: theme.muted }]}>
             {`Plans start at $${STARTING_PRICE / 100}/month.`}
           </Text>

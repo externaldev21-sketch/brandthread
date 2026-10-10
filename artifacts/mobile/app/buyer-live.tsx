@@ -116,16 +116,26 @@ function BuyerLiveNativeScreen() {
   const deliveryRefs = useRef<Record<string, TextInput | null>>({});
   const focusDelivery = (key: string) => () => deliveryRefs.current[key]?.focus();
   // Fill delivery from the saved default address once the buy sheet opens (BT-416).
-  const prefilledRef = useRef(false);
+  const prefilledRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!purchaseTag || prefilledRef.current || !user) return;
-    prefilledRef.current = true;
+    const ownerId = user?.id;
+    if (!purchaseTag || !ownerId || prefilledRef.current === ownerId) return;
+    let cancelled = false;
     api.buyer.addresses.list().then((list) => {
-      const next = prefillDelivery({ name: buyerName, phone: buyerPhone, street, city, region, postalCode }, pickDefaultAddress(list));
-      setBuyerName(next.name); setBuyerPhone(next.phone); setStreet(next.street);
-      setCity(next.city); setRegion(next.region); setPostalCode(next.postalCode);
+      if (cancelled) return;
+      prefilledRef.current = ownerId;
+      const next = prefillDelivery({ name: '', phone: '', street: '', city: '', region: '', postalCode: '' }, pickDefaultAddress(list));
+      // Read the latest field values, not the values captured before the
+      // network request. A slow response must not replace the buyer's edits.
+      setBuyerName(current => current.trim() ? current : next.name);
+      setBuyerPhone(current => current.trim() ? current : next.phone);
+      setStreet(current => current.trim() ? current : next.street);
+      setCity(current => current.trim() ? current : next.city);
+      setRegion(current => current.trim() ? current : next.region);
+      setPostalCode(current => current.trim() ? current : next.postalCode);
     }).catch(() => { /* typing still works */ });
-  }, [purchaseTag]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { cancelled = true; };
+  }, [api, purchaseTag, user?.id]);
   const lastHighlightedRef = useRef<string | null>(null);
   // Moderation + co-host: pinned comment above chat, co-host tiles, removal.
   const mod = useLiveModeration(params.streamId);

@@ -200,7 +200,7 @@ export default function MyStoreScreen() {
             {steps.map((step, i) => {
               const open = current?.id === step.id;
               return (
-                <View key={step.id} style={[s.step, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.borderSubtle }]} testID={`my-store-step-${step.id}`}>
+                <View key={step.id} style={[s.step, i > 0 && { borderTopWidth: 1, borderTopColor: theme.borderSubtle }]} testID={`my-store-step-${step.id}`}>
                   <View style={s.stepRow}>
                     <View style={[s.check, step.done ? { backgroundColor: theme.text, borderColor: theme.text } : { borderColor: theme.muted }]}>
                       {step.done ? <Icon name="check" size={13} color={theme.background} /> : null}

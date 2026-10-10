@@ -12,7 +12,8 @@ const { nativeComponent } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('react-native', () => ({
+vi.mock('react-native', async importOriginal => ({
+  ...(await importOriginal<typeof import('react-native')>()),
   Alert: { alert: vi.fn() },
   FlatList: nativeComponent('FlatList'),
   Modal: nativeComponent('Modal'),

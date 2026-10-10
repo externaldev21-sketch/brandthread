@@ -59,7 +59,7 @@ describe("subscription retention", () => {
   it("pauses billing for 30 days and puts the store on vacation", async () => {
     const res = await call("/pause", seller);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as { paused: boolean; resumesAt: string };
     expect(body.paused).toBe(true);
     const [, update] = stripe.subscriptions.update.mock.calls[0] as any[];
     expect(update.pause_collection.behavior).toBe("void");

@@ -103,7 +103,7 @@ function keyRows(plan, catalogue) {
     plan.productLimit === null ? 'Unlimited products' : `Up to ${countLabel(plan.productLimit)} products`,
     plan.teamSeats === null
       ? 'Unlimited team members'
-      : plan.teamSeats === 0
+      : plan.teamSeats <= 1
         ? 'Owner account only'
         : `Up to ${countLabel(plan.teamSeats)} team members`,
     plan.monthlyAiCredits === null ? 'Unlimited AI credits' : `${countLabel(plan.monthlyAiCredits)} AI credits a month`,

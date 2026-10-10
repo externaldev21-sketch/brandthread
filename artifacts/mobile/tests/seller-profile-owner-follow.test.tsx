@@ -199,6 +199,7 @@ vi.mock("@/hooks/useColors", () => ({
 }));
 
 vi.mock("@/contexts/AppThemeContext", () => ({
+  getOnAccentTextStyle: (theme: { onAccent: string }) => ({ color: theme.onAccent }),
   useAppTheme: () => ({
     theme: {
       background: "#09090B", text: "#FAFAFA", muted: "#D7D7DB", subtle: "#A8A8B1", border: "#FFFFFF22",
@@ -225,6 +226,8 @@ vi.mock("@/services/profileService", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/shareProfile", () => ({
+  BRANDTHREAD_ORIGIN: 'https://brandthread.app',
+  normalizeUsername: (username: string) => username?.trim().replace(/^@/, '').toLowerCase() || null,
   buildCanonicalProfileUrl: (username: string) => `https://brandthread.app/u/${username}`,
 }));
 

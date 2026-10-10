@@ -14,7 +14,7 @@ type Pusher = { push: (href: never) => void };
 export function promptUpgradeOnPlanGate(error: unknown, router: Pusher): boolean {
   const rejection = getEntitlementRejection(error);
   if (!rejection) return false;
-  const title = `Upgrade to ${rejection.requiredPlan === 'pro' ? 'Pro' : 'Growth'}`;
+  const title = `Upgrade to ${rejection.requiredPlan === 'pro' ? 'Pro' : rejection.requiredPlan === 'starter' ? 'Starter' : 'Growth'}`;
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.confirm(`${title}\n\n${rejection.message}`)) router.push('/subscription' as never);
     return true;

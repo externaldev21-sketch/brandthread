@@ -13,7 +13,8 @@
  * Nothing is saved until Save; Cancel leaves without changing the site.
  */
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

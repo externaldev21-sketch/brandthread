@@ -2171,7 +2171,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill,
     borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.5)',
   },
-  previewMarkerText: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.4 },
+  previewMarkerText: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.xs },
   previewNote: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.meta, marginBottom: SP.md },
   cartBtnWrap: { position: 'absolute', right: SP.md },
   // `right: 0` (was `-4`, pushing the badge outward past the button's

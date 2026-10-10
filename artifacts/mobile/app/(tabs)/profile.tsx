@@ -630,7 +630,7 @@ export default function ProfileScreen() {
           ring: myStoryIds.length > 0,
           onPressStoryBadge: () => nav('/create-post'),
           onLongPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            haptics.rigid();
             setAccountSwitcherOpen(true);
           },
           onPress: () => {

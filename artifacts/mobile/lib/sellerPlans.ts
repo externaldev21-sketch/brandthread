@@ -18,8 +18,8 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
     id: 'starter',
     name: 'Starter',
     tagline: 'Launch and run your storefront',
-    priceCents: 2900,
-    priceLabel: '$29',
+    priceCents: 1999,
+    priceLabel: '$19.99',
     features: [
       'Storefront, products, checkout, and orders',
       'Sales and product analytics',
@@ -32,8 +32,8 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
     id: 'growth',
     name: 'Growth',
     tagline: 'Create products and source production',
-    priceCents: 7900,
-    priceLabel: '$79',
+    priceCents: 4900,
+    priceLabel: '$49',
     highlight: true,
     features: [
       'Everything in Starter',
@@ -47,8 +47,8 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
     id: 'pro',
     name: 'Pro',
     tagline: 'Operate and promote a growing brand',
-    priceCents: 19900,
-    priceLabel: '$199',
+    priceCents: 12900,
+    priceLabel: '$129',
     features: [
       'Everything in Growth',
       'Team roles and collaborative operations',
@@ -61,6 +61,8 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
 ];
 
 /** Minimum plan to host a live (server: planCatalogue.ts → liveSelling). */
+export const SELLER_TRIAL_DAYS = 7;
+
 export const LIVE_HOST_MIN_PLAN: 'growth' | 'pro' = 'growth';
 
 /**

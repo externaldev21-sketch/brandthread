@@ -852,7 +852,7 @@ const styles = StyleSheet.create({
   hostName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 13, flexShrink: 1 },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, height: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 2 },
-  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
+  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   viewerText: { color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
   // Monochrome brand: red is reserved for the LIVE badge only, so Follow is
   // a plain white pill with black text (the "following" state drops to a

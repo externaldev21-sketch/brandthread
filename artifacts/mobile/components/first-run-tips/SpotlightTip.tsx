@@ -114,5 +114,5 @@ const styles = StyleSheet.create({
   arrow: { marginBottom: 6 },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
   body: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 4 },
-  dismissHint: { color: TEXT_TERTIARY, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14, letterSpacing: 0.3 },
+  dismissHint: { color: TEXT_TERTIARY, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14 },
 });

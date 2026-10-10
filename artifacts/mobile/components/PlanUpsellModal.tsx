@@ -29,7 +29,7 @@ interface Props {
   onClose: () => void;
   onUpgrade: () => void;
   featureName: string;
-  requiredPlan?: 'growth' | 'pro';
+  requiredPlan?: 'starter' | 'growth' | 'pro';
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ export default function PlanUpsellModal({
 
   // For Growth plan, show the rich tool list; for Pro, fall back to the
   // original plain-text list.
-  const isGrowth = requiredPlan !== 'pro';
+  const isGrowth = requiredPlan === 'growth';
 
   // React Native modals render through a global portal. Do not leave even a
   // hidden portal mounted after a gated screen loses focus.

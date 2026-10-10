@@ -140,6 +140,13 @@ vi.mock("@/components/buyer-nav/buyerTabBarMetrics", () => ({
 vi.mock("@clerk/expo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@clerk/expo")>()),
   useAuth: () => ({ isLoaded: true, userId: "seller-1" }),
+  useSignIn: () => ({ signIn: { status: null } }),
+  useUser: () => ({ isLoaded: true, user: { id: 'seller-1' } }),
+  useClerk: () => ({ client: { sessions: [] }, setActive: vi.fn(), signOut: vi.fn() }),
+}));
+
+vi.mock('@/hooks/useLinkedProfiles', () => ({
+  useLinkedProfiles: () => ({ data: undefined, loading: false, activateProfile: vi.fn() }),
 }));
 
 vi.mock("@expo/vector-icons", () => ({

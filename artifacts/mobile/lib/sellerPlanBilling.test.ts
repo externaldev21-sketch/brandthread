@@ -57,7 +57,7 @@ describe('plan state and status copy', () => {
 describe('plan prices and facts come from perks / the catalogue', () => {
   it('reads prices from perks with the catalogue as fallback', () => {
     expect(planPriceLabel('growth', DEMO_PERKS)).toBe('$79');
-    expect(planPriceLabel('pro', null)).toBe('$199');
+    expect(planPriceLabel('pro', null)).toBe('$129');
   });
 
   it('formats limits', () => {
@@ -94,7 +94,7 @@ describe('plan changes', () => {
       { label: 'Products', from: 'Unlimited', to: '25' },
       { label: 'Team seats', from: '3', to: 'None' },
     ]);
-    expect(planChangeRows('growth', 'pro', null)).toEqual([{ label: 'Price', from: '$79/mo', to: '$199/mo' }]);
+    expect(planChangeRows('growth', 'pro', null)).toEqual([{ label: 'Price', from: '$49/mo', to: '$129/mo' }]);
   });
 
   it('lists the tools a downgrade gives up', () => {

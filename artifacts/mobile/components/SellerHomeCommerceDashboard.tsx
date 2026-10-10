@@ -791,7 +791,7 @@ export default function SellerHomeCommerceDashboard({
             </View>
             {/* Share store — opens the one Share store sheet (components/store/ShareStoreSheet). */}
             <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); navigateOrShareStore('/share-store', nav); }}
+              onPress={() => { haptics.light(); navigateOrShareStore('/share-store', nav); }}
               style={styles.topBarShare}
               hitSlop={4}
               accessibilityRole="button"

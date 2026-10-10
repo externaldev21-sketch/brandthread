@@ -679,7 +679,7 @@ export default function AddProductScreen() {
       await api.products.update(created.productId, { status: 'active' });
       await completeSetupTaskWhen('first_product', true);
       setDraftData(prev => ({ ...prev, storeSettings: { ...(prev.storeSettings as any), status: 'active' } }));
-      hapticSuccessAction();
+      haptics.success();
     } catch {
       showPublishError('Could not publish', 'Your draft is saved. Try again.');
     } finally {

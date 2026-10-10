@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     padding: SP.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  stepCount: { color: TEXT_TERTIARY, fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 0.3 },
+  stepCount: { color: TEXT_TERTIARY, fontFamily: FONT.medium, fontSize: FS.xs },
   skip: { color: TEXT_SECONDARY, fontFamily: FONT.semibold, fontSize: FS.xs },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.md },
   body: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },

@@ -19,8 +19,8 @@ describe('weeklyEquivalentFor', () => {
   });
   it('formats the real catalogue price', () => {
     const starter = SELLER_PLANS.find((p) => p.id === 'starter')!;
-    expect(starter.priceCents).toBe(2900);
-    expect(weeklyEquivalentFor(starter)).toBe('~$6.69/wk');
+    expect(starter.priceCents).toBe(1999);
+    expect(weeklyEquivalentFor(starter)).toBe('~$4.61/wk');
   });
 });
 

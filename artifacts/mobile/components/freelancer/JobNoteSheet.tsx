@@ -11,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, TextInput, StyleSheet, Platform, Pressable } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -37,6 +38,7 @@ export function JobNoteSheet({
 }: JobNoteSheetProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const topInset = useHeaderTopInset();
   const [text, setText] = useState('');
 
   useEffect(() => {
@@ -56,7 +58,7 @@ export function JobNoteSheet({
         style={[styles.root, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.header, Platform.OS !== 'ios' && { paddingTop: insets.top + SP.sm }]}>
+        <View style={[styles.header, Platform.OS !== 'ios' && { paddingTop: topInset }]}>
           <Pressable
             onPress={onClose}
             hitSlop={12}
