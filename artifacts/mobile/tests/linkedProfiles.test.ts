@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addProfileLabel, otherRole, parseStartProfileError, profilesMissingFromDevice, roleExistsMessage, sessionForProfile,
+  addProfileLabel, otherRole, parseStartProfileError, previewLinkedProfiles, profilesMissingFromDevice, roleExistsMessage, sessionForProfile,
 } from '@/lib/linkedProfiles';
 import type { LinkedProfile } from '@/lib/api';
 
@@ -48,5 +48,13 @@ describe('linked profiles (one login = one buyer + one seller)', () => {
     ];
     expect(sessionForProfile(sessions, 'user_seller')?.id).toBe('sess_live');
     expect(sessionForProfile(sessions, 'user_none')).toBeNull();
+  });
+
+  it('preview: fresh offers the other role, demo=1 shows both profiles', () => {
+    const identity = { username: 'preview_studio', brandName: 'Preview Studio' };
+    expect(previewLinkedProfiles('buyer', false, identity).canAdd).toEqual({ buyer: false, seller: true });
+    const demo = previewLinkedProfiles('buyer', true, identity);
+    expect(demo.profiles.map((p) => p.username)).toEqual(['ava', 'preview_studio']);
+    expect(demo.canAdd).toEqual({ buyer: false, seller: false });
   });
 });

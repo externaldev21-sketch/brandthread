@@ -18,7 +18,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Button, Icon, ListRow, SectionHeader } from '@/components/ui';
+import { Button, Icon, ListRow } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
 import { useLinkedProfiles } from '@/hooks/useLinkedProfiles';
@@ -117,7 +117,7 @@ export default function AccountProfilesScreen() {
 
         {data && data.profiles.length > 0 ? (
           <>
-            <SectionHeader title="Profiles on this login" />
+            <Text accessibilityRole="header" style={s.sectionTitle}>Profiles on this login</Text>
             {data.profiles.map((profile, index) => (
               <ListRow
                 key={profile.clerkId}
@@ -153,6 +153,7 @@ function styles(colors: ReturnType<typeof useColors>) {
     block: { gap: SP.md, marginBottom: SP.xl },
     headline: { ...TEXT.title2, color: colors.foreground },
     body: { ...TEXT.body, color: colors.mutedForeground },
+    sectionTitle: { ...TEXT.headline, color: colors.foreground, marginBottom: SP.xs },
     footnote: { ...TEXT.footnote, color: colors.mutedForeground, marginTop: SP.lg },
   });
 }

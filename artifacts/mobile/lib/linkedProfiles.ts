@@ -68,16 +68,20 @@ export function sessionForProfile<S extends SwitcherSession>(sessions: readonly 
 /**
  * Signed-out dev web preview (`?bt_preview=buyer|seller`) has no account to
  * ask. Fresh preview: just the current profile, so "Start selling" / "Shop as
- * a buyer" is offered. `demo=1`: both profiles, the same @ava / @atelier.noire
- * pair the account switcher's preview shows.
+ * a buyer" is offered. `demo=1`: both profiles (the preview buyer @ava and
+ * the preview seller from lib/previewIdentity.ts).
  */
-export function previewLinkedProfiles(role: ProfileRole, demo: boolean): { profiles: LinkedProfile[]; canAdd: { buyer: boolean; seller: boolean } } {
+export function previewLinkedProfiles(
+  role: ProfileRole,
+  demo: boolean,
+  sellerIdentity: { username: string; brandName: string },
+): { profiles: LinkedProfile[]; canAdd: { buyer: boolean; seller: boolean } } {
   const buyer: LinkedProfile = {
     clerkId: 'preview-buyer', role: 'buyer', username: 'ava', displayName: 'Ava', avatarUrl: null,
     onboardingComplete: true, isLogin: true, isCurrent: role === 'buyer', pendingDeletion: false,
   };
   const seller: LinkedProfile = {
-    clerkId: 'preview-seller', role: 'seller', username: 'atelier.noire', displayName: 'Atelier Noire', avatarUrl: null,
+    clerkId: 'preview-seller', role: 'seller', username: sellerIdentity.username, displayName: sellerIdentity.brandName, avatarUrl: null,
     onboardingComplete: true, isLogin: false, isCurrent: role === 'seller', pendingDeletion: false,
   };
   const profiles = demo ? [buyer, seller] : [role === 'seller' ? seller : buyer];

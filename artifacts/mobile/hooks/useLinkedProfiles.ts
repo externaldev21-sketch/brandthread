@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useAuth, useClerk, useSignIn } from '@clerk/expo';
 import { useApi, type LinkedProfilesResponse } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import {
   ONBOARDING_COMPLETE_KEY,
   previewLinkedProfiles,
@@ -35,7 +36,7 @@ export function useLinkedProfiles(options: { enabled?: boolean } = {}) {
   const refresh = useCallback(async () => {
     if (preview) {
       // Signed-out preview never calls the API (see lib/linkedProfiles.ts).
-      setData(previewLinkedProfiles(isSellerDevPreview() ? 'seller' : 'buyer', isPreviewDemoMode()));
+      setData(previewLinkedProfiles(isSellerDevPreview() ? 'seller' : 'buyer', isPreviewDemoMode(), PREVIEW_SELLER_IDENTITY));
       return;
     }
     if (!isSignedIn) { setData(null); return; }
