@@ -737,6 +737,26 @@ describe('onboarding entry points and resume', () => {
     expect(has(renderer, 'onboarding-email-input')).toBe(false);
   });
 
+  it('"Start selling" / "Shop as a buyer" (signed in + pending role) goes straight to the name step, with or without postAuth', async () => {
+    for (const postAuth of ['1', undefined]) {
+      resetState();
+      clerkStore.isSignedIn = true;
+      clerkStore.userId = 'user_second_profile';
+      if (postAuth) searchParams.postAuth = postAuth;
+      memoryStorage.set('onboarding_pending_flow', 'seller');
+      renderer = await renderScreen();
+      await settle();
+      expect(has(renderer, 'onboarding-first-name-input')).toBe(true);
+      expect(has(renderer, 'onboarding-account-type-continue')).toBe(false);
+      expect(has(renderer, 'onboarding-email-input')).toBe(false);
+      await type(renderer, 'onboarding-first-name-input', 'Sasha Rivera');
+      await tap(renderer, 'onboarding-name-next');
+      expect(has(renderer, 'onboarding-brand-name-input')).toBe(true); // seller path
+      await act(async () => { renderer?.unmount(); });
+    }
+    renderer = undefined;
+  });
+
   it('reopening mid-sign-up returns to the same step with the email kept', async () => {
     memoryStorage.set('onboarding_pending_draft', JSON.stringify({
       version: 9, flow: 'buyer', stepId: 'CODE', authMethod: 'email', accountCreated: false, email: 'resume@x.test',
