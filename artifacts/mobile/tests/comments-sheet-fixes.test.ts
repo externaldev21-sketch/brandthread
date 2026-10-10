@@ -87,7 +87,7 @@ describe('Like heart: its own column near the comment text, solid when liked, ne
   it('uses Ionicons filled/outline heart instead of Feather\'s outline-only glyph', () => {
     expect(comments).toContain('FontAwesome');
     expect(comments).toMatch(/liked\s*\?\s*<FontAwesome name="heart" size=\{16\}/);
-    expect(comments).toContain('<Feather name="heart" size={16}');
+    expect(comments).toContain('<Icon name="heart" size={16}');
   });
 
   it('is a 16pt icon, not inline in the meta row', () => {
@@ -183,8 +183,8 @@ describe('PressableScale opt-out fixes the hugely-spaced comment rows (round 3)'
 
 describe('Header close icon is 20pt', () => {
   it('does not use the old 22pt size for the close X', () => {
-    expect(comments).toContain('<Feather name="x" size={20} color={FG} />');
-    expect(comments).not.toContain('<Feather name="x" size={22} color={FG} />');
+    expect(comments).toContain('<Icon name="x" size={20} color={FG} />');
+    expect(comments).not.toContain('<Icon name="x" size={22} color={FG} />');
   });
 });
 

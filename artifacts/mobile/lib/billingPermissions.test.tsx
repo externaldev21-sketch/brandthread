@@ -182,6 +182,7 @@ vi.mock('@/lib/theme', () => ({
   CARD_ELEVATED: '#18181b',
   BORDER: '#222222',
   FG: '#ffffff',
+  MEDIA: { foreground: '#ffffff' },
   MUTED: '#aaaaaa',
   SUBTLE: '#666666',
   PURPLE: '#c7cdd5',

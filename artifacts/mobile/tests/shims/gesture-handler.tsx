@@ -15,7 +15,7 @@ function makeChain(): Record<string, (...args: unknown[]) => unknown> {
   return chain;
 }
 
-export const Gesture = { Pan: makeChain, Tap: makeChain, Pinch: makeChain, Simultaneous: makeChain, Race: makeChain, Exclusive: makeChain };
+export const Gesture = { Native: makeChain, Pan: makeChain, Tap: makeChain, Pinch: makeChain, Simultaneous: makeChain, Race: makeChain, Exclusive: makeChain };
 
 export function GestureDetector({ children }: { children: React.ReactNode }) {
   return React.createElement(React.Fragment, null, children);

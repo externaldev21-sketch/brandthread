@@ -3,6 +3,12 @@ name: Expo Go native module boundary
 description: Preventing installed custom native modules from crashing Brandthread when opened through Expo Go
 ---
 
+**Preview target rule:** Keep the normal owner preview explicitly targeted at Expo Go, even when a custom development client is installed for native-only features.
+
+**Why:** Expo CLI automatically selects development-client mode when that package is installed, silently changing the QR link away from an Expo Go link.
+
+**How to apply:** Explicitly select Expo Go for the normal preview. Verify custom native calling features in a separate development build; do not replace the owner's fresh-account Expo Go preview.
+
 **Rule:** Code reachable during Expo Go startup must not statically import a custom native module that Expo Go does not bundle. Use React Native or Expo-compatible fallbacks for root providers and route modules; reserve custom native integrations for guarded, feature-local paths or development builds.
 
 **Why:** Metro can produce a valid manifest and complete iOS/Android bundles even when the app will fail at launch because a statically imported package requests an unavailable native module. Bundle success alone does not prove Expo Go runtime compatibility.

@@ -3,7 +3,6 @@
  * share sheet). Both the seller's order detail and the buyer's order detail
  * produce the same document from their own order shape via a small adapter.
  */
-import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { Order } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
@@ -150,6 +149,7 @@ export function buildInvoiceHtml(input: InvoiceInput): string {
 
 /** Render the invoice to PDF and open the share sheet. */
 export async function shareInvoice(input: InvoiceInput): Promise<void> {
+  const Print = await import('expo-print');
   const { uri } = await Print.printToFileAsync({ html: buildInvoiceHtml(input) });
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri);

@@ -2,7 +2,6 @@
  * Packing slip — renders a simple HTML packing slip to PDF and shares it.
  * Used from the fulfillment wizard (app/fulfill-order.tsx).
  */
-import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Order } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
@@ -70,6 +69,7 @@ export function buildPackingSlipHtml(order: Order): string {
 
 /** Render a packing slip to PDF and open the native share sheet. */
 export async function sharePackingSlip(order: Order): Promise<void> {
+  const Print = await import('expo-print');
   const html = buildPackingSlipHtml(order);
   const { uri } = await Print.printToFileAsync({ html });
   if (await Sharing.isAvailableAsync()) {

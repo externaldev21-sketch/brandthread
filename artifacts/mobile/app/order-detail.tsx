@@ -40,7 +40,9 @@ import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
 import { queryKeys } from '@/lib/queryClient';
 import { formatLocalDate, sellerOrderConflictMessage } from '@/lib/deliveryGuarantee';
 import { SellerDeliveryBanner } from '@/components/orders/SellerDelivery';
-import { FulfillSheet } from '@/components/orders/FulfillSheet';
+const FulfillSheet = React.lazy(async () => ({
+  default: (await import('@/components/orders/FulfillSheet')).FulfillSheet,
+}));
 import { RefundSheet } from '@/components/orders/RefundSheet';
 import { sharePackingSlip } from '@/lib/packingSlip';
 import {
@@ -1288,12 +1290,14 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
         </View>
       </Modal>
 
+      {fulfillOpen && <React.Suspense fallback={<ActivityIndicator />}>
       <FulfillSheet
         visible={fulfillOpen}
         order={order}
         onCancel={() => setFulfillOpen(false)}
         onSubmit={handleFulfill}
       />
+      </React.Suspense>}
 
       <RefundSheet
         visible={refundOpen}
