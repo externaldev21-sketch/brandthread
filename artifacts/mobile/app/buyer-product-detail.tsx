@@ -5,6 +5,7 @@
 import { track } from '@/lib/analytics';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { formatCalendarDate } from '@/lib/calendarDate';
+import { allOptionsSelected, onlyVariantSelection } from '@/lib/buyerProductSelection';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
@@ -760,6 +761,13 @@ export default function BuyerProductDetailScreen() {
     );
   }, [product?.id, sellerPreview]);
 
+  // One-size / single-variant products: nothing to choose, so it's chosen.
+  useEffect(() => {
+    if (!product || editVariantId) return;
+    const only = onlyVariantSelection(product);
+    if (only) setSelections(only);
+  }, [product, editVariantId]);
+
   useEffect(() => {
     if (!product || !editVariantId) return;
     const cartVariant = product.variants.find(candidate => candidate.id === editVariantId);
@@ -861,7 +869,7 @@ export default function BuyerProductDetailScreen() {
   const variantCompare = variant?.compareAtPriceCents ?? product.compareAtPriceCents;
   const hasDiscount = variantCompare && variantCompare > variantPrice;
   const savingsAmt = hasDiscount ? variantCompare! - variantPrice : 0;
-  const allSelected = product.options.length > 0 && Object.keys(selections).length === product.options.length;
+  const allSelected = allOptionsSelected(product, selections);
   const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 : true;
   const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
   const paymentUnavailable = sellerPaymentReady === false;

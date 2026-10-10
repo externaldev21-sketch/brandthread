@@ -18,6 +18,8 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
 import { saveImageToCameraRoll } from '@/lib/aiToolMedia';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { confirmPublishWithoutPayouts } from '@/lib/payoutReadinessPrompt';
+import { useApi } from '@/hooks/useApi';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { buildStoreUrl, storeQrDataUri } from '@/lib/storeQr';
@@ -30,6 +32,7 @@ export default function LaunchPublishScreen() {
   // Seller bar (Studio + AI side circles) floats over every seller screen.
   const tabBarInset = useTabBarMetrics(2).occupiedHeight;
   const router = useRouter();
+  const api = useApi();
   const { checklist } = useLaunchChecklist();
 
   const [live, setLive] = useState(false);
@@ -67,6 +70,11 @@ export default function LaunchPublishScreen() {
     if (publishing) return;
     setPublishing(true);
     setProblem(null);
+    // Going live without payouts: buyers couldn't check out (BT-206).
+    if (!(await confirmPublishWithoutPayouts(api, router))) {
+      setPublishing(false);
+      return;
+    }
     try {
       const result = await publishStore();
       if (result.success) {
