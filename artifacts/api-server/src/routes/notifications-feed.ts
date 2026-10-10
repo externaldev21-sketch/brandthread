@@ -13,6 +13,7 @@
  * POST   /api/internal/notifications            — publish a notification (server-to-user)
  */
 import { Router } from "express";
+import { isMirroredSellerType, mirrorSellerEmail } from "../lib/sellerLifecycle/mirror";
 import { db, notificationsFeed, conversationParticipants, users, blocks, activityMutes, follows } from "@workspace/db";
 import { eq, and, desc, inArray, notInArray, or, isNull, sql, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -383,6 +384,8 @@ async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory
 }
 
 export async function publishNotification(n: PublishInput): Promise<void> {
+  // New order / review / failed payout also reach the seller by email (own preference gate).
+  if (isMirroredSellerType(n.type)) void mirrorSellerEmail(n);
   const pushCategory = n.pushCategory ?? normalizePushEventCategory(n.category);
 
   // "See less" preferences (Activity "..." menu) — a muted type or a muted

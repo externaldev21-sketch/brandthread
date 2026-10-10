@@ -164,6 +164,14 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/payouts');
   });
 
+  it('routes a seller setup reminder to its screen, and ignores unknown routes', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('nudge-1', { targetType: 'seller_setup', targetId: '/add-product' }));
+    handler(targetResponse('nudge-2', { targetType: 'seller_setup', targetId: 'https://evil.test' }));
+    expect(router.push.mock.calls.map((call) => call[0])).toEqual(['/add-product']);
+  });
+
   it('routes a dispute notification to the dispute detail screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);

@@ -573,6 +573,13 @@ export function groupedPeopleHref(row: Pick<ActivityRow, 'type' | 'ids'>): strin
   return `/activity-people?type=${q(row.type)}&ids=${q(ids)}`;
 }
 
+/** Screens a seller setup reminder / weekly summary may open (server sends the route as targetId). */
+const SELLER_SETUP_ROUTES = new Set(['/add-product', '/payouts', '/launch-publish', '/onboarding', '/share-store', '/(tabs)/orders', '/(tabs)/analytics']);
+
+export function sellerSetupHref(route: string | null | undefined): string | null {
+  return route && SELLER_SETUP_ROUTES.has(route) ? route : null;
+}
+
 /**
  * Where tapping a row goes, or null when there is nowhere useful to go.
  * Routes match the push-notification handler (lib/notificationNavigation.ts)
@@ -654,6 +661,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return id ? `/dispute-detail?disputeId=${q(id)}` : '/disputes';
     case 'payout':
       return '/payouts';
+    case 'seller_setup':
+      return sellerSetupHref(id);
     case 'subscription_invoice':
       return '/subscription';
     default:

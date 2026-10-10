@@ -652,3 +652,11 @@ describe('delete with undo', () => {
     expect(onFailed).toHaveBeenCalledWith(['n2']);
   });
 });
+
+describe('seller setup rows', () => {
+  it('open the whitelisted screen the server named', () => {
+    expect(activityHref(item({ type: 'seller_nudge_no_payouts', targetType: 'seller_setup', targetId: '/payouts' }), 'seller')).toBe('/payouts');
+    expect(activityHref(item({ type: 'seller_weekly_summary', targetType: 'seller_setup', targetId: '/(tabs)/analytics' }), 'seller')).toBe('/(tabs)/analytics');
+    expect(activityHref(item({ type: 'seller_nudge_no_product', targetType: 'seller_setup', targetId: '/settings/delete' }), 'seller')).toBeNull();
+  });
+});
