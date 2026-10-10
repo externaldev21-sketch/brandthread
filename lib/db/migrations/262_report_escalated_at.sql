@@ -4,11 +4,9 @@
 -- has waited 12+ hours is escalated to moderators exactly once, even with
 -- several API replicas running the job.
 --
--- Deliberately NOT declared in the drizzle `reports` table: the report
--- insert (.returning()) and the moderation queue (select()) list every
--- declared column, so declaring it would break filing reports on a deploy that
--- runs before this migration. Only the job touches it, through raw SQL that
--- tolerates the column being absent.
+-- Also declared in the drizzle `reports` table (escalatedAt) so
+-- `drizzle-kit push --force` keeps the column. Apply this migration before
+-- deploying the code that selects it.
 ALTER TABLE reports
   ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMPTZ;
 
