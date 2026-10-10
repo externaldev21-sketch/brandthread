@@ -348,7 +348,7 @@ router.post("/", requireRole("manager"), validateInput({ body: createProductBody
   if (!product) {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });
@@ -513,7 +513,7 @@ router.put("/:id", requireRole("manager"), validateInput({ params: productIdPara
   if (result.limited && access) {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });
@@ -621,7 +621,7 @@ router.post("/:id/restore", requireRole("manager"), validateInput({ params: prod
   if (result.kind === "limited") {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });
@@ -789,7 +789,7 @@ router.post("/import", requireRole("manager"), validateInput({ body: importProdu
   if (!inserted) {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });

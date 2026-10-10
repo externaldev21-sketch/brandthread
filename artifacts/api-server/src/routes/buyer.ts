@@ -43,6 +43,7 @@ import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checko
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { loadSellerCheckoutSettings, stripeCheckoutLocale } from "../lib/sellerCheckoutSettings";
 import { validateDiscountCode, DiscountValidationError, reserveDiscountCapacity } from "../lib/discounts";
+import { productsBeyondSellerPlan, SELLER_PLAN_LIMIT_CODE, SELLER_PLAN_LIMIT_MESSAGE } from "../lib/planGate";
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -732,6 +733,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         code: "SELLER_ON_VACATION",
         vacationUntil: vacation.until?.toISOString() ?? null,
       });
+      return;
+    }
+    if ((await productsBeyondSellerPlan(sellerId, items.map((item: { productId: string }) => item.productId))).length > 0) {
+      res.status(409).json({ error: SELLER_PLAN_LIMIT_MESSAGE, code: SELLER_PLAN_LIMIT_CODE });
       return;
     }
 

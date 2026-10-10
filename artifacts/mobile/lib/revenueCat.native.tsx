@@ -10,6 +10,7 @@ import {
   createRevenueCatIdentityQueue,
   createRevenueCatSessionGuard,
   runRevenueCatSessionOperation,
+  switchRevenueCatIdentity,
 } from '@/lib/revenueCatSession';
 import { isExpoGo } from '@/lib/expoGoRuntime';
 
@@ -106,11 +107,9 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     const clerkId = isSignedIn ? user?.id : undefined;
     (async () => {
       try {
-        await queueRevenueCatIdentityTransition(async () => {
-          // Always log out first: login A → B cannot inherit A's customer info.
-          await Purchases!.logOut();
-          if (clerkId) await Purchases!.logIn(clerkId);
-        });
+        // Log out an identified customer before switching (A → B cannot
+        // inherit A's customer info), but never an anonymous one: that throws.
+        await queueRevenueCatIdentityTransition(() => switchRevenueCatIdentity(Purchases!, clerkId));
         if (!sessionGuard.isCurrent(generation)) return;
         listener = (info) => {
           if (!sessionGuard.isCurrent(generation)) return;

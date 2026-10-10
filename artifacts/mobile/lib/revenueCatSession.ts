@@ -29,3 +29,29 @@ export function createRevenueCatIdentityQueue() {
     return next;
   };
 }
+/** The subset of the Purchases SDK the identity switch needs (keeps it testable). */
+export type RevenueCatIdentityClient = {
+  isAnonymous: () => Promise<boolean>;
+  getAppUserID: () => Promise<string>;
+  logIn: (appUserID: string) => Promise<unknown>;
+  logOut: () => Promise<unknown>;
+};
+
+/**
+ * Moves the SDK to `clerkId` (or to an anonymous customer when signed out).
+ * logOut() throws LOGOUT_CALLED_WITH_ANONYMOUS_USER on an anonymous customer,
+ * which is the state right after configure() on a fresh install, so it only
+ * runs when an identified customer is active and differs from the target.
+ */
+export async function switchRevenueCatIdentity(
+  sdk: RevenueCatIdentityClient,
+  clerkId: string | undefined,
+): Promise<void> {
+  const anonymous = await sdk.isAnonymous();
+  if (!anonymous) {
+    const current = await sdk.getAppUserID();
+    if (clerkId && current === clerkId) return;
+    await sdk.logOut();
+  }
+  if (clerkId) await sdk.logIn(clerkId);
+}

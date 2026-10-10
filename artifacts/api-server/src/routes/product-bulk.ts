@@ -453,7 +453,7 @@ router.post("/status", requireRole("manager"), validateInput({ body: statusBody 
   } catch (err) {
     if (err instanceof BulkRefusal && err.body.limited && access) {
       sendPlanLimitReached(res, {
-        resource: "products", currentPlan: access.planId, requiredPlan: "growth", limit: access.limits.products!,
+        resource: "products", currentPlan: access.planId, paid: access.paid, requiredPlan: "growth", limit: access.limits.products!,
       });
       return;
     }
@@ -562,7 +562,7 @@ router.post("/duplicate", requireRole("manager"), validateInput({ body: duplicat
   } catch (err) {
     if (err instanceof BulkRefusal && err.body.limited) {
       sendPlanLimitReached(res, {
-        resource: "products", currentPlan: access.planId, requiredPlan: "growth", limit: access.limits.products!,
+        resource: "products", currentPlan: access.planId, paid: access.paid, requiredPlan: "growth", limit: access.limits.products!,
       });
       return;
     }

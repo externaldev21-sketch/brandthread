@@ -119,3 +119,30 @@ describe("resolveEffectiveEntitlement", () => {
     });
   });
 });
+describe("past_due grace period (BT-002)", () => {
+  const day = 24 * 60 * 60 * 1000;
+
+  it("keeps the plan while Stripe retries the card", () => {
+    const result = resolveEffectiveEntitlement(
+      stripe({ status: "past_due", pastDueSince: new Date(now.valueOf() - 3 * day) }), null, now,
+    );
+    expect(result).toMatchObject({ planId: "growth", provider: "stripe" });
+  });
+
+  it("falls back to no paid access once the grace period is over", () => {
+    const result = resolveEffectiveEntitlement(
+      stripe({ status: "past_due", pastDueSince: new Date(now.valueOf() - 8 * day) }), null, now,
+    );
+    expect(result).toMatchObject({ provider: "none", status: "none" });
+  });
+
+  it("treats a past_due row not yet stamped as in grace (no lockout on deploy)", () => {
+    expect(resolveEffectiveEntitlement(stripe({ status: "past_due", pastDueSince: null }), null, now).provider).toBe("stripe");
+  });
+
+  it("never grants access for canceled, unpaid or missing subscriptions", () => {
+    for (const status of ["canceled", "unpaid", "incomplete_expired", "none"]) {
+      expect(resolveEffectiveEntitlement(stripe({ status }), null, now).provider).toBe("none");
+    }
+  });
+});

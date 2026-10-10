@@ -15,6 +15,13 @@
 
 export const ANALYTICS_EVENTS = {
   purchase_completed: ["amount_bucket", "currency", "item_count", "charge_model", "is_guest"],
+  // Seller subscriptions, from the Stripe and RevenueCat webhooks (the
+  // authority, and they still arrive after the app is deleted). BT-450.
+  trial_started: ["plan", "provider"],
+  subscription_started: ["plan", "provider", "from_trial"],
+  subscription_cancelled: ["plan", "provider", "in_trial"],
+  subscription_ended: ["plan", "provider"],
+  subscription_past_due: ["plan", "provider"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type AnalyticsEventName = keyof typeof ANALYTICS_EVENTS;

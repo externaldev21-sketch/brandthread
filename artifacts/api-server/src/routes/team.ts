@@ -464,7 +464,7 @@ async function handleAccept(req: any, res: any) {
   if (acceptance.kind === "limited") {
     sendPlanLimitReached(res, {
       resource: "teamSeats",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: access.planId === "starter" ? "growth" : "pro",
       limit: access.limits.teamSeats!,
     });
@@ -638,7 +638,7 @@ router.post("/invite", requireRole("owner"), validateBody(teamInviteBody), async
   if (admission.kind === "limited") {
     sendPlanLimitReached(res, {
       resource: "teamSeats",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: access.planId === "starter" ? "growth" : "pro",
       limit: access.limits.teamSeats!,
     });
@@ -706,7 +706,7 @@ router.post("/invite/:id/regenerate", requireRole("owner"), async (req, res) => 
   if (result.kind === "limited") {
     sendPlanLimitReached(res, {
       resource: "teamSeats",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: access.planId === "starter" ? "growth" : "pro",
       limit: access.limits.teamSeats!,
     });
