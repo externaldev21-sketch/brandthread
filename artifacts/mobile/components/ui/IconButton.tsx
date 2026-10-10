@@ -9,7 +9,7 @@ import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'rea
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
-import { COMP, FONT } from '@/lib/theme';
+import { COMP, FONT, TEXT_TERTIARY } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { Glass } from '@/components/ui/Glass';
@@ -49,7 +49,8 @@ export function IconButton({
 }: IconButtonProps) {
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
-  const resolvedColor = color ?? (variant === 'glass' ? '#FFFFFF' : palette.foreground);
+  // Disabled is a solid gray glyph, not a faded one.
+  const resolvedColor = disabled ? TEXT_TERTIARY : color ?? (variant === 'glass' ? '#FFFFFF' : palette.foreground);
 
   return (
     <Pressable
@@ -71,7 +72,6 @@ export function IconButton({
           styles.root,
           variant === 'filled' && { backgroundColor: palette.card, borderRadius: RADII.chip },
           variant === 'glass' && { borderRadius: RADII.pill, overflow: 'hidden' },
-          disabled && { opacity: 0.4 },
           { transform: [{ scale }] },
           style,
         ]}

@@ -12,7 +12,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticToggle, hapticSelection } from '@/lib/haptics';
-import { FONT } from '@/lib/theme';
+import { FONT, TEXT_TERTIARY } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII, radius } from '@/constants/radii';
@@ -57,7 +57,7 @@ export function Chip({
   const { theme } = useAppTheme();
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
-  const contentColor = selected ? theme.onAccent : palette.mutedForeground;
+  const contentColor = disabled ? TEXT_TERTIARY : selected ? theme.onAccent : palette.mutedForeground;
   const isQuickReply = variant === 'quickReply';
 
   return (
@@ -80,7 +80,6 @@ export function Chip({
             borderColor: selected ? theme.accent : palette.border,
             borderWidth: isQuickReply ? StyleSheet.hairlineWidth : 1,
             height: isQuickReply ? 32 : undefined,
-            opacity: disabled ? 0.5 : 1,
             transform: [{ scale }],
           },
         ]}

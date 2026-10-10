@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, GUTTER, ICON, SP } from '@/lib/theme';
+import { FONT, FS, GUTTER, ICON, SP, TEXT_TERTIARY } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -112,9 +112,9 @@ export function Header({
                   disabled={action.disabled}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   onPress={action.onPress}
-                  style={[rootStyles.iconBtn, action.disabled && { opacity: 0.4 }]}
+                  style={[rootStyles.iconBtn]}
                 >
-                  <Icon name={action.icon} size={ICON.md} color={theme.text} />
+                  <Icon name={action.icon} size={ICON.md} color={action.disabled ? TEXT_TERTIARY : theme.text} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -181,9 +181,9 @@ export function Header({
                   disabled={action.disabled}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   onPress={action.onPress}
-                  style={[styles.iconBtn, action.disabled && { opacity: 0.4 }]}
+                  style={[styles.iconBtn]}
                 >
-                  <Icon name={action.icon} size={ICON.md} color={theme.text} />
+                  <Icon name={action.icon} size={ICON.md} color={action.disabled ? TEXT_TERTIARY : theme.text} />
                 </TouchableOpacity>
               ))}
               {actions.length === 0 && <View style={styles.iconBtn} />}

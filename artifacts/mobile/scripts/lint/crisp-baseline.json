@@ -23,9 +23,6 @@
     "fractionalRadius": 1,
     "fractionalFont": 1
   },
-  "app/(tabs)/following.tsx": {
-    "fadedText": 1
-  },
   "app/(tabs)/orders.tsx": {
     "hairline": 1,
     "fractionalRadius": 1
@@ -73,9 +70,6 @@
     "hairline": 1,
     "rnImage": 2
   },
-  "app/buyer-live.tsx": {
-    "fadedText": 3
-  },
   "app/buyer-order-detail.tsx": {
     "rnImage": 2
   },
@@ -97,23 +91,15 @@
   "app/buyer-return-request.tsx": {
     "rnImage": 2
   },
-  "app/buyer-search.tsx": {
-    "fadedText": 1
-  },
   "app/buyer-story-create.tsx": {
-    "fadedText": 6,
     "hairline": 4,
     "rnImage": 3
   },
   "app/buyer-story-viewer.tsx": {
-    "fadedText": 1,
     "hairline": 1
   },
   "app/c/[collectionId].tsx": {
     "rnImage": 2
-  },
-  "app/camera-capture.tsx": {
-    "fadedText": 2
   },
   "app/checkout.tsx": {
     "hairline": 1
@@ -142,9 +128,6 @@
     "smearShadow": 4,
     "disabledOpacity": 4
   },
-  "app/design-export.tsx": {
-    "fadedText": 1
-  },
   "app/design-garment.tsx": {
     "hairline": 3
   },
@@ -154,15 +137,11 @@
   "app/design-prompt-edit.tsx": {
     "rnImage": 3
   },
-  "app/design-templates.tsx": {
-    "fadedText": 1
-  },
   "app/design-text-to-design.tsx": {
     "rnImage": 4,
     "disabledOpacity": 1
   },
   "app/design-upload-sketch.tsx": {
-    "fadedText": 1,
     "rnImage": 3
   },
   "app/design.tsx": {
@@ -201,12 +180,6 @@
   "app/link-in-bio.tsx": {
     "hairline": 1,
     "rnImage": 2
-  },
-  "app/live-feed.tsx": {
-    "fadedText": 5
-  },
-  "app/live.tsx": {
-    "fadedText": 2
   },
   "app/manufacturer-hub.tsx": {
     "rnImage": 3,
@@ -274,7 +247,6 @@
     "rnImage": 2
   },
   "app/seller-go-live.tsx": {
-    "fadedText": 5,
     "hairline": 1,
     "rnImage": 1
   },
@@ -282,7 +254,6 @@
     "rnImage": 1
   },
   "app/seller-live.tsx": {
-    "fadedText": 3,
     "hairline": 1
   },
   "app/seller-schedule-live.tsx": {
@@ -297,9 +268,6 @@
   "app/size-chart-template-apply.tsx": {
     "hairline": 1,
     "rnImage": 1
-  },
-  "app/store-builder.tsx": {
-    "fadedText": 3
   },
   "app/store-collections.tsx": {
     "rnImage": 1
@@ -323,9 +291,6 @@
   "app/store-theme-picker.tsx": {
     "smearShadow": 2
   },
-  "app/story-mention-viewer.tsx": {
-    "fadedText": 1
-  },
   "app/subscription.tsx": {
     "smearShadow": 2
   },
@@ -336,7 +301,6 @@
     "rnImage": 1
   },
   "app/thread-cash.tsx": {
-    "fadedText": 1,
     "smearShadow": 2
   },
   "app/u/[username].tsx": {
@@ -353,10 +317,7 @@
   },
   "components/BrandthreadUI.tsx": {
     "smearShadow": 1,
-    "disabledOpacity": 3
-  },
-  "components/ClerkLoadErrorBoundary.tsx": {
-    "fadedText": 1
+    "disabledOpacity": 1
   },
   "components/CommerceSignal.tsx": {
     "fractionalRadius": 2
@@ -397,9 +358,6 @@
     "fractionalRadius": 2,
     "rnImage": 1,
     "smearShadow": 2
-  },
-  "components/ShareProfileQrScanner.tsx": {
-    "fadedText": 1
   },
   "components/ShareProfileSheet.tsx": {
     "rnImage": 2,
@@ -452,9 +410,6 @@
   "components/buyer-feed/CaptionBlock.tsx": {
     "hairline": 1
   },
-  "components/buyer-feed/FeedTopBar.tsx": {
-    "fadedText": 1
-  },
   "components/buyer-feed/RightActionRail.tsx": {
     "hairline": 2,
     "rnImage": 1
@@ -465,14 +420,7 @@
   "components/calls/GlobalCallOverlay.tsx": {
     "smearShadow": 1
   },
-  "components/chat/ConversationSettingsSheet.tsx": {
-    "disabledOpacity": 1
-  },
-  "components/chat/MediaViewer.tsx": {
-    "fadedText": 1
-  },
   "components/chat/ReactionOverlay.tsx": {
-    "fadedText": 1,
     "smearShadow": 2
   },
   "components/checkout/CheckoutPrimitives.tsx": {
@@ -527,7 +475,6 @@
     "hairline": 1
   },
   "components/discover/DiscoverPager.tsx": {
-    "fadedText": 1,
     "smearShadow": 2
   },
   "components/discover/DiscoverPeopleRow.tsx": {
@@ -535,9 +482,6 @@
   },
   "components/discover/DiscoverPostViewer.tsx": {
     "rnImage": 1
-  },
-  "components/discover/DiscoverTileView.tsx": {
-    "fadedText": 2
   },
   "components/discover/EditorialTile.tsx": {
     "hairline": 1
@@ -549,26 +493,17 @@
     "disabledOpacity": 1
   },
   "components/feed/UploadProgressPill.tsx": {
-    "fadedText": 1,
     "fractionalRadius": 2,
     "rnImage": 1
   },
   "components/first-run-tips/AnchoredCardTip.tsx": {
-    "fadedText": 3,
     "smearShadow": 1
   },
   "components/first-run-tips/FullScreenGuideTip.tsx": {
     "smearShadow": 1
   },
   "components/first-run-tips/GestureHintTip.tsx": {
-    "fadedText": 1,
     "smearShadow": 1
-  },
-  "components/first-run-tips/SpotlightTip.tsx": {
-    "fadedText": 2
-  },
-  "components/layout/Header.tsx": {
-    "disabledOpacity": 2
   },
   "components/layout/ScreenChrome.tsx": {
     "smearShadow": 1
@@ -584,7 +519,6 @@
     "smearShadow": 2
   },
   "components/live/LiveOverlays.tsx": {
-    "fadedText": 2,
     "hairline": 1
   },
   "components/live/LiveProductsSheet.tsx": {
@@ -596,14 +530,10 @@
   "components/onboarding/BrandsToFollowStep.tsx": {
     "rnImage": 1
   },
-  "components/onboarding/SellerPlanRecommendationStep.tsx": {
-    "fadedText": 6
-  },
   "components/orders/OrderStatusTimeline.tsx": {
     "hairline": 1
   },
   "components/paywall/SellerPlanSelector.tsx": {
-    "fadedText": 1,
     "smearShadow": 2
   },
   "components/profile/BrandHero.tsx": {
@@ -612,17 +542,13 @@
   },
   "components/profile/ProfileControls.tsx": {
     "hairline": 2,
-    "smearShadow": 2,
-    "disabledOpacity": 1
+    "smearShadow": 2
   },
   "components/profile/ProfileStoriesRow.tsx": {
     "hairline": 1
   },
   "components/profile/ProfileTopBar.tsx": {
     "hairline": 1
-  },
-  "components/search/VideoTile.tsx": {
-    "fadedText": 2
   },
   "components/share-cards/BuyerShareCard.tsx": {
     "rnImage": 2
@@ -632,9 +558,6 @@
   },
   "components/social/CreateButton.tsx": {
     "blur": 1
-  },
-  "components/social/FollowButton.tsx": {
-    "disabledOpacity": 1
   },
   "components/social/QuotedPostCard.tsx": {
     "rnImage": 1
@@ -661,18 +584,8 @@
   "components/ui/AppleEmoji.tsx": {
     "rnImage": 1
   },
-  "components/ui/Chip.tsx": {
-    "disabledOpacity": 1
-  },
   "components/ui/IconButton.tsx": {
-    "hairline": 1,
-    "disabledOpacity": 1
-  },
-  "components/ui/ListRow.tsx": {
-    "disabledOpacity": 2
-  },
-  "components/ui/QuantityStepper.tsx": {
-    "disabledOpacity": 1
+    "hairline": 1
   },
   "components/ui/Snackbar.tsx": {
     "rnImage": 1

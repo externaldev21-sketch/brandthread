@@ -8,7 +8,7 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/safety';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, TEXT_TERTIARY } from '@/lib/theme';
 
 type Confirmation = 'block' | 'unblock' | 'unfollow';
 
@@ -128,12 +128,13 @@ export function ConversationSettingsSheet({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: disabled || busy }}
-      style={[styles.row, { borderColor: theme.border, opacity: disabled ? 0.5 : 1 }]}
+      style={[styles.row, { borderColor: theme.border }]}
     >
-      <Feather name={icon} size={19} color={destructive ? theme.error : theme.text} />
+      {/* Disabled rows are solid gray, not faded. */}
+      <Feather name={icon} size={19} color={disabled ? TEXT_TERTIARY : destructive ? theme.error : theme.text} />
       <View style={styles.rowCopy}>
-        <Text style={[styles.label, { color: destructive ? theme.error : theme.text }]}>{label}</Text>
-        <Text style={[styles.detail, { color: theme.muted }]}>{detail}</Text>
+        <Text style={[styles.label, { color: disabled ? TEXT_TERTIARY : destructive ? theme.error : theme.text }]}>{label}</Text>
+        <Text style={[styles.detail, { color: disabled ? TEXT_TERTIARY : theme.muted }]}>{detail}</Text>
       </View>
       <Feather name="chevron-right" size={17} color={theme.muted} />
     </PressableScale>

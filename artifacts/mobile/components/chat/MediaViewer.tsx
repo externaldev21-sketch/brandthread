@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
 import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { TEXT_TERTIARY } from '@/lib/theme';
 
 /**
  * Full-screen photo viewer: pinch-to-zoom (two-finger, same touch-distance
@@ -162,6 +163,6 @@ const s = StyleSheet.create({
   imageWrap: { alignItems: 'center', justifyContent: 'center' },
   hint: {
     position: 'absolute', bottom: 28, alignSelf: 'center',
-    color: 'rgba(255,255,255,0.6)', fontSize: 12,
+    color: TEXT_TERTIARY, fontSize: 12,
   },
 });

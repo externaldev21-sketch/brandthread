@@ -13,7 +13,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { FILL_ELEVATED, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY } from '@/lib/theme';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { GestureGlyph } from './GestureGlyph';
 import type { GestureKind } from './types';
@@ -86,5 +86,5 @@ const styles = StyleSheet.create({
   glyphSlot: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, minWidth: 0 },
   title: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.sm },
-  body: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  body: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
 });

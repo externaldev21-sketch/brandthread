@@ -145,7 +145,6 @@ export function Button({
           isFilled ? { backgroundColor: variantStyle.bg } : { backgroundColor: 'transparent' },
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
           fullWidth && styles.fullWidth,
-          isDisabled && !isFilled && { opacity: 0.5 },
           style,
         ]}
       >

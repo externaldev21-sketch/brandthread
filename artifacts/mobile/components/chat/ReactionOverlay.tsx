@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Glass } from '@/components/ui/Glass';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { FONT, FS } from '@/lib/theme';
+import { FONT, FS, TEXT_SECONDARY } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { RADII } from '@/constants/radii';
 import { FADE_MS } from '@/constants/motion';
@@ -179,7 +179,7 @@ const s = StyleSheet.create({
   // A plain dim, not a blur: the chat stays sharp behind it.
   backdrop: { backgroundColor: 'rgba(0,0,0,0.6)' },
   rowWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  hint: { fontSize: FS.xs, fontFamily: FONT.medium, color: 'rgba(255,255,255,0.7)', marginBottom: 8 },
+  hint: { fontSize: FS.xs, fontFamily: FONT.medium, color: TEXT_SECONDARY, marginBottom: 8 },
   row: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 6, gap: 2 },
   emojiBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   menuWrap: { position: 'absolute', minWidth: 190, maxWidth: 260 },

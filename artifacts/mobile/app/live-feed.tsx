@@ -39,7 +39,7 @@ import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
 import { hapticLight } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
-import { FONT, FS, RADIUS } from '@/lib/theme';
+import { FONT, FS, RADIUS, FG, TEXT_SECONDARY } from '@/lib/theme';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
 import { LiveMoreSheet } from '@/components/live/LiveMoreSheet';
@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, height: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 2 },
   liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
-  viewerText: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
+  viewerText: { color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
   // Monochrome brand: red is reserved for the LIVE badge only, so Follow is
   // a plain white pill with black text (the "following" state drops to a
   // translucent white outline pill instead of a second color). Fixed
@@ -758,7 +758,7 @@ const styles = StyleSheet.create({
   // never straddling its edge, whatever the capsule's actual height is.
   roomTitle: {
     marginTop: 6,
-    color: 'rgba(255,255,255,0.82)', fontFamily: FONT.medium, fontSize: 12,
+    color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 12,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 
@@ -795,7 +795,7 @@ const styles = StyleSheet.create({
   productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#33303a', overflow: 'hidden' },
   productInfo: { flex: 1 },
   productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 15 },
-  productPrice: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
+  productPrice: { color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
   buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: radius.sm, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   buyBtnText: { color: '#151517', fontFamily: FONT.bold, fontSize: FS.xs },
 
@@ -803,11 +803,11 @@ const styles = StyleSheet.create({
   chatTopFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 20 },
   chatList: { gap: 4, paddingLeft: 2 },
   chatLine: {
-    color: 'rgba(255,255,255,0.92)', fontFamily: FONT.regular, fontSize: 13,
+    color: FG, fontFamily: FONT.regular, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   chatUser: {
-    color: 'rgba(230,230,235,0.95)', fontFamily: FONT.semibold, fontSize: 13,
+    color: FG, fontFamily: FONT.semibold, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 

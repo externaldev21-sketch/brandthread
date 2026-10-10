@@ -10,7 +10,7 @@ import { View, Text, StyleSheet, Image, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP, TEXT_SECONDARY } from '@/lib/theme';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import {
   usePostUploadEntry, dismissPostUpload,
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   thumbFallback: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   textCol: { flexShrink: 1, minWidth: 80 },
   title: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.xs },
-  subtitle: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.xs - 1, marginTop: 1 },
+  subtitle: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.xs - 1, marginTop: 1 },
   track: { height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.25)', marginTop: 5, overflow: 'hidden' },
   fill: { height: '100%', backgroundColor: '#fff', borderRadius: 1.5 },
 });

@@ -11,7 +11,7 @@ import { Animated, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewS
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
-import { FONT } from '@/lib/theme';
+import { FONT, TEXT_TERTIARY } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -54,22 +54,24 @@ export function ListRow({
   const highlight = React.useRef(new Animated.Value(0)).current;
   const nativeDriver = Platform.OS !== 'web';
   const interactive = !!onPress && !disabled;
-  const titleColor = destructive ? palette.destructive : palette.foreground;
+  // Disabled rows use solid gray text, never a faded row.
+  const titleColor = disabled ? TEXT_TERTIARY : destructive ? palette.destructive : palette.foreground;
+  const secondaryColor = disabled ? TEXT_TERTIARY : palette.mutedForeground;
 
   const content = (
     <>
       {avatar && <Avatar uri={avatar.uri} name={avatar.name} size={40} />}
       {icon && !avatar && (
         <View style={[styles.iconWrap, { backgroundColor: palette.card, borderRadius: RADII.chip }]}>
-          <Icon name={icon} size={17} color={iconColor ?? (destructive ? palette.destructive : palette.mutedForeground)} />
+          <Icon name={icon} size={17} color={disabled ? TEXT_TERTIARY : iconColor ?? (destructive ? palette.destructive : palette.mutedForeground)} />
         </View>
       )}
       <View style={styles.body}>
         <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: titleColor }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{title}</Text>
-        {subtitle && <Text style={[TYPE_SCALE.footnote, { color: palette.mutedForeground, marginTop: 2 }]} numberOfLines={subtitleNumberOfLines} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{subtitle}</Text>}
+        {subtitle && <Text style={[TYPE_SCALE.footnote, { color: secondaryColor, marginTop: 2 }]} numberOfLines={subtitleNumberOfLines} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{subtitle}</Text>}
       </View>
       {right}
-      {!right && value && <Text style={[TYPE_SCALE.body, { color: palette.mutedForeground, marginRight: SPACING.xs }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{value}</Text>}
+      {!right && value && <Text style={[TYPE_SCALE.body, { color: secondaryColor, marginRight: SPACING.xs }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{value}</Text>}
       {!right && toggle && <HapticSwitch value={toggle.value} onValueChange={toggle.onChange} disabled={disabled} accessibilityLabel={title} />}
       {!right && chevron && !toggle && <Icon name="chevron-right" size={17} color={palette.mutedForeground} />}
       {divider && <View pointerEvents="none" style={[styles.divider, { left: avatar ? 48 : icon ? 40 : 0, backgroundColor: palette.border }]} />}
@@ -77,7 +79,7 @@ export function ListRow({
   );
 
   if (!interactive) {
-    return <View style={[styles.row, { opacity: disabled ? 0.5 : 1 }, style]} testID={testID}>{content}</View>;
+    return <View style={[styles.row, style]} testID={testID}>{content}</View>;
   }
 
   return (
@@ -91,7 +93,7 @@ export function ListRow({
       onPressOut={() => Animated.timing(highlight, { toValue: 0, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       testID={testID}
     >
-      <View style={[styles.row, { opacity: disabled ? 0.5 : 1 }, style]}>
+      <View style={[styles.row, style]}>
         <Animated.View
           pointerEvents="none"
           style={[

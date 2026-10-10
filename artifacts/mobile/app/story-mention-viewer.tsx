@@ -38,7 +38,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useStoryMentions } from '@/hooks/useStoryMentions';
 import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, ON_DARK, RADIUS, SP, ICON } from '@/lib/theme';
+import { FONT, FS, ON_DARK, RADIUS, SP, ICON, TEXT_SECONDARY } from '@/lib/theme';
 import { RADII, radius } from '@/constants/radii';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { prefetchImage } from '@/lib/prefetch';
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
   shrinkLayer: { flex: 1, borderRadius: RADII.sheet, overflow: 'hidden', backgroundColor: '#000000' },
   centered: { alignItems: 'center', justifyContent: 'center', gap: SP.md },
-  emptyText: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.medium, fontSize: FS.base },
+  emptyText: { color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: FS.base },
   loadingTrack: { width: 120, height: 3, borderRadius: RADIUS.pill, backgroundColor: 'rgba(255,255,255,0.3)' },
   closeWrap: { position: 'absolute', right: SP.sm, zIndex: 10 },
   textSlide: { flex: 1, alignItems: 'center', justifyContent: 'center' },
