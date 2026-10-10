@@ -57,6 +57,8 @@ export interface ComposerProps {
   autoFocus?: boolean;
   inputRef?: React.Ref<TextInput>;
   nativeID?: string;
+  /** iOS: id of an InputAccessoryView (see KeyboardAccessoryBar) shown above the keyboard. */
+  inputAccessoryViewID?: string;
   onFocus?: () => void;
   onBlur?: () => void;
   onKeyPress?: (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => void;
@@ -82,7 +84,7 @@ function TabBarHider() {
 
 export default function Composer({
   value, onChangeText, onSend, placeholder = 'Message…', leftAccessory, rightAccessory,
-  canSend, busy = false, onStop, editable = true, maxLength, autoFocus, inputRef, nativeID,
+  canSend, busy = false, onStop, editable = true, maxLength, autoFocus, inputRef, nativeID, inputAccessoryViewID,
   onFocus, onBlur, onKeyPress, enterToSend = true, topSlot, hideTabBar = true, overMedia = false, bottomInset,
   style, testID = 'composer', accessibilityLabel,
 }: ComposerProps) {
@@ -138,6 +140,7 @@ export default function Composer({
           <TextInput
             ref={inputRef}
             nativeID={nativeID}
+            inputAccessoryViewID={inputAccessoryViewID}
             style={[
               styles.input,
               { height: inputH },

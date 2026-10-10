@@ -16,7 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { hapticLight } from '@/lib/haptics';
 
 export function LiveStreamOptionsSheet({
   visible, hostName, onClose, onReport, onBlock,
@@ -36,7 +35,7 @@ export function LiveStreamOptionsSheet({
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
         <Text style={[styles.title, { color: theme.muted }]}>{hostName}</Text>
         <Pressable
-          onPress={() => { hapticLight(); onClose(); onReport(); }}
+          onPress={() => { onClose(); onReport(); }}
           style={styles.row}
           accessibilityRole="button"
           accessibilityLabel="Report live stream"
@@ -45,7 +44,7 @@ export function LiveStreamOptionsSheet({
           <Text style={[styles.rowLabel, { color: theme.text }]}>Report live stream</Text>
         </Pressable>
         <Pressable
-          onPress={() => { hapticLight(); onClose(); onBlock(); }}
+          onPress={() => { onClose(); onBlock(); }}
           style={styles.row}
           accessibilityRole="button"
           accessibilityLabel={`Block ${hostName}`}

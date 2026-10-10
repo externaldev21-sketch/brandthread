@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FONT, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -13,7 +12,7 @@ import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, Card, IconButton } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { hapticDestructiveConfirm, hapticSuccess, hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -46,6 +45,9 @@ export default function BuyerAddressesScreen() {
   const [postalCode, setPostalCode] = useState('');
   const [country, setCountry] = useState('US');
   const [phone, setPhone] = useState('');
+  // Return key walks the address form top to bottom.
+  const fieldRefs = useRef<Record<string, TextInput | null>>({});
+  const focusField = (key: string) => () => fieldRefs.current[key]?.focus();
   const [isDefault, setIsDefault] = useState(false);
 
   const load = async () => {
@@ -69,7 +71,6 @@ export default function BuyerAddressesScreen() {
   useEffect(() => { load(); }, [userId]);
 
   const handleAddNew = () => {
-    Haptics.selectionAsync();
     setEditingId(null);
     setIsCreating(true);
     setLabel('Home');
@@ -85,7 +86,6 @@ export default function BuyerAddressesScreen() {
   };
 
   const handleEdit = (addr: any) => {
-    Haptics.selectionAsync();
     setEditingId(addr.id);
     setIsCreating(false);
     setLabel(addr.label || '');
@@ -124,7 +124,7 @@ export default function BuyerAddressesScreen() {
       } else if (editingId) {
         await api.buyer.addresses.update(editingId, body);
       }
-      hapticSuccess();
+      haptics.success();
       await load();
       handleCancel();
     } catch (e: any) {
@@ -139,7 +139,7 @@ export default function BuyerAddressesScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
-          hapticDestructiveConfirm();
+          haptics.warning();
           await api.buyer.addresses.delete(id);
           await load();
         } catch {
@@ -151,7 +151,7 @@ export default function BuyerAddressesScreen() {
 
   const handleSetDefault = async (id: string) => {
     try {
-      hapticToggle();
+      haptics.selection();
       await api.buyer.addresses.setDefault(id);
       await load();
     } catch {
@@ -188,43 +188,43 @@ export default function BuyerAddressesScreen() {
             <View style={styles.form}>
               <View style={styles.field}>
                 <Text style={styles.label}>Label (e.g. Home, Office)</Text>
-                <TextInput value={label} onChangeText={setLabel} style={styles.input} placeholder="Label" placeholderTextColor={palette.mutedForeground} returnKeyType="next" />
+                <TextInput value={label} ref={(r) => { fieldRefs.current.label = r; }} onChangeText={setLabel} style={styles.input} placeholder="Label" placeholderTextColor={palette.mutedForeground} returnKeyType="next" autoComplete="off" blurOnSubmit={false} onSubmitEditing={focusField('recipientName')} />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Recipient name</Text>
-                <TextInput value={recipientName} onChangeText={setRecipientName} style={styles.input} placeholder="Full name" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="name" autoComplete="name" returnKeyType="next" />
+                <TextInput value={recipientName} ref={(r) => { fieldRefs.current.recipientName = r; }} onChangeText={setRecipientName} style={styles.input} placeholder="Full name" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="name" autoComplete="name" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusField('street')} />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Street address</Text>
-                <TextInput value={street} onChangeText={setStreet} style={styles.input} placeholder="123 Main St" placeholderTextColor={palette.mutedForeground} textContentType="streetAddressLine1" autoComplete="street-address" returnKeyType="next" />
+                <TextInput value={street} ref={(r) => { fieldRefs.current.street = r; }} onChangeText={setStreet} style={styles.input} placeholder="123 Main St" placeholderTextColor={palette.mutedForeground} textContentType="streetAddressLine1" autoComplete="address-line1" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusField('line2')} />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Apt, Suite, etc. (optional)</Text>
-                <TextInput value={line2} onChangeText={setLine2} style={styles.input} placeholder="Apt 4B" placeholderTextColor={palette.mutedForeground} textContentType="streetAddressLine2" returnKeyType="next" />
+                <TextInput value={line2} ref={(r) => { fieldRefs.current.line2 = r; }} onChangeText={setLine2} style={styles.input} placeholder="Apt 4B" placeholderTextColor={palette.mutedForeground} textContentType="streetAddressLine2" returnKeyType="next" autoComplete="address-line2" blurOnSubmit={false} onSubmitEditing={focusField('city')} />
               </View>
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>City</Text>
-                  <TextInput value={city} onChangeText={setCity} style={styles.input} placeholder="City" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="addressCity" returnKeyType="next" />
+                  <TextInput value={city} ref={(r) => { fieldRefs.current.city = r; }} onChangeText={setCity} style={styles.input} placeholder="City" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="addressCity" returnKeyType="next" autoComplete="postal-address-locality" blurOnSubmit={false} onSubmitEditing={focusField('state')} />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>State / Province</Text>
-                  <TextInput value={state} onChangeText={setState} style={styles.input} placeholder="State" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="addressState" returnKeyType="next" />
+                  <TextInput value={state} ref={(r) => { fieldRefs.current.state = r; }} onChangeText={setState} style={styles.input} placeholder="State" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="addressState" returnKeyType="next" autoComplete="postal-address-region" blurOnSubmit={false} onSubmitEditing={focusField('postalCode')} />
                 </View>
               </View>
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>ZIP / Postal Code</Text>
-                  <TextInput value={postalCode} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" placeholderTextColor={palette.mutedForeground} keyboardType="number-pad" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" />
+                  <TextInput value={postalCode} ref={(r) => { fieldRefs.current.postalCode = r; }} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" placeholderTextColor={palette.mutedForeground} keyboardType="number-pad" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusField('country')} />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>Country</Text>
-                  <TextInput value={country} onChangeText={setCountry} style={styles.input} placeholder="US" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="countryName" returnKeyType="next" />
+                  <TextInput value={country} ref={(r) => { fieldRefs.current.country = r; }} onChangeText={setCountry} style={styles.input} placeholder="US" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="countryName" returnKeyType="next" autoComplete="country" blurOnSubmit={false} onSubmitEditing={focusField('phone')} />
                 </View>
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Phone (optional)</Text>
-                <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Phone number" placeholderTextColor={palette.mutedForeground} textContentType="telephoneNumber" autoComplete="tel" returnKeyType="done" />
+                <TextInput value={phone} ref={(r) => { fieldRefs.current.phone = r; }} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Phone number" placeholderTextColor={palette.mutedForeground} textContentType="telephoneNumber" autoComplete="tel" returnKeyType="done" />
               </View>
 
               <TouchableOpacity

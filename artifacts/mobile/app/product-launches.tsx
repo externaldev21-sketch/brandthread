@@ -248,7 +248,7 @@ function LaunchEditor({
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <Header title="Timezone" dividerVariant="none" onBack={() => setZoneOpen(false)} />
-        <TextInput
+        <TextInput returnKeyType="search"
           style={[s.filter, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }, WEB_INPUT_RESET]}
           value={zoneFilter}
           onChangeText={setZoneFilter}

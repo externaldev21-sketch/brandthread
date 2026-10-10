@@ -10,7 +10,6 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, ON_DARK } from '@/lib/theme';
@@ -90,7 +89,6 @@ export function FeedTopBar({
               style={[styles.liveBtn, hasActiveLive && styles.liveBtnActive]}
               activeOpacity={0.78}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 onPressLive();
               }}
               accessibilityRole="button"
@@ -113,7 +111,6 @@ export function FeedTopBar({
               onLayout={friendsHit.onLayout}
               activeOpacity={0.7}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 onOpenFriends();
               }}
               accessibilityRole="button"
@@ -143,7 +140,6 @@ export function FeedTopBar({
             onLayout={searchHit.onLayout}
             activeOpacity={0.7}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
               onOpenSearch();
             }}
             accessibilityRole="button"

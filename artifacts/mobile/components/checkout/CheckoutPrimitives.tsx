@@ -50,7 +50,7 @@ function makeStyles(ck: CheckoutColors) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       marginBottom: SP.sm + 4, minHeight: 18,
     },
-    label: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, textTransform: 'uppercase', color: ck.muted },
+    label: { fontFamily: FONT.semibold, fontSize: FS.xs, color: ck.muted },
     radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
     radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: ck.text },
     option: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.sm + 6, minHeight: 52 },
@@ -199,6 +199,7 @@ export function CheckoutField({
     <View style={[styles.field, style]}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
+        returnKeyType={inputProps.multiline ? undefined : 'done'}
         {...inputProps}
         value={value}
         onChangeText={onChangeText}

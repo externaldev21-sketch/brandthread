@@ -37,7 +37,6 @@ import { safeReturnTo } from '@/lib/guestRoutes';
 import { IconButton } from '@/components/ui/IconButton';
 import { Avatar } from '@/components/ui/Avatar';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -532,7 +531,7 @@ export default function SignInScreen() {
             />
 
             <PressableScale
-              onPress={() => { if (resendSeconds <= 0) { hapticToggle(); sendCode(true); } }}
+              onPress={() => { if (resendSeconds <= 0) { sendCode(true); } }}
               disabled={resendSeconds > 0 || sendingCode}
               accessibilityLabel="Resend code"
               style={s.resendRow}
@@ -582,7 +581,7 @@ export default function SignInScreen() {
               <View style={s.pwLabelRow}>
                 <Text style={s.label}>Password</Text>
                 <PressableScale
-                  onPress={() => { hapticToggle(); router.push('/forgot-password' as never); }}
+                  onPress={() => router.push('/forgot-password' as never)}
                   accessibilityLabel="Forgot password?"
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
@@ -635,7 +634,7 @@ export default function SignInScreen() {
             />
 
             <PressableScale
-              onPress={() => { hapticToggle(); setPassword(''); setError(''); sendCode(false); }}
+              onPress={() => { setPassword(''); setError(''); sendCode(false); }}
               accessibilityLabel="Use a one-time code instead"
               style={s.resendRow}
             >
@@ -693,7 +692,7 @@ export default function SignInScreen() {
           {showAppleOAuth && (
             <PressableScale
               style={[s.oauthBtn, s.appleBtn]}
-              onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_apple', 'Apple'); }}
+              onPress={() => handleOAuth('oauth_apple', 'Apple')}
               accessibilityLabel="Continue with Apple"
               disabled={!!oauthLoading || isFetching}
             >
@@ -712,7 +711,7 @@ export default function SignInScreen() {
           {showGoogleOAuth && (
             <PressableScale
               style={s.oauthBtn}
-              onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_google', 'Google'); }}
+              onPress={() => handleOAuth('oauth_google', 'Google')}
               accessibilityLabel="Continue with Google"
               disabled={!!oauthLoading || isFetching}
             >
@@ -792,7 +791,6 @@ export default function SignInScreen() {
               variant="secondary"
               testID="continue-as-preview-user"
               onPress={() => {
-                hapticToggle();
                 router.replace('/onboarding?previewUser=1' as never);
               }}
               fullWidth

@@ -6,10 +6,10 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -49,16 +49,15 @@ export default function KlaviyoIntegrationScreen() {
       Alert.alert('Enter your API key', 'Paste the Private API Key from your Klaviyo account settings.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setConnecting(true);
     try {
       const res = await api.integrations.klaviyoConnect(apiKey.trim());
       setStatus(res);
       setApiKey('');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       Alert.alert('Connected', 'Your existing Klaviyo email & SMS subscribers are now synced.');
     } catch (err: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       const msg = String(err?.message ?? '');
       Alert.alert(
         'Connection failed',
@@ -72,7 +71,6 @@ export default function KlaviyoIntegrationScreen() {
   }
 
   async function handleSync() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSyncing(true);
     try {
       const res = await api.integrations.klaviyoSync();
@@ -165,7 +163,7 @@ export default function KlaviyoIntegrationScreen() {
         ) : (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>Klaviyo Private API Key</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={[styles.input, { backgroundColor: colors.secondary, color: colors.foreground, borderColor: colors.border }]}
               placeholder="pk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
               placeholderTextColor={colors.mutedForeground}
@@ -212,30 +210,30 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   hero: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: 'center', marginBottom: 20, gap: 8 },
   heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  heroTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  heroSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
+  heroTitle: { fontSize: 17, fontFamily: FONT.bold, textAlign: 'center' },
+  heroSub: { fontSize: 13, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 19 },
 
   section: { borderRadius: 14, borderWidth: 1, padding: 18 },
-  label: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 14 },
+  label: { fontSize: 12, fontFamily: FONT.medium, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: FONT.regular, marginBottom: 14 },
   connectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 14 },
-  connectBtnText: { fontSize: FS.base, fontFamily: 'Inter_600SemiBold' },
+  connectBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
   helpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 },
-  helpText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  helpText: { fontSize: 12, fontFamily: FONT.medium },
 
   connectedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  connectedText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  connectedText: { fontSize: 14, fontFamily: FONT.semibold },
   statsRow: { flexDirection: 'row', marginBottom: 12 },
   statBox: { flex: 1, alignItems: 'center', gap: 3 },
-  statVal: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  syncedText: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 16 },
+  statVal: { fontSize: 20, fontFamily: FONT.bold },
+  statLabel: { fontSize: 11, fontFamily: FONT.regular },
+  syncedText: { fontSize: 11, fontFamily: FONT.regular, textAlign: 'center', marginBottom: 16 },
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingVertical: 12, marginBottom: 10 },
-  secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  secondaryBtnText: { fontSize: 13, fontFamily: FONT.semibold },
   disconnectBtn: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingVertical: 8 },
-  disconnectText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  disconnectText: { fontSize: 13, fontFamily: FONT.medium },
 
   infoBlock: { flexDirection: 'row', gap: 8, marginTop: 20, paddingHorizontal: 4 },
-  infoText: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16 },
+  infoText: { flex: 1, fontSize: 11, fontFamily: FONT.regular, lineHeight: 16 },
 });

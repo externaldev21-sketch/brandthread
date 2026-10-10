@@ -3,7 +3,6 @@ import { StyleSheet, Text, TouchableOpacity, type StyleProp, type ViewStyle } fr
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -23,7 +22,7 @@ export function LocationTag({
   const router = useRouter();
   return (
     <TouchableOpacity
-      onPress={() => { hapticSelection(); router.push(locationHref(location.id) as never); }}
+      onPress={() => { router.push(locationHref(location.id) as never); }}
       accessibilityRole="link"
       accessibilityLabel={`Location ${location.name}`}
       testID="location-tag"

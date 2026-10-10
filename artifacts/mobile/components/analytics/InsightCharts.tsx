@@ -9,7 +9,6 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Svg, { Defs, LinearGradient, Line, Path, Stop, Text as SvgText, Circle } from 'react-native-svg';
-import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { CachedImage } from '@/components/CachedImage';
@@ -171,7 +170,7 @@ export function RankedRow({ rank, thumbnailUrl, icon, title, subtitle, value, va
   );
   if (!onPress) return <View style={s.row} testID={testID}>{body}</View>;
   return (
-    <TouchableOpacity style={s.row} onPress={() => { Haptics.selectionAsync(); onPress(); }} accessibilityRole="button" accessibilityLabel={title} testID={testID}>
+    <TouchableOpacity style={s.row} onPress={() => { onPress(); }} accessibilityRole="button" accessibilityLabel={title} testID={testID}>
       {body}
     </TouchableOpacity>
   );

@@ -9,7 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -79,26 +79,17 @@ const computeParts = computeCountdownParts;
 /**
  * Countdown ticking hook. Targets `effectiveReleaseAt` (falls back to
  * `releaseAt`) so early-access followers see their own earlier unlock time.
- * Fires a light haptic tick once per second in the last 10s before launch,
- * and invokes `onBecomeLive` exactly once when the countdown crosses from
+ * Invokes `onBecomeLive` exactly once when the countdown crosses from
  * not-live to live while mounted (used for the reveal animation).
  */
 function useCountdown(target?: string | null, onBecomeLive?: () => void): CountdownParts {
   const [parts, setParts] = useState<CountdownParts>(() => computeParts(target));
-  const lastHapticSecondRef = useRef<number | null>(null);
   const wasLiveRef = useRef<boolean>(computeParts(target).isLive);
 
   useEffect(() => {
     const tick = () => {
       const next = computeParts(target);
       setParts(next);
-
-      if (!next.isLive && next.totalSeconds > 0 && next.totalSeconds <= 10) {
-        if (lastHapticSecondRef.current !== next.totalSeconds) {
-          lastHapticSecondRef.current = next.totalSeconds;
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        }
-      }
 
       if (next.isLive && !wasLiveRef.current) {
         wasLiveRef.current = true;
@@ -375,7 +366,6 @@ export default function BuyerDropDetail() {
         Animated.timing(launchFlash, { toValue: 0, duration: 460, useNativeDriver: true }),
       ]).start();
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   }
 
   const targetReleaseAt = drop?.effectiveReleaseAt ?? drop?.releaseAt;
@@ -394,7 +384,7 @@ export default function BuyerDropDetail() {
         ? await api.publicDrops.unsubscribe(dropId)
         : await api.publicDrops.subscribe(dropId);
       setSubscribed(result.subscribed);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.light();
     } catch {
       Alert.alert('Sign in to get drop alerts', 'Create or sign in to your buyer account, then tap Notify me again.');
     } finally {
@@ -405,7 +395,6 @@ export default function BuyerDropDetail() {
   function handleShare() {
     if (!drop) return;
     const url = buildCanonicalDropUrl(drop.id);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (url) {
       Share.share({ message: `Check out ${drop.name} on Brandthread: ${url}`, url });
     } else {
@@ -419,12 +408,10 @@ export default function BuyerDropDetail() {
       return;
     }
     if (!isLive) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       return;
     }
     if (product.soldOut) return;
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     // postId is only used by ShopProductSheet/cartFlight for attribution and
     // flight-animation bookkeeping, never as a server-side post lookup — a
     // stable synthetic id is safe here.

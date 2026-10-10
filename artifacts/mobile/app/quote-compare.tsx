@@ -11,7 +11,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { getQuotesForRequest, acceptQuote, getManufacturer } from '@/services/manufacturerService';
 import { Quote, Manufacturer } from '@/services/manufacturerTypes';
 import { BrandthreadCard, PrimaryButton, StatusBadge } from '@/components/BrandthreadUI';
@@ -131,12 +131,12 @@ export default function QuoteCompareScreen() {
   useEffect(() => { load(); }, [load]);
 
   async function handleAccept(quoteId: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Accept Quote', 'Accept this quote and proceed to production?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Accept', onPress: async () => {
           await acceptQuote(quoteId);
+          haptics.success();
           goBackOr(router);
         },
       },

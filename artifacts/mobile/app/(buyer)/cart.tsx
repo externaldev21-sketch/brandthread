@@ -19,7 +19,7 @@ import { Header, StickyFooter } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import {
   getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot,
   saveForLater, moveToCart, removeSavedItem,
@@ -769,13 +769,13 @@ export default function CartScreen() {
   }
 
   function toggleSelectAll() {
-    Haptics.selectionAsync();
+    haptics.selection();
     setSelectedIds(allSelected ? new Set() : new Set(cart.items.map(i => i.id)));
   }
 
   async function handleQtyDec(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    Haptics.selectionAsync();
+    haptics.selection();
     const item = cart.items.find(i => i.id === itemId);
     if (!item) return;
     const snapshot = cart;
@@ -796,7 +796,7 @@ export default function CartScreen() {
 
   async function handleQtyInc(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    Haptics.selectionAsync();
+    haptics.selection();
     const item = cart.items.find(i => i.id === itemId);
     if (!item) return;
     setPending(itemId, 'qty_inc');
@@ -810,7 +810,7 @@ export default function CartScreen() {
 
   async function handleRemove(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.warning();
     const removed = cart.items.find(item => item.id === itemId);
     const snapshot = cart;
     setPending(itemId, 'remove');
@@ -830,7 +830,7 @@ export default function CartScreen() {
 
   async function handleSaveForLater(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     setPending(itemId, 'save');
     try {
       const newCart = await saveForLater(itemId);
@@ -841,7 +841,7 @@ export default function CartScreen() {
   }
 
   async function handleMoveToCart(savedId: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     const newCart = await moveToCart(savedId);
     setCart(newCart);
   }
@@ -853,7 +853,7 @@ export default function CartScreen() {
 
   async function handleRemoveSelected() {
     if (selectedIds.size === 0 || removingSelected) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.warning();
     setRemovingSelected(true);
     try {
       const newCart = await removeCartItems([...selectedIds]);
@@ -908,7 +908,7 @@ export default function CartScreen() {
       });
       setLoyaltyBalance(current => Math.max(0, current - result.pointsUsed));
       setPointsInput('');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
     } catch (error: any) {
       Alert.alert('Could not apply points', error?.message ?? 'Please try again.');
     } finally {
@@ -997,7 +997,6 @@ export default function CartScreen() {
     if (checkingOutSellerId) return;
     const items = cart.items.filter(item => item.sellerId === sellerId && item.isAvailable);
     if (items.length === 0) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await startCheckout(items, { onBusy: busy => setCheckingOutSellerId(busy ? sellerId : null) });
   }
 
@@ -1025,7 +1024,7 @@ export default function CartScreen() {
         transparent
         rightElement={hasItems ? (
           <TouchableOpacity
-            onPress={() => { Haptics.selectionAsync(); setEditMode(e => !e); }}
+            onPress={() => { setEditMode(e => !e); }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
             accessibilityLabel={editMode ? 'Done editing cart' : 'Edit cart'}
@@ -1175,7 +1174,7 @@ export default function CartScreen() {
                 ) : (
                   <>
                     <View style={s.pointsRow}>
-                      <TextInput
+                      <TextInput returnKeyType="done"
                         value={pointsInput}
                         onChangeText={setPointsInput}
                         keyboardType="number-pad"

@@ -15,12 +15,13 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
 import { getEntitlementRejection } from '@/lib/entitlementError';
+import { FONT } from '@/lib/theme';
 
 interface Photo {
   id: string;
@@ -78,12 +79,10 @@ export default function TechPackGeneratorScreen() {
   const stepIndex = STEPS.indexOf(step);
 
   function goNext() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const idx = STEPS.indexOf(step);
     if (idx < STEPS.length - 1) setStep(STEPS[idx + 1]);
   }
   function goBack() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const idx = STEPS.indexOf(step);
     if (idx > 0) setStep(STEPS[idx - 1]);
   }
@@ -103,7 +102,6 @@ export default function TechPackGeneratorScreen() {
       base64: true,
     });
     if (result.canceled) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const picked: Photo[] = result.assets
       .filter((a) => !!a.base64)
       .slice(0, MAX_PHOTOS - photos.length)
@@ -163,7 +161,6 @@ export default function TechPackGeneratorScreen() {
 
   async function generate() {
     if (loading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setPdfBase64(null);
     setStep('result');
@@ -190,6 +187,7 @@ export default function TechPackGeneratorScreen() {
       if (result?.pdf_base64) {
         setPdfBase64(result.pdf_base64);
         setPdfFilename(result.filename || 'tech-pack.pdf');
+        haptics.success();
       } else {
         Alert.alert('Generation failed', 'Could not generate the tech pack. Please try again.');
       }
@@ -230,7 +228,6 @@ export default function TechPackGeneratorScreen() {
   }
 
   function startOver() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setStep('info');
     setProductName('');
     setBrandName('');
@@ -379,7 +376,7 @@ export default function TechPackGeneratorScreen() {
                   <View style={[styles.tableCell, styles.tableFirstCol]} />
                   {sizes.map((size) => (
                     <View key={size} style={styles.tableCell}>
-                      <TextInput
+                      <TextInput returnKeyType="done"
                         value={size}
                         onChangeText={(v) => renameSize(size, v)}
                         style={[styles.sizeInput, { color: colors.foreground, borderColor: colors.border }]}
@@ -397,7 +394,7 @@ export default function TechPackGeneratorScreen() {
                 {rows.map((row, i) => (
                   <View key={i} style={styles.tableRow}>
                     <View style={[styles.tableCell, styles.tableFirstCol]}>
-                      <TextInput
+                      <TextInput returnKeyType="done"
                         value={row.point}
                         onChangeText={(v) => updateRowPoint(i, v)}
                         placeholder="Chest"
@@ -407,7 +404,7 @@ export default function TechPackGeneratorScreen() {
                     </View>
                     {sizes.map((size) => (
                       <View key={size} style={styles.tableCell}>
-                        <TextInput
+                        <TextInput returnKeyType="done"
                           value={row.values[size] ?? ''}
                           onChangeText={(v) => updateCell(i, size, v)}
                           placeholder="—"
@@ -426,7 +423,7 @@ export default function TechPackGeneratorScreen() {
 
             <TouchableOpacity onPress={addRow} activeOpacity={0.8} style={[styles.addRowBtn, { borderColor: colors.border }]}>
               <Feather name="plus" size={14} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>Add measurement point</Text>
+              <Text style={{ color: colors.primary, fontFamily: FONT.semibold, fontSize: 12 }}>Add measurement point</Text>
             </TouchableOpacity>
 
             <View style={styles.navRow}>
@@ -576,19 +573,19 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 8, height: 8, borderRadius: 4 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 6 },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14, lineHeight: 17 },
+  sectionTitle: { fontSize: 16, fontFamily: FONT.bold, marginBottom: 4 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
   row2: { flexDirection: 'row', gap: 12 },
-  inputLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
-  input: { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  inputLabel: { fontSize: 12, fontFamily: FONT.semibold, marginBottom: 6 },
+  input: { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: FONT.regular },
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: 14, paddingVertical: 15,
   },
-  primaryBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  primaryBtnText: { fontSize: 14, fontFamily: FONT.semibold },
   secondaryBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 16 },
-  secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  secondaryBtnText: { fontSize: 13, fontFamily: FONT.regular },
   navRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
   trayRow: { gap: 10, paddingVertical: 4 },
   trayThumbWrap: { position: 'relative' },
@@ -606,9 +603,9 @@ const styles = StyleSheet.create({
   tableCell: { width: 84, paddingVertical: 4, paddingRight: 6, flexDirection: 'row', alignItems: 'center' },
   tableFirstCol: { width: 110 },
   addColBtn: { width: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 8, borderStyle: 'dashed' },
-  sizeInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: 'Inter_600SemiBold', flex: 1 },
-  pointInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: 'Inter_400Regular', width: '100%' },
-  valueInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: 'Inter_400Regular', width: '100%' },
+  sizeInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: FONT.semibold, flex: 1 },
+  pointInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: FONT.regular, width: '100%' },
+  valueInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: FONT.regular, width: '100%' },
   addRowBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
     borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, marginTop: 12,
@@ -617,8 +614,8 @@ const styles = StyleSheet.create({
     borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 40, paddingHorizontal: 20, gap: 8,
   },
-  resultFilename: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
-  resultSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  resultFilename: { fontSize: 14, fontFamily: FONT.semibold, marginTop: 4 },
+  resultSubtitle: { fontSize: 12, fontFamily: FONT.regular, textAlign: 'center' },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 8, height: 8, borderRadius: 4, opacity: 0.6 },
 });

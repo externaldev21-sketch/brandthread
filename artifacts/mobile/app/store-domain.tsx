@@ -154,7 +154,7 @@ export default function StoreDomainScreen() {
         {btDomain && (
           <BrandthreadCard style={dm.card}>
             <View style={dm.urlInputRow}>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={[dm.input, { flex: 1 }]}
                 value={subdomainInput}
                 onChangeText={setSubdomainInput}
@@ -251,7 +251,7 @@ export default function StoreDomainScreen() {
         ) : (
           <BrandthreadCard style={dm.card}>
             <Text style={dm.fieldLabel}>Custom Domain</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={dm.input}
               value={newDomain}
               onChangeText={setNewDomain}

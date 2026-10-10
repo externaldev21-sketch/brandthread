@@ -8,7 +8,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -317,7 +317,7 @@ export default function StoreNavScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title="Navigation"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        onBack={() => goBackOr(router)}
       />
       <Text style={styles.headerSubtitle}>Set up your store's navigation menus.</Text>
 
@@ -330,7 +330,7 @@ export default function StoreNavScreen() {
             <TouchableOpacity
               key={tab.type}
               style={[styles.menuTab, isActive && styles.menuTabActive]}
-              onPress={() => { Haptics.selectionAsync(); if (menu) setActiveMenuId(menu.id); }}
+              onPress={() => { haptics.selection(); if (menu) setActiveMenuId(menu.id); }}
             >
               <Text style={[styles.menuTabText, isActive && styles.menuTabTextActive]}>
                 {tab.label}
@@ -400,7 +400,7 @@ export default function StoreNavScreen() {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {/* Label */}
               <Text style={styles.fieldLabel}>Label *</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={itemForm.label}
                 onChangeText={(v) => setItemForm((p) => ({ ...p, label: v }))}
@@ -425,7 +425,7 @@ export default function StoreNavScreen() {
               {itemForm.target === 'collection' && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>Collection name or ID</Text>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={styles.textInput}
                     value={itemForm.targetId}
                     onChangeText={(v) => setItemForm((p) => ({ ...p, targetId: v }))}
@@ -437,7 +437,7 @@ export default function StoreNavScreen() {
               {itemForm.target === 'product' && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>Product name or ID</Text>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={styles.textInput}
                     value={itemForm.targetId}
                     onChangeText={(v) => setItemForm((p) => ({ ...p, targetId: v }))}
@@ -449,7 +449,7 @@ export default function StoreNavScreen() {
               {itemForm.target === 'page' && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>Page title or slug</Text>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={styles.textInput}
                     value={itemForm.targetId}
                     onChangeText={(v) => setItemForm((p) => ({ ...p, targetId: v }))}
@@ -461,7 +461,7 @@ export default function StoreNavScreen() {
               {itemForm.target === 'external' && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>URL</Text>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={styles.textInput}
                     value={itemForm.url}
                     onChangeText={(v) => setItemForm((p) => ({ ...p, url: v }))}

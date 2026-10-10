@@ -11,7 +11,6 @@ import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useColors } from '@/hooks/useColors';
-import { hapticToggle } from '@/lib/haptics';
 import { ListRow } from '@/components/ui';
 import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications/QuietHoursRow';
 import { Card } from '@/components/ui/Card';
@@ -78,7 +77,6 @@ export default function NotificationsSettingsScreen() {
   }, []);
 
   async function handleMasterToggle(value: boolean) {
-    hapticToggle();
     const prior = pushEnabled;
     setPushEnabled(value);
     try {
@@ -89,7 +87,6 @@ export default function NotificationsSettingsScreen() {
   }
 
   async function handlePromotionalToggle(value: boolean) {
-    hapticToggle();
     const prior = promotionalPush;
     setPromotionalPush(value);
     try {
@@ -113,7 +110,6 @@ export default function NotificationsSettingsScreen() {
   }
 
   async function handleCategory(key: string, value: boolean) {
-    hapticToggle();
     const prior = categories;
     setCategories({ ...categories, [key]: value });
     try {

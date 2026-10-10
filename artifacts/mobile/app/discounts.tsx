@@ -14,7 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { InlineSlider } from '@/components/InlineSlider';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
@@ -30,6 +30,8 @@ import {
   StatusBadge, SectionHeader, HapticSwitch,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 import { EmptyState } from '@/components/layout';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
@@ -290,7 +292,6 @@ export default function DiscountsScreen() {
       return;
     }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       const payload: any = {
@@ -344,7 +345,7 @@ export default function DiscountsScreen() {
         const created = await api.discountCodes.create(payload);
         setDiscounts(prev => [normalizeDiscount(created), ...prev]);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setShowModal(false);
     } catch (err: any) {
       Alert.alert("Couldn't save the code", err?.message ?? 'Try again.');
@@ -354,7 +355,7 @@ export default function DiscountsScreen() {
   }
 
   async function togglePause(d: DiscountCode) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     const nextActive = !d.active;
     setDiscounts(prev => prev.map(x => x.id === d.id ? { ...x, active: nextActive, status: nextActive ? 'active' : 'paused' } : x));
     if (previewOnly) {
@@ -387,7 +388,6 @@ export default function DiscountsScreen() {
   }
 
   function copyCode(codeValue: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Clipboard.setStringAsync(codeValue);
   }
 
@@ -467,7 +467,7 @@ export default function DiscountsScreen() {
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={s.label}>Code <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional — auto-generated if blank)</Text></Text>
-                <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCode(randomCode()); }}>
+                <TouchableOpacity onPress={() => setCode(randomCode())}>
                   <Text style={[s.linkText, { color: theme.accent }]}>Generate</Text>
                 </TouchableOpacity>
               </View>
@@ -493,7 +493,7 @@ export default function DiscountsScreen() {
                   ['free_shipping', 'Free shipping'],
                   ['free_item', 'Free item'],
                 ] as const).map(([t, label]) => (
-                  <TouchableOpacity key={t} style={[s.typeBtn, discType === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setDiscType(t); }}>
+                  <TouchableOpacity key={t} style={[s.typeBtn, discType === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { haptics.selection(); setDiscType(t); }}>
                     <Text style={[s.typeBtnText, discType === t && { color: theme.accent }]}>{label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -545,7 +545,7 @@ export default function DiscountsScreen() {
                 {((collections.length > 0 || appliesTo === 'collections'
                   ? ['entire_store', 'specific_products', 'collections']
                   : ['entire_store', 'specific_products']) as AppliesTo[]).map(t => (
-                  <TouchableOpacity key={t} style={[s.typeBtn, (collections.length > 0 || appliesTo === 'collections') && { flexGrow: 0, width: '48.5%' }, appliesTo === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAppliesTo(t); }}>
+                  <TouchableOpacity key={t} style={[s.typeBtn, (collections.length > 0 || appliesTo === 'collections') && { flexGrow: 0, width: '48.5%' }, appliesTo === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { haptics.selection(); setAppliesTo(t); }}>
                     <Text style={[s.typeBtnText, appliesTo === t && { color: theme.accent }]}>{t === 'entire_store' ? 'Entire store' : t === 'collections' ? 'Collections' : 'Specific products'}</Text>
                   </TouchableOpacity>
                 ))}
@@ -569,7 +569,7 @@ export default function DiscountsScreen() {
                       key={c.id}
                       style={[s.productRow, selected && { borderColor: theme.accent, backgroundColor: theme.accent + '15' }]}
                       onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        haptics.selection();
                         setSelectedCollectionIds(prev => selected ? prev.filter(id => id !== c.id) : [...prev, c.id]);
                       }}
                     >
@@ -616,7 +616,7 @@ export default function DiscountsScreen() {
                   ['limited', 'Limited total'],
                   ['single', 'Single-use'],
                 ] as const).map(([t, label]) => (
-                  <TouchableOpacity key={t} style={[s.typeBtn, discType === discType && usageMode === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setUsageMode(t); }}>
+                  <TouchableOpacity key={t} style={[s.typeBtn, discType === discType && usageMode === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { haptics.selection(); setUsageMode(t); }}>
                     <Text style={[s.typeBtnText, usageMode === t && { color: theme.accent }]}>{label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -644,27 +644,27 @@ export default function DiscountsScreen() {
             {/* Active dates */}
             <View>
               <Text style={s.label}>Active dates</Text>
-              <Text style={s.subLabel}>Start date <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional — blank starts immediately)</Text></Text>
-              <TextInput
-                style={s.input}
-                value={startDate}
-                onChangeText={setStartDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={MUTED}
-                autoCorrect={false}
+              <NativeDateTimeField
+                mode="date"
+                label="Start date"
+                placeholder="Immediately"
+                value={ymdToDate(startDate)}
+                onChange={(d) => setStartDate(dateToYmd(d))}
+                onClear={() => setStartDate('')}
+                testID="discount-start-date"
               />
               <View style={[s.switchRow, { marginTop: SP.sm }]}>
                 <Text style={s.switchLabel}>Set an end date</Text>
                 <HapticSwitch value={hasEnd} onValueChange={setHasEnd} />
               </View>
               {hasEnd && (
-                <TextInput
-                  style={s.input}
-                  value={endDate}
-                  onChangeText={setEndDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={MUTED}
-                  autoCorrect={false}
+                <NativeDateTimeField
+                  mode="date"
+                  label="End date"
+                  value={ymdToDate(endDate)}
+                  onChange={(d) => setEndDate(dateToYmd(d))}
+                  minimumDate={ymdToDate(startDate) ?? startOfToday()}
+                  testID="discount-end-date"
                 />
               )}
             </View>
@@ -698,7 +698,7 @@ export default function DiscountsScreen() {
                   key={p.id}
                   style={[s.productRow, selected && { borderColor: theme.accent, backgroundColor: theme.accent + '15' }]}
                   onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    haptics.selection();
                     setSelectedProductIds(prev => selected ? prev.filter(id => id !== p.id) : [...prev, p.id]);
                   }}
                 >
@@ -825,7 +825,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   summaryLine: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
   label:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  subLabel:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
   linkText:    { fontSize: FS.xs, fontFamily: FONT.semibold },
   input:       { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
   typeGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

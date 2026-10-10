@@ -19,7 +19,6 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { Button, ListRow } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -43,7 +42,6 @@ export default function RestrictedAccountsScreen() {
   }, [loadRestricted]));
 
   const handleUnrestrict = async (user: RestrictRecord) => {
-    hapticDestructiveConfirm();
     await unrestrictUser(user.restrictedUserId);
     setRestricted(r => r.filter(u => u.restrictedUserId !== user.restrictedUserId));
     setConfirmUser(null);
@@ -67,7 +65,7 @@ export default function RestrictedAccountsScreen() {
       {restricted.length > 0 && (
         <View style={styles.search}>
           <Feather name="search" size={16} color={theme.muted} />
-          <TextInput
+          <TextInput returnKeyType="search"
             style={[styles.searchInput, WEB_INPUT_RESET]}
             value={query}
             onChangeText={setQuery}
@@ -98,7 +96,7 @@ export default function RestrictedAccountsScreen() {
             right={(
               <Button
                 label="Unrestrict"
-                onPress={() => { hapticToggle(); setConfirmUser(item); }}
+                onPress={() => { setConfirmUser(item); }}
                 variant="secondary"
                 size="small"
                 accessibilityHint={`Unrestricts ${item.restrictedUserName}`}

@@ -14,7 +14,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useApi } from '@/lib/api';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 
@@ -69,14 +69,12 @@ export default function LocationsScreen() {
   });
 
   function openAdd() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setEditTarget(null);
     setForm({ name: '', address: '', city: '', state: '', country: 'US', zip: '', phone: '' });
     setModalVisible(true);
   }
 
   function openEdit(loc: Location) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setEditTarget(loc);
     setForm({
       name: loc.name, address: loc.address ?? '', city: loc.city ?? '',
@@ -121,7 +119,7 @@ export default function LocationsScreen() {
   }
 
   async function toggleActive(loc: Location) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     try {
       await api.seller.updateLocation(loc.id, { isActive: !loc.is_active }) as any;
       await load();
@@ -158,7 +156,7 @@ export default function LocationsScreen() {
                   {TABS.map((tab) => (
                     <TouchableOpacity
                       key={tab}
-                      onPress={() => { Haptics.selectionAsync(); setActiveTab(tab); }}
+                      onPress={() => { haptics.selection(); setActiveTab(tab); }}
                       activeOpacity={0.7}
                       style={[s.tabChip, activeTab === tab && { backgroundColor: colors.card }]}
                     >
@@ -248,7 +246,7 @@ export default function LocationsScreen() {
             ].map(({ label, key, placeholder }) => (
               <View key={key} style={s.formField}>
                 <Text style={[s.formLabel, { color: colors.mutedForeground }]}>{label}</Text>
-                <TextInput
+                <TextInput returnKeyType="done"
                   value={(form as any)[key]}
                   onChangeText={v => setForm(prev => ({ ...prev, [key]: v }))}
                   placeholder={placeholder}

@@ -10,7 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE,
@@ -57,15 +57,15 @@ export default function BuyerArchive() {
 
   const handleRestore = async () => {
     if (!selectedPost) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await unarchivePost(selectedPost.id);
+    haptics.success();
     setSelectedPost(null);
     await loadData();
   };
 
   const handleDelete = async () => {
     if (!selectedPost) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    haptics.warning();
     await deletePost(selectedPost.id);
     setSelectedPost(null);
     await loadData();
@@ -91,8 +91,8 @@ export default function BuyerArchive() {
     return (
       <TouchableOpacity
         style={styles.cell}
-        onPress={() => { Haptics.selectionAsync(); router.push(`/buyer-post-viewer?${qs}` as never); }}
-        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setSelectedPost(item); }}
+        onPress={() => { router.push(`/buyer-post-viewer?${qs}` as never); }}
+        onLongPress={() => { haptics.rigid(); setSelectedPost(item); }}
         activeOpacity={0.8}
       >
         <LinearGradient

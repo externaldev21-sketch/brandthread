@@ -16,15 +16,16 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  Alert, Animated, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
-import { hapticLight, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { useJoinedCommunities } from '@/lib/communities/useCommunityClient';
 
@@ -45,6 +46,7 @@ type MenuSection = {
 
 export default function BuyerSettingsMenuScreen() {
   const { theme } = useAppTheme();
+  const titleCollapse = useLargeTitleCollapse();
   const router = useRouter();
   const { signOut } = useAuth();
   const [query, setQuery] = useState('');
@@ -60,7 +62,7 @@ export default function BuyerSettingsMenuScreen() {
         text: 'Sign out',
         style: 'destructive',
         onPress: async () => {
-          hapticDestructiveConfirm();
+          haptics.warning();
           try { await signOut(); } catch {}
           router.replace('/sign-in' as never);
         },
@@ -73,7 +75,7 @@ export default function BuyerSettingsMenuScreen() {
       title: 'Your account',
       rows: [
         { key: 'edit-profile', icon: 'edit-3', label: 'Edit profile', onPress: () => router.push('/(buyer)/edit-profile') },
-        { key: 'share-profile', icon: 'share-2', label: 'Share profile', onPress: () => { hapticLight(); setShareSheetOpen(true); } },
+        { key: 'share-profile', icon: 'share-2', label: 'Share profile', onPress: () => { setShareSheetOpen(true); } },
         { key: 'qr-code', icon: 'grid', label: 'QR code', onPress: () => router.push('/buyer-qr-code' as any) },
       ],
     },
@@ -129,7 +131,7 @@ export default function BuyerSettingsMenuScreen() {
 
   return (
     <View style={[s.page, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Menu" />
+      <ScreenHeader title="Menu" collapse={titleCollapse} />
 
       <View style={s.searchWrap}>
         <View style={[s.searchField, { backgroundColor: theme.cardElevated }]}>
@@ -151,14 +153,14 @@ export default function BuyerSettingsMenuScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <Animated.ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" onScroll={titleCollapse.onScroll} scrollEventThrottle={16}>
         {filteredSections.map((section) => (
           <View key={section.title} style={s.section}>
             <Text style={[s.sectionHeader, { color: theme.subtle }]}>{section.title.toUpperCase()}</Text>
             {section.rows.map((row, i) => (
               <Pressable
                 key={row.key}
-                onPress={() => { hapticLight(); row.onPress(); }}
+                onPress={() => { row.onPress(); }}
                 style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}
                 accessibilityRole="button"
                 accessibilityLabel={row.value ? `${row.label}, ${row.value}` : row.label}
@@ -174,7 +176,7 @@ export default function BuyerSettingsMenuScreen() {
             ))}
           </View>
         ))}
-      </ScrollView>
+      </Animated.ScrollView>
 
       <ShareProfileSheet visible={shareSheetOpen} onClose={() => setShareSheetOpen(false)} />
     </View>

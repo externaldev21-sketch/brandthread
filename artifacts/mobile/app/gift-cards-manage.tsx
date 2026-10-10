@@ -175,8 +175,8 @@ export default function GiftCardsManageScreen() {
                 </View>
               ) : null}
               <CheckoutField label="Amount" value={issueAmount} onChangeText={setIssueAmount} keyboardType="decimal-pad" placeholder="25" />
-              <CheckoutField label="Recipient email" value={issueEmail} onChangeText={setIssueEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} placeholder="Enter email" />
-              <CheckoutField label="Recipient name" value={issueName} onChangeText={setIssueName} placeholder="Enter name" autoCapitalize="words" />
+              <CheckoutField label="Recipient email" value={issueEmail} onChangeText={setIssueEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" placeholder="Enter email" />
+              <CheckoutField label="Recipient name" value={issueName} onChangeText={setIssueName} placeholder="Enter name" autoCapitalize="words" autoComplete="name" textContentType="name" />
               {issueError ? <Text style={s.error}>{issueError}</Text> : null}
               <Button label="Issue gift card" onPress={() => void issue()} loading={issuing} fullWidth />
             </CheckoutSection>

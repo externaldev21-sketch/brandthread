@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -21,6 +21,8 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
 export default function VacationModeScreen() {
   const { theme } = useAppTheme();
@@ -52,7 +54,6 @@ export default function VacationModeScreen() {
   }, [api]));
 
   async function handleSave() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       await (api as any).seller?.vacation?.update?.({
@@ -60,7 +61,7 @@ export default function VacationModeScreen() {
         vacationMessage: message.trim() || null,
         vacationUntil:   returnDate ? returnDate : null,
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       Alert.alert(
         vacationMode ? '🏖 Vacation Mode Active' : '✅ Store Reopened',
         vacationMode
@@ -133,15 +134,15 @@ export default function VacationModeScreen() {
               textAlignVertical="top"
             />
 
-            <Text style={[s.label, { marginTop: SP.md }]}>Return Date <Text style={s.optional}>(optional)</Text></Text>
-            <TextInput
-              style={s.input}
-              value={returnDate}
-              onChangeText={setReturnDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={MUTED}
-              keyboardType="default"
-              autoCorrect={false}
+            <NativeDateTimeField
+              mode="date"
+              label="Return date (optional)"
+              value={ymdToDate(returnDate)}
+              onChange={(d) => setReturnDate(dateToYmd(d))}
+              onClear={() => setReturnDate('')}
+              minimumDate={startOfToday()}
+              style={{ marginTop: SP.sm }}
+              testID="vacation-return-date"
             />
             <Text style={s.fieldHint}>Vacation mode auto-clears when this date passes.</Text>
           </View>

@@ -22,7 +22,6 @@ import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button, SuccessCheck } from '@/components/ui';
@@ -126,7 +125,6 @@ function SellerProductsCarousel({ sellerId, sellerName }: { sellerId: string; se
               key={product.id}
               style={styles.moreTile}
               onPress={() => {
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push({ pathname: '/buyer-product-detail' as any, params: { productId: product.id } });
               }}
               accessibilityRole="button"
@@ -221,7 +219,6 @@ export function OrderConfirmation({
 
   function messageSeller() {
     if (!firstGroup) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const initials = firstGroup.sellerName.split(/\s+/).map(word => word[0] ?? '').slice(0, 2).join('').toUpperCase();
     router.push((
       '/buyer-conversation?participantId=' + encodeURIComponent(firstGroup.sellerId)
@@ -458,14 +455,14 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingTop: SP.sm, paddingBottom: SP.md },
   pending: { width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   titleBlock: { paddingBottom: SP.md },
-  eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.2, textTransform: 'uppercase' },
+  eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, },
   orderNumbers: { marginTop: 4, gap: 2 },
   orderNumber: { fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.6 },
   orderNumberPending: { fontFamily: FONT.medium, fontSize: FS.base, marginTop: 4 },
   body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 21, marginTop: 6 },
 
   section: { marginBottom: SP.md },
-  sectionHeading: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: SP.sm },
+  sectionHeading: { fontFamily: FONT.semibold, fontSize: FS.xs, marginBottom: SP.sm },
 
   row: { flexDirection: 'row', gap: SP.md, paddingVertical: SP.sm + 2 },
   rowLabel: { width: 118, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },

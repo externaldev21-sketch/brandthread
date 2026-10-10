@@ -114,9 +114,9 @@ async function run() {
     await zoom(seller.page, '03z-value-and-scope-buttons.png', ['Percentage', 'Fixed amount', 'Entire store', 'Products', 'Collection']);
     await seller.page.getByText('Choose a collection').click();
     await seller.page.getByText('Hoodies', { exact: true }).click();
-    await seller.page.getByPlaceholder('Start date (YYYY-MM-DD)').fill('2026-09-01');
+    await seller.page.getByLabel('Start date', { exact: true }).fill('2026-09-01');
     await seller.page.getByRole('switch').first().click();
-    await seller.page.getByPlaceholder('End date (YYYY-MM-DD)').fill('2026-10-31');
+    await seller.page.getByLabel('End date', { exact: true }).fill('2026-10-31');
     await checkFit(seller.page, 'form-filled');
     await seller.page.screenshot({ path: path.join(OUT, '04-create-sale-filled.png') });
     await seller.page.getByText('Create sale', { exact: true }).last().click();

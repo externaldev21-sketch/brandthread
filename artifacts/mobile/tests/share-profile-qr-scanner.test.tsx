@@ -75,6 +75,7 @@ vi.mock('@/lib/shareProfile', () => ({
 
 vi.mock('@/lib/haptics', () => ({
   hapticSuccess: vi.fn(),
+  haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() },
 }));
 
 import { ShareProfileQrScanner } from '@/components/ShareProfileQrScanner';

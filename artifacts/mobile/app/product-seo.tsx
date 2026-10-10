@@ -137,7 +137,7 @@ export default function ProductSeoScreen() {
           </View>
 
           <Field label="Page title" count={title.length} max={limits.title} s={s} theme={theme}>
-            <TextInput
+            <TextInput returnKeyType="done"
               value={title}
               onChangeText={v => setTitle(v.slice(0, limits.title))}
               placeholder={detail.resolved.title}
@@ -163,7 +163,7 @@ export default function ProductSeoScreen() {
           <Field label="URL handle" count={handle.length} max={limits.handle} s={s} theme={theme}>
             <View style={s.handleRow}>
               <Text style={s.handlePrefix}>/products/</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 value={handle}
                 onChangeText={v => { setHandle(v.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, limits.handle)); setFieldError(null); }}
                 placeholder={detail.suggestedHandle}
@@ -183,7 +183,7 @@ export default function ProductSeoScreen() {
           {fieldError && <Text style={s.error}>{fieldError}</Text>}
 
           <Field label="Social image link" s={s} theme={theme}>
-            <TextInput
+            <TextInput returnKeyType="done"
               value={image}
               onChangeText={setImage}
               placeholder={detail.resolved.image ?? 'https://'}

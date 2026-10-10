@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -212,7 +212,7 @@ export default function StoreBuilderScreen() {
         'customize_store',
         () => applyTheme(THREAD_THEME_ID, 'light'),
       );
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       router.push('/store-editor' as never);
     } catch {
       Alert.alert('Could not open Thread Theme', 'Please try again.');
@@ -317,7 +317,6 @@ export default function StoreBuilderScreen() {
                     key={label}
                     style={s.quickActionBtn}
                     onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       router.push(route as never);
                     }}
                     activeOpacity={0.7}
@@ -413,7 +412,7 @@ export default function StoreBuilderScreen() {
                 <TouchableOpacity
                   key={label}
                   style={s.mgmtCard}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }}
+                  onPress={() => { router.push(route as never); }}
                   activeOpacity={0.75}
                 >
                   <View style={s.mgmtIconWrap}>
@@ -431,7 +430,7 @@ export default function StoreBuilderScreen() {
                 <TouchableOpacity
                   key={label}
                   style={s.mgmtCard}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }}
+                  onPress={() => { router.push(route as never); }}
                   activeOpacity={0.75}
                 >
                   <View style={s.mgmtIconWrap}>
@@ -449,7 +448,7 @@ export default function StoreBuilderScreen() {
                 <TouchableOpacity
                   key={label}
                   style={s.mgmtCard}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }}
+                  onPress={() => { router.push(route as never); }}
                   activeOpacity={0.75}
                 >
                   <View style={s.mgmtIconWrap}>
@@ -483,7 +482,6 @@ export default function StoreBuilderScreen() {
               <PrimaryButton
                 label="Open Suggestions →"
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   router.push('/store-ai-improve' as never);
                 }}
                 style={s.aiImproveBtn}
@@ -508,7 +506,7 @@ export default function StoreBuilderScreen() {
             {!importJob ? (
               <>
                 <Text style={s.inputLabel}>Shopify store URL</Text>
-                <TextInput
+                <TextInput returnKeyType="done"
                   value={shopifyUrl}
                   onChangeText={setShopifyUrl}
                   placeholder="https://your-store.com"

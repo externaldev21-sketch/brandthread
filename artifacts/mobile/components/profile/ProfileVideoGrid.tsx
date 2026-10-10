@@ -2,13 +2,14 @@
  * 9:16 video tiles — the main content of every profile. Each tile is one
  * pressable (poster, view count, and badges are all non-interactive children).
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
+import { setPendingTileTransition } from '@/lib/tileTransition';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCompactCount } from '@/lib/compactFormat';
@@ -100,7 +101,18 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
   onLongPress?: (item: ProfileGridItem, index: number) => void;
 }) {
   const { theme } = useAppTheme();
-  const handlePress = useCallback(() => onPress(item, index), [onPress, item, index]);
+  const tileRef = useRef<View>(null);
+  // Zoom from the tile: measure it, hand its rect to the viewer (which grows
+  // a copy of the poster into place — components/ExpandFromTileOverlay),
+  // then navigate. Falls straight through when the tile can't be measured.
+  const handlePress = useCallback(() => {
+    const node = tileRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') { onPress(item, index); return; }
+    node.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) setPendingTileTransition({ postId: item.id, uri: item.posterUri ?? null, rect: { x, y, width: w, height: h } });
+      onPress(item, index);
+    });
+  }, [onPress, item, index]);
   const handleLongPress = useCallback(() => onLongPress?.(item, index), [onLongPress, item, index]);
   const metric = typeof item.viewsCount === 'number'
     ? { icon: 'play' as const, value: formatCompactCount(item.viewsCount) }
@@ -109,7 +121,7 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
       : null;
 
   return (
-    <View style={{ width, height, marginBottom: PROFILE_GRID_GAP }}>
+    <View ref={tileRef} collapsable={false} style={{ width, height, marginBottom: PROFILE_GRID_GAP }}>
       <PressableScale
         onPress={handlePress}
         onLongPress={onLongPress ? handleLongPress : undefined}

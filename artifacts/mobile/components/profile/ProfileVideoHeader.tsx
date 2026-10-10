@@ -27,7 +27,6 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, SP } from '@/lib/theme';
-import { hapticSelection } from '@/lib/haptics';
 import { loadBuyerSettings } from '@/lib/buyerSettings';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import type { ProfileStat } from './ProfileControls';
@@ -242,7 +241,7 @@ export function ProfileStatColumns({ stats, loading }: { stats: ProfileStat[]; l
           <Pressable
             key={stat.key}
             style={({ pressed }) => [cellStyle, pressed && styles.statPressed]}
-            onPress={() => { hapticSelection(); stat.onPress?.(); }}
+            onPress={() => { stat.onPress?.(); }}
             accessibilityRole="button"
             accessibilityLabel={label}
             hitSlop={6}

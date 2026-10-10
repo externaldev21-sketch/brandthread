@@ -13,7 +13,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListRow } from '@/components/ui/ListRow';
-import { hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { getStorefront, updateSettings } from '@/services/storeService';
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
 import { radius } from '@/constants/radii';
@@ -135,7 +135,7 @@ export default function StoreSettingsScreen() {
         <SectionHeader title="STORE IDENTITY" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <FieldRow ss={ss} label="Store Name">
-            <TextInput
+            <TextInput returnKeyType="done"
               style={ss.input}
               value={form.storeName}
               onChangeText={v => patch({ storeName: v })}
@@ -146,7 +146,7 @@ export default function StoreSettingsScreen() {
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Store URL">
             <View style={ss.urlRow}>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={[ss.input, { flex: 1 }]}
                 value={form.storeUrl}
                 onChangeText={v => patch({ storeUrl: v })}
@@ -159,7 +159,7 @@ export default function StoreSettingsScreen() {
           </FieldRow>
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Contact Email">
-            <TextInput
+            <TextInput returnKeyType="done" autoComplete="email" textContentType="emailAddress"
               style={ss.input}
               value={form.contactEmail}
               onChangeText={v => patch({ contactEmail: v })}
@@ -171,7 +171,7 @@ export default function StoreSettingsScreen() {
           </FieldRow>
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Customer Support Email">
-            <TextInput
+            <TextInput returnKeyType="done" autoComplete="email" textContentType="emailAddress"
               style={ss.input}
               value={form.supportEmail}
               onChangeText={v => patch({ supportEmail: v })}
@@ -208,7 +208,7 @@ export default function StoreSettingsScreen() {
           </FieldRow>
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Time Zone">
-            <TextInput
+            <TextInput returnKeyType="done"
               style={ss.input}
               value={form.timezone}
               onChangeText={v => patch({ timezone: v })}
@@ -238,7 +238,7 @@ export default function StoreSettingsScreen() {
                 <PressableScale
                   key={opt.value}
                   onPress={() => {
-                    hapticToggle();
+                    haptics.selection();
                     patch({ storeStatus: opt.value, passwordProtected: opt.value === 'password_protected' });
                   }}
                   accessibilityRole="button"
@@ -255,7 +255,7 @@ export default function StoreSettingsScreen() {
             <>
               <View style={ss.divider} />
               <FieldRow ss={ss} label="Store Password">
-                <TextInput
+                <TextInput returnKeyType="done"
                   style={ss.input}
                   value={form.storePassword ?? ''}
                   onChangeText={v => patch({ storePassword: v })}

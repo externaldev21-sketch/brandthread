@@ -14,7 +14,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { previewSellerBrandName } from '@/lib/previewIdentity';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -23,7 +23,7 @@ import { useColors } from '@/hooks/useColors';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getInitials } from '@/lib/format';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
@@ -31,6 +31,7 @@ import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/setting
 import { ConfirmSheet } from '@/components/settings/SettingsKit';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -39,6 +40,7 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 export default function SellerSettingsScreen() {
   const colors = useColors();
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const titleCollapse = useLargeTitleCollapse();
   const router = useRouter();
   const api = useApi();
   const { signOut } = useAuth();
@@ -109,7 +111,7 @@ export default function SellerSettingsScreen() {
   async function chooseAccountScope(nextScope: 'global' | 'us') {
     if (scopeLoading || scopeSaving) return;
     if (nextScope === accountScope) { setScopeVisible(false); return; }
-    hapticLight();
+    haptics.selection();
     setScopeSaving(nextScope);
     setScopeSaveError(null);
     try {
@@ -124,7 +126,6 @@ export default function SellerSettingsScreen() {
   }
 
   async function handleItem(item: SettingsCatalogItem) {
-    hapticLight();
     if (
       GROWTH_PLAN_ENFORCEMENT_ENABLED &&
       item.requiresGrowth &&
@@ -141,10 +142,10 @@ export default function SellerSettingsScreen() {
   }
 
   async function confirmSignOut() {
+    haptics.warning();
     setSigningOut(true);
     try {
       await signOut();
-      hapticSuccess();
       router.replace('/sign-in' as never);
     } finally {
       setSigningOut(false);
@@ -157,10 +158,13 @@ export default function SellerSettingsScreen() {
       <ScreenHeader
         title="Settings"
         variant="modal"
-        onBack={() => { hapticLight(); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
+        collapse={titleCollapse}
       />
 
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={titleCollapse.onScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: tabBarInset + SP.xl }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -196,7 +200,7 @@ export default function SellerSettingsScreen() {
         ))}
 
         <Text style={s.version}>Brandthread v1.0.0</Text>
-      </ScrollView>
+      </Animated.ScrollView>
 
       <PlanUpsellModal
         visible={upsellFeature !== null}
@@ -238,7 +242,7 @@ function AccountRow({ name, initials, onPress }: { name: string; initials: strin
   const colors = useColors();
   const s = useMemo(() => makeListStyles(colors), [colors]);
   return (
-    <PressableScale style={s.accountRow} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel="Edit profile">
+    <PressableScale style={s.accountRow} onPress={() => { onPress(); }} accessibilityRole="button" accessibilityLabel="Edit profile">
       <View style={[s.accountAvatar, { backgroundColor: colors.primary }]}>
         <Text style={[s.accountAvatarText, { color: colors.primaryForeground }]}>{initials}</Text>
       </View>
@@ -337,7 +341,7 @@ function SettingsRow({ icon, label, testID, onPress, destructive, soon, badge, l
   if (!onPress || inert) return <View>{content}</View>;
 
   return (
-    <TouchableOpacity testID={testID} activeOpacity={0.65} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
+    <TouchableOpacity testID={testID} activeOpacity={0.65} onPress={() => { onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
       {content}
     </TouchableOpacity>
   );

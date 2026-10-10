@@ -22,7 +22,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useCommunityClient } from '@/lib/communities/useCommunityClient';
 import { formatMemberCount, type Community } from '@/lib/communities/types';
 import { describeCommunityError } from '@/lib/communities/errors';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
@@ -123,7 +123,6 @@ export default function CommunityScreen() {
   );
 
   const openChat = useCallback((id: string) => {
-    hapticLight();
     Keyboard.dismiss();
     router.push(`/community-chat?id=${encodeURIComponent(id)}` as never);
   }, [router]);
@@ -131,14 +130,13 @@ export default function CommunityScreen() {
   /** Optimistic join; rolls back with a calm inline message on failure. Resolves true on success. */
   const join = useCallback(async (c: Community): Promise<boolean> => {
     if (joining[c.id]) return false;
-    hapticLight();
+    haptics.light();
     setRowErrors((prev) => { const { [c.id]: _drop, ...rest } = prev; return rest; });
     setNeedsSignIn(false);
     setJoinedOverride((prev) => ({ ...prev, [c.id]: true }));
     setJoining((prev) => ({ ...prev, [c.id]: true }));
     try {
       const joined = await client.join(c.id);
-      hapticSuccess();
       setMine((prev) => (prev.some((m) => m.id === c.id) ? prev : [{ ...c, ...joined, joined: true }, ...prev]));
       return true;
     } catch (e) {
@@ -212,7 +210,7 @@ export default function CommunityScreen() {
 
       {!searching ? (
         <PressableScale
-          onPress={() => { hapticLight(); router.push('/community-create' as never); }}
+          onPress={() => { router.push('/community-create' as never); }}
           style={[styles.createRow, { backgroundColor: colors.card, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel="Create a group"

@@ -10,7 +10,6 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { FONT, GOLD, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 
@@ -40,7 +39,6 @@ export function LongPressMenu({
               style={[styles.row, i > 0 && styles.rowDivider]}
               activeOpacity={0.7}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 item.onPress();
                 onClose();
               }}

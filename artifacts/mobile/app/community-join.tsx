@@ -21,7 +21,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useCommunityClient } from '@/lib/communities/useCommunityClient';
 import { formatMemberCount, type CommunityInvitePreview } from '@/lib/communities/types';
 import { describeCommunityError } from '@/lib/communities/errors';
-import { hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
@@ -68,8 +68,8 @@ export default function CommunityJoinScreen() {
     setNeedsSignIn(false);
     try {
       const res = await client.joinByCode(code);
-      if (res.status === 'requested') { hapticSuccess(); setRequested(true); return; }
-      hapticSuccess();
+      if (res.status === 'requested') { haptics.success(); setRequested(true); return; }
+      haptics.success();
       router.replace(`/community-chat?id=${encodeURIComponent(res.community?.id ?? group.id)}` as never);
     } catch (e) {
       const info = describeCommunityError(e);

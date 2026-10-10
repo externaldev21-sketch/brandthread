@@ -16,7 +16,6 @@ import type { MuteRecord } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, ListRow } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { hapticDestructiveConfirm, hapticWarning } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -37,13 +36,11 @@ export default function MutedAccountsScreen() {
   useEffect(() => { load(); }, [load]);
 
   const handleUnmute = (user: MuteRecord) => {
-    hapticWarning();
     Alert.alert('Unmute', `Unmute ${user.mutedUserName}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Unmute',
         onPress: async () => {
-          hapticDestructiveConfirm();
           setUnmuting(user.id);
           await unmuteUser(user.mutedUserId);
           setUnmuting(null);
@@ -71,7 +68,7 @@ export default function MutedAccountsScreen() {
       {muted.length > 0 && (
         <View style={styles.search}>
           <Feather name="search" size={16} color={theme.muted} />
-          <TextInput
+          <TextInput returnKeyType="search"
             style={[styles.searchInput, WEB_INPUT_RESET]}
             value={query}
             onChangeText={setQuery}

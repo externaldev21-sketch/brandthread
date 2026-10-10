@@ -26,7 +26,9 @@ import {
 import type { Friendship } from '@/services/socialTypes';
 import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { SheetRise } from '@/components/motion/SheetRise';
+import Reanimated from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { useApi } from '@/lib/api';
 import { isUUID } from '@/lib/engagementUtils';
 import { buildPostUrl } from '@/lib/shareLinks';
@@ -66,6 +68,8 @@ export function ThreadShareSheet({
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  // Shared sheet engine: rises on the iOS sheet curve, drag the grabber down to dismiss.
+  const sheetMotion = useSheetTransition(visible, onClose);
   const api = useApi();
   const router = useRouter();
   const [friends, setFriends] = useState<Friendship[]>([]);
@@ -260,9 +264,18 @@ export function ThreadShareSheet({
 
   return (
     <>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <SheetRise style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <Modal visible={sheetMotion.modalVisible} transparent animationType="none" onRequestClose={onClose}>
+        <Reanimated.View style={[StyleSheet.absoluteFill, sheetMotion.backdropStyle]}>
+          <Pressable style={styles.backdrop} onPress={onClose} />
+        </Reanimated.View>
+        <Reanimated.View
+          onLayout={sheetMotion.onSheetLayout}
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }, sheetMotion.sheetStyle]}
+        >
+          {/* Instagram share sheet: grabber + header drag down to dismiss. */}
+          <GestureDetector gesture={sheetMotion.panGesture}>
+          <Reanimated.View>
+          <View style={styles.grabberWrap}><View style={[styles.grabber, { backgroundColor: theme.muted }]} /></View>
           <View style={styles.header}>
             <View style={styles.headerSpacer} />
             <Text style={styles.title}>Share to</Text>
@@ -270,6 +283,8 @@ export function ThreadShareSheet({
               <Feather name="x" size={20} color={theme.text} />
             </Pressable>
           </View>
+          </Reanimated.View>
+          </GestureDetector>
 
           <View style={styles.section}>
             <ScrollView
@@ -327,7 +342,7 @@ export function ThreadShareSheet({
               ) : null}
             </View>
           </View>
-        </SheetRise>
+        </Reanimated.View>
       </Modal>
 
       {savingProgress != null && (
@@ -391,6 +406,8 @@ function ShareAction({
 }
 
 const makeStyles = (theme: { background: string; card: string; border: string; text: string; muted: string; surface: string; onAccent: string }) => StyleSheet.create({
+  grabberWrap: { alignItems: 'center', paddingTop: 6, paddingBottom: 2 },
+  grabber: { width: 36, height: 4, borderRadius: 2, opacity: 0.4 },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: `${theme.background}55` },
   sheet: {
     position: 'absolute',

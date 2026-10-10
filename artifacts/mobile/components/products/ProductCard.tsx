@@ -17,7 +17,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { StatusBadge, PressableScale } from '@/components/BrandthreadUI';
@@ -93,14 +93,14 @@ export const ProductCard = React.memo(function ProductCard({
       <View style={[s.swipeActions, { height: imageHeight }]}>
         <PressableScale
           style={[s.swipeBtn, { backgroundColor: theme.warning }]}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); closeSwipe(); onQuickArchive(product); }}
+          onPress={() => { closeSwipe(); onQuickArchive(product); }}
           accessibilityLabel={isArchived ? `Unarchive ${product.name}` : `Archive ${product.name}`}
         >
           <Feather name={isArchived ? 'rotate-ccw' : 'archive'} size={ICON.md} color={theme.background} />
         </PressableScale>
         <PressableScale
           style={[s.swipeBtn, { backgroundColor: theme.error }]}
-          onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); closeSwipe(); onQuickDelete(product); }}
+          onPress={() => { haptics.warning(); closeSwipe(); onQuickDelete(product); }}
           accessibilityLabel={`Delete ${product.name}`}
         >
           <Feather name="trash-2" size={ICON.md} color={theme.background} />
@@ -114,7 +114,6 @@ export const ProductCard = React.memo(function ProductCard({
       <Swipeable
         ref={swipeRef}
         renderRightActions={renderRightActions}
-        onSwipeableWillOpen={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
         overshootRight={false}
         friction={2}
       >

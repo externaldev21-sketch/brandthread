@@ -3,7 +3,7 @@ import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const CHECKOUT_MODES = ['Checkout only', 'Accounts optional', 'Accounts required'];
@@ -15,12 +15,8 @@ export default function CheckoutScreen() {
   const [postPurchaseFeatures, setPostPurchaseFeatures] = useState(false);
   const [scripts, setScripts] = useState('');
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
   function cycleMode() {
-    haptic();
+    haptics.selection();
     setModeIndex((i) => (i + 1) % CHECKOUT_MODES.length);
   }
 
@@ -46,7 +42,7 @@ export default function CheckoutScreen() {
             Customers can choose between 3 presets or enter a custom amount
           </Text>
           <TouchableOpacity
-            onPress={() => { haptic(); setTipping((v) => !v); }}
+            onPress={() => { haptics.selection(); setTipping((v) => !v); }}
             activeOpacity={0.7}
             style={styles.checkRow}
           >
@@ -70,7 +66,7 @@ export default function CheckoutScreen() {
             Add tracking scripts and other customizations
           </Text>
 
-          <TouchableOpacity onPress={() => { haptic(); setPostPurchaseFeatures((v) => !v); }} activeOpacity={0.7} style={styles.radioRow}>
+          <TouchableOpacity onPress={() => { haptics.selection(); setPostPurchaseFeatures((v) => !v); }} activeOpacity={0.7} style={styles.radioRow}>
             <View
               style={[
                 styles.checkbox,

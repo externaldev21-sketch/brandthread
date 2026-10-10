@@ -33,14 +33,14 @@ describe('Repost and save micro-animations', () => {
   it('repost spins a full turn on toggle, with haptics', () => {
     expect(feed).toContain('function spinRepost(');
     expect(rail).toContain('rotateAnim={repostSpin}');
-    expect(rail).toContain('onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onRepost(); }}');
+    expect(rail).toContain('onPress={async () => { haptics.light(); await onRepost(); }}');
     expect(feed).toContain('onRepost={async () => { spinRepost(); await onRepost(item.id); }}');
   });
 
   it('save lifts then drops/settles on toggle, with haptics', () => {
     expect(feed).toContain('function dropSave(');
     expect(rail).toContain('translateYAnim={saveDrop}');
-    expect(rail).toContain('onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onSave(); }}');
+    expect(rail).toContain('onPress={async () => { haptics.light(); await onSave(); }}');
     expect(feed).toContain('onSave={async () => { dropSave(); await onSave(item.id); }}');
   });
 

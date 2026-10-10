@@ -14,7 +14,7 @@ import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
-import { hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
@@ -56,7 +56,7 @@ export function DropsCalendar({ drops }: { drops: CalendarDropRow[] }) {
       Alert.alert('Sign in to get drop alerts', 'Create or sign in to your buyer account, then tap the bell again.');
       return;
     }
-    hapticSelection();
+    haptics.selection();
     const wasOn = !!subscribed[drop.id];
     setPending((p) => ({ ...p, [drop.id]: true }));
     try {

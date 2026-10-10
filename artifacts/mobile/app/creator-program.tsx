@@ -10,7 +10,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -67,7 +66,6 @@ export default function CreatorProgramScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const copy = async (text: string, what: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(text);
     setNote(`${what} copied`);
     setTimeout(() => setNote(null), 1800);
@@ -187,7 +185,7 @@ export default function CreatorProgramScreen() {
 
             <SectionTitle>Join a brand</SectionTitle>
             <View style={[s.input, { borderColor: theme.border, backgroundColor: theme.card }]}>
-              <TextInput
+              <TextInput returnKeyType="done"
                 value={brandRef}
                 onChangeText={setBrandRef}
                 placeholder="Brand username"

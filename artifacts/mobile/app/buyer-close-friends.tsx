@@ -16,7 +16,7 @@ import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
-import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListRow, StickyBottomCTA } from '@/components/ui';
@@ -78,7 +78,7 @@ export default function BuyerCloseFriends() {
 
   // Key on userId (e.g. "u_maya") so isCloseFriendOf() can match correctly
   function toggle(userId: string) {
-    hapticToggle();
+    haptics.selection();
     setCloseFriends(prev => {
       const next = new Set(prev);
       next.has(userId) ? next.delete(userId) : next.add(userId);
@@ -95,7 +95,7 @@ export default function BuyerCloseFriends() {
       await saveCloseFriendIds(all);
       const result = await api.closeFriends.replace(all.filter(id => !id.startsWith('u_')));
       await saveCloseFriendIds([...result.friendIds, ...all.filter(id => id.startsWith('u_'))]);
-      hapticSuccessAction();
+      haptics.success();
       goBackOr(router);
     } catch {
       Alert.alert("Couldn't save", 'Your Close Friends list was kept on this device but not saved to your account. Try again.');
@@ -144,7 +144,7 @@ export default function BuyerCloseFriends() {
       {/* Search */}
       <View style={s.searchWrap}>
         <Feather name="search" size={16} color={colors.mutedForeground} />
-        <TextInput
+        <TextInput returnKeyType="search"
           style={[s.searchInput, WEB_INPUT_RESET]}
           value={query}
           onChangeText={setQuery}

@@ -11,7 +11,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { Button } from '@/components/ui/Button';
-import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { isPreviewConversationId } from '@/lib/previewInbox';
 import { setConversationNickname } from '@/services/socialService';
@@ -32,7 +32,6 @@ export default function ConversationNicknamesScreen() {
   const isPreview = isPreviewConversationId(params.id);
 
   async function save() {
-    hapticPrimaryAction();
     setSaving(true);
     try {
       if (!isPreview) {
@@ -42,7 +41,7 @@ export default function ConversationNicknamesScreen() {
           await setConversationNickname(params.id, params.participantUserId, nickname);
         }
       }
-      hapticSuccessAction();
+      haptics.success();
       goBackOr(router);
     } catch (e) {
       Alert.alert('Couldn’t save nickname', apiErrorMessage(e, 'Please try again.'));
@@ -55,7 +54,7 @@ export default function ConversationNicknamesScreen() {
     <View style={[s.root, { backgroundColor: theme.background }]}>
       <ScreenHeader
         title="Nickname"
-        onBack={() => { hapticPrimaryAction(); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
         backTestID="conversation-nicknames-back"
       />
 
@@ -63,7 +62,7 @@ export default function ConversationNicknamesScreen() {
         <Text style={[s.label, { color: theme.muted }]}>
           Set a nickname for {params.participantName}. Only you will see it.
         </Text>
-        <TextInput
+        <TextInput returnKeyType="done"
           style={[s.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.cardElevated }]}
           value={nickname}
           onChangeText={setNickname}

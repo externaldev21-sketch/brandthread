@@ -44,7 +44,7 @@ import { FONT, FS, SP, RADIUS, ICON, SUCCESS, RED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { hapticToggle, hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { buildCanonicalProfileUrl, normalizeUsername, shareLinkWithFallback } from '@/lib/shareProfile';
 import { captureCardAtNaturalSize, saveCardImageToLibrary, triggerWebImageDownload } from '@/lib/shareCard';
 import { LOGO_SOURCE } from '@/constants/branding';
@@ -190,12 +190,11 @@ export function ShareProfileSheet({
 
   const handleSelectVariant = useCallback((next: BackgroundVariant) => {
     if (variant === next) return;
-    hapticToggle();
+    haptics.selection();
     setVariant(next);
   }, [variant]);
 
   const handleOpenScanner = useCallback(() => {
-    hapticLight();
     setScreen('scanner');
   }, []);
 
@@ -206,7 +205,6 @@ export function ShareProfileSheet({
   const handleShareProfile = useCallback(() => {
     if (!canonicalUrl || busy) return;
     void runAction('share', async () => {
-      hapticLight();
       const { Share } = await import('react-native');
       const result = await shareLinkWithFallback({
         url: canonicalUrl,
@@ -223,7 +221,6 @@ export function ShareProfileSheet({
   const handleCopyLink = useCallback(() => {
     if (!canonicalUrl || busy) return;
     void runAction('copy', async () => {
-      hapticSuccess();
       if (Platform.OS === 'web') {
         if (!navigator?.clipboard?.writeText) throw new Error('Clipboard unavailable');
         await navigator.clipboard.writeText(canonicalUrl);
@@ -238,7 +235,6 @@ export function ShareProfileSheet({
   const handleDownload = useCallback(() => {
     if (busy || !cardRef.current) return;
     void runAction('download', async () => {
-      hapticLight();
       const uri = await captureCardAtNaturalSize({ current: cardRef.current }, QR_CARD_SIZE);
       if (Platform.OS === 'web') {
         triggerWebImageDownload(uri, `${normalizedUsername || 'brandthread'}-qr.png`);

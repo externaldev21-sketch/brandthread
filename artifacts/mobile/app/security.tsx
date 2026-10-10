@@ -4,7 +4,6 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FONT } from '@/lib/theme';
 
 // Note: the previous "Collaborators" block (a fake local-only collaborator
@@ -15,12 +14,7 @@ export default function SecurityScreen() {
   const colors = useColors();
   const router = useRouter();
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
   function viewActivityLog() {
-    haptic();
     router.push('/login-activity' as any);
   }
 
@@ -57,7 +51,7 @@ export default function SecurityScreen() {
               variant="secondary"
               size="small"
               style={styles.rowBtn}
-              onPress={() => { haptic(); router.push(row.route as any); }}
+              onPress={() => router.push(row.route as any)}
             />
           </View>
         </View>

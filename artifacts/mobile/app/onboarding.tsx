@@ -16,6 +16,8 @@ import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { LegalContinueNotice } from '@/components/legal/LegalConsent';
 import { rememberPendingConsent } from '@/lib/legalConsent';
 import { AgeDobField } from '@/components/age/AgeNotices';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToMdy, mdyToDate } from '@/lib/dateTimeField';
 import { checkDobInput, formatDobInput, setPendingDob, submitPendingAge } from '@/lib/ageGate';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -43,7 +45,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
 import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
@@ -111,6 +113,7 @@ import {
 } from '@/components/onboarding/OnboardingUI';
 import { MOTION, RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 import { radius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -264,7 +267,7 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
       ]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
     >
       <Text style={ssc.emoji}>{emoji}</Text>
       <Text style={[ssc.chipText, selected && { color: theme.text }]}>{label}</Text>
@@ -275,7 +278,7 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
 const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   emoji:    { fontSize: 16 },
-  chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chipText: { fontSize: 15, fontFamily: FONT.medium, color: theme.muted },
 });
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -286,7 +289,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
       style={[sc.chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.text, borderWidth: 1 }]}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
     >
       <Text style={[sc.chipText, selected && { color: theme.text }]}>{label}</Text>
       {selected && <Feather name="check" size={13} color={theme.text} />}
@@ -295,7 +298,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
 }
 const createSc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  chipText:   { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chipText:   { fontSize: 15, fontFamily: FONT.medium, color: theme.muted },
 });
 
 /** Big tappable option row — one of a few answers to the screen's question. */
@@ -307,7 +310,7 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
       style={[sr.row, selected && { borderColor: theme.text, borderWidth: 1 }]}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
     >
       <StitchAccent active={selected} color={theme.text} style={sr.stitch} />
       <View style={{ flex: 1 }}>
@@ -323,7 +326,7 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
 const createSr = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   row:     { backgroundColor: theme.card, borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, paddingHorizontal: 18, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', gap: SPACE.md, overflow: 'hidden' },
   stitch:  { position: 'absolute', top: 10, left: 18 },
-  label:   { fontSize: 17, lineHeight: 22, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2 },
+  label:   { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold, color: theme.text, marginBottom: 2 },
   labelOn: { color: theme.text },
   sub:     { ...TYPE.body, color: theme.muted },
   circle:  { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -455,7 +458,7 @@ const createSl = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   stepIconDone:   { backgroundColor: FG, borderColor: FG },
   stepDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)' },
   stepLabel:      { ...TYPE.body, lineHeight: 28, color: MUTED },
-  stepLabelActive:{ color: FG, fontFamily: 'Inter_600SemiBold' },
+  stepLabelActive:{ color: FG, fontFamily: FONT.semibold },
   });
 };
 
@@ -570,7 +573,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
           <ThreadLogoStitch
             size={124}
             color={theme.text}
-            onStitched={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
+            onStitched={() => { haptics.success(); }}
           />
         </View>
 
@@ -618,7 +621,7 @@ const createSs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   body:       { flex: 1, justifyContent: 'center' },
   hero:       { alignItems: 'center', marginBottom: SPACE.xl },
   brandBadge: { alignSelf: 'flex-start', borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 6, marginTop: SPACE.sm, borderWidth: 1 },
-  brandBadgeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  brandBadgeText: { fontSize: 13, fontFamily: FONT.semibold },
   desc:       { ...TYPE.body, color: MUTED, marginTop: SPACE.sm, marginBottom: SPACE.lg },
   features:   { gap: SPACE.sm },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
@@ -665,6 +668,9 @@ function BuyerAuthStep({
   const [oauthLoading, setOAuth]        = useState('');
   const [error, setError]               = useState('');
   const [clearingSession, setClearSession] = useState(false);
+  const buyerReferralRef = useRef<TextInput>(null);
+  const buyerEmailRef = useRef<TextInput>(null);
+  const buyerPasswordRef = useRef<TextInput>(null);
   const [usernameError, setUsernameError] = useState('');
   // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
   // is required before any account is created (email, Google or Apple).
@@ -874,13 +880,15 @@ function BuyerAuthStep({
           <Text style={sba.sub}>We sent a 6-digit code to {email}</Text>
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Verification code</Text>
-            <TextInput accessibilityLabel="Verification code"
+            <TextInput returnKeyType="done" accessibilityLabel="Verification code"
               style={[sba.input, sba.codeInput]}
               placeholder="000000"
               placeholderTextColor={MUTED2}
               value={code}
               onChangeText={setCode}
               keyboardType="number-pad"
+              autoComplete="one-time-code"
+              textContentType="oneTimeCode"
               maxLength={6}
               autoFocus
             />
@@ -927,6 +935,11 @@ function BuyerAuthStep({
               }}
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="username-new"
+              textContentType="username"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => buyerReferralRef.current?.focus()}
               maxLength={30}
             />
             {usernameError
@@ -945,6 +958,7 @@ function BuyerAuthStep({
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Referral code (optional)</Text>
             <TextInput accessibilityLabel="Referral code"
+              ref={buyerReferralRef}
               testID="onboarding-referral-input"
               style={sba.input}
               placeholder="e.g. FASHION"
@@ -954,6 +968,10 @@ function BuyerAuthStep({
               onChangeText={v => onReferralCodeChange(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12))}
               autoCapitalize="characters"
               autoCorrect={false}
+              autoComplete="off"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => buyerEmailRef.current?.focus()}
               maxLength={12}
             />
             <Text style={sba.hint}>Enter the code from the friend who invited you.</Text>
@@ -962,6 +980,7 @@ function BuyerAuthStep({
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Email address</Text>
             <TextInput accessibilityLabel="Email"
+              ref={buyerEmailRef}
               style={sba.input}
               placeholder="mila@nightshiftstudio.co"
               placeholderTextColor={MUTED2}
@@ -970,6 +989,10 @@ function BuyerAuthStep({
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => buyerPasswordRef.current?.focus()}
             />
           </View>
 
@@ -977,13 +1000,17 @@ function BuyerAuthStep({
             <Text style={sba.label}>Password</Text>
             <View style={sba.pwRow}>
               <TextInput accessibilityLabel="Password"
+                ref={buyerPasswordRef}
                 style={[sba.input, sba.pwInput]}
                 placeholder="Minimum 8 characters"
                 placeholderTextColor={MUTED2}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPw}
+                autoCapitalize="none"
                 autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="done"
               />
               <TouchableOpacity accessibilityLabel={showPw ? 'Hide password' : 'Show password'} accessibilityRole="button" style={sba.eyeBtn} onPress={() => setShowPw(v => !v)}>
                 <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
@@ -1074,7 +1101,7 @@ function BuyerAuthStep({
               <>
                 <View style={sba.bigRowIcon}>
                   <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text>
+                    <Text style={{ fontFamily: FONT.bold, fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text>
                   </View>
                 </View>
                 <Text style={sba.bigRowText}>Continue with Google</Text>
@@ -1198,6 +1225,13 @@ function SharedAuthStep({
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
   const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
   const passwordsMatch = password === confirmPassword;
+  const signUpFirstNameRef = useRef<TextInput>(null);
+  const signUpLastNameRef = useRef<TextInput>(null);
+  const signUpPasswordRef = useRef<TextInput>(null);
+  const signUpConfirmRef = useRef<TextInput>(null);
+  const signUpUsernameRef = useRef<TextInput>(null);
+  const signUpReferralRef = useRef<TextInput>(null);
+  const signUpDobRef = useRef<TextInput>(null);
   const canSubmit = email.includes('@') && password.length >= 8 && passwordsMatch && isUsernameValid
     && !usernameLiveCheck.error && !usernameLiveCheck.checking && formFirstName.trim().length >= 1;
   const missingFields: string[] = [];
@@ -1405,7 +1439,7 @@ function SharedAuthStep({
             <PrimaryButton label={loading ? 'Verifying…' : 'Verify email'} onPress={handleVerify} disabled={!canVerify} loading={loading} />
           </Reveal>
           <TouchableOpacity style={ssa.resendBtn} onPress={() => signUp.verifications.sendEmailCode()}>
-            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.text, fontFamily: 'Inter_600SemiBold' }}>Resend</Text></Text>
+            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Resend</Text></Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1435,6 +1469,10 @@ function SharedAuthStep({
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpFirstNameRef.current?.focus()}
             valid={email.includes('@')}
           />
         </Reveal>
@@ -1442,11 +1480,17 @@ function SharedAuthStep({
         {/* First name */}
         <Reveal index={3}>
           <FloatingInput
+            ref={signUpFirstNameRef}
             label="First name"
             placeholder="Alex"
             value={formFirstName}
             onChangeText={setFormFirstName}
             autoCapitalize="words"
+            autoComplete="given-name"
+            textContentType="givenName"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpLastNameRef.current?.focus()}
             maxLength={40}
             valid={formFirstName.trim().length >= 1}
           />
@@ -1455,11 +1499,17 @@ function SharedAuthStep({
         {/* Last name */}
         <Reveal index={4}>
           <FloatingInput
+            ref={signUpLastNameRef}
             label="Last name"
             placeholder="Rivera"
             value={formLastName}
             onChangeText={setFormLastName}
             autoCapitalize="words"
+            autoComplete="family-name"
+            textContentType="familyName"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpPasswordRef.current?.focus()}
             maxLength={40}
           />
         </Reveal>
@@ -1467,12 +1517,18 @@ function SharedAuthStep({
         {/* Password */}
         <Reveal index={5}>
           <FloatingInput
+            ref={signUpPasswordRef}
             label="Password"
             placeholder="Minimum 8 characters"
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPw}
+            autoCapitalize="none"
             autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpConfirmRef.current?.focus()}
             hint={password.length > 0 && password.length < 8 ? 'Use at least 8 characters' : null}
             right={<RevealToggle shown={showPw} onToggle={() => setShowPw(v => !v)} />}
           />
@@ -1481,12 +1537,18 @@ function SharedAuthStep({
         {/* Confirm password */}
         <Reveal index={6}>
           <FloatingInput
+            ref={signUpConfirmRef}
             label="Confirm password"
             placeholder="Re-enter password"
             value={confirmPassword}
             onChangeText={setConfirm}
             secureTextEntry={!showConfirm}
+            autoCapitalize="none"
             autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpUsernameRef.current?.focus()}
             error={!passwordsMatch && confirmPassword.length > 0 ? 'Passwords do not match' : null}
             right={<RevealToggle shown={showConfirm} onToggle={() => setShowConfirm(v => !v)} />}
           />
@@ -1501,6 +1563,7 @@ function SharedAuthStep({
         {/* Username */}
         <Reveal index={7}>
           <FloatingInput
+            ref={signUpUsernameRef}
             testID="onboarding-username-input"
             value={username}
             editable
@@ -1517,6 +1580,11 @@ function SharedAuthStep({
             placeholder="e.g. noire_collective"
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete="username-new"
+            textContentType="username"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpReferralRef.current?.focus()}
             maxLength={30}
             error={usernameError || usernameLiveCheck.error || null}
             valid={isUsernameValid && !usernameLiveCheck.error && !usernameLiveCheck.checking}
@@ -1533,6 +1601,7 @@ function SharedAuthStep({
         {/* Referral code */}
         <Reveal index={8}>
           <FloatingInput
+            ref={signUpReferralRef}
             testID="onboarding-referral-input"
             value={referralCode}
             editable
@@ -1541,21 +1610,39 @@ function SharedAuthStep({
             placeholder="e.g. FASHION"
             autoCapitalize="characters"
             autoCorrect={false}
+            autoComplete="off"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpDobRef.current?.focus()}
             maxLength={12}
             hint="Enter the code from the friend who invited you."
           />
         </Reveal>
 
         <Reveal index={9}>
-          <FloatingInput
-            testID="onboarding-dob-input"
-            value={dobText}
-            onChangeText={(t) => { setDobText(formatDobInput(t)); setDobError(null); }}
+          <NativeDateTimeField
+            mode="date"
             label="Date of birth"
-            placeholder="MM/DD/YYYY"
-            keyboardType="number-pad"
-            maxLength={10}
+            value={mdyToDate(dobText)}
+            onChange={(d) => { setDobText(dateToMdy(d)); setDobError(null); }}
+            maximumDate={new Date()}
+            iosEmptyDisplay="spinner"
             error={dobError}
+            testID="onboarding-dob-input"
+            fallback={(
+              <FloatingInput
+                ref={signUpDobRef}
+                testID="onboarding-dob-input"
+                value={dobText}
+                onChangeText={(t) => { setDobText(formatDobInput(t)); setDobError(null); }}
+                label="Date of birth"
+                placeholder="MM/DD/YYYY"
+                keyboardType="number-pad"
+                returnKeyType="done"
+                maxLength={10}
+                error={dobError}
+              />
+            )}
           />
         </Reveal>
 
@@ -1622,8 +1709,8 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
   chooseScroll: { flexGrow: 1, paddingVertical: 24, gap: 0 },
-  chooseHeadline: { fontSize: 36, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1.2, marginBottom: 8 },
-  chooseSub: { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 22, marginBottom: 32 },
+  chooseHeadline: { fontSize: 36, fontFamily: FONT.bold, color: FG, letterSpacing: -1.2, marginBottom: 8 },
+  chooseSub: { fontSize: 15, fontFamily: FONT.regular, color: MUTED, lineHeight: 22, marginBottom: 32 },
   bigRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
@@ -1631,54 +1718,54 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   appleRow: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
   bigRowIcon: { width: 28, alignItems: 'center' },
-  bigRowText: { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
+  bigRowText: { flex: 1, fontSize: 15, fontFamily: FONT.semibold, color: FG },
   signInLink: { paddingVertical: 16, alignItems: 'center' },
-  signInLinkText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
+  signInLinkText: { fontSize: 14, fontFamily: FONT.regular, color: MUTED },
   backToChoose: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
-  backToChooseText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
-  headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 4 },
-  sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
+  backToChooseText: { fontSize: 14, fontFamily: FONT.medium, color: MUTED },
+  headline:  { fontSize: 28, fontFamily: FONT.bold, color: FG, letterSpacing: -0.5, marginBottom: 4 },
+  sub:       { fontSize: 14, fontFamily: FONT.regular, color: MUTED, marginBottom: 20 },
   inputWrap: { marginBottom: 12 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
-  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
-  codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: 'Inter_700Bold' },
+  label:     { fontSize: 12, fontFamily: FONT.semibold, color: MUTED, marginBottom: 5 },
+  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: FONT.regular, color: FG },
+  codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: FONT.bold },
   pwRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12 },
   pwInput:   { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
   eyeBtn:    { paddingHorizontal: 14 },
-  hint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
-  error:     { color: ERR, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 10 },
+  hint:      { fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginTop: 4 },
+  error:     { color: ERR, fontSize: 13, fontFamily: FONT.regular, marginBottom: 10 },
   resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 6 },
-  resendText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
-  legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
+  resendText:{ fontSize: 14, fontFamily: FONT.regular, color: MUTED },
+  legal:     { fontSize: 12, fontFamily: FONT.regular, color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
   existingEmailChip: {
     alignSelf: 'flex-start',
     borderRadius: 20, borderWidth: 1,
     paddingHorizontal: 14, paddingVertical: 6, marginBottom: 16,
   },
-  existingEmailText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  existingEmailText: { fontSize: 13, fontFamily: FONT.semibold },
   existingCard: {
     borderRadius: 12, borderWidth: 1,
     padding: 16, marginBottom: 20,
   },
   existingCardTitle: {
-    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, lineHeight: 23,
+    fontSize: 17, fontFamily: FONT.bold, color: FG, marginBottom: 6, lineHeight: 23,
   },
   existingCardSub: {
-    fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20,
+    fontSize: 14, fontFamily: FONT.regular, color: MUTED, lineHeight: 20,
   },
   existingSignInBtn:  { marginBottom: 9, borderRadius: 12, overflow: 'hidden' },
   existingSignInGrad: { paddingVertical: 16, alignItems: 'center', borderRadius: 12 },
-  existingSignInText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  existingSignInText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   existingDiffBtn: {
     borderRadius: 12, paddingVertical: 15, alignItems: 'center',
     borderWidth: 1, borderColor: BORDER,
   },
-  existingDiffText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  existingDiffText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   sessionBtn:     { marginTop: 8, marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
   sessionBtnGrad: { paddingVertical: 16, alignItems: 'center', paddingHorizontal: 20 },
-  sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  sessionBtnText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   continueBtn:    { paddingVertical: 14, alignItems: 'center' },
-  continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
+  continueBtnText:{ fontSize: 14, fontFamily: FONT.medium, color: MUTED },
   });
 };
 
@@ -1699,19 +1786,19 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   divText:   { ...TYPE.label, color: MUTED },
   oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
   appleBtn:  { borderColor: BORDER },
-  oauthText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: FG },
+  oauthText: { fontSize: 16, fontFamily: FONT.semibold, color: FG },
   existingEmailChip: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14, paddingVertical: 8, marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
-  existingEmailText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  existingEmailText: { fontSize: 14, fontFamily: FONT.semibold },
   existingCard: {
     borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth,
     padding: SPACE.md + 2,
   },
   existingCardTitle: {
-    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, lineHeight: 23,
+    fontSize: 17, fontFamily: FONT.bold, color: FG, marginBottom: 6, lineHeight: 23,
   },
   existingCardSub: {
     ...TYPE.body, color: MUTED,
@@ -1778,7 +1865,7 @@ function SellerPreviewStep({
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
                 accessibilityLabel={`${preset.name} storefront theme`}
-                onPress={() => { Haptics.selectionAsync(); onSelectTheme(preset.id); }}
+                onPress={() => { haptics.selection(); onSelectTheme(preset.id); }}
               >
                 <LinearGradient colors={preset.heroGradient} style={spreview.themeSwatch}>
                   <View style={[spreview.themeDot, { backgroundColor: preset.accent }]} />
@@ -1864,7 +1951,7 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   themeDot: { width: 16, height: 16, borderRadius: 8 },
   themeLine: { width: 36, height: 3, borderRadius: 2 },
   themeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 8 },
-  themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
+  themeName: { flex: 1, fontSize: 12, fontFamily: FONT.semibold, color: FG },
   hint: { ...TYPE.caption, color: MUTED2, marginTop: SPACE.xs },
   sampleHeader: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: SPACE.sm },
   sampleSub: { ...TYPE.caption, color: MUTED, paddingRight: 18, marginTop: -4 },
@@ -1872,10 +1959,10 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   resultCard: { borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: SPACE.sm },
   resultImage: { width: '100%', height: 180 },
   resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, backgroundColor: 'rgba(0,0,0,0.86)' },
-  resultText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
+  resultText: { fontSize: 13, fontFamily: FONT.semibold, color: FG },
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: SPACE.xs, marginTop: SPACE.xs, padding: SPACE.sm, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: ERR },
   errorText: { flex: 1, fontSize: 12, lineHeight: 17, color: ERR },
-  retryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  retryText: { fontSize: 13, fontFamily: FONT.bold },
   continueWrap: { marginTop: SPACE.md },
   });
 };
@@ -2212,21 +2299,18 @@ export default function OnboardingScreen() {
   }
 
   function goNext(overrideStep?: number) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const next = overrideStep ?? step + 1;
     transitionTo(next, 1);
   }
 
   function goBack() {
     if (!canGoBack(step)) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     transitionTo(step - 1, -1);
   }
 
   function continueFromAccountType() {
     if (!selectedFlow) return;
     const initiatedAt = performance.now();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     // A session is already active here in two cases: this flow's own sign-up
     // just verified (isSignedIn flipped true, but a remount lost `flow` and
     // routed back through AccountType to re-pick it), or a signed-in user is
@@ -2586,6 +2670,9 @@ export default function OnboardingScreen() {
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
+                autoComplete="given-name"
+                textContentType="givenName"
+                returnKeyType="done"
                 maxLength={40}
                 valid={firstName.trim().length >= 2}
               />
@@ -2689,6 +2776,9 @@ export default function OnboardingScreen() {
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
+                autoComplete="given-name"
+                textContentType="givenName"
+                returnKeyType="done"
                 maxLength={40}
                 valid={firstName.trim().length >= 2}
               />
@@ -2713,6 +2803,9 @@ export default function OnboardingScreen() {
                 value={brandName}
                 onChangeText={setBrandName}
                 autoCapitalize="words"
+                autoComplete="organization"
+                textContentType="organizationName"
+                returnKeyType="done"
                 maxLength={60}
                 valid={brandName.trim().length >= 1}
                 hint="Brandthread AI will use this to shape your workspace."

@@ -45,6 +45,7 @@ import {
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { anchorFromEvent, type MenuAnchor } from '@/lib/contextMenu';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { BrandDropsCard } from '@/components/BrandDropsCard';
@@ -54,7 +55,7 @@ import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { ListRow } from '@/components/ui/ListRow';
-import { hapticLight, hapticMedium, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
   ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
@@ -67,6 +68,9 @@ import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import {
   CoverCoachmarkSheet, CoverHeroAffordance, CoverManageSheet, CoverTrimSheet, useProfileCover,
 } from '@/components/profile/ProfileCover';
+import { openContextMenu } from '@/lib/contextMenu';
+import { shareLink } from '@/lib/shareActions';
+import { buildPostUrl } from '@/lib/shareLinks';
 
 type ContentTab = 'Posts' | 'Shop' | 'Tagged';
 // Internal key stays 'Shop'; the label (and accessibility name) is "Products".
@@ -172,6 +176,7 @@ export default function SellerProfileScreen() {
   const [snackbar, setSnackbar] = useState('');
   const [activeTab, setActiveTab] = useState<ContentTab>('Posts');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   const [shopProducts, setShopProducts] = useState<ShopProduct[]>([]);
   const [shopLoading, setShopLoading] = useState(false);
   const [shopError, setShopError] = useState(false);
@@ -382,7 +387,6 @@ export default function SellerProfileScreen() {
   const handleShare = useCallback(() => {
     if (!seller) return;
     if (isOwner) {
-      hapticLight();
       setShareSheetVisible(true);
       return;
     }
@@ -409,7 +413,6 @@ export default function SellerProfileScreen() {
       return;
     }
     if (!requireSignIn()) return;
-    hapticMedium();
     router.push(messageSellerHref({
       sellerId: seller.sellerId,
       sellerName: seller.brandName,
@@ -419,7 +422,6 @@ export default function SellerProfileScreen() {
   }, [router, seller, requireSignIn]);
 
   const handleOpenInbox = useCallback(() => {
-    hapticLight();
     router.push((isOwner ? '/seller-inbox' : '/(buyer)/inbox') as never);
   }, [isOwner, router]);
 
@@ -478,20 +480,39 @@ export default function SellerProfileScreen() {
     router.push(profileVideosHref({ source: 'creator', id: seller.sellerId, startPostId: item.id, title: seller.brandName }) as never);
   }, [router, seller]);
 
-  const handleTileLongPress = useCallback((item: ProfileGridItem) => {
-    if (!isOwner) return;
-    const post = videos.posts.find((candidate) => candidate.id === item.id) ?? null;
-    if (post) { hapticMedium(); setSelectedPost(post); }
-  }, [isOwner, videos.posts]);
-
   const handleCopyPostLink = useCallback(async (post: SellerThreadPost) => {
     const profileUrl = seller ? buildCanonicalProfileUrl(seller.username) : null;
     const url = profileUrl ? `${profileUrl}?post=${encodeURIComponent(post.id)}` : null;
     if (!url) { Alert.alert('Couldn’t copy link', 'Try again.'); return; }
     await Clipboard.setStringAsync(url);
-    hapticSuccessAction();
     setSnackbar('Link copied');
   }, [seller]);
+
+  // Long-press a tile: the Instagram grid preview menu (the post enlarged
+  // over a blurred screen, actions under it). Tapping the preview plays it.
+  const handleTileLongPress = useCallback((item: ProfileGridItem) => {
+    if (!isOwner) return;
+    const post = videos.posts.find((candidate) => candidate.id === item.id) ?? null;
+    if (!post) return;
+    const shareUrl = buildPostUrl(post.id);
+    const opened = openContextMenu({
+      preview: {
+        imageUri: item.posterUri,
+        aspectRatio: 9 / 16,
+        title: seller?.brandName,
+        subtitle: post.caption || undefined,
+        avatarUri: seller?.avatarUrl,
+      },
+      onPreviewPress: () => openVideo(gridItemFromThreadPost(post)),
+      items: [
+        { key: 'edit', label: 'Edit post', icon: 'edit-2', onPress: () => router.push(('/create-post?editId=' + post.id) as never) },
+        { key: 'analytics', label: 'View analytics', icon: 'bar-chart-2', onPress: () => router.push(('/post-analytics?id=' + post.id) as never) },
+        ...(shareUrl ? [{ key: 'share', label: 'Share', icon: 'share' as const, onPress: () => { void shareLink(shareUrl, post.caption || 'My post on Brandthread'); } }] : []),
+        { key: 'copy', label: 'Copy link', icon: 'link', onPress: () => { void handleCopyPostLink(post); } },
+      ],
+    });
+    if (!opened) setSelectedPost(post);
+  }, [isOwner, videos.posts, seller, openVideo, router, handleCopyPostLink]);
 
   // Owner → the seller's own product screen (edit); visitor → the buyer
   // product page, where Buy now / Add to cart / gallery / sizes / reviews live.
@@ -708,7 +729,7 @@ export default function SellerProfileScreen() {
             ) : null}
             <ProfileGlassButton
               icon="more-horizontal"
-              onPress={() => { hapticLight(); setMenuOpen(true); }}
+              onPress={(event) => { setMenuAnchor(anchorFromEvent(event)); setMenuOpen(true); }}
               accessibilityLabel="More options"
               testID="seller-profile-more"
             />
@@ -723,7 +744,7 @@ export default function SellerProfileScreen() {
         tabs={{
           items: CONTENT_TAB_ITEMS,
           active: activeTab,
-          onChange: (key) => { hapticLight(); setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
+          onChange: (key) => { setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
         }}
         data={gridData}
         renderItem={renderTile}
@@ -796,7 +817,7 @@ export default function SellerProfileScreen() {
         />
       ) : null}
 
-      <ProfileMenuSheet visible={menuOpen} title={brandName} items={menuItems} onClose={() => setMenuOpen(false)} />
+      <ProfileMenuSheet visible={menuOpen} anchor={menuAnchor} title={brandName} items={menuItems} onClose={() => setMenuOpen(false)} />
 
       <Snackbar visible={!!snackbar} message={snackbar} onDismiss={() => setSnackbar('')} />
     </>
@@ -806,7 +827,7 @@ export default function SellerProfileScreen() {
 function SheetRow({ icon, label, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
   const { theme } = useAppTheme();
   return (
-    <PressableScale style={sheetRowStyles.row} onPress={() => { hapticMedium(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
+    <PressableScale style={sheetRowStyles.row} onPress={() => { onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
       <Feather name={icon} size={18} color={theme.text} />
       <Text style={[sheetRowStyles.label, { color: theme.text }]}>{label}</Text>
       <Feather name="chevron-right" size={16} color={theme.muted} />

@@ -27,12 +27,14 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { RADII, radius } from '@/constants/radii';
 import { TYPE_SCALE } from '@/constants/typography';
-import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
 import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, dateToYmdHm, startOfToday, ymdHmToDate, ymdToDate } from '@/lib/dateTimeField';
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
 import { useApi } from '@/hooks/useApi';
@@ -110,7 +112,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
         <TouchableOpacity
           style={s.stepperBtn}
           disabled={value <= min}
-          onPress={() => { hapticToggle(); onChange(Math.max(min, value - 1)); }}
+          onPress={() => { haptics.selection(); onChange(Math.max(min, value - 1)); }}
           accessibilityLabel={`Decrease ${label}`}
         >
           <Feather name="minus" size={14} color={value <= min ? theme.subtle : theme.text} />
@@ -127,7 +129,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
         />
         <TouchableOpacity
           style={s.stepperBtn}
-          onPress={() => { hapticToggle(); onChange(value + 1); }}
+          onPress={() => { haptics.selection(); onChange(value + 1); }}
           accessibilityLabel={`Increase ${label}`}
         >
           <Feather name="plus" size={14} color={theme.text} />
@@ -313,7 +315,6 @@ export default function AddProductScreen() {
   }
 
   function toggleSection(key: string) {
-    hapticToggle();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
   }
@@ -591,7 +592,6 @@ export default function AddProductScreen() {
       sku: '', price: '', qty: '',
     }));
     updateUnsavedState(setLocalVariants, variants);
-    hapticSuccessAction();
   }
 
   // ── Publish ──
@@ -866,7 +866,6 @@ export default function AddProductScreen() {
   }
 
   function removeSizeChartPhoto() {
-    hapticToggle();
     setSizeChartUploadStatus('idle');
     patchDraft({ sizeChartImageUrl: null });
   }
@@ -881,26 +880,22 @@ export default function AddProductScreen() {
     const next = [...media];
     [next[idx], next[target]] = [next[target], next[idx]];
     const resequenced = next.map((m, i) => ({ ...m, sortOrder: i }));
-    hapticToggle();
     patchDraft({ media: resequenced });
   }
 
   function setCoverImage(id: string) {
     const media = draftData.media ?? [];
-    hapticToggle();
     patchDraft({ media: media.map(m => ({ ...m, isCover: m.id === id })) });
   }
 
   function toggleCutoutUse(id: string) {
     const media = draftData.media ?? [];
-    hapticToggle();
     patchDraft({ media: media.map(m => m.id === id ? { ...m, useCutout: !m.useCutout } : m) });
   }
 
   /** Opens the shared MediaCropper for an existing photo ("Edit crop"),
    *  always re-cropping from its uncropped original. */
   function openCropperFor(item: ProductMedia) {
-    hapticToggle();
     setCropTargetId(item.id);
   }
 
@@ -927,7 +922,6 @@ export default function AddProductScreen() {
           ? { ...m, uri: croppedUri, originalUri: sourceUri, cropRect: result.rect }
           : m),
       });
-      hapticSuccessAction();
       void uploadMediaAsset({ ...item, uri: croppedUri });
     } catch {
       Alert.alert('Crop failed', 'Could not crop this photo. Please try again.');
@@ -964,7 +958,7 @@ export default function AddProductScreen() {
       const media = draftData.media ?? [];
       patchDraft({ media: media.map(m => m.id === item.id ? { ...m, cutoutUri: localFile.uri, useCutout: true } : m) });
       setBgRemovalState(prev => ({ ...prev, [item.id]: 'done' }));
-      hapticSuccessAction();
+      haptics.success();
 
       // Upload the cutout in the background so it has a remote URL by publish time.
       try {
@@ -1018,7 +1012,7 @@ export default function AddProductScreen() {
    *  sheet instead of a permanent row of chips under every thumbnail. */
   function openPhotoActionsFor(m: ProductMedia) {
     const bgStatus = bgRemovalState[m.id];
-    hapticToggle();
+    haptics.rigid();
     showActionSheet(undefined, undefined, [
       ...(!m.isCover ? [{ text: 'Set as cover photo', onPress: () => setCoverImage(m.id) }] : []),
       { text: 'Edit crop', onPress: () => openCropperFor(m) },
@@ -1154,7 +1148,7 @@ export default function AddProductScreen() {
           {canAddSlot && (
             <TouchableOpacity
               style={s.photoMoreSlot}
-              onPress={() => { hapticToggle(); setPhotoSlotCount(c => Math.min(10, c + 1)); }}
+              onPress={() => { setPhotoSlotCount(c => Math.min(10, c + 1)); }}
               accessibilityLabel="Add another photo slot"
               accessibilityRole="button"
               testID="add-product-add-slot"
@@ -1168,7 +1162,6 @@ export default function AddProductScreen() {
   }
 
   function openCategoryPicker() {
-    hapticToggle();
     showActionSheet('Category', undefined, [
       ...PRODUCT_CATEGORIES.map(cat => ({ text: cat, onPress: () => patchDraft({ category: cat }) })),
       { text: 'Cancel', style: 'cancel' as const },
@@ -1578,7 +1571,6 @@ export default function AddProductScreen() {
               <Text style={s.variantCount}>{localVariants.length} variant{localVariants.length !== 1 ? 's' : ''}</Text>
               <TouchableOpacity
                 onPress={() => {
-                  hapticToggle();
                   setBulkEditMode(v => !v);
                   setSelectedVariantIds(new Set());
                 }}
@@ -1634,7 +1626,6 @@ export default function AddProductScreen() {
                         return next;
                       });
                     }
-                    hapticSuccessAction();
                     setBulkPrice(''); setBulkQty('');
                   }}
                 />
@@ -1765,7 +1756,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="How will you sell this product?" style={s.sectionHdr} />
         {models.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { hapticToggle(); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { haptics.selection(); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, sm === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.title}</Text>
@@ -1778,13 +1769,13 @@ export default function AddProductScreen() {
         {(sm === 'pre-order' || sm === 'both') && (
           <>
             <SectionHeader title="Pre-order settings" style={s.sectionHdr} />
-            <FormInput label="Pre-order opens" value={ps.openDate ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, openDate: v } })} placeholder="YYYY-MM-DD" />
-            <FormInput label="Pre-order closes" value={ps.closeDate ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, closeDate: v } })} placeholder="YYYY-MM-DD" />
-            <FormInput label="Est. shipping date" value={ps.estimatedShippingDate ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, estimatedShippingDate: v } })} placeholder="YYYY-MM-DD" />
+            <NativeDateTimeField mode="date" label="Pre-order opens" value={ymdToDate(ps.openDate)} onChange={d => patchDraft({ preorderSettings: { ...ps, openDate: dateToYmd(d) } })} onClear={() => patchDraft({ preorderSettings: { ...ps, openDate: undefined } })} divider />
+            <NativeDateTimeField mode="date" label="Pre-order closes" value={ymdToDate(ps.closeDate)} onChange={d => patchDraft({ preorderSettings: { ...ps, closeDate: dateToYmd(d) } })} onClear={() => patchDraft({ preorderSettings: { ...ps, closeDate: undefined } })} minimumDate={ymdToDate(ps.openDate) ?? undefined} divider />
+            <NativeDateTimeField mode="date" label="Est. shipping date" value={ymdToDate(ps.estimatedShippingDate)} onChange={d => patchDraft({ preorderSettings: { ...ps, estimatedShippingDate: dateToYmd(d) } })} minimumDate={startOfToday()} />
             <FormInput label="Funding goal (units)" value={ps.fundingGoalUnits?.toString() ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, fundingGoalUnits: parseInt(v) || 0 } })} keyboardType="numeric" />
             <FormInput label="Min order qty" keyboardType="numeric" value={ps.minOrderQty?.toString() ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, minOrderQty: parseInt(v) || 1 } })} />
             <FormInput label="Max order qty" keyboardType="numeric" value={ps.maxOrderQty?.toString() ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, maxOrderQty: parseInt(v) || 0 } })} />
-            <FormInput label="Est. production date" value={ps.productionStartDate ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, productionStartDate: v } })} placeholder="YYYY-MM-DD" />
+            <NativeDateTimeField mode="date" label="Est. production date" value={ymdToDate(ps.productionStartDate)} onChange={d => patchDraft({ preorderSettings: { ...ps, productionStartDate: dateToYmd(d) } })} onClear={() => patchDraft({ preorderSettings: { ...ps, productionStartDate: undefined } })} />
             <FormInput label="Pre-order disclaimer" value={ps.disclaimer ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, disclaimer: v } })} placeholder="e.g. Production begins when funding goal is reached." multiline />
           </>
         )}
@@ -1829,7 +1820,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="Manufacturer" style={s.sectionHdr} />
         {modes.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { hapticToggle(); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { haptics.selection(); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, mfgMode === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.label}</Text>
@@ -1846,7 +1837,7 @@ export default function AddProductScreen() {
           <>
             <FormInput label="Target cost per unit" value={targetCost} onChange={v => updateUnsavedState(setTargetCost, v)} placeholder="0.00" keyboardType="decimal-pad" />
             <FormInput label="Required quantity" value={reqQty} onChange={v => updateUnsavedState(setReqQty, v)} placeholder="50" keyboardType="numeric" />
-            <FormInput label="Production deadline" value={prodDeadline} onChange={v => updateUnsavedState(setProdDeadline, v)} placeholder="YYYY-MM-DD" />
+            <NativeDateTimeField mode="date" label="Production deadline" value={ymdToDate(prodDeadline)} onChange={d => updateUnsavedState(setProdDeadline, dateToYmd(d))} onClear={() => updateUnsavedState<string>(setProdDeadline, '')} minimumDate={startOfToday()} />
             <SecondaryButton label="Upload tech pack" onPress={() => Alert.alert('Tech Pack', 'Tech pack upload will be available in the next release.')} icon="upload" disabled />
           </>
         )}
@@ -1869,7 +1860,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="More visibility options" style={s.sectionHdr} />
         {statuses.map(st => (
-          <TouchableOpacity key={st.key} onPress={() => { hapticToggle(); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={st.key} onPress={() => { haptics.selection(); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, ss.status === st.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{st.label}</Text>
@@ -1880,7 +1871,7 @@ export default function AddProductScreen() {
           </TouchableOpacity>
         ))}
         {ss.status === 'scheduled' && (
-          <FormInput label="Publish date" value={ss.scheduledPublishDate ?? ''} onChange={v => patchDraft({ storeSettings: { ...ss, scheduledPublishDate: v } })} placeholder="YYYY-MM-DD HH:MM" />
+          <NativeDateTimeField mode="datetime" label="Publish date" value={ymdHmToDate(ss.scheduledPublishDate)} onChange={d => patchDraft({ storeSettings: { ...ss, scheduledPublishDate: dateToYmdHm(d) } })} minimumDate={new Date()} testID="add-product-publish-date" />
         )}
         <View style={s.switchRow}>
           <Text style={s.switchLabel}>Featured on homepage</Text>
@@ -1921,19 +1912,25 @@ export default function AddProductScreen() {
         </View>
         {isPreOrder && (
           <>
-            <FormInput
+            <NativeDateTimeField
+              mode="date"
               label="Pre-order closes"
-              value={draftData.preorderSettings?.closeDate ?? ''}
-              onChange={v => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), closeDate: v } })}
-              placeholder="YYYY-MM-DD"
+              value={ymdToDate(draftData.preorderSettings?.closeDate)}
+              onChange={d => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), closeDate: dateToYmd(d) } })}
+              onClear={() => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), closeDate: undefined } })}
+              minimumDate={startOfToday()}
+              divider
+              testID="add-product-preorder-closes"
             />
-            <FormInput
+            <NativeDateTimeField
+              mode="date"
               label="Ship date (required)"
-              value={draftData.preorderSettings?.estimatedShippingDate ?? ''}
-              onChange={v => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), estimatedShippingDate: v } })}
-              placeholder="YYYY-MM-DD"
+              value={ymdToDate(draftData.preorderSettings?.estimatedShippingDate)}
+              onChange={d => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), estimatedShippingDate: dateToYmd(d) } })}
+              minimumDate={startOfToday()}
               error={shipDateError}
               helper={shipDateError ? undefined : PREORDER_SHIP_DATE_REQUIRED_MESSAGE}
+              testID="add-product-ship-date"
             />
           </>
         )}
@@ -2019,7 +2016,6 @@ export default function AddProductScreen() {
   const currentStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
 
   function openStatusPicker() {
-    hapticToggle();
     showActionSheet('Product status', undefined, [
       {
         text: 'Active — visible and purchasable', onPress: () => {

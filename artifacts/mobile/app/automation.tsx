@@ -3,7 +3,6 @@ import { View, StyleSheet } from 'react-native';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function AutomationScreen() {
@@ -20,7 +19,6 @@ export default function AutomationScreen() {
           action={{
             label: 'Back to dashboard',
             onPress: () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               goBackOr(router);
             },
           }}

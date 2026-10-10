@@ -3,11 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { openPullDownMenu } from '@/lib/contextMenu';
+import { FONT } from '@/lib/theme';
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -63,13 +64,8 @@ export default function UsersScreen() {
     setRefreshing(false);
   }, [load]);
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
   const changeRole = () => {
     if (!detail) return;
-    haptic();
     const { member } = detail;
     Alert.alert('Change role', `Choose a new role for ${member.name ?? member.email}`, [
       { text: 'Cancel', style: 'cancel' },
@@ -93,7 +89,6 @@ export default function UsersScreen() {
 
   const removeMember = () => {
     if (!detail) return;
-    haptic();
     const { member } = detail;
     Alert.alert(
       'Remove team member',
@@ -235,12 +230,10 @@ export default function UsersScreen() {
         rightElement={
           <View style={styles.headerActions}>
             <TouchableOpacity
-              onPress={() => {
-                haptic();
-                Alert.alert(title, undefined, [
-                  { text: 'Invite someone', onPress: () => router.push('/team' as never) },
-                  { text: 'Cancel', style: 'cancel' },
-                ]);
+              onPress={(event) => {
+                openPullDownMenu(event, [
+                  { label: 'Invite someone', icon: 'user-plus', onPress: () => router.push('/team' as never) },
+                ], { title });
               }}
               activeOpacity={0.7}
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -265,7 +258,7 @@ export default function UsersScreen() {
             members.map((m) => (
               <TouchableOpacity
                 key={m.id}
-                onPress={() => { haptic(); router.push(`/users?id=${m.id}` as never); }}
+                onPress={() => { router.push(`/users?id=${m.id}` as never); }}
                 activeOpacity={0.7}
                 style={[styles.userRow, { borderBottomColor: colors.border }]}
               >
@@ -306,27 +299,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 12,
   },
-  userName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  userEmail: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  userName: { fontSize: 14, fontFamily: FONT.semibold },
+  userEmail: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  statusText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  statusText: { fontSize: 12, fontFamily: FONT.semibold },
   onlineDot: { width: 10, height: 10, borderRadius: 5 },
   body: { flex: 1, alignItems: 'center', paddingTop: 24, paddingBottom: 24 },
   // Detail mode
   card: { borderRadius: 14, borderWidth: 1, marginBottom: 20 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
   bigAvatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  bigAvatarText: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+  bigAvatarText: { fontSize: 17, fontFamily: FONT.bold },
   metaRow: { flexDirection: 'row', borderTopWidth: 1 },
   metaCell: { flex: 1, padding: 12, alignItems: 'center' },
-  metaLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  metaValue: { fontSize: 13, fontFamily: 'Inter_600SemiBold', marginTop: 3 },
+  metaLabel: { fontSize: 11, fontFamily: FONT.regular },
+  metaValue: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 3 },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
-  actionText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+  actionText: { fontSize: 13, fontFamily: FONT.semibold },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
   logRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   logDot: { width: 6, height: 6, borderRadius: 3 },
-  logAction: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  logMeta: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  logAction: { fontSize: 13, fontFamily: FONT.medium },
+  logMeta: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
 });

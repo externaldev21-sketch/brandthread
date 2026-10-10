@@ -16,7 +16,7 @@ import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -108,14 +108,12 @@ export default function ProductSizeChartScreen() {
   function addColumn() {
     const name = newColName.trim();
     if (!name) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setColumns(prev => [...prev, name]);
     setRows(prev => prev.map(r => ({ ...r, values: [...r.values, ''] })));
     setNewColName('');
   }
 
   function removeColumn(idx: number) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setColumns(prev => prev.filter((_, i) => i !== idx));
     setRows(prev => prev.map(r => ({ ...r, values: r.values.filter((_, i) => i !== idx) })));
   }
@@ -124,13 +122,11 @@ export default function ProductSizeChartScreen() {
   function addRow() {
     const size = newSizeName.trim();
     if (!size) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setRows(prev => [...prev, { size, values: new Array(columns.length).fill('') }]);
     setNewSizeName('');
   }
 
   function removeRow(idx: number) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setRows(prev => prev.filter((_, i) => i !== idx));
   }
 
@@ -140,7 +136,6 @@ export default function ProductSizeChartScreen() {
     if (columns.length === 0) { Alert.alert('Add at least one measurement column'); return; }
     if (rows.length === 0)    { Alert.alert('Add at least one size row'); return; }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       const chart: SizeChart = {
@@ -150,7 +145,7 @@ export default function ProductSizeChartScreen() {
         notes: notes.trim() || undefined,
       };
       await (api as any).products.update(productId, { sizeChart: chart });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       Alert.alert('Saved', 'Size chart updated successfully.', [
         { text: 'OK', onPress: () => goBackOr(router) },
       ]);
@@ -217,7 +212,7 @@ export default function ProductSizeChartScreen() {
               <TouchableOpacity
                 key={u}
                 style={[s.unitBtn, unit === u && s.unitBtnActive]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setUnit(u); }}
+                onPress={() => { haptics.selection(); setUnit(u); }}
                 activeOpacity={0.7}
               >
                 <Text style={[s.unitBtnText, unit === u && { color: theme.accentLight }]}>{u}</Text>
@@ -239,7 +234,7 @@ export default function ProductSizeChartScreen() {
           ))}
         </View>
         <View style={s.addRow}>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={s.addInput}
             value={newColName}
             onChangeText={setNewColName}
@@ -273,7 +268,7 @@ export default function ProductSizeChartScreen() {
               {rows.map((row, ri) => (
                 <View key={ri} style={t.dataRow}>
                   <View style={[t.cell, t.sizeCell]}>
-                    <TextInput
+                    <TextInput returnKeyType="done"
                       style={t.sizeInput}
                       value={row.size}
                       onChangeText={v => updateSizeLabel(ri, v)}
@@ -283,7 +278,7 @@ export default function ProductSizeChartScreen() {
                   </View>
                   {columns.map((_, ci) => (
                     <View key={ci} style={t.cell}>
-                      <TextInput
+                      <TextInput returnKeyType="done"
                         style={t.cellInput}
                         value={row.values[ci] ?? ''}
                         onChangeText={v => updateCell(ri, ci, v)}
@@ -306,7 +301,7 @@ export default function ProductSizeChartScreen() {
 
         {/* Add row */}
         <View style={[s.addRow, { marginTop: SP.sm }]}>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={s.addInput}
             value={newSizeName}
             onChangeText={setNewSizeName}

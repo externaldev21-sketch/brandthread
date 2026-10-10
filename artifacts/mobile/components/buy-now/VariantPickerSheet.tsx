@@ -16,8 +16,11 @@ import {
   TouchableWithoutFeedback, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -104,15 +107,17 @@ export function VariantPickerSheet({
   const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
   const lowStock = !!variant && variant.isAvailable && variant.inventoryQuantity > 0 && variant.inventoryQuantity <= 5;
 
+  // Opens on the shared sheet curve; a drag down on the grabber dismisses.
+  const sheetMotion = useSheetTransition(true, onClose);
+
   async function handleConfirm() {
     if (!product) return;
     if (!allSelected || !variant || !variant.isAvailable) {
       setTouched(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      haptics.warning();
       return;
     }
     setConfirming(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       await onConfirm(product, variant, quantity);
     } finally {
@@ -127,18 +132,28 @@ export function VariantPickerSheet({
     : `Add to bag · ${formatCents(price * quantity)}`;
 
   return (
-    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={s.backdrop} />
-      </TouchableWithoutFeedback>
-      <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-        <View style={s.handleWrap}><View style={s.handle} /></View>
-        <View style={s.header}>
-          <Text style={s.title}>Choose options</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={s.closeBtn}>
-            <Feather name="x" size={18} color={theme.text} />
-          </TouchableOpacity>
-        </View>
+    <Modal transparent animationType="none" visible onRequestClose={onClose}>
+      <Animated.View style={[StyleSheet.absoluteFill, sheetMotion.backdropStyle]}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={s.backdrop} />
+        </TouchableWithoutFeedback>
+      </Animated.View>
+      <Animated.View
+        onLayout={sheetMotion.onSheetLayout}
+        style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.md) }, sheetMotion.sheetStyle]}
+      >
+        {/* Grabber + header: drag down to dismiss (shared sheet engine). */}
+        <GestureDetector gesture={sheetMotion.panGesture}>
+          <Animated.View>
+            <View style={s.handleWrap}><View style={s.handle} /></View>
+            <View style={s.header}>
+              <Text style={s.title}>Choose options</Text>
+              <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={s.closeBtn}>
+                <Feather name="x" size={18} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </GestureDetector>
 
         {loading ? (
           <View style={s.centerBox}><ActivityIndicator color={theme.accent} /></View>
@@ -187,7 +202,7 @@ export function VariantPickerSheet({
                           return (
                             <TouchableOpacity
                               key={val.id}
-                              onPress={() => { if (available) { Haptics.selectionAsync().catch(() => {}); setSelections(prev => ({ ...prev, [option.id]: val.id })); } }}
+                              onPress={() => { if (available) { haptics.selection(); setSelections(prev => ({ ...prev, [option.id]: val.id })); } }}
                               style={[s.colorSwatch, selected && s.colorSwatchSelected, !available && s.chipUnavail]}
                               accessibilityRole="radio"
                               accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
@@ -251,7 +266,7 @@ export function VariantPickerSheet({
             </View>
           </>
         ) : null}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }
@@ -280,7 +295,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   lowStockText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
   optionSection: { marginBottom: SP.lg },
   optionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
-  optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, textTransform: 'uppercase', letterSpacing: 0.4 },
+  optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, },
   optionSelected: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.accentLight },
   optionRequired: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.error },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

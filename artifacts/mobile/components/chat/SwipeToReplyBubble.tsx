@@ -1,7 +1,7 @@
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { REPLY_THRESHOLD, clampSwipeTravel, nextCrossedState, shouldClaimSwipe } from '@/lib/swipeToReply';
 
 interface SwipeToReplyBubbleProps {
@@ -46,14 +46,14 @@ export function SwipeToReplyBubble({
     // Only claims the gesture past a clear rightward, horizontal-dominant
     // drag — a plain tap (double-tap-to-like) or a long-press (reactions/
     // actions sheet) on the bubble underneath is never intercepted.
-    onMoveShouldSetPanResponder: (_, gesture) => shouldClaimSwipe(gesture.dx, gesture.dy, disabled),
+    onMoveShouldSetPanResponder: (_, gesture) => shouldClaimSwipe(gesture.dx, gesture.dy, disabled, gesture.x0),
     onPanResponderGrant: () => { crossedRef.current = false; },
     onPanResponderMove: (_, gesture) => {
       const dx = Math.max(0, gesture.dx);
       translateX.setValue(clampSwipeTravel(dx));
       const { crossed, fireHaptic } = nextCrossedState(dx, crossedRef.current);
       crossedRef.current = crossed;
-      if (fireHaptic) hapticSelection();
+      if (fireHaptic) haptics.selection();
     },
     onPanResponderRelease: () => {
       const crossed = crossedRef.current;
