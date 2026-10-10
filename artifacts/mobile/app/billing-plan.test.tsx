@@ -74,6 +74,7 @@ vi.mock('@/components/RoleLockedView', () => ({ RoleLockedView: () => React.crea
 vi.mock('@/components/ui', () => ({
   Button: ({ label, onPress, testID, disabled }: { label: string; onPress: () => void; testID?: string; disabled?: boolean }) =>
     React.createElement('Button', { testID, onPress, disabled }, React.createElement('Text', null, label)),
+  Icon: ({ name }: { name: string }) => React.createElement('Icon', { name }),
   SkeletonBlock: () => null,
   SkeletonLine: () => null,
 }));

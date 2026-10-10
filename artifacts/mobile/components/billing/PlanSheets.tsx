@@ -8,14 +8,12 @@
  *  - PlanFeaturesSheet: every feature of the current plan.
  */
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { BottomSheet, Button, IconButton } from '@/components/ui';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { BottomSheet, Button, Icon, IconButton, Input } from '@/components/ui';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { TYPE_SCALE, tabularType } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { CREATE_CANVAS } from '@/lib/theme';
+import { FILL_ELEVATED, TABULAR, TEXT } from '@/lib/theme';
 import { SELLER_PLANS, getSellerPlan, type SellerPlanDefinition } from '@/lib/sellerPlans';
 import type { PerksResponse } from '@/lib/proPerks';
 import {
@@ -74,9 +72,7 @@ export function PlanOptionCard({
     <View style={styles.optionCard} testID={testID ? `${testID}-card` : undefined}>
       <View style={styles.optionTop}>
         <Text style={styles.optionName}>{plan.name}</Text>
-        {isCurrent && (
-          <View style={styles.badge}><Text style={styles.badgeText}>Current plan</Text></View>
-        )}
+        {isCurrent && <Text style={styles.badgeText}>Current plan</Text>}
       </View>
       <Text style={styles.optionTagline}>{plan.tagline}</Text>
       <View style={styles.optionPriceRow}>
@@ -207,7 +203,7 @@ function ChangeReview({
           <Text style={styles.blockTitle}>{`You'll lose`}</Text>
           {lost.map((feature) => (
             <View key={feature} style={styles.bulletRow}>
-              <Feather name="minus" size={14} color={styles.muted.color} />
+              <Icon name="minus" size={17} color={styles.muted.color} style={styles.bulletIcon} />
               <Text style={styles.bulletText}>{feature}</Text>
             </View>
           ))}
@@ -216,7 +212,7 @@ function ChangeReview({
 
       {capWarning && (
         <View style={styles.warning} testID="billing-change-cap-warning">
-          <Feather name="alert-triangle" size={16} color={styles.strong.color} />
+          <Icon name="alert-triangle" size={16} color={styles.strong.color} />
           <Text style={styles.warningText}>{capWarning}</Text>
         </View>
       )}
@@ -287,7 +283,7 @@ export function CancelPlanSheet({
               <Text style={styles.optionRowTitle}>Cancel plan</Text>
               <Text style={styles.optionRowText}>{`${planName} ends ${endsOn ? `on ${endsOn}` : 'at the end of this billing period'}. Your products and orders are kept.`}</Text>
             </View>
-            <Feather name="chevron-right" size={18} color={styles.muted.color} />
+            <Icon name="chevron-right" size={18} color={styles.muted.color} />
           </Pressable>
           {lower && (
             <Pressable
@@ -300,7 +296,7 @@ export function CancelPlanSheet({
                 <Text style={styles.optionRowTitle}>{`Switch to ${lower.name}`}</Text>
                 <Text style={styles.optionRowText}>{`For ${planPriceLabel(lower.id, perks)}/month. ${lower.tagline}.`}</Text>
               </View>
-              <Feather name="chevron-right" size={18} color={styles.muted.color} />
+              <Icon name="chevron-right" size={18} color={styles.muted.color} />
             </Pressable>
           )}
         </View>
@@ -323,22 +319,19 @@ export function CancelPlanSheet({
                   testID={`billing-cancel-reason-${item.id}`}
                 >
                   <Text style={[styles.reasonText, selected && styles.strong]}>{item.label}</Text>
-                  {selected && <Feather name="check" size={18} color={styles.strong.color} />}
+                  {selected && <Icon name="check" size={18} color={styles.strong.color} />}
                 </Pressable>
               );
             })}
           </View>
           {reason && (
-            <View style={styles.inputWrap}>
-              <TextInput
+            <View style={{ gap: SPACING.xxs }}>
+              <Input
+                label="Anything you'd like to add? (Optional)"
                 value={comment}
                 onChangeText={(text) => setComment(text.slice(0, CANCEL_COMMENT_MAX))}
-                placeholder="Anything you'd like to add? (Optional)"
-                placeholderTextColor={styles.muted.color}
                 multiline
                 maxLength={CANCEL_COMMENT_MAX}
-                style={styles.input}
-                accessibilityLabel="Anything you'd like to add"
                 testID="billing-cancel-comment"
               />
               <Text style={styles.counter}>{`${comment.length}/${CANCEL_COMMENT_MAX}`}</Text>
@@ -368,7 +361,7 @@ export function CancelPlanSheet({
             testID="billing-cancel-agree"
           >
             <View style={[styles.checkbox, agreed && styles.checkboxOn]}>
-              {agreed && <Feather name="check" size={14} color={styles.onStrong.color} />}
+              {agreed && <Icon name="check" size={14} color={styles.onStrong.color} />}
             </View>
             <View style={styles.optionRowBody}>
               <Text style={styles.optionRowTitle}>Cancel my plan</Text>
@@ -407,7 +400,7 @@ export function PlanFeaturesSheet({ visible, onClose, planId }: { visible: boole
         <SheetHeader title={plan ? `${plan.name} features` : 'Features'} leftIcon="x" onLeft={onClose} />
         {features.map((feature, i) => (
           <View key={feature} style={[styles.featureRow, i > 0 && styles.hairlineTop]}>
-            <Feather name="check" size={16} color={styles.strong.color} />
+            <Icon name="check" size={16} color={styles.strong.color} />
             <Text style={styles.bulletText}>{feature}</Text>
           </View>
         ))}
@@ -424,49 +417,48 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   sheetBody: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.md, gap: SPACING.md },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', paddingTop: SPACING.xxs },
   sheetHeaderSide: { width: 44, alignItems: 'flex-start' },
-  sheetTitle: { ...TYPE_SCALE.headline, flex: 1, textAlign: 'center', color: theme.text },
-  optionCard: { borderWidth: 1, borderColor: theme.border, borderRadius: RADII.card, padding: SPACING.md, gap: SPACING.xs },
+  sheetTitle: { ...TEXT.headline, flex: 1, textAlign: 'center', color: theme.text },
+  // Flat plan section: content on the background, plans split by a hairline (no bordered card).
+  optionCard: { paddingVertical: SPACING.md, gap: SPACING.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
   optionTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.xs },
-  optionName: { ...TYPE_SCALE.title2, color: theme.text },
-  optionTagline: { ...TYPE_SCALE.footnote, color: theme.muted },
+  optionName: { ...TEXT.title2, color: theme.text },
+  optionTagline: { ...TEXT.subhead, color: theme.muted },
   optionPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2, marginBottom: SPACING.xxs },
-  optionPrice: { ...tabularType('title1'), color: theme.text },
-  optionPeriod: { ...TYPE_SCALE.callout, color: theme.muted },
+  optionPrice: { ...TEXT.title1, ...TABULAR, color: theme.text },
+  optionPeriod: { ...TEXT.subhead, color: theme.muted },
   optionFeatures: { marginTop: SPACING.xxs },
   optionFeature: { paddingVertical: SPACING.sm },
-  optionFeatureText: { ...TYPE_SCALE.callout, color: theme.text },
-  badge: { borderWidth: 1, borderColor: theme.border, borderRadius: RADII.chip, paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xxs },
-  badgeText: { ...TYPE_SCALE.caption, color: theme.muted },
-  table: { borderWidth: 1, borderColor: theme.border, borderRadius: RADII.card, paddingHorizontal: SPACING.md },
-  tableHead: { flexDirection: 'row', paddingVertical: SPACING.sm, gap: SPACING.xs },
-  tableHeadText: { ...TYPE_SCALE.caption, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.sm, gap: SPACING.xs },
-  tableLabel: { ...TYPE_SCALE.callout, flex: 1.1, color: theme.muted },
-  tableValue: { ...TYPE_SCALE.callout, flex: 1, textAlign: 'right' },
+  optionFeatureText: { ...TEXT.subhead, color: theme.text },
+  badgeText: { ...TEXT.footnote, color: theme.muted },
+  table: {},
+  tableHead: { flexDirection: 'row', paddingBottom: SPACING.xs, gap: SPACING.xs },
+  tableHeadText: { ...TEXT.footnote, color: theme.muted },
+  tableRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48, gap: SPACING.xs },
+  tableLabel: { ...TEXT.subhead, flex: 1.1, color: theme.muted },
+  tableValue: { ...TEXT.subhead, ...TABULAR, flex: 1, textAlign: 'right' },
   tableFrom: { color: theme.muted },
-  tableTo: { color: theme.text, fontFamily: TYPE_SCALE.headline.fontFamily },
+  tableTo: { color: theme.text, fontFamily: TEXT.headline.fontFamily },
   block: { gap: SPACING.xs },
-  blockTitle: { ...TYPE_SCALE.headline, color: theme.text },
-  blockText: { ...TYPE_SCALE.callout, color: theme.muted },
-  bulletRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
-  bulletText: { ...TYPE_SCALE.callout, color: theme.text, flex: 1 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.sm },
-  warning: { flexDirection: 'row', gap: SPACING.sm, alignItems: 'flex-start', borderWidth: 1, borderColor: theme.border, borderRadius: RADII.card, padding: SPACING.sm },
-  warningText: { ...TYPE_SCALE.footnote, color: theme.text, flex: 1 },
-  note: { ...TYPE_SCALE.footnote, color: theme.muted },
+  blockTitle: { ...TEXT.headline, color: theme.text },
+  blockText: { ...TEXT.subhead, color: theme.muted },
+  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.xs },
+  bulletIcon: { marginTop: 2 },
+  bulletText: { ...TEXT.subhead, color: theme.text, flex: 1 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, minHeight: 52, paddingVertical: SPACING.xs },
+  warning: { flexDirection: 'row', gap: SPACING.sm, alignItems: 'flex-start' },
+  warningText: { ...TEXT.footnote, color: theme.text, flex: 1 },
+  note: { ...TEXT.footnote, color: theme.muted },
   actions: { gap: SPACING.xs, marginTop: SPACING.xs },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.md },
   optionRowBody: { flex: 1, gap: 2 },
-  optionRowTitle: { ...TYPE_SCALE.headline, color: theme.text },
-  optionRowText: { ...TYPE_SCALE.callout, color: theme.muted },
-  fieldLabel: { ...TYPE_SCALE.footnote, color: theme.muted },
-  reasonList: { borderWidth: 1, borderColor: theme.border, borderRadius: RADII.card, paddingHorizontal: SPACING.md },
-  reasonRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, minHeight: 48, paddingVertical: SPACING.xs },
-  reasonText: { ...TYPE_SCALE.callout, color: theme.muted, flex: 1 },
-  inputWrap: { backgroundColor: CREATE_CANVAS.surface, borderRadius: RADII.input, padding: SPACING.sm, gap: SPACING.xxs },
-  input: { ...TYPE_SCALE.callout, color: theme.text, minHeight: 72, textAlignVertical: 'top', padding: 0 },
-  counter: { ...TYPE_SCALE.caption, color: theme.muted, alignSelf: 'flex-end' },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, backgroundColor: CREATE_CANVAS.surface, borderRadius: RADII.card, padding: SPACING.md },
+  optionRowTitle: { ...TEXT.headline, color: theme.text },
+  optionRowText: { ...TEXT.subhead, color: theme.muted },
+  fieldLabel: { ...TEXT.footnote, color: theme.muted },
+  reasonList: {},
+  reasonRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, minHeight: 52, paddingVertical: SPACING.xs },
+  reasonText: { ...TEXT.subhead, color: theme.muted, flex: 1 },
+  counter: { ...TEXT.caption, color: theme.muted, alignSelf: 'flex-end' },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, backgroundColor: FILL_ELEVATED, borderRadius: RADII.card, padding: SPACING.md },
   checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 1.5, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
   checkboxOn: { backgroundColor: theme.text, borderColor: theme.text },
 });

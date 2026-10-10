@@ -12,7 +12,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
@@ -22,10 +21,10 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { TYPE_SCALE, tabularType } from '@/constants/typography';
+import { TABULAR, TEXT } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { Button, SkeletonBlock, SkeletonLine } from '@/components/ui';
+import { Button, Icon, SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { ChangePlanSheet, CancelPlanSheet, PlanFeaturesSheet, PlanOptionCard } from '@/components/billing/PlanSheets';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
@@ -323,7 +322,7 @@ export default function BillingScreen() {
         title="Billing"
         rightElement={!isReadOnly ? (
           <TouchableOpacity testID="seller-billing-export" onPress={() => exportBills()} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLabel="Export billing history">
-            <Feather name="share" size={17} color={colors.foreground} />
+            <Icon name="share" size={17} color={colors.foreground} />
           </TouchableOpacity>
         ) : undefined}
       />
@@ -341,7 +340,7 @@ export default function BillingScreen() {
               <View style={[styles.section, styles.bandBottom]} testID="billing-cancelling-banner">
                 <View style={styles.bannerRow}>
                   <View style={styles.bannerIcon}>
-                    <Feather name="alert-triangle" size={16} color={theme.text} />
+                    <Icon name="alert-triangle" size={17} color={theme.text} />
                   </View>
                   <Text style={styles.bannerTitle}>{status.renewsOn ? `Plan ends on ${status.renewsOn}` : 'Plan ends at the end of this billing period'}</Text>
                 </View>
@@ -362,7 +361,7 @@ export default function BillingScreen() {
               <View style={[styles.planCard, state === 'cancelling' && styles.planCardDim]} testID="billing-plan-card">
                 <View style={styles.planTop}>
                   <Text style={styles.planName}>{plan.name}</Text>
-                  {badge && <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View>}
+                  {badge && <Text style={styles.badgeText}>{badge}</Text>}
                 </View>
                 <View style={styles.priceRow}>
                   <Text style={styles.planPrice}>{priceLabel}</Text>
@@ -389,7 +388,7 @@ export default function BillingScreen() {
                   testID="billing-view-features"
                 >
                   <Text style={styles.featuresText}>View all features</Text>
-                  <Feather name="chevron-right" size={18} color={theme.muted} />
+                  <Icon name="chevron-right" size={20} color={theme.muted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -446,27 +445,27 @@ export default function BillingScreen() {
           </View>
 
           {isReadOnly || nativeStore ? (
-            <View style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
-                <Feather name="credit-card" size={18} color={colors.foreground} />
+            <View style={styles.cardRow}>
+              <View style={styles.cardBrand}>
+                <Icon name="credit-card" size={20} color={colors.foreground} />
               </View>
               <Text style={[styles.cardText, { color: colors.foreground }]}>{nativeStore ? `Billed by the App Store or Google Play` : status?.paymentMethodLabel ?? 'No payment method on file'}</Text>
             </View>
           ) : (
-            <TouchableOpacity testID="seller-billing-payment-method" onPress={() => openBillingPortal()} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
-                <Feather name="credit-card" size={18} color={colors.foreground} />
+            <TouchableOpacity testID="seller-billing-payment-method" onPress={() => openBillingPortal()} activeOpacity={0.7} style={styles.cardRow}>
+              <View style={styles.cardBrand}>
+                <Icon name="credit-card" size={20} color={colors.foreground} />
               </View>
               <Text style={[styles.cardText, { color: colors.foreground }]}>{status?.paymentMethodLabel ?? 'No payment method on file'}</Text>
-              <Feather name={Platform.OS === 'web' ? 'edit-2' : 'external-link'} size={16} color={colors.mutedForeground} />
+              <Icon name={Platform.OS === 'web' ? 'edit-2' : 'external-link'} size={17} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
 
         {!isReadOnly && Platform.OS !== 'web' && (
           <View style={styles.section}>
-            <TouchableOpacity onPress={restorePurchases} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]} testID="seller-revenuecat-restore">
-              <Feather name="refresh-cw" size={18} color={colors.primary} />
+            <TouchableOpacity onPress={restorePurchases} activeOpacity={0.7} style={styles.cardRow} testID="seller-revenuecat-restore">
+              <Icon name="refresh-cw" size={20} color={colors.primary} />
               <Text style={[styles.cardText, { color: colors.foreground }]}>Restore purchases</Text>
             </TouchableOpacity>
           </View>
@@ -492,7 +491,7 @@ export default function BillingScreen() {
             </View>
           </View>
 
-          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.listCard}>
             {filteredBills.length === 0 ? (
               <View style={styles.emptyBills}>
                 <Text style={[styles.billNote, { color: colors.mutedForeground }]}>No bills yet</Text>
@@ -501,7 +500,7 @@ export default function BillingScreen() {
               filteredBills.map((bill, i) => (
                 <View
                   key={bill.id}
-                  style={[styles.billRow, i !== filteredBills.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                  style={[styles.billRow, i !== filteredBills.length - 1 && styles.hairlineBottom]}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.billId, { color: colors.foreground }]} numberOfLines={1}>{bill.note}</Text>
@@ -509,7 +508,7 @@ export default function BillingScreen() {
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     <Text style={[styles.billAmount, { color: colors.foreground }]}>{formatCents(bill.amountCents, bill.currency)}</Text>
-                    <View style={styles.badge}><Text style={styles.badgeText}>{bill.status}</Text></View>
+                    <Text style={styles.badgeText}>{bill.status}</Text>
                   </View>
                 </View>
               ))
@@ -554,46 +553,47 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   section: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, gap: SPACING.sm },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.sm },
-  sectionTitle: { ...TYPE_SCALE.headline, color: theme.text },
+  sectionTitle: { ...TEXT.headline, color: theme.text },
   hairlineTop: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
   bannerRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  bannerIcon: { width: 32, height: 32, borderRadius: RADII.chip, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  bannerTitle: { ...TYPE_SCALE.headline, color: theme.text, flex: 1 },
-  planCard: { borderWidth: 1, borderColor: theme.border, borderRadius: RADII.card, paddingHorizontal: SPACING.md, paddingTop: SPACING.md, gap: SPACING.xxs },
+  bannerIcon: { width: 24, alignItems: 'center', justifyContent: 'center' },
+  bannerTitle: { ...TEXT.headline, color: theme.text, flex: 1 },
+  // Flat plan section (no bordered card): content on black, facts as hairline rows.
+  planCard: { gap: SPACING.xxs },
   planCardDim: { opacity: 0.55 },
   planTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.xs },
-  planName: { ...TYPE_SCALE.title2, color: theme.text },
-  badge: { borderWidth: 1, borderColor: theme.border, borderRadius: RADII.chip, paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xxs },
-  badgeText: { ...TYPE_SCALE.caption, color: theme.muted },
+  planName: { ...TEXT.title2, color: theme.text },
+  badgeText: { ...TEXT.footnote, color: theme.muted },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  planPrice: { ...tabularType('title1'), color: theme.text },
-  planPeriod: { ...TYPE_SCALE.callout, color: theme.muted },
-  planDate: { ...TYPE_SCALE.footnote, color: theme.muted },
-  factsBox: { borderWidth: 1, borderColor: theme.border, borderRadius: RADII.chip, paddingHorizontal: SPACING.sm, marginTop: SPACING.sm },
-  factRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SPACING.xs, gap: SPACING.sm },
-  factLabel: { ...TYPE_SCALE.callout, color: theme.muted },
-  factValue: { ...TYPE_SCALE.callout, color: theme.text },
-  featuresRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SPACING.sm, marginTop: SPACING.sm },
-  featuresText: { ...TYPE_SCALE.callout, color: theme.text },
+  planPrice: { ...TEXT.title1, ...TABULAR, color: theme.text },
+  planPeriod: { ...TEXT.subhead, color: theme.muted },
+  planDate: { ...TEXT.footnote, color: theme.muted },
+  factsBox: { marginTop: SPACING.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+  factRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: SPACING.sm },
+  factLabel: { ...TEXT.subhead, color: theme.muted },
+  factValue: { ...TEXT.subhead, ...TABULAR, color: theme.text },
+  featuresRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 52 },
+  featuresText: { ...TEXT.subhead, color: theme.text },
   band: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   bandBottom: { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   bandRow: { flexDirection: 'row', alignItems: 'center' },
-  bandText: { ...TYPE_SCALE.footnote, color: theme.muted },
+  bandText: { ...TEXT.footnote, color: theme.muted },
   link: { color: theme.text, textDecorationLine: 'underline' },
-  price: { ...tabularType('title1') },
-  priceSuffix: { ...TYPE_SCALE.footnote },
-  nextBillText: { ...TYPE_SCALE.footnote, marginTop: 2 },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: RADII.card, borderWidth: 1, padding: 14 },
+  price: { ...TEXT.title1, ...TABULAR },
+  priceSuffix: { ...TEXT.footnote },
+  nextBillText: { ...TEXT.footnote, marginTop: 2 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, minHeight: 52, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   cardBrand: { width: 34, height: 24, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  cardText: { ...TYPE_SCALE.callout, flex: 1 },
+  cardText: { ...TEXT.subhead, flex: 1 },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterTabs: { flexDirection: 'row', borderRadius: 10, padding: 3, flex: 1 },
   filterTab: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
-  filterTabText: { ...TYPE_SCALE.footnote, fontFamily: TYPE_SCALE.headline.fontFamily },
-  listCard: { borderRadius: RADII.card, borderWidth: 1, overflow: 'hidden' },
-  emptyBills: { padding: 18, alignItems: 'center' },
-  billRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, gap: 10 },
-  billId: { ...TYPE_SCALE.callout, fontFamily: TYPE_SCALE.headline.fontFamily },
-  billNote: { ...TYPE_SCALE.footnote, marginTop: 2 },
-  billAmount: { ...tabularType('callout'), fontFamily: TYPE_SCALE.headline.fontFamily },
+  filterTabText: { ...TEXT.footnote, fontFamily: TEXT.headline.fontFamily },
+  listCard: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
+  hairlineBottom: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
+  emptyBills: { paddingVertical: SPACING.md, alignItems: 'flex-start' },
+  billRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 60, paddingVertical: SPACING.sm, gap: 10 },
+  billId: { ...TEXT.subhead, fontFamily: TEXT.headline.fontFamily },
+  billNote: { ...TEXT.footnote, marginTop: 2 },
+  billAmount: { ...TEXT.subhead, ...TABULAR, fontFamily: TEXT.headline.fontFamily },
 });
