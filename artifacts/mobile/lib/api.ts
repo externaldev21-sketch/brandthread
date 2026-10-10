@@ -26,6 +26,7 @@ import { reportServerError } from '@/lib/monitoringHooks';
 import { trackAfter } from '@/lib/analytics/trackAfter';
 import { observeSellerOrderRows, trackFirstProductAfter } from '@/lib/analytics/firstEvents';
 import { afterThreadCashWrite } from '@/lib/threadCashEvents';
+import { currentCheckoutReturnUrls } from '@/lib/checkoutReturn';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { noteFollowGraphChanged } from '@/lib/feedPostsCache';
@@ -2105,8 +2106,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         ) =>
           trackAfter(post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
             items,
-            successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',
-            cancelUrl:  'mobile://checkout/cancel',
+            successUrl: currentCheckoutReturnUrls().successUrl,
+            cancelUrl:  currentCheckoutReturnUrls().cancelUrl,
             ...(opts.contactEmail          ? { contactEmail:          opts.contactEmail          } : {}),
             ...(opts.contactPhone          ? { contactPhone:          opts.contactPhone          } : {}),
             ...(opts.shippingAddress       ? { shippingAddress:       opts.shippingAddress       } : {}),
@@ -2227,8 +2228,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           },
         ) => trackAfter(post<{ sessionId: string; url: string; guestAccessToken: string }>('/api/guest/checkout/session', {
           items,
-          successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',
-          cancelUrl:  'mobile://checkout/cancel',
+          successUrl: currentCheckoutReturnUrls().successUrl,
+          cancelUrl:  currentCheckoutReturnUrls().cancelUrl,
           ...opts,
         }), [['checkout_started', { flow: 'guest', item_count: items.length }]]),
         verifySession: (sessionId: string, guestAccessToken: string) =>

@@ -42,3 +42,27 @@ describe('signed-out API guard', () => {
     }
   });
 });
+
+describe('guest checkout + product aliases (BT-249, BT-250)', () => {
+  it('lets a guest open the thread-* aliases the cart, Shop sheet and feed tiles push', () => {
+    expect(isGuestBrowseRoute(['thread-product-detail'])).toBe(true);
+    expect(isGuestBrowseRoute(['thread-checkout'])).toBe(true);
+    expect(isGuestBrowseRoute(['checkout-return'])).toBe(true);
+  });
+
+  it('every app/ file that only re-exports a guest route is itself guest-allowed', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs');
+    const path = await import('node:path');
+    const appDir = path.resolve(__dirname, '../app');
+    const offenders: string[] = [];
+    for (const file of readdirSync(appDir)) {
+      if (!file.endsWith('.tsx')) continue;
+      const source = readFileSync(path.join(appDir, file), 'utf8');
+      const alias = source.match(/export\s*\{\s*default\s*\}\s*from\s*'\.\/([\w-]+)'/);
+      if (!alias) continue;
+      const route = file.replace(/\.tsx$/, '');
+      if (isGuestBrowseRoute([alias[1]]) && !isGuestBrowseRoute([route])) offenders.push(route);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
