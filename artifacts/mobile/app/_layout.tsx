@@ -1025,10 +1025,17 @@ function AuthGate() {
 }
 
 // ─── Wire background services + module-level API singleton to Clerk token ─────
+function isDeletedProfileWithOthers(error: unknown): boolean {
+  const e = error as { status?: number; body?: string } | null;
+  if (e?.status !== 410) return false;
+  try { return (JSON.parse(e.body ?? '{}') as { hasOtherProfiles?: boolean }).hasOtherProfiles === true; } catch { return false; }
+}
+
 function ServiceConfigurer() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const api = useApi();
+  const handoffRouter = useRouter();
   const prevSignedInRef2 = useRef<boolean | null>(null);
   // Track the previously active user ID so we can clear their cache before
   // switching to the next user (or to 'anon' on sign-out).
@@ -1110,6 +1117,12 @@ function ServiceConfigurer() {
         }, socialKeysForUser(newUserId));
       })
       .catch((error) => {
+        // This profile was deleted but its login still owns the other
+        // (buyer or seller) profile: take the person there, not to sign-in.
+        if (isDeletedProfileWithOthers(error)) {
+          handoffRouter.replace('/account-type-settings?handoff=1' as never);
+          return;
+        }
         console.warn('[identity] Local profile provisioning failed', error);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps

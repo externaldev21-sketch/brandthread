@@ -106,6 +106,8 @@ export interface ProfileShellProps<T> {
     liveHostId?: string | null;
     /** `headerVariant="video"` only: shows the white "+" story badge and handles its tap. */
     onPressStoryBadge?: () => void;
+    /** Own profile: press and hold the picture to switch accounts. */
+    onLongPress?: () => void;
   };
   /** Default `hero` (collapsing parallax hero). `video` = Instagram own-profile header over the profile video. */
   headerVariant?: 'hero' | 'video';
@@ -388,6 +390,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
             initials={identity.initials || '•'}
             hasActiveStory={!!avatar?.ring}
             onPress={avatarPress}
+            onLongPress={isOwnProfile ? avatar?.onLongPress : undefined}
             onPressBadge={isOwnProfile ? avatar?.onPressStoryBadge : undefined}
             accessibilityLabel={avatarPressLabel}
           />

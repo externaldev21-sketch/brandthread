@@ -44,6 +44,8 @@ import { useRole } from '@/contexts/RoleContext';
 import {
   MAX_ACCOUNTS_MESSAGE, getHandle, getDisplayName, resolveAccountTypeLabel, isAtAccountCap,
 } from '@/lib/accountSwitcherHelpers';
+import { useLinkedProfiles } from '@/hooks/useLinkedProfiles';
+import { addProfileLabel, otherRole, profilesMissingFromDevice } from '@/lib/linkedProfiles';
 
 export interface AccountSwitcherSheetProps {
   visible: boolean;
@@ -78,6 +80,9 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
   }>>({});
 
   const isPreview = isBuyerDevPreview() || isSellerDevPreview();
+  // The buyer/seller profile of this same login, even when it isn't signed
+  // in on this device yet (one login = one buyer + one seller).
+  const linked = useLinkedProfiles({ enabled: visible });
 
   // "Only real sessions on this device" — Clerk's session list is itself
   // device/client-scoped; filtering to active just drops any session Clerk
@@ -118,6 +123,31 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
   });
 
   const accounts = isPreview ? previewAccounts : realAccounts;
+  const sameLoginNotOnDevice = isPreview ? [] : profilesMissingFromDevice(linked.data?.profiles, activeSessions);
+  const currentLinkedRole = linked.data?.profiles.find((p) => p.isCurrent)?.role ?? (role === 'seller' ? 'seller' : 'buyer');
+  const addRole = otherRole(currentLinkedRole);
+  const canAddSameLogin = !!linked.data?.canAdd[addRole];
+
+  async function handleSwitchSameLogin(clerkId: string) {
+    if (switchingId || loggingOutId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSwitchingId(clerkId);
+    try {
+      await linked.activateProfile(clerkId);
+      onClose();
+    } catch {
+      Alert.alert("Couldn't switch accounts. Try again.");
+    } finally {
+      setSwitchingId(null);
+    }
+  }
+
+  function handleAddSameLogin() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowAddAccount(false);
+    onClose();
+    router.push(`/account-type-settings?add=${addRole}` as never);
+  }
   const atCap = !isPreview && isAtAccountCap(activeSessions.length);
 
   async function handleSwitch(account: AccountRow) {
@@ -238,6 +268,15 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
             </Pressable>
           </View>
           <View style={s.list}>
+            {canAddSameLogin && (
+              <ListRow
+                icon={addRole === 'seller' ? 'shopping-bag' : 'shopping-cart'}
+                title={addProfileLabel(addRole)}
+                subtitle="Same login, no new email or password"
+                onPress={handleAddSameLogin}
+                testID="account-switcher-add-same-login"
+              />
+            )}
             <ListRow
               icon="log-in"
               title="Log into existing account"
@@ -303,6 +342,20 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
                     )}
                   </View>
                 }
+              />
+            ))}
+            {sameLoginNotOnDevice.map((profile) => (
+              <ListRow
+                key={profile.clerkId}
+                avatar={{ uri: profile.avatarUrl, name: profile.displayName ?? profile.username ?? '' }}
+                title={profile.username ? `@${profile.username}` : (profile.displayName ?? '')}
+                subtitle={profile.role === 'seller' ? 'Seller' : 'Buyer'}
+                disabled={!!switchingId || !!loggingOutId}
+                onPress={() => handleSwitchSameLogin(profile.clerkId)}
+                testID={`account-switcher-row-${profile.clerkId}`}
+                right={switchingId === profile.clerkId
+                  ? <Feather name="loader" size={18} color={colors.mutedForeground} />
+                  : undefined}
               />
             ))}
           </View>

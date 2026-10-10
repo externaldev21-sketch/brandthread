@@ -36,7 +36,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Edit profile', description: 'Name, photo, bio, and public profile', aliases: ['profile', 'personal details', 'name', 'photo', 'bio'], icon: 'user', route: '/(buyer)/edit-profile', audience: 'buyer' },
       { label: 'Accounts Center', description: 'Password, email, phone, and sign-in methods', aliases: ['password', 'email', 'phone', 'sign in', 'security', 'account ownership'], icon: 'key', route: '/buyer-account-center', audience: 'buyer' },
       { label: 'Login activity', description: 'Review devices signed into your account', aliases: ['sessions', 'devices', 'signed in'], icon: 'monitor', route: '/buyer-login-activity', audience: 'buyer' },
-      { label: 'Account type', description: 'Switch between buyer and seller account experiences', aliases: ['role', 'buyer seller', 'account role'], icon: 'layers', route: '/account-type-settings', audience: 'buyer' },
+      { label: 'Start selling', description: 'Open a store on this login, no new email or password', aliases: ['sell', 'seller account', 'open a store', 'brand', 'account type', 'role', 'buyer seller'], icon: 'shopping-bag', route: '/account-type-settings?add=seller', audience: 'buyer' },
       { label: 'Your activity', description: 'Likes, comments, searches, and time spent', aliases: ['activity', 'history'], icon: 'activity', route: '/buyer-your-activity', audience: 'buyer' },
       { label: 'Archive', description: 'Archived posts and stories', aliases: ['archived'], icon: 'archive', route: '/buyer-archive', audience: 'buyer' },
       { label: 'Saved', description: 'Posts, products, and collections you saved', aliases: ['bookmarks'], icon: 'bookmark', route: '/buyer-saved', audience: 'buyer' },
@@ -261,7 +261,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Switch mode',
     items: [
-      { label: 'Switch to buyer', description: 'Browse and shop as a buyer with this account', aliases: ['switch', 'buyer mode', 'account type'], icon: 'refresh-cw', route: '/account-type-settings', audience: 'seller' },
+      { label: 'Shop as a buyer', description: 'A buyer profile on this login, separate from your store', aliases: ['switch', 'buyer mode', 'account type', 'shop', 'buyer account'], icon: 'shopping-cart', route: '/account-type-settings?add=buyer', audience: 'seller' },
     ],
   },
   {
