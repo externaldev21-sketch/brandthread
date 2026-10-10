@@ -33,6 +33,7 @@ const {
       subscription: {
         status: vi.fn(),
         invoices: vi.fn(),
+        perks: vi.fn().mockResolvedValue({ current: null, available: [] }),
         checkout: vi.fn(),
         portal: vi.fn(),
       },
@@ -305,6 +306,7 @@ describe('seller financial role boundaries', () => {
       }
     }
     resetApiToRoleRequired();
+    apiMock.seller.subscription.perks.mockResolvedValue({ currentPlan: null, plans: [], hasAdvancedAnalytics: false });
   });
 
   afterEach(() => {

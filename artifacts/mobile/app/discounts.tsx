@@ -39,6 +39,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { PrimaryButton, HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { Feather } from '@expo/vector-icons';
 import { DayPickerSheet } from '@/components/DayPickerSheet';
 import { formatDayKey, isoToDayKey, resolveDiscountDates, toDayKey } from '@/lib/discountDates';
 

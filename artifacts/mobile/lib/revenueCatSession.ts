@@ -21,22 +21,6 @@ export async function runRevenueCatSessionOperation<T>(
   return result;
 }
 
-export interface RevenueCatIdentityClient {
-  isAnonymous(): Promise<boolean>;
-  logOut(): Promise<unknown>;
-  logIn(appUserId: string): Promise<unknown>;
-}
-
-/**
- * Puts the SDK on `appUserId` (or on an anonymous customer when signed out).
- * Logs out first so account B never inherits account A's customer info. The
- * SDK rejects logOut() while its customer is already anonymous (e.g. the
- * first launch after install); that must not skip the logIn().
- */
-export async function switchRevenueCatIdentity(client: RevenueCatIdentityClient, appUserId?: string): Promise<void> {
-  if (!(await client.isAnonymous())) await client.logOut();
-  if (appUserId) await client.logIn(appUserId);
-}
 
 /**
  * The one shared setup promise per account: configure the SDK, then switch it
@@ -79,7 +63,7 @@ export function createRevenueCatIdentityQueue() {
 /** The subset of the Purchases SDK the identity switch needs (keeps it testable). */
 export type RevenueCatIdentityClient = {
   isAnonymous: () => Promise<boolean>;
-  getAppUserID: () => Promise<string>;
+  getAppUserID?: () => Promise<string>;
   logIn: (appUserID: string) => Promise<unknown>;
   logOut: () => Promise<unknown>;
 };
@@ -96,7 +80,7 @@ export async function switchRevenueCatIdentity(
 ): Promise<void> {
   const anonymous = await sdk.isAnonymous();
   if (!anonymous) {
-    const current = await sdk.getAppUserID();
+    const current = await sdk.getAppUserID?.();
     if (clerkId && current === clerkId) return;
     await sdk.logOut();
   }

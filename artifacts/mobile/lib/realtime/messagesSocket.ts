@@ -26,6 +26,7 @@ export type RealtimeEvent =
   | { type: 'ready' }
   | { type: 'pong' }
   | { type: 'message.created'; conversationId: string; message: Record<string, unknown> }
+  | { type: 'message.reaction'; conversationId: string; messageId: string; reactions: unknown[] }
   | { type: 'message.read'; conversationId: string; readerId: string; readAt: string }
   | { type: 'typing'; conversationId: string; userId: string; typing: boolean }
   | { type: 'conversation.updated'; conversationId: string; reason: string }

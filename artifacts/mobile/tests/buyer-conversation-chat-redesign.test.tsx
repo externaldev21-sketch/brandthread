@@ -231,7 +231,12 @@ vi.mock('@/lib/mediaLibraryAdapter', () => ({ saveImageToMediaLibrary: vi.fn().m
 
 vi.mock('@/lib/api', () => ({ useApi: () => apiMock }));
 
-vi.mock('@/services/socialService', () => socialServiceMock);
+vi.mock('@/services/socialService', () => ({
+  ...socialServiceMock,
+  getCachedConversation: vi.fn().mockResolvedValue(null),
+  getCachedMessages: vi.fn().mockResolvedValue([]),
+  getSocialUserId: () => 'me',
+}));
 
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({

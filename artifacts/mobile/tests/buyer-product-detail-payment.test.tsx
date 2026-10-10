@@ -1,4 +1,8 @@
 import React from 'react';
+vi.mock('@tanstack/react-query', async importOriginal => ({
+  ...(await importOriginal<typeof import('@tanstack/react-query')>()),
+  useQueryClient: () => ({ getQueryData: () => undefined, setQueryData: vi.fn() }),
+}));
 vi.mock('@/components/first-run-tips/FirstRunTip', () => ({ FirstRunTip: () => null }));
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

@@ -261,7 +261,7 @@ export function applyOfferToGroup(group: PricedGroup, discountPercent: number): 
   const subtotal = group.subtotalCents;
   const discounted = group.items.reduce((sum, item) => sum + offerPriceCents(item.priceCents, discountPercent) * item.quantity, 0);
   const discountCents = subtotal - discounted;
-  const fee = destinationApplicationFeeCents({ merchandiseCents: discounted, preTaxTotalCents: discounted });
+  const fee = destinationApplicationFeeCents({ merchandiseCents: discounted, shippingCents: 0, preTaxTotalCents: discounted });
   return {
     ...group,
     shippingCents: 0,

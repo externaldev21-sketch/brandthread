@@ -78,7 +78,7 @@ export function notificationHref(rawData: unknown): string | null {
     return '/(buyer)/cart';
   }
   if (data?.targetType === 'drop' && typeof data.targetId === 'string' && data.targetId) {
-    return `/buyer-drop-detail?id=${encodeURIComponent(data.targetId)}`;
+    return `/buyer-drop-detail?dropId=${encodeURIComponent(data.targetId)}`;
   }
   // Price drop / back-in-stock alerts are buyer-facing; low-stock alerts on
   // the same "product" targetType are seller-facing. Distinguish by
@@ -112,9 +112,12 @@ export function notificationHref(rawData: unknown): string | null {
   // follows, Thread Cash) open the same exact destination the Activity row
   // does — the post, the comment itself, the story, the profile — instead
   // of a generic feed.
+  if (data?.targetType === 'live_cohost' && typeof data.targetId === 'string' && data.targetId) {
+    return `/live-cohost-invite?streamId=${encodeURIComponent(data.targetId)}`;
+  }
   if (
     (data?.targetType === 'post' || data?.targetType === 'story' || data?.targetType === 'user'
-      || data?.targetType === 'thread_cash_transfer' || data?.targetType === 'referral')
+      || data?.targetType === 'thread_cash_transfer' || data?.targetType === 'referral' || data?.targetType === 'live_stream')
     && typeof data.targetId === 'string' && data.targetId
   ) {
     const href = activityHref({

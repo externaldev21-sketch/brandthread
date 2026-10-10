@@ -660,6 +660,7 @@ export default function BuyerProductDetailScreen() {
   const [reserveLoading,  setReserveLoading]  = useState(false);
   const [sizeGuideOpen,   setSizeGuideOpen]   = useState(false);
   const [sizeSheetOpen,   setSizeSheetOpen]   = useState(false);
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
 
   // Add to cart → the product photo flies to the bag icon, which bumps and
   // shows the count (the feed / shop sheet pattern, #287 / #291).

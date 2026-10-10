@@ -57,7 +57,8 @@ import {
 import { clientIdFromOutboxMessageId, discardOutboxMessage, enqueueOutboxMessage, isOutboxMessageId, mergeOutboxIntoThread, outboxEntryToMessage, retryOutboxMessage, subscribeOutboxEvents, type OutboxEntry } from '@/lib/messageOutbox';
 import { useMessageOutbox } from '@/hooks/useMessageOutbox';
 import { applyReadReceipt, mergeIncomingMessage, TYPING_TTL_MS, useRealtimeConnected, useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
-import { useIsFocused } from '@react-navigation/native';
+import { useRouteIsFocused } from '@/hooks/useRouteIsFocused';
+import { peekWarmThread } from '@/lib/conversationPrefetch';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
@@ -350,10 +351,10 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const myCallInitials = isSeller ? (sellerName[0] ?? '?').toUpperCase() : MY_INITIALS;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
-  const [conv, setConv] = useState<Conversation | null>(null);
+  const [conv, setConv] = useState<Conversation | null>(() => peekWarmThread(userId, params.id)?.conversation ?? null);
   const [loadFailed, setLoadFailed] = useState(false);
   const callLog = useCallLog(conv?.id ?? params.id ?? '');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => peekWarmThread(userId, params.id)?.messages ?? []);
   const [text, setText] = useState('');
   const { showUndo } = useUndoToast();
   const textInputRef = useRef<TextInput>(null);
@@ -424,11 +425,11 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // has no real cancel/abort — this only makes the UI stop listening to it.
   const mediaUploadTokenRef = useRef(0);
   // Real-time "X is typing…": true once we've told the server we're
-  const focused = useIsFocused();
+  const focused = useRouteIsFocused();
   const realtimeConnected = useRealtimeConnected();
   const otherTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useRealtimeEvents(event => {
-    if (!conv || event.conversationId !== conv.id) return;
+    if (!conv || !('conversationId' in event) || event.conversationId !== conv.id) return;
     if (event.type === 'message.created') {
       setMessages(prev => mergeIncomingMessage(prev, event.message as unknown as Message));
       void markConversationRead(conv.id);
@@ -1811,6 +1812,13 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     closeMessageSheet();
     hapticDestructiveConfirm();
     if (!conv || !msg) return;
+    const queuedClientId = clientIdFromOutboxMessageId(msg.id);
+    if (queuedClientId && userId) {
+      void discardOutboxMessage(userId, conv.id, queuedClientId).catch(error => {
+        Alert.alert('Couldn’t discard message', apiErrorMessage(error, 'Please try again.'));
+      });
+      return;
+    }
     // A seeded preview conversation has no real backend record to delete
     // against — just drop it from local state instead of 401-ing.
     if (isPreviewId(conv.id)) {

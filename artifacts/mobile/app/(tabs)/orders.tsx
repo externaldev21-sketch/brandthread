@@ -44,7 +44,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
-import { useIsFocused } from '@react-navigation/native';
+import { useRouteIsFocused } from '@/hooks/useRouteIsFocused';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -901,7 +901,7 @@ export default function OrdersScreen() {
   // api-server lib/orderChangeListener.ts) refreshes the list right away.
   // The 30s poll above stays as the fallback. While Orders is on screen the
   // new-order badge stays cleared.
-  const ordersFocused = useIsFocused();
+  const ordersFocused = useRouteIsFocused();
   useRealtimeEvents((event) => {
     if (event.type !== 'order.created' && event.type !== 'order.updated') return;
     if (!hasLoadedRef.current) return;

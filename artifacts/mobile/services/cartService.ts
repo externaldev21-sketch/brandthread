@@ -41,6 +41,34 @@ export function initCartService(userId: string | null): void {
   _cartUserId = userId ?? 'anon';
 }
 
+const guestAdoptions = new Map<string, Promise<void>>();
+
+export function adoptGuestCart(userId: string): Promise<void> {
+  if (!userId || userId === 'anon') return Promise.resolve();
+  const running = guestAdoptions.get(userId);
+  if (running) return running;
+  const run = (async () => {
+    const guestKey = keys('anon').cart;
+    const raw = await safeGetItem(guestKey);
+    if (!raw || _cartUserId !== userId) return;
+    const guest = normalizeCart(JSON.parse(raw) as Cart);
+    if (!guest.items.length && !guest.savedItems.length) return;
+    const k = keys(userId);
+    const { cart, remoteConfirmed } = await loadCartWithStatus(k);
+    if (!remoteConfirmed || _cartUserId !== userId) return;
+    const merged = mergeGuestLines(cart, guest);
+    await saveCart(merged, k);
+    if (_cartUserId !== userId) return;
+    await scheduleSync(k);
+    const persisted = await readLocalCart(k);
+    if (_cartUserId === userId && persisted && !persisted.syncPending) {
+      await safeRemoveItem(guestKey);
+    }
+  })().finally(() => { guestAdoptions.delete(userId); });
+  guestAdoptions.set(userId, run);
+  return run;
+}
+
 function keys(uid = _cartUserId) {
   return {
     /** Baked-in user ID — compare against _cartUserId after awaits to detect account switches. */
@@ -275,13 +303,13 @@ async function pushLocalCart(k: CartKeys): Promise<void> {
 export function resolveRemoteCart(
   local: Cart,
   remote: { items: any[]; savedItems: any[] } | null,
-): { cart: Cart; adoptedRemote: boolean } {
+): { cart: Cart; adoptedRemote: boolean; push: boolean } {
   const decision = reconcileCartLoad({
     local,
     server: remote,
     dirty: local.syncPending === true ? '1' : local.syncPending === false ? '0' : null,
   });
-  return { cart: { ...decision.cart, syncPending: decision.push }, adoptedRemote: !!remote };
+  return { cart: { ...decision.cart, syncPending: decision.push }, adoptedRemote: !!remote && !decision.push, push: decision.push };
 }
 
 /** Retry pending account-scoped writes on foreground without changing queue ordering. */
@@ -324,14 +352,6 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
     return { cart, remoteConfirmed: true };
   }
 
-  // A local change the server never acknowledged (its sync failed): the
-  // local copy is the truth — re-push it instead of letting the server's
-  // older copy overwrite it.
-  if (cart.syncPending) {
-    void scheduleSync(k);
-    return { cart, remoteConfirmed: true };
-  }
-
   // Signed-in: attempt to load from DB and merge if DB has data.
   // Uses the already-captured k so the continuation can't pick up a changed userId.
   let remoteConfirmed = false;
@@ -341,11 +361,12 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
     cartConfirmedAt.set(k.userId, Date.now());
     const resolved = resolveRemoteCart(cart, remote);
     // Guard: skip cache write if account switched while the request was in-flight.
-    if (resolved.adoptedRemote && _cartUserId === k.userId) {
+    if ((resolved.adoptedRemote || resolved.push) && _cartUserId === k.userId) {
       // A write that landed while the GET was in flight wins over it.
       const latest = await readLocalCart(k);
       if (latest && latest.updatedAt !== cart.updatedAt) return { cart: latest, remoteConfirmed };
       await safeSetItem(k.cart, JSON.stringify(resolved.cart));
+      if (resolved.push) void scheduleSync(k);
       return { cart: resolved.cart, remoteConfirmed };
     }
   } catch { /* remoteConfirmed stays false — see getCartForScreen() */ }

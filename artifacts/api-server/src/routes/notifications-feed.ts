@@ -25,7 +25,7 @@ import {
   sendPushToUser,
   type PushEventCategory,
 } from "../lib/push";
-import { emitToUsers } from "../ws/userHub";
+import { emitToUsers as emitUserEvents } from "../ws/userHub";
 
 export const router = Router();
 
@@ -450,7 +450,7 @@ export async function publishNotification(n: PublishInput): Promise<void> {
   // the recipient goes looking, just not worth interrupting them for.
   if (!notification || isMuted) return;
   // The recipient's open app refreshes its Activity + badge now (ws/userHub).
-  emitToUsers([n.userId], { type: "activity.updated" });
+  emitUserEvents([n.userId], { type: "activity.updated" });
 
   if (pushCategory) {
     // A muted conversation only suppresses device delivery; the feed row

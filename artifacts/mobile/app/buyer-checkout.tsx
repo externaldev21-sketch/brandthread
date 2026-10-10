@@ -895,7 +895,7 @@ export default function BuyerCheckoutScreen() {
           return;
         }
 
-        if (verdict !== 'paid') {
+        if (verdict !== 'paid' || !verification) {
           setVerifiedOrders(confirmed);
           showError({
             title: verification?.declineReason ? 'Payment declined' : 'Payment not confirmed yet',

@@ -1,4 +1,8 @@
 import React from 'react';
+vi.mock('@tanstack/react-query', async importOriginal => ({
+  ...(await importOriginal<typeof import('@tanstack/react-query')>()),
+  useQueryClient: () => ({ getQueryData: () => undefined, setQueryData: vi.fn() }),
+}));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,6 +43,9 @@ vi.mock('react-native', () => {
     RefreshControl: nativeComponent('RefreshControl'),
     ScrollView: nativeComponent('ScrollView'),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
+    NativeModules: {},
+    KeyboardAvoidingView: nativeComponent('KeyboardAvoidingView'),
+    TurboModuleRegistry: { get: () => null },
     Text: nativeComponent('Text'),
     TextInput: nativeComponent('TextInput'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),

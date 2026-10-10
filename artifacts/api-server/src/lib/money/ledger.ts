@@ -93,21 +93,6 @@ export const LEDGER_ACCOUNTS = {
    */
   gift_card_liability: "gift_card_liability",
   /**
-   * What a seller owes Brandthread from a chargeback lost after they were
-   * paid (party = seller, order = the disputed order). Negative = owed. Goes
-   * back up as the debt is recovered (transfer reversal, netting from a later
-   * release), forgiven or reinstated — see lib/money/sellerRecovery.ts.
-   */
-  seller_recoverable: "seller_recoverable",
-  /**
-   * Brandthread's own cost of lost chargebacks: its commission and the
-   * processing fee on the disputed sale, plus any seller debt written off.
-   * Negative = cost to the platform.
-   */
-  platform_dispute_losses: "platform_dispute_losses",
-  /** Stripe's dispute fees (positive = paid to Stripe; negative = returned). */
-  stripe_dispute_fees: "stripe_dispute_fees",
-  /**
    * Affiliate commission the seller has funded (taken back from their order
    * payout) and Brandthread holds until it is paid to the creator (party =
    * seller, per order) — see lib/affiliate/funding.ts.

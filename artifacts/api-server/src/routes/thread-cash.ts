@@ -157,9 +157,6 @@ router.get("/", async (req, res) => {
       nextExpiresAt: expiry.expiringSoon.nextExpiresAt?.toISOString() ?? null,
       buckets: expiry.expiringSoon.buckets.map((b) => ({ expiresAt: b.expiresAt.toISOString(), amountCents: b.amountCents })),
     },
-    // How much of balanceCents a seller may withdraw: paid Thread Cash
-    // received from others, never promo credit. Additive field.
-    cashableCents,
     // Promo credit (platform rewards, incl. promo a buyer gifted): spendable
     // in Brandthread, never withdrawable. Additive field.
     promoCents,

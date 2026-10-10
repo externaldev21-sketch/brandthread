@@ -492,8 +492,6 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
         toBank: paidToBankCents === null ? null : money(paidToBankCents),
       },
       owed: money(Math.max(0, -advanced) + dropShortfallOwed + recoveryOwed),
-      // The part of `owed` that upcoming order payouts net first. Additive.
-      recoveryOwedCents: recoveryOwed,
       credit: money(Math.max(0, advanced)),
       lifetime: {
         grossSales: money(Number(fees[0]?.grossSales ?? 0)),

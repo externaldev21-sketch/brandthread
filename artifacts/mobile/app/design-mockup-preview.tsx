@@ -103,6 +103,7 @@ export default function DesignMockupPreviewScreen() {
     if (!project || !previewShotRef.current) return;
     try {
       // A temp file on native (uploaded via fetch like a picked photo); web only supports data URIs.
+      const { captureRef } = await import('react-native-view-shot');
       const uri = await captureRef(previewShotRef, { format: 'png', quality: 1, result: Platform.OS === 'web' ? 'data-uri' : 'tmpfile' });
       setPendingMockup({
         projectId: project.id,

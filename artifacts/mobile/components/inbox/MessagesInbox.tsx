@@ -21,6 +21,8 @@ import { radius as ControlRadius } from '@/constants/radii';
  *    Suggested people list, and the filter pill (a "coming soon" stub).
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { warmThreadOnPressIn } from '@/lib/conversationPrefetch';
+import { useScreenInteractive } from '@/lib/perf';
 import {
   View, Text, FlatList, SectionList, Image,
   Alert, StyleSheet, ScrollView, RefreshControl,
@@ -357,6 +359,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   const localReadClaims = useRef(new Map<string, { signature: string }>());
   useEffect(() => { localReadClaims.current.clear(); }, [userId]);
   const [loading, setLoading] = useState(!cachedInbox);
+  useScreenInteractive('inbox', !loading);
   // Requests deleted (or "Delete all"-ed) in this session sit in a ~4s undo
   // window (lib/pendingRequestDeletes.ts) before the real delete actually
   // fires. Tracked here purely to force a re-render + filter them out of
@@ -1275,6 +1278,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
           <PressableScale
             style={[s.convRow, { backgroundColor: theme.background }]}
+            onPressIn={() => warmThreadOnPressIn(userId, conv.id)}
             onPress={() => openConversation(conv)}
             onLongPress={() => longPressConversation(conv)}
             activeOpacity={0.75}

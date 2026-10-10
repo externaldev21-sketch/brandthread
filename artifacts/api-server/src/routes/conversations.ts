@@ -43,7 +43,7 @@ import {
   checkUpload, validateMediaAttachment, decideOrderShare, decidePostShare, decideProductShare,
 } from "../lib/dmAttachmentPolicy";
 import { IMMUTABLE_PUBLIC_CACHE_CONTROL, normalizeUploadedImage } from "../lib/productImageResize";
-import { emitToUsers } from "../ws/userHub";
+import { emitToUsers as emitUserEvents } from "../ws/userHub";
 import { publicPostCondition } from "../lib/postVisibility";
 import {
   DM_MEDIA_OBJECT_PREFIX, DM_MEDIA_SIGNED_URL_TTL_SEC, dmMediaContextFromEnv, signDmMediaPath, signDmMessageMedia,
@@ -1187,7 +1187,7 @@ router.patch("/:id/read", async (req, res) => {
   const readers = await db.select({ userId: conversationParticipants.userId }).from(conversationParticipants)
     .where(eq(conversationParticipants.conversationId, id));
   emitToUsers(readers.map((r) => r.userId), { type: "conversation.updated", conversationId: id, reason: "read" });
-  emitToUsers([userId], { type: "activity.updated" });
+  emitUserEvents([userId], { type: "activity.updated" });
 
   // Realtime read receipt for the other side; my own badge moved everywhere I'm signed in.
   const memberIds = await conversationMemberIds(id);

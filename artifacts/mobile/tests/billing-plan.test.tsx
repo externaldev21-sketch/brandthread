@@ -47,6 +47,7 @@ vi.mock('react-native', () => {
     Text: el('Text'),
     TouchableOpacity: el('TouchableOpacity'),
     View: el('View'),
+    KeyboardAvoidingView: el('KeyboardAvoidingView'),
   };
 });
 vi.mock('@expo/vector-icons', () => ({ Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }) }));
@@ -92,7 +93,7 @@ vi.mock('@/components/billing/PlanSheets', () => {
   };
 });
 
-import BillingScreen from './billing';
+import BillingScreen from '../app/billing';
 
 const ACTIVE = {
   plan: 'growth', status: 'active', trialEnd: null, renewsOn: 'Nov 9, 2026', amountCents: 7900,
