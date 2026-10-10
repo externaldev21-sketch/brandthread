@@ -64,6 +64,11 @@ export const bioPages = pgTable('bio_pages', {
   socials:            jsonb('socials').$type<Record<string, string>>().notNull().default({}),
   theme:              text('theme').notNull().default('mono'),
   accentColor:        text('accent_color'),
+  // Store website (brandthread.app/@handle) design — migration 275. The
+  // banner image is the seller's store banner (users.banner_url).
+  showBanner:         boolean('show_banner').notNull().default(true),
+  buttonStyle:        text('button_style').notNull().default('rounded'),
+  font:               text('font').notNull().default('system'),
   published:          boolean('published').notNull().default(true),
   createdAt:          timestamp('created_at').defaultNow().notNull(),
   updatedAt:          timestamp('updated_at').defaultNow().notNull(),

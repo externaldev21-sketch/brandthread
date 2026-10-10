@@ -94,5 +94,6 @@ export function slugifyBio(raw: string): string {
 }
 
 export const BIO_SLUG_RE = /^[a-z0-9][a-z0-9_-]{2,39}$/;
-export const MAX_BIO_LINKS = 50;
+/** Link buttons per page — the store website shows up to five (storeSiteDesign.MAX_STORE_SITE_LINKS). */
+export const MAX_BIO_LINKS = 5;
 export const MAX_FEATURED = 6;
