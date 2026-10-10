@@ -25,6 +25,7 @@ export const DEEP_LINK_PATHS = [
   "/place/*",
   "/onboarding*",
   "/team-invite*",
+  "/checkout-return*",
 ];
 
 function appleAppId(): string | null {
@@ -38,6 +39,17 @@ function androidSha256Fingerprints(): string[] {
   const raw = process.env.ANDROID_SHA256_CERT_FINGERPRINTS?.trim();
   if (!raw) return [];
   return raw.split(",").map((fp) => fp.trim()).filter(Boolean);
+}
+
+/**
+ * Names the env vars still missing for app-link verification (BT-302). Until
+ * they are set, iOS/Android keep shared https links in the browser.
+ */
+export function missingAppLinkEnv(): string[] {
+  const missing: string[] = [];
+  if (!appleAppId()) missing.push("APPLE_TEAM_ID");
+  if (androidSha256Fingerprints().length === 0) missing.push("ANDROID_SHA256_CERT_FINGERPRINTS");
+  return missing;
 }
 
 router.get("/apple-app-site-association", (_req, res) => {

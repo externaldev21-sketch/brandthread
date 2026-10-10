@@ -93,6 +93,58 @@ function serveFile(filePath, res, acceptEncoding = '') {
   return true;
 }
 
+/**
+ * Root-level pages the API server renders (BT-301): app-link verification
+ * files, tracked short links, link-in-bio pages, giveaway landings and the
+ * public profile landing. Production routing sends every non-/api path to
+ * this server, so these are forwarded to the API before the SPA fallback.
+ * Exact shapes only, so app routes like /live-replays or /location stay here.
+ */
+const API_ROOT_PATTERNS = [
+  /^\/\.well-known\/(apple-app-site-association|assetlinks\.json)$/,
+  /^\/l\/[^/]+$/,
+  /^\/bio\/[^/]+(\/shop|\/go\/[^/]+|\/p\/[^/]+)?$/,
+  /^\/g\/[^/]+$/,
+  /^\/u\/[^/]+$/,
+  // The seller's store website: /@handle, its product pages, link buttons and preview card.
+  /^\/@[^/]+(\/p\/[^/]+|\/go\/[^/]+|\/og\.png)?\/?$/,
+];
+
+function isApiRootPath(pathname) {
+  return API_ROOT_PATTERNS.some((pattern) => pattern.test(pathname));
+}
+
+/** The API server inside this deployment (artifacts/api-server listens on 8080). */
+function apiInternalOrigin() {
+  return (process.env.API_INTERNAL_ORIGIN || 'http://127.0.0.1:8080').replace(/\/+$/, '');
+}
+
+function proxyToApi(req, res, pathAndQuery) {
+  return new Promise((resolve) => {
+    let target;
+    try {
+      target = new URL(pathAndQuery, `${apiInternalOrigin()}/`);
+    } catch {
+      resolve(false);
+      return;
+    }
+    const client = target.protocol === 'https:' ? require('https') : http;
+    const headers = { ...req.headers };
+    // The API builds absolute URLs and rate-limits from these.
+    if (!headers['x-forwarded-host'] && headers.host) headers['x-forwarded-host'] = headers.host;
+    if (!headers['x-forwarded-proto']) headers['x-forwarded-proto'] = 'https';
+    delete headers.host;
+    const upstream = client.request(target, { method: req.method || 'GET', headers, timeout: 10000 }, (upstreamRes) => {
+      res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
+      upstreamRes.pipe(res);
+      upstreamRes.on('end', () => resolve(true));
+    });
+    upstream.on('timeout', () => upstream.destroy(new Error('timeout')));
+    upstream.on('error', () => resolve(false));
+    upstream.end();
+  });
+}
+
 function canonicalRedirectLocation(req, requestUrl) {
   const forwardedHost = req.headers?.['x-forwarded-host'];
   const hostHeader = String(forwardedHost || req.headers?.host || '')
@@ -142,6 +194,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const acceptEncoding = String(req.headers['accept-encoding'] || '');
+
+  if ((req.method === 'GET' || req.method === 'HEAD' || !req.method) && isApiRootPath(requestedPath)) {
+    if (await proxyToApi(req, res, `${pathname}${requestUrl.search}`)) return;
+    send(res, 502, 'Bad Gateway');
+    return;
+  }
 
   // Public account-deletion page (Google Play requires a URL that works
   // without the app). Plain HTML, not part of the SPA, so it never depends on
@@ -215,4 +273,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { CANONICAL_ORIGIN, GENERATED_HOST, canonicalRedirectLocation, server };
+module.exports = { CANONICAL_ORIGIN, GENERATED_HOST, canonicalRedirectLocation, isApiRootPath, server };
