@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Package, Shirt } from "lucide-react";
 import { getGetThreadMessagesQueryKey, getListManufacturerSampleOrdersQueryKey, getListManufacturerThreadsQueryKey } from "@workspace/api-client-react";
-import { CARD_LIMITS, formatMoney, parseAmountToCents, validateCardInput, type CardFieldErrors } from "@workspace/manufacturer-flow";
+import { CARD_LIMITS, formatMoney, manufacturerNetCents, parseAmountToCents, validateCardInput, type CardFieldErrors } from "@workspace/manufacturer-flow";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -136,6 +136,7 @@ export function SendCardDialog({
 
           <p className="rounded-md border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
             Prices are in US dollars. Stripe converts your payout to your bank's currency. Brandthread's platform fee and Stripe processing fees are deducted before payout.
+            {priceCents ? <span className="mt-1 block text-foreground" data-testid="text-card-net">You receive {formatMoney(manufacturerNetCents({ priceCents }))}</span> : null}
           </p>
 
           {payoutBlocked && (

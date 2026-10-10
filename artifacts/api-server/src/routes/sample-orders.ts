@@ -9,6 +9,8 @@
  * PATCH/:id/advance   manufacturer advances production stage
  * PATCH/:id/tracking  add tracking number (triggers payout release to manufacturer)
  * POST /:id/pay-from-wallet  seller pays bulk order from drop wallet
+ * POST /:id/refund           manufacturer refunds a paid card (full or partial)
+ * POST /:id/cancel-request   seller asks to cancel a paid card before production
  *
  * Sample image flow (no Stripe):
  * POST /:id/images/request-upload  → { uploadURL, objectPath } presigned GCS PUT
@@ -30,8 +32,10 @@ import { publishNotification } from "./notifications-feed";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
 import { CreateProductionOrderBody } from "@workspace/api-zod";
 import { connectReadiness } from "./manufacturer-connect";
-import { afterStageChange } from "../lib/manufacturerOrders";
+import { afterStageChange, postThreadSystemMessage, recordOrderEvent } from "../lib/manufacturerOrders";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { achEligible, b2bFees, manufacturerNetCents } from "@workspace/manufacturer-flow";
+import { B2bRefundError, refundSampleOrder } from "../lib/b2b/refunds";
 
 const router = Router();
 router.use(requireAuth);
@@ -316,9 +320,15 @@ router.post("/:id/checkout-session", async (req, res) => {
         checkoutSessionVersion = current?.checkoutSessionVersion ?? checkoutSessionVersion;
       }
     }
+    // BT-452/454: the manufacturer-side fee covers Stripe processing (one
+    // switch in @workspace/manufacturer-flow fees.ts); large bulk cards can
+    // also be paid by US bank account (ACH), whose lower fee is settled when
+    // the payment succeeds (lib/b2b/payments.ts).
+    const fees = b2bFees({ priceCents: row.order.priceCents, method: "card" });
+    const offerAch = achEligible(row.order);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["card"],
+      payment_method_types: offerAch ? ["card", "us_bank_account"] : ["card"],
       line_items: [{
         quantity: 1,
         price_data: {
@@ -332,18 +342,24 @@ router.post("/:id/checkout-session", async (req, res) => {
             ].filter(Boolean).join(" · ").slice(0, 500),
           },
         },
-      }],
+      }, ...(fees.sellerSurchargeCents > 0 ? [{
+        quantity: 1,
+        price_data: { currency: "usd", unit_amount: fees.sellerSurchargeCents, product_data: { name: "Card processing" } },
+      }] : [])],
       success_url: returnUrl.includes("?") ? `${returnUrl}&checkout_session_id={CHECKOUT_SESSION_ID}` : `${returnUrl}?checkout_session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: returnUrl,
       payment_intent_data: {
-        application_fee_amount: row.order.platformFeeCents,
+        application_fee_amount: fees.applicationFeeCents,
         transfer_data: { destination: row.stripeAccountId },
         metadata: { sampleOrderId: row.order.id, sellerId, manufacturerId: row.order.manufacturerId },
       },
       metadata: { sampleOrderId: row.order.id, sellerId },
-    }, { idempotencyKey: `sample-order-checkout/${row.order.id}/v${checkoutSessionVersion}` });
+    }, { idempotencyKey: `sample-order-checkout/${row.order.id}/v${checkoutSessionVersion}/b2b-fees` });
     const [persisted] = await db.update(sampleOrders).set({
       stripeCheckoutSessionId: session.id, updatedAt: new Date(),
+      platformFeeCents: fees.platformFeeCents,
+      processingFeeEstimateCents: fees.processingFeeEstimateCents,
+      manufacturerNetCents: fees.manufacturerNetCents,
     }).where(and(
       eq(sampleOrders.id, row.order.id),
       eq(sampleOrders.status, "pending_payment"),
@@ -812,12 +828,22 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
       res.status(409).json({ error: "Payment is already processing from a different wallet" }); return;
     }
 
+    // BT-453: wallet-funded bulk carries the same 5% platform fee as a card
+    // (no processing: no card is charged). A claim made before fees were
+    // fixed on the row keeps its original full-amount transfer on retry.
+    const walletFees = b2bFees({ priceCents: order.priceCents, method: "drop_wallet" });
+    const transferCents = order.walletPaymentState === "processing"
+      ? (order.manufacturerNetCents ?? order.priceCents)
+      : walletFees.manufacturerNetCents;
+
     // Claim the order and reserve funds together before calling Stripe. Both
     // predicates are conditional, so replayed/concurrent requests cannot pay it.
     const claimed = order.walletPaymentState === "processing" ? true : await db.transaction(async (tx) => {
       const [claim] = await tx.update(sampleOrders).set({
         walletPaymentState: "processing", walletPaymentAttemptKey: attemptKey,
         walletId, updatedAt: new Date(),
+        platformFeeCents: walletFees.platformFeeCents, processingFeeEstimateCents: 0,
+        manufacturerNetCents: walletFees.manufacturerNetCents, paymentMethodType: "drop_wallet",
       }).where(and(
         eq(sampleOrders.id, order.id), eq(sampleOrders.sellerId, sellerId),
         eq(sampleOrders.orderType, "bulk"), eq(sampleOrders.status, "pending_payment"),
@@ -843,9 +869,12 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
     let stripeTransferId: string;
     try {
       const transfer = await stripe.transfers.create({
-        amount: order.priceCents, currency: "usd", destination: row.mfrStripeId,
+        amount: transferCents, currency: "usd", destination: row.mfrStripeId,
         transfer_group: wallet.stripeTransferGroup ?? `drop_${wallet.dropId}`,
-        metadata: { sampleOrderId: order.id, sellerId, paymentSource: "drop_wallet" },
+        metadata: {
+          sampleOrderId: order.id, sellerId, paymentSource: "drop_wallet",
+          platformFeeCents: String(order.priceCents - transferCents),
+        },
       }, { idempotencyKey: attemptKey });
       stripeTransferId = transfer.id;
     } catch (error) {
@@ -895,6 +924,7 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
           sellerId,
           manufacturerId: order.manufacturerId,
           amountCents: order.priceCents,
+          platformFeeCents: order.priceCents - transferCents,
           transferId: stripeTransferId,
         });
       } else {
@@ -943,6 +973,184 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
   } catch (err) {
     req.log.error({ err, orderId: req.params.id }, "Failed to pay sample order from wallet");
     res.status(500).json({ error: "Failed to pay from wallet" });
+  }
+});
+
+// ── Refunds and seller cancel requests on paid cards (BT-460) ─────────────────
+// POST /:id/refund                     manufacturer refunds (full or partial)
+// POST /:id/cancel-request             seller asks to cancel before production starts
+// POST /:id/cancel-request/approve     manufacturer approves → full refund
+// POST /:id/cancel-request/decline     manufacturer declines
+// Admins refund through POST /api/admin/sample-orders/:id/refund.
+
+function sendRefundError(res: express.Response, err: unknown, req: express.Request, orderId: string) {
+  if (err instanceof B2bRefundError) { res.status(err.status).json({ error: err.message, code: err.code }); return; }
+  if ((err as { status?: number })?.status === 503) { res.status(503).json({ error: "Payments are not configured on this server." }); return; }
+  req.log.error({ err, orderId }, "Sample order refund failed");
+  res.status(500).json({ error: "The refund couldn't be completed. Try again." });
+}
+
+function serializeRefundResult(result: Awaited<ReturnType<typeof refundSampleOrder>>) {
+  return {
+    refund: {
+      id: result.refund.id, amountCents: result.refund.amountCents, state: result.refund.state,
+      platformFeeRefundedCents: result.refund.platformFeeRefundedCents, method: result.refund.method,
+      createdAt: result.refund.createdAt.toISOString(),
+    },
+    order: {
+      ...result.order,
+      manufacturerNetCents: manufacturerNetCents(result.order),
+      createdAt: result.order.createdAt.toISOString(),
+      updatedAt: result.order.updatedAt.toISOString(),
+      shippedAt: result.order.shippedAt?.toISOString() ?? null,
+      deliveredAt: result.order.deliveredAt?.toISOString() ?? null,
+    },
+    replayed: result.replayed,
+  };
+}
+
+router.post("/:id/refund", async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const [row] = await db.select({ order: sampleOrders, mfrClerkId: manufacturers.clerkId })
+      .from(sampleOrders).leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
+      .where(eq(sampleOrders.id, req.params.id)).limit(1);
+    if (!row) { res.status(404).json({ error: "Order not found" }); return; }
+    if (row.mfrClerkId !== clerkUserId) {
+      res.status(403).json({ error: "Only the manufacturer can refund this order." }); return;
+    }
+    const { amountCents, reason, idempotencyKey } = (req.body ?? {}) as { amountCents?: unknown; reason?: unknown; idempotencyKey?: unknown };
+    if (amountCents !== undefined && amountCents !== null && (!Number.isSafeInteger(amountCents) || (amountCents as number) < 1)) {
+      res.status(400).json({ error: "amountCents must be a positive whole number of cents." }); return;
+    }
+    if (reason !== undefined && reason !== null && (typeof reason !== "string" || reason.length > 500)) {
+      res.status(400).json({ error: "Reason must be 500 characters or fewer." }); return;
+    }
+    const result = await refundSampleOrder({
+      orderId: row.order.id,
+      amountCents: (amountCents as number | undefined) ?? null,
+      reason: (reason as string | undefined) ?? null,
+      actor: { role: "manufacturer", clerkId: clerkUserId },
+      idempotencyKey: typeof idempotencyKey === "string" ? idempotencyKey : null,
+      notify: publishNotification,
+    });
+    res.json(serializeRefundResult(result));
+  } catch (err) {
+    sendRefundError(res, err, req, req.params.id);
+  }
+});
+
+router.post("/:id/cancel-request", async (req, res) => {
+  try {
+    const sellerId = (req as any).clerkUserId as string;
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+    if (reason.length > 500) { res.status(400).json({ error: "Reason must be 500 characters or fewer." }); return; }
+    const [row] = await db.select({ order: sampleOrders, mfrClerkId: manufacturers.clerkId })
+      .from(sampleOrders).leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
+      .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.sellerId, sellerId))).limit(1);
+    if (!row) { res.status(404).json({ error: "Order not found" }); return; }
+    if (row.order.cancelRequestState === "requested") {
+      res.json({ ...row.order, createdAt: row.order.createdAt.toISOString(), updatedAt: row.order.updatedAt.toISOString() }); return;
+    }
+    if (row.order.status !== "payment_received") {
+      res.status(409).json({
+        error: row.order.status === "pending_payment"
+          ? "This card isn't paid yet. Decline it instead."
+          : "Production has started, so this order can't be cancelled here. Message the manufacturer about a refund.",
+        code: "PRODUCTION_STARTED",
+      });
+      return;
+    }
+    if (row.order.cancelRequestState !== "none") {
+      res.status(409).json({ error: "The manufacturer already answered a cancel request for this order.", code: "ALREADY_ANSWERED" }); return;
+    }
+    const [updated] = await db.update(sampleOrders).set({
+      cancelRequestState: "requested", cancelRequestReason: reason || null, cancelRequestedAt: new Date(),
+      updatedAt: new Date(), revision: sql`${sampleOrders.revision} + 1`,
+    }).where(and(
+      eq(sampleOrders.id, row.order.id), eq(sampleOrders.status, "payment_received"), eq(sampleOrders.cancelRequestState, "none"),
+    )).returning();
+    if (!updated) { res.status(409).json({ error: "This order changed. Refresh and try again.", code: "STALE_WRITE" }); return; }
+    await recordOrderEvent(db, {
+      order: updated, actorRole: "seller", actorClerkId: sellerId,
+      fromStatus: updated.status, toStatus: updated.status, note: `Asked to cancel${reason ? `: ${reason}` : ""}`,
+    }).catch((err) => req.log.error({ err, orderId: updated.id }, "Failed to record cancel request event"));
+    await postThreadSystemMessage(db, {
+      threadId: updated.threadId,
+      content: `The seller asked to cancel "${updated.title}" and get a refund${reason ? `: ${reason}` : "."}`,
+      notify: "manufacturer",
+      dedupeKey: `cancel-request:${updated.id}`,
+    }).catch((err) => req.log.error({ err, orderId: updated.id }, "Failed to post cancel request message"));
+    if (row.mfrClerkId) {
+      const notificationContext = orderNotificationContext(updated);
+      await publishNotification({
+        userId: row.mfrClerkId, category: "production", type: "manufacturer_cancel_requested",
+        title: `Cancel requested: ${updated.title}`,
+        body: reason || "The seller asked to cancel before production starts. Approve to refund them, or decline.",
+        targetId: updated.id, targetType: notificationContext.targetType, cta: notificationContext.manufacturerCta,
+      }).catch((err) => req.log.error({ err, orderId: updated.id }, "Cancel request notification failed"));
+    }
+    res.status(201).json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
+  } catch (err) {
+    req.log.error({ err, orderId: req.params.id }, "Failed to request cancellation");
+    res.status(500).json({ error: "The cancel request couldn't be sent. Try again." });
+  }
+});
+
+router.post("/:id/cancel-request/:decision", async (req, res) => {
+  const decision = req.params.decision;
+  if (decision !== "approve" && decision !== "decline") { res.status(404).json({ error: "Not found" }); return; }
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const [row] = await db.select({ order: sampleOrders, mfrClerkId: manufacturers.clerkId, mfrName: manufacturers.businessName })
+      .from(sampleOrders).leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
+      .where(eq(sampleOrders.id, req.params.id)).limit(1);
+    if (!row) { res.status(404).json({ error: "Order not found" }); return; }
+    if (row.mfrClerkId !== clerkUserId) { res.status(403).json({ error: "Only the manufacturer can answer a cancel request." }); return; }
+    if (decision === "approve") {
+      // A refund already made for this request replays; any other state needs an open request.
+      if (row.order.cancelRequestState !== "requested" && row.order.cancelRequestState !== "approved") {
+        res.status(409).json({ error: "There's no open cancel request on this order.", code: "NO_REQUEST" }); return;
+      }
+      const result = await refundSampleOrder({
+        orderId: row.order.id,
+        reason: row.order.cancelRequestReason ? `Seller cancelled: ${row.order.cancelRequestReason}` : "Seller cancelled before production",
+        actor: { role: "cancel_request", clerkId: clerkUserId },
+        idempotencyKey: "cancel-request",
+        retryAfterFailure: true,
+        notify: publishNotification,
+      });
+      res.json(serializeRefundResult(result));
+      return;
+    }
+    if (row.order.cancelRequestState !== "requested") {
+      res.status(409).json({ error: "There's no open cancel request on this order.", code: "NO_REQUEST" }); return;
+    }
+    const note = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 500) : "";
+    const [updated] = await db.update(sampleOrders).set({
+      cancelRequestState: "declined", updatedAt: new Date(), revision: sql`${sampleOrders.revision} + 1`,
+    }).where(and(eq(sampleOrders.id, row.order.id), eq(sampleOrders.cancelRequestState, "requested"))).returning();
+    if (!updated) { res.status(409).json({ error: "This order changed. Refresh and try again.", code: "STALE_WRITE" }); return; }
+    await recordOrderEvent(db, {
+      order: updated, actorRole: "manufacturer", actorClerkId: clerkUserId,
+      fromStatus: updated.status, toStatus: updated.status, note: `Declined the cancel request${note ? `: ${note}` : ""}`,
+    }).catch((err) => req.log.error({ err, orderId: updated.id }, "Failed to record cancel decline event"));
+    await postThreadSystemMessage(db, {
+      threadId: updated.threadId,
+      content: `${row.mfrName ?? "The manufacturer"} declined the cancel request for "${updated.title}"${note ? `: ${note}` : "."}`,
+      notify: "seller",
+      dedupeKey: `cancel-declined:${updated.id}`,
+    }).catch((err) => req.log.error({ err, orderId: updated.id }, "Failed to post cancel decline message"));
+    const notificationContext = orderNotificationContext(updated);
+    await publishNotification({
+      userId: updated.sellerId, category: "production", type: "manufacturer_cancel_declined",
+      title: `Cancel declined: ${updated.title}`,
+      body: note || `${row.mfrName ?? "The manufacturer"} is going ahead with production.`,
+      targetId: updated.id, targetType: notificationContext.targetType, cta: notificationContext.sellerCta,
+    }).catch((err) => req.log.error({ err, orderId: updated.id }, "Cancel decline notification failed"));
+    res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
+  } catch (err) {
+    sendRefundError(res, err, req, req.params.id);
   }
 });
 

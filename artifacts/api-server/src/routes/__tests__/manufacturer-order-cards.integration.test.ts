@@ -211,7 +211,8 @@ describe("manufacturer order card → payment → tracker", () => {
     const checkout = await call(`/api/sample-orders/${orderId}/checkout-session`, "POST", { returnUrl: returnUrl(orderId) }, seller);
     expect(checkout.status).toBe(201);
     expect(stripeState.created[0].payment_intent_data).toMatchObject({
-      application_fee_amount: 425, transfer_data: { destination: "acct_recipient_vn" },
+      // 5% (425) + card processing passed through (2.9% + 30¢ = 277), BT-452.
+      application_fee_amount: 702, transfer_data: { destination: "acct_recipient_vn" },
     });
     expect(stripeState.created[0].line_items[0].price_data).toMatchObject({ currency: "usd", unit_amount: 8_500 });
     stripeState.sessions.get(checkout.body.sessionId)!.payment_status = "paid";

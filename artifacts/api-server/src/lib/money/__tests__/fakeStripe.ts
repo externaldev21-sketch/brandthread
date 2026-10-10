@@ -42,6 +42,8 @@ export function createFakeStripe() {
     feeRefundKeys: new Map<string, any>(),
     /** Stripe fee reported for each PaymentIntent's charge (default 2.9% + 30¢ of amount). */
     chargeFees: new Map<string, number | null>(),
+    /** Payment method type of each PaymentIntent's charge (default "card"). */
+    chargeMethods: new Map<string, string>(),
     /** Applies once to the next call, then resets. */
     failNextTransfer: null as Failure,
     /** An ambiguous failure AFTER Stripe created the transfer (lost response). */
@@ -152,6 +154,7 @@ export function createFakeStripe() {
             balance_transaction: fee === null ? null : { id: `txn_${id}`, fee },
             transfer: `tr_dest_${id}`,
             application_fee: `fee_${id}`,
+            payment_method_details: { type: state.chargeMethods.get(id) ?? "card" },
           },
         };
       },
@@ -255,6 +258,7 @@ export function createFakeStripe() {
     state.reversalKeys.clear();
     state.feeRefundKeys.clear();
     state.chargeFees.clear();
+    state.chargeMethods.clear();
     state.failNextTransfer = null;
     state.loseNextTransferResponse = false;
     state.failNextRefund = null;
