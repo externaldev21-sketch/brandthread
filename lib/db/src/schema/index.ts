@@ -521,6 +521,10 @@ export const orders = pgTable('orders', {
   // the full item price (destination charges only). A full refund reverses
   // exactly this transfer in addition to the buyer's card refund.
   stripeThreadCashTransferId: text('stripe_thread_cash_transfer_id'),
+  // Loyalty / referral points redeemed on this order (platform-funded, BT-066,
+  // migration 340) and the top-up transfer that paid the seller for them.
+  loyaltyAppliedCents: integer('loyalty_applied_cents').notNull().default(0),
+  stripeLoyaltyTransferId: text('stripe_loyalty_transfer_id'),
   // Stripe Radar / review signals, seller-only (see api-server lib/risk/orderRisk.ts).
   // Null until the paid-order webhook has normalised the charge outcome.
   riskLevel: text('risk_level'), // 'normal' | 'elevated' | 'highest'

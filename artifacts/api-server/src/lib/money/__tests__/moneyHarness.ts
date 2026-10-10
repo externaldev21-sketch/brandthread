@@ -87,6 +87,8 @@ export type PayInput = {
   shippingCents?: number;
   taxCents?: number;
   discountCents?: number;
+  /** Part of discountCents that was Brandthread loyalty points (platform-funded, BT-066). */
+  loyaltyDiscountCents?: number;
   /** Stripe's actual processing fee for this charge. */
   stripeFeeCents?: number | null;
 };
@@ -101,9 +103,12 @@ export async function pay(input: PayInput) {
   const shipping = input.shippingCents ?? 0;
   const tax = input.taxCents ?? 0;
   const discount = input.discountCents ?? 0;
+  // Only the seller's own discount reduces the fee basis (routes/buyer.ts).
+  const loyalty = input.loyaltyDiscountCents ?? 0;
+  const sellerDiscount = Math.max(0, discount - loyalty);
   const fee = destinationApplicationFeeCents({
-    merchandiseCents: Math.max(0, subtotal - discount),
-    preTaxTotalCents: Math.max(0, subtotal + shipping - discount),
+    merchandiseCents: Math.max(0, subtotal - sellerDiscount),
+    preTaxTotalCents: Math.max(0, subtotal + shipping - sellerDiscount),
   });
   const [checkout] = await db.insert(checkoutSessions).values({
     buyerId: input.buyerId,
@@ -113,6 +118,7 @@ export async function pay(input: PayInput) {
     dropId: input.dropId ?? null,
     platformFeeCents: fee.platformFeeCents,
     processingFeeEstimateCents: fee.processingFeeEstimateCents,
+    ...(loyalty ? { loyaltyDiscountCents: loyalty } : {}),
   }).returning();
   const sessionId = `cs_${uid("session").replace(/-/g, "_")}`;
   const paymentIntentId = `pi_${uid("pi").replace(/-/g, "_")}`;

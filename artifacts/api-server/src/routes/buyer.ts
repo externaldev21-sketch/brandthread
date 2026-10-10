@@ -18,6 +18,7 @@ import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { buildBuyerDelivery, deliveryColumns, loadBuyerDelivery } from "../lib/delivery/buyerView";
 import { recordDelivery } from "../lib/delivery/deliveryState";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
+import { capApplicationFee, checkoutFeeBasis } from "../lib/money/loyaltyFunding";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import { notifyBuyerOrderCancelled, notifySellerOrderCancelledByBuyer } from "../lib/orderNotifications";
@@ -974,8 +975,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       };
     }
 
-    // Loyalty points and a discount code both reduce the fee basis (they are
-    // seller-funded). Thread Cash never does — see below.
+    // Discounts before Thread Cash (loyalty points + the seller's discount
+    // code). Only the discount code is seller-funded and reduces the fee basis:
+    // loyalty points are Brandthread's own program (BT-066) and, like Thread
+    // Cash, never shrink the fee basis or the seller's payout.
     const combinedDiscountCents = (loyaltyRedemption?.discountCents ?? 0) + discountCodeAmountCents;
 
     // ── Thread Cash reservation ────────────────────────────────────────────
@@ -1021,12 +1024,12 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       }
     }
     // What the buyer's Stripe charge is discounted by (loyalty + discount
-    // code + Thread Cash). Only `combinedDiscountCents` above feeds the fee
-    // basis below — Thread Cash must never shrink the platform fee or the
-    // seller's destination-transfer amount, since Brandthread (not the
-    // seller) funds it. The gap this creates for destination charges is
-    // topped up by a supplemental Stripe transfer once the order is paid
-    // (routes/webhooks.ts) — see docs/payments/thread-cash-checkout-todo.md.
+    // code + Thread Cash). Only the discount code feeds the fee basis below —
+    // Thread Cash and loyalty points must never shrink the platform fee or the
+    // seller's payout, since Brandthread (not the seller) funds them. The gap
+    // this creates is topped up by supplemental Stripe transfers
+    // (lib/threadCash/checkoutTopup.ts, lib/money/loyaltyTopup.ts) — see
+    // docs/payments/thread-cash-checkout-todo.md.
     const stripeChargeDiscountCents = combinedDiscountCents + (threadCashRedemption?.discountCents ?? 0);
 
     // Persist the checkout before Stripe is contacted. Its ID is included in
@@ -1036,10 +1039,14 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
-      merchandiseCents: Math.max(0, subtotalCents - combinedDiscountCents),
-      preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents),
+      ...checkoutFeeBasis({
+        subtotalCents,
+        totalBeforeDiscountsCents: totalBeforeLoyaltyDiscountCents,
+        sellerDiscountCents: discountCodeAmountCents,
+      }),
       platformFeeBps,
     });
+    capApplicationFee(money.paymentIntentData, totalBeforeLoyaltyDiscountCents - stripeChargeDiscountCents);
     const insertValues = {
       buyerId,
       sellerId,

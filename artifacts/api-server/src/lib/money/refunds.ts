@@ -109,6 +109,8 @@ export type LockedOrder = {
   platform_fee_refunded_cents: number;
   thread_cash_applied_cents: number;
   stripe_thread_cash_transfer_id: string | null;
+  loyalty_applied_cents: number;
+  stripe_loyalty_transfer_id: string | null;
   stripe_payment_intent_id: string | null;
   stripe_application_fee_id: string | null;
   stripe_transfer_id: string | null;
@@ -124,6 +126,7 @@ async function lockOrder(executor: DbExecutor, orderId: string): Promise<LockedO
     SELECT id, owner_id, buyer_id, order_number, status, drop_id, charge_model, funds_state,
            total_cents, gross_charged_cents, refunded_cents, platform_fee_cents,
            platform_fee_refunded_cents, thread_cash_applied_cents, stripe_thread_cash_transfer_id,
+           loyalty_applied_cents, stripe_loyalty_transfer_id,
            stripe_payment_intent_id, stripe_application_fee_id, stripe_transfer_id, created_at
     FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
   `));
@@ -461,6 +464,30 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
         } catch (error) {
           logger.error({ err: error, refundId: refund.id, orderId: locked.id }, "Thread Cash top-up reversal failed; needs review");
         }
+      }
+    }
+    // BT-066: the platform-funded loyalty top-up is its own transfer; a fully
+    // refunded order takes it back from the seller (same as Thread Cash).
+    if (fullyRefunded && locked.stripe_loyalty_transfer_id && locked.loyalty_applied_cents > 0) {
+      try {
+        await stripeClient.transfers.createReversal(locked.stripe_loyalty_transfer_id, {
+          amount: locked.loyalty_applied_cents,
+          metadata: { brandthreadRefundId: refund.id, orderId: locked.id },
+        }, { idempotencyKey: `order-refund-loyalty-topup/${refund.id}` });
+        await postLedgerTransaction(tx, {
+          idempotencyKey: `loyalty-topup-reversal/${locked.id}`,
+          kind: "loyalty_seller_topup_reversed",
+          sellerId,
+          orderId: locked.id,
+          stripeObjectId: locked.stripe_loyalty_transfer_id,
+          memo: "Reversed the platform-funded rewards top-up on a fully refunded order",
+          postings: [
+            { account: "seller_paid_out", partyId: sellerId, orderId: null, amountCents: -locked.loyalty_applied_cents },
+            { account: "loyalty_seller_topup", amountCents: locked.loyalty_applied_cents },
+          ],
+        });
+      } catch (error) {
+        logger.error({ err: error, refundId: refund.id, orderId: locked.id }, "Loyalty top-up reversal failed; needs review");
       }
     }
     // A full refund also gives any gift card used on the order its balance back.

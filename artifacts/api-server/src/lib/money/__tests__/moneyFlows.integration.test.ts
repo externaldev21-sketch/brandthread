@@ -771,3 +771,27 @@ describe("bulk orders from held funds (BT-065)", () => {
     }
   });
 });
+
+describe("loyalty points are platform-funded (BT-066)", () => {
+  it("keeps the fee on the full price and tops the seller up for redeemed points", async () => {
+    const seller = await seedSeller("bt066");
+    const product = await seedProduct(seller, { priceCents: 5_000 });
+    const { order } = await pay({
+      sellerId: seller, buyerId: await seedBuyer("bt066"), chargeModel: "destination",
+      items: [{ ...product, quantity: 1 }], discountCents: 1_000, loyaltyDiscountCents: 1_000, stripeFeeCents: 146,
+    });
+    // 5% of the full 5,000, not of the 4,000 the buyer paid by card.
+    expect(order).toMatchObject({ grossChargedCents: 4_000, platformFeeCents: 250, loyaltyAppliedCents: 1_000 });
+    const topup = fake.state.transfers.find((t: any) => t.metadata?.kind === "loyalty_seller_topup");
+    expect(topup).toMatchObject({ amount: 1_000, destination: expect.stringMatching(/^acct_/) });
+    const fresh = await reloadOrder(order.id);
+    expect(fresh.stripeLoyaltyTransferId).toBe(topup.id);
+    const [row] = (await db.execute(sql`
+      SELECT COALESCE(SUM(p.amount_cents), 0)::int AS total FROM ledger_postings p
+      JOIN ledger_transactions t ON t.id = p.transaction_id
+      WHERE t.order_id = ${order.id}::uuid AND p.account = 'loyalty_seller_topup'
+    `) as any).rows;
+    expect(row.total).toBe(-1_000);
+    await expectLedgerBalanced();
+  });
+});
