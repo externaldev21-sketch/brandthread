@@ -1,3 +1,5 @@
+import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
+import { hapticSuccessAction } from '@/lib/haptics';
 /**
  * Buyer Live — viewer screen for an active live stream.
  * Joins the Agora channel as audience. Falls back to a demo/placeholder
@@ -36,7 +38,7 @@ import { apiErrorMessage, confirmBlock, reportHref } from '@/lib/safety';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { hapticLight, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import Composer from '@/components/ui/Composer';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
@@ -359,12 +361,13 @@ function BuyerLiveNativeScreen() {
     }
   }
 
-  function openStreamOptions() {
+  function openStreamOptions(event?: unknown) {
     const sellerId: string | undefined = stream?.seller_id;
     const sellerName: string = stream?.brand_name ?? stream?.seller_name ?? 'this seller';
-    Alert.alert(sellerName, undefined, [
+    openPullDownMenu(event, menuItemsFromButtons([
       {
         text: 'Report live stream',
+        style: 'destructive' as const,
         onPress: () => router.push(reportHref({
           targetType: 'live',
           targetId: params.streamId,
@@ -381,7 +384,7 @@ function BuyerLiveNativeScreen() {
         },
       }] : []),
       { text: 'Cancel', style: 'cancel' as const },
-    ]);
+    ]).map((item, i) => ({ ...item, icon: i === 0 ? 'flag' as const : 'slash' as const })), { title: sellerName });
   }
 
   function openChatMessageOptions(comment: Comment) {
@@ -615,7 +618,7 @@ function BuyerLiveNativeScreen() {
             {productTags.map(tag => (
               <PressableScale
                 key={tag.productId}
-                onPress={() => { hapticLight(); openPurchase(tag); }}
+                onPress={() => { openPurchase(tag); }}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
@@ -663,7 +666,7 @@ function BuyerLiveNativeScreen() {
           overMedia
           value={commentText}
           onChangeText={setCommentText}
-          onSend={() => { hapticLight(); sendComment(); }}
+          onSend={() => { sendComment(); }}
           placeholder="Add a comment…"
           accessibilityLabel="Add a comment"
           hideTabBar={false}
@@ -683,7 +686,7 @@ function BuyerLiveNativeScreen() {
               <Text style={s.purchaseTitle} numberOfLines={1}>{purchaseTag.productName}</Text>
             </View>
             <PressableScale
-              onPress={() => { hapticLight(); setPurchaseTag(null); }}
+              onPress={() => { setPurchaseTag(null); }}
               style={s.purchaseClose}
               hitSlop={6}
               accessibilityRole="button"
@@ -715,7 +718,7 @@ function BuyerLiveNativeScreen() {
                     <PressableScale
                       key={variant.id}
                       disabled={!available}
-                      onPress={() => { hapticLight(); setSelectedVariantId(variant.id); }}
+                      onPress={() => { haptics.selection(); setSelectedVariantId(variant.id); }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: selectedVariantId === variant.id, disabled: !available }}
                       style={[
@@ -741,7 +744,7 @@ function BuyerLiveNativeScreen() {
               </View>
               {checkoutError ? <Text style={s.checkoutError}>{checkoutError}</Text> : null}
               <PressableScale
-                onPress={() => { hapticPrimaryAction(); checkoutInStream(); }}
+                onPress={() => { checkoutInStream(); }}
                 disabled={checkoutBusy || !!purchaseProduct?.sellerVacationMode}
                 accessibilityRole="button"
                 style={[s.buyNowButton, { backgroundColor: PURPLE }, (checkoutBusy || purchaseProduct?.sellerVacationMode) && s.buyNowDisabled]}

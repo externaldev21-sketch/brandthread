@@ -13,7 +13,6 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import Composer from '@/components/ui/Composer';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS } from '@/lib/theme';
 import { radius } from '@/constants/radii';
@@ -48,7 +47,6 @@ export default function AIMockupChatScreen() {
 
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const userMsg: Message = {
       id: Date.now().toString(),

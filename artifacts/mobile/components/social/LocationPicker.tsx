@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type PlaceInfo, type PlaceSearchResult } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
-import { hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -87,7 +87,7 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
 
   const pick = async (result: PlaceSearchResult, key: string) => {
     if (savingKey) return;
-    hapticSelection();
+    haptics.selection();
     if (result.id) { onSelect(result as PlaceInfo); setQuery(''); return; }
     if (preview) { onSelect({ id: `preview-place-${key}`, name: result.name }); setQuery(''); return; }
     setSavingKey(key);
@@ -118,7 +118,7 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
           <Text style={styles.selectedText}>{value.name}</Text>
           {onClear ? (
             <TouchableOpacity
-              onPress={() => { hapticSelection(); onClear(); }}
+              onPress={() => { onClear(); }}
               accessibilityRole="button"
               accessibilityLabel="Remove location"
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}

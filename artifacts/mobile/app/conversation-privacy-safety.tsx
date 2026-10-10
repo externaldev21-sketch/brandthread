@@ -1,3 +1,4 @@
+import { hapticSelection } from '@/lib/haptics';
 /**
  * Privacy & safety — chat details > Privacy & safety. Real, functioning
  * actions: Block/Unblock (reuses lib/safety.ts's confirmBlock/confirmUnblock,
@@ -14,7 +15,6 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { confirmBlock, confirmUnblock } from '@/lib/safety';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -69,7 +69,7 @@ export default function ConversationPrivacySafetyScreen() {
     <View style={[s.root, { backgroundColor: theme.background }]}>
       <ScreenHeader
         title="Privacy & safety"
-        onBack={() => { hapticPrimaryAction(); goBackOr(router); }}
+        onBack={() => goBackOr(router)}
         backTestID="privacy-safety-back"
       />
 

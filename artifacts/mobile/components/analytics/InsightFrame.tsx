@@ -7,7 +7,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader, type ScreenHeaderAction } from '@/components/ScreenHeader';
@@ -78,7 +78,7 @@ export function SegmentedPills<T extends string>({ options, value, onChange, tes
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             accessibilityLabel={o.label}
-            onPress={() => { Haptics.selectionAsync(); onChange(o.key); }}
+            onPress={() => { haptics.selection(); onChange(o.key); }}
             style={{
               flex: 1, minHeight: 40, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center',
               paddingHorizontal: SP.xs, borderWidth: 1,

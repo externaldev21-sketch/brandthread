@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, FlatList, Alert, StyleSheet, Dimensions,
@@ -64,7 +65,7 @@ function TilePressable({ onPress, onPressIn, onLongPress, accessibilityLabel, ch
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => onPress()}
       onLongPress={onLongPress}
       onPressIn={() => { pressScaleAnim(scale, PRESS_SCALE).start(); onPressIn?.(); }}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
@@ -191,7 +192,7 @@ export default function BuyerSaved() {
       }
       const result = await addToCart({ product, variant, quantity: 1 });
       if (result.success) {
-        hapticSuccessAction();
+        haptics.light();
         setActionsFor(null);
       } else {
         Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');

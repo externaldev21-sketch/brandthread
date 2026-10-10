@@ -1,3 +1,4 @@
+import { hapticToggle } from '@/lib/haptics';
 /**
  * Settings → Notifications, for buyers and sellers (the server resolves the
  * role from the session).
@@ -23,7 +24,6 @@ import { useRole } from '@/contexts/RoleContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useColors } from '@/hooks/useColors';
-import { hapticToggle } from '@/lib/haptics';
 import { ListRow } from '@/components/ui';
 import { OptionSheet } from '@/components/ui/OptionSheet';
 import { QUIET_HOURS_PRESETS, quietHoursPresetFor } from '@/components/notifications/QuietHoursRow';

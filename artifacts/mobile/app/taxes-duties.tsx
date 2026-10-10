@@ -65,10 +65,6 @@ export default function TaxesDutiesScreen() {
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
   const handleToggleTax = async (next: boolean) => {
     const previous = stripeTaxEnabled;
     setStripeTaxEnabled(next);
@@ -107,7 +103,6 @@ export default function TaxesDutiesScreen() {
   };
 
   const openStripeTaxRegistrations = async () => {
-    haptic();
     try {
       const supported = await Linking.canOpenURL(STRIPE_TAX_REGISTRATIONS_URL);
       if (supported) {

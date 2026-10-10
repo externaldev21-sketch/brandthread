@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Seller Vacation Mode
  * Route: /vacation-mode
@@ -12,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -82,7 +83,7 @@ export default function VacationModeScreen() {
         vacationMessage: message.trim() || null,
         vacationUntil:   vacationMode && returnDate.trim() ? returnDate.trim() : null,
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       Alert.alert(
         vacationMode ? 'Vacation mode is on' : 'Your store is open',
         vacationMode

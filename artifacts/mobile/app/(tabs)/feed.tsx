@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { DEMO_RUNWAY_VIDEO_SOURCES, DEMO_RUNWAY_VIDEO_URIS } from '@/lib/demoMedia';
@@ -278,7 +279,6 @@ function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100, top
                   style={[hdStyles.row, { borderColor: isUrgent ? `${theme.accent}44` : BORDER }]}
                   activeOpacity={0.8}
                   onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}`) as never);
                   }}
                   accessibilityRole="button"
@@ -913,7 +913,7 @@ function formatPlaybackTime(totalSeconds: number): string {
  * — this component only ever touches the player directly, never the parent's
  * `paused`/`holdPaused` state). While dragging: the line thickens, a round
  * thumb appears on it, a "current / total" time bubble tracks the thumb, and
- * a light haptic "tick" fires every ~3% of the scrub so long drags feel
+ * a selection haptic "tick" fires every ~3% of the scrub so long drags feel
  * textured rather than silent.
  *
  * The time bubble's vertical position is NOT a fixed offset above the thumb
@@ -961,7 +961,7 @@ function ScrubProgressBar({
     if (duration > 0) player.currentTime = fraction * duration;
     if (Math.abs(fraction - lastTickFraction.current) >= 0.03) {
       lastTickFraction.current = fraction;
-      hapticSelection();
+      haptics.selection();
     }
   }).current;
 
@@ -972,7 +972,6 @@ function ScrubProgressBar({
       onPanResponderGrant: (evt) => {
         setDragging(true);
         lastTickFraction.current = progress;
-        hapticLight();
         player.pause();
         Animated.parallel([
           Animated.timing(thickness, { toValue: 7, duration: 120, useNativeDriver: false }),
@@ -985,7 +984,6 @@ function ScrubProgressBar({
       },
       onPanResponderRelease: () => {
         setDragging(false);
-        hapticLight();
         Animated.parallel([
           Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }),
           Animated.timing(thumbScale, { toValue: 0, duration: 120, useNativeDriver: true }),
@@ -1642,17 +1640,13 @@ function SpotlightPageImpl({
       onDoubleTapLike(item.id);
       bumpHeart();
       burstHeart();
-      // Medium tier, not the "light" tier the rail's own like tap uses
-      // (hapticLight/hapticToggle, lib/haptics.ts) — double-tap-to-like is a
-      // bigger, more deliberate gesture with a full-screen burst to match,
-      // so it earns the stronger of the two impact tiers.
-      hapticMedium();
+      // A like is a small commit (lib/haptics.ts map) — same as the rail's like tap.
+      haptics.light();
     } else {
       lastTap.current = now;
       pauseTimer.current = setTimeout(() => {
         pauseTimer.current = null;
         setPaused(p => !p);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }, 290);
     }
   }
@@ -1675,7 +1669,6 @@ function SpotlightPageImpl({
       } else {
         setHoldPaused(true);
       }
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }, 250);
   }
 
@@ -1686,7 +1679,6 @@ function SpotlightPageImpl({
       if (speedActive) {
         setSpeedActive(false);
         Animated.timing(speedPillOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start();
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       if (holdPaused) setHoldPaused(false);
       return;
@@ -1705,7 +1697,7 @@ function SpotlightPageImpl({
           (390x0) while the separately-sized blurred mirror strip kept
           rendering, producing an all-black screen with nothing playing. */}
       <Pressable
-        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setMenuOpen(true); }}
+        onLongPress={() => { haptics.rigid(); setMenuOpen(true); }}
         delayLongPress={550}
         onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
         <View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>
@@ -2162,7 +2154,7 @@ export default function FeedScreen({
       AsyncStorage.setItem(SOUND_PREF_KEY, next ? 'on' : 'off').catch(() => {});
       return next;
     });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    haptics.selection();
   }, []);
   const [showGestureGuide, setShowGestureGuide] = useState(false);
   // Measured height of the absolutely-positioned top bar overlay (status
@@ -3015,7 +3007,6 @@ export default function FeedScreen({
   }, [allItems, router]);
 
   const handleShopTag = useCallback((item: SpotlightItem, tag: SpotlightProductTag) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const allTags = (item.productTags ?? []).length > 0
       ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number; imageUri?: string }>)
       : [tag];
@@ -3229,7 +3220,6 @@ export default function FeedScreen({
                 // the buyer to go find people to follow.
                 <TouchableOpacity
                   onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                     router.navigate('/(buyer)/friends' as never);
                   }}
                   style={styles.findFriendsBtn}
@@ -3278,7 +3268,6 @@ export default function FeedScreen({
                 pageHeight={pageHeight}
                 bottomClearance={bottomClearance}
                 onOpenDrop={(drop) => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   router.push(`/buyer-drop-detail?dropId=${encodeURIComponent(drop.id)}&dropName=${encodeURIComponent(drop.name)}` as never);
                 }}
                 onSeeAll={() => router.push('/(tabs)/following' as never)}
@@ -3389,7 +3378,6 @@ export default function FeedScreen({
               style={styles.buyerTopBtn}
               activeOpacity={0.7}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 if (router.canGoBack()) goBackOr(router);
                 else router.replace('/' as never);
               }}
@@ -3407,7 +3395,6 @@ export default function FeedScreen({
                 style={styles.buyerTopBtn}
                 activeOpacity={0.7}
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   router.push('/(buyer)/cart' as never);
                 }}
                 accessibilityRole="button"
@@ -3464,7 +3451,6 @@ export default function FeedScreen({
                 style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                   router.push('/live-feed' as never);
                 }}
                 accessibilityRole="button"
@@ -3479,7 +3465,6 @@ export default function FeedScreen({
                   style={styles.buyerTopIconBtn}
                   activeOpacity={0.7}
                   onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     router.push('/(buyer)/cart' as never);
                   }}
                   accessibilityRole="button"
@@ -3535,7 +3520,6 @@ export default function FeedScreen({
                 style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                   router.push('/buyer-search' as never);
                 }}
                 accessibilityRole="button"
@@ -3577,7 +3561,7 @@ export default function FeedScreen({
               style={styles.topAvatarBtn}
               activeOpacity={0.75}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              onPress={() => { setHasUnread(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/buyer-notifications' as never); }}
+              onPress={() => { setHasUnread(false); router.push('/buyer-notifications' as never); }}
             >
               <View style={[styles.topAvatar, { backgroundColor: SURFACE }]}>
                 <Feather name="user" size={16} color={ON_DARK} />
@@ -3605,7 +3589,6 @@ export default function FeedScreen({
               activeOpacity={0.7}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/(buyer)/cart' as never);
               }}
               accessibilityRole="button"

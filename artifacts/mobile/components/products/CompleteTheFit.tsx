@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { BottomSheet } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
@@ -116,10 +116,9 @@ export function CompleteTheFit({ productId }: { productId: string }) {
 
   const add = useCallback(async (item: RailItem, variant: BuyerProductVariant) => {
     if (!item.product) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const result = await addToCart({ product: item.product, variant, quantity: 1 });
     if (result.success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.light();
       setMessage(null);
       setAddedId(item.id);
       setTimeout(() => setAddedId((cur) => (cur === item.id ? null : cur)), 2000);

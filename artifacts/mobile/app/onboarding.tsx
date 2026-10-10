@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Brandthread onboarding — one question per screen (v9).
  *
@@ -36,7 +37,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
@@ -204,7 +205,7 @@ function StyleChip({ label, selected, onPress }: { label: string; selected: bool
       style={[styles.chip, { borderColor: selected ? theme.text : 'transparent' }]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
     >
       <Text style={[styles.chipText, { color: selected ? theme.text : theme.muted }]}>{label}</Text>
     </Pressable>

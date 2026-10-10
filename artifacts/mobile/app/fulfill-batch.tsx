@@ -87,7 +87,6 @@ export default function FulfillBatchScreen() {
   }, [api, ids, reloadKey]);
 
   async function handlePrintLabels() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setRunning('labels');
     setLastRun('labels');
     const rows: RowResult[] = [];

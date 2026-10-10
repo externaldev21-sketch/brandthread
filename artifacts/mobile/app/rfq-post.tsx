@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * RFQ Post — broadcast a Request for Quotation to up to 10 manufacturers at
  * once. Mirrors quote-request.tsx's conventions (no fake file upload: there
@@ -87,7 +88,7 @@ export default function RfqPostScreen() {
   });
 
   const toggle = (id: string) => {
-    Haptics.selectionAsync();
+    haptics.selection();
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) { next.delete(id); return next; }
@@ -117,7 +118,7 @@ export default function RfqPostScreen() {
         deadline: deadline.trim() ? new Date(deadline.trim()).toISOString() : undefined,
         manufacturerIds: [...selected],
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       router.replace(`/rfq-compare?rfqId=${rfq.id}` as never);
     } catch (e: any) {
       Alert.alert('Could not post RFQ', e?.message ?? 'Please try again.');

@@ -11,7 +11,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -78,7 +78,6 @@ export default function FreelancerApplyScreen() {
     : true;
 
   const next = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step < 2) setStep(step + 1);
   };
 
@@ -124,14 +123,14 @@ export default function FreelancerApplyScreen() {
         skillTags,
         portfolioUrls,
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       if (!freelancer.hasConnectedAccount) {
         promptConnect(freelancer.id);
       } else {
         router.replace(`/freelancer-profile?id=${freelancer.id}` as any);
       }
     } catch (e) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       Alert.alert('Could not save profile', apiErrorMessage(e));
     } finally {
       setSubmitting(false);
@@ -180,7 +179,7 @@ export default function FreelancerApplyScreen() {
                       style={[styles.typeCard, active && { backgroundColor: colors.accent, borderColor: colors.primary }]}
                       activeOpacity={0.8}
                       onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        haptics.selection();
                         setServiceType(t.value);
                       }}
                     >

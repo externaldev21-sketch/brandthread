@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Modal } from 'react-native';
 import { useColors } from '@/hooks/useColors';
@@ -5,7 +6,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { FONT, FS } from '@/lib/theme';
 import { getProjects, createProject, updateProject } from '@/services/designService';
@@ -63,7 +64,6 @@ export default function AIStudioScreen() {
   useFocusEffect(useCallback(() => { loadProjects(); }, [loadProjects]));
 
   function openProject(project: DesignProject) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(`/design-canvas?id=${project.id}` as never);
   }
 
@@ -156,7 +156,7 @@ export default function AIStudioScreen() {
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="New canvas"
               style={[styles.newCanvasBtn, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setNewCanvasVisible(true); }}
+              onPress={() => { setNewCanvasVisible(true); }}
             >
               <Feather name="plus" size={18} color={colors.primaryForeground} />
             </TouchableOpacity>

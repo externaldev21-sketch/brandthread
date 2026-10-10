@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * Buyer onboarding — "Brands to follow" step, laid out like Instagram's
  * "Try following 5+ people" (rows with a select circle). Title, subtitle
@@ -47,7 +48,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
 
   async function toggleFollow(brand: DiscoverBrand) {
     const next = !following[brand.sellerId];
-    Haptics.selectionAsync();
+    haptics.light();
     // Optimistic — the follow API itself is the source of truth; on failure
     // we revert the toggle rather than losing the app to an inconsistent state.
     setFollowing((prev) => ({ ...prev, [brand.sellerId]: next }));
@@ -62,7 +63,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
   }
 
   async function followAll() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     const toFollow = brands.filter((b) => !following[b.sellerId]);
     setFollowing((prev) => {
       const next = { ...prev };

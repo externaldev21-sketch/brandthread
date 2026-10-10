@@ -29,7 +29,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED } from '@/lib/theme';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { applyHelpfulToggle, fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
 
 export interface ReviewItem {
@@ -144,7 +144,7 @@ export function ProductReviewsSection({
   const toggleHelpful = (review: ReviewItem) => {
     const current = helpful[review.id] ?? { helpfulCount: review.helpfulCount ?? 0, viewerHelpful: !!review.viewerHelpful };
     const next = applyHelpfulToggle(current);
-    void Haptics.selectionAsync();
+    haptics.light();
     setHelpful(prev => ({ ...prev, [review.id]: next }));
     // Seeded preview data has no server rows; everything else persists.
     if (seed) return;

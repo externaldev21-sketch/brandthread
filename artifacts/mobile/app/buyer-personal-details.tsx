@@ -10,7 +10,7 @@ import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerPr
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ListRow, StickyBottomCTA } from '@/components/ui';
-import { hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
@@ -88,7 +88,6 @@ export default function BuyerPersonalDetails() {
   }
 
   async function handleSave() {
-    hapticSuccess();
     // Persist locally; only sync non-empty shared identity fields to the social
     // profile so saving an unrelated field (e.g. phone) never overwrites an
     // already-set name or username with an empty string.
@@ -100,6 +99,7 @@ export default function BuyerPersonalDetails() {
       saveBuyerProfile(fields),
       Object.keys(socialPatch).length > 0 ? updateMyProfile(socialPatch) : Promise.resolve(),
     ]);
+    haptics.success();
     goBackOr(router);
   }
 

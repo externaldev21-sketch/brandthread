@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Product Store — Buyer Preview
  *
@@ -13,7 +14,6 @@ import { formatCalendarDate } from '@/lib/calendarDate';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
@@ -61,7 +61,7 @@ function AccordionSection({ title, children, styles, theme }: { title: string; c
     <View style={styles.accordionWrap}>
       <TouchableOpacity
         style={styles.accordionHeader}
-        onPress={() => { Haptics.selectionAsync(); setOpen(v => !v); }}
+        onPress={() => { setOpen(v => !v); }}
         activeOpacity={0.7}
       >
         <Text style={styles.accordionTitle}>{title}</Text>
@@ -237,12 +237,10 @@ export default function ProductStoreScreen() {
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleBack = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     goBackOr(router, '/(buyer)/discover');
   }, [router]);
 
   const handleShare = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const link = buildProductUrl(product?.id);
     const message = `Check out ${product?.name ?? 'this product'} on Brandthread!`;
     await Share.share(link
@@ -251,7 +249,6 @@ export default function ProductStoreScreen() {
   }, [product]);
 
   const handleAddToCart = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (product) {
       router.push(('/buyer-product-detail?productId=' + product.id + (selectedVariant ? '&variantId=' + selectedVariant.id : '')) as never);
     }
@@ -259,7 +256,6 @@ export default function ProductStoreScreen() {
 
   const handleMessageSeller = useCallback(() => {
     if (!product) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const sellerName = product.vendor ?? 'Seller';
     const sellerHandle = '@' + sellerName.toLowerCase().replace(/[^a-z0-9]+/g, '');
     const sellerInitials = sellerName
@@ -291,7 +287,6 @@ export default function ProductStoreScreen() {
   }, [router, product]);
 
   const handleBuyNow = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (product) {
       router.push(('/buyer-product-detail?productId=' + product.id + (selectedVariant ? '&variantId=' + selectedVariant.id : '') + '&buyNow=1') as never);
     }

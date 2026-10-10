@@ -3,7 +3,6 @@ import { ActivityIndicator, Alert, AppState, ScrollView, StyleSheet, Text, Touch
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
-import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -110,7 +109,6 @@ export default function PayoutSetupScreen() {
       : setup;
 
   const onCta = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!view || skipApi) return;
     if (view.state === 'in_review') { void refresh(); return; }
     void openHostedLink();

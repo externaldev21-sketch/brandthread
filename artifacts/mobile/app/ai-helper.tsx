@@ -12,7 +12,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, Touc
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
@@ -94,7 +94,7 @@ export default function AiHelperScreen() {
       body = { garmentType: garment, unit, base: b, grading: g };
     }
     if (mode === 'caption' && !text.trim() && paths.length === 0) { setError({ message: 'Write a few words about the post first' }); return; }
-    setBusy(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setBusy(true);
     try {
       if (mode === 'caption') {
         const r = await api.aiHelpers.caption({ draft: text.trim() || undefined, imagePath: paths[0], tone });
@@ -127,7 +127,7 @@ export default function AiHelperScreen() {
       } else {
         await api.aiHelpers.save({ target: 'product', productId: p.productId, field: 'sizeChart', sizeChart: result.chart, overwrite });
       }
-      setSaved(true); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setSaved(true); haptics.success();
     } catch (e) {
       const err = e as { status?: number; code?: string };
       if (err.status === 409 && err.code === 'would_overwrite') {

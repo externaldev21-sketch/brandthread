@@ -12,7 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { createRefundRequest } from '@/services/cartService';
@@ -96,7 +96,6 @@ export default function BuyerRefundRequestScreen() {
     if (!reason) { Alert.alert('Select Reason', 'Please select a refund reason.'); return; }
     if (!description.trim()) { Alert.alert('Add Details', 'Please describe why you are requesting a refund.'); return; }
     if (!order) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     try {
       await createRefundRequest({
@@ -108,7 +107,7 @@ export default function BuyerRefundRequestScreen() {
         evidenceUris: evidencePhotos,
         maxRefundAmount: totalCents,
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setSubmitted(true);
     } catch {
       Alert.alert('Error', 'Could not submit your refund request. Please try again.');
@@ -200,7 +199,7 @@ export default function BuyerRefundRequestScreen() {
         <View style={s.card}>
           <Text style={s.sectionTitle}>Refund Reason</Text>
           {REFUND_REASONS.map(r => (
-            <TouchableOpacity key={r} style={s.optionRow} onPress={() => { Haptics.selectionAsync(); setReason(r); }} activeOpacity={0.7}>
+            <TouchableOpacity key={r} style={s.optionRow} onPress={() => { haptics.selection(); setReason(r); }} activeOpacity={0.7}>
               <View style={[s.radio, reason === r && s.radioSelected]}>
                 {reason === r && <View style={s.radioDot} />}
               </View>

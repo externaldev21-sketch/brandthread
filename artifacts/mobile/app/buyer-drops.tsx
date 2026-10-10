@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
@@ -55,7 +55,6 @@ function DropBrowseRow({ item }: { item: DropRowItem }) {
   const styles = createStyles(theme);
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     router.push((`/buyer-drop-detail?dropId=${encodeURIComponent(item.id)}&dropName=${encodeURIComponent(item.name)}`) as never);
   }
 
@@ -131,7 +130,6 @@ export default function BuyerDrops() {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     fetchTab(tab).finally(() => setRefreshing(false));
   }, [fetchTab, tab]);
 
@@ -149,7 +147,7 @@ export default function BuyerDrops() {
           <TouchableOpacity
             key={t.key}
             style={styles.tabItem}
-            onPress={() => { Haptics.selectionAsync().catch(() => {}); setTab(t.key); }}
+            onPress={() => { haptics.selection(); setTab(t.key); }}
             accessibilityRole="tab"
             accessibilityState={{ selected: tab === t.key }}
           >
@@ -190,7 +188,7 @@ export default function BuyerDrops() {
                 {(['list', 'calendar'] as const).map(v => (
                   <TouchableOpacity
                     key={v}
-                    onPress={() => { Haptics.selectionAsync().catch(() => {}); setUpcomingView(v); }}
+                    onPress={() => { haptics.selection(); setUpcomingView(v); }}
                     accessibilityRole="button"
                     accessibilityState={{ selected: upcomingView === v }}
                     style={[styles.viewPill, { backgroundColor: upcomingView === v ? theme.text : 'transparent', borderColor: theme.border }]}

@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Search — rebuilt to mirror Instagram's own search flow 1:1 (Mobbin
@@ -205,6 +206,7 @@ export default function BuyerSearchScreen() {
   const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
+  const [safetyMenuOpen, setSafetyMenuOpen] = useState<(() => void) | null>(null);
 
   const topPad = useHeaderTopInset();
 
@@ -255,7 +257,6 @@ export default function BuyerSearchScreen() {
   }, [api, isSignedIn]);
 
   function removeRecent(term: string) {
-    hapticSelection();
     setRecentSearches((current) => current.filter((t) => t !== term));
     api.public.removeRecent(term).catch(() => {});
   }
@@ -323,7 +324,6 @@ export default function BuyerSearchScreen() {
   }, [serverTags, videoResults, resultsQuery]);
 
   function openHashtag(tag: string) {
-    hapticPrimaryAction();
     router.push(hashtagHref(normalizeTag(tag)) as never);
   }
 
@@ -340,7 +340,6 @@ export default function BuyerSearchScreen() {
   }, [gridWidth]);
 
   function goToBrand(sellerId?: string) {
-    hapticPrimaryAction();
     if (sellerId) router.push({ pathname: '/seller-profile' as any, params: { sellerId, src: 'search' } });
   }
 
@@ -356,7 +355,6 @@ export default function BuyerSearchScreen() {
   }
 
   function handleResultPress(r: ProductResult | BrandResult) {
-    hapticPrimaryAction();
     if (r.kind === 'brand' && (r as any).sellerId) {
       goToBrand((r as any).sellerId);
     } else if (r.kind === 'product' && (r as any).productId) {
@@ -365,7 +363,6 @@ export default function BuyerSearchScreen() {
   }
 
   function handlePersonPress(p: SearchPerson) {
-    hapticPrimaryAction();
     if (p.accountType === 'seller') {
       router.push({ pathname: '/seller-profile' as any, params: { sellerId: p.userId, src: 'search' } });
     } else {
@@ -425,7 +422,6 @@ export default function BuyerSearchScreen() {
   }
 
   function handleCancel() {
-    hapticSelection();
     setQuery('');
     setSubmitted(false);
     setFieldFocused(false);
@@ -540,7 +536,7 @@ export default function BuyerSearchScreen() {
           <TouchableOpacity
             key={row.key}
             style={styles.suggestionRow}
-            onPress={() => { hapticSelection(); row.onSubmit(); }}
+            onPress={() => row.onSubmit()}
             accessibilityRole="button"
           >
             {row.avatar ? (
@@ -613,7 +609,7 @@ export default function BuyerSearchScreen() {
           <View style={styles.filterRow}>
             <TouchableOpacity
               style={styles.filterButton}
-              onPress={() => { hapticSelection(); setFilterSheetOpen(true); }}
+              onPress={() => setFilterSheetOpen(true)}
               accessibilityRole="button"
               accessibilityLabel={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : 'Filters'}
               testID="buyer-search-filter-button"
@@ -628,7 +624,7 @@ export default function BuyerSearchScreen() {
             </TouchableOpacity>
             {activeFilterCount > 0 && (
               <TouchableOpacity
-                onPress={() => { hapticSelection(); setFilters({}); }}
+                onPress={() => { haptics.selection(); setFilters({}); }}
                 accessibilityRole="button"
                 accessibilityLabel="Clear all filters"
                 hitSlop={12}
@@ -722,7 +718,7 @@ export default function BuyerSearchScreen() {
           />
           {query.length > 0 && (
             <TouchableOpacity
-              onPress={() => { hapticSelection(); setQuery(''); setSubmitted(false); inputRef.current?.focus(); }}
+              onPress={() => { setQuery(''); setSubmitted(false); inputRef.current?.focus(); }}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 2 }}
@@ -755,7 +751,11 @@ export default function BuyerSearchScreen() {
           loading={browseLoading}
           showRails={false}
           onTilePress={(post, idx) => openViewer(post, idx, browsePosts)}
-          onTileLongPress={setSafetyMenuPost}
+          onTileLongPress={(post) => {
+            const idx = browsePosts.findIndex((p) => p.id === post.id);
+            setSafetyMenuOpen(() => () => openViewer(post, Math.max(0, idx), browsePosts));
+            setSafetyMenuPost(post);
+          }}
           contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}
         />
       ) : (
@@ -814,7 +814,16 @@ export default function BuyerSearchScreen() {
         <DiscoverSafetyMenu
           visible
           authorName={safetyMenuPost.authorName}
-          onClose={() => setSafetyMenuPost(null)}
+          postId={safetyMenuPost.id}
+          preview={safetyMenuOpen ? {
+            imageUri: safetyMenuPost.imageUri,
+            title: safetyMenuPost.authorName,
+            subtitle: safetyMenuPost.authorHandle,
+            avatarUri: safetyMenuPost.authorAvatarUrl,
+            body: safetyMenuPost.imageUri ? null : safetyMenuPost.caption,
+          } : undefined}
+          onOpen={safetyMenuOpen ?? undefined}
+          onClose={() => { setSafetyMenuPost(null); setSafetyMenuOpen(null); }}
           onNotInterested={() => { removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id); setSafetyMenuPost(null); }}
           onMute={() => { removePostFromLists(safetyMenuPost.authorId); setSafetyMenuPost(null); }}
           onReport={() => {

@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Product Bundle Editor — create or edit a bundle.
  *
@@ -18,7 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
@@ -109,7 +110,6 @@ export default function ProductBundleEditScreen() {
       Alert.alert('Save first', 'Save the bundle details before adding products.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const item = await (api as any).bundles.addItem(bundleId, {
         productId: product.id,
@@ -129,7 +129,6 @@ export default function ProductBundleEditScreen() {
 
   async function removeItem(itemId: string) {
     if (!bundleId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await (api as any).bundles.removeItem(bundleId, itemId);
     setItems(prev => prev.filter(i => i.id !== itemId));
   }
@@ -144,7 +143,6 @@ export default function ProductBundleEditScreen() {
       return;
     }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       if (isNew) {
@@ -164,7 +162,7 @@ export default function ProductBundleEditScreen() {
           compareAtCents,
           status:           isActive ? 'active' : 'draft',
         });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         Alert.alert('Saved', 'Bundle updated successfully.');
       }
     } catch { Alert.alert('Error', 'Could not save bundle.'); }

@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * Seller order detail — Shopify iOS order screen, 1:1 in black/white/silver:
  * header with the order number, share and ⋯; the unfulfilled items with
@@ -693,7 +694,6 @@ export default function OrderDetailScreen() {
   );
 
   const retryUpdates = useCallback(() => {
-    hapticPrimaryAction();
     const generation = generationRef.current;
     consecutiveFailuresRef.current = 0;
     setUpdatesPaused(false);
@@ -777,7 +777,6 @@ export default function OrderDetailScreen() {
       Alert.alert('No buyer account', 'This order has no linked Brandthread account to message.');
       return;
     }
-    hapticPrimaryAction();
     setMessagingBuyer(true);
     try {
       const profile = await api.auth.me();
@@ -820,7 +819,7 @@ export default function OrderDetailScreen() {
       Alert.alert('Select a reason', 'Please choose a cancellation reason.');
       return;
     }
-    hapticDestructiveConfirm();
+    haptics.warning();
     setCancelling(true);
     try {
       await api.orders.updateStatus(id, 'cancelled', {

@@ -1,8 +1,8 @@
+import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { Card, CardDivider, SectionTitle } from '@/components/analytics/AnalyticsKit';

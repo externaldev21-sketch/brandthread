@@ -12,7 +12,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -325,7 +324,7 @@ export default function StoreCollectionsScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title={mode === 'new' ? 'New Collection' : 'Edit Collection'}
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('list'); }}
+        onBack={() => { setMode('list'); }}
       />
 
       <ScrollView

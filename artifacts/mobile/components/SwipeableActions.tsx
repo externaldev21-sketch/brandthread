@@ -12,7 +12,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { hapticLight } from '@/lib/haptics';
 
 export interface SwipeAction {
   key: string;
@@ -105,7 +104,6 @@ export default function SwipeableActions({
       const base = openRef.current ? -revealWidth : 0;
       const projected = base + gesture.dx;
       if (projected <= -revealWidth / 2) {
-        if (!openRef.current) hapticLight();
         animateTo(-revealWidth);
       } else {
         animateTo(0);

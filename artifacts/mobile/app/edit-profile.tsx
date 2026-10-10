@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
@@ -261,7 +261,7 @@ export default function EditProfileScreen() {
         );
         setUri(result[responseKey]);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       showToast(`${title.replace('Update ', '')} updated`);
       if (setupTaskOnSuccess) void completeSetupTaskWhen('customize_store', true);
     } catch {
@@ -302,7 +302,7 @@ export default function EditProfileScreen() {
         // A photo replaces any existing moving avatar server-side too.
         if (previousVideoUri) await api.avatarVideo.remove().catch(() => {});
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       showToast('Avatar updated');
     } catch {
       setAvatarUri(previousUri);
@@ -347,7 +347,7 @@ export default function EditProfileScreen() {
       }
       setAvatarUri(finalPosterUri || null);
       setAvatarVideoUri(finalVideoUri);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       showToast('Profile video updated');
     } catch {
       setAvatarUri(previousUri);
@@ -375,14 +375,14 @@ export default function EditProfileScreen() {
   async function handleSave() {
     if (saving || Object.values(uploading).some(Boolean) || !profileLoaded) return;
     if (!validate()) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.warning();
       return;
     }
     const rawUsername = fields.username.trim().toLowerCase();
     if (rawUsername !== initial.username.trim().toLowerCase()) {
       const available = await checkUsernameAvailability(rawUsername);
       if (!available) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        haptics.warning();
         return;
       }
     }
@@ -407,7 +407,7 @@ export default function EditProfileScreen() {
           },
         });
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setInitial(fields);
       showToast('Profile updated');
       setTimeout(() => goBackOr(router), 500);
@@ -421,7 +421,6 @@ export default function EditProfileScreen() {
   async function handleCopyLink() {
     const username = fields.username.replace(/^@/, '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
     if (!username) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(`https://brandthread.app/u/${username}`);
     showToast('Link copied');
   }

@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * Brandthread bag — SSENSE's Shopping bag flow 1:1, reskinned
  * (https://mobbin.com/flows/b906e342-83ab-4424-bf3b-59514df7dc6d; parts in
@@ -245,7 +246,7 @@ export default function CartScreen() {
   }
 
   function toggleSelectAll() {
-    Haptics.selectionAsync();
+    haptics.selection();
     setSelectedIds(allSelected ? new Set() : new Set(cart.items.map(i => i.id)));
   }
 
@@ -291,7 +292,7 @@ export default function CartScreen() {
 
   async function handleRemove(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.warning();
     const removed = cart.items.find(item => item.id === itemId);
     const snapshot = cart;
     setPending(itemId, 'remove');
@@ -311,7 +312,7 @@ export default function CartScreen() {
 
   async function handleSaveForLater(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     setPending(itemId, 'save');
     try {
       const newCart = await saveForLater(itemId);
@@ -322,7 +323,7 @@ export default function CartScreen() {
   }
 
   async function handleMoveToCart(savedId: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     const newCart = await moveToCart(savedId);
     setCart(newCart);
   }
@@ -386,7 +387,7 @@ export default function CartScreen() {
       });
       setLoyaltyBalance(current => Math.max(0, current - result.pointsUsed));
       setPointsInput('');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
     } catch (error: any) {
       Alert.alert('Could not apply points', error?.message ?? 'Please try again.');
     } finally {

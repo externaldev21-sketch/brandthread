@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 
 import {
@@ -293,12 +293,10 @@ export default function QuoteRequestScreen() {
       Alert.alert('Choose a manufacturer', 'Pick who you want to send this quote request to.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step < totalSteps) setStep(s => s + 1);
   }
 
   function goBack() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step > 1) setStep(s => s - 1);
   }
 
@@ -379,7 +377,7 @@ export default function QuoteRequestScreen() {
             return (
               <TouchableOpacity
                 key={mfg.id}
-                onPress={() => { setPickedManufacturerId(mfg.id); Haptics.selectionAsync(); }}
+                onPress={() => { setPickedManufacturerId(mfg.id); haptics.selection(); }}
                 style={[sc.radioCard, active && sc.radioCardActive]}
                 activeOpacity={0.8}
               >
@@ -426,7 +424,7 @@ export default function QuoteRequestScreen() {
           return (
             <TouchableOpacity
               key={src}
-              onPress={() => { setProductSource(src); Haptics.selectionAsync(); }}
+              onPress={() => { setProductSource(src); haptics.selection(); }}
               style={[sc.radioCard, active && sc.radioCardActive]}
               activeOpacity={0.8}
             >

@@ -1,3 +1,4 @@
+import { hapticPrimaryAction } from '@/lib/haptics';
 /**
  * Nicknames — chat details > Nicknames. Sets a per-conversation nickname for
  * the other participant; once set, it renders in place of their real name in
@@ -11,7 +12,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { Button } from '@/components/ui/Button';
-import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { isPreviewConversationId } from '@/lib/previewInbox';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
@@ -56,7 +57,7 @@ export default function ConversationNicknamesScreen() {
           await setConversationNickname(conversationId, participant.userId, nickname);
         }
       }
-      hapticSuccessAction();
+      haptics.success();
       goBackOr(router);
     } catch (e) {
       Alert.alert('Couldn’t save nickname', apiErrorMessage(e, 'Please try again.'));
@@ -69,7 +70,7 @@ export default function ConversationNicknamesScreen() {
     <View style={[s.root, { backgroundColor: theme.background }]}>
       <ScreenHeader
         title="Nickname"
-        onBack={() => { hapticPrimaryAction(); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
         backTestID="conversation-nicknames-back"
       />
 

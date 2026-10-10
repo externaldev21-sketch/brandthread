@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
 import {
   Keyboard,
@@ -10,7 +11,6 @@ import {
 } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -82,7 +82,6 @@ export default function SellerCreateFAB() {
           pressed && styles.pressed,
         ]}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
           setOpen(true);
         }}
         accessibilityRole="button"

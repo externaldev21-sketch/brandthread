@@ -1,3 +1,5 @@
+import { openContextMenu } from '@/lib/contextMenu';
+import { copyText } from '@/lib/shareActions';
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -118,8 +120,27 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
   const showBadge = !statusBadgeRepeatsHeadline({ status: order.status, hasHeadline: !!headline, autoRefunded });
   const thumbs = order.lineItems.slice(0, 4);
 
+  // Long-press: the long-press preview menu (Instagram) — the order enlarged
+  // over a blurred list with its actions under it; tapping it opens the order.
+  const openMenu = () => {
+    openContextMenu({
+      preview: {
+        imageUri: firstItem?.imageUri,
+        aspectRatio: 1,
+        title: order.sellerName,
+        subtitle: [order.orderNumber, headline?.text].filter(Boolean).join(' · '),
+      },
+      onPreviewPress: onPress,
+      items: [
+        { key: 'open', label: 'View order', icon: 'package', onPress },
+        ...(onReorder ? [{ key: 'reorder', label: 'Buy again', icon: 'rotate-cw' as const, onPress: () => onReorder(order.id) }] : []),
+        { key: 'copy', label: 'Copy order number', icon: 'copy', onPress: () => { void copyText(order.orderNumber, 'Order number copied'); } },
+      ],
+    });
+  };
+
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} onPressIn={isPreview ? undefined : () => prefetchBuyerOrderOnPressIn(order.id)} disabled={isPreview}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} onPressIn={isPreview ? undefined : () => prefetchBuyerOrderOnPressIn(order.id)} onLongPress={isPreview ? undefined : openMenu} delayLongPress={350} disabled={isPreview}>
       {/* Top row */}
       <View style={styles.cardTopRow}>
         <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
@@ -378,7 +399,6 @@ export default function BuyerOrdersScreen() {
 
   const retry = useCallback(() => {
     if (refreshing) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     consecutiveFailuresRef.current = 0;
     setRefreshing(true);
     if (orders.length === 0) setLoading(true);

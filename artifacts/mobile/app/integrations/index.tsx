@@ -70,7 +70,6 @@ export default function IntegrationsScreen() {
   useFocusEffect(useCallback(() => { load(); }, []));
 
   async function handleConnectStripe() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setToggling('stripe');
     try {
       const data = await api.seller.connect.onboard();
@@ -95,7 +94,6 @@ export default function IntegrationsScreen() {
       if (!isStripeFullyConnected(stripeStatus)) await handleConnectStripe();
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (item.route) { router.push(item.route as never); return; }
 
     const isConnected = connectedKeys.has(item.key);

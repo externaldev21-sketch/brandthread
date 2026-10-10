@@ -1,3 +1,5 @@
+import { haptics } from '@/lib/haptics';
+const haptic = haptics.light;
 /**
  * Seller Plan & billing — one screen modelled on Shopify's Settings → Plan
  * and Settings → Billing (iOS), reskinned black/white/silver:
@@ -135,10 +137,6 @@ export default function BillingScreen() {
   useFocusEffect(useCallback(() => {
     if (!isPreview) void loadStatus();
   }, [isPreview, loadStatus]));
-
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
 
   async function openBillingPortal() {
     haptic();
@@ -501,7 +499,7 @@ export default function BillingScreen() {
               {(['all', 'paid', 'unpaid'] as BillFilter[]).map((f) => (
                 <TouchableOpacity
                   key={f}
-                  onPress={() => { haptic(); setFilter(f); }}
+                  onPress={() => { haptics.selection(); setFilter(f); }}
                   style={[styles.filterTab, { backgroundColor: filter === f ? colors.card : 'transparent' }]}
                   activeOpacity={0.7}
                 >

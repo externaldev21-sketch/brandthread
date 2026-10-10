@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useApi } from '@/hooks/useApi';
@@ -268,7 +268,6 @@ export default function SellerHomeCommerceDashboard({
 
   const handleCopyStoreUrl = useCallback(() => {
     if (!storeUrl) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     (async () => {
       if (Platform.OS === 'web') {
         await navigator?.clipboard?.writeText?.(storeUrl);
@@ -527,7 +526,6 @@ export default function SellerHomeCommerceDashboard({
   );
 
   const nav = useCallback((route: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     router.push(route as never);
   }, [router]);
 
@@ -620,7 +618,7 @@ export default function SellerHomeCommerceDashboard({
                 payoutAttemptKeyRef.current = null;
                 await AsyncStorage.removeItem(storageKey).catch(() => {});
                 await loadFinanceBalance();
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                haptics.success();
                 Alert.alert(
                   'Cash out requested',
                   `${payout.formatted ?? financeBalance.available.formatted} is being sent to your bank account.`,
@@ -644,7 +642,7 @@ export default function SellerHomeCommerceDashboard({
                       ? 'This payout needs review before it can continue. Do not start another cash out for the same funds.'
                     : 'The cash-out request could not be confirmed. Try again to safely retry the same request.';
                 await loadFinanceBalance();
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+                haptics.error();
                 Alert.alert('Could not cash out', message);
               } finally {
                 setCashingOut(false);
@@ -657,7 +655,6 @@ export default function SellerHomeCommerceDashboard({
   }, [api, currentRole, financeBalance, isSignedIn, loadFinanceBalance, nav, userId]);
 
   const openTask = useCallback((task: SetupTask) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     // push (never replace) straight into the task's flow with an explicit
     // `from=dashboard`: the destination's Cancel/Back pops to this exact
     // dashboard scene (docs/NAVIGATION.md). replace() used to drop the

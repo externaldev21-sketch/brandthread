@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { radius as ControlRadius } from '@/constants/radii';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAgeStatus } from '@/lib/ageGate';
@@ -5,7 +6,7 @@ import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -248,7 +249,7 @@ function PayoutsScreenContent() {
   if (!isPreview && isLoadingRole) {
     return (
       <View style={styles.root}>
-        <ScreenHeader title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
+        <ScreenHeader title="Payouts" onBack={() => { leaveSetupDestination(); }} />
         <View style={{ padding: SP.md, gap: SP.sm }}>
           <LoadingSkeleton height={140} />
           <LoadingSkeleton height={44} />
@@ -260,7 +261,7 @@ function PayoutsScreenContent() {
   if (!isPreview && !hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={styles.root}>
-        <ScreenHeader title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
+        <ScreenHeader title="Payouts" onBack={() => { leaveSetupDestination(); }} />
         <RoleLockedView screenTitle="payouts" currentRole={currentRole ?? undefined} />
       </View>
     );
@@ -270,10 +271,10 @@ function PayoutsScreenContent() {
     <View style={styles.root}>
       <ScreenHeader
         title="Payouts"
-        onBack={() => { haptic(); leaveSetupDestination(); }}
+        onBack={() => { leaveSetupDestination(); }}
         actions={[{
           icon: 'help-circle',
-          onPress: () => { haptic(); router.push('/help' as never); },
+          onPress: () => { router.push('/help' as never); },
           accessibilityLabel: 'Payouts help',
         }]}
       />
@@ -311,7 +312,7 @@ function PayoutsScreenContent() {
           <LoadingSkeleton height={44} style={{ width: 160, marginTop: 6, marginBottom: 6 }} />
         ) : loadError ? (
           <View style={{ marginTop: 6, marginBottom: 6 }}>
-            <RetryRow label="Couldn't load balance" onRetry={() => { haptic(); void load(); }} />
+            <RetryRow label="Couldn't load balance" onRetry={() => { void load(); }} />
           </View>
         ) : (
           <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
@@ -351,7 +352,7 @@ function PayoutsScreenContent() {
             key={t}
             testID={`seller-payouts-tab-${t}`}
             style={[styles.tab, activeTab === t && styles.tabActive]}
-            onPress={() => { haptic(); setActiveTab(t); }}
+            onPress={() => { haptics.selection(); setActiveTab(t); }}
           >
             <Text style={[styles.tabText, activeTab === t && styles.tabTextActive]}>
               {t === 'payouts' ? 'Payout history' : 'Bank account'}
@@ -367,7 +368,7 @@ function PayoutsScreenContent() {
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
             </View>
           ) : loadError ? (
-            <ErrorState message="Couldn't load your payouts." onRetry={() => { haptic(); void load(); }} />
+            <ErrorState message="Couldn't load your payouts." onRetry={() => { void load(); }} />
           ) : payouts.length === 0 ? (
             <View style={{ alignItems: 'center' }}>
               <EmptyState
@@ -389,7 +390,7 @@ function PayoutsScreenContent() {
                 <TouchableOpacity
                   key={p.id}
                   style={styles.payoutRow}
-                  onPress={() => { haptic(); router.push({ pathname: '/payout-detail', params: { id: p.id } } as never); }}
+                  onPress={() => { router.push({ pathname: '/payout-detail', params: { id: p.id } } as never); }}
                   accessibilityRole="button"
                   accessibilityLabel={`Payout ${p.amount}, ${cfg.label}`}
                 >
@@ -448,7 +449,7 @@ function PayoutsScreenContent() {
              <TouchableOpacity
                testID="seller-payouts-setup-checklist"
                style={[styles.settingsRow, { borderTopWidth: 0, marginBottom: SP.sm }]}
-               onPress={() => { haptic(); router.push('/payout-setup' as never); }}
+               onPress={() => { router.push('/payout-setup' as never); }}
                accessibilityRole="button"
                accessibilityLabel="Open payout setup checklist"
              >
@@ -461,7 +462,7 @@ function PayoutsScreenContent() {
              <TouchableOpacity
                 testID="seller-payouts-bank-account"
                style={styles.addBankBtn}
-                onPress={() => { haptic(); void openConnectOnboarding(); }}
+                onPress={() => { void openConnectOnboarding(); }}
                disabled={isConnecting || isPreview}
                accessibilityRole="button"
                accessibilityLabel="Add bank account with Stripe"
@@ -494,7 +495,7 @@ function PayoutsScreenContent() {
                {!isReadOnly && (
                  <TouchableOpacity
                    style={[styles.addBankBtn, { marginTop: SP.md }]}
-                   onPress={() => { haptic(); void openConnectOnboarding(); }}
+                   onPress={() => { void openConnectOnboarding(); }}
                    disabled={isConnecting}
                    accessibilityRole="button"
                    accessibilityLabel="Finish Stripe verification"
@@ -520,7 +521,7 @@ function PayoutsScreenContent() {
              <TouchableOpacity
                style={styles.settingsRow}
                testID="seller-payouts-schedule-row"
-               onPress={() => { haptic(); router.push('/payout-schedule' as never); }}
+               onPress={() => { router.push('/payout-schedule' as never); }}
                accessibilityRole="button"
                accessibilityLabel="Payout schedule"
              >
@@ -537,7 +538,7 @@ function PayoutsScreenContent() {
              testID="seller-payouts-fees-link"
              accessibilityRole="button"
              accessibilityLabel="Fees and payments"
-             onPress={() => { haptic(); router.push('/fees' as never); }}
+             onPress={() => { router.push('/fees' as never); }}
            >
              <Text style={styles.feesLinkLabel}>Fees &amp; payments</Text>
              <Feather name="chevron-right" size={18} color={theme.muted} />

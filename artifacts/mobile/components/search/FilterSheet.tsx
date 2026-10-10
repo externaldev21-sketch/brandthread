@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
-import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
@@ -64,12 +64,12 @@ export function FilterSheet({
   const activeBucket = buckets.find((b) => b.min === draft.minPriceCents && b.max === draft.maxPriceCents)?.key;
 
   function toggleList(key: 'sizes' | 'colors' | 'categories' | 'brands', v: string) {
-    hapticSelection();
+    haptics.selection();
     setDraft((prev) => ({ ...prev, [key]: toggleValue(prev[key], v) }));
   }
 
   function togglePriceBucket(bucket: { min?: number; max?: number }) {
-    hapticSelection();
+    haptics.selection();
     setDraft((prev) => {
       const isActive = prev.minPriceCents === bucket.min && prev.maxPriceCents === bucket.max;
       return { ...prev, minPriceCents: isActive ? undefined : bucket.min, maxPriceCents: isActive ? undefined : bucket.max };
@@ -77,12 +77,11 @@ export function FilterSheet({
   }
 
   function handleClearAll() {
-    hapticSelection();
+    haptics.selection();
     setDraft({});
   }
 
   function handleApply() {
-    hapticPrimaryAction();
     onApply(draft);
     onClose();
   }
@@ -135,7 +134,19 @@ export function FilterSheet({
   );
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} testID="search-filter-sheet">
+    <BottomSheet visible={visible} onClose={onClose} testID="search-filter-sheet" detents footer={(
+      <PressableScale
+        onPress={handleApply}
+        style={[styles.applyBtn, { backgroundColor: theme.accent }]}
+        accessibilityRole="button"
+        accessibilityLabel={draftCount > 0 ? `Show results, ${draftCount} filters active` : 'Show results'}
+        testID="search-filter-apply"
+      >
+        <Text style={[styles.applyText, { color: theme.onAccent }]}>
+          {draftCount > 0 ? `Show results · ${draftCount}` : 'Show results'}
+        </Text>
+      </PressableScale>
+    )}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>Filters</Text>
         <PressableScale
@@ -153,7 +164,7 @@ export function FilterSheet({
       <Text style={[styles.sectionLabel, { color: theme.muted }]}>Sort by</Text>
       <View style={styles.listWrap}>
         {SORT_OPTIONS.map((opt) =>
-          row(opt.key, opt.label, (draft.sort ?? 'relevance') === opt.key, () => { hapticSelection(); setDraft((prev) => ({ ...prev, sort: opt.key })); }, undefined, `search-filter-sort-${opt.key}`),
+          row(opt.key, opt.label, (draft.sort ?? 'relevance') === opt.key, () => { haptics.selection(); setDraft((prev) => ({ ...prev, sort: opt.key })); }, undefined, `search-filter-sort-${opt.key}`),
         )}
       </View>
 
@@ -238,17 +249,6 @@ export function FilterSheet({
         </>
       )}
 
-      <PressableScale
-        onPress={handleApply}
-        style={[styles.applyBtn, { backgroundColor: theme.accent }]}
-        accessibilityRole="button"
-        accessibilityLabel={draftCount > 0 ? `Show results, ${draftCount} filters active` : 'Show results'}
-        testID="search-filter-apply"
-      >
-        <Text style={[styles.applyText, { color: theme.onAccent }]}>
-          {draftCount > 0 ? `Show results · ${draftCount}` : 'Show results'}
-        </Text>
-      </PressableScale>
     </BottomSheet>
   );
 }

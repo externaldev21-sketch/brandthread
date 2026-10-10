@@ -2,7 +2,6 @@ import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -31,7 +30,7 @@ export function RecentSearchRow({ term, onPress, onRemove, icon = 'clock' }: {
   return (
     <View style={styles.row}>
       <Pressable
-        onPress={() => { hapticPrimaryAction(); onPress(); }}
+        onPress={() => { onPress(); }}
         onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
         onPressOut={() => pressScaleAnim(scale, 1).start()}
         accessibilityRole="button"
@@ -47,7 +46,7 @@ export function RecentSearchRow({ term, onPress, onRemove, icon = 'clock' }: {
       </Pressable>
       {onRemove ? (
       <TouchableOpacity
-        onPress={() => { hapticSelection(); onRemove(); }}
+        onPress={() => { onRemove(); }}
         accessibilityRole="button"
         accessibilityLabel={`Remove ${term} from recent searches`}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}

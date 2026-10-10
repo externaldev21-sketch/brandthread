@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { relativeTime } from '@/lib/activity';
 import { plural } from '@/lib/plural';
@@ -211,7 +212,7 @@ export default function StoreBuilderScreen() {
         'customize_store',
         () => applyTheme(THREAD_THEME_ID, 'light'),
       );
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       router.push('/store-editor' as never);
     } catch {
       Alert.alert('Could not open Thread Theme', 'Please try again.');
@@ -304,7 +305,6 @@ export default function StoreBuilderScreen() {
                     key={label}
                     style={s.quickActionBtn}
                     onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       router.push(route as never);
                     }}
                     activeOpacity={0.7}
@@ -400,7 +400,7 @@ export default function StoreBuilderScreen() {
                 <TouchableOpacity
                   key={label}
                   style={s.mgmtCard}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }}
+                  onPress={() => { router.push(route as never); }}
                   activeOpacity={0.75}
                 >
                   <View style={s.mgmtIconWrap}>
@@ -420,7 +420,7 @@ export default function StoreBuilderScreen() {
                 <TouchableOpacity
                   key={label}
                   style={s.mgmtCard}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }}
+                  onPress={() => { router.push(route as never); }}
                   activeOpacity={0.75}
                 >
                   <View style={s.mgmtIconWrap}>
@@ -440,7 +440,7 @@ export default function StoreBuilderScreen() {
                 <TouchableOpacity
                   key={label}
                   style={s.mgmtCard}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }}
+                  onPress={() => { router.push(route as never); }}
                   activeOpacity={0.75}
                 >
                   <View style={s.mgmtIconWrap}>
@@ -476,7 +476,6 @@ export default function StoreBuilderScreen() {
               <Button
                 label="Open suggestions →"
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   router.push('/store-ai-improve' as never);
                 }}
                 fullWidth

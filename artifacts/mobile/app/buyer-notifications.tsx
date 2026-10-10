@@ -1,3 +1,4 @@
+import { hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import {
@@ -23,8 +24,8 @@ import { BottomSheet, Chip, ListRow } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { hapticDestructiveConfirm, hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
-import SwipeActionRow from '@/components/SwipeActionRow';
+import { haptics } from '@/lib/haptics';
+import SwipeRow from '@/components/ui/SwipeRow';
 import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
@@ -331,7 +332,6 @@ export default function BuyerNotifications() {
   }
 
   const handleTap = async (notif: Notification) => {
-    hapticPrimaryAction();
     void captureNotificationEvent(api, user?.id, {
       notificationId: notif.id,
       eventType: 'tap',
@@ -345,7 +345,7 @@ export default function BuyerNotifications() {
   };
 
   const handleLongPress = (notif: Notification) => {
-    hapticToggle();
+    haptics.rigid();
     setOptionsFor(notif);
   };
 
@@ -436,12 +436,28 @@ export default function BuyerNotifications() {
     const iconColor = notifIconColor(notif.category, theme);
 
     return (
-      <SwipeActionRow
-        label={notif.isRead ? 'Unread' : 'Read'}
-        icon={notif.isRead ? 'mail' : 'check'}
-        color={notif.isRead ? theme.accent : theme.success}
-        onAction={() => toggleRead(notif)}
-        accessibilityLabel={`Mark notification ${notif.isRead ? 'unread' : 'read'}`}
+      // Apple Mail: read / unread on the left (full swipe right toggles),
+      // clear on the right (full swipe left removes it).
+      <SwipeRow
+        rowId={notif.id}
+        leading={[{
+          key: 'read',
+          label: notif.isRead ? 'Unread' : 'Read',
+          icon: notif.isRead ? 'mail' : 'check',
+          onPress: () => toggleRead(notif),
+          accessibilityLabel: `Mark notification ${notif.isRead ? 'unread' : 'read'}`,
+        }]}
+        trailing={[{
+          key: 'clear',
+          label: 'Clear',
+          icon: 'trash-2',
+          tone: 'destructive',
+          onPress: async () => {
+            setNotifs(prev => prev.filter(n => n.id !== notif.id));
+            try { await deleteNotification(notif.id); } catch { await loadNotifs(); }
+          },
+          accessibilityLabel: 'Clear notification',
+        }]}
       >
         <PressableScale
           style={[
@@ -497,7 +513,7 @@ export default function BuyerNotifications() {
             <Feather name="chevron-right" size={ICON.sm} color={theme.subtle} />
           ) : null}
         </PressableScale>
-      </SwipeActionRow>
+      </SwipeRow>
     );
   };
 

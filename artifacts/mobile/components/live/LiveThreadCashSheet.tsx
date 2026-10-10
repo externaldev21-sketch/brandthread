@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * LIVE viewer Thread Cash gift sheet — the rail's bill icon. TikTok LIVE
  * gift-sheet structure (balance at top, grid of tip amounts, one Send CTA),
@@ -128,6 +129,7 @@ export function LiveThreadCashSheet({
         return;
       }
     }
+    haptics.success();
     setBalanceCents(prev => (prev == null ? prev : Math.max(0, prev - selected)));
     setJustSentCents(selected);
     onSent(selected);
@@ -171,7 +173,7 @@ export function LiveThreadCashSheet({
               <Pressable
                 key={cents}
                 disabled={!affordable}
-                onPress={() => { hapticLight(); setSelected(cents); }}
+                onPress={() => { haptics.selection(); setSelected(cents); }}
                 style={[
                   styles.tip,
                   { borderColor: isSelected ? theme.accent : theme.border },

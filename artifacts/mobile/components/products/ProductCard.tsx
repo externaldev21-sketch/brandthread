@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * "The Rack" — editorial product card for the seller Products tab.
  *
@@ -105,7 +106,7 @@ export const ProductCard = React.memo(function ProductCard({
         </PressableScale>
         <PressableScale
           style={[s.swipeBtn, { backgroundColor: theme.error }]}
-          onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); closeSwipe(); onQuickDelete(product); }}
+          onPress={() => { haptics.warning(); closeSwipe(); onQuickDelete(product); }}
           accessibilityLabel={`Delete ${product.name}`}
         >
           <Icon name="trash-2" size={ICON_SIZE.md} color={theme.background} />
@@ -119,7 +120,6 @@ export const ProductCard = React.memo(function ProductCard({
       <Swipeable
         ref={swipeRef}
         renderRightActions={renderRightActions}
-        onSwipeableWillOpen={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
         overshootRight={false}
         friction={2}
       >

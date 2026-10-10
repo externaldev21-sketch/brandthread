@@ -14,7 +14,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -120,7 +120,7 @@ export default function ReviewQueueScreen() {
 
   async function resolve(item: ModerationQueueItem, action: ModerationAction, note: string) {
     const result = await api.moderation.resolve(item.id, action, note || undefined);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     setSelected(null);
     setQueue((prev) => prev ? {
       ...prev,
@@ -139,7 +139,7 @@ export default function ReviewQueueScreen() {
 
   async function reinstate(owner: ProfileSummary) {
     await api.moderation.reinstate(owner.userId);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     setSelected(null);
     showToast(`${owner.name} reinstated`);
     load(true);
@@ -175,7 +175,7 @@ export default function ReviewQueueScreen() {
               return (
                 <Pressable
                   key={key}
-                  onPress={() => { Haptics.selectionAsync(); setStatus(key); }}
+                  onPress={() => { haptics.selection(); setStatus(key); }}
                   style={({ pressed }) => [s.segmentItem, active && s.segmentItemActive, pressed && !active && { opacity: 0.7 }]}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
@@ -194,7 +194,7 @@ export default function ReviewQueueScreen() {
               return (
                 <PressableScale
                   key={filter.key}
-                  onPress={() => { Haptics.selectionAsync(); setTypeFilter(filter.key); }}
+                  onPress={() => { haptics.selection(); setTypeFilter(filter.key); }}
                   style={[s.filterChip, active && s.filterChipActive]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}

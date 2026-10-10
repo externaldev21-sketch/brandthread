@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -92,7 +92,7 @@ function SellerGoLiveNativeScreen() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleFeaturedProduct(product: any) {
-    Haptics.selectionAsync();
+    haptics.selection();
     setFeaturedProducts(prev =>
       prev.some(p => p.id === product.id)
         ? prev.filter(p => p.id !== product.id)
@@ -112,7 +112,7 @@ function SellerGoLiveNativeScreen() {
   }, []);
 
   const flipCamera = useCallback(() => {
-    Haptics.selectionAsync();
+    haptics.selection();
     Animated.sequence([
       Animated.timing(flipAnim, { toValue: 0, duration: 140, useNativeDriver: true }),
       Animated.timing(flipAnim, { toValue: 1, duration: 140, useNativeDriver: true }),
@@ -125,7 +125,7 @@ function SellerGoLiveNativeScreen() {
   }, [flipAnim]);
 
   const toggleTorch = useCallback(() => {
-    Haptics.selectionAsync();
+    haptics.selection();
     setTorch(v => !v);
   }, []);
 
@@ -139,7 +139,6 @@ function SellerGoLiveNativeScreen() {
 
   async function handleGoLive() {
     if (!title.trim() || starting) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setStarting(true);
     try {
       const result = await (api as any).live.start({

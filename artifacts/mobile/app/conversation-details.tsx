@@ -1,3 +1,4 @@
+import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 /**
  * Chat details — Instagram DM's chat-settings page, opened by tapping the
  * conversation header's name (buyer-conversation.tsx / seller-conversation.tsx
@@ -28,7 +29,7 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { ThemePickerSheet } from '@/components/chat/ThemePickerSheet';
 import { ThemePreviewScreen } from '@/components/chat/ThemePreviewScreen';
 import { CONVERSATION_THEMES, getConversationTheme } from '@/lib/conversationThemes';
-import { hapticPrimaryAction, hapticSelection, hapticToggle, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { reportHref, confirmBlock, confirmUnblock, apiErrorMessage } from '@/lib/safety';
 import { useApi } from '@/lib/api';
 import {
@@ -152,7 +153,7 @@ export default function ConversationDetailsScreen() {
 
   async function applyMute(minutes: number | null) {
     setMuteVisible(false);
-    hapticToggle();
+    haptics.selection();
     setBusy(true);
     try {
       if (isPreview) {
@@ -186,7 +187,7 @@ export default function ConversationDetailsScreen() {
         await setConversationTheme(conversationId!, nextThemeId);
       }
       setThemeId(nextThemeId);
-      hapticSuccessAction();
+      haptics.success();
       setPreviewThemeId(null);
       setThemePickerVisible(false);
     } catch (e) {
@@ -197,7 +198,7 @@ export default function ConversationDetailsScreen() {
   }
 
   async function toggleDisappearing(next: boolean) {
-    hapticToggle();
+    haptics.selection();
     setDisappearing(next);
     try {
       if (isPreview) {
@@ -218,7 +219,6 @@ export default function ConversationDetailsScreen() {
   }
 
   function openNicknames() {
-    hapticPrimaryAction();
     const qs = new URLSearchParams({
       id: conversationId ?? '',
       role: params.role ?? 'buyer',
@@ -230,7 +230,6 @@ export default function ConversationDetailsScreen() {
   }
 
   function openPrivacySafety() {
-    hapticPrimaryAction();
     const qs = new URLSearchParams({
       id: conversationId ?? '',
       participantUserId: participant?.userId ?? '',
@@ -240,7 +239,6 @@ export default function ConversationDetailsScreen() {
   }
 
   function openCreateGroup() {
-    hapticPrimaryAction();
     router.push(('/conversation-group-create?role=' + (params.role ?? 'buyer')) as never);
   }
 
@@ -342,7 +340,7 @@ export default function ConversationDetailsScreen() {
               icon={isMuted ? 'bell-off' : 'bell'}
               label={isMuted ? 'Unmute' : 'Mute'}
               theme={theme}
-              onPress={() => { hapticPrimaryAction(); isMuted ? applyMute(null) : setMuteVisible(true); }}
+              onPress={() => { isMuted ? applyMute(null) : setMuteVisible(true); }}
               testID="chat-details-action-mute"
             />
             <ActionButton icon="more-horizontal" label="Options" theme={theme} onPress={openOptions} testID="chat-details-action-options" />
@@ -355,7 +353,7 @@ export default function ConversationDetailsScreen() {
             title="Theme"
             subtitle={getConversationTheme(themeId)?.name ?? 'Default'}
             pill="New"
-            onPress={() => { hapticSelection(); setThemePickerVisible(true); }}
+            onPress={() => { setThemePickerVisible(true); }}
             testID="chat-details-row-theme"
           />
           <ListRow

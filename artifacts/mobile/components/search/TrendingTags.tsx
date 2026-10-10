@@ -4,7 +4,6 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
-import { hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
@@ -42,7 +41,7 @@ export function TrendingTags({ onPress }: { onPress: (tag: string) => void }) {
         {tags.map((tag) => (
           <TouchableOpacity
             key={tag}
-            onPress={() => { hapticSelection(); onPress(tag); }}
+            onPress={() => { onPress(tag); }}
             accessibilityRole="button"
             accessibilityLabel={`Trending hashtag ${tag}`}
             style={[styles.chip, { borderColor: theme.border, backgroundColor: theme.surface }]}

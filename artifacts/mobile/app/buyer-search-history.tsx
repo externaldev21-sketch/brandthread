@@ -14,7 +14,7 @@ import { RecentSearchRow } from '@/components/search/RecentSearchRow';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
-import { hapticDestructiveConfirm, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
 
@@ -65,7 +65,7 @@ export default function BuyerSearchHistoryScreen() {
           text: 'Clear all',
           style: 'destructive',
           onPress: async () => {
-            hapticDestructiveConfirm();
+            haptics.warning();
             setTerms([]);
             try { await api.public.clearRecent(); } catch { /* already cleared locally */ }
           },
@@ -83,7 +83,7 @@ export default function BuyerSearchHistoryScreen() {
         // Only offered when there is something to clear.
         rightElement={hasTerms ? (
           <PressableScale
-            onPress={() => { hapticSelection(); confirmClearAll(); }}
+            onPress={() => { confirmClearAll(); }}
             disabled={!hasTerms}
             accessibilityRole="button"
             accessibilityLabel="Clear all recent searches"

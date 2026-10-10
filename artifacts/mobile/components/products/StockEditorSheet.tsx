@@ -17,7 +17,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { Product } from '@/services/productTypes';
 import { adjustInventory, adjustVariantStock, setVariantStock, getProduct } from '@/services/productService';
 
@@ -136,7 +136,7 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
               <View style={s.stepper}>
                 <PressableScale
                   style={s.stepBtn}
-                  onPress={() => { hapticLight(); void applyDelta(row, -1, `Decrease ${row.title}`); }}
+                  onPress={() => { haptics.selection(); void applyDelta(row, -1, `Decrease ${row.title}`); }}
                   accessibilityLabel={`Decrease ${row.title} stock`}
                   disabled={row.qty <= 0}
                 >
@@ -145,7 +145,7 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
                 <TextInput
                   value={row.draft}
                   onChangeText={(text) => setRows(prev => prev.map(r => (r.key === row.key ? { ...r, draft: text.replace(/[^0-9]/g, '') } : r)))}
-                  onSubmitEditing={() => { hapticSelection(); void applyDirectEntry(row); }}
+                  onSubmitEditing={() => { void applyDirectEntry(row); }}
                   onBlur={() => { void applyDirectEntry(row); }}
                   keyboardType="number-pad"
                   returnKeyType="done"
@@ -154,7 +154,7 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
                 />
                 <PressableScale
                   style={s.stepBtn}
-                  onPress={() => { hapticLight(); void applyDelta(row, 1, `Increase ${row.title}`); }}
+                  onPress={() => { haptics.selection(); void applyDelta(row, 1, `Increase ${row.title}`); }}
                   accessibilityLabel={`Increase ${row.title} stock`}
                 >
                   <Feather name="plus" size={ICON.sm} color={theme.text} />

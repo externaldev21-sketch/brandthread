@@ -47,7 +47,6 @@ import ReanimatedAnimated, {
   interpolate,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { Glass } from '@/components/ui/Glass';
 import { formatCents } from '@/lib/money';
@@ -112,7 +111,6 @@ export function useShopTagPill(isActive: boolean): ShopTagPillState {
   }, [progress, clearCollapseTimer]);
 
   const expand = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExpanded(true);
     progress.value = withTiming(1, { duration: SHOP_TAB_ANIM_MS, easing: SHOP_TAB_EASING });
     clearCollapseTimer();

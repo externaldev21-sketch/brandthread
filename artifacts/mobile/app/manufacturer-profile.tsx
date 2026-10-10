@@ -17,7 +17,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -129,7 +129,7 @@ export default function ManufacturerProfileScreen() {
 
   async function handleSave() {
     if (!id || actionLoading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.light();
     setActionLoading(true);
     try {
       if (saved) {
@@ -148,7 +148,6 @@ export default function ManufacturerProfileScreen() {
 
   async function handleMessage() {
     if (!id) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isSellerDevPreview()) {
       Alert.alert('Sign in required', 'Sign in to message this manufacturer.');
       return;
@@ -407,7 +406,7 @@ export default function ManufacturerProfileScreen() {
               </View>
             </View>
             <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push((`/request-sample?manufacturerId=${m.id}`) as never); }}
+              onPress={() => { router.push((`/request-sample?manufacturerId=${m.id}`) as never); }}
               style={s.requestSampleBtn}
               activeOpacity={0.85}
               accessibilityRole="button"

@@ -1,3 +1,4 @@
+import { hapticPrimaryAction } from '@/lib/haptics';
 /**
  * More Screen — Brandthread Seller App
  * Hub for store, studio, operations, growth, money, and account.
@@ -20,7 +21,6 @@ import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { RADII } from '@/constants/radii';
-import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
@@ -187,14 +187,12 @@ export default function MoreScreen() {
   };
 
   const handleNavPress = (item: NavItem) => {
-    hapticPrimaryAction();
     if (item.route) {
       router.push(item.route as any);
     }
   };
 
   const toggleSection = (key: string) => {
-    hapticToggle();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
   };

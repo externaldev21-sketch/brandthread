@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * Export analytics — CSV (or PDF) of orders, products, analytics, threads and
  * videos, audience and goals for a Dashboard range, generated server-side and
@@ -35,7 +36,7 @@ export default function ExportReport() {
   const [picked, setPicked] = useState<ExportSectionKey[]>(['orders', 'products', 'analytics']);
   const [busy, setBusy] = useState(false);
 
-  const toggle = (k: ExportSectionKey) => { Haptics.selectionAsync(); setPicked(p => (p.includes(k) ? p.filter(x => x !== k) : [...p, k])); };
+  const toggle = (k: ExportSectionKey) => { haptics.selection(); setPicked(p => (p.includes(k) ? p.filter(x => x !== k) : [...p, k])); };
 
   async function onExport() {
     if (previewMode()) { Alert.alert('Preview', 'Exports are generated for signed-in sellers.'); return; }

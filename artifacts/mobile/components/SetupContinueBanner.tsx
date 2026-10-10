@@ -6,7 +6,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -27,7 +26,7 @@ export default function SetupContinueBanner({
     <TouchableOpacity
       style={s.root}
       activeOpacity={0.85}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress(); }}
+      onPress={() => onPress()}
       accessibilityRole="button"
       accessibilityLabel={`Continue store setup, ${Math.round(percent)}% complete`}
     >

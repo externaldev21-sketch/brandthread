@@ -47,7 +47,6 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
     <View style={{ width: TILE_WIDTH }}>
     <Pressable
       onPress={() => {
-        hapticLight();
         push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}&src=feed`) as never);
       }}
       onPressIn={() => prefetchProductOnPressIn(item.productId, item.imageUri)}

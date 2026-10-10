@@ -7,7 +7,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useApi } from '@/lib/api';
 import { useTeamRole } from '@/hooks/useTeamRole';
@@ -137,7 +137,6 @@ export default function TeamScreen() {
   };
 
   const openInvite = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setInviteEmail('');
     setInviteRole('viewer');
     setInviteResult(null);
@@ -176,7 +175,6 @@ export default function TeamScreen() {
   };
 
   const handleRegenerate = async (m: any) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setRegeneratingId(m.id);
     try {
       const res = await api.team.regenerateInvite(m.id);
@@ -197,19 +195,16 @@ export default function TeamScreen() {
   };
 
   const copyLink = async (url: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(url);
     Alert.alert('Link copied', 'The invite link is on your clipboard.');
   };
 
   const shareLink = async (url: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try { await Share.share({ message: `Join my team on Brandthread: ${url}` }); } catch { /* cancelled */ }
   };
 
   const dismissExpiredInvite = (member: any) => {
     if (currentRole !== 'owner') return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
       'Dismiss expired invite',
       `${member.name ?? member.email} will be removed from your expired invites.`,
@@ -219,6 +214,7 @@ export default function TeamScreen() {
           text: 'Dismiss',
           style: 'destructive',
           onPress: async () => {
+            haptics.warning();
             setDismissingId(member.id);
             try {
               await api.team.remove(member.id);
@@ -255,7 +251,7 @@ export default function TeamScreen() {
       <TouchableOpacity
         key={m.id}
         activeOpacity={0.7}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/users?id=${m.id}` as never); }}
+        onPress={() => { router.push(`/users?id=${m.id}` as never); }}
         style={[styles.memberRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
       >
         <View style={styles.memberLeft}>
@@ -469,7 +465,7 @@ export default function TeamScreen() {
                 {INVITE_ROLES.map(r => (
                   <TouchableOpacity
                     key={r.key}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setInviteRole(r.key); }}
+                    onPress={() => { haptics.selection(); setInviteRole(r.key); }}
                     activeOpacity={0.8}
                     style={[
                       styles.rolePillWrap,

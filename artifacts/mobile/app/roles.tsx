@@ -3,7 +3,6 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-nati
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { Alert } from 'react-native';
@@ -29,10 +28,6 @@ export default function RolesScreen() {
     api.team.roles().then(r => { if (r?.length) setRoles(r); }).catch(() => {});
   }, []);
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
@@ -40,7 +35,7 @@ export default function RolesScreen() {
         rightElement={
           <View style={styles.headerActions}>
             <TouchableOpacity
-              onPress={() => { haptic(); router.push('/team' as never); }}
+              onPress={() => { router.push('/team' as never); }}
               activeOpacity={0.7}
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               accessibilityLabel="Invite a team member"
@@ -49,7 +44,6 @@ export default function RolesScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
-                haptic();
                 Alert.alert('Roles', 'Permissions are enforced per role on the server — team members only see and do what their role allows.', [
                   { text: 'Manage team', onPress: () => router.push('/team' as never) },
                   { text: 'OK', style: 'cancel' },
@@ -71,10 +65,10 @@ export default function RolesScreen() {
             <Text style={[styles.allPillText, { color: colors.foreground }]}>All</Text>
           </View>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity onPress={() => {}} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
             <Feather name="search" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity onPress={() => {}} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
             <Feather name="sliders" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
@@ -84,7 +78,6 @@ export default function RolesScreen() {
             <TouchableOpacity
               key={role.name}
               onPress={() => {
-                haptic();
                 router.push(`/users?role=${role.key ?? role.name.toLowerCase()}` as never);
               }}
               activeOpacity={0.7}
@@ -103,7 +96,7 @@ export default function RolesScreen() {
 
         <View style={[styles.footerNote, { backgroundColor: colors.secondary }]}>
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-            Learn more about <Text style={{ textDecorationLine: 'underline' }} onPress={haptic}>roles</Text>
+            Learn more about <Text style={{ textDecorationLine: 'underline' }} onPress={() => {}}>roles</Text>
           </Text>
         </View>
       </ScrollView>

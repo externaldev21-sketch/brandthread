@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * Shared fixed header for every seller list screen with the
  * title+chevron / search+filter+sort / status-chips pattern (currently
@@ -102,7 +103,6 @@ export function SellerListHeader({
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
 
   function openTitleMenu() {
-    hapticSelection();
     titleWrapRef.current?.measureInWindow((x, y, _width, height) => {
       setMenuAnchor({ x, y: y + height + 6 });
     });
@@ -174,7 +174,7 @@ export function SellerListHeader({
                   key={option.key}
                   style={s.titleMenuRow}
                   onPress={() => {
-                    hapticSelection();
+                    haptics.selection();
                     closeTitleMenu();
                     option.onSelect();
                   }}

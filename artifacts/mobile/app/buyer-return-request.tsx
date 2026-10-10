@@ -35,7 +35,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { createReturnRequest } from '@/services/cartService';
@@ -183,7 +183,6 @@ export default function BuyerReturnRequestScreen() {
   async function handleSubmit() {
     setAttempted(true);
     if (!order || reasonMissing || descriptionMissing || submitting) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -204,7 +203,7 @@ export default function BuyerReturnRequestScreen() {
         imageUris: evidencePhotos,
         preferredResolution: 'refund',
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setCreatedReturnId(created.id);
       setPhase('submitted');
     } catch (error) {
@@ -370,7 +369,7 @@ export default function BuyerReturnRequestScreen() {
               key={opt.key}
               label={opt.label}
               selected={reason === opt.key}
-              onPress={() => { Haptics.selectionAsync(); setReason(opt.key); }}
+              onPress={() => { haptics.selection(); setReason(opt.key); }}
               isLast={idx === RETURN_REASON_OPTIONS.length - 1}
             />
           ))}

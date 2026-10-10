@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * Launch publish — confirm and publish the store, then the "you're live" moment
  * with the share link and a downloadable QR code. Publishing reuses
@@ -79,7 +80,7 @@ export default function LaunchPublishScreen() {
       const result = await publishStore();
       if (result.success) {
         await completeSetupTaskWhen('publish_store', true);
-        hapticSuccessAction();
+        haptics.success();
         setLive(true);
       } else {
         setProblem(result.message);
@@ -93,7 +94,6 @@ export default function LaunchPublishScreen() {
 
   const copyLink = async () => {
     if (!storeUrl) return;
-    hapticLight();
     await Clipboard.setStringAsync(storeUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -101,7 +101,6 @@ export default function LaunchPublishScreen() {
 
   const shareLink = async () => {
     if (!storeUrl) return;
-    hapticLight();
     try {
       await Share.share({ message: `Shop ${checklist?.handle ? `@${checklist.handle}` : 'my store'} on Brandthread: ${storeUrl}`, url: storeUrl });
     } catch {
@@ -111,7 +110,6 @@ export default function LaunchPublishScreen() {
 
   const downloadQr = async () => {
     if (!storeUrl) return;
-    hapticLight();
     const result = await saveImageToCameraRoll(storeQrDataUri(storeUrl), 'brandthread-store-qr');
     if (result.ok) {
       setSaved(true);

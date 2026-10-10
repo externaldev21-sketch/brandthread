@@ -155,7 +155,6 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
     setSession((prev) => {
       if (!prev || prev.callId !== callId || prev.status === 'ended') return prev;
       const next = { ...prev, ...patch };
-      if (patch.status === 'connected' && prev.status !== 'connected') hapticSuccessAction();
       if (patch.status === 'ended') {
         teardownSubscription();
         appendLog(next);
@@ -269,7 +268,6 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   const acceptCall = useCallback(async () => {
     const s = sessionRef.current;
     if (!s || s.status !== 'incoming') return;
-    hapticSuccessAction();
     incomingTimeoutRef.current?.();
     incomingTimeoutRef.current = null;
     if (provider.id === 'preview') {
@@ -290,7 +288,6 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   const declineOrEndCall = useCallback(async () => {
     const s = sessionRef.current;
     if (!s || s.status === 'ended') return;
-    hapticDestructiveConfirm();
     const reason: CallEndReason = s.status === 'incoming' ? 'declined'
       : s.status === 'outgoing' ? 'cancelled'
       : 'hangup';

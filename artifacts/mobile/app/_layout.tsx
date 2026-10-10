@@ -89,6 +89,7 @@ import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
 import { ActionSheetHost } from '@/components/ui/ActionSheet';
 import { AppAlertHost } from '@/components/ui/AppAlertHost';
+import { ContextMenuHost } from '@/components/ui/ContextMenuHost';
 import { PushPrePromptHost } from '@/components/PushPrePromptHost';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
@@ -1435,6 +1436,7 @@ function RootLayoutNav() {
       <AiConsentSheet />
       <AppLockGate />
       <AppAlertHost />
+      <ContextMenuHost />
       <ForceUpdateGate />
     </View>
   );

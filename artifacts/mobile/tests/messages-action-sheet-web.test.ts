@@ -45,7 +45,7 @@ describe('Messages "Options" menus use showActionSheet, not the dead-on-web Aler
 
   it('seller conversation header "..." menu (DmSafety.openConversationOptions)', () => {
     const src = read('components/safety/DmSafety.tsx');
-    expect(src).toContain('showActionSheet(counterpart.name');
+    expect(src).toContain('openPullDownMenu(event');
     expect(src).not.toMatch(/Alert\.alert\(\s*(counterpart\.name|'Message')/);
     expect(src).not.toMatch(/import \{ Alert,/);
   });

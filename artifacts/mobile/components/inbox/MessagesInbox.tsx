@@ -58,6 +58,7 @@ import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from
 import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
+import { openContextMenu } from '@/lib/contextMenu';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRow';
@@ -908,7 +909,23 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   }
 
   function longPressConversation(conv: Conversation) {
-    hapticDestructiveConfirm();
+    const other = getParticipant(conv);
+    const opened = other ? openContextMenu({
+      preview: {
+        title: other.name || other.handle,
+        subtitle: other.name ? other.handle : undefined,
+        avatarUri: other.avatarUri,
+        body: conv.lastMessage || ' ',
+      },
+      onPreviewPress: () => openConversation(conv),
+      items: [
+        ...(conv.unreadCount > 0 ? [{ key: 'read', label: 'Mark as read', icon: 'check-circle' as const, onPress: () => { void swipeMarkReadConversation(conv); } }] : []),
+        { key: 'pin', label: conv.isPinned ? 'Unpin' : 'Pin', icon: 'bookmark', onPress: () => { void swipePinConversation(conv); } },
+        { key: 'mute', label: 'Mute', icon: 'bell-off', onPress: () => { void swipeMuteConversation(conv); } },
+        { key: 'archive', label: 'Archive', icon: 'archive', destructive: true, onPress: () => { void swipeArchiveConversation(conv); } },
+      ],
+    }) : false;
+    if (opened) return;
     // Alert.alert() with a button array is a silent no-op on web — this left
     // the row long-press menu completely dead in the web preview. See
     // components/ui/ActionSheet.tsx's header comment.

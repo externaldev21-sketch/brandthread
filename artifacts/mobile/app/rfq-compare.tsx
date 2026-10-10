@@ -9,7 +9,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -63,7 +62,6 @@ export default function RfqCompareScreen() {
   const pendingQuotes = rfq?.quotes.filter((q) => q.quotedPriceCents == null) ?? [];
 
   async function handleAccept(quote: RfqQuote) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Accept quote', `Accept ${quote.manufacturerName}'s quote of ${formatCents(quote.quotedPriceCents ?? 0)}?`, [
       { text: 'Cancel', style: 'cancel' },
       {

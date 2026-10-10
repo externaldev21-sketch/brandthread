@@ -14,7 +14,7 @@ import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { hapticSelection, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { StickyBottomCTA } from '@/components/ui';
@@ -83,7 +83,7 @@ export default function BuyerHighlightStories() {
   useFocusEffect(load);
 
   const toggle = (storyId: string) => {
-    hapticSelection();
+    haptics.selection();
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(storyId) ? next.delete(storyId) : next.add(storyId);
@@ -100,7 +100,7 @@ export default function BuyerHighlightStories() {
       const toRemove = [...existing.entries()].filter(([storyId]) => !selected.has(storyId));
       for (const storyId of toAdd) await api.social.addHighlightItem(highlightId, storyId);
       for (const [, itemId] of toRemove) await api.social.removeHighlightItem(highlightId, itemId);
-      hapticSuccessAction();
+      haptics.success();
       goBackOr(router);
     } catch {
       Alert.alert('Could not save', 'Your highlight was not updated. Try again.');

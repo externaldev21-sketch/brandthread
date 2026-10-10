@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Shopping Preferences — full buyer preferences screen
  * Sizes, fit, categories, alerts, and activity toggles
@@ -11,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import {
   BG, CARD, BORDER, FG, MUTED,
   FONT, FS, SP, RADIUS, GRAD_PRIMARY,
@@ -172,7 +173,7 @@ export default function ShoppingPreferences() {
       }
     }
     setHasChanges(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     goBackOr(router);
   }
 

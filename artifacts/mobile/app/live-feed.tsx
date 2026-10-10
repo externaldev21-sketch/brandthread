@@ -1,3 +1,4 @@
+import { hapticLight } from '@/lib/haptics';
 /**
  * Live Feed — the full-screen LIVE viewer opened from the header's TV glyph
  * on Threads Home. Its own route (fullScreenModal, fade — see app/_layout.tsx
@@ -29,7 +30,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
@@ -38,7 +38,7 @@ import ReanimatedAnimated, { useSharedValue, useAnimatedStyle, withTiming } from
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
-import { hapticLight } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, RADIUS } from '@/lib/theme';
@@ -254,7 +254,6 @@ export default function LiveFeedScreen() {
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
   function close() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     goBackOr(router, '/(tabs)/feed');
   }
 
@@ -268,7 +267,6 @@ export default function LiveFeedScreen() {
   }, []);
 
   function buy(room: LiveRoom) {
-    hapticLight();
     if (!room.productId) return;
     if (room.isSample) {
       setShopSelection(previewLiveFeedProduct(room));
@@ -534,7 +532,6 @@ function LiveRoomPage({
   const roomLink = buildCanonicalLiveUrl(room.streamId ?? room.id, room.sellerId);
 
   async function handleShare() {
-    hapticLight();
     const message_ = `${room.brandName} is live on Brandthread — ${room.title}`;
     if (Platform.OS === 'web') {
       const nav = (globalThis as { navigator?: { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> } }).navigator;
@@ -722,13 +719,13 @@ function LiveRoomPage({
         <PressableScale style={styles.railBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share this live">
           <Feather name="share" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
-        <PressableScale style={styles.railBtn} onPress={() => { hapticLight(); setThreadCashOpen(true); }} accessibilityRole="button" accessibilityLabel="Send Thread Cash">
+        <PressableScale style={styles.railBtn} onPress={() => setThreadCashOpen(true)} accessibilityRole="button" accessibilityLabel="Send Thread Cash">
           {/* ThreadCashBillIcon, not the full <ThreadCashBill/> — below its
               ~32pt threshold the full bill's art just turns to mush, which is
               why the gift icon effectively vanished from the rail before. */}
           <ThreadCashBillIcon size={26} />
         </PressableScale>
-        <PressableScale style={styles.railBtn} onPress={() => { hapticLight(); setMoreOpen(true); }} accessibilityRole="button" accessibilityLabel="More options">
+        <PressableScale style={styles.railBtn} onPress={() => setMoreOpen(true)} accessibilityRole="button" accessibilityLabel="More options">
           <Feather name="more-vertical" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
       </View>

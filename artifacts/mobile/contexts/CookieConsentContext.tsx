@@ -50,8 +50,6 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
     setMarketing(consent?.marketing ?? false);
     setCustomizing(true);
   }, [consent]);
-  const value = useMemo(() => ({ consent, saveConsent, openPreferences }), [consent, saveConsent, openPreferences]);
-  if (Platform.OS !== 'web') return <>{children}</>;
   const suppressForCapture = __DEV__ && typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('bt_capture') === '1';
   const showSheet = !suppressForCapture && !suppressForRoute && loaded && (!consent || customizing);

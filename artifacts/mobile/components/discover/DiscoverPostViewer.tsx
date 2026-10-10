@@ -1,3 +1,4 @@
+import { hapticLight } from '@/lib/haptics';
 /**
  * Full-screen Discover post viewer — vertical swipe through the same set of
  * results the grid tile was tapped from (Instagram Explore's own post-detail
@@ -27,7 +28,7 @@ import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { radius } from '@/constants/radii';
-import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
@@ -178,7 +179,7 @@ function ViewerPage({
         {!!post.caption && <TranslatableCaption text={post.caption} style={styles.caption} numberOfLines={3} linkStyle={styles.translationLink} />}
         {hasTags && (
           <Pressable
-            onPress={() => { hapticPrimaryAction(); onOpenShopTheLook(post); }}
+            onPress={() => { onOpenShopTheLook(post); }}
             style={styles.shopPill}
             accessibilityRole="button"
             accessibilityLabel="Shop the look"

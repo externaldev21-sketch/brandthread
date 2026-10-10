@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Buyer Post Viewer — full-screen post detail.
  * Receives lightweight params from the profile grid; loads real engagement
@@ -17,7 +18,7 @@ import { Feather, FontAwesome } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { useColors } from '@/hooks/useColors';
@@ -352,13 +353,12 @@ export default function BuyerPostViewer() {
     await updatePost(post.id, { caption: editCaption });
     setPost(prev => prev ? { ...prev, caption: editCaption } : prev);
     setEditOpen(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
   };
 
   const handleDelete = async () => {
     if (!post) return;
     await deletePost(post.id);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     goBackOr(router);
   };
 
@@ -496,7 +496,6 @@ export default function BuyerPostViewer() {
           <TouchableOpacity
             style={s.engageBtn}
             onPress={() => {
-              Haptics.selectionAsync();
               const qs = new URLSearchParams({
                 postId: params.postId ?? '',
                 postAuthorName: authorName,
@@ -541,7 +540,7 @@ export default function BuyerPostViewer() {
           {captionTrack ? (
             <TouchableOpacity
               style={s.engageBtn}
-              onPress={() => { Haptics.selectionAsync(); setCaptionsOn(!captionsOn); }}
+              onPress={() => { haptics.selection(); setCaptionsOn(!captionsOn); }}
               accessibilityRole="button"
               accessibilityLabel={captionsOn ? 'Turn captions off' : 'Turn captions on'}
               accessibilityState={{ selected: captionsOn }}
@@ -555,7 +554,6 @@ export default function BuyerPostViewer() {
             <TouchableOpacity
               style={s.engageBtn}
               onPress={() => {
-                Haptics.selectionAsync();
                 router.push(`/buyer-report?targetType=post&targetId=${params.postId ?? ''}&targetLabel=${encodeURIComponent(caption || 'Post')}&targetUserId=${post?.authorId ?? ''}` as never);
               }}
               accessibilityLabel="Report post"
@@ -591,7 +589,7 @@ export default function BuyerPostViewer() {
           <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
             <TouchableOpacity
               style={s.captionsBtn}
-              onPress={() => { Haptics.selectionAsync(); router.push(`/post-captions-edit?postId=${encodeURIComponent(params.postId ?? '')}` as never); }}
+              onPress={() => { router.push(`/post-captions-edit?postId=${encodeURIComponent(params.postId ?? '')}` as never); }}
               accessibilityRole="button"
               testID="edit-captions"
             >
@@ -606,7 +604,7 @@ export default function BuyerPostViewer() {
           <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
             <TouchableOpacity
               style={s.deleteBtn}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); setDeleteConfirm(true); }}
+              onPress={() => setDeleteConfirm(true)}
             >
               <Feather name="trash-2" size={16} color={RED} />
               <Text style={s.deleteBtnText}>Delete post</Text>

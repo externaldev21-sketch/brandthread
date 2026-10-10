@@ -39,7 +39,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useReducedMotion } from 'react-native-reanimated';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import Composer from '@/components/ui/Composer';
@@ -574,7 +574,6 @@ export default function AiBrainScreen() {
         setErrorMsg(null);
         setPendingRetryText(text);
         setIsGenerating(true);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setStreamingText('');
         try {
           const result = await sendPreviewMessageStream(
@@ -606,7 +605,6 @@ export default function AiBrainScreen() {
       setErrorMsg(null);
       setPendingRetryText(text);
       setIsGenerating(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setStreamingText('');
 
       // No sign-in wall on this screen (Dev's explicit call). Real
@@ -673,7 +671,6 @@ export default function AiBrainScreen() {
   // suggestion chip.
 
   const handlePillPress = useCallback((text: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     handleSend(text);
   }, [handleSend]);
 
@@ -711,7 +708,6 @@ export default function AiBrainScreen() {
 
   const handleCopy = useCallback((msg: AIMessage) => {
     if (!msg.content) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Clipboard.setStringAsync(msg.content);
   }, []);
 
@@ -719,7 +715,7 @@ export default function AiBrainScreen() {
 
   const handleLongPress = useCallback((msg: AIMessage) => {
     if (!msg.content) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.rigid();
     Alert.alert('Message', undefined, [
       { text: 'Copy', onPress: () => Clipboard.setStringAsync(msg.content) },
       { text: 'Cancel', style: 'cancel' },

@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Goals — several targets per seller (revenue, orders, units, visits, new
@@ -35,7 +36,7 @@ function GoalCard({ goal, onEdit }: { goal: Goal; onEdit: () => void }) {
   const s = React.useMemo(() => styles(colors), [colors]);
   const pct = Math.min(100, goal.progressPct);
   return (
-    <TouchableOpacity onPress={() => { Haptics.selectionAsync(); onEdit(); }} accessibilityRole="button" accessibilityLabel={`Edit ${goalLabel(goal.metric)} goal`} activeOpacity={0.85}>
+    <TouchableOpacity onPress={() => onEdit()} accessibilityRole="button" accessibilityLabel={`Edit ${goalLabel(goal.metric)} goal`} activeOpacity={0.85}>
       <Card padded>
         <View style={s.rowBetween}>
           <Text style={s.title}>{goalLabel(goal.metric)} {PERIOD_TEXT[goal.period]}</Text>
@@ -123,7 +124,7 @@ export default function GoalsReport() {
             {GOAL_METRICS.map(m => {
               const active = m.key === metric;
               return (
-                <TouchableOpacity key={m.key} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => { Haptics.selectionAsync(); setMetric(m.key); }}
+                <TouchableOpacity key={m.key} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => { haptics.selection(); setMetric(m.key); }}
                   style={[s.chip, active && s.chipOn]}>
                   <Text style={[s.chipText, active && s.chipTextOn]}>{m.label}</Text>
                 </TouchableOpacity>

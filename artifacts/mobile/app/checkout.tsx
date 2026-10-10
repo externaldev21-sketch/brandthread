@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Checkout settings (seller). Every control is saved to the store and
  * enforced by the API:
@@ -28,7 +29,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';

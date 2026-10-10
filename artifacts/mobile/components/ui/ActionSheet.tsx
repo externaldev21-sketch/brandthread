@@ -71,7 +71,6 @@ export function ActionSheetHost() {
               key={`${btn.text}-${i}`}
               style={styles.row}
               onPress={() => {
-                hapticLight();
                 close();
                 // Let the sheet's own close animation start before the
                 // action runs (matches native action-sheet feel).

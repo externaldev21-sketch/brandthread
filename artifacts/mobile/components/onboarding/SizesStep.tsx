@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Buyer onboarding — optional "Your sizes" step (between Style and Brands).
@@ -28,7 +29,7 @@ export function SizesStep({ sizes, onChange }: Props) {
   const styles = createStyles(theme);
 
   function pick(key: SizeCategory, value: string) {
-    Haptics.selectionAsync();
+    haptics.selection();
     onChange(toggleSize(sizes, key, value));
   }
 

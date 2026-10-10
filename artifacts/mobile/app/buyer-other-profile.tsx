@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 /**
  * A buyer's profile as seen by a VISITOR — the same ProfileShell as every
  * other profile. Visitors get only: avatar, name, @username, followers /
@@ -207,7 +208,6 @@ export default function BuyerOtherProfileScreen() {
 
   const openStories = () => {
     if (storyIds.length === 0) return;
-    hapticLight();
     router.push({
       pathname: '/buyer-story-viewer' as any,
       params: { storyId: storyIds[0], allStoryIds: storyIds.join(',') },
@@ -224,7 +224,7 @@ export default function BuyerOtherProfileScreen() {
       setProfile(prev => prev ? { ...prev, followRequested: false } : prev);
       try {
         await api.social.unfollow(canonicalUserId);
-        hapticLight();
+        haptics.light();
       } catch {
         setProfile(prev => prev ? { ...prev, followRequested: true } : prev);
         Alert.alert("Couldn't cancel request", 'Try again.');
@@ -255,7 +255,7 @@ export default function BuyerOtherProfileScreen() {
           followRequested: true,
           followersCount: typeof result.followersCount === 'number' ? result.followersCount : Math.max(0, prev.followersCount - 1),
         } : prev);
-        hapticLight();
+        haptics.light();
         return;
       }
       if (!wasFollowing) void requestContextualPushPermission(currentUserId, api, 'follow');
@@ -338,11 +338,11 @@ export default function BuyerOtherProfileScreen() {
     const subject = { userId: canonicalUserId, name: displayName };
     if (iBlockedThem) {
       if (await confirmUnblock(subject, api.social.unblock)) {
-        hapticSuccess();
+        haptics.success();
         await loadProfile();
       }
     } else if (await confirmBlock(subject, api.social.block)) {
-      hapticSuccess();
+      haptics.success();
       goBackOr(router);
     }
   };
@@ -358,7 +358,6 @@ export default function BuyerOtherProfileScreen() {
   };
 
   const openVideo = useCallback((item: ProfileGridItem) => {
-    hapticSelection();
     router.push(profileVideosHref({ source: 'creator', id: canonicalUserId, startPostId: item.id, title: displayName }) as never);
   }, [canonicalUserId, displayName, router]);
 
@@ -374,7 +373,6 @@ export default function BuyerOtherProfileScreen() {
   const openTagged = useCallback((item: ProfileGridItem) => {
     const entry = tagged.items.find((candidate) => candidate.id === item.id);
     if (!entry) return;
-    hapticSelection();
     router.push(taggedItemHref(entry) as never);
   }, [router, tagged.items]);
   const renderTile = useCallback(({ item, index }: { item: ProfileGridItem; index: number }) => (
@@ -481,7 +479,7 @@ export default function BuyerOtherProfileScreen() {
           disabled={storyIds.length === 0}
           accessibilityLabel={storyIds.length > 0 ? `View ${displayName}'s story` : 'No active stories'}
         />
-        <ProfileButton label="More" icon="more-horizontal" onPress={() => { hapticSelection(); setMoreSheetOpen(true); }} accessibilityLabel="More options" />
+        <ProfileButton label="More" icon="more-horizontal" onPress={() => setMoreSheetOpen(true)} accessibilityLabel="More options" />
       </View>
       <GiveawayProfileCard sellerId={canonicalUserId} enabled={canonicalReady && !iBlockedThem && !previewAsVisitor} />
     </>
@@ -547,7 +545,7 @@ export default function BuyerOtherProfileScreen() {
         topRight={(
           <ProfileGlassButton
             icon="more-horizontal"
-            onPress={() => { hapticSelection(); setMoreSheetOpen(true); }}
+            onPress={() => setMoreSheetOpen(true)}
             accessibilityLabel="Profile options"
             testID="buyer-other-profile-more"
           />
@@ -558,7 +556,6 @@ export default function BuyerOtherProfileScreen() {
             <ProfileStoriesRow
               items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null }))}
               onPressItem={(item) => {
-                hapticLight();
                 router.push({ pathname: '/buyer-story-viewer' as any, params: { highlightId: item.id } });
               }}
             />
@@ -571,7 +568,7 @@ export default function BuyerOtherProfileScreen() {
         tabs={{
           items: CONTENT_TAB_ITEMS,
           active: activeTab,
-          onChange: (key) => { hapticSelection(); setActiveTab(key === 'Tagged' ? 'Tagged' : 'Posts'); },
+          onChange: (key) => setActiveTab(key === 'Tagged' ? 'Tagged' : 'Posts'),
         }}
         data={gridItems}
         renderItem={renderTile}

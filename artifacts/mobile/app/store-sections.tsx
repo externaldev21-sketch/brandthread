@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -5,7 +6,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'rea
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -91,9 +92,9 @@ export default function StoreSectionsScreen() {
   async function handleAdd(sectionType: string) {
     if (adding) return;
     setAdding(sectionType);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await createSection(sectionType as StoreSectionType);
+      haptics.success();
       Alert.alert('Section added.', undefined, [{ text: 'OK', onPress: () => goBackOr(router) }]);
     } catch (e) {
       Alert.alert('Error', 'Failed to add section. Please try again.');

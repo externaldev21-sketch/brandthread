@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Buyer checkout: ONE page for every purchase path (Buy Now, the cart's
  * "Checkout from {Seller}", the Shop sheet), copied from the Shop app's
@@ -49,7 +50,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@clerk/expo';
@@ -628,7 +629,7 @@ export default function BuyerCheckoutScreen() {
     await saveAddressIfAsked(who);
     startedRef.current = null;
     await persist({ ...base, paidGroups, step: 'confirmation' }, who);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     setPlacing(false);
   };
 
@@ -1027,7 +1028,7 @@ export default function BuyerCheckoutScreen() {
     setPendingSessionIds(remaining);
     await persist({ ...current, paidGroups, step: 'confirmation' });
     if (!remaining.length) {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       await removeCartItems(current.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
     }
     setPlacing(false);

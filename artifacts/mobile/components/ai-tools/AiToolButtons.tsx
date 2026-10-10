@@ -22,7 +22,6 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { BG, FG, MUTED, BORDER, CARD, FONT, FS, SP, ICON, GRAD_DARK_FADE } from '@/lib/theme';
 import { radius } from '@/constants/radii';
@@ -49,7 +48,6 @@ export function AiPrimaryButton({
     <PressableScale
       onPress={() => {
         if (inactive) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress();
       }}
       style={[pS.root, inactive && pS.rootDisabled]}
@@ -105,7 +103,6 @@ export function AiSecondaryButton({
     <PressableScale
       onPress={() => {
         if (inactive) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
       style={[sS.root, variant === 'outline' && sS.rootOutline, inactive && sS.rootDisabled]}

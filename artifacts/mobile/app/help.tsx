@@ -1,10 +1,10 @@
+import * as Haptics from 'expo-haptics';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Linking, Alert, ActivityIndicator, Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { SupportChatModal } from '@/components/SupportChatBubble';
@@ -160,7 +160,7 @@ export default function HelpScreen() {
                     icon="help-circle"
                     label={faq.q}
                     description={faq.category}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setArticle(faq); }}
+                    onPress={() => { setArticle(faq); }}
                   />
                 ))}
               </View>
@@ -177,7 +177,7 @@ export default function HelpScreen() {
                       key={c.key}
                       style={[s.categoryCard, categoryW !== undefined && { width: categoryW }]}
                       activeOpacity={0.85}
-                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveCategory(c.key); }}
+                      onPress={() => { setActiveCategory(c.key); }}
                     >
                       <View style={[s.categoryIconWrap, { backgroundColor: theme.accent + '18' }]}>
                         <Feather name={c.icon} size={ICON.md} color={theme.accent} />
@@ -229,7 +229,7 @@ export default function HelpScreen() {
                   icon="file-text"
                   label={faq.q}
                   description={faq.category}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setArticle(faq); }}
+                  onPress={() => { setArticle(faq); }}
                 />
               ))}
             </View>

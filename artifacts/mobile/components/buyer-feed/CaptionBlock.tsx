@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Buyer Threads Home feed — bottom-left info block.
  *
@@ -19,7 +20,6 @@
 import React from 'react';
 import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';

@@ -11,7 +11,6 @@ import React from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Glass } from '@/components/ui/Glass';
 import { Icon, ICON_SIZE, type IconName } from '@/components/ui/Icon';
-import { hapticLight } from '@/lib/haptics';
 import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { RADII } from '@/constants/radii';
 import { MEDIA } from '@/lib/theme';
@@ -33,7 +32,7 @@ export function GlassIconButton({ name, onPress, accessibilityLabel, size = 40, 
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={iconAccessibilityLabel(name, accessibilityLabel)}
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => onPress()}
       hitSlop={{ top: slop, bottom: slop, left: slop, right: slop }}
       testID={testID}
       style={({ pressed }) => [{ width: size, height: size, opacity: pressed ? 0.7 : 1 }, style]}

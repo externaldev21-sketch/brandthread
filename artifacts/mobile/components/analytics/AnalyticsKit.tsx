@@ -14,7 +14,7 @@ import { useEffect, useRef } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -41,7 +41,7 @@ export function AnalyticsHeader({
   return (
     <View style={s.root}>
       <TouchableOpacity
-        onPress={() => { Haptics.selectionAsync(); onBack ? onBack() : goBackOr(router); }}
+        onPress={() => { onBack ? onBack() : goBackOr(router); }}
         style={s.backBtn}
         accessibilityRole="button"
         accessibilityLabel="Go back"
@@ -71,7 +71,7 @@ export function HeaderPillButton({ label, onPress }: { label: string; onPress: (
   const s = useMemo(() => pillBtnStyles(colors), [colors]);
   return (
     <TouchableOpacity
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { onPress(); }}
       style={s.btn}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
@@ -141,7 +141,7 @@ export function PillTabs<T extends string>({
         return (
           <TouchableOpacity
             key={opt.key}
-            onPress={() => { Haptics.selectionAsync(); onChange(opt.key); }}
+            onPress={() => { haptics.selection(); onChange(opt.key); }}
             style={[s.pill, active && s.pillActive]}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}

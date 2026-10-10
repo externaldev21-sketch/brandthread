@@ -1,3 +1,4 @@
+import { hapticSuccess } from '@/lib/haptics';
 /**
  * Seller Thread Cash cash-out sheet — moves earned Thread Cash (Live gifts,
  * message payments) into the seller's real Stripe payout balance. Same
@@ -21,7 +22,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 export function CashOutSheet({
@@ -78,7 +79,6 @@ export function CashOutSheet({
     if (!canSubmit) return;
     setConfirming(true);
     setError(null);
-    hapticLight();
     try {
       attemptKey.current ??= randomUUID();
       const result = await api.threadCash.cashOut({ threadCashCents: amountCents, idempotencyKey: attemptKey.current });
@@ -131,7 +131,7 @@ export function CashOutSheet({
             accessibilityLabel="Amount to cash out"
           />
           <Pressable
-            onPress={() => { hapticLight(); setAmountText((balanceCents / 100).toFixed(2)); }}
+            onPress={() => setAmountText((balanceCents / 100).toFixed(2))}
             style={[styles.allChip, { borderColor: theme.border }]}
             accessibilityRole="button"
             accessibilityLabel="Cash out all"

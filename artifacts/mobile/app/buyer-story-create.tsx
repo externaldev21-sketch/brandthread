@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Story composer — camera-first, modeled on Instagram/Snapchat's story-creation
  * mechanism (see PR description for Mobbin references).
@@ -20,7 +21,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useUser } from '@clerk/expo';
@@ -40,7 +40,7 @@ import { getTaggableProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
-import { hapticLight, hapticToggle, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { TEXT_FONTS, storyFontFamily, loadStoryFontsAsync, type StoryFontKey } from '@/lib/storyFonts';
 import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/lib/uploadLiveActivity';
@@ -248,7 +248,7 @@ function OverlayChip({
       {/* A plain tap lands on this Pressable (the pan responder above only takes over once the finger moves or a second finger lands). */}
       <Pressable
         onPress={() => latest.current.onTap?.(overlay.id)}
-        onLongPress={removable ? () => { hapticLight(); onRemove(overlay.id); } : undefined}
+        onLongPress={removable ? () => { haptics.warning(); onRemove(overlay.id); } : undefined}
         // No button role on the reshare card: its credit row is a button and web forbids nested <button>s.
         accessibilityRole={removable ? 'button' : undefined}
         accessibilityLabel={removable ? 'Long-press to remove' : 'Drag to move'}
@@ -738,7 +738,6 @@ export default function StoryComposer() {
     if (!cameraRef.current || recordingRef.current) return;
     recordingRef.current = true;
     setIsRecording(true);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const result = await cameraRef.current.recordAsync({ maxDuration: BOOMERANG_SECONDS });
       if (result?.uri) {
@@ -780,7 +779,6 @@ export default function StoryComposer() {
 
   const takePhoto = useCallback(async () => {
     if (!cameraRef.current) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const result = await cameraRef.current.takePictureAsync({ quality: 0.9 });
       if (!result?.uri) return;
@@ -804,7 +802,7 @@ export default function StoryComposer() {
   }, [gridSpec, compositeGrid]);
 
   const selectGrid = useCallback((spec: GridSpec) => {
-    hapticToggle();
+    haptics.selection();
     setGridSpec(spec);
     setGridCells(Array(spec.cols * spec.rows).fill(null));
     setGridPopoverOpen(false);
@@ -887,7 +885,6 @@ export default function StoryComposer() {
       Alert.alert('Mention limit', `You can tag up to ${MAX_MENTIONS_PER_STORY} people in one story.`);
       return;
     }
-    hapticLight();
     const id = `ov_${Date.now()}_${overlays.length}`;
     setOverlays((prev) => [...prev, {
       id, type: 'mention', x: W / 2 - 60, y: H / 2 - 40, rotation: 0, scale: 1, opacity: 1,
@@ -901,7 +898,7 @@ export default function StoryComposer() {
   const tapOverlay = useCallback((id: string) => {
     const tapped = overlaysRef.current.find((o) => o.id === id);
     if (tapped?.type !== 'mention') { setSelectedId(null); return; }
-    hapticToggle();
+    haptics.selection();
     setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, mentionStyle: nextMentionStyle(o.mentionStyle) } : o)));
     setSelectedId(id);
   }, []);
@@ -1003,7 +1000,7 @@ export default function StoryComposer() {
       // fields (mentionUserId/mentionHandle/mentionStyle/opacity) through as-is.
       await createStory({ media, privacy, repliesDisabled: false, originalStoryId: reshareStoryId });
 
-      hapticSuccessAction();
+      haptics.success();
       // Let the ring visibly complete (matches IG's own pill, which always
       // finishes at 100% rather than snapping away mid-count) before leaving.
       await new Promise<void>((resolve) => {
@@ -1037,7 +1034,6 @@ export default function StoryComposer() {
   // immediately (see docs/story-flows.md for what's shown there).
   const openShareSheetFromEdit = () => {
     if (!media || isPosting) return;
-    hapticLight();
     setPendingSharePayload({ type: media.kind, uri: media.uri, text: captionDraft.trim() || undefined, ovs: overlays });
     setShareSheetOpen(true);
   };
@@ -1046,14 +1042,12 @@ export default function StoryComposer() {
   // Instagram's own add-to-story screen (no extra Share sheet in between).
   const shareReshare = (closeFriends: boolean) => {
     if (isPosting || reshareUnavailable) return;
-    hapticPrimaryAction();
     setSelectedId(null);
     setCloseFriendsOnly(closeFriends);
     void doShare({ type: 'text', bg: reshareBg, ovs: overlays }, { closeFriendsOnly: closeFriends });
   };
 
   const notNowReshare = () => {
-    hapticLight();
     // Signed out there is no tag to dismiss — just leave.
     if (reshareStoryId && user?.id) api.social.dismissStoryMention(reshareStoryId).catch(() => {});
     goBackOr(router);
@@ -1066,14 +1060,12 @@ export default function StoryComposer() {
 
   const openShareSheetFromCreate = () => {
     if (!createText.trim() || isPosting) return;
-    hapticLight();
     setPendingSharePayload({ type: 'text', bg: swatches[bgIdx].colors[0], text: createText.trim(), textColor: createColor, ovs: [] });
     setShareSheetOpen(true);
   };
 
   const confirmShareSheet = () => {
     if (!pendingSharePayload || isPosting) return;
-    hapticPrimaryAction();
     void doShare(pendingSharePayload);
   };
 
@@ -1098,7 +1090,7 @@ export default function StoryComposer() {
         participant: { userId: person.userId, name: person.name, handle: person.handle, initials: person.initials, color: person.color, accountType: person.accountType },
       });
       await sendMessage(conv.id, 'Sent you my story ✨');
-      hapticLight();
+      haptics.success();
       setAlsoShareSentIds((prev) => new Set(prev).add(person.userId));
     } catch {
       Alert.alert("Couldn't send that", 'Try again.');
@@ -1180,7 +1172,7 @@ export default function StoryComposer() {
         <View style={[styles.leftRail, { top: topInset + 90 }]}>
           <TouchableOpacity
             style={styles.railBtn}
-            onPress={() => { hapticLight(); setStep('create'); }}
+            onPress={() => { setStep('create'); }}
             accessibilityLabel="Create a text story"
             accessibilityRole="button"
           >
@@ -1190,7 +1182,7 @@ export default function StoryComposer() {
 
           <TouchableOpacity
             style={styles.railBtn}
-            onPress={() => { hapticToggle(); setBoomerangOn((v) => !v); if (gridSpec) clearGrid(); }}
+            onPress={() => { haptics.selection(); setBoomerangOn((v) => !v); if (gridSpec) clearGrid(); }}
             accessibilityLabel="Boomerang"
             accessibilityRole="button"
             accessibilityState={{ selected: boomerangOn }}
@@ -1201,7 +1193,7 @@ export default function StoryComposer() {
 
           <TouchableOpacity
             style={styles.railBtn}
-            onPress={() => { hapticToggle(); setGridPopoverOpen((v) => !v); if (boomerangOn) setBoomerangOn(false); }}
+            onPress={() => { setGridPopoverOpen((v) => !v); if (boomerangOn) setBoomerangOn(false); }}
             accessibilityLabel="Layout"
             accessibilityRole="button"
             accessibilityState={{ selected: !!gridSpec }}
@@ -1212,7 +1204,7 @@ export default function StoryComposer() {
 
           <TouchableOpacity
             style={styles.railBtn}
-            onPress={() => { hapticToggle(); setHandsFree((v) => !v); }}
+            onPress={() => { haptics.selection(); setHandsFree((v) => !v); }}
             accessibilityLabel="Hands-free"
             accessibilityRole="button"
             accessibilityState={{ selected: handsFree }}
@@ -1223,7 +1215,7 @@ export default function StoryComposer() {
 
           <TouchableOpacity
             style={styles.railBtn}
-            onPress={() => { hapticLight(); setRailExpanded((v) => !v); }}
+            onPress={() => { setRailExpanded((v) => !v); }}
             accessibilityLabel={railExpanded ? 'Collapse tools' : 'Expand tools'}
             accessibilityRole="button"
           >
@@ -1268,7 +1260,7 @@ export default function StoryComposer() {
                     setModeLayouts((prev) => ({ ...prev, [m]: { x, width } }));
                   }}
                   onPress={() => {
-                    hapticToggle();
+                    haptics.selection();
                     // Forward the REAL role, not the route param this screen
                     // was reached with (see isSeller's own doc above) — a
                     // seller tapping POST must still land on create-post's
@@ -1402,7 +1394,7 @@ export default function StoryComposer() {
 
             <TouchableOpacity
               style={styles.shareRow}
-              onPress={() => { hapticToggle(); setCloseFriendsOnly(false); }}
+              onPress={() => { haptics.selection(); setCloseFriendsOnly(false); }}
               accessibilityRole="radio"
               accessibilityState={{ checked: !closeFriendsOnly }}
             >
@@ -1418,7 +1410,7 @@ export default function StoryComposer() {
 
             <TouchableOpacity
               style={styles.shareRow}
-              onPress={() => { hapticToggle(); setCloseFriendsOnly(true); }}
+              onPress={() => { haptics.selection(); setCloseFriendsOnly(true); }}
               accessibilityRole="radio"
               accessibilityState={{ checked: closeFriendsOnly }}
             >
@@ -1551,12 +1543,12 @@ export default function StoryComposer() {
 
         {/* Small toolbar: font cycle, alignment, text color */}
         <View style={[styles.createToolbar, { bottom: insets.bottom + 128 }]}>
-          <TouchableOpacity style={styles.createToolBtn} onPress={() => { hapticToggle(); setCreateFontIdx((i) => (i + 1) % FONT_PRESETS.length); }} accessibilityLabel="Cycle font style" accessibilityRole="button">
+          <TouchableOpacity style={styles.createToolBtn} onPress={() => { haptics.selection(); setCreateFontIdx((i) => (i + 1) % FONT_PRESETS.length); }} accessibilityLabel="Cycle font style" accessibilityRole="button">
             <Text style={[styles.createToolAa, { fontWeight: font.weight, fontStyle: font.italic ? 'italic' : 'normal' }]}>Aa</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.createToolBtn}
-            onPress={() => { hapticToggle(); setCreateAlign((a) => (a === 'left' ? 'center' : a === 'center' ? 'right' : 'left')); }}
+            onPress={() => { haptics.selection(); setCreateAlign((a) => (a === 'left' ? 'center' : a === 'center' ? 'right' : 'left')); }}
             accessibilityLabel={`Text alignment: ${createAlign}`}
             accessibilityRole="button"
           >
@@ -1566,7 +1558,7 @@ export default function StoryComposer() {
             <PressableScale
               key={c}
               style={[styles.colorCircle, { backgroundColor: c }, createColor === c && styles.colorCircleActive, c === '#000000' && styles.colorCircleBorder]}
-              onPress={() => { hapticToggle(); setCreateColor(c); }}
+              onPress={() => { haptics.selection(); setCreateColor(c); }}
               accessibilityRole="button"
               accessibilityLabel={`Text color ${c}`}
               accessibilityState={{ selected: createColor === c }}
@@ -1579,7 +1571,7 @@ export default function StoryComposer() {
           {swatches.map((sw, i) => (
             <PressableScale
               key={sw.id}
-              onPress={() => { hapticToggle(); setBgIdx(i); }}
+              onPress={() => { haptics.selection(); setBgIdx(i); }}
               accessibilityRole="button"
               accessibilityLabel={`Background: ${sw.label}`}
               accessibilityState={{ selected: bgIdx === i }}
@@ -1680,10 +1672,10 @@ export default function StoryComposer() {
           >
             <Text style={styles.aaIcon}>Aa</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.camIconBtn} onPress={() => { hapticLight(); setStickerSheetOpen(true); }} accessibilityLabel="Add sticker" accessibilityRole="button">
+          <TouchableOpacity style={styles.camIconBtn} onPress={() => { setStickerSheetOpen(true); }} accessibilityLabel="Add sticker" accessibilityRole="button">
             <Feather name="smile" size={20} color={ON_DARK} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.camIconBtn} onPress={() => { hapticLight(); setDrawOpen((v) => !v); }} accessibilityLabel="Draw" accessibilityRole="button">
+          <TouchableOpacity style={styles.camIconBtn} onPress={() => { setDrawOpen((v) => !v); }} accessibilityLabel="Draw" accessibilityRole="button">
             <Feather name="edit-2" size={20} color={drawOpen ? theme.accent : ON_DARK} />
           </TouchableOpacity>
         </View>
@@ -1713,7 +1705,7 @@ export default function StoryComposer() {
         <View style={[styles.mentionDock, { bottom: insets.bottom + (isReshare ? 150 : 138) }]} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.taggedChip}
-            onPress={() => { hapticLight(); setTaggedSheetOpen(true); }}
+            onPress={() => { setTaggedSheetOpen(true); }}
             accessibilityRole="button"
             accessibilityLabel={`Tagged people, ${mentionOverlays.length}`}
             testID="story-tagged-chip"
@@ -1808,7 +1800,7 @@ export default function StoryComposer() {
           </View>
           <TouchableOpacity
             style={[styles.closeFriendsChip, closeFriendsOnly && { backgroundColor: ON_DARK }]}
-            onPress={() => { hapticToggle(); setCloseFriendsOnly((v) => !v); }}
+            onPress={() => { haptics.selection(); setCloseFriendsOnly((v) => !v); }}
             accessibilityRole="button"
             accessibilityLabel="Toggle Close Friends only"
             accessibilityState={{ selected: closeFriendsOnly }}
@@ -1885,7 +1877,7 @@ export default function StoryComposer() {
                   <TouchableOpacity
                     key={f.key}
                     style={[styles.fontChip, active && { backgroundColor: ON_DARK }]}
-                    onPress={() => { hapticToggle(); setTextDraftFontKey(f.key); }}
+                    onPress={() => { haptics.selection(); setTextDraftFontKey(f.key); }}
                     accessibilityRole="button"
                     accessibilityLabel={`Font: ${f.label}`}
                     accessibilityState={{ selected: active }}
@@ -1918,7 +1910,7 @@ export default function StoryComposer() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.textToolChip, textDraftBgStyle !== 'none' && { backgroundColor: theme.accentDim }]}
-                onPress={() => { hapticToggle(); setTextDraftBgStyle((v) => (v === 'none' ? 'solid' : v === 'solid' ? 'translucent' : 'none')); }}
+                onPress={() => { haptics.selection(); setTextDraftBgStyle((v) => (v === 'none' ? 'solid' : v === 'solid' ? 'translucent' : 'none')); }}
                 accessibilityLabel={`Background: ${textDraftBgStyle}`}
                 accessibilityRole="button"
               >
@@ -1932,7 +1924,7 @@ export default function StoryComposer() {
               active={!!atToken}
               query={atToken?.query ?? ''}
               enabled={!!user?.id}
-              onPick={(p) => { hapticLight(); setTextDraft((t) => insertMention(t, (p.username ?? p.handle ?? '').replace(/^@+/, ''))); }}
+              onPick={(p) => { setTextDraft((t) => insertMention(t, (p.username ?? p.handle ?? '').replace(/^@+/, ''))); }}
             />
 
             {/* Above-keyboard row — Instagram's quick Mention/Location shortcuts. Rewrite is
@@ -1941,7 +1933,7 @@ export default function StoryComposer() {
             <View style={[styles.textAccessoryRow, atToken ? { display: 'none' } : null]}>
               <TouchableOpacity
                 style={styles.textAccessoryItem}
-                onPress={() => { hapticLight(); setTextDraft((t) => (t && !/\s$/.test(t) ? `${t} @` : `${t}@`)); }}
+                onPress={() => { setTextDraft((t) => (t && !/\s$/.test(t) ? `${t} @` : `${t}@`)); }}
                 accessibilityRole="button"
                 accessibilityLabel="Add mention"
               >
@@ -1976,7 +1968,7 @@ export default function StoryComposer() {
                 <PressableScale
                   key={c}
                   style={[styles.colorCircle, { backgroundColor: c }, textDraftColor === c && styles.colorCircleActive, c === '#000000' && styles.colorCircleBorder]}
-                  onPress={() => { hapticToggle(); setTextDraftColor(c); }}
+                  onPress={() => { haptics.selection(); setTextDraftColor(c); }}
                   accessibilityRole="button"
                   accessibilityLabel={`Text color ${c}`}
                   accessibilityState={{ selected: textDraftColor === c }}
@@ -2003,7 +1995,7 @@ export default function StoryComposer() {
                   <TouchableOpacity
                     key={a}
                     style={[styles.animationChip, active && { backgroundColor: ON_DARK }]}
-                    onPress={() => { hapticToggle(); setTextDraftAnimation(active ? undefined : a); setTextAnimationSheetOpen(false); }}
+                    onPress={() => { haptics.selection(); setTextDraftAnimation(active ? undefined : a); setTextAnimationSheetOpen(false); }}
                     accessibilityRole="button"
                     accessibilityLabel={`Animation ${a}`}
                     accessibilityState={{ selected: active }}
@@ -2031,7 +2023,7 @@ export default function StoryComposer() {
                   <TouchableOpacity
                     key={key}
                     style={[styles.animationChip, active && { backgroundColor: ON_DARK }]}
-                    onPress={() => { hapticToggle(); setTextDraftEffect(key); setTextEffectSheetOpen(false); }}
+                    onPress={() => { haptics.selection(); setTextDraftEffect(key); setTextEffectSheetOpen(false); }}
                     accessibilityRole="button"
                     accessibilityLabel={`Effect ${label}`}
                     accessibilityState={{ selected: active }}
@@ -2119,7 +2111,6 @@ export default function StoryComposer() {
                   key={p.id}
                   style={styles.productRow}
                   onPress={() => {
-                    hapticLight();
                     addOverlay({
                       type: 'product',
                       x: W / 2 - STICKER.card / 2, y: H * 0.34,

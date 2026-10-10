@@ -5,10 +5,9 @@
  * PressableScale press-feel with design-system tokens (RADII.chip, SPACING).
  */
 import React from 'react';
-import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle, type GestureResponderEvent } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
-import { hapticLight } from '@/lib/haptics';
 import { COMP, FONT } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
@@ -18,7 +17,8 @@ import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export interface IconButtonProps {
   name: IconName;
-  onPress: () => void;
+  /** Receives the press event (a ⋯ button anchors its pull-down menu to it). */
+  onPress: (event?: GestureResponderEvent) => void;
   /** Optional: when omitted (or empty) a default is derived from the icon `name` (see lib/a11y/iconLabels.ts). */
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -58,7 +58,7 @@ export function IconButton({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={(event) => onPress(event)}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

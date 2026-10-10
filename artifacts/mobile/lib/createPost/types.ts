@@ -47,8 +47,6 @@ export interface VideoDraft {
   trimEnd: number;
   /** Cover frame offset in seconds (post-trim timeline); 0 = first frame. */
   coverOffset: number;
-  /** Already uploaded (a remix's copied source clip): publish skips the upload. */
-  objectPath?: string;
 }
 
 export type MediaDraft =

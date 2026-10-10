@@ -10,7 +10,6 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
   FONT, FS, SP, RADIUS,
@@ -108,7 +107,6 @@ export default function LoyaltyScreen() {
     if (pts > balance) {
       Alert.alert('Insufficient Points', `You only have ${balance.toLocaleString()} points.`); return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     // Redemptions are deliberately created in the cart, where they are
     // persisted with the checkout session and applied to Stripe immediately.
     // Never mint a detached code here: it could be lost before checkout.

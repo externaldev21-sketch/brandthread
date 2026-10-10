@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Seller Live — active broadcast screen.
  * Uses react-native-agora in host mode. Gracefully degrades when native
@@ -9,7 +10,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -339,7 +340,7 @@ function SellerLiveNativeScreen() {
   }
 
   async function toggleProduct(product: any) {
-    Haptics.selectionAsync();
+    haptics.selection();
     const exists = productTags.find(t => t.productId === product.id);
     const updated = exists
       ? productTags.filter(t => t.productId !== product.id)
@@ -348,7 +349,7 @@ function SellerLiveNativeScreen() {
   }
 
   async function highlightProduct(productId: string) {
-    Haptics.selectionAsync();
+    haptics.selection();
     // Tapping the featured product again unpins it. The pin is stored and
     // broadcast by the server (POST /api/live/:id/pin), which also keeps the
     // legacy `highlighted` flag in step.

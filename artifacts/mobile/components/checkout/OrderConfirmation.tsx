@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * Order confirmation — redesigned 1:1 on the Shopify Shop app's
  * order-confirmed screen (reskinned monochrome/Inter): a centered success
@@ -22,7 +23,6 @@ import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button, SuccessCheck } from '@/components/ui';
@@ -222,7 +222,6 @@ export function OrderConfirmation({
 
   function messageSeller() {
     if (!firstGroup) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const initials = firstGroup.sellerName.split(/\s+/).map(word => word[0] ?? '').slice(0, 2).join('').toUpperCase();
     router.push((
       '/buyer-conversation?participantId=' + encodeURIComponent(firstGroup.sellerId)

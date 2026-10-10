@@ -19,7 +19,7 @@ import { AccessibilityInfo, StyleSheet, View, useWindowDimensions } from 'react-
 import Animated, {
   Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withTiming,
 } from 'react-native-reanimated';
-import { hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 
 const PIECE_COUNT = 40;
 const FALL_DURATION_MS = 2500;
@@ -117,7 +117,7 @@ export function OrderConfetti({ play }: { play: boolean }) {
   useEffect(() => {
     if (!play || reduceMotion) return;
     setVisible(true);
-    hapticSuccess();
+    haptics.success();
     const timer = setTimeout(() => setVisible(false), FALL_DURATION_MS + 200);
     return () => clearTimeout(timer);
   }, [play, reduceMotion]);

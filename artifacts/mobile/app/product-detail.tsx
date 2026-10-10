@@ -1,3 +1,4 @@
+import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 /**
  * Brandthread Product Detail Screen
  * 8-tab deep-dive into a single product: Overview, Variants, Inventory,
@@ -18,7 +19,7 @@ import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
 import { previewAsBuyerHref } from '@/lib/sellerProductPreview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -143,7 +144,7 @@ export default function ProductDetailScreen() {
   }, [activeTab, id, analyticsRetry, userId]);
 
   const handleTabPress = useCallback((tab: Tab, index: number) => {
-    Haptics.selectionAsync();
+    haptics.selection();
     setActiveTab(tab);
   }, []);
 
@@ -208,16 +209,15 @@ export default function ProductDetailScreen() {
         <View style={s.headerRight}>
           {/* Fix 7: edit button navigates to /add-product with editId param */}
           <PressableScale
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/add-product?editId=' + id) as never); }}
+            onPress={() => { router.push(('/add-product?editId=' + id) as never); }}
             style={s.headerBtn}
             accessibilityLabel={`Edit ${product.name}`}
           >
             <Text style={s.editBtnText}>Edit</Text>
           </PressableScale>
           <PressableScale
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Alert.alert('Product Options', '', [
+            onPress={(event) => {
+              openPullDownMenu(event, menuItemsFromButtons([
                 { text: product.status === 'active' ? 'Archive' : 'Publish', onPress: () => {
                   if (product.status === 'active') {
                     archiveProduct(product.id).then(p => {
@@ -228,7 +228,7 @@ export default function ProductDetailScreen() {
                     });
                   } else {
                     publishProduct(product.id).then(p => {
-                      if (p) { setProduct(p); Alert.alert('Product published'); }
+                      if (p) { setProduct(p); haptics.success(); Alert.alert('Product published'); }
                     }).catch(error => {
                       reportNetworkError(error, () => publishProduct(product.id).then(p => p && setProduct(p)));
                       Alert.alert('Could not publish product', 'Check your connection and try again.');
@@ -253,7 +253,7 @@ export default function ProductDetailScreen() {
                   Share.share({ message: `${product.name} — ${link}`, url: link }).catch(() => {});
                 }},
                 { text: 'Cancel', style: 'cancel' },
-              ]);
+              ], { Archive: 'archive', Publish: 'upload', Duplicate: 'copy', Share: 'share' }));
             }}
             style={s.iconBtnSmall}
             accessibilityLabel={`More actions for ${product.name}`}
@@ -312,7 +312,7 @@ export default function ProductDetailScreen() {
       {/* ── Floating Action Button ── */}
       <PressableScale accessibilityLabel="Edit product"
         style={[s.fab, { bottom: insets.bottom + SP.lg }]}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/add-product?editId=' + id) as never); }}
+        onPress={() => { router.push(('/add-product?editId=' + id) as never); }}
       >
         <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabGrad}>
           <Feather name="edit-2" size={ICON.md} color={theme.onAccent} />
@@ -1339,7 +1339,7 @@ function StoreTab({
 
           {/* Description accordion */}
           <PressableScale
-            onPress={() => { Haptics.selectionAsync(); setDescOpen(o => !o); }}
+            onPress={() => { setDescOpen(o => !o); }}
             style={st.descHeader}
             accessibilityLabel="Description"
             accessibilityState={{ expanded: descOpen }}

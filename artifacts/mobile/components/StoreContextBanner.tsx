@@ -10,7 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAuth } from '@clerk/expo';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
@@ -127,7 +127,7 @@ export default function StoreContextBanner() {
 
   const switchStore = useCallback(async (nextContext: StoreContext) => {
     if (!userId || switchingTo) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     setSwitchingTo(nextContext);
     try {
       await api.team.selectContext(nextContext);

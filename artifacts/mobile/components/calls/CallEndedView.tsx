@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 /**
  * CallEndedView — Instagram's "call ended + rating" screen. Terminal, not
  * minimizable, so the top-right icon is a close "X" (not the chevron the
@@ -13,7 +14,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCallSession } from '@/lib/calls/CallSessionContext';
 import { useApi } from '@/lib/api';

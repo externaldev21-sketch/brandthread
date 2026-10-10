@@ -9,7 +9,6 @@ import {
   type FinanceSummary, type Tone,
 } from '@/lib/financeSummary';
 import { TABULAR_NUMS } from '@/constants/typography';
-import { hapticPrimaryAction } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 type Props = {
@@ -63,7 +62,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
           Your money is safe — this is only a display problem.
         </Text>
         <TouchableOpacity
-          onPress={() => { hapticPrimaryAction(); onRetry(); }}
+          onPress={() => onRetry()}
           style={[styles.retry, { borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel="Retry loading balances"
