@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Image,
   Alert,
   ScrollView,
   TextInput,
@@ -13,6 +12,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -27,6 +27,8 @@ import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
 import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { getProducts, updateProduct } from '@/services/productService';
 import { Product, ProductMedia } from '@/services/productTypes';
+import { FONT } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 interface Photo {
   id: string;
@@ -211,7 +213,7 @@ export default function LifestyleImagesScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trayRow}>
         {photos.map((p) => (
           <View key={p.id} style={styles.trayThumbWrap}>
-            <Image source={{ uri: p.uri }} style={styles.trayThumb} resizeMode="cover" />
+            <CachedImage source={{ uri: p.uri }} style={styles.trayThumb} contentFit="cover" />
             <TouchableOpacity
               style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
               onPress={() => removePhoto(group, p.id)}
@@ -353,10 +355,10 @@ export default function LifestyleImagesScreen() {
                 </View>
               ) : resultB64 ? (
                 <>
-                  <Image
+                  <CachedImage
                     source={{ uri: `data:image/png;base64,${resultB64}` }}
                     style={styles.resultImage}
-                    resizeMode="cover"
+                    contentFit="cover"
                   />
                   <AiGeneratedBadge />
                 </>
@@ -417,13 +419,13 @@ export default function LifestyleImagesScreen() {
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.pickerRow} onPress={() => confirmAddToProduct(item)} activeOpacity={0.82}>
                   {item.media?.[0]?.uri ? (
-                    <Image source={{ uri: item.media[0].uri }} style={styles.pickerThumb} resizeMode="cover" />
+                    <CachedImage source={{ uri: item.media[0].uri }} style={styles.pickerThumb} contentFit="cover" />
                   ) : (
                     <View style={[styles.pickerThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card }]}>
                       <Feather name="package" size={20} color={colors.mutedForeground} />
                     </View>
                   )}
-                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 14 }} numberOfLines={1}>
+                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: FONT.semibold, fontSize: 14 }} numberOfLines={1}>
                     {item.name}
                   </Text>
                   <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
@@ -447,13 +449,13 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 10, height: 10, borderRadius: 5 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 8 },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14, lineHeight: 17 },
+  sectionTitle: { fontSize: 16, fontFamily: FONT.bold, marginBottom: 4 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
   dropzone: {
-    borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center',
+    borderRadius: 16, borderWidth: crispPx(1.5), borderStyle: 'dashed', alignItems: 'center',
     justifyContent: 'center', paddingVertical: 40, gap: 10,
   },
-  dropzoneTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  dropzoneTitle: { fontSize: 14, fontFamily: FONT.semibold },
   trayRow: { gap: 10, paddingVertical: 4 },
   trayThumbWrap: { position: 'relative' },
   trayThumb: { width: 72, height: 72, borderRadius: 12 },
@@ -465,18 +467,18 @@ const styles = StyleSheet.create({
     width: 72, height: 72, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center',
   },
-  inputLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 20, marginBottom: 8 },
+  inputLabel: { fontSize: 12, fontFamily: FONT.semibold, marginTop: 20, marginBottom: 8 },
   input: {
-    borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular',
+    borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: FONT.regular,
     minHeight: 72, textAlignVertical: 'top',
   },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: 14, paddingVertical: 15,
   },
-  primaryBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  primaryBtnText: { fontSize: 14, fontFamily: FONT.semibold },
   secondaryBtn: { alignItems: 'center', paddingVertical: 10 },
-  secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  secondaryBtnText: { fontSize: 13, fontFamily: FONT.regular },
   resultFrame: {
     aspectRatio: 1, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },

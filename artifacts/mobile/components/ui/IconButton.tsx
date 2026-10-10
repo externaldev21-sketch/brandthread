@@ -6,18 +6,19 @@
  */
 import React from 'react';
 import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
-import { COMP, FONT } from '@/lib/theme';
+import { COMP, FONT, TEXT_DISABLED } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { Glass } from '@/components/ui/Glass';
 import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { crispPx } from '@/lib/crispPixel';
 
 export interface IconButtonProps {
-  name: keyof typeof Feather.glyphMap;
+  name: IconName;
   onPress: () => void;
   /** Optional: when omitted (or empty) a default is derived from the icon `name` (see lib/a11y/iconLabels.ts). */
   accessibilityLabel?: string;
@@ -49,7 +50,8 @@ export function IconButton({
 }: IconButtonProps) {
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
-  const resolvedColor = color ?? (variant === 'glass' ? '#FFFFFF' : palette.foreground);
+  // Disabled is a solid gray glyph, not a faded one.
+  const resolvedColor = disabled ? TEXT_DISABLED : color ?? (variant === 'glass' ? '#FFFFFF' : palette.foreground);
 
   return (
     <Pressable
@@ -69,9 +71,8 @@ export function IconButton({
       <Animated.View
         style={[
           styles.root,
-          variant === 'filled' && { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, borderRadius: RADII.chip },
+          variant === 'filled' && { backgroundColor: palette.card, borderRadius: RADII.chip },
           variant === 'glass' && { borderRadius: RADII.pill, overflow: 'hidden' },
-          disabled && { opacity: 0.4 },
           { transform: [{ scale }] },
           style,
         ]}
@@ -79,7 +80,7 @@ export function IconButton({
         {variant === 'glass' && (
           <Glass variant="regular" tint="dark" radius={RADII.pill} style={StyleSheet.absoluteFill} />
         )}
-        <Feather name={name} size={size} color={resolvedColor} />
+        <Icon name={name} size={size} color={resolvedColor} />
         {typeof badge === 'number' && badge > 0 && (
           <View style={[styles.badge, { backgroundColor: palette.primary, borderColor: variant === 'glass' ? '#0A0A0B' : palette.background }]}>
             <Animated.Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.badgeText, { color: palette.primaryForeground }]}>
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
   },
   // fontFamily, not fontWeight: without an explicit `fontFamily` this
   // badge digit rendered in the browser's default sans font on web (no

@@ -6,8 +6,8 @@ import {
   FlatList,
   StyleSheet,
   Platform,
-  Image,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -124,10 +124,10 @@ export default function AIMockupChatScreen() {
             </Text>
             {msg.image && (
               <View>
-                <Image
+                <CachedImage
                   source={{ uri: `data:image/png;base64,${msg.image}` }}
                   style={styles.mockupImage}
-                  resizeMode="cover"
+                  contentFit="cover"
                 />
                 <AiGeneratedBadge />
               </View>

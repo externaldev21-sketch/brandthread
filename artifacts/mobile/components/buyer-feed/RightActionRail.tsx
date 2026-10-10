@@ -16,7 +16,8 @@
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
-import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import { Animated, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
@@ -28,6 +29,7 @@ import { RADII } from '@/constants/radii';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { useLiveStreamForHost } from '@/lib/live/useLiveDirectory';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
+import { crispPx } from '@/lib/crispPixel';
 
 export interface RailEngagement {
   liked?: boolean;
@@ -170,7 +172,7 @@ export function RightActionRail({
               uses the default. */}
           <LiveHostRing hostId={hostId} size={38} ringGap={1.5} ringWidth={2}>
             {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              <CachedImage source={{ uri: avatarUri }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
                 <Text style={styles.avatarText}>{initials}</Text>
@@ -336,7 +338,7 @@ const styles = StyleSheet.create({
   avatarWrap: { alignItems: 'center', marginBottom: 6 },
   avatar: {
     width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: ON_DARK,
+    borderWidth: crispPx(1.5), borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
   // fontSize bumped FS.xs (11) -> FS.sm (self-audit find #2): two-letter
@@ -358,7 +360,7 @@ const styles = StyleSheet.create({
   followBadge: {
     position: 'absolute', bottom: -13.5, width: 16, height: 16, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#000',
+    borderWidth: crispPx(1.5), borderColor: '#000',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
   followBadgeTouchable: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -23,7 +24,7 @@ export function SellerDashboardTopProducts({
   return (
     <View testID="seller-dashboard-top-products">
       <View style={styles.headerRow}>
-        <Text style={[styles.sectionHeader, { color: theme.muted }]}>Top products</Text>
+        <Text style={[styles.sectionHeader, { color: theme.text }]}>Top products</Text>
         <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all products">
           <Text style={[styles.seeAll, { color: theme.subtle }]}>See all</Text>
         </TouchableOpacity>
@@ -38,7 +39,7 @@ export function SellerDashboardTopProducts({
             accessibilityLabel={`${product.name}: ${product.unitsSold} sold, ${formatCents(product.revenueCents)}`}
           >
             {product.imageUrl ? (
-              <Image source={{ uri: product.imageUrl }} style={styles.thumb} />
+              <CachedImage source={{ uri: product.imageUrl }} style={styles.thumb} />
             ) : (
               <View style={[styles.thumb, styles.thumbPlaceholder, { backgroundColor: theme.cardElevated }]}>
                 <Text style={[styles.thumbLetter, { color: theme.subtle }]}>{product.name.charAt(0).toUpperCase()}</Text>
@@ -67,11 +68,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SP.sm,
   },
+  // Section header: sentence case, 17 semibold, white (BRANDTHREAD_DESIGN.md).
   sectionHeader: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    fontFamily: FONT.semibold,
+    fontSize: 17,
+    lineHeight: 22,
   },
   seeAll: {
     fontFamily: FONT.medium,

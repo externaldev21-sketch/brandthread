@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  View, Text, FlatList, SectionList, Image,
+  View, Text, FlatList, SectionList,
   Alert, StyleSheet, ScrollView, RefreshControl,
   Modal, TextInput, ActivityIndicator, Platform, Animated,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
@@ -65,6 +66,7 @@ import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
 // (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
@@ -1174,7 +1176,7 @@ export default function InboxScreen() {
                 // ringed avatar opens their live instead of the thread.
                 <LiveHostRing hostId={participant.userId} hostName={participant.name} size={48} ringGap={2} pressToWatch>
                   {participant.avatarUri ? (
-                    <Image source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-avatar-image-${conv.id}`} />
+                    <CachedImage source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-avatar-image-${conv.id}`} />
                   ) : (
                     <View style={[s.avatar48, { backgroundColor: participant.color }]}>
                       <Text style={s.avatarInitials}>{participant.initials}</Text>
@@ -1300,7 +1302,7 @@ export default function InboxScreen() {
           >
             <View style={s.avatarContainer}>
               {participant.avatarUri ? (
-                <Image source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-request-avatar-image-${conv.id}`} />
+                <CachedImage source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-request-avatar-image-${conv.id}`} />
               ) : (
                 <View style={[s.avatar48, { backgroundColor: participant.color }]}>
                   <Text style={s.avatarInitials}>{participant.initials}</Text>
@@ -1398,7 +1400,7 @@ export default function InboxScreen() {
         {suggestedPeople.map(person => (
           <View key={person.userId} style={s.suggestedRow} testID={`inbox-suggested-${person.userId}`}>
             {person.avatarUrl ? (
-              <Image source={{ uri: person.avatarUrl }} style={s.suggestedAvatar} />
+              <CachedImage source={{ uri: person.avatarUrl }} style={s.suggestedAvatar} />
             ) : (
               <View style={[s.suggestedAvatar, { backgroundColor: person.color }]}>
                 <Text style={s.avatarInitials}>{person.initials}</Text>
@@ -1596,7 +1598,7 @@ export default function InboxScreen() {
                       <View style={[s.storyRing, s.storyRingUnseen, { borderColor: theme.text }]} />
                     ) : null}
                     {myAvatarUri ? (
-                      <Image source={{ uri: myAvatarUri }} style={s.activeRailAvatar} />
+                      <CachedImage source={{ uri: myAvatarUri }} style={s.activeRailAvatar} />
                     ) : (
                       <View style={[s.activeRailAvatar, { backgroundColor: theme.cardElevated }]}>
                         <Text style={[s.activeRailInitials, { color: theme.text }]}>{myInitials}</Text>
@@ -1644,7 +1646,7 @@ export default function InboxScreen() {
                       {noteBubble}
                       <LiveHostRing hostId={row.authorId} hostName={row.name} size={64} ringGap={-2} pressToWatch>
                         {row.avatarUri ? (
-                          <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
+                          <CachedImage source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
                         ) : (
                           <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
                             <Text style={s.activeRailInitials}>{row.initials}</Text>
@@ -1675,7 +1677,7 @@ export default function InboxScreen() {
                         ]}
                       />
                       {row.avatarUri ? (
-                        <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
+                        <CachedImage source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
                       ) : (
                         <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
                           <Text style={s.activeRailInitials}>{row.initials}</Text>
@@ -1846,8 +1848,7 @@ export default function InboxScreen() {
       >
         <View style={s.composeBackdrop}>
           <Glass
-            variant="regular"
-            tint="dark"
+            solid
             radius={RADIUS.xl}
             style={[s.noteComposeSheet, { paddingBottom: insets.bottom + SP.md }]}
           >
@@ -1969,7 +1970,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     position: 'absolute', left: -2, top: -2, right: -2, bottom: -2, borderRadius: 34,
   },
   storyRingUnseen: { borderWidth: 2 },
-  storyRingSeen: { borderWidth: 1.5 },
+  storyRingSeen: { borderWidth: crispPx(1.5) },
   // "Add to your story" badge — pure visual decoration on top of the single
   // "Your story" Pressable, never its own tappable element.
   addStoryBadge: {

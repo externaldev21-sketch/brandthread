@@ -6,11 +6,12 @@
  * Activity (lib/uploadLiveActivity.ts) is driven from, not a forked model.
  */
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP, TEXT_SECONDARY } from '@/lib/theme';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import {
   usePostUploadEntry, dismissPostUpload,
@@ -61,9 +62,9 @@ export function UploadProgressPill({ topInset }: { topInset: number }) {
               : 'Posting your Thread'
         }
       >
-        <Glass variant="regular" tint="dark" radius={radius.sm} style={StyleSheet.absoluteFill} />
+        <Glass solid radius={radius.sm} style={StyleSheet.absoluteFill} />
         {entry.thumbnailUri ? (
-          <Image source={{ uri: entry.thumbnailUri }} style={styles.thumb} />
+          <CachedImage source={{ uri: entry.thumbnailUri }} style={styles.thumb} />
         ) : (
           <View style={[styles.thumb, styles.thumbFallback]}>
             <Feather name="image" size={14} color="#fff" />
@@ -104,7 +105,7 @@ const styles = StyleSheet.create({
   thumbFallback: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   textCol: { flexShrink: 1, minWidth: 80 },
   title: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.xs },
-  subtitle: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.xs - 1, marginTop: 1 },
+  subtitle: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.xs - 1, marginTop: 1 },
   track: { height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.25)', marginTop: 5, overflow: 'hidden' },
   fill: { height: '100%', backgroundColor: '#fff', borderRadius: 1.5 },
 });

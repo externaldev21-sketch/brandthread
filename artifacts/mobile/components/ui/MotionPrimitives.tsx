@@ -16,7 +16,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticSuccessAction, hapticToggle } from '@/lib/haptics';
 import { identityOrNone } from '@/lib/animationUtils';
-import { FONT, RED } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, RED, TEXT_DISABLED } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE, TypeRoleName } from '@/constants/typography';
 import { radius } from '@/constants/radii';
 
@@ -106,13 +106,15 @@ export function FollowMorphButton({
     progress.set(withTiming(following ? 1 : 0, { duration: 180 }));
   }, [following, progress]);
 
+  // Disabled is drawn in solid grays inside the animated style itself (an
+  // animated colour would otherwise win over a static override).
   const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.value, [0, 1], [theme.accent, 'transparent']),
+    backgroundColor: disabled ? FILL_ELEVATED : interpolateColor(progress.value, [0, 1], [theme.accent, 'transparent']),
     borderWidth: 1,
-    borderColor: interpolateColor(progress.value, [0, 1], [theme.accent, theme.text]),
+    borderColor: disabled ? FILL_ELEVATED : interpolateColor(progress.value, [0, 1], [theme.accent, theme.text]),
   }));
   const textStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(progress.value, [0, 1], [theme.onAccent, theme.text]),
+    color: disabled ? TEXT_DISABLED : interpolateColor(progress.value, [0, 1], [theme.onAccent, theme.text]),
   }));
 
   return (
@@ -123,7 +125,7 @@ export function FollowMorphButton({
       disabled={disabled}
       onPress={() => { hapticToggle(); onChange(!following); }}
     >
-      <Animated.View style={[styles.followBtn, small && styles.followBtnSmall, animatedStyle, disabled && styles.followBtnDisabled, style]}>
+      <Animated.View style={[styles.followBtn, small && styles.followBtnSmall, animatedStyle, style]}>
         <Animated.Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold }, labelStyle, textStyle]}>
           {following ? followingLabel : followLabel}
         </Animated.Text>
@@ -180,5 +182,4 @@ export function CountUpNumber({ value, role = 'headline', color, durationMs = 40
 const styles = StyleSheet.create({
   followBtn: { height: 36, paddingHorizontal: 18, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   followBtnSmall: { height: 30, paddingHorizontal: 14 },
-  followBtnDisabled: { opacity: 0.5 },
 });

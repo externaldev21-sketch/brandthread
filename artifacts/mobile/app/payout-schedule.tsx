@@ -23,6 +23,7 @@ import {
   WEEKLY_ANCHORS, cap, choiceFromSchedule, instantFeeLabel, instantUnavailableReason, nextPayoutLabel,
   type PayoutScheduleInfo, type ScheduleChoice, type WeeklyAnchor,
 } from '@/lib/payoutScheduleView';
+import { crispPx } from '@/lib/crispPixel';
 
 /** Weekday picker: a fixed 4-column grid of equal chips. */
 const DAY_COLUMNS = 4;
@@ -371,7 +372,7 @@ const createStyles = (theme: AppThemePreset) => {
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
     cardTitle: { color: text, fontSize: FS.base, fontFamily: FONT.semibold },
     cardSub: { color: muted, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 2 },
-    radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: muted, alignItems: 'center', justifyContent: 'center' },
+    radio: { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: muted, alignItems: 'center', justifyContent: 'center' },
     radioOn: { borderColor: text },
     radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: text },
     dayRow: { flexDirection: 'row', gap: DAY_GAP, marginTop: SP.md, flexWrap: 'wrap' },

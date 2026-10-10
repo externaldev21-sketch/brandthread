@@ -5,6 +5,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 const CHECKOUT_MODES = ['Checkout only', 'Accounts optional', 'Accounts required'];
 
@@ -118,7 +119,7 @@ const styles = StyleSheet.create({
   selectValue: { fontSize: FS.md, fontFamily: FONT.semibold },
   cardTitle: { fontSize: FS.md, fontFamily: FONT.semibold },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginTop: SP.xs },
-  checkbox: { width: 18, height: 18, borderRadius: RADIUS.xs - 2, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 18, height: 18, borderRadius: RADIUS.xs - 2, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
   radioRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginBottom: SP.sm + 4 },
   radioLabel: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
   textAreaBox: { borderWidth: 1, borderRadius: RADIUS.md, marginTop: SP.xs },

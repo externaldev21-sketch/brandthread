@@ -5,7 +5,8 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { Image, View, Animated, StyleSheet } from 'react-native';
+import { View, Animated, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { LOGO_SOURCE, LOGO_A11Y_LABEL } from '@/constants/branding';
 
 interface BrandthreadLogoProps {
@@ -86,7 +87,7 @@ export default function BrandthreadLogo({
         source={LOGO_SOURCE}
         style={{ width: w, height: h, opacity }}
         tintColor={tintColor}
-        resizeMode="contain"
+        contentFit="contain"
         accessible={false}
       />
     </Animated.View>

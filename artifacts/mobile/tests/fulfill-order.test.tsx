@@ -14,6 +14,10 @@ const { nativeComponent } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('expo-image', () => ({
+  Image: (props: Record<string, unknown>) => React.createElement('Image', props),
+}));
+
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   View: nativeComponent('View'),

@@ -6,7 +6,8 @@
  * from constants/postLimits.ts and the extra photo is blocked with a message.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT } from '@/lib/theme';
@@ -17,6 +18,7 @@ import type { PickedAsset } from '@/lib/createPost/types';
 import { MAX_SLIDES_BY_MODE, MAX_VIDEO_SECONDS, MODE_LABEL, type PostMode } from '@/constants/postLimits';
 import { CP, IconButton, PillButton, SubPage, tap } from '@/components/create-post/ui';
 import { ReorderStrip } from '@/components/create-post/ReorderStrip';
+import { crispPx } from '@/lib/crispPixel';
 
 type Tab = 'all' | 'videos' | 'photos';
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -41,7 +43,7 @@ export function MediaThumb({ asset, style }: { asset: PickedAsset; style?: any }
   if (Platform.OS === 'web' && asset.kind === 'video') {
     return <View style={[{ backgroundColor: CP.surface }, style]}><WebVideoThumb uri={asset.uri} /></View>;
   }
-  return <Image source={{ uri: asset.uri }} style={[{ backgroundColor: CP.surface }, style]} resizeMode="cover" />;
+  return <CachedImage source={{ uri: asset.uri }} style={[{ backgroundColor: CP.surface }, style]} contentFit="cover" />;
 }
 
 export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], destinationOptions, onPickDestination }: {
@@ -262,7 +264,7 @@ const s = StyleSheet.create({
   tabText: { fontFamily: FONT.semibold, fontSize: 15, paddingBottom: 8 },
   tabBar: { height: 2, alignSelf: 'stretch', marginHorizontal: 24 },
   duration: { position: 'absolute', right: 6, bottom: 5, color: CP.white, fontFamily: FONT.semibold, fontSize: 12 },
-  circle: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: CP.white, alignItems: 'center', justifyContent: 'center' },
+  circle: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: CP.white, alignItems: 'center', justifyContent: 'center' },
   circleOn: { backgroundColor: CP.white },
   circleNum: { color: CP.black, fontFamily: FONT.bold, fontSize: 12 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },

@@ -38,6 +38,7 @@ import {
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThreadProgress } from '@/components/onboarding/ThreadLine';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { crispPx } from '@/lib/crispPixel';
 
 // ─── Task Step Card ───────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.cr
                 paddingHorizontal: SP.md, paddingVertical: 16, marginBottom: SP.sm },
   cardActive: { borderColor: colors.primary, backgroundColor: colors.accent },
   cardDone:   { opacity: 0.6 },
-  check:      { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.primary,
+  check:      { width: 26, height: 26, borderRadius: 13, borderWidth: crispPx(1.5), borderColor: colors.primary,
                 alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   checkDone:  { backgroundColor: colors.primary, borderColor: colors.primary },
   body:       { flex: 1 },

@@ -18,6 +18,7 @@ import { RADII } from '@/constants/radii';
 import type {
   StoryCountdownState, StoryOverlay, StoryPollState, StoryProductState, StoryQuestionState, StoryStickerState,
 } from '@/services/socialTypes';
+import { crispPx } from '@/lib/crispPixel';
 
 export const STICKER = {
   paper: '#F5F5F5',
@@ -437,7 +438,7 @@ const s = StyleSheet.create({
   cellLabel: { color: STICKER.inkSoft, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 13 },
   liveNow: { height: 40, borderRadius: RADII.card, backgroundColor: STICKER.ink, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   liveNowText: { color: STICKER.paper, fontFamily: FONT.bold, fontSize: FS.sm },
-  notifyBtn: { height: 40, borderRadius: RADII.card, borderWidth: 1.5, borderColor: STICKER.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
+  notifyBtn: { height: 40, borderRadius: RADII.card, borderWidth: crispPx(1.5), borderColor: STICKER.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
   notifyBtnOn: { backgroundColor: STICKER.ink },
   notifyText: { color: STICKER.ink, fontFamily: FONT.semibold, fontSize: FS.sm },
 });

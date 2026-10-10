@@ -5,6 +5,7 @@ import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import * as ImagePicker from 'expo-image-picker';
@@ -15,7 +16,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON, TEXT_DISABLED,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import {
@@ -316,7 +317,7 @@ export default function StoreFromMoodboardScreen() {
         <View style={mb.grid}>
           {imageUris.map((uri, idx) => (
             <View key={uri + idx} style={mb.imageWrap}>
-              <Image source={{ uri }} style={mb.gridImage} resizeMode="cover" />
+              <CachedImage source={{ uri }} style={mb.gridImage} contentFit="cover" />
               <TouchableOpacity
                 style={mb.removeBtn}
                 onPress={() => removeImage(idx)}
@@ -329,14 +330,14 @@ export default function StoreFromMoodboardScreen() {
           {imageUris.length < MAX_IMAGES && (
             <TouchableOpacity
               testID="store-from-moodboard-add"
-              style={[mb.addTile, preparingImages && mb.disabledTile]}
+              style={mb.addTile}
               onPress={addImages}
               activeOpacity={0.7}
               disabled={preparingImages}
               accessibilityState={{ disabled: preparingImages }}
             >
-              <Feather name="plus" size={ICON.md} color={PURPLE_LIGHT} />
-              <Text style={mb.addTileLabel}>Add</Text>
+              <Feather name="plus" size={ICON.md} color={preparingImages ? TEXT_DISABLED : PURPLE_LIGHT} />
+              <Text style={[mb.addTileLabel, preparingImages && { color: TEXT_DISABLED }]}>Add</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -529,7 +530,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 2, borderColor: PURPLE_DIM, borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
-   disabledTile: { opacity: 0.5 },
   addTileLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   analyzeBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, justifyContent: 'center', padding: SP.md },

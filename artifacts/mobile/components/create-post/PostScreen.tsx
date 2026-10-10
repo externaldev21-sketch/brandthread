@@ -6,7 +6,8 @@
  * shows its real progress; a failed upload keeps everything and Retry resumes.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -27,6 +28,7 @@ import { activeToken, CAPTION_MAX, replaceToken, tokenizeCaption } from '@/lib/c
 import type { MediaDraft, PostDetails, PublishInput } from '@/lib/createPost/types';
 import { CP, CreateHeader, PillButton, SubPage, tap } from '@/components/create-post/ui';
 import { formatCents } from '@/lib/money';
+import { crispPx } from '@/lib/crispPixel';
 
 const MAX_PRODUCT_TAGS = 5;
 const isPreview = () => isSellerDevPreview() || isBuyerDevPreview();
@@ -102,7 +104,7 @@ function SlideCoverPage({ media, onPick, onBack }: {
       <ScrollView contentContainerStyle={s.coverGrid}>
         {media.slides.map((sl, i) => (
           <Pressable key={sl.id} onPress={() => { tap(); onPick(i); }} style={[s.coverCell, i === media.coverIndex && s.coverCellOn]} accessibilityRole="button" testID={`cover-slide-${i}`}>
-            <Image source={{ uri: sl.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <CachedImage source={{ uri: sl.uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
             {i === media.coverIndex ? <View style={s.coverCheck}><Feather name="check" size={14} color={CP.black} /></View> : null}
           </Pressable>
         ))}
@@ -460,7 +462,7 @@ export function PostScreen({
               />
             </View>
             <Pressable onPress={() => { if (media && !isPost) { tap(); setPage('cover'); } }} style={[s.cover, isPost && s.coverSmall, isPost && { order: -1 } as any, { aspectRatio: ratio }]} accessibilityRole="button" accessibilityLabel="Edit cover" testID="edit-cover" disabled={!media || isPost} {...({ dataSet: { textfitIgnore: '1' } } as object)}>
-              {coverUri ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />   : coverIsVideo ? <View style={[StyleSheet.absoluteFill, { backgroundColor: CP.surface2, alignItems: 'center', justifyContent: 'center' }]}><Feather name="video" size={26} color={CP.silver} /></View> : null}
+              {coverUri ? <CachedImage source={{ uri: coverUri }} style={StyleSheet.absoluteFill} contentFit="cover" />   : coverIsVideo ? <View style={[StyleSheet.absoluteFill, { backgroundColor: CP.surface2, alignItems: 'center', justifyContent: 'center' }]}><Feather name="video" size={26} color={CP.silver} /></View> : null}
               {media && !isPost ? <Text style={s.coverLabel}>Edit cover</Text> : null}
             </Pressable>
           </View>
@@ -554,7 +556,7 @@ const s = StyleSheet.create({
   emptyTitle: { color: CP.white, fontFamily: FONT.bold, fontSize: 17, textAlign: 'center' },
   emptyBody: { color: CP.silver, fontFamily: FONT.regular, fontSize: 14, textAlign: 'center', marginTop: 6 },
   productRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, minHeight: 64, paddingVertical: 10 },
-  check: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: CP.silver, alignItems: 'center', justifyContent: 'center' },
+  check: { width: 24, height: 24, borderRadius: 12, borderWidth: crispPx(1.5), borderColor: CP.silver, alignItems: 'center', justifyContent: 'center' },
   checkOn: { backgroundColor: CP.white, borderColor: CP.white },
   hintCenter: { color: CP.silver, fontFamily: FONT.regular, fontSize: 13, textAlign: 'center', marginVertical: 10, paddingHorizontal: 16 },
   coverGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, padding: 2 },

@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Image,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -145,7 +146,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
         <View style={styles.thumbRow}>
           {thumbs.map((item, i) => (
             item.imageUri ? (
-              <Image key={i} source={{ uri: item.imageUri }} style={styles.thumb} resizeMode="cover" accessibilityLabel={item.productName} />
+              <CachedImage key={i} source={{ uri: item.imageUri }} style={styles.thumb} contentFit="cover" accessibilityLabel={item.productName} />
             ) : (
               <View key={i} style={[styles.thumb, styles.thumbFallback]}>
                 <Feather name="image" size={16} color={theme.subtle} />

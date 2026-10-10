@@ -19,9 +19,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, Image, Modal, Platform,
+  ActivityIndicator, Alert, Modal, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -37,6 +38,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 interface SellerProductRow {
   id: string;
@@ -462,7 +464,7 @@ export default function SellerDropCreate() {
             {(heroImageUrl || heroVideoUrl) ? (
               <View style={styles.heroPreviewWrap}>
                 {heroImageUrl ? (
-                  <Image source={{ uri: heroImageUrl }} style={styles.heroPreview} resizeMode="cover" />
+                  <CachedImage source={{ uri: heroImageUrl }} style={styles.heroPreview} contentFit="cover" />
                 ) : (
                   <View style={[styles.heroPreview, styles.heroVideoPlaceholder, { backgroundColor: theme.cardElevated }]}>
                     <Feather name="film" size={22} color={theme.muted} />
@@ -576,7 +578,7 @@ export default function SellerDropCreate() {
                       accessibilityState={{ checked }}
                     >
                       {product.images?.[0] ? (
-                        <Image source={{ uri: product.images[0] }} style={styles.productThumb} />
+                        <CachedImage source={{ uri: product.images[0] }} style={styles.productThumb} />
                       ) : (
                         <View style={[styles.productThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated }]}>
                           <Feather name="package" size={16} color={theme.muted} />
@@ -688,7 +690,7 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   productRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.sm, padding: 8 },
   productThumb: { width: 36, height: 36, borderRadius: RADIUS.xs },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
   saveBtn: { minHeight: 52, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.sm },
   secondaryBtn: { flexDirection: 'row', minHeight: 46, borderWidth: 1, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: 8 },
   tzHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },

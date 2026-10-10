@@ -7,8 +7,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
-  Animated, Platform, Linking, Image, FlatList,
+  Animated, Platform, Linking, FlatList,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_DISABLED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -25,6 +26,7 @@ import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { useAgeStatus } from '@/lib/ageGate';
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 const FG = '#FFFFFF';
 const GLASS = 'rgba(0,0,0,0.5)';
@@ -304,14 +306,14 @@ function SellerGoLiveNativeScreen() {
               onPressOut={onGoLivePressOut}
               disabled={starting || !title.trim()}
               activeOpacity={0.9}
-              style={[s.goLiveBtn, { backgroundColor: LIVE_RED, opacity: starting || !title.trim() ? 0.5 : 1 }]}
+              style={[s.goLiveBtn, { backgroundColor: starting || !title.trim() ? FILL_ELEVATED : LIVE_RED }]}
             >
               {starting ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={TEXT_TERTIARY} />
               ) : (
                 <>
-                  <View style={s.liveDot} />
-                  <Text style={s.goLiveBtnText}>Go Live</Text>
+                  <View style={[s.liveDot, !title.trim() && { backgroundColor: TEXT_DISABLED }]} />
+                  <Text style={[s.goLiveBtnText, !title.trim() && { color: TEXT_DISABLED }]}>Go Live</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -354,7 +356,7 @@ function SellerGoLiveNativeScreen() {
                       style={[s.pickerRow, tagged && s.pickerRowActive]}
                     >
                       {p.imageUrl ? (
-                        <Image source={{ uri: p.imageUrl }} style={s.pickerRowThumb} />
+                        <CachedImage source={{ uri: p.imageUrl }} style={s.pickerRowThumb} />
                       ) : (
                         <View style={[s.pickerRowThumb, s.pickerRowThumbPlaceholder]}>
                           <Feather name="image" size={16} color="rgba(255,255,255,0.4)" />
@@ -391,7 +393,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     bottomGradient:    { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 100 },
     fields:            { paddingHorizontal: SP.md, paddingBottom: SP.md, gap: SP.sm },
     titleInput:        { color: FG, fontSize: FS.md, fontFamily: FONT.bold, paddingVertical: 6 },
-    descInput:         { color: 'rgba(255,255,255,0.9)', fontSize: FS.sm, fontFamily: FONT.regular, paddingVertical: 2, maxHeight: 60 },
+    descInput:         { color: FG, fontSize: FS.sm, fontFamily: FONT.regular, paddingVertical: 2, maxHeight: 60 },
 
     goLiveBtn:         { marginTop: SP.xs, borderRadius: radius.md, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
     liveDot:           { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
@@ -403,18 +405,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
     // Product picker sheet
     pickerModal:       { backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-    pickerSheet:        { backgroundColor: '#141416', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, maxHeight: '70%', paddingTop: SP.md },
+    pickerSheet:        { backgroundColor: FILL_ELEVATED, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, maxHeight: '70%', paddingTop: SP.md },
     pickerHeader:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm },
     pickerTitle:        { color: FG, fontSize: FS.base, fontFamily: FONT.bold },
     pickerLoading:      { paddingVertical: SP.xl, alignItems: 'center' },
-    pickerEmptyText:    { color: 'rgba(255,255,255,0.6)', fontSize: FS.sm, textAlign: 'center', paddingVertical: SP.xl, paddingHorizontal: SP.md },
+    pickerEmptyText:    { color: TEXT_TERTIARY, fontSize: FS.sm, textAlign: 'center', paddingVertical: SP.xl, paddingHorizontal: SP.md },
     pickerRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
     pickerRowActive:    { backgroundColor: 'rgba(255,255,255,0.06)' },
     pickerRowThumb:     { width: 40, height: 40, borderRadius: RADIUS.sm },
     pickerRowThumbPlaceholder: { backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
     pickerRowName:      { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
-    pickerRowPrice:     { color: 'rgba(255,255,255,0.6)', fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-    checkbox:           { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' },
+    pickerRowPrice:     { color: TEXT_TERTIARY, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+    checkbox:           { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' },
     checkboxActive:      { backgroundColor: FG, borderColor: FG },
 
     // Permissions gate
@@ -423,9 +425,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     permBox:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: SP.md },
     permIconWrap:      { width: 68, height: 68, borderRadius: RADIUS.xl, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
     permTitle:         { color: FG, fontSize: FS.md, fontFamily: FONT.bold, textAlign: 'center' },
-    permSub:           { color: 'rgba(255,255,255,0.65)', fontSize: FS.sm, textAlign: 'center', lineHeight: 22 },
+    permSub:           { color: TEXT_SECONDARY, fontSize: FS.sm, textAlign: 'center', lineHeight: 22 },
     permBtn:           { paddingHorizontal: 28, paddingVertical: 13, borderRadius: RADIUS.md, marginTop: SP.sm },
     permBtnText:       { fontSize: FS.base, fontFamily: FONT.semibold },
-    permCancel:        { color: 'rgba(255,255,255,0.55)', fontSize: FS.sm },
+    permCancel:        { color: TEXT_TERTIARY, fontSize: FS.sm },
   });
 };

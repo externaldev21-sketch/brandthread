@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Platform, TextInput, Image, Animated, ActivityIndicator,
+  Alert, Platform, TextInput, Animated, ActivityIndicator,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -26,6 +27,8 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { Avatar } from '@/components/ui/Avatar';
+import { FONT, TEXT_DISABLED } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -429,7 +432,7 @@ export default function EditProfileScreen() {
         rightElement={
           <TouchableOpacity onPress={handleSave} disabled={!isDirty || saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             {saving ? <ActivityIndicator size="small" color={theme.accentLight} /> : (
-              <Text style={[styles.saveText, (!isDirty || !profileLoaded) && { opacity: 0.4 }]}>Save</Text>
+              <Text style={[styles.saveText, (!isDirty || !profileLoaded) && { color: TEXT_DISABLED }]}>Save</Text>
             )}
           </TouchableOpacity>
         }
@@ -470,14 +473,14 @@ export default function EditProfileScreen() {
         <View style={styles.previewCard}>
           <View style={styles.previewBannerWrap}>
             {bannerUri ? (
-              <Image source={{ uri: bannerUri }} style={styles.previewBanner} />
+              <CachedImage source={{ uri: bannerUri }} style={styles.previewBanner} />
             ) : (
               <LinearGradient colors={theme.heroGradient as any} style={styles.previewBanner} />
             )}
           </View>
           <View style={styles.previewLogoWrap}>
             {(logoUri ?? avatarUri) ? (
-              <Image source={{ uri: (logoUri ?? avatarUri) as string }} style={styles.previewLogo} />
+              <CachedImage source={{ uri: (logoUri ?? avatarUri) as string }} style={styles.previewLogo} />
             ) : (
               <LinearGradient colors={theme.primaryGradient as any} style={styles.previewLogo}>
                 <Text style={styles.previewLogoText}>{(fields.name || 'B').slice(0, 2).toUpperCase()}</Text>
@@ -504,7 +507,7 @@ export default function EditProfileScreen() {
         >
           <View style={styles.bannerPreviewSlot}>
             {bannerUri ? (
-              <Image source={{ uri: bannerUri }} style={styles.bannerPreviewImage} />
+              <CachedImage source={{ uri: bannerUri }} style={styles.bannerPreviewImage} />
             ) : (
               <View style={[styles.bannerPreviewImage, styles.bannerPreviewEmpty]}>
                 <Feather name="image" size={20} color={theme.muted} />
@@ -541,7 +544,7 @@ export default function EditProfileScreen() {
               <TouchableOpacity activeOpacity={0.8} onPress={pickLogo} disabled={uploading.logo}>
                 <View style={styles.avatarWrap}>
                   {logoUri ? (
-                    <Image source={{ uri: logoUri }} style={styles.avatar} />
+                    <CachedImage source={{ uri: logoUri }} style={styles.avatar} />
                   ) : (
                     <View style={[styles.avatar, styles.logoEmpty]}>
                       <Feather name="award" size={22} color={theme.muted} />
@@ -697,7 +700,7 @@ function Divider({ theme }: { theme: AppThemePreset }) {
 function RetryLink({ onPress, theme }: { onPress: () => void; theme: AppThemePreset }) {
   return (
     <TouchableOpacity onPress={onPress} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-      <Text style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: theme.error, marginTop: 2 }}>Retry</Text>
+      <Text style={{ fontSize: 11, fontFamily: FONT.semibold, color: theme.error, marginTop: 2 }}>Retry</Text>
     </TouchableOpacity>
   );
 }
@@ -752,7 +755,7 @@ function ImageUploadRow({
     <View style={[styles.card, { marginBottom: 8 }]}>
       <TouchableOpacity style={[styles.row, { paddingVertical: 14 }]} activeOpacity={0.8} onPress={onPress} disabled={uploading}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.rowLabel, { width: undefined, color: theme.text, fontFamily: 'Inter_500Medium' }]}>{label}</Text>
+          <Text style={[styles.rowLabel, { width: undefined, color: theme.text, fontFamily: FONT.medium }]}>{label}</Text>
           <Text style={styles.rowHint}>{uploading ? `Uploading… ${progress}%` : hint}</Text>
           {error && <Text style={styles.inlineErrorNoIndent}>{error} · Tap to retry</Text>}
         </View>
@@ -767,7 +770,7 @@ function ImageUploadRow({
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
 
-  saveText:    { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.accentLight },
+  saveText:    { fontSize: 15, fontFamily: FONT.semibold, color: theme.accentLight },
 
   toast: {
     position: 'absolute', top: 56, alignSelf: 'center', zIndex: 99,
@@ -775,15 +778,15 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: theme.success, borderRadius: 24,
     paddingHorizontal: 16, paddingVertical: 9,
   },
-  toastText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: theme.onAccent },
+  toastText: { fontSize: 13, fontFamily: FONT.semibold, color: theme.onAccent },
 
   errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40 },
-  errorTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text, marginTop: 4 },
-  errorBody:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'center' },
+  errorTitle: { fontSize: 15, fontFamily: FONT.semibold, color: theme.text, marginTop: 4 },
+  errorBody:  { fontSize: 13, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
   retryBtn:   { marginTop: 12 },
 
   sectionLabel: {
-    fontSize: 13, fontFamily: 'Inter_500Medium', color: theme.muted,
+    fontSize: 13, fontFamily: FONT.medium, color: theme.muted,
     paddingHorizontal: 18, paddingTop: 16, paddingBottom: 8,
   },
 
@@ -799,10 +802,10 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     borderWidth: 3, borderColor: theme.card, overflow: 'hidden',
   },
   previewLogo: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  previewLogoText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: theme.onAccent },
+  previewLogoText: { fontSize: 18, fontFamily: FONT.bold, color: theme.onAccent },
   previewInfo: { paddingHorizontal: 14, paddingTop: 8, gap: 2 },
-  previewName: { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
-  previewMeta: { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: theme.muted },
+  previewName: { fontSize: 16, fontFamily: FONT.bold, color: theme.text },
+  previewMeta: { fontSize: 12.5, fontFamily: FONT.regular, color: theme.muted },
 
   bannerPreviewSlot: { marginLeft: 8 },
   bannerPreviewImage: { width: 64, height: 40, borderRadius: 8 },
@@ -816,14 +819,14 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   logoEmpty: { backgroundColor: theme.surface },
   cameraBadge: {
     position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2.5,
+    alignItems: 'center', justifyContent: 'center', borderWidth: crispPx(2.5),
   },
   imageOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 42,
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 2, // theme-exempt: scrim over avatar media
   },
-  imageOverlayText: { color: '#FFF', fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  editPhotoLink: { fontSize: 12.5, fontFamily: 'Inter_500Medium', color: theme.accentLight },
+  imageOverlayText: { color: '#FFF', fontSize: 11, fontFamily: FONT.semibold },
+  editPhotoLink: { fontSize: 12.5, fontFamily: FONT.medium, color: theme.accentLight },
 
   card: {
     backgroundColor: theme.card, marginHorizontal: 14, borderRadius: 12,
@@ -835,17 +838,17 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 13, gap: 12,
   },
   rowLabel: {
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text, width: 100,
+    fontSize: 15, fontFamily: FONT.regular, color: theme.text, width: 100,
   },
-  rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 2 },
+  rowHint: { fontSize: 12, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   rowValue: {
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.muted,
+    fontSize: 15, fontFamily: FONT.regular, color: theme.muted,
   },
   rowInput: {
-    flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
+    flex: 1, fontSize: 15, fontFamily: FONT.regular, color: theme.text,
     padding: 0, textAlign: 'right',
   },
-  charCounter: { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'right', marginTop: 4 },
-  inlineError: { fontSize: 11.5, fontFamily: 'Inter_400Regular', color: theme.error, paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
-  inlineErrorNoIndent: { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.error, marginTop: 2 },
+  charCounter: { fontSize: 11, fontFamily: FONT.regular, color: theme.muted, textAlign: 'right', marginTop: 4 },
+  inlineError: { fontSize: 11.5, fontFamily: FONT.regular, color: theme.error, paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
+  inlineErrorNoIndent: { fontSize: 11, fontFamily: FONT.regular, color: theme.error, marginTop: 2 },
 });

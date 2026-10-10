@@ -16,6 +16,7 @@ import { Card, CardDivider, SectionTitle } from '@/components/analytics/Analytic
 import { SegmentedPills, useReportBottomInset } from '@/components/analytics/InsightFrame';
 import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, previewMode, requestExport, type ExportSectionKey, type InsightRange } from '@/services/sellerInsightsService';
 import { saveExportFile } from '@/lib/saveExportFile';
+import { crispPx } from '@/lib/crispPixel';
 
 const SECTIONS: { key: ExportSectionKey; label: string; detail: string }[] = [
   { key: 'orders', label: 'Orders', detail: 'One row per order with totals, refunds and location' },
@@ -84,6 +85,6 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 56, paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm },
   label: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
   detail: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
-  box: { width: 22, height: 22, borderRadius: RADIUS.xs, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  box: { width: 22, height: 22, borderRadius: RADIUS.xs, borderWidth: crispPx(1.5), borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   boxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
 });

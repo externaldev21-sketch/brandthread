@@ -102,8 +102,6 @@ const styles = StyleSheet.create({
     color:         MUTED,
     fontSize:      FS.xs,
     fontFamily:    FONT.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
     marginBottom:  SP.xs,
   },
   maxHint: {

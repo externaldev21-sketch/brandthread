@@ -30,6 +30,7 @@ import type {
   TextOverlay, TextOverlayAlign, TextOverlayBgStyle, TextOverlayFontStyle,
 } from '@/lib/videoEditing';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 // ─── Design tokens (monochrome Brandthread identity) ─────────────────────────
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -591,7 +592,7 @@ const createEditorStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => S
     justifyContent: 'center',
   },
   swatchSelected: {
-    borderWidth: 2.5,
+    borderWidth: crispPx(2.5),
     borderColor: theme.accent,
   },
   swatchLight: {

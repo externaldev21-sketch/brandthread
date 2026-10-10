@@ -8,8 +8,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  Alert, ActivityIndicator, Animated, Linking, Image, Share,
+  Alert, ActivityIndicator, Animated, Linking, Share,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -497,7 +498,7 @@ export default function FulfillOrderScreen() {
               <TouchableOpacity key={li.id} onPress={() => toggleItem(li.id)} activeOpacity={0.8}>
                 <BrandthreadCard style={s.itemCard}>
                   {li.imageUri ? (
-                    <Image source={{ uri: li.imageUri }} style={s.itemThumb} />
+                    <CachedImage source={{ uri: li.imageUri }} style={s.itemThumb} />
                   ) : (
                     <View style={[s.itemThumb, s.itemThumbPlaceholder]}>
                       <Feather name="image" size={ICON.md} color={SUBTLE} />

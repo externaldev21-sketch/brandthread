@@ -14,7 +14,8 @@
  * never intercepts touches.
  */
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
@@ -198,7 +199,7 @@ function MiniBill({ size }: { size: number }) {
   const w = size;
   const h = size * (510 / 1200);
   return (
-    <Image source={BILL_SPRITE_SOURCE} style={{ width: w, height: h }} resizeMode="contain" />
+    <Image source={BILL_SPRITE_SOURCE} style={{ width: w, height: h }} contentFit="contain" />
   );
 }
 

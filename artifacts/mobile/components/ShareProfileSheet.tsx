@@ -30,13 +30,14 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Image, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
+  Animated, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 
@@ -413,11 +414,9 @@ function ShareBackground({ variant, avatarUrl }: { variant: BackgroundVariant; a
   if (variant === 'selfie' && avatarUrl) {
     return (
       <View style={StyleSheet.absoluteFill}>
-        <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} blurRadius={Platform.OS === 'android' ? 18 : 0} resizeMode="cover" />
-        {Platform.OS !== 'android' && (
-          <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
-        )}
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+        {/* The photo itself, sharp, under a solid dim so the card reads. */}
+        <CachedImage source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)' }]} />
       </View>
     );
   }
@@ -462,9 +461,9 @@ function EmojiPatternBackground() {
           style={{
             position: 'absolute', left: g.left, top: g.top,
             width: 22, height: 22, opacity: 0.16, transform: [{ rotate: '-12deg' }],
-            tintColor: '#FFFFFF',
           }}
-          resizeMode="contain"
+          tintColor="#FFFFFF"
+          contentFit="contain"
         />
       ))}
     </View>

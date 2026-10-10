@@ -25,6 +25,7 @@ import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 import { CaptionSpans } from '@/components/social/CaptionText';
+import { crispPx } from '@/lib/crispPixel';
 
 export interface RepostFriend {
   userId: string;
@@ -221,7 +222,7 @@ const styles = StyleSheet.create({
   repostAvatarStack: { minWidth: 22, height: 22, flexDirection: 'row', alignItems: 'center' },
   repostAvatar: {
     width: 22, height: 22, borderRadius: RADII.pill, overflow: 'hidden',
-    borderWidth: 1.5, borderColor: ON_DARK,
+    borderWidth: crispPx(1.5), borderColor: ON_DARK,
   },
   repostAvatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#35353A' },
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },

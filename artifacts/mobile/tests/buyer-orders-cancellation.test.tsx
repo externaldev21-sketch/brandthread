@@ -10,6 +10,10 @@ const { getBuyerOrdersWithStatusMock, routerMock } = vi.hoisted(() => ({
   routerMock: { push: vi.fn() },
 }));
 
+vi.mock('expo-image', () => ({
+  Image: (props: Record<string, unknown>) => React.createElement('Image', props),
+}));
+
 vi.mock('react-native', () => {
   const React = require('react') as typeof import('react');
   const nativeComponent = (name: string) => {

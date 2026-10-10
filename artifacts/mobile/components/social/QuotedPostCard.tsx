@@ -6,7 +6,8 @@
  * by the post viewer and the quote composer's original-post preview.
  */
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { RADII } from '@/constants/radii';
@@ -42,7 +43,7 @@ export function QuotedPostCard({ quotedPost, onPress, testID = 'quoted-post-card
   const body = (
     <>
       {quotedPost.thumbnailUrl ? (
-        <Image source={{ uri: quotedPost.thumbnailUrl }} style={styles.thumb} accessibilityIgnoresInvertColors />
+        <CachedImage source={{ uri: quotedPost.thumbnailUrl }} style={styles.thumb} accessibilityIgnoresInvertColors />
       ) : (
         <View style={[styles.thumb, styles.thumbEmpty]}>
           <Feather name={quotedPost.mediaType === 'video' ? 'video' : 'image'} size={20} color={theme.muted} />

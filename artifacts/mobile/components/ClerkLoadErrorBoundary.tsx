@@ -16,6 +16,7 @@ import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import * as Updates from 'expo-updates';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { reportError } from '@/lib/monitoring';
+import { TEXT_TERTIARY } from '@/lib/theme';
 
 type State = { hasError: boolean };
 
@@ -70,7 +71,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: { color: '#F7F7FA', fontSize: 17, fontWeight: '700', marginTop: 20, textAlign: 'center' },
-  body: { color: 'rgba(247,247,250,0.6)', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  body: { color: TEXT_TERTIARY, fontSize: 14, textAlign: 'center', lineHeight: 20 },
   button: {
     marginTop: 12,
     minWidth: 160,

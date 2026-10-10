@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -23,7 +24,7 @@ export const SellerShareCard = React.forwardRef<View, SellerShareCardProps>(
       <ShareCardFrame ref={ref} theme={theme} qrValue={qrValue}>
         <View style={[styles.logo, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
           {data.logoUri ? (
-            <Image source={{ uri: data.logoUri }} style={styles.logoImg} />
+            <CachedImage source={{ uri: data.logoUri }} style={styles.logoImg} />
           ) : (
             <Text style={[styles.logoInitials, { color: theme.text }]}>{initials}</Text>
           )}
@@ -45,7 +46,7 @@ export const SellerShareCard = React.forwardRef<View, SellerShareCardProps>(
           <View style={styles.thumbRow}>
             {products.map(product => (
               <View key={product.id} style={[styles.thumb, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-                {product.uri ? <Image source={{ uri: product.uri }} style={styles.thumbImg} /> : null}
+                {product.uri ? <CachedImage source={{ uri: product.uri }} style={styles.thumbImg} /> : null}
               </View>
             ))}
           </View>

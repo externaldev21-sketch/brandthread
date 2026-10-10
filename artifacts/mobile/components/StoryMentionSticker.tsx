@@ -6,11 +6,13 @@
  *  - ReshareCard: the original story as a rounded card with its credit row.
  */
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, ON_DARK, SP } from '@/lib/theme';
 import { withAt, type MentionStyle } from '@/lib/storyMentionSticker';
 import { RESHARE_CARD_RADIUS } from '@/lib/storyReshare';
+import { crispPx } from '@/lib/crispPixel';
 
 export const RESHARE_CARD_WIDTH = 252;
 export const RESHARE_CARD_HEIGHT = 448; // 9:16
@@ -43,7 +45,7 @@ export function ReshareCard({
           <Text style={styles.cardUnavailableText}>Story unavailable</Text>
         </View>
       ) : (
-        <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <CachedImage source={{ uri: imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       )}
       {handle ? (
         <View style={styles.creditWrap}>
@@ -64,7 +66,7 @@ export function ReshareCard({
 }
 
 const styles = StyleSheet.create({
-  base: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5, borderColor: 'transparent' },
+  base: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: crispPx(1.5), borderColor: 'transparent' },
   text: { fontSize: FS.md, fontFamily: FONT.bold },
 
   card: {

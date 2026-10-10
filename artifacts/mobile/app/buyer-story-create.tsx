@@ -10,9 +10,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform,
+  ActivityIndicator, Alert, Animated, Dimensions, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform,
   Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -28,7 +29,7 @@ import { useUser } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path } from 'react-native-svg';
 import {
-  CARD, BORDER, FG, MUTED, ON_DARK, FONT, FS, SP, RADIUS,
+  CARD, BORDER, FG, MUTED, ON_DARK, FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY,
 } from '@/lib/theme';
 import { createStory, searchProfiles, createOrGetConversation, sendMessage } from '@/services/socialService';
 import type { ProfileSearchResult } from '@/services/socialTypes';
@@ -61,6 +62,7 @@ import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackgr
 import type { MentionPerson } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
 import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
+import { crispPx } from '@/lib/crispPixel';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -225,7 +227,7 @@ function OverlayChip({
           style={[styles.selectionOutline, {
             left: -slop.x, right: -slop.x, top: -slop.y, bottom: -slop.y,
             // keep the outline ~1.5pt on screen however far the sticker is zoomed out
-            borderWidth: 1.5 / Math.max(scale, MENTION_MIN_SCALE),
+            borderWidth: crispPx(1.5) / Math.max(scale, MENTION_MIN_SCALE),
             borderRadius: 10 / Math.max(scale, MENTION_MIN_SCALE),
           }]}
         />
@@ -314,7 +316,7 @@ function GridIcon({ spec, active }: { spec: GridSpec; active: boolean }) {
           style={{
             width: `${100 / spec.cols}%`,
             height: `${100 / spec.rows}%`,
-            borderWidth: 0.5,
+            borderWidth: StyleSheet.hairlineWidth,
             borderColor: 'rgba(255,255,255,0.3)',
             backgroundColor: active ? 'rgba(255,255,255,0.25)' : 'transparent',
           }}
@@ -1288,7 +1290,7 @@ export default function StoryComposer() {
             {/* Gallery thumbnail */}
             <TouchableOpacity style={styles.galleryThumb} onPress={openGallery} accessibilityLabel="Choose from camera roll" accessibilityRole="button">
               {lastGalleryUri ? (
-                <Image source={{ uri: lastGalleryUri }} style={styles.galleryThumbImg} />
+                <CachedImage source={{ uri: lastGalleryUri }} style={styles.galleryThumbImg} />
               ) : (
                 <Feather name="image" size={20} color={ON_DARK} />
               )}
@@ -1365,11 +1367,11 @@ export default function StoryComposer() {
             const cw = W / gridSpec.cols;
             const ch = H / gridSpec.rows;
             return (
-              <Image
+              <CachedImage
                 key={i}
                 source={{ uri }}
                 style={{ position: 'absolute', left: col * cw, top: row * ch, width: cw, height: ch }}
-                resizeMode="cover"
+                contentFit="cover"
               />
             );
           })}
@@ -1595,7 +1597,7 @@ export default function StoryComposer() {
       {isReshare ? (
         <LinearGradient colors={reshareGradientFromBackground(reshareBg)} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
       ) : media?.kind === 'video' ? <VideoPreview uri={media.uri} /> : media ? (
-        <Image source={{ uri: media.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <CachedImage source={{ uri: media.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
       )}
@@ -2312,7 +2314,7 @@ const styles = StyleSheet.create({
   // the X icon's center instead of sitting ~4pt further right.
   railBtn: { alignItems: 'center', gap: 4, minWidth: 44, minHeight: 44, marginBottom: SP.sm },
   railAa: { color: ON_DARK, fontSize: FS.lg, fontFamily: FONT.bold },
-  railLabel: { color: 'rgba(255,255,255,0.85)', fontSize: FS.xs, fontFamily: FONT.medium },
+  railLabel: { color: TEXT_SECONDARY, fontSize: FS.xs, fontFamily: FONT.medium },
   gridPopover: {
     position: 'absolute', left: 50, top: 100, backgroundColor: 'rgba(30,30,34,0.95)',
     borderRadius: RADIUS.md, padding: SP.sm, flexDirection: 'row', flexWrap: 'wrap', width: 92,
@@ -2334,7 +2336,7 @@ const styles = StyleSheet.create({
   // Slides beneath the active label on the same 150ms timing as the app's
   // other quick UI transitions — a plain timing, never a spring/bounce.
   modeIndicator: { position: 'absolute', left: 0, bottom: -6, height: 2, borderRadius: 1, backgroundColor: ON_DARK },
-  modeText: { color: 'rgba(255,255,255,0.5)', fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.5 },
+  modeText: { color: TEXT_TERTIARY, fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.5 },
   modeTextActive: { color: ON_DARK, fontSize: FS.base },
 
   controlsRow: {
@@ -2367,7 +2369,7 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  hint: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.xs },
+  hint: { color: TEXT_TERTIARY, fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.xs },
 
   // Create mode
   createCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
@@ -2383,7 +2385,7 @@ const styles = StyleSheet.create({
   colorCircleBorder: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   bgSwatchRow: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: SP.sm, justifyContent: 'center' },
   bgSwatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
-  bgSwatchActive: { borderWidth: 2.5, borderColor: ON_DARK },
+  bgSwatchActive: { borderWidth: crispPx(2.5), borderColor: ON_DARK },
 
 
   overlayChip: { position: 'absolute', top: 0, left: 0, zIndex: 15 },
@@ -2430,13 +2432,13 @@ const styles = StyleSheet.create({
   myAvatarText: { color: ON_DARK, fontSize: 10, fontFamily: FONT.bold },
   myStoryLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold },
   closeFriendsChip: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
-  closeFriendsLabel: { color: 'rgba(255,255,255,0.75)', fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
+  closeFriendsLabel: { color: TEXT_SECONDARY, fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: ON_DARK, alignItems: 'center', justifyContent: 'center' },
 
   // Text tool
   textToolBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   textToolTop: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SP.md },
-  textToolCancel: { color: 'rgba(255,255,255,0.7)', fontSize: FS.base, fontFamily: FONT.medium },
+  textToolCancel: { color: TEXT_SECONDARY, fontSize: FS.base, fontFamily: FONT.medium },
   textToolDone: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.bold },
   textToolCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   textToolInput: { fontFamily: FONT.bold, minWidth: 60, paddingHorizontal: 8, borderRadius: 6 },
@@ -2485,7 +2487,7 @@ const styles = StyleSheet.create({
   shareRowAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
   shareRowTitle: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
   shareRowSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
   radioOuterActive: { borderColor: ON_DARK },
   radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: ON_DARK },
 
@@ -2514,7 +2516,7 @@ const styles = StyleSheet.create({
   questionCard: { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: RADIUS.md, padding: SP.md, width: 240 },
   questionCardTitle: { color: '#000', fontFamily: FONT.bold, fontSize: FS.base, marginBottom: SP.sm, textAlign: 'center' },
   questionInputMock: { backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: RADIUS.pill, paddingVertical: 8, alignItems: 'center' },
-  questionInputMockText: { color: 'rgba(0,0,0,0.4)', fontSize: FS.sm },
+  questionInputMockText: { color: TEXT_TERTIARY, fontSize: FS.sm },
   pollCard: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.md, padding: SP.md, width: 220 },
   pollQuestion: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base, marginBottom: SP.sm, textAlign: 'center' },
   pollOptionsRow: { gap: 6 },

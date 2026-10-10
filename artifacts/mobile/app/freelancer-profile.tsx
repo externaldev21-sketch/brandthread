@@ -4,7 +4,8 @@
  * The owner sees Edit / Connect Bank Account / My Gigs / Deactivate.
  */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, Modal, Platform, Linking } from 'react-native';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, Platform, Linking } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -193,7 +194,7 @@ export default function FreelancerProfileScreen() {
         {/* Identity card */}
         <View style={styles.heroCard}>
           {freelancer.avatarUrl ? (
-            <Image source={{ uri: freelancer.avatarUrl }} style={styles.avatar} />
+            <CachedImage source={{ uri: freelancer.avatarUrl }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarFallback]}>
               <Text style={styles.avatarInitial}>{(freelancer.name || 'F')[0].toUpperCase()}</Text>

@@ -5,6 +5,7 @@ import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, TextInput, ActivityIndicator,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -18,6 +19,7 @@ import {
 import { BrandthreadCard, PrimaryButton, SecondaryButton, FilterChip, EmptyState } from '@/components/BrandthreadUI';
 import { generateFromSocial, getStoreApplyFailure, StoreApplyFailure } from '@/services/storeService';
 import { useApi } from '@/lib/api';
+import { crispPx } from '@/lib/crispPixel';
 
 type TabMode = 'upload' | 'posts' | 'url';
 
@@ -221,7 +223,7 @@ export default function StoreFromSocialScreen() {
             <View style={ss.grid}>
               {screenshots.map((uri, idx) => (
                 <View key={uri + idx} style={ss.gridWrap}>
-                  <Image source={{ uri }} style={ss.gridImg} resizeMode="cover" />
+                  <CachedImage source={{ uri }} style={ss.gridImg} contentFit="cover" />
                   <TouchableOpacity style={ss.removeBtn} onPress={() => removeScreenshot(idx)}>
                     <Feather name="x" size={10} color={FG} />
                   </TouchableOpacity>
@@ -403,7 +405,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   postRowSelected: { borderColor: PURPLE_LIGHT, backgroundColor: PURPLE_DIM },
   postCheck: {
     width: 22, height: 22, borderRadius: RADIUS.xs,
-    borderWidth: 1.5, borderColor: MUTED,
+    borderWidth: crispPx(1.5), borderColor: MUTED,
     alignItems: 'center', justifyContent: 'center',
   },
   postCheckActive: { backgroundColor: PURPLE, borderColor: PURPLE },

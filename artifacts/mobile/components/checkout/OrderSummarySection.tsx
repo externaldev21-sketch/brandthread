@@ -4,7 +4,8 @@
  * shipping, tax, discounts, total). Flat on black, hairlines between groups.
  */
 import React, { useMemo } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { formatCents } from '@/lib/money';
 import { deliveryWindowLabel } from '@/lib/checkoutPayment';
@@ -20,7 +21,7 @@ type LineItem = Group['items'][number];
 const THUMB = { width: 60, height: 80 }; // 3:4
 
 function Thumb({ uri, ck, styles }: { uri?: string; ck: CheckoutColors; styles: ReturnType<typeof makeStyles> }) {
-  if (uri) return <Image source={{ uri }} style={[styles.thumb, THUMB]} resizeMode="cover" />;
+  if (uri) return <CachedImage source={{ uri }} style={[styles.thumb, THUMB]} contentFit="cover" />;
   return (
     <View style={[styles.thumb, THUMB, styles.thumbFallback]}>
       <Feather name="image" size={16} color={ck.subtle} />

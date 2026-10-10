@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, Platform, Image, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, Platform, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -47,6 +48,7 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { crispPx } from '@/lib/crispPixel';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -1089,7 +1091,7 @@ export default function AddProductScreen() {
                 testID={`add-product-photo-${m.id}`}
               >
                 {displayUri && (displayUri.startsWith('http') || displayUri.startsWith('file') || displayUri.startsWith('ph://') || displayUri.startsWith('asset-library://') || displayUri.startsWith('content://') || displayUri.startsWith('/objects/')) ? (
-                  <Image source={{ uri: displayUri }} style={s.photoSlotImg} resizeMode="cover" />
+                  <CachedImage source={{ uri: displayUri }} style={s.photoSlotImg} contentFit="cover" />
                 ) : (
                   <View style={[s.photoSlotImg, s.photoSlotImgPlaceholder]}>
                     <Feather name="image" size={20} color={MUTED} />
@@ -1711,7 +1713,7 @@ export default function AddProductScreen() {
       draftData.sizeChartImageUrl ? (
         <View style={s.sizeChartRow}>
           <View style={s.sizeChartThumbWrap}>
-            <Image source={{ uri: draftData.sizeChartImageUrl }} style={s.sizeChartThumb} resizeMode="cover" />
+            <CachedImage source={{ uri: draftData.sizeChartImageUrl }} style={s.sizeChartThumb} contentFit="cover" />
             {sizeChartUploadStatus === 'uploading' && (
               <View style={s.mediaUploadOverlay}>
                 <ActivityIndicator color={ON_DARK} />
@@ -1960,7 +1962,7 @@ export default function AddProductScreen() {
         <BrandthreadCard style={s.previewCard}>
           <View style={s.previewImageWrap}>
             {coverUri ? (
-              <Image source={{ uri: coverUri }} style={s.previewImage} resizeMode="cover" />
+              <CachedImage source={{ uri: coverUri }} style={s.previewImage} contentFit="cover" />
             ) : (
               <View style={[s.previewImage, { alignItems: 'center', justifyContent: 'center' }]}>
                 <Feather name="image" size={28} color={SUBTLE} />
@@ -1987,7 +1989,7 @@ export default function AddProductScreen() {
         {/* Feed product-sheet style preview */}
         <BrandthreadCard style={s.previewSheetCard}>
           <View style={s.previewSheetHeader}>
-            {coverUri && <Image source={{ uri: coverUri }} style={s.previewSheetThumb} resizeMode="cover" />}
+            {coverUri && <CachedImage source={{ uri: coverUri }} style={s.previewSheetThumb} contentFit="cover" />}
             <View style={{ flex: 1 }}>
               <Text style={s.previewName} numberOfLines={1}>{draftData.name || 'Untitled product'}</Text>
               <Text style={s.previewPrice}>{formatCents(pricing.retailPriceCents)}</Text>
@@ -2479,7 +2481,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   variantRow: { gap: SP.sm },
   variantTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   variantCheckbox: {
-    width: 18, height: 18, borderRadius: RADIUS.xs, borderWidth: 1.5, borderColor: BORDER,
+    width: 18, height: 18, borderRadius: RADIUS.xs, borderWidth: crispPx(1.5), borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
   variantTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },

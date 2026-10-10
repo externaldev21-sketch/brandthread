@@ -21,9 +21,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet,
-  ActivityIndicator, Modal, TextInput, RefreshControl, Image,
+  ActivityIndicator, Modal, TextInput, RefreshControl,
   Linking,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -197,7 +198,7 @@ const row = StyleSheet.create({
   root:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.xs },
   label: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
   value: { fontSize: FS.sm, fontFamily: FONT.semibold, flex: 1, textAlign: 'right' },
-  mono:  { fontFamily: 'Inter_400Regular', letterSpacing: 0.5, fontSize: FS.xs },
+  mono:  { fontFamily: FONT.regular, letterSpacing: 0.5, fontSize: FS.xs },
 });
 
 // ─── Star Rating component ────────────────────────────────────────────────────
@@ -351,7 +352,7 @@ function ReviewSheet({
         <View style={rvs.photoRow}>
           {photos.map(uri => (
             <View key={uri} style={rvs.photoWrap}>
-              <Image source={{ uri }} style={[rvs.photo, { backgroundColor: theme.cardElevated }]} />
+              <CachedImage source={{ uri }} style={[rvs.photo, { backgroundColor: theme.cardElevated }]} />
               <View style={rvs.photoRemoveSlot} pointerEvents="box-none">
                 <PressableScale
                   onPress={() => setPhotos(prev => prev.filter(u => u !== uri))}
@@ -1078,10 +1079,10 @@ export default function BuyerOrderDetailScreen() {
             >
               {/* Thumbnail */}
               {item.imageUri ? (
-                <Image
+                <CachedImage
                   source={{ uri: item.imageUri }}
                   style={styles.itemThumb}
-                  resizeMode="cover"
+                  contentFit="cover"
                   accessibilityLabel={`Product image for ${item.productName}`}
                 />
               ) : (
@@ -1396,7 +1397,7 @@ const makeStyles = (theme: AppThemePreset) => {
     paymentNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm, textAlign: 'center' },
 
     // Tracking
-    trackingNumberDisplay: { fontSize: FS.base, fontFamily: 'Inter_400Regular', color: theme.text, letterSpacing: 1 },
+    trackingNumberDisplay: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.text, letterSpacing: 1 },
     carrierChip: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
     carrierChipText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
     estDeliveryRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },

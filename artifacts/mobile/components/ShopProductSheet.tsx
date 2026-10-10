@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -66,6 +65,7 @@ import {
   type CartFlightPoint,
   type CartFlightSource,
 } from '@/lib/cartFlight';
+import { crispPx } from '@/lib/crispPixel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -230,7 +230,7 @@ function OptionChip({
       accessibilityState={{ selected, disabled: !available }}
       style={[
         chipS.chip,
-        recommended && !selected && available && { borderColor: theme.text, borderWidth: 1.5 },
+        recommended && !selected && available && { borderColor: theme.text, borderWidth: crispPx(1.5) },
         selected && { borderColor: accentColor, borderWidth: 2, backgroundColor: `${accentColor}1A` },
         !available && chipS.unavail,
       ]}
@@ -1383,7 +1383,7 @@ export function ShopProductSheet({
           ]}
         >
           {product?.imageUris?.[0] ? (
-            <Image source={{ uri: product.imageUris[0] }} style={ss.cartFlyImage} />
+            <CachedImage source={{ uri: product.imageUris[0] }} style={ss.cartFlyImage} />
           ) : (
             <View style={[ss.cartFlyFallback, { backgroundColor: theme.accent }]}>
               <Feather name="shopping-bag" size={21} color={theme.onAccent} />
@@ -2145,8 +2145,6 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: theme.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   descriptionText: {
     fontSize: FS.sm,

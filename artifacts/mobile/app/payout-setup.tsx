@@ -24,6 +24,7 @@ import {
   setupCtaLabel,
   setupHeadline,
 } from '@/lib/payoutSetupSteps';
+import { crispPx } from '@/lib/crispPixel';
 
 const DEMO_STATES: SetupState[] = ['not_started', 'in_progress', 'in_review', 'complete', 'restricted'];
 
@@ -215,7 +216,7 @@ function StepIcon({ status, theme }: { status: SetupStep['status']; theme: AppTh
 }
 
 const iconStyles = StyleSheet.create({
-  circle: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  circle: { width: 26, height: 26, borderRadius: 13, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
 });
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
