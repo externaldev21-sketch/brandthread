@@ -22,6 +22,7 @@ import {
 import { reportServerError } from '@/lib/monitoringHooks';
 import { trackAfter } from '@/lib/analytics/trackAfter';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
+import { GUEST_PAYMENT_INTENT_PATH, guestPaymentToken, rememberGuestPaymentToken } from '@/lib/guestPaymentIntent';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type { StatementDetail, StatementFormat, StatementList } from '@/lib/statements';
@@ -1806,13 +1807,34 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
          * Bodies come only from lib/checkoutPayment.ts's whitelisted builders,
          * so no card data can ever be sent here.
          */
+        // Guests (no Clerk token) go to the guest mount instead, sending no
+        // token at all (BT-257, lib/guestPaymentIntent.ts); same shapes.
         paymentIntent: {
-          quote: (body: QuoteBody) => post<CartQuote>('/api/buyer/checkout/payment-intent/quote', body),
-          create: (body: CreatePaymentIntentBody) => trackAfter(post<PaymentIntentStart>('/api/buyer/checkout/payment-intent', body), [['checkout_started', { flow: 'one_page' }]]),
-          get: (paymentIntentId: string) =>
-            get<PaymentIntentStatus>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}`),
-          cancel: (paymentIntentId: string) =>
-            post<{ ok: boolean }>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}/cancel`, {}),
+          quote: async (body: QuoteBody) => (await getCachedToken(getToken))
+            ? post<CartQuote>('/api/buyer/checkout/payment-intent/quote', body)
+            : post<CartQuote>(GUEST_PAYMENT_INTENT_PATH + '/quote', body),
+          create: async (body: CreatePaymentIntentBody) => (await getCachedToken(getToken))
+            ? trackAfter(post<PaymentIntentStart>('/api/buyer/checkout/payment-intent', body), [['checkout_started', { flow: 'one_page' }]])
+            : trackAfter(
+              post<PaymentIntentStart & { guestAccessToken?: string }>(GUEST_PAYMENT_INTENT_PATH, body)
+                .then(started => rememberGuestPaymentToken(started)),
+              [['checkout_started', { flow: 'one_page_guest' }]],
+            ),
+          get: (paymentIntentId: string) => {
+            const guestToken = guestPaymentToken(paymentIntentId);
+            return guestToken
+              ? post<PaymentIntentStatus>(`${GUEST_PAYMENT_INTENT_PATH}/${encodeURIComponent(paymentIntentId)}/status`, { guestAccessToken: guestToken })
+              : get<PaymentIntentStatus>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}`);
+          },
+          cancel: (paymentIntentId: string) => {
+            const guestToken = guestPaymentToken(paymentIntentId);
+            return post<{ ok: boolean }>(
+              guestToken
+                ? `${GUEST_PAYMENT_INTENT_PATH}/${encodeURIComponent(paymentIntentId)}/cancel`
+                : `/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}/cancel`,
+              guestToken ? { guestAccessToken: guestToken } : {},
+            );
+          },
         },
       },
       orders: {
@@ -1885,6 +1907,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
               state: string; zip: string; country?: string; phone: string;
             };
             clientIdempotencyKey?: string;
+            /** This store's discount code; the server validates it (BT-255). */
+            discountCode?: string;
+            liveStreamId?: string;
           },
         ) => post<{ sessionId: string; url: string; guestAccessToken: string }>('/api/guest/checkout/session', {
           items,

@@ -65,6 +65,9 @@ describe("appRateLimiter", () => {
   it("selects stricter named policies without double-consuming mutations", () => {
     expect(rateLimitPolicyFor("POST", "/api/v1/auth/sync", false)?.id).toBe("authentication");
     expect(rateLimitPolicyFor("POST", "/api/v1/guest/checkout/session", false)?.id).toBe("checkout");
+    // BT-257: the guest in-app payment is limited like every other guest checkout path.
+    expect(rateLimitPolicyFor("POST", "/api/guest/checkout/payment-intent", false)?.id).toBe("checkout");
+    expect(rateLimitPolicyFor("POST", "/api/guest/checkout/payment-intent/pi_1/status", false)?.id).toBe("checkout");
     expect(rateLimitPolicyFor("POST", "/api/v1/webhooks/stripe", false)?.id).toBe("webhook");
     expect(rateLimitPolicyFor("POST", "/api/v1/products", true)?.id).toBe("mutation");
     expect(rateLimitPolicyFor("GET", "/api/v1/products", true)?.id).toBe("authenticated-read");

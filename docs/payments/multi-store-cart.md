@@ -33,13 +33,27 @@ Now, only on multi-store orders, the single Promo code section becomes one
   unchanged (the one valid code goes to the one group).
 - `getCheckoutDisplayTotals` adds up the store-scoped codes; single-store math is
   unchanged.
-- The hosted Stripe fallback loop in `buyer-checkout.tsx` now passes each group
-  its own code.
+- The hosted Stripe fallback loop in `buyer-checkout.tsx` passes each group its
+  own code, for signed-in buyers and for guests. Guests (BT-255):
+  `POST /api/guest/checkout/session` takes `discountCode` (and `liveStreamId`),
+  validates it with the same `validateDiscountCode` rules, keyed on
+  `guest:<email>` (the key the order webhook records the use under), and
+  applies it as a one-time Stripe coupon. Before this, guest sessions ignored
+  the code.
+- Guests also pay in the app now (BT-257, `POST /api/guest/checkout/payment-intent`),
+  where `priceCartGroup` validates each group's code the same way.
 - Rejections show the server's reason (first order only, minimum spend, minimum
   items, limit reached, expired, not eligible) under that store's field.
 
-Not changed: Thread Cash and rewards remain single-store only (one token
-discounts one Stripe session).
+Thread Cash (BT-270): on the in-app payment it now covers every store. The
+server splits the amount across stores in proportion to what each can take
+(`allocateThreadCash`, `lib/money/cartMath.ts`), keeping every store's card
+share at or above 50¢, and splits the buyer's token into one child token per
+store (`splitThreadCashRedemption`, `lib/threadCash/wallet.ts`) so the order
+webhook spends each store's share on its own. The hosted fallback still takes
+one token per Stripe session, so a multi-store order that falls back to hosted
+Checkout keeps the one-store rule. Loyalty points stay one store per order on
+both paths (their token discounts one checkout).
 
 ## Test evidence
 

@@ -14,6 +14,8 @@
 > - frees tokens held by abandoned, unpaid Stripe sessions (`lib/threadCash/checkoutRelease.ts`).
 >
 > These are covered end to end by `lib/money/__tests__/threadCashCheckoutRoutes.integration.test.ts`. The flag still ships **off**. Only the sign-off list at the bottom remains before flipping it.
+>
+> **In-app payment and several stores (BT-258 / BT-270).** Thread Cash also works on the in-app PaymentIntent (`routes/checkout-intent.ts`, Apple Pay / Google Pay / card), so it no longer forces the hosted page, and it covers multi-store carts: the amount is split across stores (`allocateThreadCash`), the token is split into one child per store (`splitThreadCashRedemption`), and each store's order spends its own share in the paid webhook. The seller top-up now also runs for "transfer" (in-app, hold-until-delivered) and "held" (preorder) orders, right after that order's own payout goes out (`topupDue`, `lib/threadCash/checkoutTopup.ts`); before, it only ran for destination charges. Covered by `lib/money/__tests__/checkoutIntentGuestRewards.integration.test.ts`. The flag default is unchanged: flipping `threadCashCheckoutDiscount` is still Dev's call.
 
 Thread Cash is a **platform-funded** buyer reward credit: when a buyer spends
 it, the seller must still be paid the full item price. This document is the

@@ -32,6 +32,8 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
+import { rewardsNeedOneStore } from '@/lib/threadCashCheckout';
+import { stripePaymentAvailable } from '@/components/checkout/StripePayment';
 // Same flat-black language as the one-page checkout: sections on pure black,
 // uppercase labels, 1px hairlines. No card containers.
 import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives';
@@ -662,6 +664,7 @@ export default function CartScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // THREAD CASH HOOK POINT — see components/thread-cash/UseThreadCashCard.tsx.
   const threadCashCheckoutEnabled = useFeatureFlag('threadCashCheckoutDiscount');
+  const hostedCheckoutFallback = useFeatureFlag('hostedCheckoutFallback');
   const [threadCashRedemption, setThreadCashRedemption] = useState<CheckoutThreadCashRedemption | null>(null);
 
   // Which lines are included in "Checkout selected" / a per-item Buy. New
@@ -947,7 +950,11 @@ export default function CartScreen() {
       const checkingOutFullCart = items.length === cart.items.length;
       const loyaltyToApply = checkingOutFullCart ? (loyaltyRedemption ?? undefined) : undefined;
       const threadCashToApply = checkingOutFullCart ? (threadCashRedemption ?? undefined) : undefined;
-      if ((loyaltyToApply || threadCashToApply) && currentGroups.length !== 1) {
+      // Thread Cash covers several stores when checkout pays in the app (BT-270).
+      if (rewardsNeedOneStore({
+        storeCount: currentGroups.length, loyalty: !!loyaltyToApply, threadCash: !!threadCashToApply,
+        paysInApp: !!isSignedIn && stripePaymentAvailable() && !hostedCheckoutFallback,
+      })) {
         Alert.alert('Rewards need one store', 'Remove items from other sellers before continuing with this rewards discount.');
         setBusy(false);
         return;

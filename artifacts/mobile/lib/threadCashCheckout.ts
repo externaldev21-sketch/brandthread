@@ -14,9 +14,11 @@
  *    amount.
  *  - An admin-set per-order cap (thread_cash_config.max_redemption_per_order_cents)
  *    applies on top. redeemThreadCash rejects anything above it.
- *  - Single-seller orders only. Checkout sends the token only when there is
- *    one delivery group, because a token discounts exactly one Stripe
- *    session.
+ *  - Several stores (BT-270): paid in the app, the server splits the amount
+ *    across stores (allocateThreadCash, api-server lib/money/cartMath.ts),
+ *    each store keeping 50¢ on the card, so the ceiling takes 50¢ per store.
+ *    The hosted fallback still takes one token per Stripe session, so there
+ *    it stays single-store (threadCashMultiStoreAllowed).
  */
 import type { CheckoutSession, CheckoutThreadCashRedemption } from '@/services/cartTypes';
 
@@ -28,9 +30,37 @@ export function threadCashCeilingCents(input: {
   shippingCents: number;
   promoCents?: number;
   loyaltyCents?: number;
+  /** Stores in the order: each keeps Stripe's minimum on the card. Defaults to 1. */
+  storeCount?: number;
 }): number {
   const remaining = input.subtotalCents + input.shippingCents - (input.promoCents ?? 0) - (input.loyaltyCents ?? 0);
-  return Math.max(0, remaining - STRIPE_MIN_CARD_CHARGE_CENTS);
+  const stores = Math.max(1, Math.floor(input.storeCount ?? 1));
+  return Math.max(0, remaining - STRIPE_MIN_CARD_CHARGE_CENTS * stores);
+}
+
+/**
+ * Whether Thread Cash can be used on an order with several stores: only when
+ * it is paid in the app (one payment the server splits), never on the hosted
+ * per-store fallback (one token per Stripe session).
+ */
+export function threadCashMultiStoreAllowed(input: { storeCount: number; paysInApp: boolean }): boolean {
+  return input.storeCount <= 1 || input.paysInApp;
+}
+
+/**
+ * The cart's "Rewards need one store" rule. Loyalty points are always one
+ * store per order. Thread Cash only needs one store when the order can't be
+ * paid in the app (BT-270).
+ */
+export function rewardsNeedOneStore(input: {
+  storeCount: number;
+  loyalty: boolean;
+  threadCash: boolean;
+  paysInApp: boolean;
+}): boolean {
+  if (input.storeCount <= 1) return false;
+  if (input.loyalty) return true;
+  return input.threadCash && !input.paysInApp;
 }
 
 /**
@@ -60,7 +90,13 @@ export function threadCashUnavailableReason(input: { availableCents: number; cei
 /** Leftover redemptions to return to the balance: every open one except the one this checkout holds. */
 export function staleRedemptionTokens(open: { token: string }[] | undefined, keepToken: string | null | undefined): string[] {
   const keep = keepToken?.trim().toUpperCase();
-  return (open ?? []).map(r => r.token).filter(token => token.toUpperCase() !== keep);
+  // A multi-store payment splits the held token into per-store children
+  // ("<token>-S<n>-<i>", api-server splitThreadCashRedemption); they are
+  // still this checkout's, not leftovers.
+  return (open ?? []).map(r => r.token).filter(token => {
+    const upper = token.toUpperCase();
+    return upper !== keep && !(keep && upper.startsWith(`${keep}-S`));
+  });
 }
 
 /**
