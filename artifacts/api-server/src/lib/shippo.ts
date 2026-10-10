@@ -113,6 +113,8 @@ export type ShippoTrack = {
   eta?: string | null;
   tracking_status?: ShippoTrackStatus | null;
   tracking_history?: ShippoTrackStatus[];
+  /** Where the carrier says the parcel is going (city/state/zip; often partial). */
+  address_to?: { city?: string | null; state?: string | null; zip?: string | null; country?: string | null } | null;
 };
 
 /** Shippo carrier tokens for the carriers sellers type into the tracking field. */

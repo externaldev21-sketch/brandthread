@@ -37,6 +37,7 @@ vi.mock("../../lib/shippo", () => ({
 const suffix = crypto.randomBytes(6).toString("hex");
 const sellerId = `label-purchase-seller-${suffix}`;
 let orderId = "";
+let manualOrderId = "";
 let server: Server;
 let base = "";
 const rateId = `rate_test_${suffix}`;
@@ -48,6 +49,8 @@ beforeAll(async () => {
     status: "processing",
     totalCents: 5000,
     subtotalCents: 5000,
+    stripePaymentIntentId: `pi_lbl_${suffix}`,
+    chargeModel: "destination",
   }).returning({ id: orders.id });
   orderId = order.id;
 
@@ -73,6 +76,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (manualOrderId) {
+    await db.delete(shippingLabels).where(eq(shippingLabels.orderId, manualOrderId));
+    await db.delete(shippingLabelQuotes).where(eq(shippingLabelQuotes.orderId, manualOrderId));
+    await db.delete(orders).where(eq(orders.id, manualOrderId));
+  }
   await db.delete(orderFundReservations).where(eq(orderFundReservations.orderId, orderId));
   await db.delete(shippingLabels).where(eq(shippingLabels.orderId, orderId));
   await db.delete(shippingLabelQuotes).where(eq(shippingLabelQuotes.orderId, orderId));
@@ -107,5 +115,31 @@ describe("POST /api/shipping-labels/:orderId/purchase idempotency", () => {
 
     const rows = await db.select().from(shippingLabels).where(eq(shippingLabels.orderId, orderId));
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("POST /api/shipping-labels/:orderId/purchase on a manual order (BT-055)", () => {
+  it("refuses a label for an order with no Brandthread charge and never calls the carrier", async () => {
+    const [manual] = await db.insert(orders).values({
+      ownerId: sellerId, orderNumber: `LBL-M-${suffix}`, status: "pending", totalCents: 50000, subtotalCents: 50000,
+    }).returning({ id: orders.id });
+    manualOrderId = manual.id;
+    const manualRate = `rate_manual_${suffix}`;
+    await db.insert(shippingLabelQuotes).values({
+      orderId: manualOrderId, ownerId: sellerId, providerShipmentId: `shp_manual_${suffix}`, providerRateId: manualRate,
+      carrier: "UPS", service: "Ground", priceCents: 899, expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    });
+    const calls = purchaseTransaction.mock.calls.length;
+    const response = await fetch(`${base}/api/shipping-labels/${manualOrderId}/purchase`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-test-user": sellerId },
+      body: JSON.stringify({ rateId: manualRate, idempotencyKey: `manual-${manualOrderId}` }),
+    });
+    const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("LABEL_REQUIRES_PAID_ORDER");
+    expect(body.error).toMatch(/paid through Brandthread checkout/);
+    expect(purchaseTransaction.mock.calls.length).toBe(calls);
+    expect(await db.select().from(shippingLabels).where(eq(shippingLabels.orderId, manualOrderId))).toHaveLength(0);
   });
 });

@@ -717,7 +717,12 @@ export async function recordLabelPurchased(executor: DbExecutor, input: {
         { account: "shipping_carrier", amountCents: input.priceCents },
       ],
     });
+    return;
   }
+  // The label route refuses unpaid/manual orders (labelEligibility.ts). If one
+  // still gets here, nothing can recover the carrier cost: make it loud.
+  logger.error({ labelId: input.labelId, orderId: input.orderId, chargeModel: input.chargeModel },
+    "Shipping label recorded on an order with no Brandthread charge; carrier cost is unrecoverable");
 }
 
 async function transferStillHeld(executor: DbExecutor, orderId: string): Promise<boolean> {

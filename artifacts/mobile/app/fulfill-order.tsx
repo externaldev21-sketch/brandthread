@@ -252,7 +252,7 @@ export default function FulfillOrderScreen() {
         setManualMode(true);
       }
     } catch (err: any) {
-      setRatesError(err?.message ?? 'Could not load carrier rates.');
+      setRatesError(String(err?.message ?? 'Could not load carrier rates.').replace(/^API \d{3}:\s*/, ''));
       setManualMode(true);
     } finally {
       setLoadingRates(false);
@@ -275,7 +275,7 @@ export default function FulfillOrderScreen() {
     } catch (err: any) {
       Alert.alert(
         'Label not purchased',
-        err?.message ?? 'Could not purchase this label. You can enter tracking manually instead.',
+        String(err?.message ?? 'Could not purchase this label. You can enter tracking manually instead.').replace(/^API \d{3}:\s*/, ''),
       );
       setManualMode(true);
     } finally {
