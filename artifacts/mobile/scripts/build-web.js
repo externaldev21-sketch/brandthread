@@ -180,6 +180,8 @@ function writePublicCrawlFiles() {
   fs.writeFileSync(path.join(outputDir, 'robots.txt'), [
     'User-agent: *',
     'Allow: /',
+    // Share-card photos (og:image) live here; Twitterbot honours robots.txt (BT-314).
+    'Allow: /api/v1/public/media/',
     'Disallow: /api/',
     'Disallow: /sign-in',
     'Disallow: /onboarding',

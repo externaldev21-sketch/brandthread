@@ -107,7 +107,7 @@ const MATCHERS = [
       return {
         title: `${name} on Brandthread`,
         description: res.bio || `See ${name}'s storefront and posts on Brandthread.`,
-        image: res.avatarUrl || res.profileImageUrl || OG_IMAGE_FALLBACK,
+        image: httpsOrFallback(res.avatarUrl || res.profileImageUrl),
       };
     },
   },
@@ -125,15 +125,39 @@ const MATCHERS = [
     },
   },
   {
+    // Absolute https photo from the API (uploads are private /objects/ paths,
+    // which crawlers can't fetch — BT-314).
     pattern: /^\/store\/product\/([^/]+)\/?$/,
     async load(match) {
-      const product = await fetchJson(`${apiBase()}/public/products/${encodeURIComponent(match[1])}`);
+      const id = encodeURIComponent(match[1]);
+      let res = await fetchResource(`${apiBase()}/public/products/${id}/share-preview`);
+      // An API without the share-preview route yet: use the public product.
+      if (res.status === 404) res = await fetchResource(`${apiBase()}/public/products/${id}`);
+      if (res.status === 404) return NOT_FOUND;
+      const product = res.data;
       if (!product) return null;
-      const price = lowestVariantPrice(product.variants);
+      const price = typeof product.priceCents === 'number'
+        ? `$${(product.priceCents / 100).toFixed(2)}`
+        : lowestVariantPrice(product.variants);
+      const image = product.imageUrl || (Array.isArray(product.images) ? product.images[0] : null);
       return {
         title: price ? `${product.name} — ${price}` : product.name,
-        description: product.description || `Shop ${product.name} on Brandthread.`,
-        image: Array.isArray(product.images) && product.images[0] ? product.images[0] : OG_IMAGE_FALLBACK,
+        description: product.description || (product.sellerName ? `Shop ${product.name} from ${product.sellerName} on Brandthread.` : `Shop ${product.name} on Brandthread.`),
+        image: httpsOrFallback(image),
+      };
+    },
+  },
+  {
+    pattern: /^\/live\/([A-Za-z0-9_-]{6,64})\/?$/,
+    async load(match) {
+      const res = await fetchResource(`${apiBase()}/public/live/${encodeURIComponent(match[1])}/share-preview`);
+      if (res.status === 404) return NOT_FOUND;
+      const stream = res.data;
+      if (!stream) return null;
+      return {
+        title: stream.live ? `${stream.hostName} is LIVE now` : `${stream.hostName} on Brandthread`,
+        description: stream.title || (stream.live ? `Watch ${stream.hostName} live on Brandthread.` : `This live has ended. See what ${stream.hostName} is up to on Brandthread.`),
+        image: httpsOrFallback(stream.imageUrl),
       };
     },
   },
@@ -151,6 +175,11 @@ const MATCHERS = [
     },
   },
 ];
+
+/** Crawlers only fetch absolute https images; anything else gets the logo card. */
+function httpsOrFallback(url) {
+  return typeof url === 'string' && /^https:\/\//i.test(url) ? url : OG_IMAGE_FALLBACK;
+}
 
 function lowestVariantPrice(variants) {
   if (!Array.isArray(variants) || variants.length === 0) return null;
