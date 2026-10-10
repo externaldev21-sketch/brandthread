@@ -382,6 +382,9 @@ async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory
       targetType: n.targetType,
       cta: n.cta,
       commentId: n.commentId,
+      actorId: n.actorId,
+      actorName: n.actorName,
+      actorInitials: n.actorInitials,
       ...(n.extraData ?? {}),
     },
     sound: n.pushSound,
@@ -470,7 +473,9 @@ export async function publishNotification(n: PublishInput): Promise<void> {
         targetType: n.targetType,
         cta: n.cta,
         commentId: n.commentId,
+        actorId: n.actorId,
         actorName: n.actorName,
+        actorInitials: n.actorInitials,
         // Extra push-only keys; they may override the feed row's targetType/
         // targetId (e.g. an incoming call pushes the call, the feed row opens the chat).
         ...(n.extraData ?? {}),

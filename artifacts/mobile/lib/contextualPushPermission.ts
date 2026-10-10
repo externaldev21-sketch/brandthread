@@ -20,8 +20,19 @@ const declinedKey = (userId: string) => `bt:push:preprompt-declined:v1:${userId}
 let prompting = false;
 
 type PushApi = {
-  push: { register: (body: { token: string; platform?: string }) => Promise<unknown> };
+  push: { register: (body: { token: string; platform?: string; accountIds?: string[] }) => Promise<unknown> };
 };
+
+let signedInAccountIds: string[] = [];
+
+/**
+ * Every account signed in on this device (account switcher). Sent with each
+ * registration so each account keeps getting its own pushes here, and an
+ * account signed out on this device stops getting them.
+ */
+export function setSignedInAccountIds(ids: readonly string[]): void {
+  signedInAccountIds = [...new Set(ids.filter(Boolean))];
+}
 
 async function isOnboardedUser(userId: string): Promise<boolean> {
   const [[, complete], [, owner]] = await AsyncStorage.multiGet([
@@ -33,7 +44,7 @@ async function isOnboardedUser(userId: string): Promise<boolean> {
 
 async function registerToken(api: PushApi): Promise<void> {
   const token = await Notifications.getExpoPushTokenAsync();
-  await api.push.register({ token: token.data, platform: 'expo' });
+  await api.push.register({ token: token.data, platform: Platform.OS, accountIds: signedInAccountIds });
 }
 
 /**
