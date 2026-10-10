@@ -12,6 +12,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
@@ -135,6 +136,7 @@ export default function FeaturedSlotScreen() {
       if (result.type === 'success') { await verify(slot.id); return; }
       Alert.alert('Checkout cancelled', 'Your payment was not completed. Your spot is held for 30 minutes.');
     } catch (e: any) {
+      if (promptUpgradeOnPlanGate(e, router)) return;
       const msg = String(e?.message ?? '');
       Alert.alert('Featured', msg.includes('already_booked') || msg.includes('409')
         ? 'You already have a Featured slot booked or in review.'

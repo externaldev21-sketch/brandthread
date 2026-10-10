@@ -13,6 +13,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
@@ -115,6 +116,7 @@ export default function RfqPostScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace(`/rfq-compare?rfqId=${rfq.id}` as never);
     } catch (e: any) {
+      if (promptUpgradeOnPlanGate(e, router)) return;
       Alert.alert('Could not post RFQ', e?.message ?? 'Please try again.');
     } finally {
       setSubmitting(false);

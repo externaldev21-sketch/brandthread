@@ -95,7 +95,7 @@ function verifyHandler(kind: PromoKind): express.RequestHandler {
   };
 }
 
-router.post("/boost/:id/verify", express.json({ limit: "4kb" }), verifyHandler("boost")); // boosts are on every plan
+router.post("/boost/:id/verify", express.json({ limit: "4kb" }), verifyHandler("boost")); // the plan gate runs when the boost is created (POST /boosts)
 router.post("/campaign/:id/verify", requirePermission("marketing"), express.json({ limit: "4kb" }), verifyHandler("ad_campaign"));
 
 export default router;

@@ -2,7 +2,7 @@
  * Advanced analytics (Pro) — average order value, conversion, repeat buyers,
  * refunds, sales by channel and top customers. Gated by the seller's real
  * plan entitlement (useSubscriptionPlan → /api/seller/subscription/status,
- * RevenueCat/Stripe-verified) and again server-side (requirePlan("pro") on
+ * RevenueCat/Stripe-verified) and again server-side (featureGate("advanced_analytics") on
  * GET /api/analytics/insights/advanced). Mobbin reference: Shopify Analytics
  * "Customers" / "Sales by channel" cards, reskinned.
  */
@@ -24,12 +24,12 @@ import { useSellerInsight } from '@/hooks/useSellerInsight';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { DEFAULT_INSIGHT_RANGE, getAdvancedStats, previewMode, type InsightRange } from '@/services/sellerInsightsService';
 
-/** Pro check: the real plan when signed in; the demo preview shows the report, the fresh preview shows the gate. */
+/** Advanced analytics is on Growth and Pro (server plan config); the demo preview shows the report, the fresh preview shows the gate. */
 function useIsPro(): { isPro: boolean; checking: boolean } {
   const preview = previewMode();
   const { plan, loading } = useSubscriptionPlan();
   if (preview) return { isPro: preview === 'demo', checking: false };
-  return { isPro: plan === 'pro', checking: loading && plan === null };
+  return { isPro: plan === 'pro' || plan === 'growth', checking: loading && plan === null };
 }
 
 function ProGate() {
@@ -44,7 +44,7 @@ function ProGate() {
           <View style={{ width: 56, height: 56, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
             <Feather name="lock" size={22} color={colors.foreground} />
           </View>
-          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center' }}>Included with Pro</Text>
+          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center' }}>Included with Growth</Text>
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginBottom: SP.md }}>
             Average order value, conversion, repeat buyers, refunds, sales by channel and top customers.
           </Text>

@@ -20,6 +20,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
 import { parseTzOffsetMinutes } from "../lib/analyticsTime";
+import { featureGate } from "../middlewares/featureGate";
 import {
   GOAL_METRICS,
   GOAL_PERIODS,
@@ -543,7 +544,7 @@ router.get("/audience", async (req, res) => {
   } catch (err) { fail(res, req, err, "audience"); }
 });
 
-router.get("/advanced", requirePlan("pro"), async (req, res) => {
+router.get("/advanced", featureGate("advanced_analytics"), async (req, res) => {
   try {
     const c = await ctx(req);
     res.json({ window: windowJson(c.window), ...(await loadAdvanced(c.sellerId, c.window)) });
@@ -768,7 +769,7 @@ export function renderPdf(tables: ExportTable[], meta: { rangeLabel: string; gen
   });
 }
 
-router.post("/export", async (req, res) => {
+router.post("/export", featureGate("analytics_export"), async (req, res) => {
   const parsed = exportSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Choose a format, a date range and at least one section", code: "VALIDATION_ERROR" });

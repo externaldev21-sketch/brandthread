@@ -141,10 +141,12 @@ export function getGrowthStudioTools(theme: PlanTheme): GrowthTool[] {
   });
 }
 
-/** Additional Growth perks shown after the Studio tool list. */
+/** Additional Growth perks shown after the Studio tool list (server plan config: planCatalogue.ts). */
 export const GROWTH_EXTRAS = [
-  { icon: 'package' as const, label: 'Unlimited products' },
+  { icon: 'video' as const, label: 'Live selling' },
+  { icon: 'calendar' as const, label: 'Drops and pre-orders' },
+  { icon: 'trending-up' as const, label: 'Boosts and Featured slots' },
   { icon: 'globe' as const, label: 'Custom domain' },
-  { icon: 'truck' as const, label: 'Manufacturer Hub access' },
-  { icon: 'video' as const, label: 'Live selling, drops, and giveaways' },
+  { icon: 'truck' as const, label: 'Manufacturer Hub: RFQs and bulk orders' },
+  { icon: 'bar-chart-2' as const, label: 'Advanced analytics and email marketing' },
 ];

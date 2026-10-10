@@ -135,7 +135,8 @@ describe('report screens', () => {
     expect(src).toContain("import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';");
     expect(src).toContain("plan === 'pro'");
     const api = readFileSync(resolve(ROOT, '../api-server/src/routes/analytics-insights.ts'), 'utf8');
-    expect(api).toContain('router.get("/advanced", requirePlan("pro")');
+    // Growth and Pro (api-server planCatalogue.ts → analytics level).
+    expect(api).toContain('router.get("/advanced", featureGate("advanced_analytics")');
   });
 });
 

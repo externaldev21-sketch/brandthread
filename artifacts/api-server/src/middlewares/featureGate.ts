@@ -4,7 +4,8 @@
  * message } — so the app's upgrade prompt opens instead of a generic error.
  *
  * `only` limits the gate to the requests that start something new (e.g.
- * POST /), leaving list / manage / cancel open after a downgrade.
+ * POST /), leaving list / manage / cancel open after a downgrade. Which plan
+ * a feature needs comes from planCatalogue.ts (planTierFeatures).
  */
 import type { NextFunction, Request, Response } from "express";
 import { getEffectiveEntitlement } from "../lib/nativeEntitlements";
@@ -15,11 +16,14 @@ import type { SellerPlanId } from "../lib/planCatalogue";
 const ALLOW_TEST_SUBSCRIPTION_BYPASS =
   process.env.NODE_ENV === "development" && process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS === "true";
 
-export type GateMatch = { method: string; path: string | RegExp };
+/** `when` narrows a match by the request body (e.g. only bulk orders, not samples). */
+export type GateMatch = { method: string; path: string | RegExp; when?: (req: Request) => boolean };
 
 function matches(req: Request, only: GateMatch[] | undefined): boolean {
   if (!only) return true;
-  return only.some((m) => m.method === req.method && (typeof m.path === "string" ? req.path === m.path : m.path.test(req.path)));
+  return only.some((m) => m.method === req.method
+    && (typeof m.path === "string" ? req.path === m.path : m.path.test(req.path))
+    && (!m.when || m.when(req)));
 }
 
 export function planRequiredBody(feature: PlanFeature, requiredPlan: SellerPlanId, currentPlan: SellerPlanId) {

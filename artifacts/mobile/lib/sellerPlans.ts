@@ -13,11 +13,6 @@ export interface SellerPlanDefinition {
   highlight?: boolean;
 }
 
-/**
- * Plan cards (the plan picker shows the first four lines of each). Every line matches a server gate or allowance in
- * api-server lib/planFeatures.ts and lib/planCatalogue.ts — change both
- * together.
- */
 export const SELLER_PLANS: SellerPlanDefinition[] = [
   {
     id: 'starter',
@@ -26,13 +21,12 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
     priceCents: 2900,
     priceLabel: '$29',
     features: [
-      'Storefront, checkout, and orders for up to 25 products',
+      'Storefront, products, checkout, and orders',
       'Sales and product analytics',
       'AI Store Builder and seller assistant',
-      'Discounts, sales, and 500 marketing emails a month',
-      'Boosts and ads, paid per promotion',
+      'Community and freelancer marketplace',
     ],
-    notIncluded: ['AI visual creation suite', 'Manufacturer Hub', 'Live selling, drops, and giveaways'],
+    notIncluded: ['AI visual creation suite', 'Manufacturer Hub', 'Team operations and live selling'],
   },
   {
     id: 'growth',
@@ -42,15 +36,12 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
     priceLabel: '$79',
     highlight: true,
     features: [
-      'Everything in Starter, with unlimited products',
+      'Everything in Starter',
       'AI logos, mockups, product photography, and lifestyle imagery',
-      'Live selling for 4 hours a month, drops, and giveaways',
-      'Manufacturer Hub sourcing and production workflows',
       'Background removal and replacement',
-      'Custom domain, Shopify sync, and 10,000 marketing emails a month',
-      'Up to 3 team members',
+      'Manufacturer Hub sourcing and production workflows',
     ],
-    notIncluded: ['Unlimited live selling', 'Unlimited team members', 'Advanced customer analytics'],
+    notIncluded: ['Team operations', 'Live shopping', 'Promotion management'],
   },
   {
     id: 'pro',
@@ -60,16 +51,16 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
     priceLabel: '$199',
     features: [
       'Everything in Growth',
-      'Unlimited live selling',
-      'Unlimited team roles and collaborative operations',
+      'Team roles and collaborative operations',
+      'Live shopping tools',
+      'Boost and promotion management',
       'Advanced customer analytics',
-      '50,000 marketing emails a month',
     ],
     notIncluded: [],
   },
 ];
 
-/** Minimum plan to host a live (server: lib/planFeatures.ts live_hosting). */
+/** Minimum plan to host a live (server: planCatalogue.ts → liveSelling). */
 export const LIVE_HOST_MIN_PLAN: 'growth' | 'pro' = 'growth';
 
 /**

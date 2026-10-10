@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -348,7 +349,9 @@ export default function SellerDropCreate() {
       } else {
         goBackOr(router);
       }
-    } catch {
+    } catch (e) {
+      // Drops are on Growth+ (server plan config): show the upgrade prompt, not a field error.
+      if (promptUpgradeOnPlanGate(e, router)) return;
       Alert.alert('Could not save', 'Please check the fields and try again.');
     } finally {
       setSaving(false);

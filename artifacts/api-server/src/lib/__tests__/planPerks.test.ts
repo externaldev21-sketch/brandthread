@@ -107,9 +107,9 @@ describe("buildPlanPerks", () => {
     });
   });
 
-  it("only Pro has advanced analytics", () => {
+  it("gives Growth and Pro advanced analytics (planCatalogue.ts tiers)", () => {
     expect(hasAdvancedAnalytics("pro")).toBe(true);
-    expect(hasAdvancedAnalytics("growth")).toBe(false);
+    expect(hasAdvancedAnalytics("growth")).toBe(true);
     expect(hasAdvancedAnalytics("starter")).toBe(false);
     expect(hasAdvancedAnalytics(null)).toBe(false);
   });

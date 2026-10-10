@@ -7,15 +7,15 @@ import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { Card, CardDivider, SectionTitle } from '@/components/analytics/AnalyticsKit';
 
-/** Mobbin reference: Shopify Analytics "Reports" rows above the overview. */
+/** Mobbin reference: Shopify Analytics "Reports" rows above the overview. Badges match the server plan config (planCatalogue.ts). */
 export const ANALYTICS_REPORTS: { label: string; icon: keyof typeof Feather.glyphMap; href: string; badge?: string }[] = [
   { label: 'Product stats', icon: 'shopping-bag', href: '/analytics-product-stats' },
   { label: 'Threads and videos', icon: 'play-circle', href: '/analytics-content' },
   { label: 'Audience', icon: 'users', href: '/analytics-audience' },
   { label: 'Goals', icon: 'target', href: '/analytics-goals' },
-  { label: 'Export', icon: 'download', href: '/analytics-export' },
-  { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-advanced', badge: 'PRO' },
-  { label: 'Customer cohorts and lifetime value', icon: 'users', href: '/analytics-cohorts', badge: 'PRO' },
+  { label: 'Export', icon: 'download', href: '/analytics-export', badge: 'PRO' },
+  { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-advanced', badge: 'GROWTH' },
+  { label: 'Customer cohorts and lifetime value', icon: 'users', href: '/analytics-cohorts', badge: 'GROWTH' },
 ];
 
 /** Entry points to the seller reports; appended to the Analytics tab. */

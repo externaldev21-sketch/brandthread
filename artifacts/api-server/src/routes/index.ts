@@ -237,7 +237,7 @@ router.use("/drops",           tc, featureGate("drops", { only: [{ method: "POST
 router.use("/analytics/insights", tc, analyticsInsightsRouter);
 router.use("/analytics",       tc, analyticsRouter);
 router.use("/integrations",    tc, integrationsRouter);
-router.use("/shopify",         tc, featureGate("shopify_sync", { only: [{ method: "POST", path: /^\/connect\// }] }), shopifyRouter); // connecting: Growth+
+router.use("/shopify",         tc, shopifyRouter);
 // ─── Growth-plan-gated AI design routes ───────────────────────────────────────
 router.use("/logo",            tc, requirePlan("growth"), aiSafetyGuard("logo"), logoRouter);
 router.use("/mockup",          tc, requirePlan("growth"), aiSafetyGuard("mockup"), mockupRouter);
@@ -255,7 +255,7 @@ router.use("/manufacturers",   tc, manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
 router.use("/product-variants", tc, productVariantsRouter);
 router.use("/catalog-public",   catalogPublicRouter);
-router.use("/seller-hub",      tc, sellerHubRouter);
+router.use("/seller-hub",      tc, featureGate("manufacturer_hub", { only: [{ method: "POST", path: "/quote-requests", when: (req) => req.body?.type !== "sample" }, { method: "POST", path: "/rfqs" }] }), sellerHubRouter); // quotes + RFQs: Growth+, sample requests: every plan
 router.use("/push",            pushRouter);
 router.use("/notification-prefs", notificationPrefsRouter);
 router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), aiRouter);
@@ -299,7 +299,7 @@ router.use("/seller/connect",            requireRole("owner"), connectRouter);  
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
 router.use("/seller/push-broadcasts",    tc, pushBroadcastAllowance, sellerPushBroadcastsRouter); // weekly allowance per plan
-router.use("/seller/giveaways",          tc, featureGate("giveaways", { only: [{ method: "POST", path: "/" }] }), sellerGiveawaysRouter); // new giveaways: Growth+
+router.use("/seller/giveaways",          tc, sellerGiveawaysRouter);
 router.use("/seller/launch-checklist",   tc, sellerLaunchChecklistRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
@@ -333,7 +333,7 @@ router.use("/discount-codes",            tc, discountCodesRouter);
 router.use("/sales",                     tc, salesRouter);
 router.use("/returns",                   tc, returnsRouter);
 router.use("/return-labels",             returnLabelsRouter);
-router.use("/sample-orders",             tc, sampleOrdersRouter);
+router.use("/sample-orders",             tc, featureGate("manufacturer_hub", { only: [{ method: "POST", path: "/", when: (req) => req.body?.orderType === "bulk" }] }), sampleOrdersRouter); // bulk orders: Growth+, samples: every plan
 router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
 router.use("/finance/statements",        financeStatementsRouter);
@@ -386,9 +386,9 @@ router.use("/live-replays",              tc, liveReplaysRouter);
 router.use("/live-tips",                 tc, liveTipsRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
-router.use("/boosts",                    tc, boostsRouter); // paid per boost: every plan (lib/planFeatures.ts)
+router.use("/boosts",                    tc, featureGate("boosts", { only: [{ method: "POST", path: "/" }] }), boostsRouter); // buying a boost: Growth+
 router.use("/promotions",                promotionsRouter); // viewer-scoped Sponsored delivery; no tc
-router.use("/featured-slots",            tc, featuredSlotsRouter); // /active is public; seller routes require auth
+router.use("/featured-slots",            tc, featureGate("boosts", { only: [{ method: "POST", path: "/" }] }), featuredSlotsRouter); // /active is public; booking a slot: Growth+
 router.use("/admin/promotions",          adminPromotionsRouter); // platform admins only
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
 router.use("/iap-promotions",            tc, iapPromotionsRouter);

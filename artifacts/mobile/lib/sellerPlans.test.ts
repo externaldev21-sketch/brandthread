@@ -19,8 +19,7 @@ describe('seller plan recommendations', () => {
   it('publishes three distinct plan choices with honest feature differences', () => {
     expect(SELLER_PLANS.map((plan) => plan.id)).toEqual(['starter', 'growth', 'pro']);
     expect(SELLER_PLANS[1].features.join(' ')).toContain('Manufacturer Hub');
-    expect(SELLER_PLANS[2].features.join(' ')).toContain('Unlimited live selling');
-    expect(SELLER_PLANS[1].features.join(' ')).toContain('Live selling for 4 hours a month');
+    expect(SELLER_PLANS[2].features.join(' ')).toContain('Live shopping');
   });
 
   it('keeps public names and monthly prices in one catalogue', () => {

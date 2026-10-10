@@ -1,7 +1,7 @@
 /**
- * Monthly marketing-email allowance per plan (lib/planFeatures.ts →
- * marketing_emails_per_month: Starter 500, Growth 10,000, Pro 50,000 by
- * default). Counted from email_campaign_sends this calendar month (UTC);
+ * Monthly marketing-email allowance per plan (planCatalogue.ts →
+ * emailSendsPerMonth: Starter 0, Growth 10,000, Pro 50,000 by default).
+ * A plan with 0 gets the "on Growth" upgrade prompt. Counted from email_campaign_sends this calendar month (UTC);
  * queued and in-flight sends count, so two campaigns can't both squeeze under
  * the cap. The daily cap in sender.ts still applies on top.
  */
@@ -38,6 +38,19 @@ export function emailsLeft(cap: number | null, used: number): number {
 }
 
 export function emailLimitBody(plan: SellerPlanId, cap: number, used: number, recipients: number) {
+  if (cap === 0) {
+    const required = planForMore("marketing_emails_per_month", plan, recipients) ?? "pro";
+    return {
+      error: "Plan required",
+      code: "PLAN_REQUIRED",
+      resource: "marketing_emails",
+      currentPlan: plan,
+      requiredPlan: required,
+      limit: 0,
+      used,
+      message: `Email marketing is on the ${required.charAt(0).toUpperCase() + required.slice(1)} plan. Upgrade to send campaigns.`,
+    };
+  }
   const left = Math.max(0, cap - used);
   return {
     error: "Plan limit reached",

@@ -16,6 +16,7 @@ import {
   parseTzOffsetMinutes,
   previousPeriod,
 } from "../lib/analyticsTime";
+import { featureGate } from "../middlewares/featureGate";
 
 const router = Router();
 router.use(requireAuth);
@@ -621,7 +622,7 @@ router.get("/notifications", async (req, res) => {
 // GET /api/analytics/customers?limit=10
 // Top customers by total spend + repeat-buyer stats derived from real orders.
 // Returns topCustomers list and aggregate stats (totalCustomers, repeatRate).
-router.get("/customers", requirePlan("pro"), async (req, res) => {
+router.get("/customers", featureGate("advanced_analytics"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const limit   = Math.min(parseInt((req.query.limit as string) ?? "10", 10) || 10, 50);
 
@@ -669,11 +670,11 @@ router.get("/customers", requirePlan("pro"), async (req, res) => {
   }
 });
 
-// GET /api/analytics/advanced  (Brandthread Pro)
+// GET /api/analytics/advanced  (advanced analytics: Growth+ by default, planCatalogue.ts)
 // Customer cohorts by first-order month, lifetime value and average order
 // value by month, from real non-cancelled orders. Existing analytics stay
 // free; only this additional module is plan-gated.
-router.get("/advanced", requirePlan("pro"), async (req, res) => {
+router.get("/advanced", featureGate("advanced_analytics"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   try {
     const since = sql`date_trunc('month', now()) - make_interval(months => ${ADVANCED_MONTHS - 1})`;

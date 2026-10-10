@@ -13,6 +13,12 @@ import express from "express";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db, storefronts, customers, follows, users, emailSubscribers, emailCampaigns, emailSettings } from "@workspace/db";
 
+// Email marketing is on Growth+ (planCatalogue.ts: Starter has 0 sends); sellers here are Growth unless a test says otherwise.
+const planOf = vi.hoisted(() => new Map<string, "starter" | "growth" | "pro">());
+vi.mock("../../lib/nativeEntitlements", async (orig) => ({
+  ...(await orig<typeof import("../../lib/nativeEntitlements")>()),
+  getEffectiveEntitlement: async (id: string) => ({ planId: planOf.get(id) ?? "growth", status: "active", provider: "stripe", native: null }),
+}));
 vi.mock("../../middlewares/requireAuth", async (orig) => ({
   ...(await orig<typeof import("../../middlewares/requireAuth")>()),
   requireAuth: (req: any, res: any, next: () => void) => {
@@ -307,6 +313,16 @@ describe("feature off when no provider key", () => {
 });
 
 describe("campaign send", () => {
+  it("shows a Starter seller the upgrade prompt instead of sending", async () => {
+    const c = await makeCampaign(SELLER_A);
+    planOf.set(SELLER_A, "starter");
+    try {
+      const res = await sellerJson(SELLER_A, "POST", `/campaigns/${c.id}/send`, {});
+      expect(res.status).toBe(403);
+      expect(await res.json()).toMatchObject({ code: "PLAN_REQUIRED", requiredPlan: "growth", resource: "marketing_emails" });
+    } finally { planOf.delete(SELLER_A); }
+    await db.delete(emailCampaigns).where(eq(emailCampaigns.id, c.id));
+  });
   it("sends to consented subscribers only with unsubscribe headers, then reports results", async () => {
     const a1 = await addSub(SELLER_A, addr("s1"));
     const a2 = await addSub(SELLER_A, addr("s2"));

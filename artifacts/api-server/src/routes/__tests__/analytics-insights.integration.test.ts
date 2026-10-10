@@ -7,7 +7,7 @@
  * isolation, range handling (Today / Week / Month / Year / All with a tz
  * offset) and an honest empty response.
  */
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
@@ -33,6 +33,13 @@ vi.mock("../../middlewares/requireAuth", () => ({
   },
   requirePlan: (min: string) => (_q: unknown, res: any, next: () => void) => {
     if (min === "pro" && authState.plan !== "pro") { res.status(403).json({ error: "Upgrade required", code: "PLAN_UPGRADE_REQUIRED" }); return; }
+    next();
+  },
+}));
+// Advanced analytics and export (planCatalogue.ts): this file's sellers are Starter or Pro.
+vi.mock("../../middlewares/featureGate", () => ({
+  featureGate: () => (_q: unknown, res: any, next: () => void) => {
+    if (authState.plan !== "pro") { res.status(403).json({ error: "Plan required", code: "PLAN_REQUIRED" }); return; }
     next();
   },
 }));
@@ -358,6 +365,14 @@ describe("GET /advanced", () => {
 });
 
 describe("POST /export", () => {
+  // Export is part of Pro's full analytics (planCatalogue.ts).
+  beforeEach(() => { authState.plan = "pro"; });
+  afterEach(() => { authState.plan = "starter"; });
+  it("is refused below Pro", async () => {
+    authState.plan = "starter";
+    const res = await send("POST", "/api/analytics/insights/export", { format: "csv", range: "today", sections: ["orders"], tz: TZ });
+    expect(res.status).toBe(403);
+  });
   it("produces a formula-safe CSV of orders, products and analytics for the seller's own data", async () => {
     const res = await send("POST", "/api/analytics/insights/export", { format: "csv", range: "today", sections: ["orders", "products", "analytics", "audience"], tz: TZ });
     expect(res.status).toBe(200);

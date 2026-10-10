@@ -28,8 +28,9 @@ import {
   DeleteMyManufacturerPhotoBody,
   DeleteMyManufacturerPhotoParams,
 } from "@workspace/api-zod";
-import { requireAuth, requirePlan } from "../middlewares/requireAuth";
+import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext } from "../middlewares/requireRole";
+import { featureGate } from "../middlewares/featureGate";
 import { getWebOrigin } from "../lib/webOrigin";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { sendManufacturerSignupEmail } from "../lib/brandthreadEmail";
@@ -74,7 +75,8 @@ function profilePhotoConflict(res: express.Response) {
   });
 }
 
-const requireGrowthSeller = [requireAuth, teamContext(), requirePlan("growth")] as const;
+// Manufacturer Hub (favorites, partners, invites, threads): the plan in planCatalogue.ts → manufacturerHub.
+const requireGrowthSeller = [requireAuth, teamContext(), featureGate("manufacturer_hub")] as const;
 
 function isSupportedImage(buffer: Buffer): boolean {
   return (

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { featureMinPlans, hasPlan, planAllowances, planForMore } from "../planFeatures";
+import { featureMinPlans, hasPlan, planAllowances, planForMore, planIncludes, publicPlanFeatures } from "../planFeatures";
+import { PLAN_CATALOGUE, planTierFeatures } from "../planCatalogue";
 import { liveAllowanceBlock, monthStartUtc } from "../liveAllowance";
 import { emailLimitBody, emailsLeft } from "../emailMarketing/allowance";
 import { isMarketingMailerConfigured, marketingFrom, marketingFromHeader } from "../emailMarketing/marketingMailer";
@@ -10,34 +11,56 @@ const saved = { ...process.env };
 afterEach(() => { process.env = { ...saved }; });
 
 describe("plan features", () => {
-  it("puts live selling on Growth by default, with an env switch back to Pro", () => {
-    expect(featureMinPlans().live_hosting).toBe("growth");
-    process.env.LIVE_HOST_MIN_PLAN = "pro";
-    expect(featureMinPlans().live_hosting).toBe("pro");
+  it("reads Dev's tiers from the one plan config", () => {
+    expect(featureMinPlans()).toEqual({
+      live_hosting: "growth",
+      drops: "growth",
+      boosts: "growth",
+      custom_domain: "growth",
+      manufacturer_hub: "growth",
+      advanced_analytics: "growth",
+      analytics_export: "pro",
+    });
+    const tiers = planTierFeatures();
+    expect([tiers.starter.analytics, tiers.growth.analytics, tiers.pro.analytics]).toEqual(["basic", "advanced", "full"]);
+    expect([tiers.starter.prioritySupport, tiers.growth.prioritySupport, tiers.pro.prioritySupport]).toEqual([false, false, true]);
+    expect([tiers.starter.payoutSpeed, tiers.pro.payoutSpeed]).toEqual(["standard", "faster"]);
   });
-  it("puts drops, giveaways, custom domains and Shopify sync on Growth", () => {
-    const min = featureMinPlans();
-    expect([min.drops, min.giveaways, min.custom_domain, min.shopify_sync]).toEqual(["growth", "growth", "growth", "growth"]);
+  it("answers per plan", () => {
+    expect(planIncludes("starter", "live_hosting")).toBe(false);
+    expect(planIncludes("growth", "analytics_export")).toBe(false);
+    expect(planIncludes("pro", "analytics_export")).toBe(true);
   });
   it("ranks plans", () => {
     expect(hasPlan("pro", "growth")).toBe(true);
     expect(hasPlan("starter", "growth")).toBe(false);
   });
-  it("names the cheapest plan with room for more", () => {
-    expect(planForMore("marketing_emails_per_month", "starter", 600)).toBe("growth");
+  it("gives Starter no marketing email and names the cheapest plan with room for more", () => {
+    expect(planAllowances().marketing_emails_per_month).toEqual({ starter: 0, growth: 10_000, pro: 50_000 });
+    expect(planForMore("marketing_emails_per_month", "starter", 1)).toBe("growth");
     expect(planForMore("marketing_emails_per_month", "starter", 20_000)).toBe("pro");
-    expect(planForMore("live_minutes_per_month", "growth", 300)).toBe("pro");
     expect(planForMore("push_broadcasts_per_week", "pro", 7)).toBeNull();
   });
-  it("reads email allowances from env, including unlimited", () => {
+  it("has no live-minute cap on Growth unless one is set", () => {
+    expect(planAllowances().live_minutes_per_month).toEqual({ starter: 0, growth: null, pro: null });
+    process.env.LIVE_GROWTH_MINUTES_PER_MONTH = "240";
+    expect(planForMore("live_minutes_per_month", "growth", 300)).toBe("pro");
+  });
+  it("reads email caps from env, including unlimited", () => {
     process.env.EMAIL_MONTHLY_CAP_PRO = "unlimited";
     process.env.EMAIL_MONTHLY_CAP_STARTER = "250";
     expect(planAllowances().marketing_emails_per_month).toEqual({ starter: 250, growth: 10_000, pro: null });
+  });
+  it("publishes every tier for the plan screen, with the product cap and seats from the same config", () => {
+    const pub = publicPlanFeatures();
+    expect(Object.keys(pub.tiers)).toEqual(["starter", "growth", "pro"]);
+    expect(pub.tiers.starter).toMatchObject({ analytics: "basic", emailSendsPerMonth: 0, productLimit: PLAN_CATALOGUE.starter.limits.products, staffSeats: PLAN_CATALOGUE.starter.limits.teamSeats });
   });
 });
 
 describe("live minutes", () => {
   it("lets Growth host until the monthly allowance is used, Pro always", () => {
+    process.env.LIVE_GROWTH_MINUTES_PER_MONTH = "240";
     expect(liveAllowanceBlock("growth", 239)).toBeNull();
     expect(liveAllowanceBlock("growth", 240)).toMatchObject({ code: "PLAN_LIMIT_REACHED", requiredPlan: "pro", limit: 240 });
     expect(liveAllowanceBlock("pro", 100_000)).toBeNull();
@@ -59,6 +82,11 @@ describe("email allowance", () => {
       message: "This campaign goes to 400 people and your plan has 200 emails left this month. Upgrade to send it.",
     });
     expect(emailLimitBody("growth", 10_000, 10_000, 1).message).toBe("You've sent this month's 10,000 marketing emails. Upgrade to send more.");
+  });
+  it("shows the upgrade prompt, not a used-up count, on a plan without email", () => {
+    expect(emailLimitBody("starter", 0, 0, 1)).toMatchObject({
+      code: "PLAN_REQUIRED", requiredPlan: "growth", message: "Email marketing is on the Growth plan. Upgrade to send campaigns.",
+    });
   });
 });
 
