@@ -98,3 +98,20 @@ one-time setup this overlaps with).
       `EXPO_PUBLIC_DOMAIN` and `https://brandthread.app` (marketing site + privacy/terms
       URLs) are live and stable before store review starts; a reviewer hitting a dead
       backend is an instant rejection risk.
+
+## Stripe and payments (before taking real orders)
+
+- [ ] **Platform payouts set to manual** — Stripe Dashboard (platform account) →
+      Settings → Payouts → Payout schedule → **Manual**. With `PAYOUT_MODE=hold` (the
+      default) seller money for in-stock orders (~18 days) and pre-orders (up to 180
+      days) sits on the platform balance; an automatic schedule would sweep it to the
+      company bank and later seller transfers would fail. The server checks this at boot
+      and hourly and logs an error if it isn't manual; admins can check
+      `GET /api/admin/platform-balance` (`healthy`, `schedule.ok`, `coverage.ok`). Only
+      pay Brandthread's own revenue out by hand, never more than available minus
+      `seller_held`. See `docs/payments/merchant-of-record.md` §6.
+- [ ] **Written Stripe sign-off** on separate charges and transfers with an 18–60 day
+      hold, reserve terms, pre-orders up to 180 days, and the merchant-of-record decision
+      (`docs/payments/merchant-of-record.md` §4).
+- [ ] **CPA opinion on sales tax** (marketplace facilitator obligations) before launch:
+      `docs/payments/sales-tax-facilitator-plan.md` §4.
