@@ -53,6 +53,8 @@ beforeAll(async () => {
       email: `${sellerA}@test.local`,
       name: "Catalog Seller A",
       displayName: "Seller A",
+      username: `catalog_a_${suffix}`,
+      avatarUrl: "https://cdn.test/a.jpg",
       role: "seller",
       accountType: "seller",
     },
@@ -111,6 +113,15 @@ describe("public catalog search and related products", () => {
     ).then((response) => response.json() as Promise<any>);
     expect(sorted.results.filter((result: any) => result.kind === "product")
       .map((product: any) => product.priceCents)).toEqual([1_000, 2_500, 3_000]);
+  });
+
+  it("returns the seller's handle and avatar for the product page seller row", async () => {
+    const response = await fetch(`${base}/api/public/products/${currentProductId}`);
+    expect(response.status).toBe(200);
+    const product = await response.json() as any;
+    expect(product.sellerDisplayName).toBe("Seller A");
+    expect(product.sellerUsername).toBe(`catalog_a_${suffix}`);
+    expect(product.sellerAvatarUrl).toBe("https://cdn.test/a.jpg");
   });
 
   it("excludes the current product and prioritizes the same seller", async () => {

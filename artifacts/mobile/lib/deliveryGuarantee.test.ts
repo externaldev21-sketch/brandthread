@@ -179,3 +179,11 @@ describe('seller conflicts', () => {
     expect(unshippedItems(items).map(i => i.id)).toEqual(['b']);
   });
 });
+
+describe('deliveryPromiseLine', () => {
+  it('promises 15 days for a regular item and 60 for a pre-order', async () => {
+    const { deliveryPromiseLine } = await import('./deliveryGuarantee');
+    expect(deliveryPromiseLine(false)).toBe('Delivered in 15 days or your money back');
+    expect(deliveryPromiseLine(true)).toBe('Delivered in 60 days or your money back');
+  });
+});
