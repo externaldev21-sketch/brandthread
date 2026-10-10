@@ -230,8 +230,16 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: theme.background, alignItems: 'center' },
     column: { flex: 1 },
+<<<<<<< HEAD
     headerWrap: { alignSelf: 'stretch' },
     header: { paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.md, gap: SP.sm },
+=======
+    header: { paddingHorizontal: SP.md, paddingBottom: SP.md, gap: SP.sm },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
+    headerCopy: { flex: 1, minWidth: 0 },
+    eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.muted },
+    title: { fontFamily: FONT.bold, fontSize: FS.xxl, lineHeight: 32, letterSpacing: -0.5, color: theme.text },
+>>>>>>> origin/approved-pr-796
     count: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
     ownerRow: { flexDirection: 'row', gap: SP.sm },
     pad: { paddingHorizontal: SP.md },

@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   divider: { height: 10 },
   card: { borderRadius: 14, borderWidth: 1, padding: 14 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  cardTitle: { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold },
+  cardTitle: { fontSize: 15, lineHeight: 18, fontFamily: FONT.semibold },
   cardSub: { fontSize: 12, fontFamily: FONT.regular, marginTop: 3, lineHeight: 17 },
   listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, minHeight: 52 },

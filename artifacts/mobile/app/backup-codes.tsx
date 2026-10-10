@@ -60,7 +60,7 @@ export default function BackupCodes() {
                   key={code}
                   selectable
                   style={{
-                    fontFamily: FONT.regular, fontSize: 14, color: colors.foreground,
+                    fontFamily: FONT.regular, fontSize: 15, color: colors.foreground,
                     backgroundColor: colors.elevated, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4,
                   }}
                 >

@@ -260,7 +260,7 @@ const st = StyleSheet.create({
   label: { fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: 6 },
   audRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 14, minHeight: 48, marginBottom: 8 },
   preview: { borderWidth: 1, borderRadius: RADIUS.md, padding: 16 },
-  pvStore: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 16 },
+  pvStore: { fontFamily: FONT.bold, fontSize: FS.xs, marginBottom: 16 },
   pvImage: { width: '100%', height: 160, marginBottom: 14 },
   pvHead: { fontFamily: FONT.bold, fontSize: FS.xl, marginBottom: 10 },
   pvText: { fontFamily: FONT.regular, fontSize: FS.md, lineHeight: 24, marginBottom: 14 },

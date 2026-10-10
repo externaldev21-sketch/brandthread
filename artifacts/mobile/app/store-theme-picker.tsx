@@ -360,8 +360,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   currentBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
+<<<<<<< HEAD
     color: FG,
-    letterSpacing: 0.5,
+=======
+    color: SUCCESS,
+>>>>>>> origin/approved-pr-796
   },
   previewingBadge: {
     position: 'absolute',
@@ -376,7 +379,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: CYAN,
-    letterSpacing: 0.5,
   },
   themeInfo: {
     padding: SP.sm,
@@ -536,8 +538,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: SUBTLE,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   styleSheetValue: {
     fontSize: FS.sm,

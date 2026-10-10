@@ -155,8 +155,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     ...TYPE_SCALE.caption,
     fontFamily: FONT.semibold,
     color: theme.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
     marginBottom: SPACING.sm,
     marginTop: SPACING.md,
   },

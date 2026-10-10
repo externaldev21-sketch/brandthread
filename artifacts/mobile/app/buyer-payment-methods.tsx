@@ -45,7 +45,7 @@ function CardBrand({ brand }: { brand: string }) {
 }
 const cb = StyleSheet.create({
   wrap: { borderRadius: RADII.chip, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
-  text: { fontSize: 11, fontFamily: FONT.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  text: { fontSize: 11, fontFamily: FONT.bold },
 });
 
 export default function BuyerPaymentMethodsScreen() {

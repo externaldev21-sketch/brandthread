@@ -878,7 +878,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: `${ACCENT}55`,
   },
   tagProductText: {
-    color: FG, fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 0.3,
+    color: FG, fontSize: FS.xs, fontFamily: FONT.semibold,
   },
 
   // ── Gesture hint ──

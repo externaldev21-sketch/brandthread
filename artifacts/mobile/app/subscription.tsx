@@ -625,7 +625,7 @@ const createStyles = (theme: AppThemePreset) => {
   currentPlanRenews:  { color: ON_ACCENT, fontSize: FS.xs, fontFamily: FONT.regular },
   statusPill:         { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
   statusText:         { fontSize: FS.xs, fontFamily: FONT.medium },
-  sectionTitle:       { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle:       { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm },
   planCard:           { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
   planCardHighlight:  { borderColor: MUTED, backgroundColor: CARD_ELEVATED },
   planCardFeatured:   {
@@ -653,14 +653,19 @@ const createStyles = (theme: AppThemePreset) => {
    growthFeatureStatus: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 4, marginTop: 1 },
    growthFeatureStatusText: { fontSize: FS.xs, fontFamily: FONT.medium },
    growthComparisonDivider: { height: 1, backgroundColor: BORDER, marginTop: SP.xs, marginBottom: SP.md },
-   growthExtrasLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm },
+   growthExtrasLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm },
    growthPerkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
    growthPerkIcon: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
    growthPerkText: { color: FG, fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
    growthPerkTextDim: { color: SUBTLE },
    growthPerkStatus: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.medium },
+<<<<<<< HEAD
   popularBadge:       { alignSelf: 'flex-start', backgroundColor: `${FG}1F`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: SP.sm },
-  popularText:        { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 0.5 },
+  popularText:        { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
+=======
+  popularBadge:       { alignSelf: 'flex-start', backgroundColor: `${SUCCESS}22`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: SP.sm },
+  popularText:        { color: SUCCESS, fontSize: FS.xs, fontFamily: FONT.semibold },
+>>>>>>> origin/approved-pr-796
   planHeader:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SP.md },
   planName:           { color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },
   planTagline:        { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },

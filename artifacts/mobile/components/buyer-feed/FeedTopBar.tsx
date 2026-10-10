@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
   liveText: {
-    fontSize: 11, letterSpacing: 0.6, fontFamily: FONT.bold, color: 'rgba(255,255,255,0.85)',
+    fontSize: 11, fontFamily: FONT.bold, color: 'rgba(255,255,255,0.85)',
   },
   liveTextActive: { color: ON_DARK },
   searchRow: {
@@ -190,6 +190,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   searchInput: {
-    flex: 1, height: 44, paddingHorizontal: 10, fontSize: 14, color: ON_DARK,
+    flex: 1, height: 44, paddingHorizontal: 10, fontSize: 15, color: ON_DARK,
   },
 });

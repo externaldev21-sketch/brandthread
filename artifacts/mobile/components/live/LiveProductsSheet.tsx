@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   index: { fontFamily: FONT.semibold, fontSize: FS.xs, width: 14, textAlign: 'center' },
   thumb: { width: 56, height: 56, borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   liveChip: { alignSelf: 'flex-start', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1, marginBottom: 3 },
-  liveChipText: { fontFamily: FONT.bold, fontSize: 8.5, letterSpacing: 0.8 },
+  liveChipText: { fontFamily: FONT.bold, fontSize: 11 },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
   price: { fontFamily: FONT.bold, fontSize: FS.sm, marginTop: 2 },
   buy: { height: 32, paddingHorizontal: 16, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },

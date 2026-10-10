@@ -164,7 +164,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   mutedOnInverted: { color: 'rgba(10,10,11,0.6)' },
 
   recBadge: { alignSelf: 'center', backgroundColor: theme.accent, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 2 },
-  recBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.onAccent, letterSpacing: 0.6 },
+  recBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.onAccent },
   recBadgeOnInverted: { backgroundColor: '#0A0A0B' },
   recBadgeTextOnInverted: { color: '#FFFFFF' },
 
@@ -172,7 +172,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   planName: { fontSize: FS.xl, fontFamily: FONT.semibold, color: theme.text },
   tagline: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   priceCol: { alignItems: 'flex-end' },
-  priceLabel: { fontSize: 26, fontFamily: FONT.semibold, color: theme.text, letterSpacing: -0.5 },
+  priceLabel: { fontSize: 28, fontFamily: FONT.semibold, color: theme.text, letterSpacing: -0.5 },
   pricePeriod: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   priceWeekly: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
 

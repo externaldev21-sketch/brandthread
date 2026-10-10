@@ -316,7 +316,7 @@ const s = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 },
   reviewerName: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  // Was fontSize: 10 (below the 11pt floor) — "Verified buyer" specifically
+  // Was fontSize: 11 (below the 11pt floor) — "Verified buyer" specifically
   // measured as blurry-small on live.
   verifiedText: { fontSize: FS.meta, fontFamily: FONT.semibold },
   reviewDate: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },

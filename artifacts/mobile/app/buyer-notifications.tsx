@@ -689,8 +689,6 @@ const makeStyles = () => StyleSheet.create({
   sectionHeaderText: {
     ...TYPE_SCALE.caption,
     fontFamily: FONT.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   notifRow: {
     flexDirection: 'row',

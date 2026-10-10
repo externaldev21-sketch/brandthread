@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  codeChar: { fontSize: 26, fontFamily: FONT.bold },
+  codeChar: { fontSize: 28, fontFamily: FONT.bold },
   codeHiddenInput: { ...StyleSheet.absoluteFill, opacity: 0.011, color: 'transparent' },
 
   stitch: { flexDirection: 'row', gap: 5, height: 2, overflow: 'hidden' },

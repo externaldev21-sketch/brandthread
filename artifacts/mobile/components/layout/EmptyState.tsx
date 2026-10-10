@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     fontSize: FS.lg,
     textAlign: 'center',
   },
-  titleCompact: { fontSize: 18 },
+  titleCompact: { fontSize: 17 },
   message: {
     fontFamily: FONT.medium,
     fontSize: FS.base,

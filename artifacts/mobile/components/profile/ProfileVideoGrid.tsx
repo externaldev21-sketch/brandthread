@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: 6, right: 6, borderWidth: 1, borderRadius: RADIUS.pill,
     paddingHorizontal: 6, paddingVertical: 1,
   },
-  statusText: { fontFamily: FONT.semibold, fontSize: 10, lineHeight: 13 },
+  statusText: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 13 },
   metric: { position: 'absolute', left: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
   metricText: {
     color: '#FFFFFF', // theme-exempt: over media

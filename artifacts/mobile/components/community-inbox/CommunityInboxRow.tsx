@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, minWidth: 0, marginLeft: SP.md },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
   name: { flexShrink: 1, fontSize: FS.base },
-  preview: { fontSize: 14 },
+  preview: { fontSize: 15 },
   trailing: { alignItems: 'flex-end', justifyContent: 'center', gap: 6, marginLeft: SP.sm },
   time: { fontSize: FS.sm, fontFamily: FONT.medium },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 20 },

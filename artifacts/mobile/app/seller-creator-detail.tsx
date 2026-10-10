@@ -63,7 +63,7 @@ export default function SellerCreatorDetailScreen() {
         ) : (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
-              <Text style={{ fontFamily: FONT.bold, fontSize: FS.xl, color: theme.text, letterSpacing: 2 }}>{c.code}</Text>
+              <Text style={{ fontFamily: FONT.bold, fontSize: FS.xl, color: theme.text }}>{c.code}</Text>
               <Pill label={c.status === 'active' ? 'Active' : c.status === 'pending' ? 'Needs approval' : c.status === 'paused' ? 'Paused' : 'Invited'} tone={c.status === 'active' ? 'strong' : 'neutral'} />
             </View>
             {c.username ? <Text style={{ fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.sm }}>@{c.username}</Text> : null}

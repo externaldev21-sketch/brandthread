@@ -1131,7 +1131,6 @@ const s = StyleSheet.create({
     color: MUTED,
     marginBottom: SP.xs,
     letterSpacing: 0.2,
-    textTransform: 'uppercase',
   },
   notesText: {
     fontSize: FS.sm,
@@ -1256,7 +1255,6 @@ const s = StyleSheet.create({
     marginBottom: SP.sm,
     marginTop: SP.sm,
     letterSpacing: 0.2,
-    textTransform: 'uppercase',
   },
   chipRow: {
     flexDirection: 'row',

@@ -1231,7 +1231,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   actionBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    letterSpacing: 0.8,
   },
   actionTitle: {
     color: colors.text,

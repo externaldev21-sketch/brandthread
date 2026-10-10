@@ -595,7 +595,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
     color: 'rgba(255,255,255,0.7)',
-    letterSpacing: 0.5,
     marginBottom: SP.xs,
   },
   headerHeading: {
@@ -667,7 +666,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: THREAD_THEME_LIGHT_PALETTE.text,
     fontSize: 12,
     fontFamily: FONT.bold,
-    letterSpacing: 2.4,
   },
   threadPreviewNavLines: {
     flexDirection: 'row',
@@ -694,7 +692,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: THREAD_THEME_LIGHT_PALETTE.secondary,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    letterSpacing: 1.7,
   },
   threadPreviewHeadline: {
     color: THREAD_THEME_LIGHT_PALETTE.text,
@@ -745,7 +742,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: MUTED,
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    letterSpacing: 0.9,
   },
   threadThemeDesc: {
     color: MUTED,
@@ -793,9 +789,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shopifyLogoText: { color: '#142000', fontSize: 21, fontFamily: FONT.bold },
+  shopifyLogoText: { color: '#142000', fontSize: 22, fontFamily: FONT.bold },
   shopifyCopy: { flex: 1, gap: 3 },
-  shopifyEyebrow: { color: MUTED, fontSize: FS.xs, letterSpacing: 1.2, fontFamily: FONT.bold },
+<<<<<<< HEAD
+  shopifyEyebrow: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.bold },
+=======
+  shopifyEyebrow: { color: '#95BF47', fontSize: FS.xs, fontFamily: FONT.bold },
+>>>>>>> origin/approved-pr-796
   shopifyTitle: { color: FG, fontSize: FS.base, lineHeight: 21, fontFamily: FONT.bold },
   shopifyDesc: { color: MUTED, fontSize: FS.xs, lineHeight: 17, fontFamily: FONT.regular },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
@@ -844,7 +844,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   popularBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: GOLD },
   heroCardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginBottom: SP.md },
   heroCardText: { flex: 1, gap: SP.xs },
-  heroCardTitle: { fontSize: 18, fontFamily: FONT.bold, color: theme.onAccent },
+  heroCardTitle: { fontSize: 17, fontFamily: FONT.bold, color: theme.onAccent },
   heroCardDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: 'rgba(255,255,255,0.8)' },
   heroCardButton: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -861,7 +861,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: '48%',
     gap: SP.xs,
   },
-  halfCardTitle: { fontSize: 14, fontFamily: FONT.bold, color: FG, marginTop: SP.xs },
+  halfCardTitle: { fontSize: 15, fontFamily: FONT.bold, color: FG, marginTop: SP.xs },
   halfCardDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 16 },
   demoBadge: {
     marginTop: SP.xs,
@@ -898,8 +898,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: SUBTLE,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
     marginTop: SP.sm,
     marginBottom: SP.xs,
   },

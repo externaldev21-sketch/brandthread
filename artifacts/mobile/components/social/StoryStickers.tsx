@@ -430,7 +430,7 @@ const s = StyleSheet.create({
   productText: { flex: 1, gap: 2 },
   productName: { color: STICKER.ink, fontFamily: FONT.semibold, fontSize: FS.sm, lineHeight: 17 },
   productSub: { color: STICKER.inkSoft, fontFamily: FONT.medium, fontSize: FS.meta },
-  countName: { color: STICKER.ink, fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 18, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.6 },
+  countName: { color: STICKER.ink, fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 18, textAlign: 'center' },
   cells: { flexDirection: 'row', gap: 8 },
   cell: { flex: 1, height: 56, borderRadius: RADII.input, backgroundColor: STICKER.silverSoft, alignItems: 'center', justifyContent: 'center', gap: 2 },
   cellValue: { color: STICKER.ink, fontFamily: FONT.bold, fontSize: FS.md, lineHeight: 20 },

@@ -137,11 +137,17 @@ export default function BuyerDownloadData() {
 const makeStyles = (palette: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
   intro: { ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 18, marginBottom: SPACING.md },
-  groupLabel: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SPACING.xs },
+<<<<<<< HEAD
+  groupLabel: { ...TYPE_SCALE.caption, color: palette.mutedForeground, marginBottom: SPACING.xs },
   // Side padding so the switches sit inset from the card's right edge, the
   // same as the icons on the left (audit QA-0376/1043).
   card: { padding: 0, paddingHorizontal: SPACING.md, overflow: 'hidden', marginBottom: SPACING.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: 32 + SPACING.sm },
+=======
+  groupLabel: { ...TYPE_SCALE.caption, color: palette.mutedForeground, marginBottom: SPACING.xs },
+  card: { padding: 0, overflow: 'hidden', marginBottom: SPACING.md },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: SPACING.md + 32 + SPACING.sm },
+>>>>>>> origin/approved-pr-796
   note: { flexDirection: 'row', gap: 8, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: 12, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
   noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },
   footerCount: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textAlign: 'center' },

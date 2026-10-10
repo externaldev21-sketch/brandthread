@@ -301,8 +301,6 @@ const s = StyleSheet.create({
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: SUBTLE,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
   },
   labelCell: {
     height: CELL_HEIGHT,

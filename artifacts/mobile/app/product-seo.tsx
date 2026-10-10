@@ -242,7 +242,7 @@ function makeStyles(theme: any) {
     faviconText: { fontFamily: FONT.bold, fontSize: 12, color: theme.text },
     siteName: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text },
     siteUrl: { fontFamily: FONT.regular, fontSize: 12, color: theme.muted },
-    previewTitle: { fontFamily: FONT.medium, fontSize: 19, lineHeight: 24, color: theme.text, textDecorationLine: 'underline' },
+    previewTitle: { fontFamily: FONT.medium, fontSize: 20, lineHeight: 24, color: theme.text, textDecorationLine: 'underline' },
     previewDesc: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: theme.muted },
     field: { marginTop: SP.lg },
     fieldHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },

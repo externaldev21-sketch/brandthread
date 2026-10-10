@@ -268,11 +268,19 @@ export default function BuyerRefundRequestScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, BORDER_ACTIVE = `${theme.accent}73`;
   return StyleSheet.create({
+<<<<<<< HEAD
   card: { backgroundColor: theme.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
-  sectionTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  sectionTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
   maxCard: { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER_ACTIVE, padding: SP.md, marginBottom: SP.md },
-  maxLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 },
+  maxLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginBottom: 4 },
   maxAmount: { fontSize: FS.xxl, fontFamily: FONT.bold, color: theme.text, marginBottom: 4 },
+=======
+  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
+  sectionTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
+  maxCard: { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER_ACTIVE, padding: SP.md, marginBottom: SP.md },
+  maxLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginBottom: 4 },
+  maxAmount: { fontSize: FS.xxl, fontFamily: FONT.bold, color: FG, marginBottom: 4 },
+>>>>>>> origin/approved-pr-796
   maxNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 16 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 6 },
   itemBorder: { borderTopWidth: 1, borderTopColor: BORDER },

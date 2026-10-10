@@ -1039,7 +1039,7 @@ export function NewFeatureBadge({ featureId, openedIds, style }: NewFeatureBadge
 
 const nfS = StyleSheet.create({
   root: { borderRadius: RADIUS.pill, paddingHorizontal: 5, paddingVertical: 2 },
-  text: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  text: { fontSize: FS.xs, fontFamily: FONT.bold },
 });
 
 // ─── LockBadge ────────────────────────────────────────────────────────────────
@@ -1071,7 +1071,7 @@ const lbS = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
-  text: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  text: { fontSize: FS.xs, fontFamily: FONT.bold },
 });
 
 // ─── FormInput ────────────────────────────────────────────────────────────────

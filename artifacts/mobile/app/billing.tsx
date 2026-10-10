@@ -610,6 +610,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterTabs: { flexDirection: 'row', borderRadius: 10, padding: 3, flex: 1 },
   filterTab: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
+<<<<<<< HEAD
   filterTabText: { ...TEXT.footnote, fontFamily: TEXT.headline.fontFamily },
   listCard: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   hairlineBottom: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
@@ -618,4 +619,16 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   billId: { ...TEXT.subhead, fontFamily: TEXT.headline.fontFamily },
   billNote: { ...TEXT.footnote, marginTop: 2 },
   billAmount: { ...TEXT.subhead, ...TABULAR, fontFamily: TEXT.headline.fontFamily },
+=======
+  filterTabText: { fontSize: 12, fontFamily: FONT.semibold },
+  iconBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  emptyBills: { padding: 18, alignItems: 'center' },
+  billRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, gap: 10 },
+  billId: { fontSize: 15, fontFamily: FONT.semibold },
+  billNote: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
+  billAmount: { fontSize: 15, fontFamily: FONT.semibold },
+  statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  statusText: { fontSize: 11, fontFamily: FONT.semibold },
+>>>>>>> origin/approved-pr-796
 });

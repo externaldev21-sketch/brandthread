@@ -104,10 +104,17 @@ const styles = StyleSheet.create({
     padding: SP.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  stepCount: { color: mediaAlpha(MEDIA.foreground, 0.5), fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 0.3 },
+<<<<<<< HEAD
+  stepCount: { color: mediaAlpha(MEDIA.foreground, 0.5), fontFamily: FONT.medium, fontSize: FS.xs },
   skip: { color: mediaAlpha(MEDIA.foreground, 0.75), fontFamily: FONT.semibold, fontSize: FS.xs },
   title: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.md },
   body: { color: mediaAlpha(MEDIA.foreground, 0.75), fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },
+=======
+  stepCount: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, fontSize: FS.xs },
+  skip: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.semibold, fontSize: FS.xs },
+  title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.md },
+  body: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },
+>>>>>>> origin/approved-pr-796
   dots: { flexDirection: 'row', gap: 5, marginTop: 14, marginBottom: 14 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: mediaAlpha(MEDIA.foreground, 0.3) },
   dotActive: { backgroundColor: MEDIA.foreground, width: 14 },

@@ -173,10 +173,15 @@ const styles = StyleSheet.create({
   glyphSlot: { width: 56, height: 40, alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1 },
   rowTitle: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base },
+<<<<<<< HEAD
   rowSubtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2 },
   dismissBtn: {
     marginTop: 48, minHeight: 48, paddingHorizontal: SP.xl, borderRadius: ControlRadius.md,
     backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch',
   },
   dismissText: { color: '#000000', fontFamily: FONT.semibold, fontSize: FS.base },
+=======
+  rowSubtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  dismissHint: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 48 },
+>>>>>>> origin/approved-pr-796
 });

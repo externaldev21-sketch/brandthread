@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: { flex: 1 },
-  title: { fontSize: 14, fontFamily: FONT.semibold },
+  title: { fontSize: 15, fontFamily: FONT.semibold },
   subtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   badge: {
     paddingHorizontal: 8,

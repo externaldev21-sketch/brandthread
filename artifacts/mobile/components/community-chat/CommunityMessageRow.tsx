@@ -303,7 +303,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     ...(Platform.OS === 'web' ? { fontFamily: `${FONT.regular}, ${EMOJI_FONT_STACK}` } : null),
   },
   meta: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 4, gap: 4 },
-  time: { fontSize: 10, fontFamily: FONT.regular },
+  time: { fontSize: 11, fontFamily: FONT.regular },
   failedRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 6, alignSelf: 'flex-end' },
   failedAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   failedText: { fontSize: FS.xs, fontFamily: FONT.regular },

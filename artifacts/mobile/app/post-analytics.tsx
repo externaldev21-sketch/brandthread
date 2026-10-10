@@ -623,7 +623,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   previewCaption: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 19,
   },
   previewBadgeRow: {
@@ -750,7 +750,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   analyticsLabel: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: FONT.semibold,
   },
   analyticsDetail: {

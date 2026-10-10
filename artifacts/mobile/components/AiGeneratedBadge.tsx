@@ -40,5 +40,9 @@ const styles = StyleSheet.create({
   },
   topLeft: { top: 6, left: 6 },
   bottomLeft: { bottom: 6, left: 6 },
-  label: { color: MEDIA.foreground, fontSize: 10, lineHeight: 12, fontWeight: '600', fontFamily: FONT.semibold },
+<<<<<<< HEAD
+  label: { color: MEDIA.foreground, fontSize: 11, lineHeight: 12, fontWeight: '600', fontFamily: FONT.semibold },
+=======
+  label: { color: '#FFFFFF', fontSize: 11, lineHeight: 12, fontWeight: '600', fontFamily: FONT.semibold },
+>>>>>>> origin/approved-pr-796
 });
