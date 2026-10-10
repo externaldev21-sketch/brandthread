@@ -17,7 +17,13 @@ import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
  * row here is honestly the clock-icon variant rather than a fabricated
  * avatar for a query that was never actually a profile visit.
  */
-export function RecentSearchRow({ term, onPress, onRemove }: { term: string; onPress: () => void; onRemove: () => void }) {
+export function RecentSearchRow({ term, onPress, onRemove, icon = 'clock' }: {
+  term: string;
+  onPress: () => void;
+  /** Omit for rows that can't be removed (trending searches). */
+  onRemove?: () => void;
+  icon?: 'clock' | 'trending-up';
+}) {
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
   const scale = React.useRef(new Animated.Value(1)).current;
@@ -34,11 +40,12 @@ export function RecentSearchRow({ term, onPress, onRemove }: { term: string; onP
       >
         <Animated.View style={[styles.tapAreaInner, { transform: [{ scale }] }]}>
           <View style={[styles.iconWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Feather name="clock" size={18} color={theme.muted} />
+            <Feather name={icon} size={18} color={theme.muted} />
           </View>
           <Text style={[styles.term, { color: theme.text }]} numberOfLines={1}>{term}</Text>
         </Animated.View>
       </Pressable>
+      {onRemove ? (
       <TouchableOpacity
         onPress={() => { hapticSelection(); onRemove(); }}
         accessibilityRole="button"
@@ -48,6 +55,7 @@ export function RecentSearchRow({ term, onPress, onRemove }: { term: string; onP
       >
         <Feather name="x" size={18} color={theme.muted} />
       </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

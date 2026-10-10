@@ -15,12 +15,14 @@ import { radius } from '@/constants/radii';
 // stand in for locations).
 export type SearchTabKey = 'forYou' | 'accounts' | 'products' | 'tags' | 'brands';
 
+// Products / Brands / People lead (the buyer brief); "accounts" is the
+// People tab (buyers and sellers).
 export const SEARCH_TABS: Array<{ key: SearchTabKey; label: string }> = [
   { key: 'forYou', label: 'For you' },
-  { key: 'accounts', label: 'Accounts' },
   { key: 'products', label: 'Products' },
-  { key: 'tags', label: 'Tags' },
   { key: 'brands', label: 'Brands' },
+  { key: 'accounts', label: 'People' },
+  { key: 'tags', label: 'Tags' },
 ];
 
 /**
