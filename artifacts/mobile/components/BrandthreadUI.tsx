@@ -500,8 +500,8 @@ export function PrimaryButton({
           <ActivityIndicator color={disabled ? palette.mutedForeground : foreground} size="small" />
         ) : (
           <>
-            {icon && <Icon name={icon} size={ICON.sm} color={disabled ? palette.mutedForeground : foreground} />}
-            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
+            {icon && <Icon name={icon} size={ICON.sm} color={disabled ? TEXT_TERTIARY : foreground} />}
+            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: TEXT_TERTIARY, fontSize: small ? FS.sm : FS.base } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
           </>
         )}
       </LinearGradient>
