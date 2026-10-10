@@ -261,6 +261,37 @@ export async function sendWelcomeEmail(options: {
   });
 }
 
+/**
+ * The day-5 trial reminder (Dev's trial decision): what is charged, when, and
+ * a direct link to manage or cancel (Stripe on the web, the store page for an
+ * in-app purchase).
+ */
+export async function sendTrialReminderEmail(options: {
+  to: string;
+  planLabel: string;
+  amount: string;
+  trialEndsAt: Date;
+  manageUrl: string;
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const ends = options.trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+  const plan = escapeHtml(options.planLabel);
+  const html = renderBrandthreadEmail({
+    preheader: `Your free trial ends ${ends}. Cancel anytime before then and you won't be charged.`,
+    eyebrow: "Free trial reminder",
+    title: `Your free trial ends ${ends}`,
+    subtitle: `Your ${options.planLabel} plan starts then at ${options.amount}/month.`,
+    bodyHtml: `<p>Your Brandthread <strong>${plan}</strong> plan will start on <strong>${escapeHtml(ends)}</strong> and your card will be charged <strong>${escapeHtml(options.amount)}</strong> per month.</p><p>Want to keep selling? You don't need to do anything. Changed your mind? Cancel before ${escapeHtml(ends)} and you won't be charged. Your store and products are kept.</p><p style="word-break:break-word;color:#666666;font-size:13px;">Manage or cancel here:<br />${escapeHtml(options.manageUrl)}</p>`,
+    cta: { label: "Manage or cancel", url: options.manageUrl },
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `Your Brandthread free trial ends ${ends}`,
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
 export async function sendTeamInviteEmail(options: {
   to: string;
   ownerName: string;

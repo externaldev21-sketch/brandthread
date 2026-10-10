@@ -266,16 +266,16 @@ describe("POST /duplicate", () => {
     expect(secondVariants.map((c) => c.stock).sort()).toEqual([3, 9]);
   });
 
-  it("respects the plan limit and is atomic", async () => {
+  it("duplicates past the live-product cap as drafts (drafts don't count)", async () => {
     const owner = `${seller}-dupelimit`;
     const a = await seed(owner, "Limit A");
     const b = await seed(owner, "Limit B");
-    state.limit = 3;
-    const { status, body } = await call(owner, "/duplicate", "POST", { productIds: [a, b] });
-    expect(status).toBe(403);
-    expect(body.code).toBe("PLAN_LIMIT_REACHED");
-    const after = await db.select({ id: products.id }).from(products).where(eq(products.ownerId, owner));
-    expect(after).toHaveLength(2);
+    state.limit = 2;
+    const { status } = await call(owner, "/duplicate", "POST", { productIds: [a, b] });
+    expect(status).toBe(201);
+    const after = await db.select({ status: products.status }).from(products).where(eq(products.ownerId, owner));
+    expect(after).toHaveLength(4);
+    expect(after.filter((p) => p.status === "draft")).toHaveLength(2);
   });
 
   it("cannot duplicate another seller's product", async () => {

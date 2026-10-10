@@ -2,7 +2,7 @@ import { ApiError } from './networkNotice';
 
 export type EntitlementRejection = {
   code: 'PLAN_REQUIRED' | 'PLAN_LIMIT_REACHED';
-  requiredPlan: 'growth' | 'pro';
+  requiredPlan: 'starter' | 'growth' | 'pro';
   message: string;
 };
 
@@ -12,13 +12,16 @@ export function getEntitlementRejection(error: unknown): EntitlementRejection | 
   try {
     const body = JSON.parse(error.body) as Record<string, unknown>;
     const requiredPlan = body.requiredPlan;
-    if (requiredPlan !== 'growth' && requiredPlan !== 'pro') return null;
+    // 'starter': a seller on the free limits (no paid subscription, BT-002).
+    if (requiredPlan !== 'starter' && requiredPlan !== 'growth' && requiredPlan !== 'pro') return null;
     return {
       code: error.code,
       requiredPlan,
       message: typeof body.message === 'string'
         ? body.message
-        : `Upgrade to ${requiredPlan === 'growth' ? 'Growth' : 'Pro'} to continue.`,
+        : requiredPlan === 'starter'
+          ? 'Start a plan to continue.'
+          : `Upgrade to ${requiredPlan === 'growth' ? 'Growth' : 'Pro'} to continue.`,
     };
   } catch {
     return null;
