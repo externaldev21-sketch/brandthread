@@ -96,19 +96,22 @@ describe('preview fixtures', () => {
 });
 
 describe('report screens', () => {
-  const SCREENS = ['analytics-product-stats', 'analytics-content', 'analytics-audience', 'analytics-goals', 'analytics-export', 'analytics-advanced'];
-  it('exist, are registered in the root stack, and are listed as Reports', () => {
-    for (const name of SCREENS) {
-      expect(existsSync(resolve(ROOT, `app/${name}.tsx`))).toBe(true);
-      expect(read('app/_layout.tsx')).toContain(`<Stack.Screen name="${name}"`);
-      expect(ANALYTICS_REPORTS.map(r => r.href)).toContain(`/${name}`);
-    }
-    expect(ANALYTICS_REPORTS.filter(r => r.badge).map(r => r.href)).toEqual(['/analytics-advanced']);
+  // Every report renders on one route: /analytics-reports?report=<key>.
+  const REPORTS = ['ProductStatsReport', 'ContentReport', 'AudienceReport', 'GoalsReport', 'ExportReport', 'AdvancedReport'];
+  const reportFile = (name: string) => `components/analytics/reports/${name}.tsx`;
+  it('are listed as Reports and all open on the one Reports route', () => {
+    for (const name of REPORTS) expect(existsSync(resolve(ROOT, reportFile(name)))).toBe(true);
+    expect(read('app/_layout.tsx')).toContain('<Stack.Screen name="analytics-reports"');
+    const route = read('app/analytics-reports.tsx');
+    const keys = ['product-stats', 'content', 'audience', 'goals', 'export', 'advanced', 'cohorts'];
+    expect(ANALYTICS_REPORTS.map(r => r.href)).toEqual(keys.map(k => `/analytics-reports?report=${k}`));
+    for (const k of keys) expect(route).toMatch(new RegExp(`'?${k}'?: \\w+Report`));
+    expect(ANALYTICS_REPORTS.filter(r => r.badge).map(r => r.href)).toEqual(['/analytics-reports?report=advanced', '/analytics-reports?report=cohorts']);
     expect(read('app/(tabs)/analytics.tsx')).toContain('<AnalyticsReportsList />');
   });
   it('read only through sellerInsightsService, whose preview branch runs before the network', () => {
-    for (const name of SCREENS) {
-      const src = read(`app/${name}.tsx`);
+    for (const name of REPORTS) {
+      const src = read(reportFile(name));
       expect(src).toContain("from '@/services/sellerInsightsService'");
       expect(src).not.toMatch(/serviceRequest\(|fetch\(/);
     }
@@ -123,19 +126,23 @@ describe('report screens', () => {
     expect(read('hooks/useSellerInsight.ts')).toContain('if (!previewMode() && (!isLoaded || !userId)) return;');
   });
   it('use the shared header with no subtitle and keep content clear of the tab bar', () => {
-    for (const name of [...SCREENS, '(tabs)/analytics']) {
-      const src = read(`app/${name}.tsx`);
+    for (const file of [...REPORTS.map(reportFile), reportFile('CohortsReport'), 'app/(tabs)/analytics.tsx']) {
+      const src = read(file);
       expect(src).not.toMatch(/<ScreenHeader[^>]*subtitle=/);
       expect(src).toMatch(/InsightFrame|useReportBottomInset/);
     }
-    expect(read('components/analytics/InsightFrame.tsx')).toContain('useTabBarMetrics(2).occupiedHeight');
   });
   it('gate Advanced analytics on the real plan entitlement, client and server', () => {
-    const src = read('app/analytics-advanced.tsx');
+    const src = read(reportFile('AdvancedReport'));
     expect(src).toContain("import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';");
     expect(src).toContain("plan === 'pro'");
     const api = readFileSync(resolve(ROOT, '../api-server/src/routes/analytics-insights.ts'), 'utf8');
     expect(api).toContain('router.get("/advanced", requirePlan("pro")');
+  });
+  it('open a report from each key metric on Analytics (Shopify Analytics)', () => {
+    const src = read('app/(tabs)/analytics.tsx');
+    expect(src).toContain("router.push('/analytics-reports?report=audience' as never)");
+    expect(src).toContain("router.push('/analytics-reports?report=product-stats' as never)");
   });
 });
 

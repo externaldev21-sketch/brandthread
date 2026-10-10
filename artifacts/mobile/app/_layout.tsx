@@ -1410,9 +1410,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="shipping"         options={{ headerShown: false }} />
         <Stack.Screen name="team"             options={{ headerShown: false }} />
         <Stack.Screen name="team-invite"      options={{ headerShown: false }} />
-        <Stack.Screen name="ai-assistant"     options={{ headerShown: false }} />
         <Stack.Screen name="community" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
-        <Stack.Screen name="automation"       options={{ headerShown: false }} />
         <Stack.Screen name="payments"         options={{ headerShown: false }} />
         <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
@@ -1430,7 +1428,6 @@ const AppStack = React.memo(function AppStack() {
               ? { headerShown: false, presentation: 'modal', animation: 'slide_from_bottom', contentStyle: OPAQUE_SCREEN_CONTENT }
               : { headerShown: false, animation: consumeAnimationOverride('ios_from_right') };
           }} />
-        <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
@@ -1440,7 +1437,6 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="notification-channels" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="help"             options={{ headerShown: false }} />
-        <Stack.Screen name="bg-removal"       options={{ headerShown: false }} />
         <Stack.Screen name="tech-pack-generator" options={{ headerShown: false }} />
         {/* Manufacturer Hub screens */}
         <Stack.Screen name="manufacturer-hub" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
@@ -1452,7 +1448,6 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="production-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="manufacturer-messages" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="invite-manufacturer"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="shipping-label"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="return-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1484,20 +1479,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="store-from-social"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-ai-improve"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Analytics screens */}
-        <Stack.Screen name="analytics-sales"       options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-products"    options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-customers"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-content"     options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-store"       options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-marketing"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-production"  options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-product-stats" options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-audience" options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-advanced" options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-goals" options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-export" options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-cohorts"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-reports"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
@@ -1516,7 +1498,6 @@ const AppStack = React.memo(function AppStack() {
         */}
         <Stack.Screen name="thread-checkout"       options={{ headerShown: false, animation: 'slide_from_bottom', gestureEnabled: false }} />
         <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* return-request is an alias used by existing buyer-order-detail */}
         <Stack.Screen name="return-request"        options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1563,7 +1544,6 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="appearance"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1572,7 +1552,6 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="find-friends-contacts" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-download-data"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1584,24 +1563,19 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="quote-post"                options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="buyer-drops"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-category"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-trending"           options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="seller-drops"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-push-broadcast" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-push-broadcast-results" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-giveaways" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-giveaway-create" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-giveaway-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="giveaway" options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="seller-drop-create"       options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="seller-drop-preview"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-highlight-stories"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-report"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-post-comments"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="ai-brain"         options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="ai-brand-memory"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="ai-settings"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Design Studio screens */}
         <Stack.Screen name="design" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
@@ -1631,8 +1605,6 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="general-settings"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="push-notifications" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="payout-setup" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="payouts" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="fees"               options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1680,7 +1652,6 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="metafields"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="checkout"           options={{ headerShown: false, animation: 'ios_from_right' }} />
