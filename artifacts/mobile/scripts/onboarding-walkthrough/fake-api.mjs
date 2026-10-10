@@ -24,7 +24,16 @@ function clerkIdFromAuthHeader(authorization) {
   return match ? match[1] : null;
 }
 
-export function createFakeOnboardingApi() {
+/** Seeded only with --demo, so the brands step can be shown with brands in it. */
+const DEMO_BRANDS = [
+  { id: 'b1', sellerId: 'seller_demo_1', name: 'Noir Field', brandType: 'Streetwear', logoUrl: null, verified: true },
+  { id: 'b2', sellerId: 'seller_demo_2', name: 'Atelier Rue', brandType: 'Luxury', logoUrl: null, verified: false },
+  { id: 'b3', sellerId: 'seller_demo_3', name: 'Common Thread', brandType: 'Basics', logoUrl: null, verified: false },
+  { id: 'b4', sellerId: 'seller_demo_4', name: 'Second Hand Club', brandType: 'Vintage', logoUrl: null, verified: true },
+  { id: 'b5', sellerId: 'seller_demo_5', name: 'Mono Lab', brandType: 'Minimal', logoUrl: null, verified: false },
+];
+
+export function createFakeOnboardingApi({ demo = false } = {}) {
   /** @type {any} */
   let dbUser = null;
   const calls = [];
@@ -106,10 +115,16 @@ export function createFakeOnboardingApi() {
       return { status: 200, body: user };
     }
     if (p === '/seller/onboarding/data' && method === 'POST') {
-      const user = ensureUser();
+      const user = ensureUser(undefined, clerkId);
       if (body?.goals != null) user.goals = body.goals;
       if (body?.brandStage != null) user.brandStage = body.brandStage;
       return { status: 200, body: { ok: true } };
+    }
+    if (p === '/public/username-check' && get) {
+      return { status: 200, body: { available: true } };
+    }
+    if (p === '/public/email-check' && get) {
+      return { status: 200, body: { available: true } };
     }
     if (p === '/auth/username/check' && get) {
       return { status: 200, body: { available: true } };
@@ -125,7 +140,12 @@ export function createFakeOnboardingApi() {
     }
     if (p === '/public/brands/discover' && get) {
       // Empty is a valid, gracefully-handled state for BrandsToFollowStep.
-      return { status: 200, body: [] };
+      return { status: 200, body: { brands: demo ? DEMO_BRANDS : [] } };
+    }
+    if (p === '/shipping-zones/settings' && method === 'PATCH') {
+      const user = ensureUser();
+      user.shipFromCountry = body?.shipFromCountry ?? null;
+      return { status: 200, body: { shipFromCountry: user.shipFromCountry } };
     }
     if (p === '/config/features' && get) {
       return { status: 200, body: { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null } };

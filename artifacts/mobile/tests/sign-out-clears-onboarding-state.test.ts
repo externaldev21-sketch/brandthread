@@ -22,6 +22,6 @@ describe('sign-out clears device-scoped onboarding-in-progress state', () => {
       layoutSource.indexOf('// Transition: was signed-in, now signed-out'),
       layoutSource.indexOf('// Pending team invite'),
     );
-    expect(transitionBlock).toContain("AsyncStorage.multiRemove(['onboarding_pending_flow', 'onboarding_pending_username'])");
+    expect(transitionBlock).toContain("AsyncStorage.multiRemove(['onboarding_pending_flow', 'onboarding_pending_username', 'onboarding_pending_draft'])");
   });
 });

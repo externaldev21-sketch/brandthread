@@ -1,123 +1,92 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { BUYER_STEP_INDEX, SELLER_STEP_INDEX, DRAFT_VERSION } from "../lib/onboardingFlow";
+import { BUYER_STEPS, DRAFT_VERSION, SELLER_STEPS } from "../lib/onboardingFlow";
 
-const source = readFileSync(path.resolve(__dirname, "./onboarding.tsx"), "utf8");
+const read = (rel: string) => readFileSync(path.resolve(__dirname, rel), "utf8");
+const source = read("./onboarding.tsx");
+const accountType = read("./account-type.tsx");
+const accountSteps = read("../components/onboarding/steps/AccountSteps.tsx");
+const profileSteps = read("../components/onboarding/steps/ProfileSteps.tsx");
+const sellerSteps = read("../components/onboarding/steps/SellerSteps.tsx");
+const allOnboardingCopy = [source, accountType, accountSteps, profileSteps, sellerSteps].join("\n");
 
-describe("onboarding questionnaire defaults", () => {
-  it("preselects editable preference choices without pre-filling identity fields", () => {
-    expect(source).toContain("useState<string[]>(DEFAULT_BUYER_INTERESTS)");
-    expect(source).toContain("useState('idea')");
-    expect(source).toContain("useState<string[]>(DEFAULT_SELLER_GOALS)");
-    expect(source).toContain("selectedPlanId",);
-    expect(source).toContain("setStyleArr((prev) => prev.includes(item)");
-    expect(source).toContain("setGoals((prev) => prev.includes(g)");
-    expect(source).toContain('useState(\'\')');
-    expect(source).toContain("selectedThemeId,");
-    expect(source).toContain("isAppThemeId(draft.selectedThemeId)");
-  });
-});
-
-describe("seller pre-plan experience", () => {
-  it("uses all theme presets and a server-backed one-sample request", () => {
-    expect(source).toContain("APP_THEME_PRESETS.map");
-    expect(source).toContain("Saved when your seller workspace is created.");
-    expect(source).toContain("api.logo.onboardingSample");
-    expect(source).toContain("onboarding-generate-sample");
-    expect(source).toContain("Your real AI sample is ready.");
-    expect(source).toContain("Retry");
-    expect(source).toContain("Skip sample · Continue to plans");
-    expect(source).toContain('accessibilityRole="radio"');
-    expect(source).toContain("accessibilityState={{ selected }}");
-    expect(source).toContain("await selectTheme(selectedThemeId)");
-  });
-});
-
-describe("v7 step order: Welcome opener, then AccountType, then path-specific auth", () => {
-  it("Welcome is step 0, AccountType step 1, Auth step 2 for both flows", () => {
-    expect(BUYER_STEP_INDEX.WELCOME).toBe(0);
-    expect(BUYER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
-    expect(BUYER_STEP_INDEX.AUTH).toBe(2);
-    expect(SELLER_STEP_INDEX.WELCOME).toBe(0);
-    expect(SELLER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
-    expect(SELLER_STEP_INDEX.AUTH).toBe(2);
+describe("Dev's onboarding items", () => {
+  it("1: buyer and seller accounts are described as separate, never one combined account", () => {
+    expect(allOnboardingCopy).not.toContain("One account for everything");
+    expect(accountType).toContain("Buyer and seller accounts are separate. You can have both.");
   });
 
-  it("renders the cinematic Welcome opener before AccountType", () => {
-    expect(source).toContain("import { WelcomeStep } from '@/components/onboarding/WelcomeStep'");
-    expect(source).toContain("step === BUYER_STEP_INDEX.WELCOME");
-    expect(source).toContain("onGetStarted={() => transitionTo(BUYER_STEP_INDEX.ACCOUNT_TYPE, 1)}");
+  it("2: one question per screen, buyer/seller first, Create new account starts at that question", () => {
+    expect(BUYER_STEPS[1]).toBe("ACCOUNT_TYPE");
+    expect(SELLER_STEPS[1]).toBe("ACCOUNT_TYPE");
+    expect(source).toContain("isAddAccount || start === 'account-type' ? 'ACCOUNT_TYPE' : 'WELCOME'");
+    // No screen crams username, email and password together any more.
+    expect(source).not.toContain("SharedAuthStep");
+    expect(source).not.toContain("Confirm password");
   });
 
-  it("buyer flow inserts a Brands-to-follow step after Style, before Loading", () => {
-    expect(BUYER_STEP_INDEX.STYLE).toBeLessThan(BUYER_STEP_INDEX.BRANDS);
-    expect(BUYER_STEP_INDEX.BRANDS).toBeLessThan(BUYER_STEP_INDEX.LOADING);
-    expect(source).toContain("step === BUYER_STEP_INDEX.BRANDS");
+  it("3: the referral field is hidden behind a small 'Have a code?' link and auto-fills from the invite link", () => {
+    expect(source).toContain("Have a code?");
+    expect(source).toContain("useState(false);\n  const [styleInterests"); // showReferral defaults to hidden
+    expect(source).toContain("cleanReferral(referralCodeParam)");
+  });
+
+  it("4: no AI-sounding copy, arrows on buttons or 'Already signed in' wording", () => {
+    for (const phrase of ["journey", "Already signed in", "Never miss", "Build my workspace"]) {
+      expect(allOnboardingCopy).not.toContain(phrase);
+    }
+    // No arrows inside any string literal (button labels, copy).
+    expect(allOnboardingCopy).not.toMatch(/['"`][^'"`\n]*[→›»][^'"`\n]*['"`]/);
+  });
+
+  it("5 & 6: no payouts, plans or trial during sign-up; the store preview comes first", () => {
+    for (const phrase of ["payout-setup", "SellerPlanRecommendationStep", "Continue to plans"]) {
+      expect(source).not.toContain(phrase);
+    }
+    expect(SELLER_STEPS[SELLER_STEPS.length - 1]).toBe("BUILDING");
+  });
+
+  it("7: the free logo sample sends the install id so the server limits it per device", () => {
+    expect(source).toContain("api.logo.onboardingSample(brandName.trim(), sampleStyle, await getInstallId())");
+    expect(source).toContain("onboarding_sample_used");
+  });
+
+  it("8: buyer onboarding ends with styles and brands to follow", () => {
+    expect(BUYER_STEPS.slice(-3)).toEqual(["STYLE", "SIZES", "BRANDS"]);
     expect(source).toContain("<BrandsToFollowStep");
   });
 
-  it("buyer flows through AccountType → BuyerAuth → Name → Style", () => {
-    // The AccountTypeStep is rendered at step 0
-    expect(source).toContain("step === BUYER_STEP_INDEX.ACCOUNT_TYPE");
-    // BuyerAuthStep is rendered at step 1
-    expect(source).toContain("step === BUYER_STEP_INDEX.AUTH");
-    expect(source).toContain("function BuyerAuthStep");
-    expect(source).toContain("step === BUYER_STEP_INDEX.NAME");
-    expect(source).toContain("step === BUYER_STEP_INDEX.STYLE");
+  it("9: no notification permission step in onboarding", () => {
+    expect(source).not.toContain("NotificationsStep");
+    expect(source).not.toContain("requestPermissionsAsync");
   });
 
-  it("seller flows through AccountType → SellerAuth → Name → BrandName", () => {
-    // Buyer and seller now share the runtime-themed auth form.
-    expect(source).toContain("function SharedAuthStep");
-    expect(source).toContain("allowSignedInAccountCreation");
-    expect(source).toContain("step === SELLER_STEP_INDEX.AUTH");
-    expect(source).toContain("step === SELLER_STEP_INDEX.NAME");
-    expect(source).toContain("step === SELLER_STEP_INDEX.BRAND_NAME");
+  it("10: answers are saved as a draft (v9) and restored on reopen, password excluded", () => {
+    expect(DRAFT_VERSION).toBe(9);
+    expect(source).toContain("sanitizeDraftForStorage(draft)");
+    expect(source).toContain("resolveResumeStep(");
+    expect(source).toContain("password, setPassword] = useState(''); // memory only, never in a draft");
+  });
+});
+
+describe("account creation order and safety", () => {
+  it("creates the Clerk account only after birthday and terms (age gate before any account exists)", () => {
+    const terms = source.indexOf("async function agreeToTerms()");
+    const finalize = source.indexOf("await finalizeEmailAccount()", terms);
+    expect(source.indexOf("signUp.create({ emailAddress")).toBeGreaterThan(0);
+    expect(finalize).toBeGreaterThan(terms);
+    expect(source).toContain("signUp.password({ password, legalAccepted: true })");
+    expect(source).toContain("checkDobInput(wheelDateToDobInput(birthday), { seller: flow === 'seller' })");
   });
 
-  it("draft version is 8 and onboarding.tsx defers migration to lib/onboardingFlow.ts", () => {
-    expect(DRAFT_VERSION).toBe(8);
-    expect(source).toContain("restoreDraftStep(draft.flow, draft.step ?? 0, draft.version)");
-    expect(source).toContain("from '@/lib/onboardingFlow'");
+  it("Apple and Google go through birthday and terms before the OAuth sheet", () => {
+    expect(source).toContain("goTo('BIRTHDAY', 1);");
+    expect(source).toContain("if (authMethod !== 'email') { await runOAuth(authMethod); return; }");
   });
 
-  it("seller auth has confirm password validation", () => {
-    expect(source).toContain("Confirm password");
-    expect(source).toContain("passwordsMatch");
-    expect(source).toContain("Passwords do not match");
-  });
-
-  it("buyer auth 'Use email' reveals the email form", () => {
-    expect(source).toContain("'email-form'");
-    expect(source).toContain("Use email");
-    expect(source).toContain("chooseHeadline");
-  });
-
-  it("buyer success routes to thread-explainer, seller to tabs", () => {
+  it("buyer lands on the thread explainer, seller on the dashboard", () => {
     expect(source).toContain("router.replace('/thread-explainer'");
     expect(source).toContain("router.replace('/(tabs)/'");
-  });
-
-  it("style interests carry emoji and solid-fill selected chip with checkmark", () => {
-    expect(source).toContain("STYLE_INTERESTS_WITH_EMOJI");
-    expect(source).toContain("emoji: '🏙️'");
-    expect(source).toContain("function StyleChip");
-    // Solid fill: accentDim background on selected state
-    expect(source).toContain("backgroundColor: theme.accentDim");
-    // Checkmark icon when selected
-    expect(source).toContain('name="check"');
-  });
-
-  it("seller name step is pre-filled from auth form first/last name", () => {
-    expect(source).toContain("onFirstNamePrefill");
-    expect(source).toContain("onLastNamePrefill");
-    expect(source).toContain("onFirstNamePrefill(fn)");
-    expect(source).toContain("onLastNamePrefill(ln)");
-  });
-
-  it("combined name is written to profile with first and last name", () => {
-    // Name is composed as 'firstName lastName'
-    expect(source).toContain("[firstName.trim(), lastName.trim()].filter(Boolean).join(' ')");
   });
 });
