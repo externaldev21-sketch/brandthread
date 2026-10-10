@@ -1,5 +1,5 @@
 import type * as Notifications from 'expo-notifications';
-import { activityHref, buyerOrderHref, isBuyerOrderNotification } from './activity';
+import { activityHref, buyerOrderHref, isBuyerOrderNotification, sellerSetupHref } from './activity';
 import { signalIncomingCall } from './calls/incomingCallSignal';
 
 export type NotificationRouter = {
@@ -103,6 +103,12 @@ export function notificationHref(rawData: unknown): string | null {
   }
   if (data?.targetType === 'payout') {
     return '/payouts';
+  }
+  if (data?.targetType === 'seller_setup') {
+    return sellerSetupHref(typeof data.targetId === 'string' ? data.targetId : null);
+  }
+  if (data?.targetType === 'freelancer_job') {
+    return '/freelancer-jobs';
   }
   // A buyer reviewed the seller (api-server routes/reviews.ts).
   if (data?.targetType === 'review') {

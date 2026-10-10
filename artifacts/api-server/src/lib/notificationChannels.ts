@@ -32,6 +32,8 @@ export const SELLER_PREF_KEYS = [
   "disputes",
   "subscription_trial",
   "inventory_alerts",
+  /** Setup reminders and the Monday summary (lib/sellerLifecycle). */
+  "seller_tips",
 ] as const;
 
 /** Types whose email channel is off until the user opts in. */

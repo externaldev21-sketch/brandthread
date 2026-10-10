@@ -2898,3 +2898,6 @@ export * from './places';
 export * from './productDrafts';
 export * from './liveActivities';
 export * from './reviewRequests';
+
+// Seller lifecycle messages (migration 511).
+export * from './sellerLifecycle';
