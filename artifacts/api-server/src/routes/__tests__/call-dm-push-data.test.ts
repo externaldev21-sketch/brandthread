@@ -37,6 +37,8 @@ vi.mock("@workspace/db", () => {
 vi.mock("../../lib/push", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../lib/push")>(),
   normalizePushEventCategory: () => "message",
+  // lib/notificationChannels.ts (in-app channel switch): no per-type key → enabled.
+  preferenceKey: () => null,
   sendPushToUser: vi.fn(async (_userId: string, payload: any) => { pushes.push(payload); }),
 }));
 

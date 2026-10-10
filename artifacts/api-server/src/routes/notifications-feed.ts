@@ -355,6 +355,8 @@ type PublishInput = {
   pushPriority?: "default" | "normal" | "high";
   pushInterruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
   extraData?: Record<string, unknown>;
+  /** Incoming calls bypass chat/device mutes without unmuting the Activity row. */
+  ringThroughMutes?: boolean;
 };
 
 /** conversation_participants.muted_until in the future (Chat details > Mute). */
@@ -371,7 +373,7 @@ async function isConversationMutedFor(n: PublishInput): Promise<boolean> {
 }
 
 async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory): Promise<void> {
-  if (await isConversationMutedFor(n)) return;
+  if (!n.ringThroughMutes && await isConversationMutedFor(n)) return;
   await sendPushToUser(n.userId, {
     title: n.title,
     body: n.body ?? "",
@@ -448,14 +450,14 @@ export async function publishNotification(n: PublishInput): Promise<void> {
   // Do not send a second push when the in-app notification already existed,
   // and don't push a muted ("see less") event either — it's still visible if
   // the recipient goes looking, just not worth interrupting them for.
-  if (!notification || isMuted) return;
+  if (!notification || (isMuted && !n.ringThroughMutes)) return;
   // The recipient's open app refreshes its Activity + badge now (ws/userHub).
   emitUserEvents([n.userId], { type: "activity.updated" });
 
   if (pushCategory) {
     // A muted conversation only suppresses device delivery; the feed row
     // above is kept and unread state is unchanged.
-    if (await isConversationMutedFor(n)) return;
+    if (!n.ringThroughMutes && await isConversationMutedFor(n)) return;
 
     // App-icon badge = the same unread count the bell shows, so the icon
     // never lags the in-app badge (pushes used to carry no badge at all).

@@ -31,6 +31,7 @@ import { createPreviewCallProvider, schedulePreviewIncomingTimeout } from './pre
 import { CallStartError, createAgoraCallProvider, type AgoraCallProvider } from './agoraCallProvider';
 import { logEntryFromDto } from './dmCallClient';
 import { onIncomingCallSignal } from './incomingCallSignal';
+import { useNativeCallBridge, useNativeCallsAvailable } from './native/useNativeCallBridge';
 import type { RtcEngine } from './rtc/types';
 import type {
   CallEndReason, CallLogEntry, CallProvider, CallSession, StartCallInput,
@@ -76,7 +77,7 @@ function logReasonFor(session: CallSession): CallEndReason {
 
 export function CallSessionProvider({ children }: { children: React.ReactNode }) {
   const api = useApi();
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded, userId: authUserId } = useAuth();
   const { user } = useUser();
   const demo = isPreviewDemoMode();
 
@@ -351,6 +352,25 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
     if (!s || s.mode !== 'video' || !agora) return;
     agora.switchCamera(s.callId);
   }, [agora]);
+
+  // System call screen (CallKit / ConnectionService) on native builds —
+  // drives the same accept / decline / end above; inert in Expo Go and web,
+  // and while calls are unavailable (no Agora credentials on the server).
+  const nativeBridgeEnabled = !!agora && !!isSignedIn;
+  const nativeUserId = !isLoaded ? undefined : (isSignedIn && authUserId ? authUserId : null);
+  const nativeCallsAvailable = useNativeCallsAvailable(nativeBridgeEnabled, nativeUserId);
+  useNativeCallBridge({
+    enabled: nativeBridgeEnabled,
+    callsAvailable: nativeCallsAvailable,
+    userId: nativeUserId,
+    session,
+    checkIncoming: () => agora?.checkIncoming(),
+    acceptCall,
+    declineOrEndCall,
+    endOnServer: (callId) => api.call.dm.end(callId),
+    uploadToken: (token) => api.push.registerVoipToken(token),
+    deregisterToken: (token) => api.push.deregisterVoipToken(token),
+  });
 
   const rtcEngine = useCallback(() => {
     const s = sessionRef.current;

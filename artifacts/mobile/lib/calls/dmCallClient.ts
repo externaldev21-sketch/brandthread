@@ -111,6 +111,9 @@ export function startFailureMessage(code: string | undefined, fallback?: string)
     case 'CALLEE_BUSY': return 'They’re on another call.';
     case 'CALLER_BUSY': return 'You’re already on a call.';
     case 'SIGNED_OUT': return 'Sign in to call.';
+    case 'BLOCKED': return 'You can’t call this person.';
+    case 'CALL_REQUEST_NOT_ACCEPTED': return 'You can call once they accept your message request.';
+    case 'CALL_REQUEST_PENDING': return 'Accept the message request to call.';
     default: return fallback || 'The call couldn’t be placed. Check your connection and try again.';
   }
 }

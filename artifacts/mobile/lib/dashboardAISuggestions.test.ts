@@ -75,7 +75,9 @@ describe('selectDashboardSuggestions', () => {
 
 describe('safeSuggestionRoute', () => {
   it('accepts app paths only', () => {
-    expect(safeSuggestionRoute('/inventory')).toBe('/inventory');
+    expect(safeSuggestionRoute('/(tabs)/products?filter=out-of-stock')).toBe('/(tabs)/products?filter=out-of-stock');
+    // The removed Inventory screen: older servers still send it, so it opens Products' low-stock filter.
+    expect(safeSuggestionRoute('/inventory')).toBe('/(tabs)/products?filter=low-stock');
     expect(safeSuggestionRoute('/(tabs)/orders')).toBe('/(tabs)/orders');
     expect(safeSuggestionRoute('//evil.test')).toBeUndefined();
     expect(safeSuggestionRoute('javascript:alert(1)')).toBeUndefined();

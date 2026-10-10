@@ -523,7 +523,8 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
           : `Only ${v.stock} units remaining (threshold: ${v.lowStockThreshold ?? 5}). At current velocity, stock may deplete within days.`,
         expectedImpact: isOut ? "Prevents ongoing missed revenue from visitors" : `Reordering now prevents ~${(v.stock ?? 0) * 2} lost sales`,
         actionLabel:    "View inventory",
-        actionRoute:    "/inventory",
+        // Inventory lives in the Products tab (the old /inventory screen was removed).
+        actionRoute:    isOut ? "/(tabs)/products?filter=out-of-stock" : "/(tabs)/products?filter=low-stock",
         category:       "inventory",
         priority:       isOut ? "urgent" : "high",
       });

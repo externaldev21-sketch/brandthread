@@ -55,6 +55,13 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   const suppressForCapture = __DEV__ && typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('bt_capture') === '1';
   const showSheet = !suppressForCapture && !suppressForRoute && loaded && (!consent || customizing);
+  // The sheet is a docked flex sibling that takes its own height out of the
+  // layout, so screens never need to reserve extra room for it.
+  const noticeClearance = 0;
+  const value = useMemo(() => ({ consent, saveConsent, openPreferences, noticeClearance }),
+    [consent, saveConsent, openPreferences, noticeClearance]);
+  // Cookie consent is a web concern; native apps never show the sheet.
+  if (Platform.OS !== 'web') return <Context.Provider value={value}>{children}</Context.Provider>;
   // A bottom sheet docked to the window's bottom edge that takes its own
   // height out of the layout (a flex sibling, not an absolute overlay), so
   // the app — fields, tiles, the floating tab bar — sits fully above it and

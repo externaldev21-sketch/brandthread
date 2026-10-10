@@ -1902,6 +1902,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
     },
     push: {
+      registerVoipToken: (body: {
+        token: string;
+        platform: 'ios' | 'android';
+        kind: 'voip' | 'fcm';
+        environment?: 'sandbox' | 'production';
+      }) => post<{ ok: boolean }>('/api/push/voip-token', body),
+      deregisterVoipToken: (token: string) =>
+        request<{ ok: boolean }>(
+          '/api/push/voip-token',
+          { method: 'DELETE', body: JSON.stringify({ token }) },
+          getToken,
+        ),
       register:   (body: { token: string; platform?: string; accountIds?: string[] }) =>
         post<{ ok: boolean }>('/api/push/register', body),
       deregister: (token: string) =>

@@ -12,6 +12,7 @@
  * POST   /api/social/suggested/:userId/dismiss — hide a suggestion
  */
 import { Router } from "express";
+import { emitUserBlocked } from "../lib/blockEvents";
 import { attachQuoteData } from "../lib/quotedPosts";
 import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
@@ -1763,6 +1764,7 @@ router.post("/block", validateBody(userIdBody), async (req, res) => {
     ));
   });
   await afterBlockChange(myId, userId);
+  await emitUserBlocked(myId, userId);
 
   res.json({ ok: true });
 });

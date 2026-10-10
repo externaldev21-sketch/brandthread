@@ -178,8 +178,10 @@ export function createAgoraCallProvider(deps: {
         created = await deps.api.create({ conversationId: input.conversationId, mode: input.mode });
       } catch (error) {
         const code = error instanceof ApiError ? error.code : undefined;
+        // 403s carry a policy code (lib/callPolicy.ts on the server): blocked,
+        // or a message request that hasn't been accepted yet.
         const message = error instanceof ApiError && error.status === 403
-          ? 'You can’t call this person.'
+          ? startFailureMessage(code, 'You can’t call this person.')
           : startFailureMessage(code);
         throw new CallStartError(code, message);
       }

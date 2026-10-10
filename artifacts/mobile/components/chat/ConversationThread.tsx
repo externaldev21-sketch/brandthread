@@ -2470,7 +2470,9 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               just the info icon below. */}
           {conv && !isAgentConv && callsAvailable && (
             <PressableScale rippleEnabled={false}
-              style={s.roundBtn}
+              style={[s.roundBtn, isRequestMode && { opacity: 0.55 }]}
+              disabled={isRequestMode}
+              accessibilityState={{ disabled: isRequestMode }}
               onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-call-voice"
@@ -2482,7 +2484,9 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
           )}
           {conv && !isAgentConv && callsAvailable && (
             <PressableScale rippleEnabled={false}
-              style={s.roundBtn}
+              style={[s.roundBtn, isRequestMode && { opacity: 0.55 }]}
+              disabled={isRequestMode}
+              accessibilityState={{ disabled: isRequestMode }}
               onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-call-video"

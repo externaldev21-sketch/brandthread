@@ -23,6 +23,8 @@ vi.mock('./aiAuditLog', () => ({
 }));
 
 vi.mock('../lib/previewAiBrain', () => ({ getPreviewAiReply: () => 'preview reply' }));
+// lib/devPreview pulls in react-native; these tests are the signed-in path.
+vi.mock('@/lib/devPreview', () => ({ isSellerDevPreview: () => false }));
 
 type Call = { url: string; init?: RequestInit };
 let calls: Call[] = [];
