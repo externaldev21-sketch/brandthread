@@ -28,6 +28,7 @@ import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
 import { reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
+import { syncProductsToPlanSoon } from "../lib/planProductSync";
 import { revenueCatSubscriptionEvent, stripeSubscriptionEndedEvent, stripeSubscriptionEvents } from "../lib/subscriptionAnalytics";
 import { grantPromotionPurchase, iapPromotionsEnabled, promotionPurchaseFromWebhookEvent } from "../lib/iapPromotions";
 import { drizzlePromoStore } from "../lib/iapPromotionsStore";
@@ -553,6 +554,7 @@ router.post("/revenuecat", async (req: Request, res: Response): Promise<void> =>
     // Reconciliation reads the current provider state, so stale/out-of-order
     // webhook payloads cannot overwrite a newer entitlement.
     await reconcileRevenueCatEntitlement(appUserId);
+    syncProductsToPlanSoon(appUserId);
     const funnel = revenueCatSubscriptionEvent(event);
     if (funnel) captureServerEvent(funnel.event, appUserId, funnel.props);
     res.json({ received: true });
@@ -1456,6 +1458,9 @@ async function handleSubscriptionUpdated(sub: any, previousAttributes: Record<st
     updatedAt: new Date(),
   }).where(eq(users.stripeCustomerId, customerId));
 
+  // Downgrade / upgrade / lapse: fit live listings to the plan (lib/planProductSync.ts).
+  syncProductsToPlanSoon(before?.clerkId);
+
   if (before?.clerkId) {
     for (const { event, props } of stripeSubscriptionEvents({
       sub, plan: planId ?? before.planId, previousStatus: before.status, previousAttributes,
@@ -1689,6 +1694,8 @@ async function handleSubscriptionDeleted(sub: any) {
     subscriptionPastDueSince: null,
     updatedAt: new Date(),
   }).where(eq(users.stripeCustomerId, customerId));
+
+  syncProductsToPlanSoon(seller?.clerkId);
 
   if (seller?.clerkId) {
     const ended = stripeSubscriptionEndedEvent(seller.planId);

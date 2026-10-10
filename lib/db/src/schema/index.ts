@@ -276,6 +276,8 @@ export const products = pgTable('products', {
   recoverableUntil: timestamp('recoverable_until', { withTimezone: true }),
   // `seller_deleted` can be restored briefly; `moderation_removed` is final.
   removalKind: text('removal_kind'),
+  // Moved to drafts because the seller's plan no longer covers it (lib/planProductSync.ts).
+  planHiddenAt: timestamp('plan_hidden_at', { withTimezone: true }),
   images: json('images').$type<string[]>().notNull().default([]),
   tags: json('tags').$type<string[]>().notNull().default([]),
   // jsonb, not json: migration 088 GIN-indexes this with jsonb_path_ops for

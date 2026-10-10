@@ -1,9 +1,11 @@
 /**
- * Day-four seller trial reminder.
+ * Seller trial reminder, sent TRIAL_REMINDER_DAYS_BEFORE days before the
+ * first charge (lib/planCatalogue.ts: a 7-day trial reminds on day 5).
  *
  * Event creation is deliberately separate from delivery draining. Creation is
- * strict day four only; a leased event can still be drained on day five after
- * a late-day provider failure, while every drain rechecks the live trial.
+ * strict to the reminder day only; a leased event can still be drained until
+ * the trial ends after a late-day provider failure, while every drain
+ * rechecks the live trial.
  */
 import { and, eq, gte, isNull, lte, or, sql, count } from "drizzle-orm";
 import {
@@ -16,7 +18,7 @@ import {
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
-import { PLAN_CATALOGUE, type SellerPlanId } from "../lib/planCatalogue";
+import { PLAN_CATALOGUE, TRIAL_REMINDER_DAYS_BEFORE, type SellerPlanId } from "../lib/planCatalogue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INTERVAL_MS = 60 * 60 * 1000;
@@ -60,18 +62,33 @@ export function buildTrialReminderMessage(input: {
   return { title: `Your free trial ends on ${ends}`, body, usedFeatures, entitledFeatures: entitled };
 }
 
-/** A Stripe 5-day trial's fourth 24-hour day, strictly. */
-export function isDayFourOfFive(start: Date, end: Date, now: Date): boolean {
-  const elapsed = now.getTime() - start.getTime();
-  return end.getTime() - start.getTime() === 5 * DAY_MS
-    && elapsed >= 3 * DAY_MS && elapsed < 4 * DAY_MS;
+/** Whole days in a trial, or null when the window isn't a whole number of days. */
+function trialLengthDays(start: Date, end: Date): number | null {
+  const days = (end.getTime() - start.getTime()) / DAY_MS;
+  return Number.isInteger(days) && days > TRIAL_REMINDER_DAYS_BEFORE ? days : null;
 }
 
-/** The event may be drained during day four or the still-valid day five. */
-export function isReminderWindowOpen(start: Date, end: Date, now: Date): boolean {
+/**
+ * The reminder day, strictly: the 24-hour day that ends `reminderDaysBefore`
+ * days before the charge (day 5 of a 7-day trial with the default 2).
+ */
+export function isTrialReminderDay(start: Date, end: Date, now: Date, reminderDaysBefore = TRIAL_REMINDER_DAYS_BEFORE): boolean {
+  const days = trialLengthDays(start, end);
+  if (days === null || days <= reminderDaysBefore) return false;
   const elapsed = now.getTime() - start.getTime();
-  return end.getTime() - start.getTime() === 5 * DAY_MS
-    && elapsed >= 3 * DAY_MS && elapsed < 5 * DAY_MS;
+  const day = days - reminderDaysBefore; // 1-indexed day of the trial
+  return elapsed >= (day - 1) * DAY_MS && elapsed < day * DAY_MS;
+}
+
+/** Kept for existing callers (routes/subscription.ts trial banner). */
+export const isDayFourOfFive = isTrialReminderDay;
+
+/** The event may be drained from the reminder day until the trial ends. */
+export function isReminderWindowOpen(start: Date, end: Date, now: Date, reminderDaysBefore = TRIAL_REMINDER_DAYS_BEFORE): boolean {
+  const days = trialLengthDays(start, end);
+  if (days === null || days <= reminderDaysBefore) return false;
+  const elapsed = now.getTime() - start.getTime();
+  return elapsed >= (days - reminderDaysBefore - 1) * DAY_MS && elapsed < days * DAY_MS;
 }
 
 export function isPendingTrialReminderDeliverable(input: {

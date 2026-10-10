@@ -2,15 +2,13 @@
  * Seller subscription / platform billing endpoints.
  * Mounted at /api/seller/subscription — all routes require Clerk auth.
  *
- * Three tiers:
- *   starter  $29/mo  — storefront, AI store builder, 25 products, standard checkout
- *   growth   $79/mo  — everything in starter + unlimited products, AI Design Studio,
- *                       manufacturer hub, live shopping, 3 team seats, boosts
- *   pro     $199/mo  — everything in growth + unlimited team seats, advanced analytics,
- *                       priority manufacturer intros, white-glove support, early access
+ * Three tiers (Starter / Growth / Pro). Prices, the active-product cap,
+ * staff seats and every other tier gate live in lib/planCatalogue.ts, the one
+ * plan config (served to the app at GET /api/config/seller-plans).
  *
- * All subscriptions start with a 5-day free trial. Card is collected upfront so the
- * trial auto-converts to paid on day 6 without any further seller action.
+ * Every subscription starts with a TRIAL_DAYS-day free trial (7 by default).
+ * The card is collected up front, so the trial converts to paid when it ends
+ * unless the seller cancels first.
  *
  * These charges go directly to the seller's own payment method via a standard
  * Stripe Subscription. They are completely separate from Stripe Connect, which
@@ -25,9 +23,10 @@ import { requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
 import { getWebOrigin } from "../lib/webOrigin";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
-import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
+import { PLAN_CATALOGUE, TRIAL_DAYS, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
 import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
 import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
+import { syncProductsToPlanSoon } from "../lib/planProductSync";
 
 const router = Router();
 router.use(requireAuth);
@@ -299,6 +298,7 @@ router.post("/native/sync", requireRole("owner"), async (req, res) => {
     const clerkUserId = (req as any).clerkUserId as string;
     const entitlement = await reconcileRevenueCatEntitlement(clerkUserId);
     const effective = await getEffectiveEntitlement(clerkUserId);
+    syncProductsToPlanSoon(clerkUserId);
     res.json({
       plan: effective.planId,
       status: effective.status,
@@ -365,7 +365,7 @@ router.get("/invoices", requireRole("owner"), async (req, res) => {
  *   in-place (Stripe subscription items update + prorations) instead of creating
  *   a new Checkout session — this prevents concurrent duplicate subscriptions.
  * • If no active subscription exists, creates a Stripe Checkout Session in
- *   subscription mode with a 5-day free trial. Card collected upfront so the
+ *   subscription mode with a TRIAL_DAYS-day free trial. Card collected upfront so the
  *   trial auto-converts to paid on day 6.
  * Returns { url } for redirect or { updated: true } for in-place update.
  */
@@ -422,10 +422,11 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
       mode:                      "subscription",
       customer:                  customerId,
       line_items:                [{ price: priceId, quantity: 1 }],
-      // Require card upfront even during trial — auto-converts on day 6.
+      // Require card upfront even during trial; it converts automatically when
+      // the trial (TRIAL_DAYS, lib/planCatalogue.ts) ends unless cancelled.
       payment_method_collection: "always",
       subscription_data: {
-        trial_period_days: 5,
+        trial_period_days: TRIAL_DAYS,
         metadata:          { clerkUserId, planId },
       },
       success_url:          `${returnBase}/seller/subscription/return?status=success&plan=${planId}`,
@@ -495,7 +496,7 @@ router.get("/return", (req, res) => {
   const plan   = (req.query.plan   as string) ?? "";
   const title  = status === "success" ? "✓ Trial started" : "Checkout cancelled";
   const body   = status === "success"
-    ? `Your <strong>${plan}</strong> plan trial is now active. You won't be charged until your 5-day trial ends. Close this window and return to the app.`
+    ? `Your <strong>${plan}</strong> plan trial is now active. You won't be charged until your ${TRIAL_DAYS}-day trial ends. Close this window and return to the app.`
     : "Your checkout was cancelled. Close this window and return to the app.";
 
   res.setHeader("Content-Type", "text/html");

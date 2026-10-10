@@ -10,6 +10,8 @@
  *    reservations are detected (stock still equals the previous value) and
  *    produce nothing.
  */
+import { getVerifiedPlanAccess } from "./planAccess";
+import { hasProductCapacity } from "./productCapacity";
 import { and, eq, sql } from "drizzle-orm";
 import { db, products, productVariants, productStockRules } from "@workspace/db";
 import { logActivity } from "./activityLog";
@@ -67,8 +69,16 @@ export async function afterStockChange(productId: string): Promise<SoldOutAction
         void logActivity(product.ownerId, product.ownerId, "system", `${product.name} sold out and was archived`, "product", productId, { soldOutBehavior: "archive" });
       }
     } else if (action === "restore") {
-      const moved = await db.update(products).set({ status: "active", updatedAt: now })
-        .where(and(eq(products.id, productId), eq(products.status, "draft"))).returning({ id: products.id });
+      // Back in stock goes live again only while the plan's product cap allows it.
+      // Over the cap it stays hidden (still auto-hidden), so a later restock
+      // or plan upgrade can bring it back.
+      const moved = await db.transaction(async (tx) => {
+        const access = await getVerifiedPlanAccess(product.ownerId).catch(() => null);
+        if (access && !await hasProductCapacity(tx, product.ownerId, access.limits.products, 1)) return null;
+        return tx.update(products).set({ status: "active", updatedAt: now })
+          .where(and(eq(products.id, productId), eq(products.status, "draft"))).returning({ id: products.id });
+      });
+      if (moved === null) return action;
       await db.update(productStockRules).set({ autoHiddenAt: null, updatedAt: now }).where(eq(productStockRules.productId, productId));
       if (moved.length > 0) {
         void logActivity(product.ownerId, product.ownerId, "system", `${product.name} is back in stock and visible again`, "product", productId, { soldOutBehavior: "hide" });
