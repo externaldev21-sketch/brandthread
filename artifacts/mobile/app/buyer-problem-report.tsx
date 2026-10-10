@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { createProblemReport } from '@/services/cartService';
 import { PROBLEM_TYPE_OPTIONS, BuyerProblemType } from '@/services/cartTypes';
 import { getBuyerOrder } from '@/services/orderService';
@@ -75,7 +75,6 @@ export default function BuyerProblemReportScreen() {
     if (!problemType) { Alert.alert('Select Issue Type', 'Please select what kind of problem you experienced.'); return; }
     if (!description.trim()) { Alert.alert('Add Details', 'Please describe the problem.'); return; }
     if (!isGeneralReport && !order) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     try {
       await createProblemReport({
@@ -86,7 +85,7 @@ export default function BuyerProblemReportScreen() {
         evidenceUris: evidencePhotos,
         contactedSeller,
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setSubmitted(true);
     } catch {
       Alert.alert('Error', 'Could not submit your report. Please try again.');
@@ -125,7 +124,7 @@ export default function BuyerProblemReportScreen() {
               <TouchableOpacity
                 key={opt.key}
                 style={[s.typeCard, problemType === opt.key && s.typeCardSelected]}
-                onPress={() => { Haptics.selectionAsync(); setProblemType(opt.key); }}
+                onPress={() => { haptics.selection(); setProblemType(opt.key); }}
                 activeOpacity={0.8}
               >
                 <Feather name={opt.icon as any} size={20} color={problemType === opt.key ? PURPLE_LIGHT : MUTED} />

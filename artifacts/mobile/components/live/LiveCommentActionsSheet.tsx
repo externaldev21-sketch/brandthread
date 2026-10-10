@@ -10,7 +10,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { hapticLight } from '@/lib/haptics';
 
 export interface CommentActionTarget {
   id: string;
@@ -54,7 +53,7 @@ export function LiveCommentActionsSheet({
         {rows.map((r) => (
           <Pressable
             key={r.action}
-            onPress={() => { hapticLight(); onClose(); onAction(r.action, comment); }}
+            onPress={() => { onClose(); onAction(r.action, comment); }}
             style={styles.row}
             accessibilityRole="button"
             accessibilityLabel={r.label}

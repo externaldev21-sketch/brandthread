@@ -9,7 +9,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { SUCCESS, SUCCESS_DIM, FONT, FS, RADIUS } from '@/lib/theme';
 
 interface LanguageOption {
@@ -55,7 +55,7 @@ export default function LanguagesScreen() {
 
   async function selectLanguage(code: string) {
     if (code === storeLanguage) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     setSaving(code);
     try {
       await api.seller.updateSettings({ storeLanguage: code }) as any;

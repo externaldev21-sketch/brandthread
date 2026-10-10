@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
 import {
   archiveSellerPost, deleteSellerPost, getSellerPosts, publishSellerPostNow, unscheduleSellerPost, updateSellerPost,
@@ -139,12 +139,10 @@ export default function ContentScreen() {
   };
 
   function createPost(type: ContentType) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(('/create-post?type=' + type) as never);
   }
 
   function openPostActions(post: ContentPost) {
-    Haptics.selectionAsync();
     Alert.alert('Manage post', post.caption || 'Untitled post', [
       {
         text: 'Edit',
@@ -257,7 +255,7 @@ export default function ContentScreen() {
           { icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View analytics' },
           {
             icon: 'plus',
-            onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); },
+            onPress: () => { router.push('/create-post' as never); },
             accessibilityLabel: 'Create a new post',
           },
         ]}
@@ -394,7 +392,7 @@ export default function ContentScreen() {
                   { backgroundColor: colors.card, borderColor: colors.border },
                   tab === t && { backgroundColor: colors.accent, borderColor: colors.primary },
                 ]}
-                onPress={() => { setTab(t); Haptics.selectionAsync(); }}
+                onPress={() => { setTab(t); haptics.selection(); }}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityState={{ selected: tab === t }}

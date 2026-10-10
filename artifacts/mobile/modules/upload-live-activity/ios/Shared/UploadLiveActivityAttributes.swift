@@ -5,14 +5,11 @@ import ActivityKit
 
 /// Shared ActivityAttributes for Brandthread's upload Live Activity.
 ///
-/// This file is compiled into BOTH the main app target (which calls
-/// `Activity<UploadLiveActivityAttributes>.request(...)`/`.update(...)`/
-/// `.end(...)` from `UploadLiveActivityModule.swift`) and the
-/// `UploadLiveActivity` widget extension target (which renders it in
-/// `UploadLiveActivityWidget.swift`). The config plugin that adds the
-/// widget extension target (`plugins/with-upload-live-activity.js`) adds
-/// this file to both targets' "Compile Sources" build phase — do not move
-/// it without updating that plugin.
+/// Compiled into the app by this local Expo module's pod (so
+/// `UploadLiveActivityModule.swift` can call `Activity<…>.request`), and
+/// copied into the `UploadLiveActivity` widget extension by
+/// `plugins/with-upload-live-activity.js` (which renders it in
+/// `UploadLiveActivityWidget.swift`). Keep this the only copy.
 ///
 /// Brandthread has no separate "reel" content type: a photo, video or
 /// slideshow post is one "Thread" (`SellerThreadPost` server-side). A

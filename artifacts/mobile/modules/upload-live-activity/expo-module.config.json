@@ -1,6 +1,7 @@
 {
   "platforms": ["ios"],
   "ios": {
-    "modules": ["UploadLiveActivityModule"]
+    "modules": ["UploadLiveActivityModule", "BrandthreadSystemModule"],
+    "appDelegateSubscribers": ["QuickActionsAppDelegateSubscriber"]
   }
 }

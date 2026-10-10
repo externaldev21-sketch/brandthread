@@ -34,7 +34,7 @@ import { describeCommunityError } from '@/lib/communities/errors';
 import { inviteUrlForCode } from '@/lib/communities/inviteLink';
 import { pickAndUploadCommunityPhoto } from '@/lib/communities/pickPhoto';
 import { validateGroupDescription, validateGroupName } from '@/lib/communities/validation';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useBlockAction } from '@/lib/useBlockAction';
@@ -168,7 +168,6 @@ export default function CommunityMembersScreen() {
 
   const openProfile = (m: CommunityMember) => {
     if (m.userId === myId) return;
-    hapticLight();
     if (m.accountType === 'seller') {
       router.push(`/seller-profile?id=${encodeURIComponent(m.userId)}` as never);
     } else {
@@ -240,7 +239,7 @@ export default function CommunityMembersScreen() {
   const deleteGroup = () => confirmAction('Delete this group?', 'This removes the group and its messages for everyone. This can’t be undone.', 'Delete group', () => {
     void run('delete', async () => {
       await client.remove(id);
-      hapticSuccess();
+      haptics.success();
       router.replace('/community' as never);
     });
   });
@@ -443,12 +442,10 @@ function InviteSheet({ visible, onClose, community }: { visible: boolean; onClos
 
   const copy = async () => {
     if (!url) return;
-    hapticLight();
     try { await Clipboard.setStringAsync(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { setMessage("Couldn't copy the link."); }
   };
   const share = async () => {
     if (!url) return;
-    hapticLight();
     try { await Share.share({ message: `Join ${community.name} on Brandthread: ${url}` }); } catch { /* cancelled */ }
   };
   const reset = () => confirmAction('Reset invite link?', 'The current link and QR code stop working.', 'Reset link', () => { void fetchLink(true); });
@@ -522,7 +519,7 @@ function EditGroupModal({ visible, onClose, community, onSaved }: { visible: boo
         requireApproval: form.visibility === 'private' ? form.requireApproval : false,
         iconUrl: photoUrl,
       });
-      hapticSuccess();
+      haptics.success();
       onSaved(updated);
     } catch (e) {
       const info = describeCommunityError(e);

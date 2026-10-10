@@ -4,8 +4,8 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
+import { FONT } from '@/lib/theme';
 
 const STRIPE_TAX_REGISTRATIONS_URL = 'https://dashboard.stripe.com/tax/registrations';
 
@@ -37,10 +37,6 @@ export default function TaxesDutiesScreen() {
   }, []);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
-
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
 
   const handleToggleTax = async (next: boolean) => {
     const previous = stripeTaxEnabled;
@@ -78,7 +74,6 @@ export default function TaxesDutiesScreen() {
   };
 
   const openStripeTaxRegistrations = async () => {
-    haptic();
     try {
       const supported = await Linking.canOpenURL(STRIPE_TAX_REGISTRATIONS_URL);
       if (supported) {
@@ -256,23 +251,23 @@ export default function TaxesDutiesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
-  sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 6, marginBottom: 14, lineHeight: 17 },
+  sectionTitle: { fontSize: 15, fontFamily: FONT.semibold },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 6, marginBottom: 14, lineHeight: 17 },
   rowStart: { flexDirection: 'row', alignItems: 'center' },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   divider: { height: 10 },
   manageBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  manageBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  rowLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  rowDescription: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2, lineHeight: 17 },
+  manageBtnText: { fontSize: 13, fontFamily: FONT.semibold },
+  rowLabel: { fontSize: 14, fontFamily: FONT.semibold },
+  rowDescription: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2, lineHeight: 17 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 12 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 2 },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 12, fontFamily: 'Inter_400Regular', flex: 1 },
+  statusText: { fontSize: 12, fontFamily: FONT.regular, flex: 1 },
   reportCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 14 },
   unavailableCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 4 },
-  disclaimer: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginTop: 10, paddingHorizontal: 4 },
+  disclaimer: { fontSize: 11, fontFamily: FONT.regular, lineHeight: 16, marginTop: 10, paddingHorizontal: 4 },
   rowIcon: { width: 20 },
   infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginTop: 12 },
-  infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
+  infoText: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, flex: 1 },
 });

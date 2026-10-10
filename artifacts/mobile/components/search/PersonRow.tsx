@@ -3,7 +3,7 @@ import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from '
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
-import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -64,7 +64,7 @@ export function PersonRow({
   return (
     <View style={styles.row}>
       <Pressable
-        onPress={() => { hapticPrimaryAction(); onPress(); }}
+        onPress={() => onPress()}
         onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
         onPressOut={() => pressScaleAnim(scale, 1).start()}
         accessibilityRole="button"
@@ -136,7 +136,7 @@ export function FollowPill({
 
   return (
     <Pressable
-      onPress={() => { if (!loading) { hapticLight(); onPress(); } }}
+      onPress={() => { if (!loading) { haptics.light(); onPress(); } }}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"

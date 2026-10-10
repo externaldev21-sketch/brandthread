@@ -9,7 +9,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -27,6 +27,7 @@ import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationO
 import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
 import { radius } from '@/constants/radii';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
+import { endLiveStreamActivity, startLiveStreamActivity, updateLiveStreamActivity } from '@/lib/nativeSystem';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -256,7 +257,7 @@ function SellerLiveNativeScreen() {
   }
 
   async function toggleProduct(product: any) {
-    Haptics.selectionAsync();
+    haptics.selection();
     const exists = productTags.find(t => t.productId === product.id);
     const updated = exists
       ? productTags.filter(t => t.productId !== product.id)
@@ -272,7 +273,7 @@ function SellerLiveNativeScreen() {
   }
 
   async function highlightProduct(productId: string) {
-    Haptics.selectionAsync();
+    haptics.selection();
     // Tapping the featured product again unpins it. The pin is stored and
     // broadcast by the server (POST /api/live/:id/pin), which also keeps the
     // legacy `highlighted` flag in step.
@@ -304,6 +305,18 @@ function SellerLiveNativeScreen() {
     }
   }
 
+  // Live Activity on the Lock Screen / Dynamic Island while broadcasting
+  // (iOS dev builds only; a no-op elsewhere): LIVE, viewers, sales.
+  useEffect(() => {
+    if (!params.streamId) return undefined;
+    const streamId = params.streamId;
+    startLiveStreamActivity(streamId, params.title || 'Live', { viewers: 0, salesCents: 0, ordersCount: 0, isLive: true });
+    return () => endLiveStreamActivity(streamId, { viewers: 0, salesCents: 0, ordersCount: 0, isLive: false });
+  }, [params.streamId, params.title]);
+  useEffect(() => {
+    if (params.streamId) updateLiveStreamActivity(params.streamId, { viewers: viewerCount, salesCents: 0, ordersCount: 0, isLive: true });
+  }, [params.streamId, viewerCount]);
+
   async function handleEnd() {
     Alert.alert('End stream?', "We'll try to save your stream as a replay in the Thread feed. This can take a few minutes, and isn't guaranteed.", [
       { text: 'Keep going', style: 'cancel' },
@@ -314,7 +327,7 @@ function SellerLiveNativeScreen() {
           try {
             await (api as any).live.end(params.streamId);
           } catch {}
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          haptics.success();
           router.dismissTo('/(tabs)/' as any);
         },
       },

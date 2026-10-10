@@ -14,7 +14,7 @@ import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-n
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { QuotedPostCard } from '@/components/social/QuotedPostCard';
@@ -65,7 +65,7 @@ export default function QuotePostScreen() {
         return;
       }
       await api.posts.create({ quotedPostId: postId, caption: trimmed, mediaType: 'photo' });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      haptics.success();
       goBackOr(router, '/');
     } catch (err) {
       setError(quoteErrorMessage(err));

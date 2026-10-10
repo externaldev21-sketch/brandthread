@@ -21,7 +21,6 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@clerk/expo';
 import { localTimeLabel } from '@workspace/manufacturer-flow';
@@ -264,7 +263,6 @@ export default function ManufacturerMessagesScreen() {
     const assets = pending;
     const signature = `${threadId}:${text}:${assets.map((asset) => asset.uri).join('|')}`;
     const operation = pendingOperations.current.get(assets.length ? 'photo' : 'text', signature);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       let mediaUrls: string[] | undefined;
       if (assets.length) {

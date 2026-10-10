@@ -20,7 +20,6 @@ import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { RADII } from '@/constants/radii';
-import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
@@ -183,14 +182,12 @@ export default function MoreScreen() {
   };
 
   const handleNavPress = (item: NavItem) => {
-    hapticPrimaryAction();
     if (item.route) {
       router.push(item.route as any);
     }
   };
 
   const toggleSection = (key: string) => {
-    hapticToggle();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -243,7 +240,7 @@ export default function MoreScreen() {
             <View style={[styles.progressFill, { width: `${percent}%` }]} />
           </View>
           <TouchableOpacity
-            onPress={() => { hapticPrimaryAction(); router.push('/settings' as any); }}
+            onPress={() => { router.push('/settings' as any); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={styles.continueSetup}>Continue setup →</Text>

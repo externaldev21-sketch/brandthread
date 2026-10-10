@@ -18,7 +18,7 @@ import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { hapticSelection, hapticSuccessAction, hapticDestructiveConfirm, hapticLight } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui';
 import {
@@ -80,7 +80,7 @@ function HLFormModal({
               {/* Emoji picker trigger */}
               <PressableScale
                 style={s.emojiTrigger}
-                onPress={() => { hapticSelection(); setEmojiGridOpen(v => !v); }}
+                onPress={() => { setEmojiGridOpen(v => !v); }}
                 accessibilityRole="button"
                 accessibilityLabel="Change highlight emoji"
               >
@@ -96,7 +96,7 @@ function HLFormModal({
                     <PressableScale
                       key={e}
                       style={s.emojiBtn}
-                      onPress={() => { hapticSelection(); setEmoji(e); setEmojiGridOpen(false); }}
+                      onPress={() => { haptics.selection(); setEmoji(e); setEmojiGridOpen(false); }}
                       accessibilityRole="button"
                       accessibilityLabel={`Use ${e} as the emoji`}
                     >
@@ -125,7 +125,7 @@ function HLFormModal({
                     key={c}
                     noMinHeight
                     style={[s.colorSwatch, { backgroundColor: c }, coverColor === c && [s.colorSwatchActive, { borderColor: colors.foreground }]]}
-                    onPress={() => { hapticSelection(); setCoverColor(c); }}
+                    onPress={() => { haptics.selection(); setCoverColor(c); }}
                     accessibilityRole="button"
                     accessibilityLabel={`Use this color as the cover`}
                     accessibilityState={{ selected: coverColor === c }}
@@ -136,7 +136,7 @@ function HLFormModal({
               {onSelectStories ? (
                 <PressableScale
                   style={[s.selectStories, { borderColor: colors.border }]}
-                  onPress={() => { hapticSelection(); onSelectStories(); }}
+                  onPress={() => { onSelectStories(); }}
                   disabled={!label.trim()}
                   accessibilityRole="button"
                   accessibilityLabel="Select stories for this highlight"
@@ -197,7 +197,6 @@ export default function BuyerHighlightsManager() {
   }, [params.create, params.edit]));
 
   function openCreate() {
-    hapticSelection();
     setLabel('');
     setEmoji('✨');
     setCoverColor(COVER_COLORS[0]);
@@ -205,7 +204,6 @@ export default function BuyerHighlightsManager() {
   }
 
   function openEdit(h: Highlight) {
-    hapticSelection();
     setEditing(h);
     setLabel(h.label);
     setEmoji(h.emoji);
@@ -215,7 +213,7 @@ export default function BuyerHighlightsManager() {
   async function handleSaveCreate() {
     if (!label.trim()) return;
     const h = await createHighlight({ emoji, label, coverColor });
-    hapticSuccessAction();
+    haptics.success();
     setHighlights(prev => [...prev, h]);
     setCreating(false);
   }
@@ -226,7 +224,7 @@ export default function BuyerHighlightsManager() {
   async function handleSelectStoriesCreate() {
     if (!label.trim()) return;
     const h = await createHighlight({ emoji, label, coverColor });
-    hapticSuccessAction();
+    haptics.success();
     setHighlights(prev => [...prev, h]);
     setCreating(false);
     router.push(`/buyer-highlight-stories?highlightId=${encodeURIComponent(h.id)}` as any);
@@ -244,13 +242,13 @@ export default function BuyerHighlightsManager() {
   async function handleSaveEdit() {
     if (!editing) return;
     await updateHighlight(editing.id, { emoji, label, coverColor });
-    hapticSuccessAction();
+    haptics.success();
     setHighlights(prev => prev.map(h => h.id === editing.id ? { ...h, emoji, label, coverColor } : h));
     setEditing(null);
   }
 
   function confirmDelete(h: Highlight) {
-    hapticLight();
+    haptics.warning();
     Alert.alert(
       'Delete highlight?',
       `"${h.label}" will be removed from your profile. This can't be undone.`,
@@ -260,7 +258,6 @@ export default function BuyerHighlightsManager() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            hapticDestructiveConfirm();
             await deleteHighlight(h.id);
             setHighlights(prev => prev.filter(x => x.id !== h.id));
           },
@@ -272,7 +269,6 @@ export default function BuyerHighlightsManager() {
 
   async function moveUp(index: number) {
     if (index === 0) return;
-    hapticSelection();
     const next = [...highlights];
     [next[index - 1], next[index]] = [next[index], next[index - 1]];
     setHighlights(next);
@@ -281,7 +277,6 @@ export default function BuyerHighlightsManager() {
 
   async function moveDown(index: number) {
     if (index >= highlights.length - 1) return;
-    hapticSelection();
     const next = [...highlights];
     [next[index], next[index + 1]] = [next[index + 1], next[index]];
     setHighlights(next);

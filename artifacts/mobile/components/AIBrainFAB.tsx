@@ -17,7 +17,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { AIScreenContext } from '@/services/aiTypes';
-import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -122,7 +121,6 @@ export default function AIBrainFAB({
 
     if (!expanded) {
       // Tap 1: slide the full button into view
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       setExpanded(true);
       Animated.spring(slideX, {
         toValue: 0,
@@ -133,7 +131,6 @@ export default function AIBrainFAB({
       scheduleAutoCollapse();
     } else {
       // Tap 2: open AI Brain, then collapse
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       collapseToTab();
       router.push({
         pathname: '/ai-brain',

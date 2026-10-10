@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, Share, Platform } from 'react
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -37,7 +36,6 @@ export default function BuyerQRCode() {
   const qrValue = canonicalUrl ?? 'https://brandthread.app';
 
   async function handleShare() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await Share.share({
         message: `Find me on Brandthread! ${qrValue}`,

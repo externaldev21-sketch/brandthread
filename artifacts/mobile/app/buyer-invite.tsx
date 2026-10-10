@@ -13,7 +13,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -101,21 +100,18 @@ export default function BuyerInviteScreen() {
 
   async function copyCode() {
     if (!invite) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(invite.code);
     showToast('Code copied');
   }
 
   async function copyLink() {
     if (!invite) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(invite.link);
     showToast('Link copied');
   }
 
   async function shareInvite() {
     if (!invite) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await Share.share({ message: invite.shareText, url: invite.link });
     } catch {

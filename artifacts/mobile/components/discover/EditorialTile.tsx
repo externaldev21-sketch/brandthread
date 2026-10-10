@@ -15,7 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, GUTTER } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
-import { hapticLight } from '@/lib/haptics';
 import { formatTimeRemaining } from '@/lib/countdown';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -46,7 +45,6 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
     <View style={{ width: TILE_WIDTH }}>
     <Pressable
       onPress={() => {
-        hapticLight();
         push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}&src=feed`) as never);
       }}
       accessibilityRole="button"

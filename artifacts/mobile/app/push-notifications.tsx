@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { ListRow } from '@/components/ui/ListRow';
 import { Card } from '@/components/ui/Card';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -58,7 +58,7 @@ export default function PushNotificationsScreen() {
   });
 
   function toggle(key: string) {
-    hapticToggle();
+    haptics.selection();
     setValues((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 

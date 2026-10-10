@@ -8,7 +8,7 @@ import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Activi
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -76,7 +76,6 @@ export default function FreelancerProfileScreen() {
   );
 
   const startConnectOnboarding = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const { url } = await api.freelancerConnect.onboard();
       await WebBrowser.openBrowserAsync(url);
@@ -98,7 +97,7 @@ export default function FreelancerProfileScreen() {
           onPress: async () => {
             try {
               await api.freelancers.deactivate();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              haptics.success();
               goBackOr(router);
             } catch (e) {
               Alert.alert('Failed', apiErrorMessage(e));
@@ -132,7 +131,7 @@ export default function FreelancerProfileScreen() {
         // Webhooks can lag in dev — confirm payment status directly
         try { await api.freelancerJobs.syncPayment(job.id); } catch {}
         if (result.type === 'success') {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          haptics.success();
           Alert.alert(
             'Payment sent',
             `${freelancer.name} has been notified. Funds are held by Brandthread until the job is completed.`,
@@ -147,7 +146,7 @@ export default function FreelancerProfileScreen() {
       setTitle(''); setDescription(''); setPriceText('');
       router.push('/freelancer-jobs' as any);
     } catch (e) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       const code = apiErrorCode(e);
       Alert.alert(
         code === 'FREELANCER_NOT_PAYABLE' ? 'Not available yet' : 'Could not create job',
@@ -340,7 +339,6 @@ export default function FreelancerProfileScreen() {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setHireVisible(true);
               }}
             >

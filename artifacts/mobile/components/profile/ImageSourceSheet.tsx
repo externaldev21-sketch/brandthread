@@ -16,7 +16,7 @@ import type * as ImagePicker from 'expo-image-picker';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
-import { hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { pickFromCamera, pickFromLibrary, pickVideoFromLibrary, recordAvatarVideo } from '@/lib/pickProfileImage';
 
 export const AVATAR_VIDEO_MAX_SECONDS = 10;
@@ -85,31 +85,27 @@ export function useImageSourceSheet() {
   }, []);
 
   const takePhoto = useCallback(async () => {
-    hapticSelection();
     const asset = await pickFromCamera(aspectRef.current, nativeEditRef.current);
     settle(asset);
   }, [settle]);
 
   const chooseLibrary = useCallback(async () => {
-    hapticSelection();
     const asset = await pickFromLibrary(aspectRef.current, nativeEditRef.current);
     settle(asset);
   }, [settle]);
 
   const chooseVideo = useCallback(async () => {
-    hapticSelection();
     const asset = await pickVideoFromLibrary();
     settle(asset);
   }, [settle]);
 
   const recordVideo = useCallback(async () => {
-    hapticSelection();
     const asset = await recordAvatarVideo(AVATAR_VIDEO_MAX_SECONDS);
     settle(asset);
   }, [settle]);
 
   const remove = useCallback(() => {
-    hapticSelection();
+    haptics.warning();
     onRemoveRef.current?.();
     settle(null);
   }, [settle]);

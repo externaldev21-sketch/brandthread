@@ -18,7 +18,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { apiErrorMessage } from '@/lib/safety';
 import { formatMinute, parseMinute } from '@/lib/awayHours';
@@ -93,7 +93,7 @@ export default function AwayMessageScreen() {
     try {
       if (!offline) await api.seller.awayMessage.update(body);
       setForm(body);
-      hapticSuccess();
+      haptics.success();
       setSaved(true);
     } catch (e) {
       setError(apiErrorMessage(e, 'Could not save your away message.'));
@@ -118,7 +118,7 @@ export default function AwayMessageScreen() {
             </View>
             <HapticSwitch
               value={form.enabled}
-              onValueChange={(v) => { hapticLight(); patch({ enabled: v }); }}
+              onValueChange={(v) => { patch({ enabled: v }); }}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor={colors.primaryForeground}
               accessibilityLabel="Send away message"
@@ -141,7 +141,7 @@ export default function AwayMessageScreen() {
           <SegmentedControl
             options={[{ id: 'always', label: 'Always' }, { id: 'outside_hours', label: 'Outside hours' }]}
             selectedId={form.mode}
-            onChange={(id) => { hapticLight(); patch({ mode: id as SellerAwaySettings['mode'] }); }}
+            onChange={(id) => { patch({ mode: id as SellerAwaySettings['mode'] }); }}
             testID="away-message-mode"
           />
 
@@ -154,7 +154,7 @@ export default function AwayMessageScreen() {
                   return (
                   <View key={label} style={styles.chipCell}>
                     <PressableScale
-                      onPress={() => { hapticLight(); patch({ openDays: form.openDays ^ (1 << i) }); }}
+                      onPress={() => { haptics.selection(); patch({ openDays: form.openDays ^ (1 << i) }); }}
                       accessibilityRole="button"
                       accessibilityLabel={DAY_NAMES[i]}
                       accessibilityState={{ selected: on }}
