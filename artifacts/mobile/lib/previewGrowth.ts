@@ -12,6 +12,9 @@ import type {
 const demo = () => isPreviewDemoMode();
 let links: TrackedLink[] | null = null;
 let bio: BioPage | null = null;
+// Which dataset `bio` was built for: demo is URL-only (lib/devPreview), so a
+// page without demo=1 must not keep an earlier page's demo data, or vice versa.
+let bioDemo: boolean | null = null;
 let pixels: PixelIds = { metaPixelId: null, tiktokPixelId: null };
 let n = 100;
 
@@ -65,6 +68,8 @@ export const previewGrowth = {
     // socials, links and the preview catalog's products.
     const siteUrl = `https://brandthread.app/@${PREVIEW_SELLER_IDENTITY.username}`;
     // Loaded lazily: the preview catalog pulls in bundled images (expo-asset).
+    if (bio && bioDemo !== demo()) bio = null;
+    bioDemo = demo();
     const catalog = demo() ? (await import('./previewSellerProducts')).getPreviewSellerProducts() : [];
     return (bio ??= {
       exists: false, slug: null, url: siteUrl, published: true,
