@@ -177,9 +177,9 @@ export function getPreviewSellerProducts(): Product[] {
       posterIndex: 3,
       lowStockThreshold: 6,
       variants: [
-        { size: 'S', color: 'Ivory', qty: 22 },
-        { size: 'M', color: 'Ivory', qty: 3 },
-        { size: 'L', color: 'Ivory', qty: 9 },
+        { size: '30', color: 'Indigo', qty: 3 },
+        { size: '32', color: 'Indigo', qty: 1 },
+        { size: '34', color: 'Indigo', qty: 2 },
       ],
     }),
     buildProduct({

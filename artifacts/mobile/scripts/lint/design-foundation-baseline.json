@@ -715,9 +715,6 @@
     "uppercase": 1,
     "letterSpacing": 1
   },
-  "app/products-bulk-edit.tsx": {
-    "feather": 1
-  },
   "app/profile-products.tsx": {
     "feather": 1,
     "uppercase": 1,
@@ -1515,9 +1512,6 @@
     "feather": 1
   },
   "components/products/PreOrderShipBy.tsx": {
-    "feather": 1
-  },
-  "components/products/ProductCard.tsx": {
     "feather": 1
   },
   "components/products/ProductImportPreview.tsx": {

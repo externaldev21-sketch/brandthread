@@ -83,7 +83,11 @@ describe('seller-preview manufacturer fixtures', () => {
     expect(roles).not.toContain("roleKeyForUser('preview')");
     expect(messages).toContain("setLoadError('Manufacturer messaging is unavailable in the signed-out preview.')");
     expect(messages).toContain('setLoading(false);');
-    expect(bulkEdit).toContain("setError('Product bulk editing is unavailable in the signed-out preview.')");
+    // Bulk edit never calls the API in the preview: demo edits the local
+    // preview catalog, fresh shows the empty catalog.
+    expect(bulkEdit.indexOf('if (preview) {')).toBeLessThan(bulkEdit.indexOf('api.productBulk.list('));
+    expect(bulkEdit).toContain('bulkCatalogFromProducts(getPreviewSellerProducts())');
+    expect(bulkEdit).toContain("const next = demo && catalog ? filterLocalCatalog(catalog, debounced, status) : [];");
     expect(productSeo).toContain("setLoadError('Product SEO editing is unavailable in the signed-out preview.')");
   });
 });
