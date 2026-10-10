@@ -18,7 +18,7 @@ import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetHandle, PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { hapticLight } from '@/lib/haptics';
 import { WebAlertHost } from '@/components/ui/WebAlertHost';
 
@@ -58,7 +58,7 @@ export function ActionSheetHost() {
     <WebAlertHost />
     <Modal visible={!!state} transparent animationType="fade" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Close menu">
-        <Pressable {...a11yModalProps()} style={[styles.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.md }]} onPress={() => {}}>
+        <Pressable {...a11yModalProps()} style={[styles.sheet, { backgroundColor: FILL_ELEVATED, paddingBottom: insets.bottom + SP.md }]} onPress={() => {}}>
           <SheetHandle />
           {(state?.title || state?.message) && (
             <View style={styles.header}>

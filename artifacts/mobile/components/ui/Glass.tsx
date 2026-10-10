@@ -32,6 +32,7 @@ import React from 'react';
 import { Animated, Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RADII } from '@/constants/radii';
+import { FILL_ELEVATED } from '@/lib/theme';
 import { FADE_MS, PRESS_DURATION_MS, PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export type GlassVariant =
@@ -61,6 +62,12 @@ export interface GlassProps {
    *  high-repetition contexts where a live blur per-instance would be a
    *  real performance cost (see the perf note in Glass.tsx's sweep PR). */
   noBlur?: boolean;
+  /** An opaque surface instead of glass: one solid fill (#1C1C1E on dark,
+   *  white on light), no blur, no see-through, no specular edge. Use it for
+   *  anything that is not a small control floating over a photo or video —
+   *  pills, indicators, tooltips, sheets, bars (BRANDTHREAD_DESIGN.md
+   *  "Glass"; scripts/lint/crisp.mjs flags a <Glass> without it). */
+  solid?: boolean;
   pointerEvents?: ViewStyle extends { pointerEvents?: infer P } ? P : never;
   testID?: string;
 }
@@ -103,9 +110,23 @@ export function useGlassPress() {
   return { progress, scale, onPressIn, onPressOut };
 }
 
-export function Glass({ variant = 'regular', tint = 'dark', radius = RADII.pill, style, children, noBlur = false, pointerEvents, testID }: GlassProps) {
+export function Glass({ variant = 'regular', tint = 'dark', radius = RADII.pill, style, children, noBlur = false, solid = false, pointerEvents, testID }: GlassProps) {
+  if (solid) {
+    return (
+      <View testID={testID} pointerEvents={pointerEvents} style={[{ borderRadius: radius, overflow: 'hidden', backgroundColor: tint === 'dark' ? FILL_ELEVATED : '#FFFFFF' }, style]}>
+        {children}
+      </View>
+    );
+  }
   return (
-    <View testID={testID} pointerEvents={pointerEvents} style={[{ borderRadius: radius, overflow: 'hidden' }, style]}>
+    <View
+      testID={testID}
+      pointerEvents={pointerEvents}
+      // Marks real glass for the crisp crawl (scripts/crisp/crawl.mjs): the
+      // one allowed blur, on floating controls over photos/video.
+      {...({ dataSet: { crispAllow: 'glass-over-media' } } as object)}
+      style={[{ borderRadius: radius, overflow: 'hidden' }, style]}
+    >
       <GlassBackdrop variant={variant} tint={tint} noBlur={noBlur} />
       <LinearGradient
         pointerEvents="none"

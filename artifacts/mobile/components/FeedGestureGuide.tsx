@@ -124,6 +124,7 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
       {/* Opaque solid-black surface (no blur/dim over the feed — QA-0438/
           1112/1113). Tapping anywhere still dismisses; the explicit
           "Keep watching" button below is the visible dismiss affordance. */}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.dim]} />
       <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} accessibilityLabel="Tap to keep watching" />
       <View style={styles.content} pointerEvents="box-none">
         <View pointerEvents="none" style={styles.inner}>
@@ -163,7 +164,8 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
 }
 
 const styles = StyleSheet.create({
-  root: { zIndex: 9999, elevation: 9999, backgroundColor: '#000000' },
+  root: { zIndex: 9999, elevation: 9999 },
+  dim: { backgroundColor: 'rgba(0,0,0,0.8)' },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   inner: { width: '100%', alignItems: 'center' },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.xxl, textAlign: 'center' },

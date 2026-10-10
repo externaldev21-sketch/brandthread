@@ -35,9 +35,9 @@ describe('Feed gesture guide content', () => {
     expect(guide).toContain("title: 'Drag the bar'");
   });
 
-  it('renders on an opaque surface (no translucent overlay) with a visible dismiss button', () => {
+  it('dims the feed behind it with a solid dim, never a blur', () => {
     expect(guide).not.toContain('<BlurView');
-    expect(guide).toContain("backgroundColor: '#000000'");
+    expect(guide).toContain('styles.dim');
     expect(guide).toContain('feed-gesture-guide-dismiss');
   });
 });

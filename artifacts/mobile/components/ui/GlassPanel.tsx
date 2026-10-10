@@ -1,9 +1,9 @@
 /**
  * Brandthread Design System — GlassPanel
  *
- * A frosted, monochrome glass surface for floating chrome over full-bleed
- * photo/gradient backdrops (Discover hero, product stat strips) — the same
- * "glass info card" language GOAT uses over its product cutout stories.
+ * A floating panel (the call bar). It is a bar, not a control over media,
+ * so it is drawn as one solid #1C1C1E surface — no blur, nothing showing
+ * through (BRANDTHREAD_DESIGN.md "Glass": never a bar).
  *
  * Thin wrapper over `components/ui/Glass` — the app's one shared glass
  * primitive (Apple Liquid Glass sweep) — kept as its own component only so
@@ -30,7 +30,7 @@ export interface GlassPanelProps {
 export function GlassPanel({ children, tint = 'dark', radius = RADII.sheet, style }: GlassPanelProps) {
   return (
     <View style={[{ borderRadius: radius, overflow: 'hidden' }, style]}>
-      <Glass variant="regular" tint={tint} radius={radius} style={StyleSheet.absoluteFill} />
+      <Glass solid tint={tint} radius={radius} style={StyleSheet.absoluteFill} />
       {children}
     </View>
   );

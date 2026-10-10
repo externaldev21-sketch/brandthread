@@ -13,7 +13,7 @@ import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -691,7 +691,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   commentText:      { color: 'rgba(255,255,255,0.9)', fontFamily: FONT.regular, fontSize: 12 },
   // Product picker
   pickerModal:      { backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 20, justifyContent: 'flex-end' },
-  pickerSheet:      { backgroundColor: BG, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '70%' },
+  pickerSheet:      { backgroundColor: FILL_ELEVATED, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
   pickerHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
   pickerTitle:      { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   pickerRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },

@@ -16,7 +16,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Icon } from '@/components/ui/Icon';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { GestureGlyph } from './GestureGlyph';
 import type { GestureKind } from './types';
@@ -81,8 +81,8 @@ const styles = StyleSheet.create({
   root: { position: 'absolute', left: SP.lg, right: SP.lg, alignItems: 'center', zIndex: 9998, elevation: 9998 },
   card: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: mediaAlpha(MEDIA.background, 0.92),
-    borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.14),
+    backgroundColor: FILL_ELEVATED, // solid: content never shows through a tip
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
     borderRadius: RADIUS.lg,
     paddingVertical: 10, paddingHorizontal: 14,
     maxWidth: 340,

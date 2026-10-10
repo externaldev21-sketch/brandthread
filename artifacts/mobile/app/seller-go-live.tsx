@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useLiveAvailable } from '@/hooks/useLiveAvailable';
@@ -412,7 +412,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
     // Product picker sheet
     pickerModal:       { backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-    pickerSheet:        { backgroundColor: '#141416', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, maxHeight: '70%', paddingTop: SP.md },
+    pickerSheet:        { backgroundColor: FILL_ELEVATED, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, maxHeight: '70%', paddingTop: SP.md },
     pickerHeader:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm },
     pickerTitle:        { color: FG, fontSize: FS.base, fontFamily: FONT.bold },
     pickerLoading:      { paddingVertical: SP.xl, alignItems: 'center' },

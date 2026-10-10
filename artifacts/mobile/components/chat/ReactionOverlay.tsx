@@ -117,10 +117,10 @@ export function ReactionOverlay({
           accessibilityRole="button"
           accessibilityLabel="Close reactions"
         >
-          <Glass variant="regular" tint="dark" radius={0} style={StyleSheet.absoluteFill} />
+          <View style={[StyleSheet.absoluteFill, s.backdrop]} />
         </Pressable>
 
-        {/* Elevated bubble clone — visually raised above the blur. */}
+        {/* Elevated bubble clone — visually raised above the dim. */}
         <View pointerEvents="none" style={{ position: 'absolute', top: anchor.y, left: bubbleLeft, width: anchor.width }}>
           <View style={[bubbleStyle, s.elevatedShadow]}>{bubbleContent}</View>
         </View>
@@ -128,7 +128,7 @@ export function ReactionOverlay({
         {/* "Tap and hold to react" hint + floating emoji row */}
         <View onLayout={(e) => setRowH(e.nativeEvent.layout.height)} style={[s.rowWrap, { top: rowTop }]}>
           <Text style={s.hint}>Tap and hold to react</Text>
-          <Glass variant="regular" tint="dark" radius={RADII.pill} style={s.row}>
+          <Glass solid radius={RADII.pill} style={s.row}>
             {REACTION_CONFIG.map((r) => {
               const isSelected = selected === r.type;
               return (
@@ -155,7 +155,7 @@ export function ReactionOverlay({
             onLayout={(e) => setMenuH(e.nativeEvent.layout.height)}
             style={[s.menuWrap, { top: menuTop }, sidePos]}
           >
-            <Glass variant="regular" tint="dark" radius={RADII.card} style={s.menuGlass}>
+            <Glass solid radius={RADII.card} style={s.menuGlass}>
               {menuItems.map((item, idx) => (
                 <PressableScale
                   key={item.key}
@@ -178,6 +178,8 @@ export function ReactionOverlay({
 }
 
 const s = StyleSheet.create({
+  // A plain dim, not a blur: the chat stays sharp behind it.
+  backdrop: { backgroundColor: 'rgba(0,0,0,0.6)' },
   rowWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   hint: { fontSize: FS.xs, fontFamily: FONT.medium, color: 'rgba(255,255,255,0.7)', marginBottom: 8 },
   row: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 6, gap: 2 },

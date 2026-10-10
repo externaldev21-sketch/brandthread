@@ -347,21 +347,6 @@ export default function LiveFeedScreen() {
   );
 }
 
-/**
- * Lazily requires expo-blur (same pattern as IconButton.tsx's GlassBlur) so
- * screens that never render the pinned product card don't pull the native
- * blur module into their bundle. Skipped on Android at the call site, where
- * the flat productCardTint below stands in.
- */
-function ProductCardBlur({ style }: { style?: StyleProp<ViewStyle> }) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { BlurView } = require('expo-blur') as { BlurView: typeof import('expo-blur').BlurView };
-    return <BlurView intensity={35} tint="dark" style={style} />;
-  } catch {
-    return null;
-  }
-}
 
 function LiveRoomPage({
   room, isActive, pageWidth, pageHeight, insetTop, insetBottom, onClose, onBuy,
@@ -787,8 +772,6 @@ function LiveRoomPage({
           // wrapper narrows the real tap target too.
           <ReanimatedAnimated.View style={[styles.productCardWrap, cardStyle]}>
             <PressableScale onPress={onBuy} style={styles.productCard} accessibilityRole="button" accessibilityLabel={`Buy ${room.productName}`}>
-              {Platform.OS !== 'android' && <ProductCardBlur style={StyleSheet.absoluteFill} />}
-              <View style={[StyleSheet.absoluteFill, styles.productCardTint]} pointerEvents="none" />
               {room.posterSource ? (
                 <ExpoImage source={room.posterSource} style={styles.productThumb} contentFit="cover" />
               ) : (
@@ -924,13 +907,10 @@ const styles = StyleSheet.create({
   productCardWrap: { marginRight: 48 },
   productCard: {
     height: 64, flexDirection: 'row', alignItems: 'center', gap: 10,
-    // Solid fallback color: the blur (ProductCardBlur) and the translucent
-    // productCardTint layer above it are what actually reads as "subtle
-    // dark blur" on iOS/web; on Android (no blur) this alone stands in.
-    backgroundColor: '#17171A', borderRadius: RADIUS.md, overflow: 'hidden',
+    // One solid surface over the stream (no blur, nothing showing through).
+    backgroundColor: '#1C1C1E', borderRadius: RADIUS.md, overflow: 'hidden',
     paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  productCardTint: { backgroundColor: 'rgba(20,20,22,0.45)' },
   productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#33303a', overflow: 'hidden' },
   productInfo: { flex: 1 },
   productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 15 },

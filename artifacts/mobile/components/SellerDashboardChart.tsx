@@ -304,7 +304,7 @@ export function SellerDashboardChart({
                 },
               ]}
             >
-              <Glass variant="regular" radius={10} style={StyleSheet.absoluteFill} />
+              <Glass solid radius={10} style={StyleSheet.absoluteFill} />
               {labels[tooltipIndex] ? (
                 <Text style={[styles.tooltipLabel, { color: theme.muted }]} numberOfLines={1}>
                   {labels[tooltipIndex]}

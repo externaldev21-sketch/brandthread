@@ -14,7 +14,7 @@ import { MEDIA } from '@/lib/theme';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import type { FirstRunTipStep, TargetRect } from './types';
 
@@ -98,8 +98,8 @@ const styles = StyleSheet.create({
   cardWrap: { position: 'absolute', paddingHorizontal: SP.lg, zIndex: 9998, elevation: 9998 },
   card: {
     width: 280,
-    backgroundColor: mediaAlpha(MEDIA.background, 0.96),
-    borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.14),
+    backgroundColor: FILL_ELEVATED, // solid: content never shows through a tip
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
     borderRadius: RADIUS.lg,
     padding: SP.md,
   },

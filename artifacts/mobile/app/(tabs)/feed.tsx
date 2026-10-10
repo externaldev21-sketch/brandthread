@@ -1180,15 +1180,6 @@ function PosterOnlyVisual({
   return (
     <>
       <View style={frameStyle}>
-        {immersive && fit === 'contain' && posterImage && (
-          <CachedImage
-            source={posterImage}
-            style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
-            contentFit="cover"
-            blurRadius={40}
-            {...a11yHidden(true, 'no')}
-          />
-        )}
         {posterImage ? (
           <CachedImage source={posterImage} style={StyleSheet.absoluteFill} contentFit={fit} priority={posterPriority} />
         ) : (
@@ -1362,15 +1353,6 @@ function LiveVideoVisual({
   return (
     <>
       <View style={frameStyle}>
-        {immersive && fit === 'contain' && posterImage && (
-          <CachedImage
-            source={posterImage}
-            style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
-            contentFit="cover"
-            blurRadius={40}
-            {...a11yHidden(true, 'no')}
-          />
-        )}
         {showPoster && (
           <CachedImage
             source={posterSource ?? { uri: posterUri! }}
@@ -3699,7 +3681,6 @@ const styles = StyleSheet.create({
   heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   videoFill: { width: '100%', height: '100%' },
-  letterboxBackdrop: { opacity: 0.55 },
   feedContentFade: { flex: 1 },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },

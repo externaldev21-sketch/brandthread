@@ -11,7 +11,6 @@
     "hairline": 1
   },
   "app/(buyer)/inbox.tsx": {
-    "glass": 1,
     "hairline": 1,
     "fractionalRadius": 1,
     "rnImage": 6
@@ -20,7 +19,6 @@
     "rnImage": 1
   },
   "app/(tabs)/feed.tsx": {
-    "blur": 2,
     "hairline": 3,
     "fractionalRadius": 1,
     "fractionalFont": 1
@@ -34,9 +32,6 @@
   },
   "app/account-type.tsx": {
     "hairline": 1
-  },
-  "app/activity-center.tsx": {
-    "glass": 1
   },
   "app/add-product.tsx": {
     "hairline": 1,
@@ -75,7 +70,6 @@
     "smearShadow": 1
   },
   "app/buyer-drop-detail.tsx": {
-    "blur": 1,
     "hairline": 1,
     "rnImage": 2
   },
@@ -209,11 +203,9 @@
     "rnImage": 2
   },
   "app/live-feed.tsx": {
-    "blur": 1,
     "fadedText": 5
   },
   "app/live.tsx": {
-    "blur": 1,
     "fadedText": 2
   },
   "app/manufacturer-hub.tsx": {
@@ -273,9 +265,6 @@
   },
   "app/sample-detail.tsx": {
     "rnImage": 2
-  },
-  "app/seller-conversation.tsx": {
-    "glass": 1
   },
   "app/seller-drop-create.tsx": {
     "hairline": 1,
@@ -379,7 +368,6 @@
     "smearShadow": 1
   },
   "components/FeedGestureGuide.tsx": {
-    "blur": 1,
     "fractionalRadius": 1,
     "smearShadow": 1
   },
@@ -398,12 +386,6 @@
   "components/SellerCreateFAB.tsx": {
     "smearShadow": 2
   },
-  "components/SellerDashboardChart.tsx": {
-    "glass": 1
-  },
-  "components/SellerDashboardRangePills.tsx": {
-    "glass": 1
-  },
   "components/SellerDashboardTopProducts.tsx": {
     "rnImage": 1
   },
@@ -420,7 +402,6 @@
     "fadedText": 1
   },
   "components/ShareProfileSheet.tsx": {
-    "blur": 2,
     "rnImage": 2,
     "smearShadow": 2
   },
@@ -446,14 +427,10 @@
     "hairline": 1
   },
   "components/ai-tools/AiResultViewer.tsx": {
-    "glass": 1,
     "rnImage": 1
   },
   "components/ai-tools/AiResultsGrid.tsx": {
     "rnImage": 1
-  },
-  "components/ai-tools/AiSlimComposer.tsx": {
-    "blur": 1
   },
   "components/ai-tools/BgRemovalGlowSweep.tsx": {
     "fractionalRadius": 1,
@@ -495,7 +472,6 @@
     "fadedText": 1
   },
   "components/chat/ReactionOverlay.tsx": {
-    "glass": 3,
     "fadedText": 1,
     "smearShadow": 2
   },
@@ -551,7 +527,6 @@
     "hairline": 1
   },
   "components/discover/DiscoverPager.tsx": {
-    "blur": 1,
     "fadedText": 1,
     "smearShadow": 2
   },
@@ -574,7 +549,6 @@
     "disabledOpacity": 1
   },
   "components/feed/UploadProgressPill.tsx": {
-    "glass": 1,
     "fadedText": 1,
     "fractionalRadius": 2,
     "rnImage": 1
@@ -584,7 +558,6 @@
     "smearShadow": 1
   },
   "components/first-run-tips/FullScreenGuideTip.tsx": {
-    "blur": 1,
     "smearShadow": 1
   },
   "components/first-run-tips/GestureHintTip.tsx": {
@@ -666,9 +639,6 @@
   "components/social/QuotedPostCard.tsx": {
     "rnImage": 1
   },
-  "components/social/StoryGestureGuide.tsx": {
-    "blur": 1
-  },
   "components/social/StoryQuestionResponsesSheet.tsx": {
     "hairline": 1
   },
@@ -694,9 +664,6 @@
   "components/ui/Chip.tsx": {
     "disabledOpacity": 1
   },
-  "components/ui/GlassPanel.tsx": {
-    "glass": 1
-  },
   "components/ui/IconButton.tsx": {
     "hairline": 1,
     "disabledOpacity": 1
@@ -706,9 +673,6 @@
   },
   "components/ui/QuantityStepper.tsx": {
     "disabledOpacity": 1
-  },
-  "components/ui/SegmentedControl.tsx": {
-    "glass": 1
   },
   "components/ui/Snackbar.tsx": {
     "rnImage": 1
