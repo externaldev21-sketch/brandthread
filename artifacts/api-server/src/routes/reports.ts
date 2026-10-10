@@ -24,6 +24,7 @@ import {
   resolveReportTarget,
 } from "../lib/reportTargets";
 import { isAgentUserId } from "../lib/brandthreadAgent";
+import { notifyModeratorsOfReport } from "../lib/moderatorAlertsDelivery";
 
 const router = Router();
 router.use(requireAuth);
@@ -167,6 +168,9 @@ router.post("/", rateLimit("report"), async (req, res) => {
         source: "user",
       })
       .returning();
+
+    // Fire-and-forget: alerting moderators never delays or fails the report.
+    notifyModeratorsOfReport(report);
 
     if (targetType === "community") {
       await db.update(communities).set({ reportCount: sql`${communities.reportCount} + 1` }).where(eq(communities.id, target.targetId));
