@@ -804,7 +804,7 @@ export default function SignInScreen() {
           <Button
             label="Create an account"
             variant="secondary"
-            onPress={() => router.replace('/onboarding' as never)}
+            onPress={() => router.replace((isAddAccount ? '/onboarding?addAccount=1' : '/onboarding?start=account-type') as never)}
             fullWidth
           />
 

@@ -10,6 +10,13 @@ import {
   ImageQualityError,
   ImageQualityUnavailableError,
 } from "@workspace/integrations-openai-ai-server/image";
+import {
+  OnboardingSampleClaimedError,
+  claimOnboardingSampleKeys,
+  completeOnboardingSampleKeys,
+  releaseOnboardingSampleKeys,
+} from "../lib/onboardingSampleClaims";
+import { normalizeClientIp } from "../middlewares/rateLimit";
 
 const router = Router();
 router.use(requireAuth);
@@ -158,7 +165,7 @@ router.post("/logo", async (req, res) => {
   // profile write before requesting the sample. The client cannot override
   // this server-owned state, and completed/buyer accounts are rejected.
   const [account] = await db
-    .select({ accountType: users.accountType, role: users.role, onboardingComplete: users.onboardingComplete })
+    .select({ accountType: users.accountType, role: users.role, onboardingComplete: users.onboardingComplete, email: users.email })
     .from(users)
     .where(eq(users.clerkId, userId))
     .limit(1);
@@ -173,6 +180,27 @@ router.post("/logo", async (req, res) => {
   } catch (error: any) {
     const status = error?.code === "onboarding_sample_in_progress" ? 409 : 429;
     res.status(status).json({ error: error?.message || "The onboarding sample is unavailable.", code: error?.code });
+    return;
+  }
+
+  // One sample per person/device, not just per account: a new sign-up on the
+  // same device, inbox or network can't burn another generation.
+  try {
+    await claimOnboardingSampleKeys({
+      accountId: userId,
+      reservationId,
+      email: account.email,
+      deviceId: req.body?.deviceId ?? req.get("x-device-id"),
+      ip: normalizeClientIp(req.ip || req.socket.remoteAddress),
+      leaseMs: ONBOARDING_SAMPLE_RESERVATION_LEASE_MS,
+    });
+  } catch (error) {
+    await releaseOnboardingSample(userId, reservationId).catch(() => {});
+    if (error instanceof OnboardingSampleClaimedError) {
+      res.status(429).json({ error: error.message, code: error.code });
+    } else {
+      res.status(503).json({ error: "The onboarding sample is unavailable. Please try again.", retryable: true });
+    }
     return;
   }
 
@@ -194,6 +222,7 @@ router.post("/logo", async (req, res) => {
     );
   } catch (error: any) {
     await releaseOnboardingSample(userId, reservationId).catch(() => {});
+    await releaseOnboardingSampleKeys(reservationId).catch(() => {});
     res.status(400).json({ error: error?.message || "Invalid onboarding sample request." });
     return;
   }
@@ -209,6 +238,7 @@ router.post("/logo", async (req, res) => {
   } catch (err) {
     // A failed provider or QA attempt must not consume the allowance.
     await releaseOnboardingSample(userId, reservationId).catch(() => {});
+    await releaseOnboardingSampleKeys(reservationId).catch(() => {});
     if (err instanceof ImageQualityError) {
       res.status(422).json({ error: "The generated logo did not meet the quality check. Please try again.", retryable: true });
     } else if (err instanceof ImageQualityUnavailableError) {
@@ -226,6 +256,7 @@ router.post("/logo", async (req, res) => {
     res.status(503).json({ error: "The sample could not be recorded. Please try again.", retryable: true });
     return;
   }
+  await completeOnboardingSampleKeys(reservationId).catch(() => {});
   res.json({ b64_json: buffer.toString("base64") });
 });
 

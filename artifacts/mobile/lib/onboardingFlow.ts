@@ -1,115 +1,205 @@
 /**
- * Explicit, typed onboarding step machine for buyer and seller flows.
+ * Explicit, typed onboarding step machine for buyer and seller flows (v9).
  *
- * This is the single source of truth for:
- *  - step ordering per flow (including the v7 Welcome + Brands-to-follow steps)
- *  - which steps may be skipped
- *  - draft-version migration (old in-flight AsyncStorage drafts -> current step)
+ * v9 is one question per screen:
+ *  - BUYER copies Instagram's sign-up 1:1 after the buyer/seller question
+ *    (https://mobbin.com/flows/4a6da069-d7db-4720-94e6-db74d80428c0):
+ *    email → code → password → birthday → terms → name → username → photo →
+ *    "Welcome to Brandthread, @username" → styles → sizes → brands to follow.
+ *  - SELLER copies Shopify's onboarding
+ *    (https://mobbin.com/flows/5d834cad-e1a4-4893-a1bf-e50ac56090ab):
+ *    question screens (stage, goals) → location → the same account fields,
+ *    one per screen → brand name → username → "Building your store" preview.
+ *    Plan, trial and payouts happen later from the seller dashboard.
  *
- * `app/onboarding.tsx` renders steps driven by these definitions instead of
- * hand-maintained, duplicated index objects. Keeping this logic in a plain
- * module (no React Native imports) makes it directly unit-testable.
+ * Steps are addressed by id, not index. Which account steps appear depends on
+ * how the person signs up (email adds CODE + PASSWORD; Apple/Google skip
+ * them) and whether a session already exists (then no account steps at all).
+ * Plain module, no React Native imports, so it is directly unit-testable.
  */
 
 export type Flow = 'buyer' | 'seller';
+export type AuthMethod = 'email' | 'apple' | 'google';
 
-export type BuyerStepId =
+export type StepId =
   | 'WELCOME'
   | 'ACCOUNT_TYPE'
-  | 'AUTH'
+  // seller questions (Shopify)
+  | 'STAGE'
+  | 'GOALS'
+  | 'LOCATION'
+  // account (Instagram)
+  | 'EMAIL'
+  | 'CODE'
+  | 'PASSWORD'
+  | 'BIRTHDAY'
+  | 'TERMS'
+  // profile
   | 'NAME'
+  | 'BRAND_NAME'
+  | 'USERNAME'
+  | 'PHOTO'
+  | 'WELCOME_USER'
+  // buyer personalisation
   | 'STYLE'
   | 'SIZES'
   | 'BRANDS'
-  | 'LOADING'
-  | 'NOTIFICATIONS'
-  | 'SUCCESS';
+  // seller finish
+  | 'BUILDING';
 
-export type SellerStepId =
-  | 'WELCOME'
-  | 'ACCOUNT_TYPE'
-  | 'AUTH'
-  | 'NAME'
-  | 'BRAND_NAME'
-  | 'BRAND_STAGE'
-  | 'GOALS'
-  | 'PLAN'
-  | 'LOADING'
-  | 'NOTIFICATIONS'
-  | 'SUCCESS';
+/** Steps that exist only before the account is created. */
+export const ACCOUNT_STEPS: readonly StepId[] = ['EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS'];
+/** Only the email path verifies a code and sets a password. */
+const EMAIL_ONLY_STEPS: readonly StepId[] = ['CODE', 'PASSWORD'];
 
-export interface StepDef<Id extends string> {
-  id: Id;
-  /** Whether the user can advance past this step without completing it. */
-  skippable: boolean;
-}
-
-// ─── Step order (v8) ──────────────────────────────────────────────────────
-// BOTH:   0=Welcome  1=AccountType  2=Auth  3=Name
-// BUYER:  4=Style  5=Sizes  6=Brands  7=Loading  8=Notifications  9=Success
-// SELLER: 4=BrandName  5=BrandStage  6=Goals  7=Plan  8=Loading  9=Notifications  10=Success
-export const BUYER_FLOW_STEPS: StepDef<BuyerStepId>[] = [
-  { id: 'WELCOME', skippable: false },
-  { id: 'ACCOUNT_TYPE', skippable: false },
-  { id: 'AUTH', skippable: false },
-  { id: 'NAME', skippable: false },
-  { id: 'STYLE', skippable: true },
-  { id: 'SIZES', skippable: true },
-  { id: 'BRANDS', skippable: true },
-  { id: 'LOADING', skippable: false },
-  { id: 'NOTIFICATIONS', skippable: true },
-  { id: 'SUCCESS', skippable: false },
+export const BUYER_STEPS: readonly StepId[] = [
+  'WELCOME', 'ACCOUNT_TYPE',
+  'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
+  'NAME', 'USERNAME', 'PHOTO', 'WELCOME_USER',
+  'STYLE', 'SIZES', 'BRANDS',
 ];
 
-export const SELLER_FLOW_STEPS: StepDef<SellerStepId>[] = [
-  { id: 'WELCOME', skippable: false },
-  { id: 'ACCOUNT_TYPE', skippable: false },
-  { id: 'AUTH', skippable: false },
-  { id: 'NAME', skippable: false },
-  { id: 'BRAND_NAME', skippable: false },
-  { id: 'BRAND_STAGE', skippable: true },
-  { id: 'GOALS', skippable: true },
-  { id: 'PLAN', skippable: true },
-  { id: 'LOADING', skippable: false },
-  { id: 'NOTIFICATIONS', skippable: true },
-  { id: 'SUCCESS', skippable: false },
+export const SELLER_STEPS: readonly StepId[] = [
+  'WELCOME', 'ACCOUNT_TYPE',
+  'STAGE', 'GOALS', 'LOCATION',
+  'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
+  'NAME', 'BRAND_NAME', 'USERNAME',
+  'BUILDING',
 ];
 
-function stepIndexMap<Id extends string>(steps: StepDef<Id>[]): Record<Id, number> {
-  return Object.fromEntries(steps.map((s, i) => [s.id, i])) as Record<Id, number>;
+/** Steps the person may pass without answering (Shopify "Skip", Instagram "Skip"). */
+const SKIPPABLE: ReadonlySet<StepId> = new Set(['STAGE', 'GOALS', 'PHOTO', 'STYLE', 'SIZES', 'BRANDS']);
+
+/** Shopify's question screens: the thin progress bar sits above their bottom buttons. */
+export const SELLER_QUESTION_STEPS: readonly StepId[] = ['STAGE', 'GOALS', 'LOCATION'];
+
+export interface FlowContext {
+  /** A session for the account being onboarded already exists. */
+  accountReady: boolean;
+  /** How the person chose to sign up on the EMAIL step. */
+  authMethod: AuthMethod;
 }
 
-export const BUYER_STEP_INDEX = stepIndexMap(BUYER_FLOW_STEPS);
-export const SELLER_STEP_INDEX = stepIndexMap(SELLER_FLOW_STEPS);
-
-export function stepsFor(flow: Flow): StepDef<string>[] {
-  return flow === 'buyer' ? BUYER_FLOW_STEPS : SELLER_FLOW_STEPS;
+export function allStepsFor(flow: Flow): readonly StepId[] {
+  return flow === 'buyer' ? BUYER_STEPS : SELLER_STEPS;
 }
 
-export function totalStepsFor(flow: Flow): number {
-  return stepsFor(flow).length;
+/** The ordered steps this person will actually see. */
+export function stepsFor(flow: Flow, ctx: FlowContext): StepId[] {
+  return allStepsFor(flow).filter((id) => {
+    if (ctx.accountReady && ACCOUNT_STEPS.includes(id)) return false;
+    if (ctx.authMethod !== 'email' && EMAIL_ONLY_STEPS.includes(id)) return false;
+    return true;
+  });
 }
 
-export function clampStep(flow: Flow, stepIndex: number): number {
+export function isStepSkippable(id: StepId): boolean {
+  return SKIPPABLE.has(id);
+}
+
+export function isAccountStep(id: StepId): boolean {
+  return ACCOUNT_STEPS.includes(id);
+}
+
+export function nextStepId(flow: Flow, current: StepId, ctx: FlowContext): StepId | null {
+  const steps = stepsFor(flow, ctx);
+  const i = steps.indexOf(current);
+  if (i < 0) return firstStepAfterAccount(flow, ctx);
+  return steps[i + 1] ?? null;
+}
+
+/**
+ * Back is not offered on NAME once the account exists: the account steps
+ * behind it are done and can't be redone (Instagram behaves the same).
+ */
+export function prevStepId(flow: Flow, current: StepId, ctx: FlowContext): StepId | null {
+  if (ctx.accountReady && current === firstStepAfterAccount(flow, ctx)) return null;
+  const steps = stepsFor(flow, ctx);
+  const i = steps.indexOf(current);
+  if (i <= 0) return null;
+  return steps[i - 1];
+}
+
+/** First step after account creation: NAME for both flows. */
+export function firstStepAfterAccount(_flow: Flow, _ctx?: FlowContext): StepId {
+  return 'NAME';
+}
+
+/** The first account step for the chosen method (EMAIL, or BIRTHDAY for Apple/Google). */
+export function firstAccountStep(): StepId {
+  return 'EMAIL';
+}
+
+/** 0..1 position used by the seller question progress bar. */
+export function progressFraction(flow: Flow, current: StepId, ctx: FlowContext): number {
+  const steps: StepId[] = stepsFor(flow, ctx).filter((id) => id !== 'WELCOME');
+  const i = steps.indexOf(current);
+  if (i < 0) return 0;
+  return (i + 1) / steps.length;
+}
+
+export function isStepId(value: unknown): value is StepId {
+  return typeof value === 'string' && ([...BUYER_STEPS, ...SELLER_STEPS] as string[]).includes(value);
+}
+
+// ─── Draft version ───────────────────────────────────────────────────────────
+
+/**
+ * Draft schema version. v9 stores the step *id*; v8 and older stored an index
+ * into the old step arrays, which are translated with the frozen tables below.
+ */
+export const DRAFT_VERSION = 9;
+
+// The v8 order, frozen, so old drafts can be mapped to ids.
+const V8_BUYER = ['WELCOME', 'ACCOUNT_TYPE', 'AUTH', 'NAME', 'STYLE', 'SIZES', 'BRANDS', 'LOADING', 'NOTIFICATIONS', 'SUCCESS'] as const;
+const V8_SELLER = ['WELCOME', 'ACCOUNT_TYPE', 'AUTH', 'NAME', 'BRAND_NAME', 'BRAND_STAGE', 'GOALS', 'PLAN', 'LOADING', 'NOTIFICATIONS', 'SUCCESS'] as const;
+
+const V8_TO_V9: Record<string, StepId> = {
+  WELCOME: 'ACCOUNT_TYPE',
+  ACCOUNT_TYPE: 'ACCOUNT_TYPE',
+  // Old drafts were written only for signed-in accounts, so "Auth" is done.
+  AUTH: 'NAME',
+  NAME: 'NAME',
+  STYLE: 'STYLE',
+  SIZES: 'SIZES',
+  BRANDS: 'BRANDS',
+  BRAND_NAME: 'BRAND_NAME',
+  BRAND_STAGE: 'STAGE',
+  GOALS: 'GOALS',
+};
+
+/**
+ * Translate any persisted draft into a v9 step id. v9 drafts carry `stepId`;
+ * older drafts carry `step` (an index) and `version`.
+ */
+export function restoreDraftStepId(
+  flow: Flow,
+  draft: { stepId?: unknown; step?: unknown; version?: unknown },
+): StepId {
+  if (draft.version === DRAFT_VERSION && isStepId(draft.stepId) && allStepsFor(flow).includes(draft.stepId)) {
+    return draft.stepId;
+  }
+  if (draft.version === DRAFT_VERSION || typeof draft.step !== 'number') return 'ACCOUNT_TYPE';
+  const index = draft.step;
+  const version = typeof draft.version === 'number' ? draft.version : undefined;
+  const v8Index = restoreLegacyDraftStep(flow, index, version);
+  const v8Id = (flow === 'buyer' ? V8_BUYER : V8_SELLER)[v8Index] ?? 'ACCOUNT_TYPE';
+  // Old finishing screens (loading, notifications, success, plan) resume on
+  // the last real question of the new flow.
+  return V8_TO_V9[v8Id] ?? (flow === 'buyer' ? 'BRANDS' : 'BUILDING');
+}
+
+// ─── Legacy (v1–v8, index-based) ─────────────────────────────────────────────
+// Kept only to translate old in-flight drafts. Do not use for new code.
+type LegacyBuyerStepId = typeof V8_BUYER[number];
+type LegacySellerStepId = typeof V8_SELLER[number];
+const BUYER_STEP_INDEX = Object.fromEntries(V8_BUYER.map((id, i) => [id, i])) as Record<LegacyBuyerStepId, number>;
+const SELLER_STEP_INDEX = Object.fromEntries(V8_SELLER.map((id, i) => [id, i])) as Record<LegacySellerStepId, number>;
+function totalStepsFor(flow: Flow): number {
+  return flow === 'buyer' ? V8_BUYER.length : V8_SELLER.length;
+}
+function clampStep(flow: Flow, stepIndex: number): number {
   return Math.max(0, Math.min(stepIndex, totalStepsFor(flow) - 1));
-}
-
-export function isStepSkippable(flow: Flow, stepIndex: number): boolean {
-  return stepsFor(flow)[stepIndex]?.skippable ?? false;
-}
-
-/** One step forward, clamped to the last step of the flow. */
-export function nextStepIndex(flow: Flow, stepIndex: number): number {
-  return clampStep(flow, stepIndex + 1);
-}
-
-/** One step back, clamped to the first step of the flow (Welcome). */
-export function prevStepIndex(flow: Flow, stepIndex: number): number {
-  return clampStep(flow, stepIndex - 1);
-}
-
-export function canGoBack(stepIndex: number): boolean {
-  return stepIndex > 0;
 }
 
 // ─── Draft persistence & migration ──────────────────────────────────────────
@@ -121,7 +211,7 @@ export function canGoBack(stepIndex: number): boolean {
  * in-flight user resuming mid-onboarding lands back on an equivalent step
  * instead of restarting from scratch.
  */
-export const DRAFT_VERSION = 8;
+const LEGACY_DRAFT_VERSION = 8;
 
 // v7 order (Welcome + Brands, no Sizes step): the *source* indices for the
 // v7 -> v8 migration. Frozen — never reference the live index maps here.
@@ -278,8 +368,8 @@ function v7ToV8(flow: Flow, v7Step: number): number {
  * step index for that flow. Unknown/undefined versions are treated as the
  * oldest legacy shape, matching the historical behaviour of this function.
  */
-export function restoreDraftStep(flow: Flow, step: number, version?: number): number {
-  if (version === DRAFT_VERSION) return clampStep(flow, step);
+export function restoreLegacyDraftStep(flow: Flow, step: number, version?: number): number {
+  if (version === LEGACY_DRAFT_VERSION) return clampStep(flow, step);
   if (version === 7) return clampStep(flow, v7ToV8(flow, step));
   const v6Step = restoreLegacyStepToV6(flow, step, version);
   return clampStep(flow, v7ToV8(flow, v6ToV7(flow, v6Step)));
