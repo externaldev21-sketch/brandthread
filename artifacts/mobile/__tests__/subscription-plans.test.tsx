@@ -139,7 +139,11 @@ vi.mock('@/lib/growthTools', () => ({
 }));
 vi.mock('@/components/ui', () => {
   const React = require('react');
-  return { Button: (props: Record<string, unknown>) => React.createElement('Button', props, props.label as string) };
+  return {
+    Button: (props: Record<string, unknown>) => React.createElement('Button', props, props.label as string),
+    Icon: (props: Record<string, unknown>) => React.createElement('Icon', props),
+    BottomSheet: (props: { visible: boolean; children: unknown }) => (props.visible ? React.createElement('BottomSheet', null, props.children) : null),
+  };
 });
 vi.mock('@/lib/revenueCat', () => ({
   useRevenueCat: () => ({
@@ -232,8 +236,15 @@ describe('recommendSellerPlan', () => {
 // ─── Component render tests ───────────────────────────────────────────────────
 
 describe('onboarding PlanStep (after the store preview)', () => {
+  const tiers = [
+    { id: 'starter', name: 'Starter', amountCents: 1999, limits: { activeProducts: 10, staffSeats: 1 }, features: { analytics: 'basic' } },
+    { id: 'growth', name: 'Growth', amountCents: 4900, limits: { activeProducts: 50, staffSeats: 3 }, features: { analytics: 'advanced', liveSelling: true } },
+    { id: 'pro', name: 'Pro', amountCents: 12900, limits: { activeProducts: null, staffSeats: null }, features: { analytics: 'full', liveSelling: true, prioritySupport: true } },
+  ];
   const props = () => ({
     brandName: 'Noir Field Studio',
+    tiers,
+    commissionPercent: 5,
     recommendedId: 'growth' as const,
     selectedId: 'growth' as const,
     onSelect: vi.fn(),
@@ -254,6 +265,13 @@ describe('onboarding PlanStep (after the store preview)', () => {
   it('renders every plan with its price', async () => {
     const json = await render();
     for (const text of ['Starter', 'Growth', 'Pro', '$29', '$79', '$199', 'Recommended']) expect(json).toContain(text);
+  });
+
+  it('the active-product count is the headline on every card, then the differences', async () => {
+    const json = await render();
+    for (const text of ['List up to 10 products', 'List up to 50 products', 'Unlimited products', '3 staff seats', 'Advanced analytics', 'Live selling', 'Priority support', 'Compare all features']) {
+      expect(json).toContain(text);
+    }
   });
 
   it("shows Dev's exact trial sentence under the cards", async () => {

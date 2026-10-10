@@ -362,6 +362,20 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir, demo })
         throw new Error(`Unexpected trial copy: ${copy}`);
       }
       await shot('plan');
+      for (const [id, headline] of [['starter', 'List up to 10 products'], ['growth', 'List up to 50 products'], ['pro', 'Unlimited products']]) {
+        const text = await page.getByTestId(`onboarding-plan-${id}-headline`).innerText();
+        if (text !== headline) throw new Error(`Plan ${id} headline: ${text}`);
+      }
+      await page.getByTestId('onboarding-plan-scroll').evaluate((el) => el.scrollTo(0, el.scrollHeight)).catch(() => {});
+      await page.waitForTimeout(300);
+      await shot('plan-scrolled');
+      await page.getByTestId('onboarding-plan-compare').click();
+      await page.getByTestId('plan-compare-sheet').waitFor({ timeout: 5_000 }).catch(() => {});
+      await page.waitForTimeout(600);
+      await shot('plan-compare-all-features');
+      await page.keyboard.press('Escape');
+      await page.mouse.click(195, 60);
+      await page.waitForTimeout(600);
       await page.getByTestId('onboarding-plan-growth').click();
       const popup = page.context().waitForEvent('page', { timeout: 10_000 }).catch(() => null);
       await page.getByTestId('onboarding-plan-start').click();

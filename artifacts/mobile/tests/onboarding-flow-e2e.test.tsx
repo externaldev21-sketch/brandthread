@@ -340,7 +340,14 @@ vi.mock('@/lib/useSellerTrialCheckout', () => ({
   useSellerTrialCheckout: ({ onActive }: { onActive: () => void }) => {
     trialMock.onActive = onActive;
     return {
-      config: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', plans: [] },
+      config: {
+        trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', plans: [], commissionPercent: 5,
+        tiers: [
+          { id: 'starter', name: 'Starter', amountCents: 1999, limits: { activeProducts: 10 }, features: {} },
+          { id: 'growth', name: 'Growth', amountCents: 4900, limits: { activeProducts: 50 }, features: {} },
+          { id: 'pro', name: 'Pro', amountCents: 12900, limits: { activeProducts: null }, features: {} },
+        ],
+      },
       native: false,
       priceLabel: (id: string) => ({ starter: '$29', growth: '$79', pro: '$199' } as Record<string, string>)[id],
       trialDays: () => 7,
@@ -383,6 +390,7 @@ vi.mock('@/components/ui', () => {
     Input: (props: Record<string, unknown>) => React.createElement('TextInput', { ...props, accessibilityLabel: props.label }, props.right as React.ReactNode),
     Icon: (props: Record<string, unknown>) => React.createElement('Icon', props),
     OptionSheet: () => null,
+    BottomSheet: () => null,
   };
 });
 vi.mock('@/components/branding/BrandthreadLogo', () => ({ default: () => null }));
@@ -495,7 +503,9 @@ async function settle() {
 
 async function tap(renderer: ReactTestRenderer, testID: string) {
   await act(async () => {
-    findByTestId(renderer, testID).props.onPress();
+    // The pressable host, not a wrapper component that only forwards testID.
+    const target = renderer.root.findAll((n) => n.props.testID === testID && typeof n.props.onPress === 'function')[0];
+    (target ?? findByTestId(renderer, testID)).props.onPress();
     await Promise.resolve();
   });
   await settle();

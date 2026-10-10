@@ -10,24 +10,28 @@
  * The numbers come from the store's intro offer on iOS/Android and from the
  * shared server config on web, so the copy always matches what happens.
  */
-import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';
-import { radius } from '@/constants/radii';
-import { SELLER_PLANS } from '@/lib/sellerPlans';
 import type { SellerPlanId } from '@/lib/sellerBilling';
 import { trialCopy } from '@/lib/sellerPlanConfig';
+import type { PlanTier } from '@/lib/planTiers';
+import { PlanTierCard } from '@/components/plans/PlanTierCard';
+import { CompareFeaturesSheet } from '@/components/plans/CompareFeaturesSheet';
 
 export function PlanStep({
-  brandName, recommendedId, selectedId, onSelect, priceLabel, trialDays, reminderDaysBefore,
+  brandName, tiers, commissionPercent, recommendedId, selectedId, onSelect, priceLabel, trialDays, reminderDaysBefore,
   onStart, starting, error, onRestore,
 }: {
   brandName: string;
+  /** From the shared plan config: product cap first, then the differences. */
+  tiers: PlanTier[];
+  commissionPercent: number | null;
   recommendedId: SellerPlanId;
   selectedId: SellerPlanId;
   onSelect: (id: SellerPlanId) => void;
@@ -45,51 +49,35 @@ export function PlanStep({
   const router = useRouter();
   const selectedPrice = priceLabel(selectedId);
   const days = trialDays(selectedId);
-  const pricesLoading = SELLER_PLANS.some((p) => priceLabel(p.id) === null);
+  const pricesLoading = tiers.some((t) => priceLabel(t.id) === null);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   return (
     <View style={styles.root} testID="onboarding-plan-step">
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView testID="onboarding-plan-scroll" contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text accessibilityRole="header" style={[styles.title, { color: palette.foreground }]}>
           {days ? 'Start your free trial' : 'Choose your plan'}
         </Text>
         <Text style={[styles.subtitle, { color: palette.mutedForeground }]}>Pick a plan for {brandName}.</Text>
 
         <View style={styles.cards}>
-          {SELLER_PLANS.map((plan) => {
-            const selected = plan.id === selectedId;
-            const price = priceLabel(plan.id);
-            return (
-              <Pressable
-                key={plan.id}
-                testID={`onboarding-plan-${plan.id}`}
-                onPress={() => onSelect(plan.id)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                accessibilityLabel={`${plan.name}${price ? `, ${price} a month` : ''}`}
-                style={[styles.card, { borderColor: selected ? palette.foreground : 'transparent' }]}
-              >
-                <View style={[styles.radio, { borderColor: selected ? palette.foreground : palette.mutedForeground }]}>
-                  {selected ? <View style={[styles.radioDot, { backgroundColor: palette.foreground }]} /> : null}
-                </View>
-                <View style={styles.cardText}>
-                  <View style={styles.nameRow}>
-                    <Text style={[styles.planName, { color: palette.foreground }]}>{plan.name}</Text>
-                    {plan.id === recommendedId ? (
-                      <Text style={[styles.recommended, { color: palette.mutedForeground }]}>Recommended</Text>
-                    ) : null}
-                  </View>
-                  <Text style={[styles.tagline, { color: palette.mutedForeground }]} numberOfLines={2}>{plan.tagline}</Text>
-                </View>
-                {price ? (
-                  <Text style={[styles.price, { color: palette.foreground }]}>{price}<Text style={[styles.per, { color: palette.mutedForeground }]}>/mo</Text></Text>
-                ) : (
-                  <ActivityIndicator size="small" color={palette.mutedForeground} />
-                )}
-              </Pressable>
-            );
-          })}
+          {tiers.map((tier, i) => (
+            <PlanTierCard
+              key={tier.id}
+              testID={`onboarding-plan-${tier.id}`}
+              tier={tier}
+              below={tiers[i - 1] ?? null}
+              selected={tier.id === selectedId}
+              onSelect={() => onSelect(tier.id)}
+              priceLabel={priceLabel(tier.id)}
+              badge={tier.id === recommendedId ? 'Recommended' : null}
+            />
+          ))}
         </View>
+
+        <Pressable onPress={() => setCompareOpen(true)} accessibilityRole="button" hitSlop={8} style={styles.compare} testID="onboarding-plan-compare">
+          <Text style={[styles.compareText, { color: palette.foreground }]}>Compare all features</Text>
+        </Pressable>
 
         {days ? (
           <Text testID="onboarding-plan-trial-copy" style={[styles.trial, { color: palette.foreground }]}>
@@ -123,6 +111,8 @@ export function PlanStep({
           </Pressable>
         ) : null}
       </View>
+
+      <CompareFeaturesSheet visible={compareOpen} onClose={() => setCompareOpen(false)} tiers={tiers} commissionPercent={commissionPercent} />
     </View>
   );
 }
@@ -133,21 +123,9 @@ const styles = StyleSheet.create({
   title: { ...TEXT.title1 },
   subtitle: { ...TEXT.subhead, marginTop: SPACING.sm },
   cards: { gap: SPACING.sm, marginTop: SPACING.xl },
-  card: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, minHeight: 72,
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    borderRadius: radius.md, backgroundColor: FILL_ELEVATED, borderWidth: 1,
-  },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
-  cardText: { flex: 1, minWidth: 0 },
-  nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xs },
-  planName: { ...TEXT.headline },
-  recommended: { ...TEXT.caption, fontFamily: FONT.medium },
-  tagline: { ...TEXT.footnote, marginTop: 2 },
-  price: { ...TEXT.money },
-  per: { ...TEXT.footnote },
-  trial: { ...TEXT.subhead, marginTop: SPACING.lg },
+  compare: { alignSelf: 'flex-start', paddingVertical: SPACING.sm, marginTop: SPACING.xs },
+  compareText: { ...TEXT.subhead, fontFamily: FONT.semibold, textDecorationLine: 'underline' },
+  trial: { ...TEXT.subhead, marginTop: SPACING.md },
   error: { ...TEXT.footnote, marginTop: SPACING.sm },
   footer: { paddingTop: SPACING.xs, gap: SPACING.xs },
   legal: { ...TEXT.caption, textAlign: 'center' },

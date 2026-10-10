@@ -1194,6 +1194,8 @@ export default function OnboardingScreen() {
         return (
           <PlanStep
             brandName={brandName.trim()}
+            tiers={trial.config.tiers}
+            commissionPercent={trial.config.commissionPercent}
             recommendedId={recommendedPlanId}
             selectedId={planId ?? recommendedPlanId}
             onSelect={setPlanId}
