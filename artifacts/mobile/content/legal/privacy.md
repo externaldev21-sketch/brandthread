@@ -24,6 +24,7 @@ Brandthread is operated by Brandthread, Inc. This policy covers the Brandthread 
 - Crash and performance reports: when the app, website or our servers hit an error, the error, stack trace, device model, operating system, app version, recent in-app actions and performance timings go to our error-monitoring provider (Sentry). These reports are used only to find and fix problems, are not linked to your name, email or account, and are not used for advertising.
 - Sign-in sessions: Clerk records the device type, browser or app, approximate location (city and country, derived from IP address) and last-active time for each session. You can see and sign out these sessions in Settings → Login activity.
 - Notifications: your notification permission, push token and preferences.
+- Searches: when you're signed in, the searches you submit are saved to your account so you can see them under Recent searches on any device. You can remove one or clear them all in Search. We also count search terms without your account to show trending searches.
 - Location: we use the addresses you enter and carrier tracking locations. We don’t request precise GPS location. If that changes, we’ll ask first and update this policy.
 - Brandthread doesn’t use a device advertising identifier or track you across other companies’ apps. On our website, optional marketing pixels load only if you allow marketing cookies.
 
@@ -62,7 +63,7 @@ When content is reported or held, our moderators see the content, a snapshot sav
 
 You can delete your account in the app at any time: Settings → Delete account. The app first shows what will be deleted and anything that must be settled — for sellers, open orders, funds held for drops, returns, disputes or payouts in progress; for buyers, paid orders that haven’t shipped yet.
 
-- Deleted: your profile, username, photo and bio; posts, comments, stories, likes, reposts and follows; messages you sent; saved items, cart, addresses and notification settings; blocks and muted words; for sellers, your storefront, listings, discount codes and shipping settings; and your Clerk sign-in, which signs you out everywhere.
+- Deleted: your profile, username, photo and bio; posts, comments, stories, likes, reposts and follows; messages you sent; saved items, cart, addresses, search history and notification settings; blocks and muted words; for sellers, your storefront, listings, discount codes and shipping settings; and your Clerk sign-in, which signs you out everywhere.
 - Kept in anonymized form: order, payment, refund and tax records required by law, with your name, email and address removed; reports you filed about others, without your identity; and reviews on past orders, shown as from a deleted account.
 - Backups are overwritten on a rolling schedule. Content others copied or shared outside Brandthread can’t be recalled.
 

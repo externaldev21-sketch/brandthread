@@ -149,3 +149,29 @@ describe("EAS production build and submit profiles", () => {
     }))).toEqual([]);
   });
 });
+
+describe("Live Activity widget extension signing (EAS credentials)", () => {
+  const plugin = require("../plugins/with-upload-live-activity.js") as { APP_GROUP: string; EXTENSION_NAME: string };
+  const entitlementsPlist = readFileSync(
+    path.join(mobileRoot, "ios-extensions", plugin.EXTENSION_NAME, `${plugin.EXTENSION_NAME}.entitlements`),
+    "utf8",
+  );
+  const extensions = appConfig.extra?.eas?.build?.experimental?.ios?.appExtensions as
+    | Array<{ targetName: string; bundleIdentifier: string; entitlements: Record<string, string[]> }>
+    | undefined;
+
+  it("declares the plugin's extension target for EAS so it gets its own provisioning profile", () => {
+    expect(appConfig.plugins).toContain("./plugins/with-upload-live-activity");
+    expect(extensions).toHaveLength(1);
+    const [extension] = extensions!;
+    expect(extension.targetName).toBe(plugin.EXTENSION_NAME);
+    // The plugin derives the extension bundle id as `<main bundle id>.<EXTENSION_NAME>`.
+    expect(extension.bundleIdentifier).toBe(`${appConfig.ios.bundleIdentifier}.${plugin.EXTENSION_NAME}`);
+  });
+
+  it("registers the same App Group the plugin and the extension entitlements use", () => {
+    const [extension] = extensions!;
+    expect(extension.entitlements["com.apple.security.application-groups"]).toEqual([plugin.APP_GROUP]);
+    expect(entitlementsPlist).toContain(`<string>${plugin.APP_GROUP}</string>`);
+  });
+});

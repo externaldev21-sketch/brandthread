@@ -6,7 +6,7 @@ iOS privacy manifest in `artifacts/mobile/app.json`
 (`scripts/legal-privacy.test.ts`) fail if this table, the manifest and
 `scripts/verify-ios-privacy-manifest.js` ever disagree.
 
-Last audited: 2026-09-22, against the mobile app source on `dev` (updated for Sentry crash reporting).
+Last audited: 2026-10-10, against the mobile app and API source on `dev` (updated for server-stored search history).
 
 ## Answers that apply to every row
 
@@ -36,6 +36,7 @@ Last audited: 2026-09-22, against the mobile app source on `dev` (updated for Se
 | Identifiers → User ID | `NSPrivacyCollectedDataTypeUserID` | Clerk account ID used as the Brandthread user ID; RevenueCat app user ID | App Functionality |
 | Identifiers → Device ID | `NSPrivacyCollectedDataTypeDeviceID` | Expo push token registered to the account (`lib/contextualPushPermission.ts`) | App Functionality |
 | Usage Data → Product Interaction | `NSPrivacyCollectedDataTypeProductInteraction` | Notification received/opened/tapped events (`lib/notificationEventOutbox.ts`); story views; storefront visits (`/api/public/sellers/:id/visit`) and post analytics shown to sellers; shopping preferences for "Personalized recommendations" (`app/shopping-preferences.tsx`); funnel analytics events (screen-level actions such as product viewed or add to cart, keyed by the opaque account id, no names, emails, message or search text) sent to PostHog only when `EXPO_PUBLIC_POSTHOG_KEY` is set (`lib/analytics`, see `docs/reliability/observability.md`) | App Functionality, Analytics, Product Personalization |
+| Search History → Search History | `NSPrivacyCollectedDataTypeSearchHistory` | Searches a signed-in person submits are saved with their account (`POST /api/public/search/log` → `search_log`, `artifacts/api-server/src/routes/public.ts`) to show and sync "Recent searches" (`GET`/`DELETE /api/public/search/recent`). The same rows, counted without the account, feed trending search chips. Signed-out searches are stored without any user ID. Removable one by one or all at once in Search, and erased when the account is deleted (`purgeAccount` in `lib/accountDeletion.ts`). Not used for tracking | App Functionality |
 | Diagnostics → Other Diagnostic Data | `NSPrivacyCollectedDataTypeOtherDiagnosticData` | Call lifecycle events including failures (`/api/call/events`); request IDs and error logs kept by the API to troubleshoot and secure the service | App Functionality |
 | Diagnostics → Crash Data | `NSPrivacyCollectedDataTypeCrashData` | Crash and error reports sent to Sentry when `EXPO_PUBLIC_SENTRY_DSN` is set (`lib/monitoring.ts`, `components/ErrorBoundary.tsx`): the error, stack trace, device model, OS and app version, and recent in-app actions with URL query strings removed. **Not linked** to the user | App Functionality |
 | Diagnostics → Performance Data | `NSPrivacyCollectedDataTypePerformanceData` | App start and network timing samples sent to Sentry (10% of sessions by default, `EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`). **Not linked** to the user | App Functionality |
@@ -49,7 +50,6 @@ update the manifest, this page and the verifier together.
 | --- | --- |
 | Sensitive Info | Apple's category covers racial/ethnic data, sexual orientation, pregnancy, disability, religious or political beliefs, trade-union membership, genetic data and biometric data. **No feature collects any of these.** Face ID is handled by iOS on the device, and the app only receives a success or failure result. Seller identity checks (ID photo and selfie) run on Stripe Identity's hosted page, opened in the external browser (`app/seller-verification.tsx`). Brandthread receives only a session ID and a verified/not-verified status. |
 | Precise Location / Coarse Location | The app has no device-location library and never asks for location permission. Addresses are typed by the user and declared as Physical Address. IP addresses are used for rate limiting and passed to Clerk for sign-in security; Brandthread never works out or stores a location from them. |
-| Search History | Search queries are sent only to return results and are not stored on the server. Recent searches are kept only on the device (`app/(buyer)/search.tsx`). |
 | Browsing History | The app does not see what people view outside it. |
 | Health & Fitness, Credit Info, Gameplay Content, Advertising Data, Other Usage Data | No feature collects these. |
 | Other User Contact Info, Other Data Types | Nothing else is collected. Birthday is shown as "managed by Clerk" and is never sent to Brandthread. |
