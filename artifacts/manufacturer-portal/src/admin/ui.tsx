@@ -160,9 +160,11 @@ export function Pager({ offset, limit, hasMore, total, onChange }: { offset: num
 }
 
 /** Confirmation with an optional required reason — used by every destructive-feeling admin action. */
-export function ConfirmAction({ open, title, description, confirmLabel, reasonLabel, reasonRequired, destructive, pending, error, onCancel, onConfirm }: {
+export function ConfirmAction({ open, title, description, confirmLabel, reasonLabel, reasonRequired, destructive, pending, error, onCancel, onConfirm, children }: {
   open: boolean; title: string; description: string; confirmLabel: string; reasonLabel?: string; reasonRequired?: boolean;
   destructive?: boolean; pending?: boolean; error?: unknown; onCancel: () => void; onConfirm: (reason: string) => void;
+  /** Extra controls shown above the reason box (e.g. a suspension length). */
+  children?: ReactNode;
 }) {
   const [reason, setReason] = useState("");
   useEffect(() => { if (open) setReason(""); }, [open]);
@@ -173,6 +175,7 @@ export function ConfirmAction({ open, title, description, confirmLabel, reasonLa
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {children}
         {reasonLabel && <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={reasonLabel} maxLength={500} rows={3} />}
         {error ? <p className="text-sm text-destructive">{errorMessage(error)}</p> : null}
         <AlertDialogFooter className="grid grid-cols-2 gap-2 sm:space-x-0">

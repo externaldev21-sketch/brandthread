@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { Show, useClerk } from "@clerk/react";
-import { Activity, AlertTriangle, Banknote, Coins, Cpu, Gift, Landmark, LayoutDashboard, Megaphone, Menu, ScrollText, ShieldAlert, ShoppingBag, Sparkles, Users } from "lucide-react";
+import { Activity, AlertTriangle, Banknote, Coins, Cpu, Gift, Landmark, LayoutDashboard, Megaphone, Menu, ScrollText, ShieldAlert, ShoppingBag, Sparkles, UserX, Users } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import NotFound from "@/pages/not-found";
@@ -22,6 +22,7 @@ import AuditPage from "./pages/audit";
 import ThreadCashPage from "./pages/thread-cash";
 import RiskPage from "./pages/risk";
 import PayoutsPage from "./pages/payouts";
+import ProblemSellersPage from "./pages/problem-sellers";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -33,6 +34,7 @@ const NAV = [
   { href: "/admin/risk", label: "Risk", icon: AlertTriangle },
   { href: "/admin/ai-spend", label: "AI spend", icon: Cpu },
   { href: "/admin/moderation", label: "Moderation", icon: ShieldAlert },
+  { href: "/admin/problem-sellers", label: "Problem sellers", icon: UserX },
   { href: "/admin/promotions", label: "Promoted threads", icon: Sparkles },
   { href: "/admin/featured", label: "Featured", icon: Activity },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
@@ -120,6 +122,7 @@ function Gate() {
         <Route path="/admin/risk" component={RiskPage} />
         <Route path="/admin/ai-spend" component={AiSpendPage} />
         <Route path="/admin/moderation" component={ModerationPage} />
+        <Route path="/admin/problem-sellers" component={ProblemSellersPage} />
         <Route path="/admin/promotions" component={PromotionsPage} />
         <Route path="/admin/featured" component={FeaturedPage} />
         <Route path="/admin/announcements" component={AnnouncementsPage} />
