@@ -188,8 +188,8 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
       </View>
 
       <Text style={[styles.footnote, { color: colors.mutedForeground }]}>
-        Brandthread keeps 5% of each sale plus Stripe's processing fee. Preorder money is held until each order
-        ships, then released for that order.
+        Brandthread keeps 5% of each sale plus Stripe's processing fee. Order money is held until each order
+        is delivered, then paid out for that order.
       </Text>
     </View>
   );

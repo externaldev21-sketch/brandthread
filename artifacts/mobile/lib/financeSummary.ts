@@ -21,11 +21,34 @@ export type FinanceSummaryDrop = {
   ordersRefunded: number;
 };
 
+export type PayoutHoldRule = {
+  mode: 'hold' | 'immediate';
+  bufferDays: number;
+  regularDeliveryDays: number;
+  preorderDeliveryDays: number;
+};
+
+export type HeldOrderTiming = {
+  orderId: string;
+  orderNumber: string;
+  isPreorder: boolean;
+  netCents: number;
+  state: 'awaiting_delivery' | 'scheduled' | 'paused' | 'on_ship' | 'processing';
+  deliverBy: string | null;
+  payoutReleaseAt: string | null;
+};
+
 export type FinanceSummary = {
   currency: string;
   connected: boolean;
   stripeError: boolean;
-  held: MoneyAmount & { drops: FinanceSummaryDrop[] };
+  held: MoneyAmount & {
+    drops: FinanceSummaryDrop[];
+    /** Payout hold policy (additive; absent on older servers). */
+    rule?: PayoutHoldRule;
+    /** Per-order payout timing, soonest first (additive; null if it failed to load). */
+    orders?: HeldOrderTiming[] | null;
+  };
   releasing: MoneyAmount & { count: number };
   available: MoneyAmount | null;
   pending: MoneyAmount | null;

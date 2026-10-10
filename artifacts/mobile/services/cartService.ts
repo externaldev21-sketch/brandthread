@@ -980,12 +980,16 @@ export async function createRefundRequest(params: {
   maxRefundAmount: number;
 }): Promise<BuyerRefundRequest> {
   const { api } = await import('@/lib/api');
+  // Device photos are uploaded first; the server only accepts the stored
+  // object paths (POST /api/returns/evidence), never file:// URIs.
+  const { uploadEvidencePhotos } = await import('@/lib/refundRequestFlow');
+  const evidenceUrls = await uploadEvidencePhotos(params.evidenceUris.map((uri) => ({ uri })), api.returns.uploadEvidence);
   const result = await api.returns.create({
     orderId: params.orderId,
     reason: params.reason,
     notes: params.description,
     resolutionRequested: 'refund',
-    evidenceUrls: params.evidenceUris,
+    evidenceUrls,
   });
   const req: BuyerRefundRequest = {
     id: result.id,

@@ -14,7 +14,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { createRefundRequest } from '@/services/cartService';
+import { useApi } from '@/lib/api';
+import {
+  chooseRefundRoute, refundErrorMessage, submitRefundRequest, type EvidencePhoto,
+} from '@/lib/refundRequestFlow';
 import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
@@ -54,18 +57,33 @@ export default function BuyerRefundRequestScreen() {
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [evidencePhotos, setEvidencePhotos] = useState<string[]>([]);
+  const [evidencePhotos, setEvidencePhotos] = useState<EvidencePhoto[]>([]);
+  const [cancelResult, setCancelResult] = useState<{ refunded: boolean } | null>(null);
+  const api = useApi();
+  // Not shipped yet: the buyer cancel endpoint refunds in full; /returns only
+  // takes shipped or delivered orders (lib/refundRequestFlow.ts).
+  const route = order ? chooseRefundRoute(order) : 'return';
+
+  function patchPhoto(uri: string, patch: Partial<EvidencePhoto>) {
+    setEvidencePhotos(prev => prev.map(p => (p.uri === uri ? { ...p, ...patch } : p)));
+  }
 
   async function pickEvidence() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission required', 'Please allow access to your photo library.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      // POST /api/returns/evidence takes JPEG, PNG or WebP photos only.
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       quality: 0.8,
     });
     if (!result.canceled) {
-      setEvidencePhotos(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 5));
+      setEvidencePhotos(prev => [
+        ...prev,
+        ...result.assets
+          .filter(a => !prev.some(p => p.uri === a.uri))
+          .map((a): EvidencePhoto => ({ uri: a.uri, mimeType: a.mimeType ?? null })),
+      ].slice(0, 5));
     }
   }
 
@@ -80,25 +98,32 @@ export default function BuyerRefundRequestScreen() {
   const totalCents = order?.payment.totalCents ?? 0;
 
   async function handleSubmit() {
-    if (!reason) { Alert.alert('Select Reason', 'Please select a refund reason.'); return; }
-    if (!description.trim()) { Alert.alert('Add Details', 'Please describe why you are requesting a refund.'); return; }
-    if (!order) return;
+    if (!order || route === 'closed') return;
+    if (route === 'return') {
+      if (!reason) { Alert.alert('Select Reason', 'Please select a refund reason.'); return; }
+      if (!description.trim()) { Alert.alert('Add Details', 'Please describe why you are requesting a refund.'); return; }
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     try {
-      await createRefundRequest({
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        sellerName: order.sellerName,
-        reason,
-        description: description.trim(),
-        evidenceUris: evidencePhotos,
-        maxRefundAmount: totalCents,
-      });
+      const result = await submitRefundRequest(
+        { order, reason, description: description.trim(), photos: evidencePhotos },
+        {
+          uploadEvidence: api.returns.uploadEvidence,
+          createReturn: api.returns.create,
+          cancelOrder: api.buyer.orders.cancel,
+          onPhotoChange: patchPhoto,
+        },
+      );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (result.kind === 'cancel') setCancelResult({ refunded: result.refunded });
       setSubmitted(true);
-    } catch {
-      Alert.alert('Error', 'Could not submit your refund request. Please try again.');
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        route === 'cancel' ? "Couldn't cancel the order" : "Couldn't send your request",
+        refundErrorMessage(error, 'Check your connection and try again.'),
+      );
     }
     setSubmitting(false);
   }
@@ -108,6 +133,24 @@ export default function BuyerRefundRequestScreen() {
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <ScreenHeader title="Request Refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>
+      </View>
+    );
+  }
+
+  if (submitted && cancelResult) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Request Refund" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
+          <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
+          <Text style={s.successTitle}>Order cancelled</Text>
+          <Text style={s.successSub}>
+            {cancelResult.refunded
+              ? 'A full refund was issued to your original payment method. It can take 5–10 business days to show on your statement.'
+              : 'Nothing was charged for this order.'}
+          </Text>
+          <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
+        </View>
       </View>
     );
   }
@@ -136,9 +179,13 @@ export default function BuyerRefundRequestScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
         {/* Max refund */}
         <View style={s.maxCard}>
-          <Text style={s.maxLabel}>Maximum possible refund</Text>
+          <Text style={s.maxLabel}>{route === 'cancel' ? 'Refund' : 'Maximum possible refund'}</Text>
           <Text style={s.maxAmount}>{formatCents(totalCents)}</Text>
-          <Text style={s.maxNote}>Actual refund amount is subject to seller and payment provider review. Refunds are not guaranteed until confirmed.</Text>
+          <Text style={s.maxNote}>
+            {route === 'cancel'
+              ? "This order hasn't shipped yet, so it will be cancelled and refunded in full to your original payment method."
+              : 'Actual refund amount is subject to seller and payment provider review. Refunds are not guaranteed until confirmed.'}
+          </Text>
         </View>
 
         {/* Order */}
@@ -158,6 +205,15 @@ export default function BuyerRefundRequestScreen() {
           </View>
         )}
 
+        {route === 'closed' && order && (
+          <Text style={s.disclaimer}>
+            {order.status === 'disputed'
+              ? 'A chargeback is open on this order, so the refund is handled through your card issuer.'
+              : `This order is already ${order.status === 'cancelled' ? 'cancelled' : 'refunded'}.`}
+          </Text>
+        )}
+
+        {route === 'return' && (<>
         {/* Reason */}
         <View style={s.card}>
           <Text style={s.sectionTitle}>Refund Reason</Text>
@@ -200,11 +256,22 @@ export default function BuyerRefundRequestScreen() {
         {evidencePhotos.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              {evidencePhotos.map((uri, idx) => (
-                <View key={idx} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
-                  <Image source={{ uri }} style={{ width: 72, height: 72 }} resizeMode="cover" />
+              {evidencePhotos.map((photo, idx) => (
+                <View key={photo.uri} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' }} testID={`refund-evidence-${idx}`}>
+                  <Image source={{ uri: photo.uri }} style={{ width: 72, height: 72 }} resizeMode="cover" />
+                  {photo.state === 'uploading' || photo.state === 'failed' ? (
+                    <View
+                      style={s.photoState}
+                      accessibilityLabel={photo.state === 'uploading' ? 'Uploading photo' : "Photo didn't upload"}
+                    >
+                      {photo.state === 'uploading'
+                        ? <ActivityIndicator size="small" color={ON_DARK} />
+                        : <Feather name="alert-circle" size={14} color={RED} />}
+                    </View>
+                  ) : null}
                   <TouchableOpacity
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
+                    disabled={photo.state === 'uploading'}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
                   >
                     <Feather name="x" size={10} color="#fff" />
@@ -218,10 +285,16 @@ export default function BuyerRefundRequestScreen() {
         <Text style={s.disclaimer}>
           Submitting a refund request does not guarantee approval. Do not claim a refund is approved until the seller or payment provider confirms it.
         </Text>
+        </>)}
       </ScrollView>
 
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
-        <PrimaryButton label="Submit Refund Request" onPress={handleSubmit} loading={submitting} disabled={submitting} />
+        <PrimaryButton
+          label={route === 'cancel' ? 'Cancel order and refund' : 'Submit Refund Request'}
+          onPress={handleSubmit}
+          loading={submitting}
+          disabled={submitting || route === 'closed'}
+        />
       </View>
     </View>
   );
@@ -249,6 +322,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   textarea: { minHeight: 100, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   evidenceNote: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, padding: SP.sm, marginBottom: SP.md },
   evidenceNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, flex: 1 },
+  photoState: { position: 'absolute', left: 4, bottom: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
   disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },
   bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
   submitBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },

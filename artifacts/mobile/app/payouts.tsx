@@ -30,6 +30,7 @@ import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashC
 import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 import { formatCents } from '@/lib/money';
+import { HeldForDeliverySection } from '@/components/payouts/HeldForDeliveryRow';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -286,6 +287,7 @@ function PayoutsScreenContent() {
           <Text style={styles.balancePendingAmount}>{loadError ? '—' : pendFmt}</Text>
         </View>
       </View>
+      <HeldForDeliverySection />
 
       {!isPreview && (
         <StripeConnectWarning
