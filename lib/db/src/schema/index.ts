@@ -2872,3 +2872,4 @@ export * from './hashtags';
 export * from './captions';
 export * from './places';
 export * from './productDrafts';
+export * from './liveActivities';

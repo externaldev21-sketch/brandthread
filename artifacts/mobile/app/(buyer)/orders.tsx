@@ -38,6 +38,9 @@ import { canReorderStatus } from '@/lib/reorderSummary';
 import { RetryRow } from '@/components/ui/RetryRow';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
+import { openContextMenu } from '@/lib/contextMenu';
+import { copyText } from '@/lib/shareActions';
+import { syncOrderActivities } from '@/lib/nativeSystem';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -369,6 +372,8 @@ export default function BuyerOrdersScreen() {
       // getBuyerOrdersWithStatus). Never replace real orders with an empty
       // list just because this fetch failed — show an error banner instead.
       setOrders(result.orders);
+      // Order tracking Live Activities follow the real orders (iOS builds).
+      if (!result.error) syncOrderActivities(result.orders);
       setOrdersOwnerId(userId);
       setLoadError(!!result.error);
       // A buyer's 2nd delivered order is the moment to ask for an App Store

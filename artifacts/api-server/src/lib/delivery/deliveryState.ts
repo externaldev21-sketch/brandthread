@@ -25,6 +25,7 @@ import {
   notifyBuyerDelivered, notifyBuyerOutForDelivery,
 } from "./notifications";
 import { publishNotification } from "../../routes/notifications-feed";
+import { notifyOrderLiveActivity } from "../liveActivityPush";
 
 // ─── At purchase ──────────────────────────────────────────────────────────────
 
@@ -196,6 +197,7 @@ export async function recordDelivery(input: {
         byBuyer: input.source === "buyer",
       }).catch(() => {});
     }
+    void notifyOrderLiveActivity(input.orderId);
     logger.info({ orderId: input.orderId, source: input.source, allDelivered: outcome.result.allDelivered }, "Order delivery recorded");
   }
   return outcome.result;
@@ -300,6 +302,7 @@ export async function applyCarrierTracking(input: {
       targetId: before.id, targetType: "buyer_order",
     }).catch(() => {});
   }
+  if (changed || (isPrimary && !!input.estimatedDelivery && input.estimatedDelivery !== before.estimatedDelivery)) void notifyOrderLiveActivity(input.orderId);
   return { applied: true };
 }
 

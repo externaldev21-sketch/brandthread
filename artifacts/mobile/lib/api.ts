@@ -1435,6 +1435,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** The shared seller plan config (trial length, reminder, prices, checkout mode). */
       sellerPlans: () => get<unknown>('/api/config/seller-plans'),
     },
+    // ── iOS Live Activity push tokens (lib/nativeSystem.ts) ──────────────────
+    liveActivities: {
+      registerToken: (body: { kind: 'order' | 'live'; targetId: string; token: string }) =>
+        post<{ ok: boolean }>('/api/live-activities/tokens', body),
+      removeToken: (token: string) =>
+        del<{ ok: boolean }>(`/api/live-activities/tokens/${encodeURIComponent(token)}`),
+    },
     // ── Live replays + Live tips (PR: live-replays-profile-tips) ──────────────
     liveReplays: {
       bySeller: (sellerId: string, opts: { limit?: number; offset?: number } = {}) =>

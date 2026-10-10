@@ -68,6 +68,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PRESS_IN_REUSE_MS, queryKeys } from '@/lib/queryClient';
 import { classifyNetworkError } from '@/lib/networkNotice';
 import { useRealtimeConnected, useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
+import { isReturnEligible, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
+import { syncOrderActivities } from '@/lib/nativeSystem';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -641,6 +643,12 @@ export default function BuyerOrderDetailScreen() {
   const [showReceiptSheet, setShowReceiptSheet] = useState(false);
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
   const [returnRequest, setReturnRequest] = useState<BuyerReturnSummary | null>(null);
+
+  // Keep this order's tracking Live Activity in step with what's on screen
+  // (iOS builds; a no-op elsewhere).
+  useEffect(() => {
+    if (storedOrder && orderOwnerId === userId) syncOrderActivities([storedOrder]);
+  }, [storedOrder, orderOwnerId, userId]);
 
   const consecutiveFailuresRef = useRef(0);
   const hasOrderRef = useRef(false);

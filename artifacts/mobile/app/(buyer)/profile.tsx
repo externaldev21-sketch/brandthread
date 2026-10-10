@@ -83,6 +83,8 @@ import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
 import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
 import { useScreenInteractive } from '@/lib/perf';
+import { openContextMenu } from '@/lib/contextMenu';
+import { updateBuyerCashWidget } from '@/lib/nativeSystem';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -539,6 +541,11 @@ export default function ProfileScreen() {
         // buyer can hold a nonzero balance from a gift/blast) — only the
         // streak itself falls back when the response has nothing to show.
         setThreadCashBalanceCents(Math.max(0, status?.balanceCents ?? 0));
+        // Home Screen Thread Cash widget — real balance + streak only.
+        updateBuyerCashWidget({
+          balanceCents: Math.max(0, status?.balanceCents ?? 0),
+          streakDays: Math.max(0, status?.streak?.currentStreak ?? 0),
+        });
         if (status?.streak && status.streak.currentStreak > 0) {
           setThreadCashStreak(status.streak);
         } else {

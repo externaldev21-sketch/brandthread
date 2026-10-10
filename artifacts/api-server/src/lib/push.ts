@@ -10,6 +10,7 @@ import { withRetry } from "./retry";
 import { isPromotionalPush, promoConsentAllows } from "./pushPolicy";
 import { decidePushType, isPushPaused } from "./pushTypes";
 import crypto from "node:crypto";
+import { inferNotificationCategoryId, withNotificationCategoryData } from "./notificationCategories";
 
 export interface PushPayload {
   title: string;
@@ -35,6 +36,11 @@ export interface PushPayload {
   priority?: "default" | "normal" | "high";
   /** iOS interruption level; 'time-sensitive' breaks through Focus (incoming calls). */
   interruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
+  /**
+   * Actionable notification category registered by the mobile app (see
+   * lib/notificationCategories.ts). Inferred from `data` when omitted.
+   */
+  categoryId?: string;
 }
 
 export type NotificationEventType = "receipt" | "open" | "tap";
@@ -129,6 +135,7 @@ export interface ExpoPushMessage {
   channelId?: string;
   priority?: "default" | "normal" | "high";
   interruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
+  categoryId?: string;
 }
 
 export function preferenceKey(accountType: string | null, category: PushEventCategory): string | null {
@@ -190,6 +197,7 @@ export function buildExpoPushMessages(
   payload: PushPayload,
   accountHandle?: string | null,
 ): ExpoPushMessage[] {
+  const categoryId = payload.categoryId ?? inferNotificationCategoryId(payload.data);
   return tokens.map((token) => {
     const labelled = accountLabelledContent(token, payload.title, accountHandle);
     return {
@@ -197,10 +205,11 @@ export function buildExpoPushMessages(
       title: labelled.title,
       ...(labelled.subtitle ? { subtitle: labelled.subtitle } : {}),
       body: payload.body,
-      data: payload.data ?? {},
+      data: withNotificationCategoryData(payload.data ?? {}, categoryId),
       sound: payload.sound ?? "default",
       badge: payload.badge,
       channelId: payload.channelId,
+      ...(categoryId !== undefined ? { categoryId } : {}),
       ...(payload.priority ? { priority: payload.priority } : {}),
       ...(payload.interruptionLevel ? { interruptionLevel: payload.interruptionLevel } : {}),
     };

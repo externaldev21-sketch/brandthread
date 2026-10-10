@@ -32,6 +32,8 @@ import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
 import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
 import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
+import { endLiveStreamActivity, startLiveStreamActivity, updateLiveStreamActivity } from '@/lib/nativeSystem';
+
 
 // ─── Agora SDK (native-only, gracefully skipped on web/Expo Go) ───────────────
 const AgoraModule = loadAgoraModule();
@@ -373,6 +375,18 @@ function SellerLiveNativeScreen() {
       Alert.alert('Couldn’t update', 'That action did not go through. Try again.');
     }
   }
+
+  // Live Activity on the Lock Screen / Dynamic Island while broadcasting
+  // (iOS dev builds only; a no-op elsewhere): LIVE, viewers, sales.
+  useEffect(() => {
+    if (!params.streamId) return undefined;
+    const streamId = params.streamId;
+    startLiveStreamActivity(streamId, params.title || 'Live', { viewers: 0, salesCents: 0, ordersCount: 0, isLive: true });
+    return () => endLiveStreamActivity(streamId, { viewers: 0, salesCents: 0, ordersCount: 0, isLive: false });
+  }, [params.streamId, params.title]);
+  useEffect(() => {
+    if (params.streamId) updateLiveStreamActivity(params.streamId, { viewers: viewerCount, salesCents: 0, ordersCount: 0, isLive: true });
+  }, [params.streamId, viewerCount]);
 
   async function handleEnd() {
     Alert.alert('End stream?', "We'll try to save your stream as a replay in the Thread feed. This can take a few minutes, and isn't guaranteed.", [

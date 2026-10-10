@@ -25,6 +25,7 @@ import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
 import { z } from "@workspace/api-zod";
 import { bodyObject, centsLike, idArray, idParams, intLike, str, validateInput } from "../lib/commerceValidation";
 import { formatRefundAmount, parseSellerRefundRequest, sellerRefundBlockedReason } from "../lib/sellerRefundRequest";
+import { notifyOrderLiveActivity } from "../lib/liveActivityPush";
 
 const router = Router();
 router.use(requireAuth);
@@ -693,6 +694,7 @@ router.patch("/:id/status", requireRole("staff"), validateInput({ params: orderI
   if (status === "processing" || status === "fulfilled") {
     void notifyBuyerPreparing(transitioned);
   }
+  void notifyOrderLiveActivity(transitioned.id);
 
   res.json(transitioned);
 });
@@ -1082,6 +1084,7 @@ router.patch("/:id/tracking", requireRole("staff"), validateInput({ params: orde
       logger.error({ err, orderId: updated.id }, "Could not record the order release; sweep will retry");
     }
   }
+  if (statusTransition || trackingStatusTransition || trackingChange) void notifyOrderLiveActivity(updated.id);
 
   res.json(updated);
 });
@@ -1125,6 +1128,7 @@ router.patch("/:id/items-tracking", requireRole("staff"), validateInput({ params
       targetId: req.params.id, targetType: "buyer_order",
     }).catch(() => { /* non-critical */ });
   }
+  void notifyOrderLiveActivity(req.params.id);
   const [order] = await db.select().from(orders).where(eq(orders.id, req.params.id)).limit(1);
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, req.params.id));
   res.json({ ...order, items });
