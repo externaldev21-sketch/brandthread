@@ -181,6 +181,8 @@ import muxWebhookRouter from "./webhooks-mux";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
 import sharePreviewRouter from "./share-preview";
+import publicMediaRouter from "./public-media";
+import sitemapRouter from "./sitemap";
 import affiliatePublicRouter from "./affiliate-public";
 import affiliateCreatorRouter from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
@@ -236,6 +238,8 @@ const bumpSearchOnWrite: import("express").RequestHandler = (req, res, next) => 
 router.use(["/product-bulk", "/shopify-imports", "/product-import", "/product-launches"], bumpSearchOnWrite);
 router.use("/public",          publicRouter);
 router.use("/public",          sharePreviewRouter); // /posts/:id/share-preview, /stores/:slug/share-preview (OG data)
+router.use("/public",          sitemapRouter); // /sitemap.xml — products, seller profiles, drops (served at brandthread.app/sitemap.xml)
+router.use("/public",          publicMediaRouter); // /media/products/:id/:index — public product photo (share cards, bio, email)
 router.use("/public",          discoveryRouter); // /categories, /trending/products, /trending/brands
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
