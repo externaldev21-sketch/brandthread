@@ -14,7 +14,7 @@ export interface SellerPlanDefinition {
 }
 
 /**
- * Plan cards. Every line matches a server gate or allowance in
+ * Plan cards (the plan picker shows the first four lines of each). Every line matches a server gate or allowance in
  * api-server lib/planFeatures.ts and lib/planCatalogue.ts — change both
  * together.
  */
@@ -44,9 +44,9 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
     features: [
       'Everything in Starter, with unlimited products',
       'AI logos, mockups, product photography, and lifestyle imagery',
-      'Background removal and replacement',
-      'Manufacturer Hub sourcing and production workflows',
       'Live selling for 4 hours a month, drops, and giveaways',
+      'Manufacturer Hub sourcing and production workflows',
+      'Background removal and replacement',
       'Custom domain, Shopify sync, and 10,000 marketing emails a month',
       'Up to 3 team members',
     ],
