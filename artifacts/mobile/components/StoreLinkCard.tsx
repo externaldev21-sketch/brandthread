@@ -1,7 +1,6 @@
 /**
  * Store link card — the seller's QR code, link, and Copy / Share / Save QR.
- * One component for every place the store link is handed out (Share store,
- * the Add Product publish sheet). Not a boxed card: the QR sits on its own
+ * Used by the Share Store screen. Not a boxed card: the QR sits on its own
  * white tile (it must stay dark-on-white to scan) and the actions are the
  * shared Button pair, equal widths.
  */
@@ -18,17 +17,15 @@ import type { StoreLinkState } from '@/hooks/useStoreLink';
 
 interface StoreLinkCardProps {
   link: StoreLinkState;
-  /** QR edge length; the publish sheet uses a smaller one. */
+  /** QR edge length. */
   qrSize?: number;
-  /** Hide the Save QR action (the publish sheet keeps to Copy / Share). */
+  /** Hide the Save QR action. */
   showSaveQr?: boolean;
-  /** Link + Copy / Share only — no QR or store name (the publish sheet). */
-  compact?: boolean;
   testID?: string;
 }
 
 export function StoreLinkCard({
-  link, qrSize = 184, showSaveQr = true, compact = false, testID = 'store-link-card',
+  link, qrSize = 184, showSaveQr = true, testID = 'store-link-card',
 }: StoreLinkCardProps) {
   const { theme } = useAppTheme();
   const router = useRouter();
@@ -59,18 +56,16 @@ export function StoreLinkCard({
 
   return (
     <View style={styles.root} testID={testID}>
-      {compact ? null : (
-        <View style={styles.qrTile} accessible accessibilityRole="image" accessibilityLabel="Store QR code">
-          <QRCode
-            value={link.url}
-            size={qrSize}
-            backgroundColor="#FFFFFF"
-            // theme-exempt: a QR must stay physically dark-on-white to scan.
-            color="#0A0A0B"
-          />
-        </View>
-      )}
-      {link.brandName && !compact ? (
+      <View style={styles.qrTile} accessible accessibilityRole="image" accessibilityLabel="Store QR code">
+        <QRCode
+          value={link.url}
+          size={qrSize}
+          backgroundColor="#FFFFFF"
+          // theme-exempt: a QR must stay physically dark-on-white to scan.
+          color="#0A0A0B"
+        />
+      </View>
+      {link.brandName ? (
         <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{link.brandName}</Text>
       ) : null}
       <Text
@@ -82,7 +77,7 @@ export function StoreLinkCard({
       >
         {displayStoreLink(link.url)}
       </Text>
-      <View style={[styles.pair, compact && styles.pairCompact]}>
+      <View style={styles.pair}>
         <View style={styles.pairItem}>
           <Button
             label={link.copied ? 'Copied' : 'Copy link'}
@@ -101,7 +96,7 @@ export function StoreLinkCard({
           />
         </View>
       </View>
-      {showSaveQr && !compact ? (
+      {showSaveQr ? (
         <Button
           label={link.saved ? 'Saved' : 'Save QR code'}
           variant="tertiary"
@@ -122,7 +117,6 @@ const styles = StyleSheet.create({
   title: { ...TYPE_SCALE.headline, textAlign: 'center', maxWidth: '100%' },
   link: { ...TYPE_SCALE.footnote, textAlign: 'center', marginTop: 4, maxWidth: '100%' },
   pair: { flexDirection: 'row', gap: 12, width: '100%', marginTop: 24 },
-  pairCompact: { marginTop: 12 },
   pairItem: { flex: 1, minWidth: 0 },
   spaced: { marginTop: 20 },
   saveQr: { marginTop: 8 },
