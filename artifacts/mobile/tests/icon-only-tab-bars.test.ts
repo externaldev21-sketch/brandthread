@@ -24,7 +24,7 @@ describe('icon-only bottom navigation', () => {
     expect(seller).toContain('accessibilityLabel="Open Brandthread AI"');
     expect(seller).toContain('`${tabDef.label} tab`');
     expect(seller).toContain('focused={isFocused}');
-    expect(seller).toContain('<TabBarIndicator x={indicatorX} target={indicatorTarget}');
+    expect(seller).toMatch(/<TabBarIndicator\s+x=\{indicatorX\}\s+target=\{indicatorTarget\}/);
     expect(seller).toContain('<TabBarGlass theme={theme}');
     expect(seller).not.toContain('{tabDef.label}\n');
     expect(seller).not.toContain('styles.sideLabel');

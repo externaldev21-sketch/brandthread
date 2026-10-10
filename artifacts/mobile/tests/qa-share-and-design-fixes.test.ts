@@ -24,7 +24,8 @@ describe('QA-0110 live share link', () => {
     expect(src).toContain('buildCanonicalLiveUrl(room.streamId ?? room.id, room.sellerId)');
     expect(src).not.toMatch(/brandthread\.app\/live\/\$\{/);
     expect(existsSync(resolve(root, 'app/live.tsx'))).toBe(true);
-    expect(existsSync(resolve(root, 'app/live'))).toBe(false);
+    // Public share previews are an additional route; the in-app canonical helper stays unchanged.
+    expect(existsSync(resolve(root, 'app/live/[streamId].tsx'))).toBe(true);
   });
 });
 

@@ -47,20 +47,23 @@ describe('AI consent (BT-372)', () => {
     expect(all).not.toContain('!');
   });
 
-  it('gates the agent send and quick replies before anything is sent', () => {
+  it('gates agent requests through the shared consent boundary before provider calls', () => {
     const conv = source('app/buyer-conversation.tsx');
-    const handleSend = conv.slice(conv.indexOf('async function handleSend()'));
-    expect(handleSend.indexOf('aiConsent.ensure()')).toBeLessThan(handleSend.indexOf("setText('')"));
-    const quick = conv.slice(conv.indexOf('function sendQuickReply'));
-    expect(quick.indexOf('aiConsent.ensure()')).toBeLessThan(quick.indexOf('sendToAgent('));
-    expect(conv).toContain('{aiConsent.sheet}');
+    expect(conv).toContain('ConversationThread');
+    const service = source('services/aiService.ts');
+    expect(service).toContain('withAiConsent(() => callAI(');
+    expect(service).toContain('withAiConsent(() => callAIStream(');
+    const routes = source('../api-server/src/routes/index.ts');
+    expect(routes).toMatch(/"\/brandthread-agent",\s+requireAiConsent\(\), aiSafetyGuard/);
+    expect(source('app/_layout.tsx')).toContain('<AiConsentSheet');
   });
 
-  it('sheet is solid #1C1C1E and links the privacy policy', () => {
+  it('sheet uses the shared solid elevated surface and links the privacy policy', () => {
     const sheet = source('components/AiConsentSheet.tsx');
-    expect(sheet).toContain("'#1C1C1E'");
+    expect(sheet).toContain('<BottomSheet');
     expect(sheet).toContain("'/privacy'");
-    expect(sheet).not.toMatch(/rgba\(/);
+    const primitive = source('components/ui/BottomSheet.tsx');
+    expect(primitive).toContain('backgroundColor: FILL_ELEVATED');
     expect(sheet).not.toMatch(/BlurView/);
   });
 

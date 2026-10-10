@@ -27,7 +27,7 @@ import {
   BAG_BAR_HEIGHT, BagCheckoutBar, BagColumns, BagEmpty, BagHeader, BagItemRow, BagTotals, toNewArrivals,
   type BagLineBusy, type NewArrival,
 } from '@/components/bag/BagParts';
-import { Cart, CartItem, SavedCartItem, CheckoutLoyaltyRedemption, BuyerProduct, BuyerProductVariant } from '@/services/cartTypes';
+import { Cart, CartItem, SavedCartItem, CheckoutThreadCashRedemption, CheckoutLoyaltyRedemption, BuyerProduct, BuyerProductVariant } from '@/services/cartTypes';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
@@ -165,15 +165,12 @@ export default function CartScreen() {
   // Which lines are included in "Checkout selected" / a per-item Buy. New
   // items default to selected — buyers opt OUT, they never have to opt in
   // just to check out everything.
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const knownItemIdsRef = useRef<Set<string>>(new Set());
   const [checkingOutSellerId, setCheckingOutSellerId] = useState<string | null>(null);
 
   // Header "Edit" toggle — reuses the existing per-item selection checkboxes
   // to drive a bulk "Remove selected" action instead of adding a second,
   // parallel selection model.
-  const [editMode, setEditMode] = useState(false);
-  const [removingSelected, setRemovingSelected] = useState(false);
 
   // Per-row pending actions: itemId → action
   const [pendingByItemId, setPendingByItemId] = useState<Record<string, RowPendingAction>>({});
@@ -450,7 +447,6 @@ export default function CartScreen() {
       // only honor it when this checkout actually covers the whole cart.
       const checkingOutFullCart = items.length === cart.items.length;
       const loyaltyToApply = checkingOutFullCart ? (loyaltyRedemption ?? undefined) : undefined;
-      if (loyaltyToApply && currentGroups.length !== 1) {
       const threadCashToApply = checkingOutFullCart ? (threadCashRedemption ?? undefined) : undefined;
       // Thread Cash covers several stores when checkout pays in the app (BT-270).
       if (rewardsNeedOneStore({

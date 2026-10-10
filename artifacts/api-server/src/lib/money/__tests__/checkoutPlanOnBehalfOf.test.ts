@@ -8,6 +8,7 @@ vi.mock("@workspace/db", () => {
 const { onBehalfOfEnabled, paymentIntentMoney } = await import("../checkoutPlan");
 
 const base = {
+  shippingCents: 0,
   sellerStripeAccountId: "acct_seller",
   merchandiseCents: 5_000,
   preTaxTotalCents: 5_500,

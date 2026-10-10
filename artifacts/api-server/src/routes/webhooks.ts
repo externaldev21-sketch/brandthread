@@ -781,6 +781,7 @@ export async function handleCartPaymentEnded(pi: any, failed: boolean): Promise<
       await releaseCheckoutDiscount(tx, group.id);
     });
   }
+  if (pi.status !== "succeeded") await releaseCartRewards(groups);
 }
 
 /**
@@ -818,8 +819,6 @@ async function notifyLowStockAfterOrder(
       lowStockThreshold: row.lowStockThreshold ?? 0,
     });
   }
-  // Loyalty / Thread Cash this payment held go back to the buyer (BT-258).
-  if (pi.status !== "succeeded") await releaseCartRewards(groups);
 }
 
 export async function handleCheckoutPaid(

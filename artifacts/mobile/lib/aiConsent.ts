@@ -71,3 +71,37 @@ export async function withAiConsent<T>(run: () => Promise<T>): Promise<T> {
     return run();
   }
 }
+
+// Compatibility for older consent callers; authorization is always checked server-side.
+/** Sheet copy, kept here so it is reviewable and testable in one place. */
+export const AI_CONSENT_COPY = {
+  title: 'Allow Brandthread Agent to use OpenAI?',
+  lead: 'Brandthread Agent replies are written by OpenAI. To reply, your messages and the recent history of this conversation are sent to OpenAI.',
+  detail: 'They are used only to generate replies. Your payment details, Thread Cash and other conversations are not sent.',
+  privacyLink: 'Privacy policy',
+  allow: 'Allow',
+  notNow: 'Not now',
+  error: 'Could not save your choice. Check your connection and try again.',
+} as const;
+
+export function isAiConsentRequiredError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { status?: unknown; code?: unknown };
+  return e.code === 'AI_CONSENT_REQUIRED' || e.code === AI_CONSENT_REQUIRED || e.status === 428;
+}
+
+// Per-session cache: once allowed (or confirmed by the server) the sheet is
+// never shown again this session. Keyed by account so a switch re-checks.
+let consentedFor: string | null = null;
+
+export function hasCachedAiConsent(accountKey: string): boolean {
+  return consentedFor === accountKey;
+}
+
+export function cacheAiConsent(accountKey: string): void {
+  consentedFor = accountKey;
+}
+
+export function clearCachedAiConsent(): void {
+  consentedFor = null;
+}

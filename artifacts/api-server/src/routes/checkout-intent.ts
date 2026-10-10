@@ -88,6 +88,7 @@ const itemSchema = z.object({
   variantId: requestPrimitives.uuid,
   productId: requestPrimitives.uuid,
   quantity: z.coerce.number().int().min(1).max(100),
+  bundleId: requestPrimitives.uuid.nullable().optional(),
 });
 const addressSchema = z.object({
   recipientName: requestPrimitives.shortText,
@@ -99,6 +100,7 @@ const addressSchema = z.object({
   country: z.string().trim().length(2).default("US"),
 });
 const groupsSchema = z.array(z.object({
+  tipCents: z.number().int().min(0).max(MAX_TIP_CENTS).optional(),
   items: z.array(itemSchema).min(1).max(100),
   discountCode: z.string().trim().min(1).max(64).optional(),
   liveStreamId: z.string().uuid().nullable().optional(),
@@ -273,6 +275,8 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     subtotalCents: group.subtotalCents,
     shippingCents: group.shippingCents,
     discountCents: group.discountCents,
+    bundleDiscountCents: group.bundleDiscountCents,
+    tipCents: group.tipCents, tippingEnabled: group.tippingEnabled,
     loyaltyCents: group.loyaltyCents,
     threadCashCents: group.threadCashCents,
     taxCents: group.taxCents,
@@ -567,8 +571,11 @@ export function createCheckoutIntentRouter(mode: CheckoutIntentMode): Router {
             buyerId: payer.buyerId,
             ...(payer.buyerId ? {} : { guestEmail: payer.guestEmail, guestAccessTokenHash: tokenHash(guestToken!) }),
             sellerId: group.sellerId,
-            items: group.items.map(({ variantId, productName, variantLabel, quantity, priceCents }) => ({
-              variantId, productName, variantLabel, quantity, priceCents,
+            bundleDiscountCents: group.bundleDiscountCents, bundleLines: group.bundleLines,
+            tipCents: group.tipCents,
+            sourceLiveStreamId: await resolveLiveAttribution(body.groups[index]?.liveStreamId, group.sellerId),
+            items: group.items.map(({ variantId, productName, variantLabel, quantity, priceCents, bundleId }) => ({
+              variantId, productName, variantLabel, quantity, priceCents, ...(bundleId ? { bundleId } : {}),
             })),
             shippingAddress: {
               name: shipping.name, street: shipping.street, line2: shipping.line2,
@@ -600,6 +607,7 @@ export function createCheckoutIntentRouter(mode: CheckoutIntentMode): Router {
               actorId: payer.buyerId, sellerId: group.sellerId,
             });
           }
+          if (group.discountCodeId) await reserveDiscountCapacity(tx, { discountCodeId: group.discountCodeId, customerKey: customerKeyOf(payer) });
           inserted.push(row);
         }
         return inserted;

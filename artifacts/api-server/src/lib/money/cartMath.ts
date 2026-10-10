@@ -20,7 +20,7 @@ export class CartCheckoutError extends Error {
 
 /** The parts of a priced seller group these rules read (lib/money/cartCheckout.ts PricedGroup). */
 export type GroupAmounts = {
-  items: Array<{ priceCents: number; quantity: number }>;
+  items: Array<{ priceCents: number; quantity: number; bundleDiscountCents?: number }>;
   subtotalCents: number;
   shippingCents: number;
   /** Promo on merchandise + any free-shipping part. */
@@ -53,7 +53,7 @@ export function taxableAmounts(
   group: Pick<GroupAmounts, "items" | "merchandiseDiscountCents" | "shippingCents" | "shippingDiscountCents">,
   rewardDiscountCents = 0,
 ): { lineAmounts: number[]; shippingCents: number } {
-  const afterPromo = spreadDiscount(group.items.map((i) => i.priceCents * i.quantity), group.merchandiseDiscountCents)
+  const afterPromo = spreadDiscount(group.items.map((i) => Math.max(0, i.priceCents * i.quantity - (i.bundleDiscountCents ?? 0))), group.merchandiseDiscountCents)
     .map((amount) => Math.max(0, amount));
   const merchandise = afterPromo.reduce((sum, amount) => sum + amount, 0);
   const reward = Math.max(0, rewardDiscountCents);

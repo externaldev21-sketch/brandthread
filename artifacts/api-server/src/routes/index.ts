@@ -64,7 +64,6 @@ import sellerProfileRouter from "./seller-profile";
 import conversationsRouter from "./conversations";
 import communitiesRouter from "./communities";
 import brandthreadAgentRouter from "./brandthread-agent";
-import aiConsentRouter from "./ai-consent";
 import savedRouter from "./saved";
 import collectionsRouter from "./collections";
 import productBulkRouter from "./product-bulk";
@@ -364,7 +363,6 @@ router.use("/conversations",             conversationsRouter);
 router.use("/communities",               communitiesRouter);
 // requireAiConsent runs before aiSafetyGuard so no text reaches OpenAI (moderation included) without consent.
 router.use("/brandthread-agent",         requireAiConsent(), aiSafetyGuard("brandthread-agent", { mode: "chat" }), brandthreadAgentRouter);
-router.use("/ai-consent",                aiConsentRouter);
 // Stripe redirects the seller's browser here with no app session: mounted before the owner-only router.
 router.use("/seller/connect/onboard",    connectRedirectRouter);
 router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliate / creator program (seller side)
