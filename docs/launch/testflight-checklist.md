@@ -28,8 +28,13 @@ Submit either kind with `eas submit --platform ios --profile production --latest
 - [ ] Apple Developer Program, agreements accepted in App Store Connect.
 - [ ] Agreements, Tax and Banking completed (needed before subscriptions can be tested).
 - [ ] App record in App Store Connect with bundle ID `com.brandthread.mobile`.
-- [ ] `eas.json` `submit.production.ios` filled in (`appleId`, `ascAppId`, `appleTeamId`;
-      where to find each is in `release-flow.md`). Check with `pnpm run verify:submit-config`.
+- [ ] `EXPO_APPLE_ID`, `EAS_ASC_APP_ID`, `EXPO_APPLE_TEAM_ID` set in your shell (where to find
+      each is in `release-flow.md`; eas.json can't read env, so they are not committed).
+      Check with `pnpm run verify:submit-config`; upload with `pnpm run submit:ios`.
+- [ ] `eas init` run and `app.json` committed (or `EAS_PROJECT_ID` set), and
+      `EXPO_PUBLIC_SENTRY_DSN` in the EAS production environment. Production/TestFlight
+      builds stop without them. Check locally with
+      `pnpm run verify:launch-config -- --profile production`.
 - [ ] Subscription products created in App Store Connect and connected in RevenueCat.
 
 ## 2. Environment variables (once, then when a value changes)

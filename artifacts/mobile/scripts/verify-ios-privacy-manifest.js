@@ -34,6 +34,9 @@ const REQUIRED_COLLECTED_TYPES = [
   'NSPrivacyCollectedDataTypeOtherUserContent',
   'NSPrivacyCollectedDataTypeCustomerSupport',
   'NSPrivacyCollectedDataTypeProductInteraction',
+  // Signed-in searches are stored with the account for "Recent searches"
+  // (search_log, routes/public.ts) and erased with the account.
+  'NSPrivacyCollectedDataTypeSearchHistory',
   'NSPrivacyCollectedDataTypeOtherDiagnosticData',
   'NSPrivacyCollectedDataTypeCrashData',
   'NSPrivacyCollectedDataTypePerformanceData',

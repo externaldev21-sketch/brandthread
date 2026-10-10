@@ -203,6 +203,14 @@
             ]
           },
           {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeSearchHistory",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
             "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherDiagnosticData",
             "NSPrivacyCollectedDataTypeLinked": true,
             "NSPrivacyCollectedDataTypeTracking": false,
@@ -444,6 +452,27 @@
         }
       ]
     ],
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "UploadLiveActivity",
+                  "bundleIdentifier": "com.brandthread.mobile.UploadLiveActivity",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.brandthread.mobile.liveactivity"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

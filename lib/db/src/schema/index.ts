@@ -1806,6 +1806,8 @@ export const reports = pgTable('reports', {
   resolutionNote:   text('resolution_note'),
   resolvedBy:       text('resolved_by'),
   resolvedAt:       timestamp('resolved_at', { withTimezone: true }),
+  /** Set once by the hourly escalation job (migration 262) when a report waited 12h+. */
+  escalatedAt:      timestamp('escalated_at', { withTimezone: true }),
   createdAt:   timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   statusCreatedIdx: index('reports_status_created_idx').on(table.status, table.createdAt),

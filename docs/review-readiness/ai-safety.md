@@ -25,7 +25,7 @@ Maintaining the list: edit `lib/aiSafety/denylist.ts` (plain arrays, commented) 
 - Never crashes: every provider call is wrapped; the guard itself falls through to `next()` if it errors.
 - No OpenAI key: prompt filter runs on local rules only; output check reports "unavailable" and the image is returned (logged). Set `AI_OUTPUT_MODERATION_STRICT=1` to withhold unchecked images instead (recommended for production once the key is set).
 - Signed-out requests pass straight through (the route's own auth rejects them), so no moderation API calls are spent on anonymous or web-preview traffic.
-- Key lookup: `AI_INTEGRATIONS_OPENAI_API_KEY` (already used by the app) or `OPENAI_API_KEY`; base URL `AI_INTEGRATIONS_OPENAI_BASE_URL` or api.openai.com. No new key is required.
+- Key lookup (shared with every AI feature, `lib/integrations-openai-ai-server/src/config.ts`): the Replit pair `AI_INTEGRATIONS_OPENAI_API_KEY` + `AI_INTEGRATIONS_OPENAI_BASE_URL`, otherwise `OPENAI_API_KEY` with `OPENAI_BASE_URL` or api.openai.com. No new key is required.
 
 ## Coverage table
 
@@ -58,7 +58,7 @@ Maintaining the list: edit `lib/aiSafety/denylist.ts` (plain arrays, commented) 
 
 ## Owner actions
 
-- Keep `AI_INTEGRATIONS_OPENAI_API_KEY` set in the API environment so OpenAI moderation is active; without it only local rules run.
+- Keep `OPENAI_API_KEY` (or the Replit `AI_INTEGRATIONS_OPENAI_*` pair) set in the API environment so OpenAI moderation is active; without it only local rules run, production logs an error at boot and `/api/healthz/ready` reports `degraded: true`.
 - Set `AI_OUTPUT_MODERATION_STRICT=1` in production so unchecked images are never delivered.
 - Run migration `240_ai_generated_media.sql`.
 

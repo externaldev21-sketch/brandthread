@@ -21,7 +21,7 @@ import {
 const clean: FrameScores = { flags: {}, scores: { sexual: 0.01, violence: 0.02 } };
 const png = Buffer.from("89504e470d0a1a0a", "hex");
 
-const ENV_KEYS = ["AI_INTEGRATIONS_OPENAI_BASE_URL", "AI_INTEGRATIONS_OPENAI_API_KEY", "MEDIA_MODERATION_ENABLED"] as const;
+const ENV_KEYS = ["AI_INTEGRATIONS_OPENAI_BASE_URL", "AI_INTEGRATIONS_OPENAI_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL", "MEDIA_MODERATION_ENABLED"] as const;
 let saved: Record<string, string | undefined>;
 
 beforeEach(() => {

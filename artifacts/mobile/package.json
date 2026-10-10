@@ -8,10 +8,11 @@
     "build": "node scripts/build-web.js",
     "legal:generate": "node scripts/generate-legal-content.mjs",
     "prebuild": "pnpm run verify:app-identity && pnpm run verify:apple-auth && pnpm run verify:ios-build",
-    "eas-build-pre-install": "pnpm run verify:app-identity && pnpm run verify:apple-auth && pnpm run verify:ios-build && node scripts/sentry-upload-status.js",
+    "eas-build-pre-install": "pnpm run verify:app-identity && pnpm run verify:apple-auth && pnpm run verify:ios-build && node scripts/verify-launch-config.js && node scripts/sentry-upload-status.js",
     "native:prebuild": "node scripts/native-prebuild.js",
     "build:preview": "eas build --profile preview --platform all",
     "build:testflight": "node scripts/build-testflight.js",
+    "submit:ios": "node scripts/eas-submit.js",
     "update:preview": "node scripts/eas-update.js --channel preview",
     "update:production": "node scripts/eas-update.js --channel production",
     "update:rollback": "eas update:rollback",
@@ -57,6 +58,7 @@
     "verify:privacy-manifest": "node scripts/verify-ios-privacy-manifest.js",
     "verify:privacy-manifest:config": "node scripts/verify-ios-privacy-manifest.js --config-only",
     "verify:submit-config": "node scripts/verify-submit-config.js",
+    "verify:launch-config": "node scripts/verify-launch-config.js",
     "check:landing-fit": "node scripts/landing-fit-check.mjs"
   },
   "devDependencies": {

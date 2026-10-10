@@ -3,6 +3,8 @@
  * The shared client throws at import time when its env vars are missing, so it
  * is imported lazily and only after `aiConfigured()` passes.
  */
+import { isOpenAiConfigured } from "@workspace/integrations-openai-ai-server/config";
+
 export const HELPERS_MODEL = "gpt-5.4-mini";
 
 export class AiUnavailableError extends Error {
@@ -14,7 +16,7 @@ export class AiUnavailableError extends Error {
 export class AiProviderError extends Error {}
 
 export function aiConfigured(): boolean {
-  return Boolean(process.env.AI_INTEGRATIONS_OPENAI_API_KEY?.trim() && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL?.trim());
+  return isOpenAiConfigured();
 }
 
 export type ImagePart = { dataUrl: string };
