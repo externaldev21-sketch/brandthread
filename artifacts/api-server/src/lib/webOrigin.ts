@@ -36,6 +36,13 @@ export function allowedWebOrigins(): string[] {
   const internalDomain = process.env.REPLIT_INTERNAL_APP_DOMAIN?.trim();
   if (internalDomain) origins.add(`https://${internalDomain}`);
 
+  // Split deployments on their own hosts (docs/scale/DEPLOYMENTS.md), e.g.
+  // "https://manufacturers.brandthread.app". Exact origins, comma separated.
+  for (const extra of (process.env.CORS_EXTRA_ORIGINS ?? "").split(",")) {
+    const o = extra.trim().replace(/\/+$/, "");
+    if (/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o)) origins.add(o.toLowerCase());
+  }
+
   if (process.env.NODE_ENV !== "production") {
     // Expo web preview is served on a separate host from the API proxy.
     // Admit only this workspace's exact Expo host for credentialed requests.

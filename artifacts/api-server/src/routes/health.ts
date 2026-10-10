@@ -3,6 +3,7 @@ import { HealthCheckResponse } from "@workspace/api-zod";
 import { pool } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { redisStatus } from "../lib/redis";
+import { realtimeBusStatus } from "../lib/realtime/bus";
 
 const router: IRouter = Router();
 
@@ -64,7 +65,7 @@ router.get("/ready", async (_req, res) => {
   res.status(ready ? 200 : 503).json({
     status: ready ? "ok" : "unavailable",
     // Informational only: a missing or down cache never makes an instance unready.
-    checks: { database, cache: { status: redisStatus() } },
+    checks: { database, cache: { status: redisStatus() }, realtime: realtimeBusStatus() ?? { status: "idle" } },
   });
 });
 

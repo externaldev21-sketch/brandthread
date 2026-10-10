@@ -29,6 +29,7 @@ import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { redirectToPublicMedia } from "../lib/mediaDelivery";
 import { ObjectPermission } from "../lib/objectAcl";
 import { setPublicCacheHeaders } from "../lib/httpCache";
 import { isUuid } from "../lib/productPairings";
@@ -138,6 +139,7 @@ export function createProductVideosRouter({
       const file = await objectStorage.getObjectEntityFile(`/objects/${suffix}`);
       const allowed = await objectStorage.canAccessObjectEntity({ objectFile: file, requestedPermission: ObjectPermission.READ });
       if (!allowed) return res.status(404).end();
+      if (await redirectToPublicMedia(res, `/objects/${suffix}`)) return; // CDN / signed URL, not Express (BT-473)
       const [metadata] = await file.getMetadata();
       const size = Number(metadata.size ?? 0);
       if (!Number.isSafeInteger(size) || size <= 0) return res.status(404).end();
