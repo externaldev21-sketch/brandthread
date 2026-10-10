@@ -35,6 +35,12 @@ describe('shareLinks builders', () => {
 });
 
 describe('parseShareLink', () => {
+  it('maps the short /s/ store link and the long /post/ link', () => {
+    expect(parseShareLink('https://brandthread.app/s/Atelier')).toEqual({ kind: 'store', handle: 'atelier', href: '/u/atelier' });
+    expect(parseShareLink('https://brandthread.app/post/abc123def')?.href).toBe('/buyer-post-viewer?postId=abc123def');
+    expect(parseShareLink('/s/a/b')).toBeNull();
+  });
+
   it('maps https links to in-app routes', () => {
     expect(parseShareLink('https://brandthread.app/p/abc123def?utm=x')?.href).toBe('/buyer-post-viewer?postId=abc123def');
     expect(parseShareLink('https://www.brandthread.app/tag/Streetwear')?.href).toBe('/hashtag/streetwear');
