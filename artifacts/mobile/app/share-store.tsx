@@ -10,12 +10,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ShareStoreContent, ShareStoreToast, useToast } from '@/components/store/ShareStoreSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 export default function ShareStoreScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const bottomInset = useScreenBottomInset();
+  // Clear of the floating tab bar.
+  const bottomInset = useTabBarClearance(2);
   const [toast, flash] = useToast();
 
   return (
