@@ -96,7 +96,8 @@ export function useLinkedProfiles(options: { enabled?: boolean } = {}) {
         [ONBOARDING_COMPLETE_KEY, 'false'],
       ]).catch(() => {});
       await activateProfile(created.profile.clerkId, created.signInToken);
-      router.replace('/onboarding?postAuth=1' as never);
+      // flow= lets onboarding skip the buyer/seller question as well.
+      router.replace(`/onboarding?postAuth=1&flow=${role}` as never);
       return { kind: 'started' };
     } catch (err) {
       return parseStartProfileError(err, role);
