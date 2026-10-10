@@ -77,7 +77,6 @@ const SELLER_CORE_GLOBS = [
   'app/fulfill-order.tsx',
   'app/fulfill-batch.tsx',
   'app/shipping.tsx',
-  'app/shipping-label.tsx',
   'app/shipping-delivery.tsx',
   'app/refund-detail.tsx',
   'app/add-product.tsx',

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Stack, useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Redirect, Stack, useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -11,8 +11,35 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { resolveLegacyRoute, type LegacyParams } from '@/lib/navigation/legacyRoutes';
+
+/**
+ * Screens that were merged or removed (see lib/navigation/legacyRoutes) no
+ * longer have a file, so their old paths land here. Send them to the new
+ * home instead of showing "doesn't exist".
+ */
+function useLegacyRedirect(): string | null {
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    const hit = resolveLegacyRoute(`${window.location.pathname}${window.location.search}`);
+    if (hit) return hit;
+  }
+  const flat: LegacyParams = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (k === 'not-found' || v === undefined) continue;
+    flat[k] = Array.isArray(v) ? v.join(',') : String(v);
+  }
+  return resolveLegacyRoute(pathname ?? '', flat);
+}
 
 export default function NotFoundScreen() {
+  const legacyTarget = useLegacyRedirect();
+  if (legacyTarget) return <Redirect href={legacyTarget as never} />;
+  return <NotFoundContent />;
+}
+
+function NotFoundContent() {
   const { theme } = useAppTheme();
   const colors = useColors();
   const insets = useSafeAreaInsets();
