@@ -3,10 +3,12 @@
  * app reads for the plan screen, the cap-hit sheet and Settings → Plan:
  * GET /api/config/seller-plans. Account-free, so it is public and cacheable.
  *
- * AI credits per month come from the AI credits catalogue (its own source
- * of truth); everything else comes from PLAN_CATALOGUE.
+ * AI credits per month come from the AI credits catalogue and the commission
+ * from the platform fee config (each its own source of truth); everything
+ * else comes from PLAN_CATALOGUE.
  */
 import { creditPolicyForPlan } from "./aiCredits/catalogue";
+import { platformFeeBpsForPlan } from "./planPerks";
 import {
   PLAN_CATALOGUE,
   PLAN_IDS,
@@ -29,6 +31,8 @@ export interface PublicSellerPlan {
   staffSeats: number | null;
   /** AI credits granted each month (never unlimited on paid plans once the AI catalogue caps Pro). */
   aiCreditsMonthly: number | null;
+  /** Platform commission per sale, in percent (what checkout actually charges). */
+  commissionPercent: number;
   features: SellerPlanFeatures;
 }
 
@@ -56,6 +60,7 @@ export function publicSellerPlanConfig(): PublicSellerPlanConfig {
         productLimit: plan.limits.products,
         staffSeats: plan.limits.teamSeats,
         aiCreditsMonthly: creditPolicyForPlan(id).monthlyAllowance,
+        commissionPercent: platformFeeBpsForPlan(id) / 100,
         features: { ...plan.features },
       };
     }),
