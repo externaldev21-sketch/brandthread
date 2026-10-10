@@ -1,10 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-vi.mock('react-native', () => ({
-  StyleSheet: {
-    flatten: (s: unknown) => (Array.isArray(s) ? Object.assign({}, ...s.flat(Infinity).filter(Boolean)) : s ?? undefined),
-  },
-}));
 
 import { splitButtonStyle } from '@/lib/buttonStyle';
 
@@ -13,6 +8,12 @@ describe('splitButtonStyle', () => {
     const { outerStyle, innerStyle } = splitButtonStyle([{ flex: 1, marginTop: 8 }, { backgroundColor: '#fff', paddingHorizontal: 12 }]);
     expect(outerStyle).toEqual({ flex: 1, marginTop: 8 });
     expect(innerStyle).toEqual({ backgroundColor: '#fff', paddingHorizontal: 12 });
+  });
+
+  it('flattens nested arrays and skips falsy entries', () => {
+    const { outerStyle, innerStyle } = splitButtonStyle([[{ flex: 1 }, false], null, [{ opacity: 0.5 }]] as never);
+    expect(outerStyle).toEqual({ flex: 1 });
+    expect(innerStyle).toEqual({ opacity: 0.5 });
   });
 
   it('handles no style', () => {

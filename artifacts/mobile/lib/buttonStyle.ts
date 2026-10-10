@@ -1,4 +1,4 @@
-import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 
 /**
  * Layout props (flex, width, margins, alignSelf, position) size the whole
@@ -16,7 +16,15 @@ const OUTER_KEYS = new Set([
 ]);
 
 export function splitButtonStyle(style: StyleProp<ViewStyle>): { outerStyle: ViewStyle; innerStyle: ViewStyle } {
-  const flat = (StyleSheet.flatten(style) ?? {}) as Record<string, unknown>;
+  const flat: Record<string, unknown> = {};
+  // Own flatten (StyleSheet.create returns plain objects) so this also works
+  // under the partial react-native mocks many tests use.
+  const merge = (s: unknown): void => {
+    if (!s) return;
+    if (Array.isArray(s)) { s.forEach(merge); return; }
+    if (typeof s === 'object') Object.assign(flat, s);
+  };
+  merge(style);
   const outerStyle: Record<string, unknown> = {};
   const innerStyle: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(flat)) (OUTER_KEYS.has(key) ? outerStyle : innerStyle)[key] = value;
