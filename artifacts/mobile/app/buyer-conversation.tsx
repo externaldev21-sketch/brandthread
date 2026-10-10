@@ -36,6 +36,8 @@ import type {
   Conversation, Message, MessageAttachment, ConversationParticipant, ReactionType,
 } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { useAiConsentGate } from '@/components/AiConsentSheet';
+import { isAiConsentRequiredError, clearCachedAiConsent } from '@/lib/aiConsent';
 import * as ImagePicker from 'expo-image-picker';
 import {
   useAudioPlayer,
@@ -297,6 +299,8 @@ export default function BuyerConversationScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
+  // BT-372: one-time consent before any agent message goes to OpenAI.
+  const aiConsent = useAiConsentGate({ local: !!params.id && isPreviewConversationId(params.id) });
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [transcriptionToast, setTranscriptionToast] = useState(false);
@@ -1334,7 +1338,13 @@ export default function BuyerConversationScreen() {
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
       void result;
-    } catch {
+    } catch (err) {
+      if (isAiConsentRequiredError(err)) {
+        // Server refused (consent withdrawn elsewhere): drop the bubble, ask again on next send.
+        clearCachedAiConsent();
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+        return;
+      }
       const { text: replyText } = cannedAgentReply(messageText);
       setMessages((prev) => [...prev.filter((m) => m.id !== optimistic.id), optimistic, {
         id: `local-agent-fallback-${Date.now()}`,
@@ -1355,8 +1365,9 @@ export default function BuyerConversationScreen() {
     }
   }
 
-  function sendQuickReply(reply: AgentQuickReply) {
+  async function sendQuickReply(reply: AgentQuickReply) {
     hapticSelection();
+    if (!(await aiConsent.ensure())) return;
     void sendToAgent(reply.value);
   }
 
@@ -1392,6 +1403,7 @@ export default function BuyerConversationScreen() {
 
   async function handleSend() {
     if (!conv || !canSend) return;
+    if (isAgentConv && !selectedAttachment && !replyTo && !(await aiConsent.ensure())) return;
     const t = text.trim();
     const att = selectedAttachment;
     const replyingTo = replyTo;
@@ -2876,6 +2888,7 @@ export default function BuyerConversationScreen() {
         }}
         onDismiss={() => setThreadCashNotice(null)}
       />
+      {aiConsent.sheet}
     </KeyboardAvoidingView>
   );
 }

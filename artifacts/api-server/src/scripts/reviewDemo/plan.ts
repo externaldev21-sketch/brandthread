@@ -226,12 +226,27 @@ export function summarize(assetBaseUrl: string | null): PlanSummary {
  * Output is for pasting into App Store Connect / Play Console and must never
  * be written to a tracked file.
  */
-export function renderNotes(template: string, env: DemoEnv): string {
+export function renderNotes(template: string, env: DemoEnv, opts: RenderNotesOptions = {}): string {
+  const withSections = applyLiveSection(template, opts.liveAvailable ?? true);
   const map: Record<string, string> = {
     REVIEW_DEMO_BUYER_EMAIL: env.buyerEmail,
     REVIEW_DEMO_BUYER_PASSWORD: env.buyerPassword,
     REVIEW_DEMO_SELLER_EMAIL: env.sellerEmail,
     REVIEW_DEMO_SELLER_PASSWORD: env.sellerPassword,
   };
-  return template.replace(/\{\{(REVIEW_DEMO_[A-Z_]+)\}\}/g, (m, key: string) => map[key] ?? m);
+  return withSections.replace(/\{\{(REVIEW_DEMO_[A-Z_]+)\}\}/g, (m, key: string) => map[key] ?? m);
+}
+
+export interface RenderNotesOptions {
+  /** Agora configured on the production API (AGORA_APP_ID + AGORA_APP_CERTIFICATE).
+   *  When false, the `<!-- if:live -->...<!-- endif:live -->` blocks are dropped
+   *  so the reviewer is never told to Go Live (the app hides Go Live then). */
+  liveAvailable?: boolean;
+}
+
+const LIVE_BLOCK = /<!-- if:live -->\n?([\s\S]*?)<!-- endif:live -->\n?/g;
+
+/** Keeps (unwrapped) or removes the live-only sections of REVIEW_NOTES.md. */
+export function applyLiveSection(template: string, liveAvailable: boolean): string {
+  return template.replace(LIVE_BLOCK, (_m, body: string) => (liveAvailable ? body : ""));
 }

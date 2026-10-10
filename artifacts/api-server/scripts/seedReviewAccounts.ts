@@ -29,6 +29,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { and, eq } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
+import { isLiveAvailable } from "../src/lib/liveAvailability";
 import {
   DEMO_BRAND_NAME,
   DEMO_BUYER_USERNAME,
@@ -245,7 +246,9 @@ async function main() {
     }
     const here = path.dirname(fileURLToPath(import.meta.url));
     const tpl = fs.readFileSync(path.resolve(here, "../../../REVIEW_NOTES.md"), "utf8");
-    process.stdout.write(renderNotes(tpl, r.env));
+    // Live-only notes are dropped unless Agora is configured in this env
+    // (run with the production API env loaded), matching the app hiding Go Live.
+    process.stdout.write(renderNotes(tpl, r.env, { liveAvailable: isLiveAvailable(process.env) }));
     return;
   }
   const guard = checkRunGuard(flags);

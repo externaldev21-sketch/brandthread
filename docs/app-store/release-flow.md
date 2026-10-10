@@ -219,7 +219,16 @@ Or build and submit in one go: `eas build --platform all --profile production --
 
 - [ ] Screenshots: 6.9″ iPhone **and 13″ iPad** (both are required now that iPad is supported).
 - [ ] App Privacy answers exactly as in [privacy-labels.md](privacy-labels.md).
-- [ ] Privacy Policy URL `https://brandthread.app/privacy` and a Support URL.
+- [ ] Privacy Policy URL `https://brandthread.app/privacy`.
+- [ ] Support URL `https://brandthread.app/help`. It opens signed out (it is in
+      `PUBLIC_SCREENS` in `artifacts/mobile/app/_layout.tsx`) and shows the
+      support email `support@brandthread.app` plus a contact form that opens
+      the mail app when signed out. Open it in a private browser window to check.
+- [ ] Production API env for live video: `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`
+      (Agora Console → Project Management → your project, at https://console.agora.io).
+      Check `https://<api-domain>/api/config/live` returns `{"liveAvailable":true}`.
+      If it returns `false`, the app hides Go Live and the rendered review notes
+      leave out the live/call instructions (see `REVIEW_NOTES.md`).
 - [ ] Age rating questionnaire (the app has user-generated content, messaging and live video).
 - [ ] **Sign-in info for the reviewer**: a working demo buyer account and a demo seller account, plus notes explaining how to reach live video, the design studio and subscriptions.
 - [ ] Review notes: subscriptions are in-app purchases (RevenueCat); physical goods are paid through Stripe; seller identity checks open Stripe in the browser; account deletion is in Settings → Delete account.

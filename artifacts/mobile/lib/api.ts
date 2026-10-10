@@ -1117,6 +1117,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     config: {
       featureFlags: () =>
         get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
+      /** Public: whether live video (Agora) is configured; Go Live is hidden when false. */
+      live: () => get<{ liveAvailable: boolean }>('/api/config/live'),
+    },
+    /** AI data-sharing consent (Guideline 5.1.2(i)); see components/AiConsentSheet.tsx. */
+    aiConsent: {
+      get: () => freshGet<{ consented: boolean; consentedAt: string | null; provider: string }>('/api/ai-consent'),
+      accept: () => post<{ consented: boolean; consentedAt: string | null; provider: string }>('/api/ai-consent', { accept: true }),
     },
     // ── Live replays + Live tips (PR: live-replays-profile-tips) ──────────────
     liveReplays: {

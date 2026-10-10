@@ -15,6 +15,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { useApi } from '@/lib/api';
+import { useLiveAvailable } from '@/hooks/useLiveAvailable';
+import { shouldShowGoLive } from '@/lib/liveConfig';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
@@ -29,6 +31,7 @@ export default function SellerScheduleLiveScreen() {
   const insets = useSafeAreaInsets();
   const api = useApi() as any;
   const router = useRouter();
+  const liveAvailable = useLiveAvailable(); // BT-376: hide Go live when Agora isn't configured
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const signedIn = authLoaded && !!isSignedIn;
 
@@ -203,6 +206,7 @@ export default function SellerScheduleLiveScreen() {
                   {formatUpcomingTime(new Date(m.startsAt).getTime(), Date.now())} · {m.reminderCount} reminder{m.reminderCount === 1 ? '' : 's'}
                 </Text>
                 <View style={styles.cardActions}>
+                  {shouldShowGoLive(liveAvailable) && (
                   <View style={styles.cardAction}>
                     <Button
                       label="Go live"
@@ -213,6 +217,7 @@ export default function SellerScheduleLiveScreen() {
                       accessibilityLabel={`Go live now with ${m.title}`}
                     />
                   </View>
+                  )}
                   <View style={styles.cardAction}>
                     <Button label="Cancel" variant="secondary" size="compact" fullWidth onPress={() => cancel(m.id)} accessibilityLabel={`Cancel ${m.title}`} />
                   </View>

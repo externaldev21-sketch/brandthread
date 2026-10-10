@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
+import { requireAiConsent } from "../middlewares/requireAiConsent";
 import healthRouter from "./health";
 import { responseCache, invalidateResponseCache } from "../middlewares/responseCache";
 import authRouter from "./auth";
@@ -55,6 +56,7 @@ import sellerProfileRouter from "./seller-profile";
 import conversationsRouter from "./conversations";
 import communitiesRouter from "./communities";
 import brandthreadAgentRouter from "./brandthread-agent";
+import aiConsentRouter from "./ai-consent";
 import savedRouter from "./saved";
 import collectionsRouter from "./collections";
 import productBulkRouter from "./product-bulk";
@@ -145,6 +147,7 @@ import threadCashRouter from "./thread-cash";
 import giftCardsRouter from "./gift-cards";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
+import configLiveRouter from "./config-live";
 import accessRouter from "./access";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
@@ -168,6 +171,7 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/config/live", configLiveRouter); // public: { liveAvailable } (Agora configured)
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
@@ -288,7 +292,9 @@ router.use("/conversations",             conversationsRouter);
 // Topic group chats (unlimited members). Public discovery + invite preview are
 // declared inside before the router applies requireAuth.
 router.use("/communities",               communitiesRouter);
-router.use("/brandthread-agent",         aiSafetyGuard("brandthread-agent", { mode: "chat" }), brandthreadAgentRouter);
+// requireAiConsent runs before aiSafetyGuard so no text reaches OpenAI (moderation included) without consent.
+router.use("/brandthread-agent",         requireAiConsent(), aiSafetyGuard("brandthread-agent", { mode: "chat" }), brandthreadAgentRouter);
+router.use("/ai-consent",                aiConsentRouter);
 // Stripe redirects the seller's browser here with no app session: mounted before the owner-only router.
 router.use("/seller/connect/onboard",    connectRedirectRouter);
 router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliate / creator program (seller side)

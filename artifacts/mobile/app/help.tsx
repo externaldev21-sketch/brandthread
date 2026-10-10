@@ -6,7 +6,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import { useUser } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -44,13 +44,18 @@ const CATEGORIES: { key: Category; icon: keyof typeof Feather.glyphMap }[] = [
 
 const POPULAR = FAQS.filter(f => f.popular);
 
+/** Same address as the Terms / Privacy Policy and REVIEW_NOTES.md. */
+const SUPPORT_EMAIL = 'support@brandthread.app';
+
 export default function HelpScreen() {
   const api = useApi();
   const { user } = useUser();
+  const { isSignedIn } = useAuth();
   const { theme } = useAppTheme();
   const s = useMemo(() => createStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView>(null);
   const [contactY, setContactY] = useState(0);
+  const [faqY, setFaqY] = useState(0);
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
@@ -66,6 +71,13 @@ export default function HelpScreen() {
   async function handleSubmitTicket() {
     if (!subject.trim() || !ticketBody.trim()) {
       Alert.alert('Missing info', 'Please fill in the subject and message before sending.');
+      return;
+    }
+    // Signed out (public Support URL): no account to file a ticket under, so
+    // hand the message to the mail app instead of calling the authed API.
+    if (!isSignedIn) {
+      const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`[${category}] ${subject.trim()}`)}&body=${encodeURIComponent(ticketBody.trim())}`;
+      Linking.openURL(url).catch(() => Alert.alert('Email us', SUPPORT_EMAIL));
       return;
     }
     setSubmitting(true);
@@ -167,7 +179,7 @@ export default function HelpScreen() {
         )}
 
         {/* FAQ list (search / category results, or the full list) */}
-        <View style={{ gap: SP.sm }}>
+        <View style={{ gap: SP.sm }} onLayout={(e) => setFaqY(e.nativeEvent.layout.y)}>
           <SectionHeader
             title={isSearching ? 'Results' : 'All questions'}
             action={activeCategory ? { label: 'Clear filter', onPress: () => setActiveCategory(null) } : undefined}
@@ -211,7 +223,7 @@ export default function HelpScreen() {
 
         {/* Contact shortcuts */}
         <View style={s.contactRow}>
-          <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('mailto:support@brandthread.app')} activeOpacity={0.8}>
+          <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} activeOpacity={0.8}>
             <Feather name="mail" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Email Us</Text>
           </TouchableOpacity>
@@ -219,11 +231,14 @@ export default function HelpScreen() {
             <Feather name="message-circle" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Live Chat</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('https://brandthread.app/help')} activeOpacity={0.8}>
+          <TouchableOpacity style={s.contactBtn} onPress={() => scrollRef.current?.scrollTo({ y: faqY, animated: true })} activeOpacity={0.8}>
             <Feather name="book-open" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Full Docs</Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} accessibilityRole="link" testID="help-support-email">
+          <Text style={s.supportEmail}>Email {SUPPORT_EMAIL}</Text>
+        </TouchableOpacity>
 
         {/* Support ticket form */}
         <View onLayout={(e) => setContactY(e.nativeEvent.layout.y)}>
@@ -317,6 +332,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   contactRow: { flexDirection: 'row', gap: SP.sm },
   contactBtn: { flex: 1, backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.md, alignItems: 'center', gap: SP.sm },
   contactLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
+  supportEmail: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', marginTop: -SP.sm },
 
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   categoryCard: { width: '31%', flexGrow: 1, backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, gap: 4, alignItems: 'flex-start' },

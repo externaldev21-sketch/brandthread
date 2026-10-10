@@ -20,6 +20,7 @@ import { useApi } from '@/lib/api';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
+import { useLiveAvailable } from '@/hooks/useLiveAvailable';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { useAgeStatus } from '@/lib/ageGate';
@@ -31,6 +32,7 @@ const GLASS = 'rgba(0,0,0,0.5)';
 
 export default function SellerGoLiveScreen() {
   const age = useAgeStatus();
+  const liveAvailable = useLiveAvailable();
   if (age.status !== 'ok') return <AgeRestrictedScreen title="Go live" status={age.status} onResolved={age.setBand} />;
   if (Platform.OS === 'web') {
     return (
@@ -40,6 +42,11 @@ export default function SellerGoLiveScreen() {
         description="Start a Brandthread live broadcast from the iOS or Android app, where camera and microphone access are available."
       />
     );
+  }
+  // BT-376 backstop: entry points hide Go Live when Agora isn't configured;
+  // a stale deep link lands here instead of a broadcast that cannot start.
+  if (liveAvailable === false) {
+    return <NativeOnlyFeature icon="video-off" title="Live video is unavailable" description="Going live isn't available right now." />;
   }
   return <SellerGoLiveNativeScreen />;
 }

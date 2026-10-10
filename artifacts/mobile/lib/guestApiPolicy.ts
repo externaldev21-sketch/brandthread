@@ -10,7 +10,7 @@
 const SIGNED_IN_ONLY_PREFIXES = [
   // Paid / AI generation
   'ai', 'logo', 'mockup', 'photography', 'bg-removal', 'lifestyle', 'techpack',
-  'design-studio', 'store/ai', 'brandthread-agent', 'meta-ads', 'ad-campaigns', 'boosts',
+  'design-studio', 'store/ai', 'brandthread-agent', 'ai-consent', 'meta-ads', 'ad-campaigns', 'boosts',
   // Account-scoped buyer data
   'conversations', 'notifications', 'notification-prefs', 'push',
   'buyer/notifications', 'buyer/payment-methods', 'buyer/saved', 'buyer/collections',
