@@ -524,12 +524,6 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
  * (a line already in the cart for the same variant is topped up and tagged).
  * All or nothing: if one item can't be added, nothing is.
  */
-export async function addBundleToCart(
-  bundle: PublicBundle,
-  selections: Record<string, string | undefined>,
-  seller?: { name?: string; handle?: string; avatarUri?: string },
-): Promise<{ success: boolean; message?: string; cart: Cart }> {
-
 async function askPushAfterAddToCart(userId: string): Promise<void> {
   try {
     const [{ requestContextualPushPermission }, { api }] = await Promise.all([
@@ -542,7 +536,11 @@ async function askPushAfterAddToCart(userId: string): Promise<void> {
   }
 }
 
-export async function updateCartItemQuantity(itemId: string, quantity: number): Promise<Cart> {
+export async function addBundleToCart(
+  bundle: PublicBundle,
+  selections: Record<string, string | undefined>,
+  seller?: { name?: string; handle?: string; avatarUri?: string },
+): Promise<{ success: boolean; message?: string; cart: Cart }> {
   const k = keys();
   const cart = await loadCart(k);
   const snapshot = snapshotOf(bundle);

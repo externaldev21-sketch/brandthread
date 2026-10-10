@@ -57,6 +57,9 @@ const {
       }),
       onboarding: vi.fn(record('auth.onboarding')),
       saveBuyerPreferences: vi.fn(record('auth.saveBuyerPreferences')),
+      accountTypes: vi.fn(async (ids: string[]) => ({
+        accountTypes: Object.fromEntries(ids.map((id) => [id, { accountType: id.includes('seller') ? 'seller' : 'buyer', username: null, avatarUrl: null, displayName: null, name: '' }])),
+      })),
       completeOnboarding: vi.fn(record('auth.completeOnboarding')),
     },
     referrals: {
@@ -103,6 +106,14 @@ const {
       hasPassword: false,
       finalized: false,
     },
+    // Server-side Clerk state for the "account exists" regression tests.
+    takenEmails: new Set<string>(),
+    takenUsernames: new Set<string>(),
+    singleSession: false,
+    deviceSessions: [] as { id: string; status: string; user: { id: string; emailAddresses: { emailAddress: string }[] } }[],
+    createCalls: [] as string[],
+    passwordCalls: 0,
+    setActiveCalls: [] as string[],
     notify() { this.listeners.forEach((fn) => fn()); },
   };
 
@@ -262,6 +273,18 @@ vi.mock('@clerk/expo', () => {
       clerkStore.notify();
       return { error: null };
     },
+    async create({ emailAddress, username }: { emailAddress: string; password?: string; username?: string }) {
+      clerkStore.createCalls.push(emailAddress);
+      const fail = (code: string, paramName: string) => ({
+        error: { code, message: 'taken', errors: [{ code, message: 'taken', meta: { paramName } }] },
+      });
+      if (clerkStore.singleSession && clerkStore.isSignedIn) return fail('session_exists', '');
+      if (clerkStore.takenEmails.has(emailAddress)) return fail('form_identifier_exists', 'email_address');
+      if (username && clerkStore.takenUsernames.has(username)) return fail('form_identifier_exists', 'username');
+      clerkStore.signUp = { status: 'missing_requirements', emailAddress, pendingCode: null, finalized: false };
+      clerkStore.notify();
+      return { error: null };
+    },
     verifications: {
       get emailAddress() { return { status: clerkStore.signUp.emailVerified ? 'verified' : 'unverified' }; },
       async sendEmailCode() {
@@ -312,10 +335,19 @@ vi.mock('@clerk/expo', () => {
       return { isLoaded: true, signUp };
     },
     useSSO: () => ({ startSSOFlow: vi.fn(async () => ({ createdSessionId: null })) }),
+    useClerk: () => ({
+      client: { sessions: clerkStore.deviceSessions },
+      setActive: async ({ session }: { session: string }) => { clerkStore.setActiveCalls.push(session); },
+    }),
   };
 });
 
 vi.mock('@/lib/api', () => ({ useApi: () => api }));
+
+// Debounced network availability check; the flow under test owns the rest.
+vi.mock('@/lib/onboarding/useUsernameLiveCheck', () => ({
+  useUsernameLiveCheck: () => ({ error: '', checking: false }),
+}));
 
 vi.mock('@/services/socialService', () => ({
   hydrateMyProfileFromAccount: vi.fn(async () => {}),
@@ -403,6 +435,17 @@ vi.mock('@/components/legal/LegalConsent', () => {
   return {
     // Sign-up shows one linked line; continuing is the agreement (no checkbox).
     LegalContinueNotice: () => React.createElement('Text', { testID: 'legal-consent-line' }),
+    LegalConsent: (props: { checked: boolean; onChange: (v: boolean) => void }) =>
+      React.createElement('LegalConsent', { testID: 'legal-consent-checkbox', ...props }),
+  };
+});
+
+// The real file pulls a CJS dependency that requires the un-mocked
+// react-native entry; the auth step only needs the field to exist.
+vi.mock('@/components/age/AgeNotices', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    AgeDobField: (props: Record<string, unknown>) => React.createElement('AgeDobField', props),
   };
 });
 
@@ -863,6 +906,132 @@ describe('Dev P0: a brand-new email never shows "this email already has an accou
     await submitNewEmail(renderer, 'taken@x.test');
     await tap(renderer, 'onboarding-email-switch');
     expect(routerReplaceMock).toHaveBeenCalledWith('/sign-in');
+  });
+});
+
+// ── Regression: a brand-new email must never hit "this email already has an
+// account". Dev reported it on create with an email never used before. The
+// screen is only for Clerk saying the EMAIL itself is taken.
+describe('onboarding sign-up — new email always reaches the code step', () => {
+  let renderer: ReactTestRenderer | undefined;
+
+  function resetClerk() {
+    clerkStore.isSignedIn = false;
+    clerkStore.userId = null;
+    clerkStore.signUp = { status: 'missing_requirements', emailAddress: null, pendingCode: null, finalized: false };
+    clerkStore.takenEmails = new Set();
+    clerkStore.takenUsernames = new Set();
+    clerkStore.singleSession = false;
+    clerkStore.deviceSessions = [];
+    clerkStore.createCalls = [];
+    clerkStore.passwordCalls = 0;
+    clerkStore.setActiveCalls = [];
+  }
+
+  beforeEach(() => {
+    memoryStorage.clear();
+    apiCalls.length = 0;
+    resetClerk();
+    routerReplaceMock.mockClear();
+    delete searchParams.addAccount;
+    delete searchParams.postAuth;
+  });
+
+  afterEach(async () => {
+    await act(async () => { renderer?.unmount(); });
+    renderer = undefined;
+    delete searchParams.addAccount;
+    delete searchParams.postAuth;
+  });
+
+  async function startCreate(role: 'buyer' | 'seller') {
+    renderer = await renderScreen();
+    await press(renderer, findByTestId(renderer, 'onboarding-welcome-get-started'));
+    await press(renderer, findByTestId(renderer, `onboarding-account-type-${role}`));
+    await press(renderer, findByTestId(renderer, 'onboarding-account-type-continue'));
+    return renderer;
+  }
+
+  function expectCodeStepFor(r: ReactTestRenderer, email: string) {
+    const text = screenText(r);
+    expect(onCodeStep(r)).toBe(true);
+    expect(text).toContain(email);
+    expect(text).not.toContain('already has');
+    expect(text).not.toContain('Already signed in');
+  }
+
+  it('(a) clean device', async () => {
+    const r = await startCreate('buyer');
+    await fillAndCreate(r, 'buyer', 'fresh-a@onboarding-e2e.test');
+    expectCodeStepFor(r, 'fresh-a@onboarding-e2e.test');
+  });
+
+  it('(b) device already signed into another account: no "Already signed in" screen, straight to the code', async () => {
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_other_account';
+    memoryStorage.set('onboarding_pending_flow', 'seller'); // lands on the Auth step while signed in
+    renderer = await renderScreen();
+    await act(async () => { await Promise.resolve(); });
+    expect(screenText(renderer)).not.toContain('Already signed in');
+    await fillAndCreate(renderer, 'seller', 'fresh-b@onboarding-e2e.test');
+    expectCodeStepFor(renderer, 'fresh-b@onboarding-e2e.test');
+  });
+
+  it('(b) single-session Clerk: the leftover session is signed out silently and the new sign-up continues', async () => {
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_other_account';
+    clerkStore.singleSession = true;
+    memoryStorage.set('onboarding_pending_flow', 'buyer');
+    renderer = await renderScreen();
+    await act(async () => { await Promise.resolve(); });
+    await fillAndCreate(renderer, 'buyer', 'fresh-b2@onboarding-e2e.test');
+    expect(clerkStore.isSignedIn).toBe(false);
+    expectCodeStepFor(renderer, 'fresh-b2@onboarding-e2e.test');
+  });
+
+  it('(c) an earlier sign-up abandoned at the code step is never reused for the new email', async () => {
+    clerkStore.signUp = { status: 'missing_requirements', emailAddress: 'abandoned@onboarding-e2e.test', pendingCode: '000000', finalized: false };
+    const r = await startCreate('buyer');
+    await fillAndCreate(r, 'buyer', 'fresh-c@onboarding-e2e.test');
+    expect(clerkStore.passwordCalls).toBe(0);
+    expect(clerkStore.createCalls).toEqual(['fresh-c@onboarding-e2e.test']);
+    expect(clerkStore.signUp.emailAddress).toBe('fresh-c@onboarding-e2e.test');
+    expectCodeStepFor(r, 'fresh-c@onboarding-e2e.test');
+  });
+
+  it('(d) multi-account "add account" flow', async () => {
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_source_account';
+    searchParams.addAccount = '1';
+    const r = await startCreate('seller');
+    await fillAndCreate(r, 'seller', 'fresh-d@onboarding-e2e.test');
+    expectCodeStepFor(r, 'fresh-d@onboarding-e2e.test');
+  });
+
+  it('a really-taken email that is signed in on this device: role-specific copy and one-tap switch', async () => {
+    clerkStore.takenEmails.add('owner@onboarding-e2e.test');
+    clerkStore.deviceSessions = [{
+      id: 'sess_owner',
+      status: 'active',
+      user: { id: 'user_seller_owner', emailAddresses: [{ emailAddress: 'owner@onboarding-e2e.test' }] },
+    }];
+    const r = await startCreate('seller');
+    await fillAndCreate(r, 'seller', 'owner@onboarding-e2e.test');
+    await act(async () => { await Promise.resolve(); });
+    expect(onCodeStep(r)).toBe(false);
+    expect(screenText(r)).toContain('This email already has a seller account.');
+    await act(async () => { findButtonByLabel(r, 'Switch to it').props.onPress(); await Promise.resolve(); });
+    expect(clerkStore.setActiveCalls).toEqual(['sess_owner']);
+  });
+
+  it('a really-taken email not on this device: generic copy, "Switch to it" opens log in with the email', async () => {
+    clerkStore.takenEmails.add('elsewhere@onboarding-e2e.test');
+    const r = await startCreate('buyer');
+    await fillAndCreate(r, 'buyer', 'elsewhere@onboarding-e2e.test');
+    expect(screenText(r)).toContain('This email already has an account.');
+    expect(screenText(r)).toContain('Use a different email');
+    await act(async () => { findButtonByLabel(r, 'Switch to it').props.onPress(); await Promise.resolve(); });
+    expect(routerReplaceMock).toHaveBeenCalledWith('/sign-in?email=elsewhere%40onboarding-e2e.test');
   });
 });
 

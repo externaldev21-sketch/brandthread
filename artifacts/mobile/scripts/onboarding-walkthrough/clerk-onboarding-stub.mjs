@@ -26,7 +26,8 @@
 export function clerkOnboardingStubScript() {
   return `(() => {
   const genId = (prefix) => prefix + '_' + Math.random().toString(36).slice(2, 10);
-  const usedEmails = new Set();
+  // Walkthroughs may seed emails that already belong to an account.
+  const usedEmails = new Set(Array.isArray(window.__BT_USED_EMAILS__) ? window.__BT_USED_EMAILS__ : []);
 
   // ── "backend" state for the in-flight sign-up attempt ──────────────────────
   function freshSignUpState() {
@@ -89,9 +90,10 @@ export function clerkOnboardingStubScript() {
     signUpListeners.forEach((fn) => { try { fn(); } catch {} });
   }
 
-  function fakeError(code, message, meta) {
-    const inner = meta ? { code, message, longMessage: message, meta } : { code, message, longMessage: message };
-    return { code, message, longMessage: message, clerkError: true, errors: [inner] };
+  // meta.paramName mirrors real Clerk: a duplicate names the field it hit.
+  function fakeError(code, message, paramName) {
+    const meta = paramName ? { paramName } : undefined;
+    return { code, message, longMessage: message, clerkError: true, meta, errors: [{ code, message, longMessage: message, meta }] };
   }
 
   function makeUser(profile) {
@@ -215,7 +217,7 @@ export function clerkOnboardingStubScript() {
       }
       const emailAddress = (params?.emailAddress || '').trim().toLowerCase();
       if (usedEmails.has(emailAddress)) {
-        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.', { paramName: 'email_address' }) };
+        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.', 'email_address') };
       }
       signUpState = {
         ...freshSignUpState(),
