@@ -30,6 +30,7 @@ const {
           invoices,
           checkout,
           portal: subscriptionPortal,
+          perks: vi.fn(async () => ({ plans: [], currentPlan: null, hasAdvancedAnalytics: false })),
         },
       },
     },
@@ -197,6 +198,11 @@ vi.mock('@/lib/theme', () => ({
   CONTENT_MAX_WIDTH: 720,
   GRID_MAX_WIDTH: 1080,
   BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
+  TABULAR: { fontVariant: ['tabular-nums'] },
+  TEXT: {
+    title1: { fontSize: 28 }, title2: { fontSize: 22 }, headline: { fontSize: 17 }, body: { fontSize: 17 },
+    subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 },
+  },
   TYPE: {
     largeTitle: { fontSize: 36, fontFamily: 'Inter_700Bold', lineHeight: 42 },
     title: { fontSize: 30, fontFamily: 'Inter_700Bold', lineHeight: 36 },
@@ -208,6 +214,24 @@ vi.mock('@/lib/theme', () => ({
     label: { fontSize: 11, fontFamily: 'Inter_600SemiBold', lineHeight: 14 },
   },
 }));
+
+// The billing screen's plan sheets and shared buttons are covered by
+// app/billing-plan.test.tsx; here they only need to render inertly.
+vi.mock('@/components/billing/PlanSheets', () => ({
+  ChangePlanSheet: () => null,
+  CancelPlanSheet: () => null,
+  PlanFeaturesSheet: () => null,
+  PlanOptionCard: () => null,
+}));
+
+vi.mock('@/components/ui', () => ({
+  Button: ({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) =>
+    React.createElement('Button', { testID, onPress }, label),
+  Icon: ({ name }: { name: string }) => React.createElement('Icon', { name }),
+  SkeletonBlock: () => null,
+  SkeletonLine: () => null,
+}));
+
 
 vi.mock('@/lib/growthTools', () => ({
   GROWTH_EXTRAS: [],

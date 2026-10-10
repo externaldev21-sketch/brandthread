@@ -107,6 +107,16 @@ describe("buildPlanPerks", () => {
     });
   });
 
+  it("carries each plan's product cap and team seats from the plan catalogue", () => {
+    const perks = buildPlanPerks();
+    for (const perk of perks) {
+      expect(perk.productLimit).toBe(PLAN_CATALOGUE[perk.planId].limits.products);
+      expect(perk.teamSeats).toBe(PLAN_CATALOGUE[perk.planId].limits.teamSeats);
+    }
+    expect(perks.find((p) => p.planId === "starter")).toMatchObject({ productLimit: 25, teamSeats: 0 });
+    expect(perks.find((p) => p.planId === "pro")).toMatchObject({ productLimit: null, teamSeats: null });
+  });
+
   it("only Pro has advanced analytics", () => {
     expect(hasAdvancedAnalytics("pro")).toBe(true);
     expect(hasAdvancedAnalytics("growth")).toBe(false);

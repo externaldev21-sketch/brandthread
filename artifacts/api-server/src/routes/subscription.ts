@@ -28,6 +28,7 @@ import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/
 import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
 import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
 import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
+import { cancellationDetailsFor, isCancelReasonId } from "../lib/cancelReasons";
 
 const router = Router();
 router.use(requireAuth);
@@ -241,6 +242,9 @@ router.get("/status", requireRole("owner"), async (req, res) => {
       trialBanner,
       amountCents,
       paymentMethodLabel: pmLabel,
+      // Set when the seller cancelled in-app: the plan stays until renewsOn,
+      // then ends. POST /resume clears it.
+      cancelAtPeriodEnd:  sub.cancel_at_period_end === true,
       // Reaching this branch means the persisted Stripe subscription was
       // retrieved successfully. Keep billing recovery pointed at Stripe even
       // when an unpaid subscription no longer grants an effective entitlement.
@@ -442,6 +446,69 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
     res.status(500).json({ error: "Failed to create subscription checkout" });
   }
 });
+
+/**
+ * POST /api/seller/subscription/cancel   — cancel at the end of the paid period
+ * POST /api/seller/subscription/resume   — undo a pending cancellation
+ * Stripe subscriptions only: App Store / Play subscriptions are cancelled in
+ * the store, so those answer 409 with code NATIVE_SUBSCRIPTION.
+ */
+async function setCancelAtPeriodEnd(req: any, res: any, cancel: boolean): Promise<void> {
+  try {
+    const clerkUserId = req.clerkUserId as string;
+    const effective = await getEffectiveEntitlement(clerkUserId);
+    if (effective.provider === "revenuecat") {
+      res.status(409).json({
+        error: "This plan is billed through the App Store or Google Play. Manage it in your store subscriptions.",
+        code: "NATIVE_SUBSCRIPTION",
+      });
+      return;
+    }
+    const [user] = await db
+      .select({ subscriptionId: users.subscriptionId })
+      .from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+    if (!user?.subscriptionId) {
+      res.status(409).json({ error: "You don't have a paid plan to change.", code: "NO_SUBSCRIPTION" });
+      return;
+    }
+    const stripe = requireStripe();
+    const sub = await (stripe.subscriptions.retrieve as any)(user.subscriptionId);
+    if (!sub || !["active", "trialing", "past_due"].includes(sub.status)) {
+      res.status(409).json({ error: "This subscription has already ended.", code: "SUBSCRIPTION_ENDED" });
+      return;
+    }
+    // Optional "main reason" from the in-app cancel flow → Stripe's own
+    // cancellation feedback. Unknown reasons are ignored, never an error.
+    const details = cancel ? cancellationDetailsFor(req.body?.reason, req.body?.comment) : null;
+    const updated = sub.cancel_at_period_end === cancel
+      ? sub
+      : await (stripe.subscriptions.update as any)(user.subscriptionId, {
+          cancel_at_period_end: cancel,
+          ...(details ? { cancellation_details: details } : {}),
+          metadata: {
+            ...(sub.metadata ?? {}),
+            clerkUserId,
+            cancelledInApp: cancel ? "true" : "false",
+            cancelReason: cancel && isCancelReasonId(req.body?.reason) ? req.body.reason : "",
+          },
+        });
+    const periodEnd = updated.current_period_end ? new Date(updated.current_period_end * 1000) : null;
+    req.log?.info?.({ clerkUserId, cancel }, "Seller subscription cancel_at_period_end changed");
+    res.json({
+      status: updated.status,
+      cancelAtPeriodEnd: updated.cancel_at_period_end === true,
+      endsAt: cancel && periodEnd ? periodEnd.toISOString() : null,
+    });
+  } catch (err: any) {
+    const status = err.status ?? 500;
+    if (status < 500) { res.status(status).json({ error: err.message }); return; }
+    req.log.error({ err }, cancel ? "Failed to cancel subscription" : "Failed to resume subscription");
+    res.status(500).json({ error: cancel ? "Failed to cancel subscription" : "Failed to resume subscription" });
+  }
+}
+
+router.post("/cancel", requireRole("owner"), (req, res) => setCancelAtPeriodEnd(req, res, true));
+router.post("/resume", requireRole("owner"), (req, res) => setCancelAtPeriodEnd(req, res, false));
 
 /**
  * POST /api/seller/subscription/portal

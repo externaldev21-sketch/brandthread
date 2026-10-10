@@ -1,10 +1,10 @@
 import { Router } from "express";
 import crypto from "node:crypto";
-import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks } from "@workspace/db";
+import { db, orders, orderItems, orderRefunds, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
 import { withItemProductIds } from "../lib/orderItemProducts";
-import { refundOrder, RefundError } from "../lib/money/refunds";
+import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds";
 import { orderStatusMachine, type OrderStatus } from "../lib/money/stateMachines";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
@@ -19,6 +19,7 @@ import { withRiskView } from "../lib/risk/orderRisk";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { notifyBuyerPreparing } from "../lib/delivery/notifications";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
+import { formatRefundAmount, parseSellerRefundRequest, sellerRefundBlockedReason } from "../lib/sellerRefundRequest";
 
 const router = Router();
 router.use(requireAuth);
@@ -593,6 +594,112 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
   }
 
   res.json(transitioned);
+});
+
+/** What can still be refunded (legacy rows only carry totalCents). */
+function refundableCentsOf(order: { grossChargedCents: number; totalCents: number; refundedCents: number }): number {
+  const gross = order.grossChargedCents > 0 ? order.grossChargedCents : order.totalCents;
+  return Math.max(0, gross - order.refundedCents);
+}
+
+// GET /api/orders/:id/refunds — refunds issued on this order (newest first)
+router.get("/:id/refunds", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const [order] = await db.select({ id: orders.id, refundedCents: orders.refundedCents, grossChargedCents: orders.grossChargedCents, totalCents: orders.totalCents })
+    .from(orders)
+    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
+    .limit(1);
+  if (!order) { res.status(404).json({ error: "Not found" }); return; }
+  const refunds = await db.select({
+    id: orderRefunds.id,
+    amountCents: orderRefunds.amountCents,
+    reason: orderRefunds.reason,
+    state: orderRefunds.state,
+    createdAt: orderRefunds.createdAt,
+    succeededAt: orderRefunds.succeededAt,
+  }).from(orderRefunds)
+    .where(eq(orderRefunds.orderId, order.id))
+    .orderBy(desc(orderRefunds.createdAt));
+  res.json({
+    refundedCents: order.refundedCents,
+    refundableCents: refundableCentsOf(order),
+    refunds,
+  });
+});
+
+// POST /api/orders/:id/refund — seller refunds part or all of what is left,
+// without cancelling the order (manager+). Body: { amountCents, reason, note?, requestId }
+router.post("/:id/refund", requireRole("manager"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const parsed = parseSellerRefundRequest(req.body);
+  if (!parsed.ok) { res.status(400).json({ error: parsed.error, code: parsed.code }); return; }
+  const { amountCents, reason, note, requestId } = parsed.value;
+
+  const [current] = await db.select().from(orders)
+    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
+    .limit(1);
+  if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  const blocked = sellerRefundBlockedReason(current);
+  if (blocked) { res.status(409).json(blocked); return; }
+
+  const actor = reqActor(req);
+  let result: Awaited<ReturnType<typeof refundOrder>>;
+  try {
+    result = await refundOrder({
+      orderId: current.id,
+      amountCents,
+      reason: "seller_refund",
+      initiatedBy: actor.actorClerkId,
+      idempotencyKey: `seller-refund/${current.id}/${requestId}`,
+      precondition: (locked) => {
+        if (locked.owner_id !== ownerId) throw new RefundError("Not found", 404, "ORDER_NOT_FOUND");
+        if (locked.status === "refund_pending") {
+          throw new RefundError("A refund is already in progress for this order.", 409, "REFUND_IN_PROGRESS");
+        }
+        if (orderGrossCents(locked) - locked.refunded_cents <= 0) {
+          throw new RefundError("This order has already been fully refunded.", 409, "ALREADY_REFUNDED");
+        }
+      },
+    });
+  } catch (err) {
+    if (err instanceof RefundError) {
+      const httpStatus = err.status >= 500 ? 502 : err.status;
+      if (httpStatus >= 500) req.log.error({ err, orderId: current.id }, "Seller refund failed");
+      res.status(httpStatus).json({
+        error: httpStatus >= 500 ? "The refund could not be processed. Nothing was charged back. Please try again." : err.message,
+        code: err.code,
+      });
+      return;
+    }
+    throw err;
+  }
+
+  const [updated] = await db.select().from(orders).where(eq(orders.id, current.id)).limit(1);
+  if (!result.duplicate) {
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Refunded ${formatRefundAmount(result.amountCents)} on order #${current.orderNumber}`,
+      "order", current.id, { amountCents: result.amountCents, reason, note, refundId: result.refundId },
+    );
+    if (current.buyerId) {
+      publishNotification({
+        userId:       current.buyerId,
+        category:     "orders",
+        pushCategory: "order",
+        type:         "refund_update",
+        title:        "You've been refunded",
+        body:         `${formatRefundAmount(result.amountCents)} is on its way back to you for order #${current.orderNumber}.`,
+        targetId:     current.id,
+        targetType:   "buyer_order",
+      }).catch(() => { /* non-critical */ });
+    }
+  }
+
+  res.json({
+    refund: result,
+    refundedCents: updated?.refundedCents ?? 0,
+    refundableCents: updated ? refundableCentsOf(updated) : 0,
+  });
 });
 
 // PATCH /api/orders/:id/tracking — fulfillment (staff+)
