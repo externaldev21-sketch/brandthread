@@ -91,6 +91,7 @@ import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
 import { pickRouteParam } from '@/lib/routeParamAliases';
 import { adCampaignToFormState } from '@/lib/adCampaignFormState';
+import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -494,9 +495,11 @@ export default function CreateAdScreen() {
 
       setLoading(true);
       try {
-        const fetchRes = await fetch(asset.uri);
+        // Photos go through the shared compress/resize step; videos as picked.
+        const prepared = kind === 'video' ? { uri: asset.uri, mimeType } : await prepareImageForUpload({ uri: asset.uri, mimeType }, 'product');
+        const fetchRes = await fetch(prepared.uri);
         const blob = await fetchRes.blob();
-        const uploadRes = await api.adCampaigns.uploadMedia(campaign.id, blob, mimeType, {
+        const uploadRes = await api.adCampaigns.uploadMedia(campaign.id, blob, prepared.mimeType || mimeType, {
           mediaKind: kind,
           ...(kind === 'video' && duration != null ? { durationSeconds: duration / 1000 } : {}),
         });

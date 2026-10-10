@@ -21,6 +21,7 @@ import {
 } from "../lib/storeIdentity";
 import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeration";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 // ─── Startup migration — add tutorial flag + questionnaire + profile columns ───
 (async () => {
@@ -199,6 +200,7 @@ function createProfileImageUploadHandler(
   label: string,
 ) {
   return [
+    acceptUploadSession({ allowedTypes: ["image/*"], maxBytes: maxBytes }),
     express.raw({ type: "image/*", limit: maxBytes }),
     async (req: express.Request, res: express.Response): Promise<void> => {
       const clerkId = (req as any).clerkUserId as string;

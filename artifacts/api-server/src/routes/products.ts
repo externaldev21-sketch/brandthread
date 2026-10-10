@@ -88,6 +88,7 @@ const importProductsBody = bodyObject({
     tags: importCell,
   }).passthrough()).max(1_000),
 });
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -159,6 +160,7 @@ async function hasProductCapacity(tx: any, ownerId: string, limit: number | null
 router.post(
   "/images",
   requireRole("manager"),
+  acceptUploadSession({ allowedTypes: ["image/*"], maxBytes: MAX_PRODUCT_IMAGE_BYTES }),
   express.raw({ type: "image/*", limit: MAX_PRODUCT_IMAGE_BYTES }),
   async (req, res): Promise<void> => {
     const ownerId = (req as any).clerkUserId as string;

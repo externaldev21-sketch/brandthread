@@ -32,6 +32,7 @@ import { CreateProductionOrderBody } from "@workspace/api-zod";
 import { connectReadiness } from "./manufacturer-connect";
 import { afterStageChange } from "../lib/manufacturerOrders";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const router = Router();
 router.use(requireAuth);
@@ -957,7 +958,7 @@ router.post("/:id/images/request-upload", async (_req, res) => {
 // ── POST /api/sample-orders/:id/images/upload ─────────────────────────────────
 // A raw, authenticated upload avoids an unconstrained client-direct storage write.
 // The parser rejects bodies above 20 MB before any object is created.
-router.post("/:id/images/upload", express.raw({ type: "image/*", limit: MAX_IMAGE_BYTES }), async (req, res) => {
+router.post("/:id/images/upload", acceptUploadSession<{ id: string }>({ allowedTypes: ["image/*"], maxBytes: MAX_IMAGE_BYTES }), express.raw({ type: "image/*", limit: MAX_IMAGE_BYTES }), async (req, res) => {
   try {
     const clerkUserId = (req as any).clerkUserId as string;
     const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();

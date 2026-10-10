@@ -39,6 +39,7 @@ import {
 import { publishNotification } from "./notifications-feed";
 import { serializeMessage } from "./manufacturers";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { acceptUploadSession } from "../lib/uploadSessions";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -427,6 +428,7 @@ router.post("/orders/:orderId/confirm-delivery", ...participantAuth, async (req,
 router.post(
   "/orders/:orderId/updates/photo",
   ...participantAuth,
+  acceptUploadSession({ allowedTypes: ["image/*"], maxBytes: MAX_IMAGE_BYTES }),
   express.raw({ type: "image/*", limit: MAX_IMAGE_BYTES }),
   async (req, res) => {
     try {

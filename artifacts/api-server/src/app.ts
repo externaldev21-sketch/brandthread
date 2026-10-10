@@ -94,6 +94,16 @@ app.use(
   express.raw({ type: "application/json" }),
 );
 
+// Mux (HLS video transcode) webhooks are HMAC-signed over the raw body.
+app.use(
+  "/api/webhooks/mux",
+  express.raw({ type: "application/json", limit: "1mb" }),
+);
+app.use(
+  "/api/v1/webhooks/mux",
+  express.raw({ type: "application/json", limit: "1mb" }),
+);
+
 // Shopify webhooks are HMAC-signed over the raw body too.
 app.use(
   "/api/webhooks/shopify",

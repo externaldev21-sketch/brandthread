@@ -744,9 +744,16 @@ export const posts = pgTable('posts', {
   repostKind: text('repost_kind'), // null | 'quote'
   /** The video post this one remixes (migration 119; FK ON DELETE SET NULL in SQL). */
   remixOfPostId: uuid('remix_of_post_id'),
+  // Adaptive streaming copy of a video post (migration 270). Only written when
+  // the Mux integration is configured (MUX_* env); the feed plays the HLS URL
+  // when present and the original MP4 otherwise.
+  videoHlsUrl: text('video_hls_url'),
+  videoMuxAssetId: text('video_mux_asset_id'),
+  videoHlsStatus: text('video_hls_status'), // null | 'pending' | 'ready' | 'errored'
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
+  muxAssetIdx: index('posts_video_mux_asset_idx').on(table.videoMuxAssetId).where(sql`${table.videoMuxAssetId} IS NOT NULL`),
   quotedPostFk: foreignKey({ columns: [table.quotedPostId], foreignColumns: [table.id], name: 'posts_quoted_post_id_fkey' }).onDelete('set null'),
   quotedPostIdx: index('posts_quoted_post_idx').on(table.quotedPostId).where(sql`${table.quotedPostId} IS NOT NULL`),
   userCreatedPublishedIdx: index('posts_user_created_published_idx')

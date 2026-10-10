@@ -22,6 +22,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import type { CommunityAttachment } from '@/lib/communities/types';
 import type { DisplayMessage } from '@/lib/communities/chatMerge';
 import type { SendOutcome } from './useCommunityChat';
+import { prepareImageBase64ForUpload } from '@/lib/imageUploadPrep';
 
 /** Links the message list's KeyboardGestureArea to this TextInput (interactive keyboard dismiss). */
 export const COMMUNITY_CHAT_INPUT_ID = 'community-chat-composer-input';
@@ -116,11 +117,19 @@ export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply,
       height: a.height,
       state: 'uploading',
     }));
-    staged.forEach((p, i) => { if (picked[i].base64) base64Ref.current.set(p.key, picked[i].base64 as string); });
     setInlineNote(null);
     setPhotos((prev) => [...prev, ...staged]);
-    for (const p of staged) await uploadOne(p.key, p.mimeType);
-  }, [onNotice, photos.length, uploadOne]);
+    for (let i = 0; i < staged.length; i += 1) {
+      const p = staged[i];
+      // Compressed (message preset); falls back to the picker's own bytes.
+      const prepared = await prepareImageBase64ForUpload({ uri: p.uri, mimeType: p.mimeType, base64: picked[i].base64 }, 'message');
+      if (prepared) {
+        base64Ref.current.set(p.key, prepared.base64);
+        if (prepared.mimeType !== p.mimeType) patchPhoto(p.key, { mimeType: prepared.mimeType });
+      }
+      await uploadOne(p.key, prepared?.mimeType ?? p.mimeType);
+    }
+  }, [onNotice, patchPhoto, photos.length, uploadOne]);
 
   const removePhoto = useCallback((key: string) => {
     base64Ref.current.delete(key);

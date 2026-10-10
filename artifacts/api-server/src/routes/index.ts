@@ -169,6 +169,8 @@ import packagePresetsRouter from "./package-presets";
 import webhooksShippoRouter from "./webhooks-shippo";
 import releaseTestControlRouter from "./release-test-control";
 import webhooksShopifyRouter from "./webhooks-shopify";
+import uploadSessionsRouter from "./upload-sessions";
+import muxWebhookRouter from "./webhooks-mux";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
 import sharePreviewRouter from "./share-preview";
@@ -234,6 +236,7 @@ router.use("/checkout-profile", checkoutProfileRouter); // public: store languag
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/webhooks/shopify", webhooksShopifyRouter);
+router.use("/webhooks/mux",     muxWebhookRouter); // HLS transcode status (off unless MUX_* env is set)
 // Shopify's OAuth redirect hits the seller's browser directly (no Brandthread
 // session) — mounted unauthenticated, before the authenticated /shopify group.
 router.use("/shopify/oauth/callback", shopifyOauthCallbackRouter);
@@ -353,6 +356,7 @@ router.use("/product-qa",                tc, productQaRouter);
 router.use("/posts",                     postCommentsRouter);
 router.use("/posts",                     postCaptionsRouter);
 router.use("/posts",                     tc, postsRouter);
+router.use("/upload-sessions",           uploadSessionsRouter); // resumable chunked uploads; owned by the signed-in person, no tc
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
 router.use("/moderation",                auditModerationActions, moderationRouter);

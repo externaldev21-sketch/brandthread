@@ -31,6 +31,7 @@ import { scheduleAutoCaptions } from "../lib/captions";
 import { repostsAllowedBy } from "../lib/interactionSettings";
 import { checkRemix, remixCredits } from "../lib/remix";
 import { cleanTaggedUserIds, MAX_POST_USER_TAGS, recordPostUserTags } from "../lib/tagApproval";
+import { scheduleHlsTranscode, scheduleMuxAssetRemoval } from "../lib/muxVideo";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
 import { notifyCaptionMentions } from "../lib/activityEvents";
@@ -1118,6 +1119,10 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
     post,
   }).catch((err) => req.log.error({ err, postId: post.id }, "Could not record people tags"));
   const remixOf = (await remixCredits([post])).get(post.id) ?? null;
+  // HLS streaming copy: additive, fire-and-forget, no-op unless MUX_* env is set.
+  if (post.mediaType === "video" && postStatus === "published" && !postHeld) {
+    scheduleHlsTranscode(post.id, singleVideo ? slideRecords[0].path : mediaPath);
+  }
 
   return res.status(201).json({
     ...withQuote,
@@ -1546,6 +1551,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
     .where(and(eq(posts.id, id), eq(posts.userId, clerkId)))
     .returning({ id: posts.id });
   if (!deleted) return res.status(404).json({ error: "Post not found" });
+  scheduleMuxAssetRemoval(existing.videoMuxAssetId);
 
   // Fire-and-forget: clean up all composed slide media paths
   const slidePaths = [

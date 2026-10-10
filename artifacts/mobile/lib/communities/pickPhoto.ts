@@ -5,6 +5,7 @@
  */
 import * as ImagePicker from 'expo-image-picker';
 import type { CommunityClient } from './useCommunityClient';
+import { prepareImageBase64ForUpload } from '@/lib/imageUploadPrep';
 
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -20,8 +21,10 @@ export async function pickAndUploadCommunityPhoto(client: CommunityClient): Prom
   });
   if (result.canceled || !result.assets[0]) return null;
   const asset = result.assets[0];
-  if (!asset.base64) throw new Error("We couldn't read that photo. Try another one.");
-  const mimeType = asset.mimeType && ALLOWED.has(asset.mimeType) ? asset.mimeType : 'image/jpeg';
-  const { url } = await client.uploadPhoto({ data: asset.base64, mimeType });
+  const fallbackMime = asset.mimeType && ALLOWED.has(asset.mimeType) ? asset.mimeType : 'image/jpeg';
+  // Group photos are small squares: compressed with the avatar preset.
+  const prepared = await prepareImageBase64ForUpload({ uri: asset.uri, mimeType: asset.mimeType, base64: asset.base64 }, 'avatar', fallbackMime);
+  if (!prepared) throw new Error("We couldn't read that photo. Try another one.");
+  const { url } = await client.uploadPhoto({ data: prepared.base64, mimeType: prepared.mimeType });
   return { uri: asset.uri, url };
 }

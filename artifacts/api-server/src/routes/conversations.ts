@@ -46,6 +46,7 @@ import { publicPostCondition } from "../lib/postVisibility";
 import {
   DM_MEDIA_OBJECT_PREFIX, DM_MEDIA_SIGNED_URL_TTL_SEC, dmMediaContextFromEnv, signDmMediaPath, signDmMessageMedia,
 } from "../lib/dmMedia";
+import { readUploadSession, UPLOAD_SESSION_TYPES } from "../lib/uploadSessions";
 
 const router = Router();
 
@@ -1380,31 +1381,42 @@ const UPLOAD_MEDIA_BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
 
 router.post("/upload-media", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { data, mimeType = "image/jpeg" } = req.body ?? {};
+  const { data, mimeType = "image/jpeg", uploadId } = req.body ?? {};
 
   if (!(process.env.PRIVATE_OBJECT_DIR ?? "").trim()) {
     return res.status(503).json({ error: "Object storage not configured" });
   }
 
-  if (!data || typeof data !== "string") {
-    return res.status(400).json({ error: "data (base64) is required" });
-  }
+  let buffer: Buffer;
+  let normalizedMimeType: string;
+  if (typeof uploadId === "string" && uploadId) {
+    // Large media (videos) arrive as a completed resumable upload session
+    // instead of an in-memory base64 string (lib/uploadSessions.ts).
+    const read = await readUploadSession(req, res, uploadId, { allowedTypes: UPLOAD_SESSION_TYPES, maxBytes: 60 * 1024 * 1024 });
+    if (!read.ok) return res.status(read.status).json({ error: read.error });
+    buffer = read.buffer;
+    normalizedMimeType = read.contentType;
+  } else {
+    if (!data || typeof data !== "string") {
+      return res.status(400).json({ error: "data (base64) is required" });
+    }
 
-  // Strip data-URL prefix if present
-  let base64 = data;
-  const dataUrlMatch = /^data:([^;]+);base64,(.+)$/.exec(data);
-  if (dataUrlMatch) base64 = dataUrlMatch[2];
+    // Strip data-URL prefix if present
+    let base64 = data;
+    const dataUrlMatch = /^data:([^;]+);base64,(.+)$/.exec(data);
+    if (dataUrlMatch) base64 = dataUrlMatch[2];
 
-  // 80 MB safety cap (base64 is ~4/3 × raw size)
-  if (base64.length > 80 * 1024 * 1024) {
-    return res.status(413).json({ error: "File too large (max ~60 MB)" });
-  }
-  if (!UPLOAD_MEDIA_BASE64_RE.test(base64)) {
-    return res.status(400).json({ error: "data must be base64-encoded" });
-  }
+    // 80 MB safety cap (base64 is ~4/3 × raw size)
+    if (base64.length > 80 * 1024 * 1024) {
+      return res.status(413).json({ error: "File too large (max ~60 MB)" });
+    }
+    if (!UPLOAD_MEDIA_BASE64_RE.test(base64)) {
+      return res.status(400).json({ error: "data must be base64-encoded" });
+    }
 
-  const normalizedMimeType = typeof mimeType === "string" ? mimeType.toLowerCase() : "";
-  const buffer = Buffer.from(base64, "base64");
+    normalizedMimeType = typeof mimeType === "string" ? mimeType.toLowerCase() : "";
+    buffer = Buffer.from(base64, "base64");
+  }
   const check = checkUpload(normalizedMimeType, buffer);
   if (!check.ok) return res.status(check.status).json({ error: check.error });
   const ext = check.ext;

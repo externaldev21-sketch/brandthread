@@ -61,7 +61,9 @@ describe('Feed video list virtualization bounds', () => {
     // the round 3 PR description). `readyToPlay` (backed by the video
     // element's own `canplay`/readyState>=3 on web) confirms there is
     // actually something to paint before the poster comes down.
-    expect(feed).toContain("const showPoster = Boolean(posterSource || posterUri) && !(hasStarted && readyToPlay);");
+    expect(feed).toContain("const videoVisible = shouldRevealVideo({ hasStarted, readyToPlay, firstFrameRendered, firstFrameTimedOut });");
+    expect(feed).toContain("const showPoster = Boolean(posterSource || posterUri) && !videoVisible;");
+    expect(feed).toContain("onFirstFrameRender={() => setFirstFrameRendered(true)}");
     expect(feed).toContain("player.addListener('statusChange', ({ status }) => {");
     expect(feed).toContain("if (status === 'readyToPlay') setReadyToPlay(true);");
   });
