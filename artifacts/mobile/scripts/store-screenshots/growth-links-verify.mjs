@@ -12,7 +12,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { clerkStubScript } from './clerk-stub.mjs';
-import { DEFAULT_BUILD_DIR, MOBILE_ROOT, launchBrowser, openContext, openScreen, serveBuild, waitForImages, waitForQuietNetwork } from './harness.mjs';
+import { DEFAULT_BUILD_DIR, MOBILE_ROOT, launchBrowser, openContext, serveBuild, waitForImages, waitForQuietNetwork } from './harness.mjs';
 import { BUYER_USER, DEMO_NOW, DEMO_TIME_ZONE, IMAGE_HOST, respond } from './demo-data.mjs';
 import { ensureDemoImages } from './demo-images.mjs';
 
@@ -88,7 +88,7 @@ async function main() {
           const cors = { 'access-control-allow-origin': origin, 'access-control-allow-headers': 'authorization,content-type,x-store-context', 'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS' };
           if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
           lastApi = Date.now();
-          const key = `${req.method()} ${u.pathname}`;
+          const key = `${req.method()} ${u.pathname.replace(/^\/api\/v1\//, '/api/')}`;
           report.guestRequests.push(`${name}: ${key}`);
           if (req.headers().authorization) report.violations.push(`${name}: ${key} sent an Authorization header while signed out`);
           const body = FAKE[key] ?? respond({ method: req.method(), path: u.pathname, query: u.searchParams, role: 'buyer', options: {} });
@@ -102,6 +102,7 @@ async function main() {
       await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20000 }).catch(() => {});
       const end = Date.now() + 10000;
       while (Date.now() < end && Date.now() - lastApi < 1200) await page.waitForTimeout(100);
+      await page.getByText('Necessary only', { exact: true }).first().click({ timeout: 2500 }).catch(() => {});
       await page.waitForTimeout(1500);
       await waitForImages(page, 6000);
       await page.screenshot({ path: path.join(OUT, `${name}.png`) });
@@ -115,19 +116,30 @@ async function main() {
     await guestShot('guest-giveaway-link', '/g/AB12CD34');
     await guestShot('guest-invite-link-iphone', '/invite/K7M2PQ');
 
-    const signedIn = async (name, role, target, extraQuery = '') => {
+    const signedIn = async (name, role, target, extraQuery = '', full = false) => {
       const { context, page, activity } = await openContext(browser, { device, role, origin, images });
-      await openScreen(page, activity, origin, role, target, { extraQuery });
+      await page.goto(`${origin}/?bt_preview=${role}${extraQuery}`);
+      await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20000 }).catch(() => {});
+      await page.waitForTimeout(2500);
+      const url = extraQuery ? `${target}${target.includes('?') ? '&' : '?'}${extraQuery.replace(/^&/, '')}` : target;
+      await page.evaluate((u) => { history.pushState(history.state, '', u); window.dispatchEvent(new PopStateEvent('popstate', { state: history.state })); }, url);
       await waitForQuietNetwork(activity, 800, 10000);
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(2000);
+      await page.getByText('Necessary only', { exact: true }).first().click({ timeout: 2500 }).catch(() => {});
+      await page.waitForTimeout(600);
       await waitForImages(page, 6000);
       await page.screenshot({ path: path.join(OUT, `${name}.png`) });
       report.textFit[name] = await textFit(page);
       report.landedOn[name] = new URL(page.url()).pathname;
+      if (full) {
+        await page.setViewportSize({ width: 393, height: 1900 });
+        await page.waitForTimeout(800);
+        await page.screenshot({ path: path.join(OUT, `${name}-full.png`) });
+      }
       await context.close();
     };
-    await signedIn('buyer-menu', 'buyer', '/buyer-settings-menu');
-    await signedIn('seller-marketing-growth', 'seller', '/marketing', '&demo=1');
+    await signedIn('buyer-menu', 'buyer', '/buyer-settings-menu', '', true);
+    await signedIn('seller-marketing-growth', 'seller', '/marketing', '&demo=1', true);
     await signedIn('seller-refer-a-brand', 'seller', '/seller-refer', '&demo=1');
     await signedIn('seller-store-domain', 'seller', '/store-domain');
   } finally {
