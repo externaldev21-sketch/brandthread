@@ -527,6 +527,10 @@ export const orders = pgTable('orders', {
   riskScore: integer('risk_score'),
   riskFlags: jsonb('risk_flags').$type<Array<{ code: string; label: string; severity: 'info' | 'medium' | 'high' }>>().default([]),
   riskReviewed: boolean('risk_reviewed'),
+  // Loyalty / referral points redeemed on this order (platform-funded, BT-066,
+  // migration 340) and the top-up transfer that paid the seller for them.
+  loyaltyAppliedCents: integer('loyalty_applied_cents').notNull().default(0),
+  stripeLoyaltyTransferId: text('stripe_loyalty_transfer_id'),
   // ── Delivery guarantee (see api-server lib/delivery, migration 110) ───────
   // deliverBy is stamped at purchase: paid_at + 15 days (60 for a pre-order).
   // NULL on orders that predate the guarantee.

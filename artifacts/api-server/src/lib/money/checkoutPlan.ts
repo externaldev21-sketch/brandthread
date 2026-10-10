@@ -132,6 +132,19 @@ export async function resolveChargePlan(input: {
 }
 
 /**
+ * STRIPE_ON_BEHALF_OF=1 (default off) makes a destination charge settle on the
+ * seller's connected account (`on_behalf_of`): the seller is the settlement
+ * merchant, their statement descriptor shows, and disputes debit their
+ * account, while Brandthread keeps the application fee. Only applies to
+ * destination charges (PAYOUT_MODE=immediate). Do not turn on before the
+ * Stripe sign-off in docs/payments/merchant-of-record.md.
+ */
+export function onBehalfOfEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env.STRIPE_ON_BEHALF_OF?.trim().toLowerCase();
+  return raw === "1" || raw === "true";
+}
+
+/**
  * The Stripe payment_intent_data fragment and the fee decision to persist
  * alongside the checkout. Destination charges carry the application fee;
  * held charges stay on Brandthread's balance, grouped by drop.
@@ -183,6 +196,7 @@ export function paymentIntentMoney(input: {
   return {
     paymentIntentData: {
       transfer_data: { destination: input.sellerStripeAccountId },
+      ...(onBehalfOfEnabled() ? { on_behalf_of: input.sellerStripeAccountId } : {}),
       application_fee_amount: fee.applicationFeeCents,
       metadata: { chargeModel: "destination" },
     },

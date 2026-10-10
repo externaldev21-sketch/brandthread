@@ -125,12 +125,17 @@ async function ship(orderId: string, trackingNumber = `1Z${uid("trk")}`) {
   return trackingNumber;
 }
 
+const BROOKLYN = { street: "1 Main St", city: "Brooklyn", state: "NY", zip: "11201", country: "US" };
+
+/** Carrier "delivered" for seller-typed tracking whose destination matches the order (BT-070). */
 async function carrierDelivers(orderId: string, trackingNumber: string, when: Date) {
   vi.setSystemTime(when);
+  await db.update(orders).set({ shippingAddress: BROOKLYN }).where(eq(orders.id, orderId));
   await applyShippoTrack(orderId, trackingNumber, {
     tracking_number: trackingNumber,
     tracking_status: { status: "DELIVERED", status_details: "Delivered, left at front door", status_date: when.toISOString(), location: { city: "Brooklyn", state: "NY" } },
     tracking_history: [{ status: "TRANSIT", status_details: "Out for delivery", status_date: new Date(when.valueOf() - 4 * HOUR).toISOString() }],
+    address_to: { city: "Brooklyn", state: "NY", zip: "11201", country: "US" },
   });
 }
 
@@ -624,5 +629,46 @@ describe("recordDelivery", () => {
     const res = await recordDelivery({ orderId: order.id, source: "carrier", at: at(17) });
     expect(res).toMatchObject({ changed: false, blocked: "cancelled" });
     expect((await reloadOrder(order.id)).status).toBe("cancelled");
+  });
+});
+
+describe("seller-typed tracking must match the order's destination (BT-070)", () => {
+  async function deliveredScan(orderId: string, tracking: string, addressTo: Record<string, string> | null) {
+    await db.update(orders).set({ shippingAddress: BROOKLYN }).where(eq(orders.id, orderId));
+    vi.setSystemTime(at(5));
+    await applyShippoTrack(orderId, tracking, {
+      tracking_number: tracking,
+      tracking_status: { status: "DELIVERED", status_details: "Delivered", status_date: at(5).toISOString() },
+      ...(addressTo ? { address_to: addressTo } : {}),
+    });
+  }
+
+  it("a delivered scan to another ZIP does not deliver the order and flags it", async () => {
+    const { order } = await place();
+    const tracking = await ship(order.id);
+    await deliveredScan(order.id, tracking, { city: "Austin", state: "TX", zip: "73301" });
+    const after = await reloadOrder(order.id);
+    expect(after.deliveredAt).toBeNull();
+    expect(after.payoutReleaseAt).toBeNull();
+    expect((after.riskFlags ?? []).map((f: any) => f.code)).toContain("tracking_destination_mismatch");
+  });
+
+  it("a delivered scan with no destination data waits for the buyer", async () => {
+    const { order, buyer } = await place();
+    const tracking = await ship(order.id);
+    await deliveredScan(order.id, tracking, null);
+    expect((await reloadOrder(order.id)).deliveredAt).toBeNull();
+    const confirmed = await call(app.base, "POST", `/api/buyer/orders/${order.id}/confirm-receipt`, buyer, {});
+    expect(confirmed.status).toBe(200);
+    const after = await reloadOrder(order.id);
+    expect(after.deliveredAt).not.toBeNull();
+    expect(after.deliveryConfirmedBy).toBe("buyer");
+  });
+
+  it("a matching ZIP+4 is accepted", async () => {
+    const { order } = await place();
+    const tracking = await ship(order.id);
+    await deliveredScan(order.id, tracking, { city: "BROOKLYN", state: "NY", zip: "11201-4410" });
+    expect((await reloadOrder(order.id)).deliveredAt).not.toBeNull();
   });
 });

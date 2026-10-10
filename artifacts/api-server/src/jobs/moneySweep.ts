@@ -1,5 +1,6 @@
 import { logger } from "../lib/logger";
 import { runMoneySweep } from "../lib/money/dropLifecycle";
+import { sweepLoyaltySellerTopups } from "../lib/money/loyaltyTopup";
 
 const INTERVAL_MS = 5 * 60 * 1000;
 let running = false;
@@ -18,6 +19,9 @@ export async function runMoneySweepJob(now = new Date()): Promise<void> {
     if (result.failedDrops.length || result.completedDrops || result.releasesSettled) {
       logger.info({ job: "moneySweep", ...result }, "Money sweep made progress");
     }
+    // BT-066: pay sellers for redeemed loyalty points once their payout left.
+    const loyaltyTopups = await sweepLoyaltySellerTopups();
+    if (loyaltyTopups) logger.info({ job: "moneySweep", loyaltyTopups }, "Loyalty seller top-ups sent");
   } catch (err) {
     logger.error({ err, job: "moneySweep" }, "Money sweep failed");
   } finally {
