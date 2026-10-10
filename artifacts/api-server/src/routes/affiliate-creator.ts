@@ -21,6 +21,16 @@ import { attributionExpiry, isSelfReferral, normalizeAffiliateCode } from "../li
 import { generateUniqueCode, getProgram, syncDiscountCode } from "../lib/affiliate/service";
 import { creatorAccountState, payoutsConfigured } from "../lib/affiliate/payouts";
 import { creatorBrandRows, creatorPayoutRows, sumStats } from "../lib/affiliate/queries";
+import { CREATOR_CONNECT_REFRESH_PATH, CREATOR_CONNECT_RETURN_PATH, creatorConnectLanding } from "../lib/affiliate/connectReturn";
+
+/** Stripe Connect return/refresh for creators (BT-323), mounted at /api/affiliate/connect. */
+export const affiliateConnectRedirectRouter = Router();
+affiliateConnectRedirectRouter.get("/return", (req, res) => {
+  res.redirect(302, creatorConnectLanding(req.get("user-agent"), "returned"));
+});
+affiliateConnectRedirectRouter.get("/refresh", (req, res) => {
+  res.redirect(302, creatorConnectLanding(req.get("user-agent"), "refresh"));
+});
 
 const router = Router();
 router.use(requireAuth);
@@ -264,11 +274,11 @@ router.post("/payout-account/onboard", async (req, res) => {
       await db.update(users).set({ stripeAccountId: accountId, stripeAccountStatus: "pending", updatedAt: new Date() })
         .where(and(eq(users.clerkId, creatorId), sql`${users.stripeAccountId} IS NULL`));
     }
-    const baseUrl = `${getWebOrigin("https://localhost:3000")}/api-server`;
+    const origin = getWebOrigin("https://localhost:3000");
     const link = await client.accountLinks.create({
       account: accountId,
-      refresh_url: `${baseUrl}/seller/connect/onboard/refresh`,
-      return_url: `${baseUrl}/seller/connect/onboard/return`,
+      refresh_url: `${origin}${CREATOR_CONNECT_REFRESH_PATH}`,
+      return_url: `${origin}${CREATOR_CONNECT_RETURN_PATH}`,
       type: "account_onboarding",
     });
     res.json({ url: link.url });
