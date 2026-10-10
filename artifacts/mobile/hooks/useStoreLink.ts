@@ -1,7 +1,6 @@
 /**
  * The seller's store link with its three actions — copy, share, save QR —
- * for the Store link card (Share store, the Add Product publish sheet). Copying
- * or sharing marks the dashboard checklist's "Share your store" step done.
+ * for the Store link card (Share store, the Add Product publish sheet).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Share } from 'react-native';
@@ -64,12 +63,6 @@ export function useStoreLink(): StoreLinkState {
   useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
 
   const url = sellerStoreLink(profile?.username);
-  // Ticks "Share your store" on the dashboard checklist (server-side, so it
-  // follows the seller across devices). Best effort; never blocks the share.
-  const markShared = useCallback(() => {
-    if (isSellerDevPreview()) return;
-    api.seller.launchChecklist.storeShared().catch(() => {});
-  }, [api]);
   const flash = (set: (v: boolean) => void) => {
     set(true);
     timers.current.push(setTimeout(() => set(false), 2000));
@@ -81,23 +74,21 @@ export function useStoreLink(): StoreLinkState {
     try {
       await writeClipboard(url);
       flash(setCopied);
-      markShared();
     } catch {
       Alert.alert("Couldn't copy the link", 'Try again.');
     }
-  }, [markShared, url]);
+  }, [url]);
 
   const share = useCallback(async () => {
     if (!url) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
       const name = profile?.brandName ?? (profile?.username ? `@${profile.username}` : 'my store');
-      const result = await Share.share({ message: `Shop ${name} on Brandthread: ${url}`, url });
-      if (result.action !== Share.dismissedAction) markShared();
+      await Share.share({ message: `Shop ${name} on Brandthread: ${url}`, url });
     } catch {
       // dismissed or unavailable
     }
-  }, [markShared, profile, url]);
+  }, [profile, url]);
 
   const saveQr = useCallback(async () => {
     if (!url) return;
@@ -105,14 +96,13 @@ export function useStoreLink(): StoreLinkState {
     const result = await saveImageToCameraRoll(storeQrDataUri(url), 'brandthread-store-qr');
     if (result.ok) {
       flash(setSaved);
-      markShared();
       return;
     }
     Alert.alert(
       result.reason === 'permission' ? 'Photos access is off' : "Couldn't save the QR code",
       result.reason === 'permission' ? 'Allow Photos access in Settings to save your QR code.' : 'Try again.',
     );
-  }, [markShared, url]);
+  }, [url]);
 
   return {
     loading, url, brandName: profile?.brandName ?? null, username: profile?.username ?? null,

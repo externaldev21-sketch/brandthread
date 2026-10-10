@@ -79,8 +79,8 @@ import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProdu
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
-import { ReadyToSellChecklist } from '@/components/ReadyToSellChecklist';
-import { useReadyToSell } from '@/hooks/useReadyToSell';
+import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
+import { getReadyRows } from '@/lib/launchChecklist';
 import {
   BG,
   FG,
@@ -652,10 +652,14 @@ export default function SellerHomeCommerceDashboard({
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
   const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
-  // Shopify's "Get ready to sell" until the first sale, then the sales hero.
-  // If the checklist can't load, the previous setup card stays as the fallback.
-  const readyToSell = useReadyToSell();
-  const showReadyToSell = newSeller && readyToSell.data !== null && !readyToSell.data.hasSale;
+  // Shopify's "Get ready to sell" (LaunchChecklistCard) takes the hero's
+  // place until the first sale; from then on it stays below as before.
+  const { checklist: launchChecklist } = useLaunchChecklist();
+  const readyToSellOpen = Boolean(
+    launchChecklist && !launchChecklist.dismissed
+      && getReadyRows(launchChecklist).some((row) => !row.done),
+  );
+  const showReadyToSell = newSeller && readyToSellOpen;
   const actionCounts: DashboardActionCounts | null = actionInputs ? {
     toShip: actionInputs.toShip,
     toAnswer: actionInputs.unreadMessages,
@@ -793,14 +797,9 @@ export default function SellerHomeCommerceDashboard({
             </View>
           ) : (
             <>
-              {showReadyToSell && readyToSell.data ? (
+              {showReadyToSell ? (
                 <View style={styles.readyToSell}>
-                  <ReadyToSellChecklist
-                    data={readyToSell.data}
-                    hasPlan={readyToSell.hasPlan}
-                    onOpen={(route) => nav(route === '/add-product' ? withOrigin(route, 'dashboard') : route)}
-                    testID="seller-dashboard-ready-to-sell"
-                  />
+                  <LaunchChecklistCard />
                 </View>
               ) : (
               <>
