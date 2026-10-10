@@ -23,12 +23,12 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
+import { resolveWebAnnualPriceForCheckout } from "../lib/webAnnualPrices";
 import { getWebOrigin } from "../lib/webOrigin";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
 import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
 import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
-import { resolveWebAnnualPriceForCheckout } from "../lib/webAnnualPrices";
 
 const router = Router();
 router.use(requireAuth);

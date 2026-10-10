@@ -2425,6 +2425,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Platform subscription — billed to the seller's own payment method (sellers only).
        *  Completely separate from Stripe Connect (buyer payouts). */
       subscription: {
+        /** Stripe Checkout on the optional web-only yearly price (STRIPE_PRICE_<TIER>_ANNUAL_WEB); used by app/subscribe.tsx. */
+        checkoutAnnualWeb: (planId: 'starter' | 'growth' | 'pro') =>
+          post<{ url: string }>('/api/seller/subscription/checkout', { planId, billing: 'annual' }),
         /** Returns the seller's current plan, subscription status, renewal date,
          *  and payment-method label. */
         status: () => get<{
@@ -2462,10 +2465,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           }>;
         }>('/api/seller/subscription/invoices'),
         /** Create a Stripe Checkout Session in subscription mode.
-         *  Returns { url } for the mobile client to open in the system browser.
-         *  billing 'annual' = the optional web-only yearly price (STRIPE_PRICE_<TIER>_ANNUAL_WEB). */
-        checkout: (planId: 'starter' | 'growth' | 'pro', billing?: 'monthly' | 'annual') =>
-          post<{ url: string }>('/api/seller/subscription/checkout', billing === 'annual' ? { planId, billing } : { planId }),
+         *  Returns { url } for the mobile client to open in the system browser. */
+        checkout: (planId: 'starter' | 'growth' | 'pro') =>
+          post<{ url: string }>('/api/seller/subscription/checkout', { planId }),
         /** Create a Stripe Billing Portal session so the seller can manage their
          *  payment method, view invoices, or cancel. Returns { url }. */
         portal: () =>

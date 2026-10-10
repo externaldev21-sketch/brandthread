@@ -31,7 +31,9 @@ export default function SubscribeScreen() {
     if (!params || Platform.OS !== 'web' || preview) return;
     setError(null);
     try {
-      const { url } = await api.seller.subscription.checkout(params.planId, params.billing);
+      const { url } = params.billing === 'annual'
+        ? await api.seller.subscription.checkoutAnnualWeb(params.planId)
+        : await api.seller.subscription.checkout(params.planId);
       window.location.assign(url);
     } catch (e: any) {
       setError(e?.message ?? 'Check your connection and try again.');
