@@ -16,6 +16,7 @@
     "benchmark:ai-providers": "tsx ./scripts/aiProviderBenchmark/runBenchmark.ts",
     "benchmark:ai-providers:mock": "tsx ./scripts/aiProviderBenchmark/runBenchmark.ts --mock",
     "seed:review-accounts": "tsx ./scripts/seedReviewAccounts.ts",
+    "verify:reviewer-sign-in": "tsx ./scripts/verifyReviewerSignIn.ts",
     "admin:reset-accounts": "tsx ./scripts/reset-accounts.ts"
   },
   "dependencies": {
