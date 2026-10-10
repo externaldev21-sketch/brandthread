@@ -220,7 +220,7 @@ export default function FulfillBatchScreen() {
                         accessibilityLabel={`Use box ${p.name}`}
                       >
                         <Text style={s.orderNumber}>{p.name}</Text>
-                        <Text style={s.mutedText}>{p.lengthIn}×{p.widthIn}×{p.heightIn} in</Text>
+                        <Text style={s.mutedText}>{Number(p.lengthIn)}×{Number(p.widthIn)}×{Number(p.heightIn)} in</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
