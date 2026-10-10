@@ -96,6 +96,7 @@ import disputesRouter from "./disputes";
 import financeRouter from "./finance";
 import financeStatementsRouter from "./finance-statements";
 import { financeFeesRouter, publicFeeScheduleRouter } from "./fees";
+import { publicWebAnnualPlansRouter } from "./web-annual-plans";
 import taxesRouter from "./taxes";
 import sellerPaymentSettingsRouter from "./seller-payment-settings";
 import teamRouter from "./team";
@@ -196,6 +197,7 @@ router.use("/app",             appConfigRouter); // GET /config: min supported a
 router.use("/config/seller-plans", sellerPlanConfigRouter);
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
+router.use("/public",          publicWebAnnualPlansRouter); // GET /web-annual-plans (no auth; empty until a yearly web price is set)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
 router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
 router.use("/access",          accessRouter); // invite-only launch: validate/waitlist public, status/redeem authed

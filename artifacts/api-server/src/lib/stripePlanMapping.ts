@@ -13,5 +13,9 @@ export function sellerPlanFromStripeLookupKey(lookupKey: unknown): SellerPlanId 
   if (lookupKey === "brandthread_pro_monthly") return "growth";
   if (lookupKey === "brandthread_scale_monthly") return "pro";
   if (lookupKey === "brandthread_pro_199_monthly") return "pro";
+  // Optional web-only yearly prices (lib/webAnnualPrices.ts).
+  if (lookupKey === "brandthread_starter_annual_web") return "starter";
+  if (lookupKey === "brandthread_growth_annual_web") return "growth";
+  if (lookupKey === "brandthread_pro_annual_web") return "pro";
   return undefined;
 }

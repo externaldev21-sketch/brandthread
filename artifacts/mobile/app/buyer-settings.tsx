@@ -22,7 +22,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
-import { useLargeTitleCollapse } from '@/lib/largeTitleCollapse';
+import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

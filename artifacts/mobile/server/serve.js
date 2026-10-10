@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { renderSharePreview } = require('./sharePreview');
-const { landingPathFor, shouldServeLanding } = require('./landing');
+const { landingPathFor, pricingPathFor, shouldServeLanding, shouldServePricing } = require('./landing');
 const { legacyRedirectTarget } = require('./legacyRedirects');
 const { appLinkFile } = require('./appLinks');
 
@@ -310,7 +310,16 @@ const server = http.createServer(async (req, res) => {
     res.end(gzip ? zlib.gzipSync(landingHtml) : landingHtml);
     return;
   }
+<<<<<<< HEAD
   if (serveFile(safeFilePath(requestedPath), res, acceptEncoding, req.headers?.range)) return;
+=======
+  // Public seller pricing page, built next to landing.html.
+  if (shouldServePricing({ method: req.method, pathname: requestedPath, staticRoot: STATIC_ROOT })) {
+    sendHtml(res, 200, fs.readFileSync(pricingPathFor(STATIC_ROOT), 'utf8'), acceptEncoding);
+    return;
+  }
+  if (serveFile(safeFilePath(requestedPath), res, acceptEncoding)) return;
+>>>>>>> origin/approved-pr-811
 
   // This server only ever serves the exported browser app — real /api/*
   // traffic is handled by api-server, a separate process/origin (see this

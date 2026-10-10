@@ -23,6 +23,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
+import { resolveWebAnnualPriceForCheckout } from "../lib/webAnnualPrices";
 import { getWebOrigin } from "../lib/webOrigin";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, TRIAL_DAYS, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
@@ -403,6 +404,16 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
       return;
     }
 
+    // Optional { billing: "annual" }: the web-only yearly Stripe price
+    // (STRIPE_PRICE_<TIER>_ANNUAL_WEB, lib/webAnnualPrices.ts). Monthly otherwise.
+    const annualPriceId = req.body?.billing === "annual"
+      ? await resolveWebAnnualPriceForCheckout(stripe as any, planId)
+      : null;
+    if (req.body?.billing === "annual" && !annualPriceId) {
+      res.status(400).json({ error: "Yearly billing isn't available for this plan." });
+      return;
+    }
+
     const returnBase = `${getWebOrigin("https://localhost:3000")}/api-server`;
 
     // Check for an existing active or trialing subscription so we don't create a duplicate.
@@ -415,7 +426,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
         const sub = await (stripe.subscriptions.retrieve as any)(user.subscriptionId);
         if (sub && ["active", "trialing"].includes(sub.status)) {
           // Update the existing subscription to the new plan — no new Checkout needed.
-          const priceId = await ensurePrice(stripe, planId);
+          const priceId = annualPriceId ?? await ensurePrice(stripe, planId);
           await (stripe.subscriptions.update as any)(user.subscriptionId, {
             items: [{ id: sub.items.data[0].id, price: priceId }],
             proration_behavior: "create_prorations",
@@ -437,7 +448,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
 
     // No active subscription — create a new Checkout session.
     const [priceId, customerId] = await Promise.all([
-      ensurePrice(stripe, planId),
+      annualPriceId ?? ensurePrice(stripe, planId),
       ensureCustomer(stripe, clerkUserId),
     ]);
 
