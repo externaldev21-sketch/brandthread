@@ -13,6 +13,7 @@
  *   ✓ Wrong seller on the order → 400
  *   ✓ Wrong productId (not on order) → 400
  *   ✓ Undelivered order (processing) → 400
+ *   ✓ "fulfilled" order (a PRE-ship status) → 400
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import express from "express";
@@ -66,6 +67,7 @@ beforeAll(async () => {
 
 let deliveredOrderId: string;
 let processingOrderId: string;
+let fulfilledOrderId: string;
 let otherBuyerOrderId: string;
 let inProductId: string;     // a product that IS on the delivered order
 let offProductId: string;    // a product that is NOT on the delivered order
@@ -143,6 +145,21 @@ beforeAll(async () => {
     .returning({ id: orders.id });
   processingOrderId = processingOrder.id;
 
+  // "fulfilled" = packed, not yet shipped (lib/money/stateMachines.ts).
+  const [fulfilledOrder] = await db
+    .insert(orders)
+    .values({
+      ownerId:      SELLER,
+      buyerId:      BUYER_A,
+      orderNumber:  `BT-REVIEW-AUTH-F-${suffix}`,
+      status:       "fulfilled",
+      totalCents:   1000,
+      subtotalCents: 1000,
+      shippingCents: 0,
+    })
+    .returning({ id: orders.id });
+  fulfilledOrderId = fulfilledOrder.id;
+
   // Delivered order owned by BUYER_B (foreign order to BUYER_A).
   const [otherOrder] = await db
     .insert(orders)
@@ -173,6 +190,9 @@ afterAll(async () => {
   }
   if (processingOrderId) {
     await db.delete(orders).where(eq(orders.id, processingOrderId));
+  }
+  if (fulfilledOrderId) {
+    await db.delete(orders).where(eq(orders.id, fulfilledOrderId));
   }
   if (otherBuyerOrderId) {
     await db.delete(orders).where(eq(orders.id, otherBuyerOrderId));
@@ -298,7 +318,18 @@ describe("POST /api/reviews — buyer authorization", () => {
     expect(body.error).toMatch(/product/i);
   });
 
-  it("400 when the order is not delivered/fulfilled", async () => {
+  it("400 for a fulfilled (packed, not yet shipped) order", async () => {
+    const res = await postReview({
+      orderId:  fulfilledOrderId,
+      sellerId: SELLER,
+      rating:   5,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.error).toMatch(/delivered/i);
+  });
+
+  it("400 when the order is not delivered", async () => {
     const res = await postReview({
       orderId:  processingOrderId,
       sellerId: SELLER,

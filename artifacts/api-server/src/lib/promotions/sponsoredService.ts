@@ -9,6 +9,7 @@ import {
 } from "@workspace/db";
 import { blockedUserIds, mutedPhrasesFor } from "../safety";
 import { publicPostCondition, visibleCommentCounts } from "../postVisibility";
+import { taggedProductVisibleTo } from "../productVisibility";
 import { deriveSellerVerified } from "../sellerEligibility";
 import {
   planSponsoredSlots, SPONSORED_COST_PER_IMPRESSION_CENTS,
@@ -91,7 +92,7 @@ async function hydrateSponsoredPosts(postIds: string[]) {
     })
       .from(postTaggedProducts)
       .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-      .where(inArray(postTaggedProducts.postId, postIds))
+      .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(null)))
       .orderBy(postTaggedProducts.position),
     db.select({ postId: interactions.postId, cnt: sql<number>`count(*)` })
       .from(interactions)

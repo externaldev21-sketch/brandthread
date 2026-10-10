@@ -5,8 +5,16 @@
  */
 import type { savedItems } from "@workspace/db";
 import { fetchProductBadgeInfo, isBackInStockRecent } from "./savedProductBadges";
+import { deletedProductIds } from "./productVisibility";
 
-export async function adaptSavedRows(rows: (typeof savedItems.$inferSelect)[]) {
+/** Drop saved product rows whose product the seller deleted (target_id has no FK). */
+export async function withoutDeletedProducts<T extends { itemType: string; targetId: string }>(rows: T[]): Promise<T[]> {
+  const deleted = await deletedProductIds(rows.filter((r) => r.itemType === "product").map((r) => r.targetId));
+  return deleted.size === 0 ? rows : rows.filter((r) => !(r.itemType === "product" && deleted.has(r.targetId)));
+}
+
+export async function adaptSavedRows(allRows: (typeof savedItems.$inferSelect)[]) {
+  const rows = await withoutDeletedProducts(allRows);
   const productIds = rows.filter((r) => r.itemType === "product").map((r) => r.targetId);
   const badgeInfo = await fetchProductBadgeInfo(productIds);
 

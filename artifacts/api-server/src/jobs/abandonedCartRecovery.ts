@@ -64,7 +64,12 @@ export async function runCartReminders(now: Date = new Date()): Promise<{ pushed
     const claimed = await db
       .update(cartItems)
       .set({ notifiedAbandonedAt: now, pushRemindedAt: now })
-      .where(sql`${cartItems.updatedAt} < ${cutoff} AND ${cartItems.notifiedAbandonedAt} IS NULL AND ${cartItems.savedForLater} = false`)
+      .where(sql`${cartItems.updatedAt} < ${cutoff} AND ${cartItems.notifiedAbandonedAt} IS NULL AND ${cartItems.savedForLater} = false AND NOT EXISTS (
+        SELECT 1 FROM products p
+        WHERE (p.id::text = ${cartItems.itemData}->>'productId'
+          OR p.id IN (SELECT pv.product_id FROM product_variants pv WHERE pv.id::text = ${cartItems.variantId}))
+          AND (p.deleted_at IS NOT NULL OR p.status <> 'active')
+      )`)
       .returning({ userId: cartItems.userId, itemData: cartItems.itemData });
 
     const byUser = groupByUser(claimed);

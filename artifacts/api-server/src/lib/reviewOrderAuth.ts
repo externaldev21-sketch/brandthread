@@ -4,7 +4,9 @@
  * Rules (canonical post-purchase flow):
  *  1. orderId is required — reviews must be tied to a real purchase.
  *  2. The order must be owned by the requesting buyer (buyerId).
- *  3. The order status must be "delivered" or "fulfilled".
+ *  3. The order must have been delivered: status "delivered", or a recorded
+ *     deliveredAt on a non-cancelled order. ("fulfilled" is a PRE-ship
+ *     status — see lib/money/stateMachines.ts — so it does not qualify.)
  *  4. The supplied sellerId must match the order's ownerId.
  *  5. When productId is supplied it must appear on an order line item
  *     (via order_items → product_variants → products).
@@ -26,6 +28,12 @@ export interface ReviewAuthInput {
   productId?: string | null;
 }
 
+/** Reviews open only once the item reached the buyer. */
+export function isDeliveredForReview(order: { status: string | null; deliveredAt: Date | null }): boolean {
+  if (order.status === "delivered") return true;
+  return !!order.deliveredAt && order.status !== "cancelled";
+}
+
 export async function assertReviewOrderAuth(
   input: ReviewAuthInput,
 ): Promise<ReviewAuthResult> {
@@ -38,6 +46,7 @@ export async function assertReviewOrderAuth(
       buyerId: orders.buyerId,
       ownerId: orders.ownerId,
       status:  orders.status,
+      deliveredAt: orders.deliveredAt,
     })
     .from(orders)
     .where(eq(orders.id, orderId))
@@ -49,9 +58,9 @@ export async function assertReviewOrderAuth(
     return { ok: false, status: 403, error: "Not eligible to review this order" };
   }
 
-  // Rule 3: must be delivered/fulfilled.
-  if (!["delivered", "fulfilled"].includes(order.status ?? "")) {
-    return { ok: false, status: 400, error: "Can only review a delivered or fulfilled order" };
+  // Rule 3: must be delivered.
+  if (!isDeliveredForReview(order)) {
+    return { ok: false, status: 400, error: "Can only review a delivered order" };
   }
 
   // Rule 4: sellerId must match the order's seller (ownerId).

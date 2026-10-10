@@ -5,7 +5,7 @@
  * views (routes/public.ts) so both surfaces compute Price drop / Back in
  * stock / Low stock / Sold out the same way.
  */
-import { inArray } from "drizzle-orm";
+import { and, inArray, isNull } from "drizzle-orm";
 import { db, products, productVariants, users } from "@workspace/db";
 
 const LOW_STOCK_THRESHOLD = 5;
@@ -29,7 +29,7 @@ export async function fetchProductBadgeInfo(productIds: string[]): Promise<Map<s
   const [productRows, variantRows] = await Promise.all([
     db.select({ id: products.id, name: products.name, images: products.images, ownerId: products.ownerId })
       .from(products)
-      .where(inArray(products.id, ids)),
+      .where(and(inArray(products.id, ids), isNull(products.deletedAt))),
     db.select({
       productId: productVariants.productId,
       priceCents: productVariants.priceCents,

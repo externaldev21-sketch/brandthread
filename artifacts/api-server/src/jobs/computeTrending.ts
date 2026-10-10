@@ -33,6 +33,7 @@ import {
 import { eq, and, inArray, count, gte, desc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { scheduleJob } from "./runner";
+import { taggedProductVisibleTo } from "../lib/productVisibility";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ export async function computeTrendingForToday(): Promise<void> {
       })
       .from(postTaggedProducts)
       .innerJoin(products, eq(products.id, postTaggedProducts.productId))
-      .where(inArray(postTaggedProducts.postId, postIds));
+      .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(null)));
 
     const categoryMap: Record<string, string> = {};
     for (const t of tagRows) {

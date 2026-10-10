@@ -15,6 +15,7 @@ import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { EmptyState } from '@/components/layout';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { PREVIEW_SELLER_REVIEW_SUMMARY, previewReviewsEnabled, previewSellerReviews } from '@/lib/previewReviews';
 
 type Review = {
   id: string;
@@ -173,6 +174,7 @@ export default function SellerReviewsScreen() {
   const { user, isLoaded: clerkLoaded } = useUser();
   const requestGeneration = useRef(0);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [summary, setSummary] = useState<{ avgRating: number; totalCount: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Clerk never finishes loading in the signed-out web preview; treat it as
@@ -183,6 +185,7 @@ export default function SellerReviewsScreen() {
   useEffect(() => {
     requestGeneration.current += 1;
     setReviews([]);
+    setSummary(null);
     setError(null);
     setLoading(!authReady);
   }, [authReady, user?.id]);
@@ -192,9 +195,14 @@ export default function SellerReviewsScreen() {
     const generation = ++requestGeneration.current;
     try {
       setError(null);
-      const data = await api.reviews.mine();
+      // The rollup comes from the server (all reviews), not the ≤100 rows listed.
+      const [data, summary] = await Promise.all([
+        api.reviews.mine(),
+        api.reviews.forSeller(user.id).catch(() => null),
+      ]);
       if (requestGeneration.current !== generation) return;
       if (Array.isArray(data)) setReviews(data);
+      setSummary(summary ? { avgRating: Number(summary.avgRating ?? 0), totalCount: Number(summary.totalCount ?? 0) } : null);
     } catch {
       if (requestGeneration.current !== generation) return;
       setError('unavailable');
@@ -204,6 +212,12 @@ export default function SellerReviewsScreen() {
   }, [api, clerkLoaded, user?.id]);
 
   useFocusEffect(useCallback(() => {
+    if (previewReviewsEnabled()) {
+      setReviews(previewSellerReviews());
+      setSummary(PREVIEW_SELLER_REVIEW_SUMMARY);
+      setLoading(false);
+      return;
+    }
     if (!clerkLoaded || !user?.id) {
       setReviews([]);
       setLoading(!authReady);
@@ -213,9 +227,10 @@ export default function SellerReviewsScreen() {
     load();
   }, [load, clerkLoaded, authReady, user?.id]));
 
-  const avgRating = reviews.length
-    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-    : null;
+  const avgRating = summary
+    ? (summary.totalCount > 0 ? summary.avgRating.toFixed(1) : null)
+    : reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : null;
+  const totalCount = summary?.totalCount ?? reviews.length;
   const replied = reviews.filter((r) => r.seller_reply).length;
 
   return (
@@ -231,7 +246,7 @@ export default function SellerReviewsScreen() {
           </View>
           <View style={s.statDivider} />
           <View style={s.stat}>
-            <Text style={s.statVal}>{reviews.length}</Text>
+            <Text style={s.statVal}>{totalCount}</Text>
             <Text style={s.statLabel}>Total</Text>
           </View>
           <View style={s.statDivider} />
