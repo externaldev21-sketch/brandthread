@@ -36,8 +36,8 @@ describe('flooredFontSize', () => {
 });
 
 describe('AppTextWeight', () => {
-  it('every weight key resolves to one of Inter\'s 4 loaded font files', () => {
-    const loaded = new Set(['Inter_400Regular', 'Inter_500Medium', 'Inter_600SemiBold', 'Inter_700Bold']);
+  it('every weight key resolves to one of the 4 system-font weight tokens', () => {
+    const loaded = new Set(['system-400', 'system-500', 'system-600', 'system-700']);
     const weights = Object.keys(FONT) as AppTextWeight[];
     expect(weights.length).toBeGreaterThan(0);
     for (const w of weights) {

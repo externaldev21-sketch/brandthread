@@ -85,7 +85,7 @@ export function SellerDashboardRangePills({
           style={[styles.rangeIndicatorWrap, rangeIndicatorStyle]}
           testID="seller-dashboard-range-indicator"
         >
-          <Glass variant="pressed" radius={999} style={StyleSheet.absoluteFill} />
+          <Glass solid radius={999} style={StyleSheet.absoluteFill} />
         </Animated.View>
       )}
       {DASHBOARD_RANGES.map((item) => {

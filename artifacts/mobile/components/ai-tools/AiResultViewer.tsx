@@ -91,7 +91,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
         </View>
 
         <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
-          <Glass variant="regular" radius={RADIUS.xl} style={s.actionBar}>
+          <Glass solid radius={RADIUS.xl} style={s.actionBar}>
             {actions.map((a) => {
               const loading = a.loading?.(current) ?? false;
               return (
