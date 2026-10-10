@@ -2,7 +2,7 @@
  * Brandthread — Login Methods
  * Shows all connected sign-in methods for the current account.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform,
 } from 'react-native';

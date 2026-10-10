@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { type TextInputProps } from 'react-native';

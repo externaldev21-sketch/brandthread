@@ -153,7 +153,7 @@ async function payByCard(order: typeof sampleOrders.$inferSelect, method: "card"
 describe("BT-452 / BT-454 fee math", () => {
   it("passes card processing through with the same estimate retail uses", () => {
     for (const price of [100, 8_500, 99_999, 1_000_000, 50_000_000]) {
-      const retail = destinationApplicationFeeCents({ merchandiseCents: price, preTaxTotalCents: price });
+      const retail = destinationApplicationFeeCents({ merchandiseCents: price, shippingCents: 0, preTaxTotalCents: price });
       const card = b2bFees({ priceCents: price, method: "card" });
       expect(card).toMatchObject({
         platformFeeCents: retail.platformFeeCents,

@@ -11,7 +11,7 @@ import { Image } from 'expo-image';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deriveCardState, formatMoney, formatTimestamp, localTimeLabel, orderStatusLabel, orderTypeLabel } from '@workspace/manufacturer-flow';

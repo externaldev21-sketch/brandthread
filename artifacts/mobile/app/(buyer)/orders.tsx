@@ -38,8 +38,6 @@ import { canReorderStatus } from '@/lib/reorderSummary';
 import { RetryRow } from '@/components/ui/RetryRow';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
-import { openContextMenu } from '@/lib/contextMenu';
-import { copyText } from '@/lib/shareActions';
 import { syncOrderActivities } from '@/lib/nativeSystem';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

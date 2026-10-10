@@ -1,5 +1,5 @@
 import { hapticDestructiveConfirm, hapticSuccess, hapticToggle } from '@/lib/haptics';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon } from '@/components/ui/Icon';

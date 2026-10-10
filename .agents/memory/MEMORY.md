@@ -103,3 +103,4 @@
 - [Web interactive containers](expo-web-interactive-containers.md) — a View with button semantics can become an HTML button; never give a container button semantics around interactive children.
 - [Test result accounting](test-result-accounting.md) — zero failed assertions does not mean a suite passed; setup errors can leave every assertion skipped.
 - [Validation evidence](validation-evidence-persistence.md) — keep long-run logs in ignored workspace storage; restarts can erase temporary evidence and interrupt checks.
+- [Merge runtime validation](merge-runtime-validation.md) — TypeScript checks do not cover every runtime server; scan tracked sources and syntax-check changed JavaScript.

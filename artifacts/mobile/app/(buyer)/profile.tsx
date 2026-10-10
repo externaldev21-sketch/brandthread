@@ -83,7 +83,6 @@ import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
 import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
 import { useScreenInteractive } from '@/lib/perf';
-import { openContextMenu } from '@/lib/contextMenu';
 import { updateBuyerCashWidget } from '@/lib/nativeSystem';
 
 // Realistic identity shown only when there is truly no signed-in user at all

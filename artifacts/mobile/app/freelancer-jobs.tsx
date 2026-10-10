@@ -176,11 +176,11 @@ export default function FreelancerJobsScreen() {
       } else {
         await api.freelancerJobs.dispute(job.id, text);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setNoteSheet(null);
       await load();
     } catch (e) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       Alert.alert('Action failed', apiErrorMessage(e));
     } finally {
       setNoteBusy(false);

@@ -24,6 +24,7 @@ type Hub = typeof import("../liveHub");
 type Instance = { hub: Hub; server: Server; port: number; close: () => Promise<void> };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const testStreams = new Set<string>();
 
 async function startInstance(): Promise<Instance> {
   vi.resetModules();
@@ -47,7 +48,20 @@ async function startInstance(): Promise<Instance> {
 }
 
 async function connect(inst: Instance, streamId: string, userId: string) {
-  // role=host: never counted in live_viewers, so the test writes no rows.
+  // Transport fixtures must satisfy the real stream/host admission policy.
+  // These rows are isolated to this test; production authorization stays intact.
+  await db.execute(sql`
+    INSERT INTO live_streams (id, seller_id, channel_name, title, status)
+    VALUES (${streamId}::uuid, ${userId}, ${`bt-multi-instance-test-${streamId}`}, 'Transport fixture', 'live')
+    ON CONFLICT (id) DO NOTHING
+  `);
+  testStreams.add(streamId);
+  await db.execute(sql`
+    INSERT INTO live_cohosts (stream_id, host_id, cohost_id, status)
+    SELECT id, seller_id, ${userId}, 'accepted' FROM live_streams WHERE id = ${streamId}::uuid
+    ON CONFLICT DO NOTHING
+  `);
+  // Authorized hosts are not counted in live_viewers.
   const ws = new WS(`ws://127.0.0.1:${inst.port}/ws/live?streamId=${streamId}&token=${userId}&role=host`);
   const messages: any[] = [];
   let closedWith: number | null = null;
@@ -66,6 +80,11 @@ async function waitFor(pred: () => boolean, ms = 3_000) {
 const running: Instance[] = [];
 afterEach(async () => {
   await Promise.all(running.splice(0).map((i) => i.close()));
+  for (const streamId of testStreams) {
+    await db.execute(sql`DELETE FROM live_cohosts WHERE stream_id = ${streamId}::uuid`);
+    await db.execute(sql`DELETE FROM live_streams WHERE id = ${streamId}::uuid AND channel_name = ${`bt-multi-instance-test-${streamId}`}`);
+  }
+  testStreams.clear();
   delete process.env.REALTIME_BUS;
 });
 afterAll(async () => {

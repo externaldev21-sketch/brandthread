@@ -111,7 +111,6 @@ const {
     takenUsernames: new Set<string>(),
     singleSession: false,
     deviceSessions: [] as { id: string; status: string; user: { id: string; emailAddresses: { emailAddress: string }[] } }[],
-    createCalls: [] as string[],
     passwordCalls: 0,
     setActiveCalls: [] as string[],
     notify() { this.listeners.forEach((fn) => fn()); },
@@ -260,7 +259,7 @@ vi.mock('@clerk/expo', () => {
         clerkStore.createErrorOnce = null;
         return { error };
       }
-      if (clerkStore.existingEmails.has(emailAddress)) {
+      if (clerkStore.existingEmails.has(emailAddress) || clerkStore.takenEmails.has(emailAddress)) {
         return { error: { errors: [{ code: 'form_identifier_exists', message: 'That email address is taken. Please try another.', meta: { paramName: 'email_address' } }] } };
       }
       clerkStore.signUp = { ...clerkStore.signUp, id: 'su_test', emailAddress, status: 'missing_requirements', emailVerified: false, hasPassword: false };
@@ -270,18 +269,6 @@ vi.mock('@clerk/expo', () => {
     async password() {
       clerkStore.signUp.hasPassword = true;
       complete();
-      clerkStore.notify();
-      return { error: null };
-    },
-    async create({ emailAddress, username }: { emailAddress: string; password?: string; username?: string }) {
-      clerkStore.createCalls.push(emailAddress);
-      const fail = (code: string, paramName: string) => ({
-        error: { code, message: 'taken', errors: [{ code, message: 'taken', meta: { paramName } }] },
-      });
-      if (clerkStore.singleSession && clerkStore.isSignedIn) return fail('session_exists', '');
-      if (clerkStore.takenEmails.has(emailAddress)) return fail('form_identifier_exists', 'email_address');
-      if (username && clerkStore.takenUsernames.has(username)) return fail('form_identifier_exists', 'username');
-      clerkStore.signUp = { status: 'missing_requirements', emailAddress, pendingCode: null, finalized: false };
       clerkStore.notify();
       return { error: null };
     },
@@ -909,6 +896,38 @@ describe('Dev P0: a brand-new email never shows "this email already has an accou
   });
 });
 
+// Compatibility helpers for the email-first, one-question signup flow.
+async function press(renderer: ReactTestRenderer, node: ReactTestRenderer['root']) {
+  await act(async () => { node.props.onPress(); await Promise.resolve(); });
+  await settle();
+}
+
+async function fillAndCreate(renderer: ReactTestRenderer, _role: 'buyer' | 'seller', email: string) {
+  if (renderer.root.findAll((n) => n.props.testID === 'onboarding-first-name-input').length) {
+    await type(renderer, 'onboarding-first-name-input', 'New Seller');
+    await tap(renderer, 'onboarding-name-next');
+  }
+  await type(renderer, 'onboarding-email-input', email);
+  await tap(renderer, 'onboarding-email-next');
+}
+
+function screenText(renderer: ReactTestRenderer): string {
+  return renderer.root.findAll((n) => String(n.type) === 'Text')
+    .flatMap((n) => Array.isArray(n.props.children) ? n.props.children : [n.props.children])
+    .filter((c) => typeof c === 'string' || typeof c === 'number').join(' ');
+}
+
+function onCodeStep(renderer: ReactTestRenderer): boolean {
+  return renderer.root.findAll((n) => n.props.testID === 'onboarding-code-input').length > 0;
+}
+
+function findButtonByLabel(renderer: ReactTestRenderer, label: string): ReactTestRenderer['root'] {
+  const node = renderer.root.findAll((n) => typeof n.props.onPress === 'function'
+    && (n.props.accessibilityLabel === label || JSON.stringify(n.props.children).includes(label)))[0];
+  if (!node) throw new Error(`Missing button: ${label}`);
+  return node;
+}
+
 // ── Regression: a brand-new email must never hit "this email already has an
 // account". Dev reported it on create with an email never used before. The
 // screen is only for Clerk saying the EMAIL itself is taken.
@@ -918,7 +937,7 @@ describe('onboarding sign-up — new email always reaches the code step', () => 
   function resetClerk() {
     clerkStore.isSignedIn = false;
     clerkStore.userId = null;
-    clerkStore.signUp = { status: 'missing_requirements', emailAddress: null, pendingCode: null, finalized: false };
+    clerkStore.signUp = { id: null, status: 'missing_requirements', emailAddress: null, pendingCode: null, emailVerified: false, hasPassword: false, finalized: false };
     clerkStore.takenEmails = new Set();
     clerkStore.takenUsernames = new Set();
     clerkStore.singleSession = false;
@@ -929,6 +948,7 @@ describe('onboarding sign-up — new email always reaches the code step', () => 
   }
 
   beforeEach(() => {
+    resetState();
     memoryStorage.clear();
     apiCalls.length = 0;
     resetClerk();
@@ -945,10 +965,16 @@ describe('onboarding sign-up — new email always reaches the code step', () => 
   });
 
   async function startCreate(role: 'buyer' | 'seller') {
+    if (!searchParams.addAccount) searchParams.start = 'account-type';
     renderer = await renderScreen();
-    await press(renderer, findByTestId(renderer, 'onboarding-welcome-get-started'));
-    await press(renderer, findByTestId(renderer, `onboarding-account-type-${role}`));
-    await press(renderer, findByTestId(renderer, 'onboarding-account-type-continue'));
+    await settle();
+    if (renderer.root.findAll((n) => n.props.testID === 'onboarding-welcome-get-started').length) {
+      await tap(renderer, 'onboarding-welcome-get-started');
+    }
+    if (renderer.root.findAll((n) => n.props.testID === `onboarding-account-type-${role}`).length) {
+      await tap(renderer, `onboarding-account-type-${role}`);
+      await tap(renderer, 'onboarding-account-type-continue');
+    }
     return renderer;
   }
 
@@ -990,7 +1016,7 @@ describe('onboarding sign-up — new email always reaches the code step', () => 
   });
 
   it('(c) an earlier sign-up abandoned at the code step is never reused for the new email', async () => {
-    clerkStore.signUp = { status: 'missing_requirements', emailAddress: 'abandoned@onboarding-e2e.test', pendingCode: '000000', finalized: false };
+    clerkStore.signUp = { id: 'su_abandoned', status: 'missing_requirements', emailAddress: 'abandoned@onboarding-e2e.test', pendingCode: '000000', emailVerified: false, hasPassword: false, finalized: false };
     const r = await startCreate('buyer');
     await fillAndCreate(r, 'buyer', 'fresh-c@onboarding-e2e.test');
     expect(clerkStore.passwordCalls).toBe(0);
@@ -1036,7 +1062,7 @@ describe('onboarding sign-up — new email always reaches the code step', () => 
 });
 
 describe('onboarding step machine sanity', () => {
-  it('neither flow has a payout or notifications step; only sellers have a plan step', () => {
+  it('step metadata excludes payout and notification steps and retains the legacy seller plan identifier', () => {
     for (const id of [...BUYER_STEPS, ...SELLER_STEPS]) {
       expect(['PAYOUTS', 'NOTIFICATIONS', 'LOADING', 'SUCCESS']).not.toContain(id);
     }

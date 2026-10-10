@@ -79,7 +79,7 @@ export function EmailStep({
   /** Under the field: the "Have a code?" link or the invite-code field. */
   extra?: React.ReactNode;
   /** Only when Clerk says this exact email already has an account. */
-  existing?: { role: 'buyer' | 'seller'; onSwitch: () => void; onUseDifferent: () => void } | null;
+  existing?: { role: 'buyer' | 'seller' | null; onSwitch: () => void; onUseDifferent: () => void } | null;
 }) {
   return (
     <StepScreen

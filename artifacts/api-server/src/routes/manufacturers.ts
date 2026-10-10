@@ -121,8 +121,8 @@ function serializeQuoteRequest(row: typeof sellerQuoteRequests.$inferSelect) {
 // ── Helper ─────────────────────────────────────────────────────────────────────
 
 /** The terms checkbox travels with the signup body but isn't a profile column. */
-function withoutTermsField<T extends { acceptedTermsVersion?: unknown }>(data: T): Omit<T, "acceptedTermsVersion"> {
-  const { acceptedTermsVersion: _accepted, ...profile } = data;
+function withoutTermsField<T extends object>(data: T): Omit<T, "acceptedTermsVersion"> {
+  const { acceptedTermsVersion: _accepted, ...profile } = data as T & { acceptedTermsVersion?: unknown };
   return profile;
 }
 

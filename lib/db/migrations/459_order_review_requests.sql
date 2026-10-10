@@ -1,4 +1,4 @@
--- 262: Post-delivery review request (one per order).
+-- 459: Post-delivery review request (one per order).
 -- A row is inserted before the review request push/email goes out, so a
 -- re-run of the job, or the same job on another server instance, can never ask
 -- the same buyer twice for the same order (the primary key is the claim).

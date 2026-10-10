@@ -15,9 +15,8 @@ import { hapticLight } from '@/lib/haptics';
 import React, { useEffect, useMemo, useState } from 'react';
 import { previewSellerBrandName } from '@/lib/previewIdentity';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { appVersion } from '@/lib/appVersion';
-import { Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
@@ -193,7 +192,7 @@ export default function SellerSettingsScreen() {
         ))}
 
         <Text style={s.version}>Brandthread v{appVersion()}</Text>
-      </ScrollView>
+      </Animated.ScrollView>
 
       <PlanUpsellModal
         visible={upsellFeature !== null}

@@ -68,7 +68,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PRESS_IN_REUSE_MS, queryKeys } from '@/lib/queryClient';
 import { classifyNetworkError } from '@/lib/networkNotice';
 import { useRealtimeConnected, useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
-import { isReturnEligible, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
 import { syncOrderActivities } from '@/lib/nativeSystem';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
