@@ -73,6 +73,7 @@ import {
 import {
   allStepsFor,
   isAccountStep,
+  firstStepAfterAccount,
   isStepId,
   nextStepId,
   prevStepId,
@@ -422,6 +423,14 @@ export default function OnboardingScreen() {
           if (draft) {
             accountCreatedRef.current = true;
             applyDraft(draft, resolveResumeStep(draft, { accountReady: true, signUpPending: false, emailVerified: false }));
+          } else if (landingFlow === 'buyer' || landingFlow === 'seller') {
+            // The role is already known ("Start selling" / "Shop as a buyer"
+            // created this profile, or the landing page picked it): go
+            // straight to the first profile step, even after a relaunch.
+            accountCreatedRef.current = true;
+            setSelectedFlow(landingFlow);
+            setFlow(landingFlow);
+            setStepId(firstStepAfterAccount(landingFlow));
           } else {
             // Signed in without onboarding answers (e.g. a new Apple account
             // from the sign-in screen): ask buyer or seller, then profile.
