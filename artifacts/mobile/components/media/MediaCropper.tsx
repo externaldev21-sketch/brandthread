@@ -33,7 +33,7 @@ import { Feather } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP, RADIUS, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, TEXT_DISABLED } from '@/lib/theme';
 import {
   DEFAULT_CROP_TRANSFORM, MIN_SCALE_DEFAULT, MAX_SCALE_DEFAULT,
   normalizeCropRect, resolvePixelCropRect, transformFromNormalizedRect,
@@ -218,7 +218,7 @@ export function MediaCropper({
         </PressableScale>
         <Text style={[s.headerTitle, { color: theme.text }]}>{title}</Text>
         <PressableScale style={centerHeaderActions ? s.headerActionCentered : undefined} onPress={handleSave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Save crop" testID="media-cropper-save" disabled={!sourceSize}>
-          <Text style={[s.headerAction, s.headerActionPrimary, { color: sourceSize ? theme.text : TEXT_TERTIARY }]}>Done</Text>
+          <Text style={[s.headerAction, s.headerActionPrimary, { color: sourceSize ? theme.text : TEXT_DISABLED }]}>Done</Text>
         </PressableScale>
       </View>
 

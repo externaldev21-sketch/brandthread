@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, ICON, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -156,10 +156,10 @@ export default function MutedWordsScreen() {
         </Text>
 
         <View style={s.inputShell}>
-          <Feather name="plus" size={18} color={(!canEdit || atLimit) ? TEXT_TERTIARY : theme.muted} />
+          <Feather name="plus" size={18} color={(!canEdit || atLimit) ? TEXT_DISABLED : theme.muted} />
           <TextInput
             ref={inputRef}
-            style={[s.input, (!canEdit || atLimit) && { color: TEXT_TERTIARY }]}
+            style={[s.input, (!canEdit || atLimit) && { color: TEXT_DISABLED }]}
             value={draft}
             onChangeText={(value) => setDraft(value.slice(0, MAX_LENGTH))}
             placeholder="Add a word, phrase, #hashtag or @handle"
@@ -179,7 +179,7 @@ export default function MutedWordsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Mute"
           >
-            {saving ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Text style={[s.addText, (!draft.trim() || atLimit) && { color: TEXT_TERTIARY }]}>Mute</Text>}
+            {saving ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Text style={[s.addText, (!draft.trim() || atLimit) && { color: TEXT_DISABLED }]}>Mute</Text>}
           </PressableScale>
         </View>
         <Text style={s.hint}>
@@ -199,8 +199,8 @@ export default function MutedWordsScreen() {
             <View style={s.chips}>
               {available.map((suggestion) => (
                 <PressableScale key={suggestion} style={s.suggestion} disabled={!canEdit} onPress={() => add(suggestion)} accessibilityRole="button" accessibilityLabel={`Mute ${suggestion}`}>
-                  <Feather name="plus" size={12} color={canEdit ? theme.muted : TEXT_TERTIARY} />
-                  <Text style={[s.suggestionText, !canEdit && { color: TEXT_TERTIARY }]}>{suggestion}</Text>
+                  <Feather name="plus" size={12} color={canEdit ? theme.muted : TEXT_DISABLED} />
+                  <Text style={[s.suggestionText, !canEdit && { color: TEXT_DISABLED }]}>{suggestion}</Text>
                 </PressableScale>
               ))}
             </View>

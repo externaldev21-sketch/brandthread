@@ -9,7 +9,7 @@ import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { FONT, FS, SP, RADIUS, COMP, ICON, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, EmptyState, FormInput } from '@/components/BrandthreadUI';
 
@@ -282,11 +282,11 @@ export default function ProductImportScreen() {
           >
             <View style={s.methodRow}>
               <View style={[s.methodIconWrap, { backgroundColor: theme.secondaryDim }]}>
-                <Feather name="tag" size={ICON.md} color={providers.etsy.enabled ? theme.secondary : TEXT_TERTIARY} />
+                <Feather name="tag" size={ICON.md} color={providers.etsy.enabled ? theme.secondary : TEXT_DISABLED} />
               </View>
               <View style={s.methodInfo}>
-                <Text style={[s.methodTitle, !providers.etsy.enabled && { color: TEXT_TERTIARY }]}>Import from Etsy</Text>
-                <Text style={[s.methodDesc, !providers.etsy.enabled && { color: TEXT_TERTIARY }]}>
+                <Text style={[s.methodTitle, !providers.etsy.enabled && { color: TEXT_DISABLED }]}>Import from Etsy</Text>
+                <Text style={[s.methodDesc, !providers.etsy.enabled && { color: TEXT_DISABLED }]}>
                   {!providers.etsy.enabled
                     ? (providers.etsy.reason ?? "Etsy import isn't enabled on this server.")
                     : providers.etsy.connected
@@ -418,7 +418,7 @@ export default function ProductImportScreen() {
             activeOpacity={0.85}
             onPress={importCsv}
           >
-            <Text style={{ fontSize: 15, fontFamily: FONT.bold, color: !csvText.trim() ? TEXT_TERTIARY : theme.onAccent }}>
+            <Text style={{ fontSize: 15, fontFamily: FONT.bold, color: !csvText.trim() ? TEXT_DISABLED : theme.onAccent }}>
               Review import
             </Text>
           </TouchableOpacity>

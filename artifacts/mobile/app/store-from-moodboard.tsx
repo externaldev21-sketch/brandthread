@@ -15,7 +15,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  FONT, FS, SP, RADIUS, ICON, TEXT_TERTIARY,
+  FONT, FS, SP, RADIUS, ICON, TEXT_DISABLED,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import {
@@ -335,8 +335,8 @@ export default function StoreFromMoodboardScreen() {
               disabled={preparingImages}
               accessibilityState={{ disabled: preparingImages }}
             >
-              <Feather name="plus" size={ICON.md} color={preparingImages ? TEXT_TERTIARY : PURPLE_LIGHT} />
-              <Text style={[mb.addTileLabel, preparingImages && { color: TEXT_TERTIARY }]}>Add</Text>
+              <Feather name="plus" size={ICON.md} color={preparingImages ? TEXT_DISABLED : PURPLE_LIGHT} />
+              <Text style={[mb.addTileLabel, preparingImages && { color: TEXT_DISABLED }]}>Add</Text>
             </TouchableOpacity>
           )}
         </View>

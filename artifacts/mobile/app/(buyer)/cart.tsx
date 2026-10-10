@@ -41,7 +41,7 @@ import { useApi } from '@/hooks/useApi';
 import SwipeableActions, { type SwipeAction } from '@/components/SwipeableActions';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
-  FONT, FS, SP, RADIUS, COMP, ICON, TYPE, FILL_ELEVATED, TEXT_TERTIARY,
+  FONT, FS, SP, RADIUS, COMP, ICON, TYPE, FILL_ELEVATED, TEXT_TERTIARY, TEXT_DISABLED,
 } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import {
@@ -1280,7 +1280,7 @@ export default function CartScreen() {
                   {validating ? (
                     <ActivityIndicator size="small" color={TEXT_TERTIARY} />
                   ) : (
-                    <Text style={[s.checkoutPillText, selectedItems.length === 0 && { color: TEXT_TERTIARY }]}>Checkout</Text>
+                    <Text style={[s.checkoutPillText, selectedItems.length === 0 && { color: TEXT_DISABLED }]}>Checkout</Text>
                   )}
                 </TouchableOpacity>
               </View>

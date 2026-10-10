@@ -20,7 +20,7 @@ import { useApi } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, apiErrorMessage } from '@/lib/freelancer';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, RED, FILL_ELEVATED, TEXT_TERTIARY,
+  FONT, FS, SP, RADIUS, RED, FILL_ELEVATED, TEXT_TERTIARY, TEXT_DISABLED,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
@@ -298,7 +298,7 @@ export default function FreelancerApplyScreen() {
               {submitting ? (
                 <ActivityIndicator color={TEXT_TERTIARY} size="small" />
               ) : (
-                <Text style={[styles.nextBtnText, { color: colors.primaryForeground }, !stepValid && { color: TEXT_TERTIARY }]}>
+                <Text style={[styles.nextBtnText, { color: colors.primaryForeground }, !stepValid && { color: TEXT_DISABLED }]}>
                   {step === 2 ? (isEdit ? 'Save Profile' : 'Submit Application') : 'Continue'}
                 </Text>
               )}

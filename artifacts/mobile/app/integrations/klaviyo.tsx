@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { FS, FONT, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
+import { FS, FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -149,8 +149,8 @@ export default function KlaviyoIntegrationScreen() {
               disabled={syncing}
               activeOpacity={0.8}
             >
-              {syncing ? <ActivityIndicator size="small" color={TEXT_TERTIARY} /> : <Feather name="refresh-cw" size={15} color={colors.foreground} />}
-              <Text style={[styles.secondaryBtnText, { color: syncing ? TEXT_TERTIARY : colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
+              {syncing ? <ActivityIndicator size="small" color={TEXT_DISABLED} /> : <Feather name="refresh-cw" size={15} color={colors.foreground} />}
+              <Text style={[styles.secondaryBtnText, { color: syncing ? TEXT_DISABLED : colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -181,8 +181,8 @@ export default function KlaviyoIntegrationScreen() {
               disabled={connecting}
               activeOpacity={0.85}
             >
-              {connecting ? <ActivityIndicator size="small" color={TEXT_TERTIARY} /> : <Feather name="link" size={16} color={colors.primaryForeground} />}
-              <Text style={[styles.connectBtnText, { color: connecting ? TEXT_TERTIARY : colors.primaryForeground }]}>{connecting ? 'Connecting…' : 'Connect Klaviyo'}</Text>
+              {connecting ? <ActivityIndicator size="small" color={TEXT_DISABLED} /> : <Feather name="link" size={16} color={colors.primaryForeground} />}
+              <Text style={[styles.connectBtnText, { color: connecting ? TEXT_DISABLED : colors.primaryForeground }]}>{connecting ? 'Connecting…' : 'Connect Klaviyo'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

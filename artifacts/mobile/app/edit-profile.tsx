@@ -26,7 +26,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { Avatar } from '@/components/ui/Avatar';
-import { FONT, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, TEXT_DISABLED } from '@/lib/theme';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -430,7 +430,7 @@ export default function EditProfileScreen() {
         rightElement={
           <TouchableOpacity onPress={handleSave} disabled={!isDirty || saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             {saving ? <ActivityIndicator size="small" color={theme.accentLight} /> : (
-              <Text style={[styles.saveText, (!isDirty || !profileLoaded) && { color: TEXT_TERTIARY }]}>Save</Text>
+              <Text style={[styles.saveText, (!isDirty || !profileLoaded) && { color: TEXT_DISABLED }]}>Save</Text>
             )}
           </TouchableOpacity>
         }

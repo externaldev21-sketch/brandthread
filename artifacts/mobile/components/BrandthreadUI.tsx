@@ -24,7 +24,7 @@ import {
   SUCCESS, SUCCESS_DIM,
   BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, FILL_ELEVATED,
-  SHADOW, SHADOW_SM, TEXT_TERTIARY,
+  SHADOW, SHADOW_SM, TEXT_DISABLED,
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -500,8 +500,8 @@ export function PrimaryButton({
           <ActivityIndicator color={disabled ? palette.mutedForeground : foreground} size="small" />
         ) : (
           <>
-            {icon && <Icon name={icon} size={ICON.sm} color={disabled ? TEXT_TERTIARY : foreground} />}
-            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: TEXT_TERTIARY, fontSize: small ? FS.sm : FS.base } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
+            {icon && <Icon name={icon} size={ICON.sm} color={disabled ? TEXT_DISABLED : foreground} />}
+            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: TEXT_DISABLED, fontSize: small ? FS.sm : FS.base } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
           </>
         )}
       </LinearGradient>
@@ -538,7 +538,7 @@ interface SecondaryButtonProps {
 export function SecondaryButton({ label, onPress, icon, disabled, small, style, accent }: SecondaryButtonProps) {
   const { theme } = useAppTheme();
   // Disabled: solid gray label/outline, not a faded button.
-  const resolvedAccent = disabled ? TEXT_TERTIARY : accent ?? theme.accent;
+  const resolvedAccent = disabled ? TEXT_DISABLED : accent ?? theme.accent;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
     <PressableScale
@@ -577,7 +577,7 @@ interface TertiaryButtonProps {
 
 export function TertiaryButton({ label, onPress, icon, disabled, small, style, accent }: TertiaryButtonProps) {
   const { theme } = useAppTheme();
-  const resolvedAccent = disabled ? TEXT_TERTIARY : accent ?? theme.accentLight;
+  const resolvedAccent = disabled ? TEXT_DISABLED : accent ?? theme.accentLight;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
     <PressableScale

@@ -11,7 +11,7 @@ import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
-import { FS, SP, RADIUS, FONT, TEXT_TERTIARY } from '@/lib/theme';
+import { FS, SP, RADIUS, FONT, TEXT_DISABLED } from '@/lib/theme';
 import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
 import { parseDecimalToCents } from '@/lib/money';
 import { HapticSwitch } from '@/components/BrandthreadUI';
@@ -605,35 +605,35 @@ export default function ShippingScreen() {
             <View style={styles.zoneHeader}>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <Text style={[styles.zoneName, { color: zone.active ? colors.foreground : TEXT_TERTIARY }]}>{zone.name}</Text>
+                  <Text style={[styles.zoneName, { color: zone.active ? colors.foreground : TEXT_DISABLED }]}>{zone.name}</Text>
                   <Badge label={ZONE_TYPE_LABEL[zone.zoneType]} variant="default" />
                   {!zone.active && <Badge label="Inactive" variant="default" />}
                 </View>
                 {zone.zoneType === 'country' && zone.countries.length > 0 && (
-                  <Text style={[styles.rateSub, { color: zone.active ? colors.mutedForeground : TEXT_TERTIARY, marginTop: 4 }]}>
+                  <Text style={[styles.rateSub, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED, marginTop: 4 }]}>
                     {zone.countries.join(', ')}
                   </Text>
                 )}
               </View>
-              <Text style={[styles.rateAmount, { color: zone.active ? colors.foreground : TEXT_TERTIARY }]}>{zoneRateSummary(zone)}</Text>
+              <Text style={[styles.rateAmount, { color: zone.active ? colors.foreground : TEXT_DISABLED }]}>{zoneRateSummary(zone)}</Text>
             </View>
 
             <View style={styles.zoneMetaRow}>
               {zone.freeAboveCents != null && (
-                <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_TERTIARY }]}>
+                <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED }]}>
                   Free above {formatCents(zone.freeAboveCents)}
                 </Text>
               )}
-              <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_TERTIARY }]}>
+              <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED }]}>
                 {zone.processingDays} business day{zone.processingDays === 1 ? '' : 's'} to ship
               </Text>
               {zone.carrierLabel && (
-                <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_TERTIARY }]}>{zone.carrierLabel}</Text>
+                <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED }]}>{zone.carrierLabel}</Text>
               )}
             </View>
 
             {zone.zoneType !== 'domestic' && (
-              <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_TERTIARY, marginTop: 2 }]}>
+              <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED, marginTop: 2 }]}>
                 {zone.shipsInternationally
                   ? `Ships internationally · ${zone.dutiesHandling === 'ddp' ? 'Duties prepaid (DDP)' : 'Buyer pays duties on delivery (DAP)'}`
                   : 'Does not ship to this zone'}

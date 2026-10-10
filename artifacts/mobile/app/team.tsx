@@ -11,7 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useApi } from '@/lib/api';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { getEntitlementRejection } from '@/lib/entitlementError';
-import { FONT, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 
 function relTime(iso: string) {
@@ -486,7 +486,7 @@ export default function TeamScreen() {
                   activeOpacity={0.8}
                   style={[styles.addBtn, { backgroundColor: inviting || !inviteEmail.trim() ? FILL_ELEVATED : colors.primary }]}
                 >
-                  <Text style={[styles.addBtnText, { color: inviting || !inviteEmail.trim() ? TEXT_TERTIARY : colors.primaryForeground }]}>
+                  <Text style={[styles.addBtnText, { color: inviting || !inviteEmail.trim() ? TEXT_DISABLED : colors.primaryForeground }]}>
                     {inviting ? 'Creating…' : 'Create Invite'}
                   </Text>
                 </TouchableOpacity>

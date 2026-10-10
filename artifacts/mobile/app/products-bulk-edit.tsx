@@ -12,7 +12,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS, ICON, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, TEXT_DISABLED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { HapticSwitch, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
@@ -478,7 +478,7 @@ function SegRow<T extends string>({ options, value, onChange, s }: {
 function BarButton({ label, onPress, disabled, s }: { label: string; onPress: () => void; disabled?: boolean; s: ReturnType<typeof makeStyles> }) {
   return (
     <Pressable onPress={disabled ? undefined : onPress} style={s.barBtn} accessibilityRole="button" accessibilityLabel={label}>
-      <Text style={[s.barBtnText, disabled && { color: TEXT_TERTIARY }]}>{label}</Text>
+      <Text style={[s.barBtnText, disabled && { color: TEXT_DISABLED }]}>{label}</Text>
     </Pressable>
   );
 }

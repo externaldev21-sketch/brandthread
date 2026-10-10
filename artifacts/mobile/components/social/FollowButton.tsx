@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FILL_ELEVATED, FONT, FS, RADIUS, SP, TEXT_TERTIARY } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 
 export type FollowState = {
@@ -95,9 +95,9 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       ) : (
         <>
           {state.isFollowing && (
-            <Feather name="check" size={14} color={disabled ? TEXT_TERTIARY : isPrimary ? theme.onAccent : theme.text} style={styles.icon} />
+            <Feather name="check" size={14} color={disabled ? TEXT_DISABLED : isPrimary ? theme.onAccent : theme.text} style={styles.icon} />
           )}
-          <Text style={[styles.label, { color: disabled ? TEXT_TERTIARY : isPrimary ? theme.onAccent : theme.text }]}>{label}</Text>
+          <Text style={[styles.label, { color: disabled ? TEXT_DISABLED : isPrimary ? theme.onAccent : theme.text }]}>{label}</Text>
         </>
       )}
     </Pressable>

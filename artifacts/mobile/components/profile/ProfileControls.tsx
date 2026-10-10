@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FILL_ELEVATED, FONT, FS, RADIUS, SP, TEXT_TERTIARY } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { SHOP_PILL_HEIGHT } from './profileLayout';
@@ -83,7 +83,7 @@ export function ProfileButton({
   const { theme } = useAppTheme();
   const primary = variant === 'primary';
   // Disabled: solid gray fill + gray label, never a faded button.
-  const fg = disabled ? TEXT_TERTIARY : primary ? theme.onAccent : theme.text;
+  const fg = disabled ? TEXT_DISABLED : primary ? theme.onAccent : theme.text;
   // The wrapper owns flex sizing (PressableScale styles its inner animated
   // view, not the outer Pressable), so buttons split a row evenly.
   return (

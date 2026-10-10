@@ -13,7 +13,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, TEXT_DISABLED } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ASPECT_RATIO_VALUE, MAX_SLIDES_BY_MODE } from '@/constants/postLimits';
 import { DEFAULT_SLIDE_CROP } from '@/lib/createPost/crop';
@@ -276,8 +276,8 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
       </View>
 
       <View style={[ed.bottom, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <Pressable onPress={() => { tap(); if (!atCap) onAdd(); }} disabled={atCap} style={[ed.add, atCap && { borderColor: TEXT_TERTIARY }]} accessibilityRole="button" accessibilityLabel="Add more" testID="slide-add">
-          <Feather name="plus" size={22} color={atCap ? TEXT_TERTIARY : CP.white} />
+        <Pressable onPress={() => { tap(); if (!atCap) onAdd(); }} disabled={atCap} style={[ed.add, atCap && { borderColor: TEXT_DISABLED }]} accessibilityRole="button" accessibilityLabel="Add more" testID="slide-add">
+          <Feather name="plus" size={22} color={atCap ? TEXT_DISABLED : CP.white} />
         </Pressable>
         <View style={{ flex: 1 }} />
         <PillButton label="Next" icon="arrow-right" onPress={onNext} testID="edit-next" flex={false} style={{ paddingHorizontal: 28, minWidth: 132 }} />

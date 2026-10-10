@@ -13,7 +13,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
-  FONT, FS, SP, RADIUS, FILL_ELEVATED, TEXT_TERTIARY,
+  FONT, FS, SP, RADIUS, FILL_ELEVATED, TEXT_DISABLED,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
@@ -201,8 +201,8 @@ export default function LoyaltyScreen() {
             activeOpacity={0.85}
           >
              {redeeming
-               ? <ActivityIndicator color={TEXT_TERTIARY} size="small" />
-               : <Text style={[s.redeemBtnText, { color: theme.onAccent }, balance < 100 && { color: TEXT_TERTIARY }]}>Use points in Cart</Text>
+               ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
+               : <Text style={[s.redeemBtnText, { color: theme.onAccent }, balance < 100 && { color: TEXT_DISABLED }]}>Use points in Cart</Text>
             }
           </TouchableOpacity>
           <Text style={s.redeemDisabledNote}>Choose your points in Cart when you’re ready to check out.</Text>

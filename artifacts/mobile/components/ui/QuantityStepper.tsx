@@ -8,7 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { hapticToggle } from '@/lib/haptics';
-import { FONT, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, TEXT_DISABLED } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { radius } from '@/constants/radii';
 
@@ -69,7 +69,7 @@ export function QuantityStepper({
         hitSlop={8}
         testID={testID ? `${testID}-decrement` : undefined}
       >
-        <Feather name={removeMode ? 'trash-2' : 'minus'} size={sm ? 13 : 16} color={canDecrement ? palette.foreground : TEXT_TERTIARY} />
+        <Feather name={removeMode ? 'trash-2' : 'minus'} size={sm ? 13 : 16} color={canDecrement ? palette.foreground : TEXT_DISABLED} />
       </Pressable>
       <Text
         style={[TYPE_SCALE.headline, TABULAR_NUMS, { color: palette.foreground, minWidth: sm ? 18 : 22, textAlign: 'center', fontSize: sm ? 13 : undefined }]}
@@ -86,7 +86,7 @@ export function QuantityStepper({
         hitSlop={8}
         testID={testID ? `${testID}-increment` : undefined}
       >
-        <Feather name="plus" size={sm ? 13 : 16} color={canIncrement ? palette.foreground : TEXT_TERTIARY} />
+        <Feather name="plus" size={sm ? 13 : 16} color={canIncrement ? palette.foreground : TEXT_DISABLED} />
       </Pressable>
     </View>
   );

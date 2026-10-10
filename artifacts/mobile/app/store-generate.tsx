@@ -15,7 +15,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard, HapticSwitch} from '@/components/BrandthreadUI';
@@ -975,8 +975,8 @@ export default function StoreGenerateScreen() {
               end={{ x: 1, y: 0 }}
               style={st.navContinueGrad}
             >
-              <Text style={[st.navContinueText, continueEnabled ? getOnAccentTextStyle(theme) : { color: TEXT_TERTIARY }]}>Continue</Text>
-              <Feather name="arrow-right" size={ICON.sm} color={continueEnabled ? theme.onAccent : TEXT_TERTIARY} />
+              <Text style={[st.navContinueText, continueEnabled ? getOnAccentTextStyle(theme) : { color: TEXT_DISABLED }]}>Continue</Text>
+              <Feather name="arrow-right" size={ICON.sm} color={continueEnabled ? theme.onAccent : TEXT_DISABLED} />
             </LinearGradient>
           </TouchableOpacity>
         ) : (

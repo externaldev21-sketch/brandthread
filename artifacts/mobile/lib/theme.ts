@@ -67,6 +67,10 @@ export const FG      = '#FFFFFF';
 export const TEXT_PRIMARY   = FG;
 export const TEXT_SECONDARY = '#C0C0C0';
 export const TEXT_TERTIARY  = '#8E8E93'; // tertiary / disabled
+// A disabled control's label/glyph: Apple's dark systemGray2. Solid, so a
+// disabled state reads as clearly dimmer than secondary text without fading
+// the control with opacity.
+export const TEXT_DISABLED  = '#636366';
 export const MUTED   = TEXT_SECONDARY;
 export const SUBTLE  = TEXT_TERTIARY;
 /**

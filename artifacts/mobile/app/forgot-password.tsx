@@ -19,7 +19,7 @@ import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
-import { FONT, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
 type Step = 'email' | 'code' | 'done';
 
@@ -152,8 +152,8 @@ export default function ForgotPasswordScreen() {
                   style={s.primaryBtn}
                 >
                   {isFetching
-                    ? <ActivityIndicator color={TEXT_TERTIARY} size="small" />
-                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme), (!email.trim() || isFetching) && { color: TEXT_TERTIARY }]}>Send reset code</Text>}
+                    ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
+                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme), (!email.trim() || isFetching) && { color: TEXT_DISABLED }]}>Send reset code</Text>}
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -230,8 +230,8 @@ export default function ForgotPasswordScreen() {
                   style={s.primaryBtn}
                 >
                   {isFetching
-                    ? <ActivityIndicator color={TEXT_TERTIARY} size="small" />
-                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme), (!code || !password || isFetching) && { color: TEXT_TERTIARY }]}>Reset password</Text>}
+                    ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
+                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme), (!code || !password || isFetching) && { color: TEXT_DISABLED }]}>Reset password</Text>}
                 </LinearGradient>
               </TouchableOpacity>
 

@@ -21,7 +21,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
-import { FONT, FS, RADIUS, SP, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
 
 const MAX_PAIRINGS = 6;
 
@@ -170,7 +170,7 @@ export default function ProductPairingsScreen() {
                 accessibilityLabel={c.name}
               >
                 <Thumb uri={c.image} s={s} colors={colors} />
-                <Text style={[s.name, blocked && { color: TEXT_TERTIARY }]}>{c.name}</Text>
+                <Text style={[s.name, blocked && { color: TEXT_DISABLED }]}>{c.name}</Text>
                 <View style={[s.checkbox, checked && s.checkboxOn]}>
                   {checked ? <Feather name="check" size={14} color={colors.primaryForeground} /> : null}
                 </View>
@@ -224,9 +224,9 @@ export default function ProductPairingsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Add product"
           >
-            <View style={[s.thumb, s.addThumb]}><Feather name="plus" size={20} color={paired.length >= MAX_PAIRINGS ? TEXT_TERTIARY : colors.foreground} /></View>
-            <Text style={[s.name, paired.length >= MAX_PAIRINGS && { color: TEXT_TERTIARY }]}>Add product</Text>
-            <Feather name="chevron-right" size={16} color={paired.length >= MAX_PAIRINGS ? TEXT_TERTIARY : colors.mutedForeground} />
+            <View style={[s.thumb, s.addThumb]}><Feather name="plus" size={20} color={paired.length >= MAX_PAIRINGS ? TEXT_DISABLED : colors.foreground} /></View>
+            <Text style={[s.name, paired.length >= MAX_PAIRINGS && { color: TEXT_DISABLED }]}>Add product</Text>
+            <Feather name="chevron-right" size={16} color={paired.length >= MAX_PAIRINGS ? TEXT_DISABLED : colors.mutedForeground} />
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -248,7 +248,7 @@ function IconBtn({ name, onPress, label, disabled, colors, s }: {
 }) {
   return (
     <TouchableOpacity style={s.iconBtn} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
-      <Feather name={name} size={18} color={disabled ? TEXT_TERTIARY : colors.foreground} />
+      <Feather name={name} size={18} color={disabled ? TEXT_DISABLED : colors.foreground} />
     </TouchableOpacity>
   );
 }

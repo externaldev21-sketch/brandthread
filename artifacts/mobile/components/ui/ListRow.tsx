@@ -11,7 +11,7 @@ import { Animated, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewS
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
-import { FONT, TEXT_TERTIARY } from '@/lib/theme';
+import { FONT, TEXT_DISABLED } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -55,15 +55,15 @@ export function ListRow({
   const nativeDriver = Platform.OS !== 'web';
   const interactive = !!onPress && !disabled;
   // Disabled rows use solid gray text, never a faded row.
-  const titleColor = disabled ? TEXT_TERTIARY : destructive ? palette.destructive : palette.foreground;
-  const secondaryColor = disabled ? TEXT_TERTIARY : palette.mutedForeground;
+  const titleColor = disabled ? TEXT_DISABLED : destructive ? palette.destructive : palette.foreground;
+  const secondaryColor = disabled ? TEXT_DISABLED : palette.mutedForeground;
 
   const content = (
     <>
       {avatar && <Avatar uri={avatar.uri} name={avatar.name} size={40} />}
       {icon && !avatar && (
         <View style={[styles.iconWrap, { backgroundColor: palette.card, borderRadius: RADII.chip }]}>
-          <Icon name={icon} size={17} color={disabled ? TEXT_TERTIARY : iconColor ?? (destructive ? palette.destructive : palette.mutedForeground)} />
+          <Icon name={icon} size={17} color={disabled ? TEXT_DISABLED : iconColor ?? (destructive ? palette.destructive : palette.mutedForeground)} />
         </View>
       )}
       <View style={styles.body}>

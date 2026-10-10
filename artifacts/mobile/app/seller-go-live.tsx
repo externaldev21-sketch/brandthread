@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_DISABLED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -310,8 +310,8 @@ function SellerGoLiveNativeScreen() {
                 <ActivityIndicator color={TEXT_TERTIARY} />
               ) : (
                 <>
-                  <View style={[s.liveDot, !title.trim() && { backgroundColor: TEXT_TERTIARY }]} />
-                  <Text style={[s.goLiveBtnText, !title.trim() && { color: TEXT_TERTIARY }]}>Go Live</Text>
+                  <View style={[s.liveDot, !title.trim() && { backgroundColor: TEXT_DISABLED }]} />
+                  <Text style={[s.goLiveBtnText, !title.trim() && { color: TEXT_DISABLED }]}>Go Live</Text>
                 </>
               )}
             </TouchableOpacity>
