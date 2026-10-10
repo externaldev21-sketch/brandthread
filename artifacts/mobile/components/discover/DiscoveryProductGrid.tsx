@@ -1,5 +1,6 @@
 /**
- * Two-column product grid (image, price chip, name, brand) shared by the
+ * Product grid (2 columns on phones, `useResponsive().gridColumns` on iPad —
+ * GOAT's iPad browse grid) (image, price chip, name, brand) shared by the
  * category page and the trending see-all screen. Reuses the search
  * ProductTile so product cards look the same everywhere. Mobbin reference:
  * GOAT / SSENSE collection grids.
@@ -11,6 +12,8 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { ProductTile } from '@/components/search/ProductTile';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { toProductTileItem } from '@/lib/discoveryShelves';
+import { useResponsive } from '@/hooks/useResponsive';
+import { useIsWebShell } from '@/components/web/WebAppShell';
 
 const GAP = SPACING.sm + 4;
 
@@ -26,13 +29,20 @@ export function DiscoveryProductGrid({ products, header, footer, empty, contentB
   const { theme } = useAppTheme();
   const { push } = useThreadPull();
   const { width } = useWindowDimensions();
-  const cardWidth = Math.floor((Math.min(width, 640) - SCREEN_GUTTER * 2 - GAP) / 2);
+  const { isTablet, gridColumns } = useResponsive();
+  // The web preview shows the app in a 640pt column, so it keeps the phone grid.
+  const isWebShell = useIsWebShell();
+  const wide = isTablet && !isWebShell;
+  const columns = wide ? gridColumns : 2;
+  const cardWidth = Math.floor(((wide ? width : Math.min(width, 640)) - SCREEN_GUTTER * 2 - GAP * (columns - 1)) / columns);
 
   return (
     <FlatList
+      // FlatList can't change numColumns in place; rotation remounts it.
+      key={`grid-${columns}`}
       data={products}
       keyExtractor={(p) => p.id}
-      numColumns={2}
+      numColumns={columns}
       columnWrapperStyle={styles.column}
       contentContainerStyle={{ paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.md, paddingBottom: contentBottom, gap: GAP }}
       showsVerticalScrollIndicator={false}

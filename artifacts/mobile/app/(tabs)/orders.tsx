@@ -13,6 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON, ANIM } from '@/lib/theme';
+import { useResponsive } from '@/hooks/useResponsive';
+import { useIsWebShell } from '@/components/web/WebAppShell';
+import OrderDetailScreen from '@/app/order-detail';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
 import { Button } from '@/components/ui/Button';
@@ -582,13 +585,15 @@ function FilterSheet({
  * selection state are unchanged.
  */
 const OrderListRow = React.memo(function OrderListRow({
-  order, isLast, selected, selectionMode, actions,
+  order, isLast, selected, selectionMode, actions, current = false,
 }: {
   order: Order;
   isLast: boolean;
   selected: boolean;
   selectionMode: boolean;
   actions: OrderRowActions;
+  /** iPad split: the order shown in the detail pane (white outline, like Shopify iPad's selected row). */
+  current?: boolean;
 }) {
   const { theme } = useAppTheme();
   // Orders are automatic (paid orders arrive as "To ship"), so the only useful
@@ -606,16 +611,18 @@ const OrderListRow = React.memo(function OrderListRow({
       disabled={selectionMode}
       accessibilityLabel={`${swipeAction.label} order ${order.orderNumber}`}
     >
-      <OrderRow
-        order={order}
-        selected={selected}
-        selectionMode={selectionMode}
-        onPress={() => actions.press(order)}
-        onPressIn={() => actions.pressIn(order)}
-        onLongPress={() => actions.longPress(order.id)}
-        onShip={() => actions.ship(order.id)}
-        isLast={isLast}
-      />
+      <View style={current ? { borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: theme.text } : undefined} accessibilityState={current ? { selected: true } : undefined}>
+        <OrderRow
+          order={order}
+          selected={selected}
+          selectionMode={selectionMode}
+          onPress={() => actions.press(order)}
+          onPressIn={() => actions.pressIn(order)}
+          onLongPress={() => actions.longPress(order.id)}
+          onShip={() => actions.ship(order.id)}
+          isLast={isLast}
+        />
+      </View>
     </SwipeActionRow>
   );
 });
@@ -668,6 +675,10 @@ function SellerOrdersListSkeleton() {
   );
 }
 
+/** iPad split view: on at >= 900pt (iPad landscape, 12.9" portrait); list column width. */
+const SPLIT_MIN_WIDTH = 900;
+const SPLIT_LIST_WIDTH = 400;
+
 export default function OrdersScreen() {
   const scrollResetRef = useScrollReset<any>(true, false);
   const { theme } = useAppTheme();
@@ -675,12 +686,17 @@ export default function OrdersScreen() {
   const { background: BG, surface: SCREEN_BG, text: FG, muted: MUTED, subtle: SUBTLE, error: RED, border: BORDER, borderSubtle: BORDER_ACTIVE, card: CARD, cardElevatedGlass: CARD_ELEVATED_GLASS } = theme;
   const STRONG = theme.text, DIM = `${theme.text}14`, RED_DIM = `${theme.error}22`, CARD_GLASS = theme.cardGlass, SURFACE = theme.surface;
   const palette = theme as typeof theme & Record<string, string>;
+  const { width: windowWidth, isTablet } = useResponsive();
+  // Not inside the web preview's centred 640pt column (components/web/WebAppShell).
+  const isWebShell = useIsWebShell();
+  const splitCapable = isTablet && !isWebShell && windowWidth >= SPLIT_MIN_WIDTH;
+  const [splitOrderId, setSplitOrderId] = useState<string | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const topInset = useHeaderTopInset();
   // Extra centering padding beyond each row's own SP.md gutter — 0 on phone,
   // grows on iPad so the list doesn't stretch edge to edge.
-  const listSidePad = Math.max(0, useCenteredContentPadding() - SP.md);
+  const centeredPad = Math.max(0, useCenteredContentPadding() - SP.md);
   const tabBarMetrics = useTabBarMetrics();
 
   const api = useApi();
@@ -707,6 +723,10 @@ export default function OrdersScreen() {
   })();
 
   const [orders, setOrders] = useState<OrderListOrder[]>([]);
+  // Split only once there are orders; with none, the list's empty state keeps the full width.
+  const splitView = splitCapable && orders.length > 0;
+  // In the split the list owns a fixed column, so no tablet centring inside it.
+  const listSidePad = splitView ? 0 : centeredPad;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatesPaused, setUpdatesPaused] = useState(false);
@@ -955,9 +975,10 @@ export default function OrdersScreen() {
       );
     } else {
       seedDetailOnInteraction(queryClient, queryKeys.order(order.id), order.id, detailSeedRef.current, userId ?? null);
-      router.push(('/order-detail?id=' + order.id) as never);
+      if (splitView) setSplitOrderId(order.id);
+      else router.push(('/order-detail?id=' + order.id) as never);
     }
-  }, [selectedIds, router, queryClient, userId]);
+  }, [selectedIds, router, queryClient, userId, splitView]);
 
   // Fires ~100-200ms before onPress (finger-down vs. finger-up): warms the
   // query cache order-detail.tsx reads on mount, so by the time the tap
@@ -1067,9 +1088,10 @@ export default function OrdersScreen() {
         selected={selectedIdSet.has(item.order.id)}
         selectionMode={selectionMode}
         actions={rowActions}
+        current={splitView && item.order.id === (splitOrderId ?? orders[0]?.id)}
       />
     );
-  }, [s, selectedIdSet, selectionMode, rowActions]);
+  }, [s, selectedIdSet, selectionMode, rowActions, splitView, splitOrderId, orders]);
 
   const keyExtractor = useCallback((row: OrderListItem) => row.key, []);
   const getItemType = useCallback((row: OrderListItem) => row.type, []);
@@ -1131,7 +1153,7 @@ export default function OrdersScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  return (
+  const list = (
     <View style={[s.root, { paddingTop: topInset + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       {/* ── Fixed header ── */}
       <SellerListHeader
@@ -1241,6 +1263,24 @@ export default function OrdersScreen() {
         contentReady={!loading}
         gesture={SELLER_ORDERS_GESTURE}
       />
+    </View>
+  );
+
+  if (!splitView) return list;
+
+  // iPad split (Shopify iPad / Apple Mail): the list keeps its phone layout
+  // in a fixed column, the selected order fills the rest. Selection
+  // defaults to the first order so the pane is never empty.
+  const paneOrderId = splitOrderId ?? orders[0]?.id ?? null;
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: palette.background ?? palette.surface ?? BG }}>
+      <View style={{ width: SPLIT_LIST_WIDTH }}>{list}</View>
+      <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: palette.border ?? BORDER }} />
+      <View style={{ flex: 1, paddingBottom: tabBarMetrics.occupiedHeight }} testID="orders-split-detail">
+        {paneOrderId ? (
+          <OrderDetailScreen key={paneOrderId} orderId={paneOrderId} embedded />
+        ) : null}
+      </View>
     </View>
   );
 }

@@ -863,6 +863,9 @@ export function respond({ method, path, query, role, options = {} }) {
 
   // Public / buyer
   if (p === '/public/products/high-demand') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? 6));
+  // Trending see-all and category pages (DiscoveryProductGrid).
+  if (p === '/public/trending/products') return { windowDays: 7, products: PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? 12)) };
+  if ((match = p.match(/^\/public\/categories\/([^/]+)\/products$/))) return { slug: decodeURIComponent(match[1]), label: null, total: PUBLIC_PRODUCTS.length, products: PUBLIC_PRODUCTS };
   if (p === '/public/products') {
     const ownerId = query.get('ownerId');
     const list = ownerId ? PUBLIC_PRODUCTS.filter((item) => item.sellerId === ownerId) : PUBLIC_PRODUCTS;

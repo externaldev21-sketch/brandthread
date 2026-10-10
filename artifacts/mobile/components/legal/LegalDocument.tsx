@@ -19,6 +19,7 @@ import {
   type LegalDocId,
 } from '@/content/legal';
 import { radius, nestedRadius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 export type { LegalSection } from '@/content/legal';
 
@@ -190,12 +191,12 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   brandMarkText: {
     color: theme.onAccent,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     fontSize: 17,
   },
   brandName: {
     color: theme.text,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     fontSize: 17,
     letterSpacing: -0.3,
   },
@@ -232,7 +233,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   switchText: {
     color: theme.muted,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: FONT.semibold,
     fontSize: 13,
   },
   switchTextActive: {
@@ -245,15 +246,13 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   eyebrow: {
     color: theme.accentLight,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     fontSize: 12,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
     marginBottom: 14,
   },
   title: {
     color: theme.text,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     // FS.h1 (36) — the largest step on the declared type scale in lib/theme.ts.
     fontSize: 36,
     lineHeight: 42,
@@ -262,14 +261,14 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   summary: {
     color: theme.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: FONT.regular,
     fontSize: 17,
     lineHeight: 27,
     maxWidth: 700,
   },
   date: {
     color: theme.subtle,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: FONT.medium,
     fontSize: 13,
     marginTop: 18,
   },
@@ -287,20 +286,20 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   sectionNumber: {
     color: theme.accentLight,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     fontSize: 12,
   },
   sectionTitle: {
     flex: 1,
     color: theme.text,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     fontSize: 22,
     lineHeight: 29,
     letterSpacing: -0.4,
   },
   paragraph: {
     color: theme.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: FONT.regular,
     fontSize: 15,
     lineHeight: 25,
   },
@@ -320,36 +319,36 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   bulletText: {
     flex: 1,
     color: theme.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: FONT.regular,
     fontSize: 15,
     lineHeight: 24,
   },
   numberText: {
     minWidth: 18,
     color: theme.accentLight,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     fontSize: 15,
     lineHeight: 24,
   },
   heading: {
     color: theme.text,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     fontSize: 16,
     lineHeight: 24,
     marginTop: 6,
   },
   bold: {
     color: theme.text,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
   },
   link: {
     color: theme.text,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: FONT.semibold,
     textDecorationLine: 'underline',
   },
   footer: {
     color: theme.subtle,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: FONT.regular,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 40,
