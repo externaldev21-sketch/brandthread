@@ -29,6 +29,11 @@ function rows(pairs: Array<[string, string]>): string {
   ).join("")}</table>`;
 }
 
+/** Same button as the shared template, placed inline so the "stop" note can sit under it. */
+function button(label: string, url: string): string {
+  return `<table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin:28px 0 4px;"><tr><td style="border-radius:999px;background:#111111;"><a href="${esc(url)}" style="display:inline-block;padding:13px 22px;border:1px solid #111111;border-radius:999px;color:#ffffff;font-size:14px;font-weight:700;line-height:20px;text-decoration:none;">${esc(label)}</a></td></tr></table>`;
+}
+
 function footerNote(unsubscribeUrl?: string | null): string {
   const off = unsubscribeUrl
     ? `<a href="${esc(unsubscribeUrl)}" style="color:#666666;">Stop these emails</a>`
@@ -46,8 +51,7 @@ export function newOrderEmail(input: { orderNumber: string; totalCents: number; 
       title: "You have a new order",
       subtitle: `Order #${input.orderNumber} is paid and ready to ship.`,
       bodyHtml: rows([["Order", `#${input.orderNumber}`], ["Items", String(input.itemCount)], ["Total", total]])
-        + footerNote(),
-      cta: { label: "View order", url: link(`/order-detail?id=${encodeURIComponent(input.orderId)}`) },
+        + button("View order", link(`/order-detail?id=${encodeURIComponent(input.orderId)}`)) + footerNote(),
     }),
   };
 }
@@ -63,8 +67,7 @@ export function newReviewEmail(input: { rating: number | null; productName: stri
       title: "A buyer left a review",
       subtitle: stars ? `${stars}${about}.` : `${input.productName ?? "Your store"} has a new review.`,
       bodyHtml: (input.body ? `<p style="margin:0;padding:16px;border-left:3px solid #111111;background:#f6f6f6;">${esc(input.body.slice(0, 500))}</p>` : "")
-        + `<p style="margin:${input.body ? "16px" : "0"} 0 0;color:#666666;">Replying shows future buyers you're there.</p>` + footerNote(),
-      cta: { label: "Reply to review", url: link("/seller-reviews") },
+        + `<p style="margin:${input.body ? "16px" : "0"} 0 0;color:#666666;">Replying shows future buyers you're there.</p>` + button("Reply to review", link("/seller-reviews")) + footerNote(),
     }),
   };
 }
@@ -135,8 +138,7 @@ export function nudgeEmail(kind: NudgeKind, unsubscribeUrl: string | null): Rend
       preheader: copy.body,
       title: copy.title,
       subtitle: copy.body,
-      bodyHtml: footerNote(unsubscribeUrl),
-      cta: { label: copy.cta, url: link(copy.route) },
+      bodyHtml: button(copy.cta, link(copy.route)) + footerNote(unsubscribeUrl),
     }),
   };
 }
@@ -165,8 +167,7 @@ export function weeklySummaryEmail(summary: WeeklySummary, weekLabel: string, un
         eyebrow: weekLabel,
         title: "No sales this week",
         subtitle: `${summary.visits} store visit${summary.visits === 1 ? "" : "s"}. Try these to get your next sale.`,
-        bodyHtml: `<ol style="margin:0;padding-left:20px;color:#252525;">${tips.map((t) => `<li style="margin:0 0 8px;">${esc(t)}</li>`).join("")}</ol>` + footerNote(unsubscribeUrl),
-        cta: { label: "Share your store", url: link("/share-store") },
+        bodyHtml: `<ol style="margin:0;padding-left:20px;color:#252525;">${tips.map((t) => `<li style="margin:0 0 8px;">${esc(t)}</li>`).join("")}</ol>` + button("Share your store", link("/share-store")) + footerNote(unsubscribeUrl),
       }),
     };
   }
@@ -184,10 +185,9 @@ export function weeklySummaryEmail(summary: WeeklySummary, weekLabel: string, un
       eyebrow: weekLabel,
       title: `${money(summary.salesCents)} in sales`,
       subtitle: `${summary.orderCount} order${summary.orderCount === 1 ? "" : "s"} this week.`,
-      bodyHtml: rows(pairs) + footerNote(unsubscribeUrl),
-      cta: summary.toShipCount > 0
-        ? { label: "Ship orders", url: link("/orders") }
-        : { label: "View analytics", url: link("/analytics") },
+      bodyHtml: rows(pairs)
+        + (summary.toShipCount > 0 ? button("Ship orders", link("/orders")) : button("View analytics", link("/analytics")))
+        + footerNote(unsubscribeUrl),
     }),
   };
 }
