@@ -2,7 +2,7 @@
 - [Brandthread design system](brandthread-woven-system.md) — system fonts, native icons and flat cards; preserve seller tab-bar swipe and glow.
 - [Runtime app themes](runtime-app-themes.md) — 12 account-scoped palettes have matching native launcher icons; null icon preference follows the active theme.
 - [Onboarding value-first contract](onboarding-value-first.md) — defaults stay editable; seller personalization and one optional, durable AI success precede plan commitment.
-- [Seller trial reminder delivery](seller-trial-reminder-delivery.md) — create on day four of an exact five-day trial; leases, retries, preferences, and per-token dedupe protect delivery.
+- [Seller trial reminder delivery](seller-trial-reminder-delivery.md) — server trial terms govern timing; leases, retries, preferences, and per-token dedupe protect delivery.
 - [Transparent navigation isolation](transparent-navigation-isolation.md) — every root scene needs an opaque plane; only the focused scene animates, and inactive tab scenes detach.
 - [Clerk Expo v3 Signals API](clerk-expo-v3-signals-api.md) — @clerk/expo v3 hooks return SignInFutureResource; use password()+finalize() not create()+setActive(); Metro needs _tmp_ blockList fix.
 - [Brandthread backend architecture](brandthread-backend-architecture.md) — ownerId scoping, transactional orders, lib/db build requirement, clerkClient usage, healthz double-path gotcha.
