@@ -10,6 +10,7 @@ import {
   ImageQualityError,
   ImageQualityUnavailableError,
 } from "@workspace/integrations-openai-ai-server/image";
+import { personKeyFor } from "../lib/accountProfiles";
 
 const router = Router();
 router.use(requireAuth);
@@ -167,9 +168,11 @@ router.post("/logo", async (req, res) => {
     return;
   }
 
+  // One free sample per PERSON: a login's buyer and seller profiles share it.
+  const sampleKey = await personKeyFor(userId);
   let reservationId: string;
   try {
-    reservationId = await reserveOnboardingSample(userId);
+    reservationId = await reserveOnboardingSample(sampleKey);
   } catch (error: any) {
     const status = error?.code === "onboarding_sample_in_progress" ? 409 : 429;
     res.status(status).json({ error: error?.message || "The onboarding sample is unavailable.", code: error?.code });
@@ -193,7 +196,7 @@ router.post("/logo", async (req, res) => {
       "Create a crisp fashion-brand logo on a clean background. It must remain legible at small sizes and contain no invented words.",
     );
   } catch (error: any) {
-    await releaseOnboardingSample(userId, reservationId).catch(() => {});
+    await releaseOnboardingSample(sampleKey, reservationId).catch(() => {});
     res.status(400).json({ error: error?.message || "Invalid onboarding sample request." });
     return;
   }
@@ -208,7 +211,7 @@ router.post("/logo", async (req, res) => {
     });
   } catch (err) {
     // A failed provider or QA attempt must not consume the allowance.
-    await releaseOnboardingSample(userId, reservationId).catch(() => {});
+    await releaseOnboardingSample(sampleKey, reservationId).catch(() => {});
     if (err instanceof ImageQualityError) {
       res.status(422).json({ error: "The generated logo did not meet the quality check. Please try again.", retryable: true });
     } else if (err instanceof ImageQualityUnavailableError) {
@@ -221,7 +224,7 @@ router.post("/logo", async (req, res) => {
 
   // Completion is the durable success boundary. If this update cannot be
   // recorded, do not release the reservation or risk a second success.
-  const completed = await completeOnboardingSample(userId, reservationId);
+  const completed = await completeOnboardingSample(sampleKey, reservationId);
   if (!completed) {
     res.status(503).json({ error: "The sample could not be recorded. Please try again.", retryable: true });
     return;
