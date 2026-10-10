@@ -1365,7 +1365,6 @@ export default function BuyerCheckoutScreen() {
             </CheckoutSection>
           )}
 
-<<<<<<< HEAD
           {inApp ? (
             <TipSection
               groups={current.deliveryGroups.flatMap(group => {
@@ -1377,11 +1376,7 @@ export default function BuyerCheckoutScreen() {
             />
           ) : null}
 
-          <OrderSummarySection
-            session={current}
-=======
           <ReviewTotals
->>>>>>> origin/approved-pr-775
             totals={totals}
             itemCount={itemCount}
             taxNote={taxNote}

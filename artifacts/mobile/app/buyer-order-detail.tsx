@@ -60,8 +60,8 @@ import { canBuyerCancel } from '@/services/orderPolicy';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
-import { isReturnEligible, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
 import { formatDate } from '@/lib/format';
+import { isRefundEligible, isReturnEligible, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1274,6 +1274,16 @@ export default function BuyerOrderDetailScreen() {
               label={returnRequest ? 'View Return' : 'Request Return'}
               icon="refresh-ccw"
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleRequestReturn(); }}
+            />
+          ) : null}
+          {!returnRequest && !order.delivery?.autoRefund && isRefundEligible(order.status) ? (
+            <SecondaryButton
+              label="Request a Refund"
+              icon="rotate-ccw"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push(('/buyer-refund-request?orderId=' + encodeURIComponent(order.id)) as never);
+              }}
             />
           ) : null}
           <SecondaryButton label="Report a Problem" icon="alert-circle" onPress={handleReportProblem} accent={theme.error} />
