@@ -150,8 +150,8 @@ export function BuyerTabBar({
   // Owns the pill's position so a tab press can kick the glide immediately,
   // before the tabPress event and the screen swap — see the hook's doc.
   const {
-    x: indicatorX, target: indicatorTarget, opacity: indicatorOpacity,
-    press: pressIndicator, hide: hideIndicator,
+    x: indicatorX, target: indicatorTarget, origin: indicatorOrigin, peakStretch: indicatorStretch,
+    opacity: indicatorOpacity, press: pressIndicator, hide: hideIndicator, afterGlide,
   } = useTabBarActiveIndex(activeIndex, reducedMotion);
 
   // 0 = regular, 1 = compact. Every animated style below reads this one
@@ -269,8 +269,8 @@ export function BuyerTabBar({
       return;
     }
     hapticTabChange();
-    navigation.navigate(routeName as never);
-  }, [activeRoute, activeIndex, navigation, state.routes, pressIndicator, hideIndicator]);
+    afterGlide(() => navigation.navigate(routeName as never));
+  }, [activeRoute, activeIndex, navigation, state.routes, pressIndicator, hideIndicator, afterGlide]);
 
   const onLongPress = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);
@@ -330,6 +330,8 @@ export function BuyerTabBar({
         <TabBarIndicator
           x={indicatorX}
           target={indicatorTarget}
+          origin={indicatorOrigin}
+          peakStretch={indicatorStretch}
           opacity={indicatorOpacity}
           metrics={regularMetrics}
           theme={theme}
