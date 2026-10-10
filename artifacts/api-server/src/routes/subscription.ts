@@ -30,6 +30,7 @@ import { PLAN_CATALOGUE, TRIAL_DAYS, isSellerPlanId, type SellerPlanId as PlanId
 import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
 import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
 import { cancellationDetailsFor, isCancelReasonId } from "../lib/cancelReasons";
+import { personHadTrial, withPersonTrialRule } from "../lib/personTrial";
 
 const router = Router();
 router.use(requireAuth);
@@ -452,7 +453,10 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
       ensureCustomer(stripe, clerkUserId),
     ]);
 
-    const session = await stripe.checkout.sessions.create({
+    // One free trial per person: a login's other profile (or a deleted one)
+    // that already had a trial means this checkout starts paid.
+    const trialAllowed = !(await personHadTrial(clerkUserId));
+    const session = await stripe.checkout.sessions.create(withPersonTrialRule(trialAllowed, {
       mode:                      "subscription",
       customer:                  customerId,
       line_items:                [{ price: priceId, quantity: 1 }],
@@ -467,7 +471,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
       cancel_url:           `${returnBase}/seller/subscription/return?status=cancel`,
       client_reference_id:  clerkUserId,
       metadata:             { clerkUserId, planId },
-    });
+    }));
 
     res.json({ url: session.url });
   } catch (err: any) {

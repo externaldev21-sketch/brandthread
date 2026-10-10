@@ -68,6 +68,7 @@ import {
 import { isUniqueViolation, isUsernameUniqueViolation, violatedConstraint } from "../lib/dbErrors";
 import { validateHandle } from "../lib/storeIdentity";
 import { isEmailUniqueViolation, releaseStaleEmailClaims } from "../lib/staleEmailClaim";
+import { ProfileRoleTakenError, activeSiblingIds, assertRoleAvailable, isLoginWithLiveSiblings, recordProfileRole } from "../lib/accountProfiles";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
 import { AGE_RESTRICTED_MESSAGE, bandMaySellOrEarn, denyIfAgeRestricted } from "../lib/ageGate";
 import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSource } from "../lib/legalAcceptance";
@@ -246,8 +247,12 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         avatarUrl,
         updatedAt: new Date(),
       };
-      // Signing back in during the grace period cancels the deletion.
-      const cancellation = graceSyncUpdates(existing);
+      // Signing back in during the grace period cancels the deletion, except
+      // for a login whose other profile is still in use: signing in is how
+      // the person reaches that profile (restore stays explicit).
+      const cancellation = existing.deletionRequestedAt && await isLoginWithLiveSiblings(clerkUserId)
+        ? null
+        : graceSyncUpdates(existing);
       const cancelledDeletion = cancellation !== null;
       if (cancellation) Object.assign(updates, cancellation);
       if (preferredName) {
@@ -302,7 +307,10 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
     res.status(created ? 201 : 200).json({ ...user, deletionCancelled });
   } catch (err) {
     if ((err as any)?.statusCode === 410) {
-      res.status(410).json({ error: "This account has been deleted." });
+      // A deleted profile whose login still owns another profile: the app
+      // switches there instead of signing the person out.
+      const otherProfiles = await activeSiblingIds(clerkUserId).catch(() => [] as string[]);
+      res.status(410).json({ error: "This account has been deleted.", hasOtherProfiles: otherProfiles.length > 0 });
       return;
     }
     // A brand-new Clerk user (different clerkId) whose email collides,
@@ -508,6 +516,7 @@ export async function accountDeletionHandler(req: Request, res: Response) {
       }
     }
 
+    const keepsLogin = await isLoginWithLiveSiblings(clerkUserId);
     const scheduledFor = await scheduleAccountDeletion(clerkUserId);
     // App Store 5.1.1(v): revoke the Sign in with Apple tokens with the code
     // from the re-authentication. Best effort; never blocks deletion.
@@ -518,7 +527,9 @@ export async function accountDeletionHandler(req: Request, res: Response) {
       });
     }
     try {
-      await revokeAllSessions(clerkUserId);
+      // Deleting one profile keeps the other: the login's sessions are how
+      // the person still reaches their remaining profile.
+      if (!keepsLogin) await revokeAllSessions(clerkUserId);
     } catch (err) {
       // The account is already hidden and scheduled; a failed revoke must not
       // report the whole request as failed.
@@ -959,6 +970,17 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
       return;
     }
     if (accountType === "seller" && await denyIfAgeRestricted(clerkId, res)) return;
+    // One login = at most one buyer + one seller profile.
+    try {
+      await assertRoleAvailable(clerkId, accountType);
+      await recordProfileRole(clerkId, accountType);
+    } catch (err) {
+      if (err instanceof ProfileRoleTakenError) {
+        res.status(409).json({ error: `${err.message} Switch to it.`, code: err.code, role: err.role, profileClerkId: err.profileClerkId });
+        return;
+      }
+      throw err;
+    }
     updates.accountType = accountType;
   }
   if (appThemeId !== undefined) updates.appThemeId = appThemeId;
