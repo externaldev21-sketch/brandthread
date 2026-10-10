@@ -12,6 +12,7 @@
  * an honest empty state (sellers have no tagged-post data yet).
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { openShareStoreSheet } from '@/lib/shareStoreSheet';
 import { useAuth } from '@clerk/expo';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
@@ -766,6 +767,8 @@ export default function ProfileScreen() {
         onClose={() => setMenuOpen(false)}
         items={[
           caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: () => setShareSheetVisible(true) },
+          // The store website link (brandthread.app/@handle) — the same Share store sheet as the Dashboard.
+          caps.showShare && { key: 'share-store', icon: 'shopping-bag', label: 'Share store', onPress: () => openShareStoreSheet() },
           caps.showViewAsVisitor && userId && {
             key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
             onPress: () => nav(viewAsVisitorHref('seller', userId)),

@@ -25,6 +25,7 @@ import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { useAgeStatus } from '@/lib/ageGate';
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 import { radius } from '@/constants/radii';
+import { toLiveProductOptions } from '@/lib/liveProductOptions';
 
 const FG = '#FFFFFF';
 const GLASS = 'rgba(0,0,0,0.5)';
@@ -79,8 +80,11 @@ function SellerGoLiveNativeScreen() {
   useEffect(() => {
     let cancelled = false;
     setProductsLoading(true);
-    (api as any).products?.list?.()
-      .then((r: any) => { if (!cancelled) setAllProducts(r?.products ?? []); })
+    // The bulk catalog listing carries image + price (GET /api/products has
+    // neither, and returns a bare array — reading `.products` off it left
+    // this picker permanently empty).
+    api.productBulk.list({ status: 'active' })
+      .then((r) => { if (!cancelled) setAllProducts(toLiveProductOptions(r)); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setProductsLoading(false); });
     return () => { cancelled = true; };

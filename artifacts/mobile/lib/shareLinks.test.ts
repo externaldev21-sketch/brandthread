@@ -17,7 +17,8 @@ describe('shareLinks builders', () => {
 
   it('builds canonical https urls', () => {
     expect(buildPostUrl('0f8fad5b-d9cb-469f-a165-70867728950e')).toBe('https://brandthread.app/p/0f8fad5b-d9cb-469f-a165-70867728950e');
-    expect(buildStoreUrl('@NovaGoods')).toBe('https://brandthread.app/store/novagoods');
+    expect(buildStoreUrl('@NovaGoods')).toBe('https://brandthread.app/@novagoods');
+    expect(buildStoreUrl('nova.goods')).toBe('https://brandthread.app/store/nova.goods');
     expect(buildProductUrl('prod_123456')).toBe('https://brandthread.app/store/product/prod_123456');
     expect(buildProfileUrl('JordanReyes')).toBe('https://brandthread.app/u/jordanreyes');
     expect(buildHashtagUrl('#StreetWear')).toBe('https://brandthread.app/tag/streetwear');
@@ -42,6 +43,10 @@ describe('parseShareLink', () => {
     expect(parseShareLink('https://brandthread.app/u/Jordan_R')?.href).toBe('/u/jordan_r');
     expect(parseShareLink('https://brandthread.app/store/product/prod_123456')?.href).toBe('/product-detail?id=prod_123456');
     expect(parseShareLink('https://brandthread.app/store/novagoods')).toMatchObject({ kind: 'store', href: '/u/novagoods' });
+    expect(parseShareLink('https://brandthread.app/@NovaGoods')).toMatchObject({ kind: 'store', handle: 'novagoods', href: '/u/novagoods' });
+    expect(parseShareLink('https://brandthread.app/@novagoods/p/prod_123456')?.href).toBe('/product-detail?id=prod_123456');
+    expect(parseShareLink('https://brandthread.app/@novagoods/settings')).toBeNull();
+    expect(parseShareLink('https://brandthread.app/@x')).toBeNull();
     expect(parseShareLink('https://brandthread.app/c/col1')?.kind).toBe('collection');
     expect(parseShareLink('https://brandthread.app/drops/d1')?.kind).toBe('drop');
   });

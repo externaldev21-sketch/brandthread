@@ -82,6 +82,10 @@ beforeAll(async () => {
   app.get("/bio/:slug/go/:linkId", pub.bioLinkRedirect);
   app.get("/bio/:slug/shop", pub.bioShopRedirect);
   app.get("/bio/:slug/p/:productId", pub.bioProductRedirect);
+  const site = await import("../storeSite");
+  app.get("/@:handle", site.storeSiteHandler);
+  app.get("/@:handle/p/:productId", site.storeSiteProductHandler);
+  app.get("/@:handle/go/:linkId", site.storeSiteLinkRedirect);
   await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", () => resolve()); });
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -155,7 +159,8 @@ describe("tracked links", () => {
     const res = await get(`/l/${code}`, H(CHROME, { referer: "https://www.instagram.com/some/path?secret=1", "cf-ipcountry": "de" }));
     expect(res.status).toBe(302);
     const loc = new URL(res.headers.get("location")!);
-    expect(loc.pathname).toBe(`/api/store/site/${storeSlug}`);
+    // One store link: the store website, even when an older web store is published.
+    expect(loc.pathname).toBe(`/@${usernameA}`);
     expect(loc.searchParams.get("utm_source")).toBe("instagram");
     expect(loc.searchParams.get("utm_medium")).toBe("social");
     expect(loc.searchParams.get("utm_campaign")).toBe("launch-week");
@@ -290,21 +295,25 @@ describe("link in bio", () => {
   });
 
   it("renders a server-side page with OG tags, escaped content and only enabled links", async () => {
-    const res = await get(`/bio/${slug}`, H(CHROME, { "cf-ipcountry": "US" }));
+    // The bio page now lives at the store website address.
+    const old = await get(`/bio/${slug}?utm_source=ig`);
+    expect(old.status).toBe(301);
+    expect(old.headers.get("location")).toMatch(new RegExp(`/@${usernameA}\\?utm_source=ig$`));
+    const res = await get(`/@${usernameA}`, H(CHROME, { "cf-ipcountry": "US" }));
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
     expect(res.headers.get("content-security-policy")).toContain("default-src 'none'");
     const html = await res.text();
     expect(html).toContain('property="og:title" content="Acme Studio"');
-    expect(html).toContain('property="og:image" content="https://cdn.test/a.jpg"');
-    expect(html).toContain("Shop my store");
+    expect(html).toMatch(/property="og:image" content="[^"]*\/@growtha[0-9a-f]+\/og\.png\?v=[0-9a-f]+"/);
+    expect(html).toContain('src="https://cdn.test/a.jpg"');
     expect(html).toContain("Tee A");
     expect(html).toContain("$45.00");
     expect(html).toContain("Lookbook");
     expect(html).toContain("Press &lt;b&gt;kit&lt;/b&gt;");
     expect(html).not.toContain("Hidden");
     expect(html).not.toContain("Tee B");
-    expect(html).not.toMatch(/<script/i);
+    expect(html.match(/<script/gi)).toHaveLength(1); // only the share button script, allowed by hash in the CSP
     expect(html).not.toContain("lookbook.test"); // destination URLs only appear behind the tracked redirect
     expect((await get("/bio/nope-nope")).status).toBe(404);
   });
@@ -340,8 +349,9 @@ describe("link in bio", () => {
     const t = await api("POST", "/links", { destinationType: "bio", utmSource: "tiktok", utmMedium: "social" });
     expect(t.status).toBe(201);
     const res = await get(`/l/${t.body.code}`);
-    expect(new URL(res.headers.get("location")!).pathname).toBe(`/bio/${slug}`);
+    expect(new URL(res.headers.get("location")!).pathname).toBe(`/@${usernameA}`);
     await api("PUT", "/bio", { published: false });
+    expect((await get(`/@${usernameA}`)).status).toBe(404);
     expect((await get(`/bio/${slug}`)).status).toBe(404);
     expect((await get(`/l/${t.body.code}`)).status).toBe(404);
     await api("PUT", "/bio", { published: true });
