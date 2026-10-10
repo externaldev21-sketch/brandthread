@@ -38,6 +38,7 @@ import {
 } from '@/services/metaAdsService';
 import { InlineSlider } from '@/components/InlineSlider';
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
+import { adDestinationUrl } from '@/lib/adDestination';
 import type {
   MetaAdObjective, MetaAdPromoteKind, MetaCampaign, MetaTargetingResult,
 } from '@/lib/api';
@@ -217,10 +218,10 @@ export default function MetaAdsSetupScreen() {
     }
   }, [promoteKind, promoteRefId, products, videos]);
 
-  // ── Destination URL — NOTE: Brandthread has no dedicated public product
-  // page route (no app/p/[id] or similar), so every kind falls back to the
-  // seller's own store URL. This is a known gap, not an invented route. ────
-  const destinationUrl = storeUrl;
+  // ── Destination URL: a product ad lands on that product's page
+  // (/store/product/{id}); store and video ads on the store. UTM-tagged as
+  // paid Facebook traffic (BT-326, lib/adDestination.ts). ─────────────────
+  const destinationUrl = adDestinationUrl({ promoteKind, promoteRefId, storeUrl, campaignId });
 
   const mediaKind: 'video' | 'photos' = promoteKind === 'video' ? 'video' : 'photos';
   const mediaObjectPaths = useMemo(() => (creativeImage ? [creativeImage] : []), [creativeImage]);

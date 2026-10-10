@@ -1,7 +1,8 @@
 /** Renders a campaign into table-based, inline-styled HTML (black/white) plus a plain-text part. */
 import type { CampaignBody } from "./validation";
 
-export type RenderProduct = { id: string; name: string; imageUrl: string | null; priceCents: number | null };
+/** `url` is the product's own page (BT-327); tiles without one link to the store. */
+export type RenderProduct = { id: string; name: string; imageUrl: string | null; priceCents: number | null; url?: string | null };
 
 export type RenderInput = {
   storeName: string;
@@ -14,7 +15,22 @@ export type RenderInput = {
   /** null for test sends, which have no subscriber to unsubscribe. */
   unsubscribeUrl: string | null;
   isTest?: boolean;
+  /** Tags product links utm_campaign=<id> so sales show up per campaign. */
+  campaignId?: string | null;
 };
+
+/** Product / store links from an email: utm_source=brandthread_email&utm_medium=email&utm_campaign=<id>. */
+export function emailLink(url: string, campaignId: string | null | undefined): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.set("utm_source", "brandthread_email");
+    u.searchParams.set("utm_medium", "email");
+    if (campaignId) u.searchParams.set("utm_campaign", campaignId);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
 
 export function escapeHtml(s: unknown): string {
   return String(s ?? "")
@@ -48,7 +64,8 @@ export function renderCampaign(input: RenderInput): { html: string; text: string
       const img = p.imageUrl && /^https:\/\//i.test(p.imageUrl)
         ? `<img src="${escapeHtml(p.imageUrl)}" alt="${escapeHtml(p.name)}" width="170" style="display:block;width:100%;height:auto;border:0;background:#f2f2f2;">`
         : `<div style="height:170px;background:#f2f2f2;"></div>`;
-      const href = input.storeUrl ? ` href="${escapeHtml(input.storeUrl)}"` : "";
+      const target = p.url ?? input.storeUrl;
+      const href = target ? ` href="${escapeHtml(emailLink(target, input.campaignId))}"` : "";
       return `<td valign="top" width="${Math.floor(100 / products.length)}%" style="padding:0 6px 20px;">
         <a${href} style="text-decoration:none;color:#000000;">${img}
         <div style="padding-top:8px;font:600 14px/1.3 ${FONT};color:#000000;">${escapeHtml(p.name)}</div>
@@ -82,7 +99,10 @@ ${parts.join("\n")}
   const textLines: string[] = [];
   if (body.headline) textLines.push(body.headline, "");
   if (body.text) textLines.push(body.text, "");
-  for (const p of products) textLines.push(`${p.name}${p.priceCents != null ? ` - ${money(p.priceCents)}` : ""}`);
+  for (const p of products) {
+    const target = p.url ?? input.storeUrl;
+    textLines.push(`${p.name}${p.priceCents != null ? ` - ${money(p.priceCents)}` : ""}${target ? `: ${emailLink(target, input.campaignId)}` : ""}`);
+  }
   if (products.length) textLines.push("");
   if (body.cta) textLines.push(`${body.cta.label}: ${body.cta.url}`, "");
   textLines.push("--", `You are receiving this because you joined the ${input.storeName} email list.`);

@@ -17,6 +17,7 @@ import { countableClick } from "../lib/growth/clicks";
 import { resolveProductUrl, resolveStoreHome, resolveTrackedLinkTarget, bioPageUrl } from "../lib/growth/destinations";
 import { normalizeLinkCode } from "../lib/growth/linkCodes";
 import { buildDestinationUrl } from "../lib/growth/utm";
+import { publicProductCoverUrl } from "../lib/publicMedia";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -90,9 +91,10 @@ export async function bioPageHandler(req: Request, res: Response): Promise<void>
         .from(productVariants).where(inArray(productVariants.productId, rows.map((r) => r.id)));
       featured = ids.map((id) => rows.find((r) => r.id === id)).filter((r): r is NonNullable<typeof r> => !!r).map((r) => {
         const prices = variants.filter((v) => v.productId === r.id).map((v) => v.priceCents);
-        const imgs = Array.isArray(r.images) ? (r.images as string[]) : [];
         return {
-          href: `/bio/${slug}/p/${r.id}`, name: r.name, image: imgs[0] ?? null,
+          // Uploaded photos are private /objects/ paths; the bio page only
+          // renders https images, so use the public media URL (BT-314).
+          href: `/bio/${slug}/p/${r.id}`, name: r.name, image: publicProductCoverUrl(r.id, r.images),
           priceLabel: prices.length ? usd(Math.min(...prices)) : "",
         };
       });

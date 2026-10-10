@@ -261,6 +261,7 @@ async function buildPreview(sellerId: string, c: typeof emailCampaigns.$inferSel
     storeName: ctx.storeName, subject: c.subject, preheader: c.preheader, body,
     products: await loadRenderProducts(sellerId, body.productIds ?? []),
     storeUrl: ctx.storeUrl, postalAddress: ctx.postalAddress, unsubscribeUrl: null, isTest,
+    campaignId: c.id,
   });
   return { ctx, ...out };
 }

@@ -12,6 +12,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { renderSharePreview } = require('./sharePreview');
 const { landingPathFor, shouldServeLanding } = require('./landing');
+const { dynamicSitemap } = require('./sitemap');
 
 const STATIC_ROOT = path.resolve(
   __dirname,
@@ -173,6 +174,16 @@ const server = http.createServer(async (req, res) => {
     });
     res.end(gzip ? zlib.gzipSync(landingHtml) : landingHtml);
     return;
+  }
+  // Live sitemap with products, stores and profiles (BT-315); the static
+  // build file below is the fallback.
+  if (requestedPath === '/sitemap.xml') {
+    const xml = await dynamicSitemap().catch(() => null);
+    if (xml) {
+      res.writeHead(200, { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=3600' });
+      res.end(xml);
+      return;
+    }
   }
   if (serveFile(safeFilePath(requestedPath), res, acceptEncoding)) return;
 
