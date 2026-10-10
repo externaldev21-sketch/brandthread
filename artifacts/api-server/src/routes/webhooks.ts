@@ -58,6 +58,8 @@ import { isChannelEnabledForUser } from "../lib/notificationChannels";
 import { publishNotification } from "./notifications-feed";
 import { shouldNotifyRestricted } from "../lib/connectOnboarding";
 import { processDisputeEvent } from "../lib/disputes/webhook";
+import { markB2bAsyncPaymentFailed, markB2bPaymentProcessing, settleB2bCardPayment } from "../lib/b2b/payments";
+import { processB2bDisputeEvent } from "../lib/b2b/disputes";
 import { buildDisputeDeps } from "../lib/disputes/store";
 import { productThumbnail } from "../lib/activityEvents";
 import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
@@ -294,6 +296,9 @@ router.post("/stripe", async (req: Request, res: Response) => {
         // ── Regular buyer checkout ───────────────────────────────────────────
         if (cs.payment_status === "paid") {
           await handleCheckoutPaid(cs, event.id, paidAt);
+        } else if (cs.payment_status === "unpaid") {
+          // Sample/bulk card paid by ACH: processing, not paid yet.
+          await markB2bPaymentProcessing(cs, event.id, publishNotification);
         }
         // payment_status === 'unpaid' means async method chosen → wait for below
         break;
@@ -321,6 +326,10 @@ router.post("/stripe", async (req: Request, res: Response) => {
       case "checkout.session.async_payment_failed":
       case "checkout.session.expired": {
         const cs = event.data.object as any;
+        if (event.type === "checkout.session.async_payment_failed"
+          && await markB2bAsyncPaymentFailed(cs, event.id, publishNotification)) {
+          break;
+        }
         if (cs.metadata?.kind === "ad_campaign") {
           await markAdCampaignCheckoutFailed(cs);
         } else if (cs.metadata?.kind === "boost") {
@@ -433,6 +442,9 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
       // ── Stripe Disputes / Chargebacks ─────────────────────────────────────
       case "charge.dispute.created":
+        // B2B chargebacks (sample/bulk cards, freelancer jobs): recorded for
+        // admin, freelancer payouts frozen (lib/b2b/disputes.ts).
+        if (await processB2bDisputeEvent(event, publishNotification) === "freelancer_job") break;
         if (!await handleManufacturerCardReversal({
           paymentIntentId: stripeReferenceId(event.data.object.payment_intent),
           chargeId: stripeReferenceId(event.data.object.charge),
@@ -449,6 +461,8 @@ router.post("/stripe", async (req: Request, res: Response) => {
       case "charge.dispute.closed":
       case "charge.dispute.funds_withdrawn":
       case "charge.dispute.funds_reinstated":
+        // A lost B2B chargeback is clawed back from the payee's transfer.
+        if (await processB2bDisputeEvent(event, publishNotification)) break;
         if (!await isManufacturerCardPayment(
           stripeReferenceId(event.data.object.payment_intent),
           stripeReferenceId(event.data.object.charge),
@@ -1992,22 +2006,6 @@ async function handleManufacturerCheckoutPaid(session: any, providerEventId?: st
   }).where(and(eq(sampleOrders.id, row.order.id), eq(sampleOrders.status, "pending_payment")))
     .returning({ id: sampleOrders.id });
   if (updated) {
-    // Sample/bulk card: the seller's card paid the manufacturer directly
-    // (destination charge); Brandthread kept its application fee.
-    const feeCents = Math.min(row.order.platformFeeCents, row.order.priceCents);
-    await db.transaction((tx) => postLedgerTransaction(tx, {
-      idempotencyKey: `manufacturer-card/${row.order.id}`,
-      kind: "manufacturer_card_paid",
-      sellerId: row.order.sellerId,
-      sampleOrderId: row.order.id,
-      stripeObjectId: paymentIntentId,
-      memo: `${row.order.orderType === "bulk" ? "Bulk" : "Sample"} card paid by the seller's card`,
-      postings: [
-        { account: "seller_card_payments", partyId: row.order.sellerId, amountCents: -row.order.priceCents },
-        { account: "manufacturer_paid", partyId: row.order.manufacturerId, amountCents: row.order.priceCents - feeCents },
-        { account: "platform_revenue", amountCents: feeCents },
-      ],
-    }));
     await db.insert(manufacturerActivityEvents).values({
       manufacturerId: row.order.manufacturerId,
       sampleOrderId: row.order.id,
@@ -2030,6 +2028,14 @@ async function handleManufacturerCheckoutPaid(session: any, providerEventId?: st
       targetType: row.order.orderType === "bulk" ? "bulk_order" : "sample_order",
       cta: `/manufacturers/orders/${row.order.id}`,
     });
+  }
+  if (updated || (row.order.status !== "pending_payment" && row.order.status !== "cancelled")) {
+    // Sample/bulk card: the seller's card (or bank account) paid the
+    // manufacturer directly (destination charge); Brandthread kept its
+    // application fee. Idempotent, so it also settles a card the seller's
+    // own confirmation (/pay) already moved to payment_received, and a
+    // Stripe retry after a failure here settles it then.
+    await settleB2bCardPayment(row.order, session, paymentIntentId ?? row.order.stripePaymentIntentId);
   }
   if (updated) inBackground(emailManufacturerOrderPaid(row.order.id), { orderId: row.order.id });
   return true;
@@ -2075,6 +2081,7 @@ async function handleManufacturerTransfer(transfer: any, providerEventId: string
           sellerId: order.sellerId,
           manufacturerId: order.manufacturerId,
           amountCents: order.priceCents,
+          platformFeeCents: Math.max(0, order.priceCents - (Number.isSafeInteger(transfer.amount) ? transfer.amount : order.priceCents)),
           transferId: transfer.id,
         });
       }
