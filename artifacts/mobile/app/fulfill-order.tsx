@@ -36,9 +36,10 @@ import {
 import { sharePackingSlip } from '@/lib/packingSlip';
 import { radius } from '@/constants/radii';
 import { errorMessageOr } from '@/lib/errorMessage';
+import { SHIPPING_CARRIERS } from '@/lib/orderFulfillment';
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
-const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL', 'Other'] as const;
+const CARRIERS = SHIPPING_CARRIERS;
 
 type Step = 1 | 2 | 3 | 4;
 

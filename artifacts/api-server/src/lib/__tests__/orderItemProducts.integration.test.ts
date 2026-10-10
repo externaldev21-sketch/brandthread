@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, products, productVariants } from "@workspace/db";
-import { withItemProductIds } from "../orderItemProducts";
+import { withItemImageUrls, withItemProductIds } from "../orderItemProducts";
 
 const suffix = crypto.randomBytes(6).toString("hex");
 let productId = "";
@@ -11,6 +11,7 @@ let variantId = "";
 beforeAll(async () => {
   const [product] = await db.insert(products).values({
     ownerId: `oip-seller-${suffix}`, name: "Order Item Tee", status: "active",
+    images: ["https://cdn.example.com/tee-front.jpg", "https://cdn.example.com/tee-back.jpg"],
   }).returning({ id: products.id });
   productId = product.id;
   const [variant] = await db.insert(productVariants).values({
@@ -36,5 +37,20 @@ describe("withItemProductIds", () => {
 
   it("returns an empty list unchanged", async () => {
     expect(await withItemProductIds([])).toEqual([]);
+  });
+});
+
+describe("withItemImageUrls", () => {
+  it("adds the product's first photo per line, null without a product", async () => {
+    const items = await withItemImageUrls([
+      { id: "line-1", productId },
+      { id: "line-2", productId: null },
+      { id: "line-3", productId: crypto.randomUUID() },
+    ]);
+    expect(items.map((item) => item.imageUrl)).toEqual(["https://cdn.example.com/tee-front.jpg", null, null]);
+  });
+
+  it("returns an empty list unchanged", async () => {
+    expect(await withItemImageUrls([])).toEqual([]);
   });
 });
