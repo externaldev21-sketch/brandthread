@@ -23,7 +23,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BG, BORDER, FG, MUTED, SUBTLE, RED,
-  FONT, FS, SP, RADIUS,
+  FONT, FS, SP, RADIUS, TEXT_SECONDARY,
 } from '@/lib/theme';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { formatCents } from '@/lib/money';
@@ -710,18 +710,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   viewerText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 12 },
   leaveBtn:         { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   titleRow:         { position: 'absolute', top: 0, left: 14, right: 60, zIndex: 9 },
-  streamTitle:      { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 13 },
+  streamTitle:      { color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 13 },
   productStrip:     { position: 'absolute', bottom: 155, left: 0, right: 0, zIndex: 8 },
   productStripInner:{ paddingHorizontal: 12, gap: 8 },
   productChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7 },
   productChipName:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 90 },
-  productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
+  productChipPrice: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: 11 },
   bottom:           { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 },
   commentScroll:    { maxHeight: 185, marginHorizontal: 12 },
   commentContent:   { gap: 3, paddingBottom: 6 },
   commentRow:       { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, paddingVertical: 3 },
   commentName:      { color: '#fff', fontFamily: FONT.bold, fontSize: 12 },
-  commentMsg:       { color: 'rgba(255,255,255,0.88)', fontFamily: FONT.regular, fontSize: 12 },
+  commentMsg:       { color: FG, fontFamily: FONT.regular, fontSize: 12 },
   purchaseSheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 30,
     maxHeight: H * 0.78, backgroundColor: BG, borderTopLeftRadius: RADIUS.xl,

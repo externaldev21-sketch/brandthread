@@ -28,7 +28,7 @@ import { useUser } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path } from 'react-native-svg';
 import {
-  CARD, BORDER, FG, MUTED, ON_DARK, FONT, FS, SP, RADIUS,
+  CARD, BORDER, FG, MUTED, ON_DARK, FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY,
 } from '@/lib/theme';
 import { createStory, searchProfiles, createOrGetConversation, sendMessage } from '@/services/socialService';
 import type { ProfileSearchResult } from '@/services/socialTypes';
@@ -2312,7 +2312,7 @@ const styles = StyleSheet.create({
   // the X icon's center instead of sitting ~4pt further right.
   railBtn: { alignItems: 'center', gap: 4, minWidth: 44, minHeight: 44, marginBottom: SP.sm },
   railAa: { color: ON_DARK, fontSize: FS.lg, fontFamily: FONT.bold },
-  railLabel: { color: 'rgba(255,255,255,0.85)', fontSize: FS.xs, fontFamily: FONT.medium },
+  railLabel: { color: TEXT_SECONDARY, fontSize: FS.xs, fontFamily: FONT.medium },
   gridPopover: {
     position: 'absolute', left: 50, top: 100, backgroundColor: 'rgba(30,30,34,0.95)',
     borderRadius: RADIUS.md, padding: SP.sm, flexDirection: 'row', flexWrap: 'wrap', width: 92,
@@ -2334,7 +2334,7 @@ const styles = StyleSheet.create({
   // Slides beneath the active label on the same 150ms timing as the app's
   // other quick UI transitions — a plain timing, never a spring/bounce.
   modeIndicator: { position: 'absolute', left: 0, bottom: -6, height: 2, borderRadius: 1, backgroundColor: ON_DARK },
-  modeText: { color: 'rgba(255,255,255,0.5)', fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.5 },
+  modeText: { color: TEXT_TERTIARY, fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.5 },
   modeTextActive: { color: ON_DARK, fontSize: FS.base },
 
   controlsRow: {
@@ -2367,7 +2367,7 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  hint: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.xs },
+  hint: { color: TEXT_TERTIARY, fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.xs },
 
   // Create mode
   createCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
@@ -2430,13 +2430,13 @@ const styles = StyleSheet.create({
   myAvatarText: { color: ON_DARK, fontSize: 10, fontFamily: FONT.bold },
   myStoryLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold },
   closeFriendsChip: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
-  closeFriendsLabel: { color: 'rgba(255,255,255,0.75)', fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
+  closeFriendsLabel: { color: TEXT_SECONDARY, fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: ON_DARK, alignItems: 'center', justifyContent: 'center' },
 
   // Text tool
   textToolBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   textToolTop: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SP.md },
-  textToolCancel: { color: 'rgba(255,255,255,0.7)', fontSize: FS.base, fontFamily: FONT.medium },
+  textToolCancel: { color: TEXT_SECONDARY, fontSize: FS.base, fontFamily: FONT.medium },
   textToolDone: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.bold },
   textToolCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   textToolInput: { fontFamily: FONT.bold, minWidth: 60, paddingHorizontal: 8, borderRadius: 6 },
@@ -2514,7 +2514,7 @@ const styles = StyleSheet.create({
   questionCard: { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: RADIUS.md, padding: SP.md, width: 240 },
   questionCardTitle: { color: '#000', fontFamily: FONT.bold, fontSize: FS.base, marginBottom: SP.sm, textAlign: 'center' },
   questionInputMock: { backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: RADIUS.pill, paddingVertical: 8, alignItems: 'center' },
-  questionInputMockText: { color: 'rgba(0,0,0,0.4)', fontSize: FS.sm },
+  questionInputMockText: { color: TEXT_TERTIARY, fontSize: FS.sm },
   pollCard: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.md, padding: SP.md, width: 220 },
   pollQuestion: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base, marginBottom: SP.sm, textAlign: 'center' },
   pollOptionsRow: { gap: 6 },

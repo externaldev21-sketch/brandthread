@@ -1,14 +1,14 @@
 import React, { useRef } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, GUTTER, ICON, SP } from '@/lib/theme';
+import { FONT, FS, GUTTER, ICON, SP, TEXT_DISABLED } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 export type HeaderAction = {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   onPress: () => void;
   accessibilityLabel: string;
   disabled?: boolean;
@@ -112,9 +112,9 @@ export function Header({
                   disabled={action.disabled}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   onPress={action.onPress}
-                  style={[rootStyles.iconBtn, action.disabled && { opacity: 0.4 }]}
+                  style={[rootStyles.iconBtn]}
                 >
-                  <Feather name={action.icon} size={ICON.md} color={theme.text} />
+                  <Icon name={action.icon} size={ICON.md} color={action.disabled ? TEXT_DISABLED : theme.text} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -158,7 +158,7 @@ export function Header({
             onPress={handleBack}
             style={styles.iconBtn}
           >
-            <Feather name="chevron-left" size={ICON.lg} color={theme.text} />
+            <Icon name="chevron-left" size={ICON.lg} color={theme.text} />
           </TouchableOpacity>
         ) : (
           <View style={styles.iconBtn} />
@@ -181,9 +181,9 @@ export function Header({
                   disabled={action.disabled}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   onPress={action.onPress}
-                  style={[styles.iconBtn, action.disabled && { opacity: 0.4 }]}
+                  style={[styles.iconBtn]}
                 >
-                  <Feather name={action.icon} size={ICON.md} color={theme.text} />
+                  <Icon name={action.icon} size={ICON.md} color={action.disabled ? TEXT_DISABLED : theme.text} />
                 </TouchableOpacity>
               ))}
               {actions.length === 0 && <View style={styles.iconBtn} />}

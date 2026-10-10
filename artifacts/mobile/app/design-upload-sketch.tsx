@@ -20,7 +20,7 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON, TEXT_SECONDARY,
 } from '@/lib/theme';
 import { AI_STYLES, AIStyleKind } from '@/services/designTypes';
 import {
@@ -590,7 +590,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   resultLabel: {
     fontFamily: FONT.medium,
     fontSize: FS.sm,
-    color: 'rgba(255,255,255,0.7)',
+    color: TEXT_SECONDARY,
   },
   resultActions: {
     flexDirection: 'row',

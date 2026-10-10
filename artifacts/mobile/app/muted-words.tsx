@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -155,11 +155,11 @@ export default function MutedWordsScreen() {
             : 'Comments and posts that contain these words are hidden from you everywhere on Brandthread. Nobody is notified.'}
         </Text>
 
-        <View style={[s.inputShell, (!canEdit || atLimit) && { opacity: 0.5 }]}>
-          <Feather name="plus" size={18} color={theme.muted} />
+        <View style={s.inputShell}>
+          <Feather name="plus" size={18} color={(!canEdit || atLimit) ? TEXT_DISABLED : theme.muted} />
           <TextInput
             ref={inputRef}
-            style={s.input}
+            style={[s.input, (!canEdit || atLimit) && { color: TEXT_DISABLED }]}
             value={draft}
             onChangeText={(value) => setDraft(value.slice(0, MAX_LENGTH))}
             placeholder="Add a word, phrase, #hashtag or @handle"
@@ -175,11 +175,11 @@ export default function MutedWordsScreen() {
           <PressableScale
             onPress={() => add(draft)}
             disabled={!canEdit || !draft.trim() || saving || atLimit}
-            style={[s.addBtn, (!draft.trim() || atLimit) && { opacity: 0.35 }]}
+            style={[s.addBtn, (!draft.trim() || atLimit) && { backgroundColor: FILL_ELEVATED }]}
             accessibilityRole="button"
             accessibilityLabel="Mute"
           >
-            {saving ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Text style={s.addText}>Mute</Text>}
+            {saving ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Text style={[s.addText, (!draft.trim() || atLimit) && { color: TEXT_DISABLED }]}>Mute</Text>}
           </PressableScale>
         </View>
         <Text style={s.hint}>
@@ -198,9 +198,9 @@ export default function MutedWordsScreen() {
             <Text style={s.sectionLabel}>SUGGESTIONS</Text>
             <View style={s.chips}>
               {available.map((suggestion) => (
-                <PressableScale key={suggestion} style={[s.suggestion, !canEdit && { opacity: 0.5 }]} disabled={!canEdit} onPress={() => add(suggestion)} accessibilityRole="button" accessibilityLabel={`Mute ${suggestion}`}>
-                  <Feather name="plus" size={12} color={theme.muted} />
-                  <Text style={s.suggestionText}>{suggestion}</Text>
+                <PressableScale key={suggestion} style={s.suggestion} disabled={!canEdit} onPress={() => add(suggestion)} accessibilityRole="button" accessibilityLabel={`Mute ${suggestion}`}>
+                  <Feather name="plus" size={12} color={canEdit ? theme.muted : TEXT_DISABLED} />
+                  <Text style={[s.suggestionText, !canEdit && { color: TEXT_DISABLED }]}>{suggestion}</Text>
                 </PressableScale>
               ))}
             </View>

@@ -256,10 +256,12 @@ function ProductTile({
         accessibilityLabel={locked ? 'Locked — unlocks at launch' : `${product.name}${soldOut ? ', sold out' : ''}`}
       >
         <View style={styles.productMedia}>
-          {imageUri ? (
-            <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={locked ? 22 : 0} />
+          {/* Locked: the photo stays hidden until launch (a solid tile under
+              the lock), never shown blurred. */}
+          {imageUri && !locked ? (
+            <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
-            <View style={styles.productFallback}><Feather name="image" size={28} color={SUBTLE} /></View>
+            <View style={styles.productFallback}>{locked ? null : <Feather name="image" size={28} color={SUBTLE} />}</View>
           )}
           {soldOut && (
             <View style={StyleSheet.absoluteFill}>

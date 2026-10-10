@@ -11,7 +11,7 @@ import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
-import { FS, SP, RADIUS } from '@/lib/theme';
+import { FS, SP, RADIUS, FONT, TEXT_DISABLED } from '@/lib/theme';
 import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
 import { parseDecimalToCents } from '@/lib/money';
 import { HapticSwitch } from '@/components/BrandthreadUI';
@@ -601,39 +601,39 @@ export default function ShippingScreen() {
         </View>
       ) : (
         zones.slice().sort((a, b) => a.sortOrder - b.sortOrder).map((zone) => (
-          <View key={zone.id} style={[styles.zoneCard, { backgroundColor: colors.card, borderColor: colors.border, opacity: zone.active ? 1 : 0.55 }]}>
+          <View key={zone.id} style={[styles.zoneCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.zoneHeader}>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <Text style={[styles.zoneName, { color: colors.foreground }]}>{zone.name}</Text>
+                  <Text style={[styles.zoneName, { color: zone.active ? colors.foreground : TEXT_DISABLED }]}>{zone.name}</Text>
                   <Badge label={ZONE_TYPE_LABEL[zone.zoneType]} variant="default" />
                   {!zone.active && <Badge label="Inactive" variant="default" />}
                 </View>
                 {zone.zoneType === 'country' && zone.countries.length > 0 && (
-                  <Text style={[styles.rateSub, { color: colors.mutedForeground, marginTop: 4 }]}>
+                  <Text style={[styles.rateSub, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED, marginTop: 4 }]}>
                     {zone.countries.join(', ')}
                   </Text>
                 )}
               </View>
-              <Text style={[styles.rateAmount, { color: colors.foreground }]}>{zoneRateSummary(zone)}</Text>
+              <Text style={[styles.rateAmount, { color: zone.active ? colors.foreground : TEXT_DISABLED }]}>{zoneRateSummary(zone)}</Text>
             </View>
 
             <View style={styles.zoneMetaRow}>
               {zone.freeAboveCents != null && (
-                <Text style={[styles.zoneMetaText, { color: colors.mutedForeground }]}>
+                <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED }]}>
                   Free above {formatCents(zone.freeAboveCents)}
                 </Text>
               )}
-              <Text style={[styles.zoneMetaText, { color: colors.mutedForeground }]}>
+              <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED }]}>
                 {zone.processingDays} business day{zone.processingDays === 1 ? '' : 's'} to ship
               </Text>
               {zone.carrierLabel && (
-                <Text style={[styles.zoneMetaText, { color: colors.mutedForeground }]}>{zone.carrierLabel}</Text>
+                <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED }]}>{zone.carrierLabel}</Text>
               )}
             </View>
 
             {zone.zoneType !== 'domestic' && (
-              <Text style={[styles.zoneMetaText, { color: colors.mutedForeground, marginTop: 2 }]}>
+              <Text style={[styles.zoneMetaText, { color: zone.active ? colors.mutedForeground : TEXT_DISABLED, marginTop: 2 }]}>
                 {zone.shipsInternationally
                   ? `Ships internationally · ${zone.dutiesHandling === 'ddp' ? 'Duties prepaid (DDP)' : 'Buyer pays duties on delivery (DAP)'}`
                   : 'Does not ship to this zone'}
@@ -1053,83 +1053,83 @@ const styles = StyleSheet.create({
   },
   sheetBtnText: { fontSize: FS.md, fontWeight: '600' },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
+  backText: { fontSize: 15, fontFamily: FONT.medium },
+  pageTitle: { fontSize: 28, fontFamily: FONT.bold, marginBottom: 4 },
+  pageSubtitle: { fontSize: 13, fontFamily: FONT.regular, marginBottom: 20 },
   statsRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
   stat: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 3 },
-  statVal: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
+  statVal: { fontSize: 18, fontFamily: FONT.bold },
+  statLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   actionsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   action: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 6 },
-  actionLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: -6, marginBottom: 12, lineHeight: 17 },
+  actionLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: -6, marginBottom: 12, lineHeight: 17 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 },
   addRateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
-  addRateBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  addRateBtnText: { fontSize: 12, fontFamily: FONT.semibold },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   emptySection: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, flexWrap: 'wrap' },
-  emptyText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  emptyText: { fontSize: 13, fontFamily: FONT.regular },
   shipCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 10 },
   shipHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
-  shipId: { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  shipCustomer: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
-  shipCarrier: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  shipId: { fontSize: 12, fontFamily: FONT.bold },
+  shipCustomer: { fontSize: 15, fontFamily: FONT.semibold, marginTop: 2 },
+  shipCarrier: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   progressBar: { height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 10 },
   progressFill: { height: '100%', borderRadius: 2 },
   shipSteps: { flexDirection: 'row', justifyContent: 'space-between' },
   stepItem: { alignItems: 'center', gap: 4 },
   stepDot: { width: 8, height: 8, borderRadius: 4 },
-  stepLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
+  stepLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
   returnRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   returnInfo: { flex: 1, gap: 2 },
-  returnId: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  returnItem: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  returnReason: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  rateName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  rateSub: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  rateAmount: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  returnId: { fontSize: 11, fontFamily: FONT.bold },
+  returnItem: { fontSize: 13, fontFamily: FONT.medium },
+  returnReason: { fontSize: 11, fontFamily: FONT.regular },
+  rateName: { fontSize: 13, fontFamily: FONT.semibold },
+  rateSub: { fontSize: 11, fontFamily: FONT.regular },
+  rateAmount: { fontSize: 14, fontFamily: FONT.bold },
   shipFromRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rowLabelStrong: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  rowLabelStrong: { fontSize: 13, fontFamily: FONT.semibold },
   countryPill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8 },
-  countryPillText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  countryInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, width: 60, fontSize: 13, fontFamily: 'Inter_700Bold', textAlign: 'center' },
+  countryPillText: { fontSize: 13, fontFamily: FONT.bold },
+  countryInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, width: 60, fontSize: 13, fontFamily: FONT.bold, textAlign: 'center' },
   smallBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   zoneCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10 },
   zoneHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-  zoneName: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  zoneName: { fontSize: 15, fontFamily: FONT.semibold },
   zoneMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
-  zoneMetaText: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  zoneMetaText: { fontSize: 11, fontFamily: FONT.regular },
   zoneActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   zoneActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
-  zoneActionText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  zoneActionText: { fontSize: 12, fontFamily: FONT.semibold },
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
   tableHeaderRow: { borderBottomWidth: 1 },
-  tableHeaderText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.4 },
-  tableCellText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  tableHeaderText: { fontSize: 10, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  tableCellText: { fontSize: 12, fontFamily: FONT.medium },
   presetRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 8 },
   presetIconBtn: { padding: 6 },
   segmentRow: { flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' },
   segment: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  segmentText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  segmentText: { fontSize: 12, fontFamily: FONT.semibold },
   tierRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 8, borderBottomWidth: 1, paddingBottom: 8 },
   tierField: { flex: 1 },
-  tierLabel: { fontSize: 10, fontFamily: 'Inter_500Medium', marginBottom: 4 },
+  tierLabel: { fontSize: 10, fontFamily: FONT.medium, marginBottom: 4 },
   tierInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 8, fontSize: 12 },
   tierRemoveBtn: { padding: 8 },
   addTierBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginTop: 8, alignSelf: 'flex-start' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   suggestionChip: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 5 },
-  suggestionChipText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+  suggestionChipText: { fontSize: 11, fontFamily: FONT.medium },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: SP.sm },
   dimsRow: { flexDirection: 'row', gap: 8 },
   warehouseCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 10 },
   warehouseHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  warehouseName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  warehouseLoc: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  warehouseStock: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  warehouseName: { fontSize: 14, fontFamily: FONT.semibold },
+  warehouseLoc: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
+  warehouseStock: { fontSize: 14, fontFamily: FONT.semibold },
   capacityBar: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 6 },
   capacityFill: { height: '100%', borderRadius: 3 },
-  capacityLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  capacityLabel: { fontSize: 11, fontFamily: FONT.regular },
 });

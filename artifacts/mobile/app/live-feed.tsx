@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { Asset } from 'expo-asset';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
+import type { ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
@@ -39,7 +39,7 @@ import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
 import { hapticLight } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
-import { FONT, FS, RADIUS } from '@/lib/theme';
+import { FONT, FS, RADIUS, FG, TEXT_SECONDARY } from '@/lib/theme';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
 import { LiveMoreSheet } from '@/components/live/LiveMoreSheet';
@@ -327,21 +327,6 @@ export default function LiveFeedScreen() {
   );
 }
 
-/**
- * Lazily requires expo-blur (same pattern as IconButton.tsx's GlassBlur) so
- * screens that never render the pinned product card don't pull the native
- * blur module into their bundle. Skipped on Android at the call site, where
- * the flat productCardTint below stands in.
- */
-function ProductCardBlur({ style }: { style?: StyleProp<ViewStyle> }) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { BlurView } = require('expo-blur') as { BlurView: typeof import('expo-blur').BlurView };
-    return <BlurView intensity={35} tint="dark" style={style} />;
-  } catch {
-    return null;
-  }
-}
 
 function LiveRoomPage({
   room, isActive, pageWidth, pageHeight, insetTop, insetBottom, onClose, onBuy,
@@ -672,8 +657,6 @@ function LiveRoomPage({
           // wrapper narrows the real tap target too.
           <ReanimatedAnimated.View style={[styles.productCardWrap, cardStyle]}>
             <PressableScale onPress={onBuy} style={styles.productCard} accessibilityRole="button" accessibilityLabel={`Buy ${room.productName}`}>
-              {Platform.OS !== 'android' && <ProductCardBlur style={StyleSheet.absoluteFill} />}
-              <View style={[StyleSheet.absoluteFill, styles.productCardTint]} pointerEvents="none" />
               {room.posterSource ? (
                 <ExpoImage source={room.posterSource} style={styles.productThumb} contentFit="cover" />
               ) : (
@@ -753,7 +736,7 @@ const styles = StyleSheet.create({
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, height: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 2 },
   liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
-  viewerText: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
+  viewerText: { color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
   // Monochrome brand: red is reserved for the LIVE badge only, so Follow is
   // a plain white pill with black text (the "following" state drops to a
   // translucent white outline pill instead of a second color). Fixed
@@ -775,7 +758,7 @@ const styles = StyleSheet.create({
   // never straddling its edge, whatever the capsule's actual height is.
   roomTitle: {
     marginTop: 6,
-    color: 'rgba(255,255,255,0.82)', fontFamily: FONT.medium, fontSize: 12,
+    color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 12,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 
@@ -805,17 +788,14 @@ const styles = StyleSheet.create({
   productCardWrap: { marginRight: 48 },
   productCard: {
     height: 64, flexDirection: 'row', alignItems: 'center', gap: 10,
-    // Solid fallback color: the blur (ProductCardBlur) and the translucent
-    // productCardTint layer above it are what actually reads as "subtle
-    // dark blur" on iOS/web; on Android (no blur) this alone stands in.
-    backgroundColor: '#17171A', borderRadius: RADIUS.md, overflow: 'hidden',
+    // One solid surface over the stream (no blur, nothing showing through).
+    backgroundColor: '#1C1C1E', borderRadius: RADIUS.md, overflow: 'hidden',
     paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  productCardTint: { backgroundColor: 'rgba(20,20,22,0.45)' },
   productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#33303a', overflow: 'hidden' },
   productInfo: { flex: 1 },
   productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 15 },
-  productPrice: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
+  productPrice: { color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
   buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: radius.sm, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   buyBtnText: { color: '#151517', fontFamily: FONT.bold, fontSize: FS.xs },
 
@@ -823,11 +803,11 @@ const styles = StyleSheet.create({
   chatTopFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 20 },
   chatList: { gap: 4, paddingLeft: 2 },
   chatLine: {
-    color: 'rgba(255,255,255,0.92)', fontFamily: FONT.regular, fontSize: 13,
+    color: FG, fontFamily: FONT.regular, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   chatUser: {
-    color: 'rgba(230,230,235,0.95)', fontFamily: FONT.semibold, fontSize: 13,
+    color: FG, fontFamily: FONT.semibold, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 

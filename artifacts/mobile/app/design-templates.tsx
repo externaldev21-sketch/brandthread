@@ -17,7 +17,7 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON, TEXT_TERTIARY,
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
@@ -225,7 +225,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   templateCard:  { flex: 1, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   thumbnail:     { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   thumbnailContent: { alignItems: 'center', gap: SP.xs },
-  thumbnailLabel:{ fontSize: FS.xs, fontFamily: FONT.bold, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 },
+  thumbnailLabel:{ fontSize: FS.xs, fontFamily: FONT.bold, color: TEXT_TERTIARY, letterSpacing: 1 },
   cardInfo:      { padding: SP.sm, gap: 2 },
   cardName:      { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   cardDims:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },

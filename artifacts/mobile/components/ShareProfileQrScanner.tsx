@@ -18,7 +18,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
-import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, ICON, RADIUS, SP, TEXT_SECONDARY } from '@/lib/theme';
 import { parseProfileDeepLink } from '@/lib/shareProfile';
 import { hapticSuccess } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     gap: SP.sm,
   },
   permissionTitle: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.lg },
-  permissionBody: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
+  permissionBody: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
   permissionBtn: {
     marginTop: SP.sm,
     paddingHorizontal: SP.lg,

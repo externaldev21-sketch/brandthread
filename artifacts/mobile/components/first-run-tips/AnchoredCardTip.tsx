@@ -12,7 +12,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import type { FirstRunTipStep, TargetRect } from './types';
 
@@ -96,16 +96,16 @@ const styles = StyleSheet.create({
   cardWrap: { position: 'absolute', paddingHorizontal: SP.lg, zIndex: 9998, elevation: 9998 },
   card: {
     width: 280,
-    backgroundColor: 'rgba(15,15,15,0.96)',
+    backgroundColor: FILL_ELEVATED, // solid: content never shows through a tip
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
     borderRadius: RADIUS.lg,
     padding: SP.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  stepCount: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 0.3 },
-  skip: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.semibold, fontSize: FS.xs },
+  stepCount: { color: TEXT_TERTIARY, fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 0.3 },
+  skip: { color: TEXT_SECONDARY, fontFamily: FONT.semibold, fontSize: FS.xs },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.md },
-  body: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },
+  body: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },
   dots: { flexDirection: 'row', gap: 5, marginTop: 14, marginBottom: 14 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
   dotActive: { backgroundColor: '#FFFFFF', width: 14 },

@@ -9,7 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, TEXT_DISABLED } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -105,11 +105,11 @@ export default function AppLockSettingsScreen() {
             </View>
           ) : null}
 
-          <View style={[s.card, !available && { opacity: 0.5 }]}>
+          <View style={s.card}>
             <View style={s.row}>
               <View style={{ flex: 1, paddingRight: SP.md }}>
-                <Text style={s.rowTitle}>Require {label}</Text>
-                <Text style={s.rowSub}>{settings.enabled ? 'On — required to open the app' : 'Off'}</Text>
+                <Text style={[s.rowTitle, !available && { color: TEXT_DISABLED }]}>Require {label}</Text>
+                <Text style={[s.rowSub, !available && { color: TEXT_DISABLED }]}>{settings.enabled ? 'On — required to open the app' : 'Off'}</Text>
               </View>
               {busy ? <ActivityIndicator color={theme.text} /> : (
                 <HapticSwitch

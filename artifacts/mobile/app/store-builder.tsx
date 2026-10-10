@@ -14,7 +14,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, TEXT_SECONDARY } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard } from '@/components/BrandthreadUI';
@@ -601,7 +601,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerSubtitle: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: 'rgba(255,255,255,0.7)',
+    color: TEXT_SECONDARY,
     letterSpacing: 0.5,
     marginBottom: SP.xs,
   },
@@ -615,7 +615,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerDesc: {
     fontSize: FS.base,
     fontFamily: FONT.regular,
-    color: 'rgba(255,255,255,0.75)',
+    color: TEXT_SECONDARY,
     lineHeight: 22,
   },
   content: {
@@ -853,7 +853,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   heroCardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginBottom: SP.md },
   heroCardText: { flex: 1, gap: SP.xs },
   heroCardTitle: { fontSize: 18, fontFamily: FONT.bold, color: theme.onAccent },
-  heroCardDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: 'rgba(255,255,255,0.8)' },
+  heroCardDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: TEXT_SECONDARY },
   heroCardButton: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: RADIUS.md,

@@ -1846,8 +1846,7 @@ export default function InboxScreen() {
       >
         <View style={s.composeBackdrop}>
           <Glass
-            variant="regular"
-            tint="dark"
+            solid
             radius={RADIUS.xl}
             style={[s.noteComposeSheet, { paddingBottom: insets.bottom + SP.md }]}
           >

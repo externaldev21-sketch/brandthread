@@ -41,7 +41,7 @@ import { useApi } from '@/hooks/useApi';
 import SwipeableActions, { type SwipeAction } from '@/components/SwipeableActions';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
-  FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
+  FONT, FS, SP, RADIUS, COMP, ICON, TYPE, FILL_ELEVATED, TEXT_TERTIARY, TEXT_DISABLED,
 } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import {
@@ -97,7 +97,7 @@ function QuantityControl({
   const busy = pendingDec || pendingInc;
   const handleChange = useCallback((next: number) => (next > value ? onInc() : onDec()), [value, onInc, onDec]);
   return (
-    <View style={{ opacity: busy ? 0.5 : 1, flexDirection: 'row', alignItems: 'center', gap: SP.xs }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.xs }}>
       <QuantityStepper
         value={value}
         min={1}
@@ -1272,15 +1272,15 @@ export default function CartScreen() {
                   onPress={handleCheckoutSelected}
                   disabled={selectedItems.length === 0 || validating}
                   activeOpacity={0.85}
-                  style={[s.checkoutPill, (selectedItems.length === 0 || validating) && { opacity: 0.5 }]}
+                  style={[s.checkoutPill, (selectedItems.length === 0 || validating) && { backgroundColor: FILL_ELEVATED }]}
                   accessibilityRole="button"
                   accessibilityLabel="Checkout"
                   accessibilityHint="Reviews shipping and opens secure payment"
                 >
                   {validating ? (
-                    <ActivityIndicator size="small" color="#000000" />
+                    <ActivityIndicator size="small" color={TEXT_TERTIARY} />
                   ) : (
-                    <Text style={s.checkoutPillText}>Checkout</Text>
+                    <Text style={[s.checkoutPillText, selectedItems.length === 0 && { color: TEXT_DISABLED }]}>Checkout</Text>
                   )}
                 </TouchableOpacity>
               </View>

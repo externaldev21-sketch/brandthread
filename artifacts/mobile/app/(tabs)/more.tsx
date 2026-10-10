@@ -262,7 +262,7 @@ export default function MoreScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.sectionHeaderLeft}>
-                  <Feather name={icon} size={13} color={theme.subtle} style={styles.sectionIcon} />
+                  <Feather name={icon} size={13} color={theme.subtle} />
                   <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
                 </View>
                 <Feather
@@ -475,9 +475,6 @@ const createStyles = (theme: any) => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  sectionIcon: {
-    opacity: 0.7,
   },
   sectionTitle: {
     fontSize: FS.xs,

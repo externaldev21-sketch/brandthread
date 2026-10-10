@@ -9,7 +9,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP, ON_LIGHT_MUTED } from '@/lib/theme';
 import { weeklyEquivalentFor } from '@/lib/sellerPlansDisplay';
 import type { SellerPlanDefinition } from '@/lib/sellerPlans';
 import type { useAppTheme } from '@/contexts/AppThemeContext';
@@ -161,7 +161,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 6,
   },
   textOnInverted: { color: '#0A0A0B' },
-  mutedOnInverted: { color: 'rgba(10,10,11,0.6)' },
+  mutedOnInverted: { color: ON_LIGHT_MUTED },
 
   recBadge: { alignSelf: 'center', backgroundColor: theme.accent, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 2 },
   recBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.onAccent, letterSpacing: 0.6 },

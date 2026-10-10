@@ -21,7 +21,7 @@ import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON, TEXT_TERTIARY,
 } from '@/lib/theme';
 import { RADII, radius } from '@/constants/radii';
 import { AppleEmoji } from '@/components/ui/AppleEmoji';
@@ -1334,7 +1334,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     textShadowRadius: 3,
   },
   repliesDisabled: {
-    color: 'rgba(255,255,255,0.4)',
+    color: TEXT_TERTIARY,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     textAlign: 'center',

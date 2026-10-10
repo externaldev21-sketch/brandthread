@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { SHOP_PILL_HEIGHT } from './profileLayout';
@@ -82,7 +82,8 @@ export function ProfileButton({
 }) {
   const { theme } = useAppTheme();
   const primary = variant === 'primary';
-  const fg = primary ? theme.onAccent : theme.text;
+  // Disabled: solid gray fill + gray label, never a faded button.
+  const fg = disabled ? TEXT_DISABLED : primary ? theme.onAccent : theme.text;
   // The wrapper owns flex sizing (PressableScale styles its inner animated
   // view, not the outer Pressable), so buttons split a row evenly.
   return (
@@ -98,12 +99,13 @@ export function ProfileButton({
         testID={testID}
         style={[
           styles.button,
-          primary
+          disabled
+            ? { backgroundColor: FILL_ELEVATED, borderColor: FILL_ELEVATED }
+            : primary
             ? { backgroundColor: theme.accent, borderColor: theme.accent }
             : variant === 'neutral'
               ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
               : { backgroundColor: theme.cardGlass, borderColor: theme.border },
-          disabled && styles.disabled,
         ]}
       >
         {(state) => (
@@ -578,7 +580,6 @@ const styles = StyleSheet.create({
     gap: 6, paddingHorizontal: SP.md, overflow: 'hidden',
   },
   buttonText: { fontFamily: FONT.bold, fontSize: FS.base, flexShrink: 1 },
-  disabled: { opacity: 0.5 },
 
   // `width: '100%'` (not just `flex: 1`): this row is the sole child of the
   // caller's own `actionRow` View, itself sized by content along its own
@@ -627,7 +628,7 @@ const styles = StyleSheet.create({
   statSlot: { flex: 1, justifyContent: 'center' },
   statCell: { height: 64, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, gap: 2 },
   statValue: { ...TYPE_SCALE.title1, ...TABULAR_NUMS, letterSpacing: -0.8 },
-  statLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, letterSpacing: 0.8, textTransform: 'uppercase' },
+  statLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, },
   statDivider: { width: StyleSheet.hairlineWidth, marginVertical: SP.md },
 
   tabs: {
@@ -646,7 +647,7 @@ const styles = StyleSheet.create({
 
   section: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: SP.md },
   sectionStitch: { flex: 1, borderTopWidth: 1, borderStyle: 'dashed' },
-  sectionText: { fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 2, textTransform: 'uppercase' },
+  sectionText: { fontFamily: FONT.bold, fontSize: FS.base, },
 
   pillWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: SP.md },
   pillInline: { alignItems: 'stretch', paddingHorizontal: SP.md },

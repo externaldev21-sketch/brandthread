@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_DISABLED } from '@/lib/theme';
 
 /** Two-tab switch (Overview / Payouts): text tabs with an underline on the active one. */
 export function SegmentTabs<T extends string>({ tabs, value, onChange }: {
@@ -68,11 +68,11 @@ export function ActionButton({ label, onPress, outline, disabled, loading, flex 
       style={[
         st.btn,
         flex && { flex: 1 },
-        outline ? { borderColor: theme.border, borderWidth: 1, backgroundColor: 'transparent' } : { backgroundColor: theme.text },
-        inactive && { opacity: 0.45 },
+        outline ? { borderColor: theme.border, borderWidth: 1, backgroundColor: 'transparent' } : { backgroundColor: inactive ? FILL_ELEVATED : theme.text },
       ]}
     >
-      <Text style={[st.btnText, { color: outline ? theme.text : theme.background }]}>{loading ? 'Working…' : label}</Text>
+      {/* Inactive: solid gray fill + gray label, never a faded button. */}
+      <Text style={[st.btnText, { color: inactive ? TEXT_DISABLED : outline ? theme.text : theme.background }]}>{loading ? 'Working…' : label}</Text>
     </TouchableOpacity>
   );
 }
