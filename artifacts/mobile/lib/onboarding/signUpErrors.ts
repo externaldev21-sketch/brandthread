@@ -60,6 +60,7 @@ export function identifierTakenMessage(err: unknown): string | null {
   return 'Check what you entered and try again.';
 }
 
+/** Role is only supplied for an account known on this device; never guessed. */
 export function existingAccountCopy(role: 'buyer' | 'seller' | null): string {
   if (!role) return 'This email already has an account.';
   return role === 'seller'

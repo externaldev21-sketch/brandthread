@@ -258,9 +258,6 @@ router.get("/status", requireRole("owner"), async (req, res) => {
       trialBanner,
       amountCents,
       paymentMethodLabel: pmLabel,
-      // Set when the seller cancelled in-app: the plan stays until renewsOn,
-      // then ends. POST /resume clears it.
-      cancelAtPeriodEnd:  sub.cancel_at_period_end === true,
       // Reaching this branch means the persisted Stripe subscription was
       // retrieved successfully. Keep billing recovery pointed at Stripe even
       // when an unpaid subscription no longer grants an effective entitlement.

@@ -39,5 +39,6 @@ describe('identifierTakenMessage / existingAccountCopy', () => {
   it("uses Dev's copy for the real case", () => {
     expect(existingAccountCopy('buyer')).toBe('This email already has a buyer account.');
     expect(existingAccountCopy('seller')).toBe('This email already has a seller account.');
+    expect(existingAccountCopy(null)).toBe('This email already has an account.');
   });
 });

@@ -59,7 +59,9 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { track } from '@/lib/analytics';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
 import { displayPriceFor } from '@/lib/sellerPlansDisplay';
-import { useSellerPlanConfig } from '@/lib/sellerPlanConfig';
+import { formatPlanPrice, useSellerPlanConfig } from '@/lib/sellerPlanConfig';
+import { PlanTierCard } from '@/components/plans/PlanTierCard';
+import { CompareFeaturesSheet } from '@/components/plans/CompareFeaturesSheet';
 import { commissionSummary, wantsProHighlight, DEMO_PERKS, type PerksResponse } from '@/lib/proPerks';
 import { isPreviewDemoMode, isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
@@ -69,7 +71,7 @@ import {
 import { SellerPaywallHeadline } from '@/components/paywall/SellerPaywallHeadline';
 import { SellerPaywallBullets } from '@/components/paywall/SellerPaywallBullets';
 import { freeTrialDays, manageOrCancelLine } from '@/lib/trialOffer';
-import { SellerPlanSelector, type PlanPricing } from '@/components/paywall/SellerPlanSelector';
+import type { PlanPricing } from '@/components/paywall/SellerPlanSelector';
 import { SellerTrialTimeline, type TrialTimelineStep } from '@/components/paywall/SellerTrialTimeline';
 import { SellerPaywallCTA } from '@/components/paywall/SellerPaywallCTA';
 import { SellerPaywallExitDrawer } from '@/components/paywall/SellerPaywallExitDrawer';
@@ -118,7 +120,8 @@ export default function PlansScreen() {
   }, []);
   const { currentRole } = useTeamRole();
   const { available: revenueCatAvailable, packages, purchase, restore } = useRevenueCat();
-  const { trialDays } = useSellerPlanConfig();
+  const { trialDays, tiers, commissionPercent } = useSellerPlanConfig();
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const [loadingId,         setLoadingId]         = useState<string | null>(null);
   const [awaitingReturn,    setAwaitingReturn]    = useState(false);
@@ -391,8 +394,10 @@ export default function PlansScreen() {
   function getPricing(plan: SellerPlanDefinition): PlanPricing {
     const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
     const webPrice = displayPriceFor(plan);
+    // Web prices come from the shared plan config; native from the store.
+    const configCents = tiers.find((t) => t.id === plan.id)?.amountCents;
     const priceLabel = Platform.OS === 'web'
-      ? webPrice.price
+      ? (configCents ? formatPlanPrice(configCents) : webPrice.price)
       : revenueCatPackage?.product.priceString ?? null;
     return {
       priceLabel,
@@ -451,16 +456,28 @@ export default function PlansScreen() {
 
         <SellerPaywallBullets theme={theme} bullets={BENEFIT_BULLETS} />
 
-        <SellerPlanSelector
-          theme={theme}
-          plans={SELLER_PLANS}
-          recommendedId={recommendedId}
-          currentPlanId={currentPlanId}
-          isOnboarding={isOnboarding}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          getPricing={getPricing}
-        />
+        {/* Plan cards: the active-product count is the headline (shared plan config). */}
+        <View style={{ gap: SP.sm }}>
+          {tiers.map((tier, i) => {
+            const plan = SELLER_PLANS.find((p) => p.id === tier.id);
+            const isCurrent = !isOnboarding && tier.id === currentPlanId && currentPlanStatus !== 'none';
+            return (
+              <PlanTierCard
+                key={tier.id}
+                testID={`seller-plan-card-${tier.id}`}
+                tier={tier}
+                below={tiers[i - 1] ?? null}
+                selected={tier.id === selectedPlan.id}
+                onSelect={() => setSelectedId(tier.id)}
+                priceLabel={plan ? getPricing(plan).priceLabel : null}
+                badge={isCurrent ? 'Current plan' : tier.id === recommendedId ? 'Recommended' : null}
+              />
+            );
+          })}
+          <TouchableOpacity onPress={() => setCompareOpen(true)} accessibilityRole="button" testID="seller-plans-compare" style={styles.compareRow}>
+            <Text style={styles.compareText}>Compare all features</Text>
+          </TouchableOpacity>
+        </View>
 
         <SellerPaywallCTA
           theme={theme}
@@ -541,6 +558,8 @@ export default function PlansScreen() {
         </View>
 
       </ScrollView>
+
+      <CompareFeaturesSheet visible={compareOpen} onClose={() => setCompareOpen(false)} tiers={tiers} commissionPercent={commissionPercent} />
 
       <SellerPaywallExitDrawer
         visible={exitDrawerVisible}
@@ -653,6 +672,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   restoreRow: { alignItems: 'center', paddingVertical: SP.sm },
+  compareRow: { alignSelf: 'flex-start', paddingVertical: SP.xs },
+  compareText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, textDecorationLine: 'underline' },
 
   // Legal footer (Apple 3.1.2 — auto-renew disclosure + Terms/Privacy)
   legalFooter: { paddingTop: SP.sm, paddingHorizontal: SP.xs, gap: 10 },

@@ -187,8 +187,18 @@ export function createFakeOnboardingApi({ demo = false } = {}) {
       return { status: 200, body: { url: 'https://checkout.stripe.test/c/pay/stub' } };
     }
     if (get && p === '/config/seller-plans') {
-      return { status: 200, body: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', plans: [
-        { id: 'starter', amountCents: 2900, interval: 'month' }, { id: 'growth', amountCents: 7900, interval: 'month' }, { id: 'pro', amountCents: 19900, interval: 'month' },
+      // Dev's tier decision in the shape GET /api/config/seller-plans sends
+      // (Revenue P0, #766). AI credits are left out until the catalogue sets them.
+      const plan = (id, amountCents, productLimit, staffSeats, tier) => ({
+        id, name: id.charAt(0).toUpperCase() + id.slice(1), amountCents, interval: 'month', productLimit, staffSeats,
+        features: {
+          analytics: ['basic', 'advanced', 'full'][tier], analyticsExport: tier === 2, liveSelling: tier > 0, dropsEscrow: tier > 0,
+          boostFeatured: tier > 0, customDomain: tier > 0, manufacturerHub: tier > 0,
+          payoutSpeed: tier === 2 ? 'faster' : 'standard', prioritySupport: tier === 2,
+        },
+      });
+      return { status: 200, body: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', commissionPercent: 5, plans: [
+        plan('starter', 1999, 10, 1, 0), plan('growth', 4900, 50, 3, 1), plan('pro', 12900, null, null, 2),
       ] } };
     }
     if (get && p === '/seller/subscription/status') {

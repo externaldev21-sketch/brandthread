@@ -35,10 +35,12 @@ import { pollSubscriptionStatus } from '@/lib/pollSubscriptionStatus';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { getSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
+import { formatPlanPrice, useSellerPlanConfig } from '@/lib/sellerPlanConfig';
+import { PlanTierCard } from '@/components/plans/PlanTierCard';
+import { CompareFeaturesSheet } from '@/components/plans/CompareFeaturesSheet';
 import {
   isSubscriptionPaymentRecoveryRequired,
   platformSubscriptionSettingsUrl,
@@ -68,7 +70,8 @@ export default function SubscriptionScreen() {
   const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
   const isSellerPreview = isSellerDevPreview() && (!authLoaded || !isSignedIn || !userId);
   const { available: revenueCatAvailable, packages: revenueCatPackages, purchase, restore, managementURL } = useRevenueCat();
-  const growthStudioTools = React.useMemo(() => getGrowthStudioTools(theme), [theme]);
+  const planConfig = useSellerPlanConfig();
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const [activeTab,   setActiveTab]   = useState<'plan' | 'billing'>('plan');
   const { currentRole, isLoadingRole } = useTeamRole();
@@ -94,7 +97,6 @@ export default function SubscriptionScreen() {
   // No subscription = no plan (there is no free tier): never "Starter · Free"
   // next to a "$29 CURRENT PLAN" card (QA-0166).
   const planSummary = currentPlanSummary({ plan: selectedPlan, status: currentPlan.status, amountCents: currentPlan.amountCents });
-  const hasGrowthAccess = selectedPlan === 'growth' || selectedPlan === 'pro';
 
   const externalSessionOpenedRef = useRef<
     { kind: 'checkout'; expectedPlan: string } | { kind: 'portal' } | null
@@ -267,7 +269,6 @@ export default function SubscriptionScreen() {
   function handleCancelButton() {
     if (isSellerPreview) return;
     if (cancelAction === 'manage') { handleOpenPortal(); return; }
-    haptic();
     if (cancelAction === 'resubscribe') { void resubscribe(); return; }
     const copy = cancelConfirmCopy(currentPlan);
     const confirm = () => { void cancelPlan(); };
@@ -445,131 +446,40 @@ export default function SubscriptionScreen() {
 
             {/* Plan options */}
             <Text style={styles.sectionTitle}>All plans</Text>
-             {SELLER_PLANS.map((plan) => {
-              const isCurrent = planSummary.hasPlan && plan.id === planSummary.planId;
-              return (
-                <View key={plan.id} style={[styles.planCard, plan.highlight && styles.planCardFeatured, isCurrent && styles.planCardHighlight]}>
-                  {isCurrent && (
-                    <View style={styles.popularBadge}>
-                      <Text style={styles.popularText}>CURRENT PLAN</Text>
-                    </View>
-                  )}
-                  {plan.highlight && (
-                    <View style={[styles.popularBadge, { backgroundColor: PURPLE_DIM }]}>
-                      <Text style={[styles.popularText, { color: PURPLE_LIGHT }]}>MOST POPULAR</Text>
-                    </View>
-                  )}
-                  <View style={styles.planHeader}>
-                    <View>
-                      <Text style={styles.planName}>{plan.name}</Text>
-                      <Text style={styles.planTagline}>{plan.tagline}</Text>
-                    </View>
-                    <View style={styles.planPriceCol}>
-                        <Text style={styles.planPrice}>
-                         {Platform.OS === 'web'
-                            ? plan.priceLabel
-                           : revenueCatPackages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id as keyof typeof SELLER_PACKAGE_IDS])?.product.priceString ?? '—'}
-                       </Text>
-                       <Text style={styles.planPeriod}>/mo</Text>
-                    </View>
-                  </View>
-                  <View style={styles.featureList}>
-                     {plan.features.map((feature) => (
-                       <View key={feature} style={styles.featureRow}>
-                         <Icon name="check" size={14} color={SUCCESS} />
-                         <Text style={styles.featureText}>{feature}</Text>
-                       </View>
-                     ))}
-                     {plan.notIncluded.map((feature) => (
-                       <View key={feature} style={styles.featureRow}>
-                         <Icon name="x" size={14} color={SUBTLE} />
-                         <Text style={[styles.featureText, styles.featureTextDim]}>{feature}</Text>
-                      </View>
-                    ))}
-                  </View>
-                    {!isReadOnly && !isSellerPreview && !isCurrent && (
-                    <TouchableOpacity
-                      testID={`seller-subscription-change-${plan.id}`}
-                      style={[styles.changePlanBtn, plan.id === 'starter' && styles.changePlanBtnOutline]}
-                      onPress={() => handleChangePlan(plan.id)}
-                    >
-                      <Text style={[styles.changePlanText, plan.id === 'starter' && { color: MUTED }]}>
-                        {plan.id === 'starter' && planSummary.hasPlan ? 'Downgrade' : `Switch to ${plan.name}`}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-            })}
-
-            {/* ── Growth feature comparison ── */}
-            <View style={styles.growthComparison}>
-              <View style={styles.growthComparisonHeader}>
-                <View style={styles.growthComparisonIcon}>
-                  <Icon name="layers" size={18} color={PURPLE_LIGHT} />
-                </View>
-                <View style={styles.growthComparisonHeading}>
-                  <Text style={styles.growthComparisonTitle}>What’s included in your plan</Text>
-                  <Text style={styles.growthComparisonSubtitle}>
-                    Your Growth Studio toolkit at a glance
-                  </Text>
-                </View>
-              </View>
-
-              {growthStudioTools.map((tool) => (
-                <View key={tool.id} style={styles.growthFeatureRow}>
-                  <View style={styles.growthToolIcon}>
-                    <Icon name={tool.icon} size={16} color={FG} />
-                  </View>
-                  <View style={styles.growthFeatureLabels}>
-                    <Text style={styles.growthFeatureTitle}>{tool.title}</Text>
-                    <Text style={styles.growthFeatureDescription}>{tool.desc}</Text>
-                  </View>
-                  <View style={[
-                    styles.growthFeatureStatus,
-                    { backgroundColor: hasGrowthAccess ? `${SUCCESS}18` : `${SUBTLE}12` },
-                  ]}>
-                    <Icon
-                      name={hasGrowthAccess ? 'check' : 'lock'}
-                      size={11}
-                      color={hasGrowthAccess ? SUCCESS : SUBTLE}
-                    />
-                    <Text style={[
-                      styles.growthFeatureStatusText,
-                      { color: hasGrowthAccess ? SUCCESS : SUBTLE },
-                    ]}>
-                      {hasGrowthAccess ? 'Included' : 'Growth only'}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-
-              <View style={styles.growthComparisonDivider} />
-              <Text style={styles.growthExtrasLabel}>More Growth perks</Text>
-              {GROWTH_EXTRAS.map((perk) => (
-                <View key={perk.label} style={styles.growthPerkRow}>
-                  <View style={[
-                    styles.growthPerkIcon,
-                    { backgroundColor: hasGrowthAccess ? `${SUCCESS}18` : `${SUBTLE}12` },
-                  ]}>
-                    <Icon
-                      name={hasGrowthAccess ? 'check' : 'lock'}
-                      size={11}
-                      color={hasGrowthAccess ? SUCCESS : SUBTLE}
-                    />
-                  </View>
-                  <Text style={[
-                    styles.growthPerkText,
-                    !hasGrowthAccess && styles.growthPerkTextDim,
-                  ]}>
-                    {perk.label}
-                  </Text>
-                  {!hasGrowthAccess && (
-                    <Text style={styles.growthPerkStatus}>Growth only</Text>
-                  )}
-                </View>
-              ))}
+            {/* Plan cards from the shared plan config: the product count is the headline. */}
+            <View style={{ gap: SP.sm }}>
+              {planConfig.tiers.map((tier, i) => {
+                const isCurrent = planSummary.hasPlan && tier.id === planSummary.planId;
+                const plan = getSellerPlan(tier.id);
+                const nativePrice = revenueCatPackages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[tier.id])?.product.priceString;
+                return (
+                  <PlanTierCard
+                    key={tier.id}
+                    testID={`seller-subscription-plan-${tier.id}`}
+                    tier={tier}
+                    below={planConfig.tiers[i - 1] ?? null}
+                    selected={isCurrent}
+                    priceLabel={Platform.OS === 'web' ? formatPlanPrice(tier.amountCents) : nativePrice ?? null}
+                    badge={isCurrent ? 'Current plan' : null}
+                    footer={!isReadOnly && !isSellerPreview && !isCurrent && plan ? (
+                      <TouchableOpacity
+                        testID={`seller-subscription-change-${tier.id}`}
+                        style={[styles.changePlanBtn, tier.id === 'starter' && styles.changePlanBtnOutline]}
+                        onPress={() => handleChangePlan(tier.id)}
+                      >
+                        <Text style={[styles.changePlanText, tier.id === 'starter' && { color: MUTED }]}>
+                          {tier.id === 'starter' && planSummary.hasPlan ? 'Downgrade' : `Switch to ${tier.name}`}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  />
+                );
+              })}
+              <TouchableOpacity onPress={() => setCompareOpen(true)} accessibilityRole="button" testID="seller-subscription-compare" style={{ alignSelf: 'flex-start', paddingVertical: SP.xs }}>
+                <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, textDecorationLine: 'underline' }}>Compare all features</Text>
+              </TouchableOpacity>
             </View>
+            <CompareFeaturesSheet visible={compareOpen} onClose={() => setCompareOpen(false)} tiers={planConfig.tiers} commissionPercent={planConfig.commissionPercent} />
 
               {!isReadOnly && !isSellerPreview && (
                 <TouchableOpacity testID="seller-subscription-cancel" style={styles.cancelBtn} onPress={handleCancelButton}>

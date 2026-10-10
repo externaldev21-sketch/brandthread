@@ -76,6 +76,7 @@ import {
 import {
   allStepsFor,
   isAccountStep,
+  firstStepAfterAccount,
   isStepId,
   nextStepId,
   prevStepId,
@@ -241,6 +242,7 @@ export default function OnboardingScreen() {
     deviceStep,
     deviceProbe,
     previewUser,
+    flow: flowParam,
   } = useLocalSearchParams<{
     postAuth?: string;
     addAccount?: string;
@@ -250,6 +252,8 @@ export default function OnboardingScreen() {
     deviceStep?: string;
     deviceProbe?: string;
     previewUser?: string;
+    /** Set by "Start selling" / "Shop as a buyer" (Accounts session). */
+    flow?: string;
   }>();
   const isAddAccount = addAccount === '1';
   const isDevWebPreviewUser = __DEV__ && Platform.OS === 'web' && previewUser === '1';
@@ -409,7 +413,8 @@ export default function OnboardingScreen() {
 
     void (async () => {
       try {
-        const landingFlow = await AsyncStorage.getItem(PENDING_FLOW_KEY).catch(() => null);
+        const storedFlow = await AsyncStorage.getItem(PENDING_FLOW_KEY).catch(() => null);
+        const landingFlow = flowParam === 'buyer' || flowParam === 'seller' ? flowParam : storedFlow;
         await AsyncStorage.multiRemove(LEGACY_PENDING_KEYS).catch(() => {});
         // "Create new account" always starts clean at the buyer/seller question.
         if (isAddAccount && postAuth !== '1') {
@@ -433,6 +438,14 @@ export default function OnboardingScreen() {
           if (draft) {
             accountCreatedRef.current = true;
             applyDraft(draft, resolveResumeStep(draft, { accountReady: true, signUpPending: false, emailVerified: false }));
+          } else if (landingFlow === 'buyer' || landingFlow === 'seller') {
+            // The role is already known ("Start selling" / "Shop as a buyer"
+            // created this profile, or the landing page picked it): go
+            // straight to the first profile step, even after a relaunch.
+            accountCreatedRef.current = true;
+            setSelectedFlow(landingFlow);
+            setFlow(landingFlow);
+            setStepId(firstStepAfterAccount(landingFlow));
           } else {
             // Signed in without onboarding answers (e.g. a new Apple account
             // from the sign-in screen): ask buyer or seller, then profile.
@@ -1213,6 +1226,8 @@ export default function OnboardingScreen() {
         return (
           <PlanStep
             brandName={brandName.trim()}
+            tiers={trial.config.tiers}
+            commissionPercent={trial.config.commissionPercent}
             recommendedId={recommendedPlanId}
             selectedId={planId ?? recommendedPlanId}
             onSelect={setPlanId}

@@ -47,6 +47,7 @@ import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } fr
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
 import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
+import { getInstallId } from '@/lib/installId';
 
 /** Server story highlight (GET /api/social/highlights/*). */
 export interface ServerHighlight {
@@ -1434,6 +1435,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
   const quietGet = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope, false);
   const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true, getCacheScope);
   const post  = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }, getToken, false, getCacheScope);
+  /** POST with this install's id, for server-side "one per device" rules (trials). */
+  const postWithInstallId = async <T>(path: string, body: unknown) => {
+    const installId = await getInstallId().catch(() => null);
+    return request<T>(path, { method: 'POST', body: JSON.stringify(body), ...(installId ? { headers: { 'x-bt-install-id': installId } } : {}) }, getToken, false, getCacheScope);
+  };
   const postExpensive = <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }, getToken, false, getCacheScope, true, EXPENSIVE_REQUEST_TIMEOUT_MS);
   const put   = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }, getToken, false, getCacheScope);
@@ -2925,8 +2931,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           renewsOn: string | null;    // e.g. "Aug 14, 2026"
           amountCents: number;        // monthly charge in cents (0 for starter)
           paymentMethodLabel: string | null; // e.g. "Visa ···4242"
-          /** True after an in-app cancel: the plan ends on renewsOn. */
-          cancelAtPeriodEnd?: boolean;
           effectiveProvider: 'stripe' | 'revenuecat' | 'none';
           /** Cancelled: nothing more is charged; access runs until accessEndsAt. */
           cancelAtPeriodEnd?: boolean;
@@ -2957,7 +2961,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         /** Create a Stripe Checkout Session in subscription mode.
          *  Returns { url } for the mobile client to open in the system browser. */
         checkout: (planId: 'starter' | 'growth' | 'pro') =>
-          post<{ url: string; /** True when an active plan was switched in place (prorated) — no checkout page to open. */ updated?: boolean }>('/api/seller/subscription/checkout', { planId }),
+          postWithInstallId<{ url: string; trial?: boolean; /** True when an active plan was switched in place (prorated). */ updated?: boolean }>('/api/seller/subscription/checkout', { planId }),
         /** Create a Stripe Billing Portal session so the seller can manage their
          *  payment method, view invoices, or cancel. Returns { url }. */
         portal: () =>
@@ -2969,7 +2973,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         resume: () =>
           post<{ status: string; cancelAtPeriodEnd: boolean; endsAt: string | null }>('/api/seller/subscription/resume', {}),
         /** Server verifies the current RevenueCat customer; no plan is client supplied. */
-        syncNative: () => post<{
+        syncNative: () => postWithInstallId<{
           plan: string;
           status: string;
           trialEnd: string | null;

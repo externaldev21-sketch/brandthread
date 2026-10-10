@@ -359,7 +359,14 @@ vi.mock('@/lib/useSellerTrialCheckout', () => ({
   useSellerTrialCheckout: ({ onActive }: { onActive: () => void }) => {
     trialMock.onActive = onActive;
     return {
-      config: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', plans: [] },
+      config: {
+        trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', plans: [], commissionPercent: 5,
+        tiers: [
+          { id: 'starter', name: 'Starter', amountCents: 1999, limits: { activeProducts: 10 }, features: {} },
+          { id: 'growth', name: 'Growth', amountCents: 4900, limits: { activeProducts: 50 }, features: {} },
+          { id: 'pro', name: 'Pro', amountCents: 12900, limits: { activeProducts: null }, features: {} },
+        ],
+      },
       native: false,
       priceLabel: (id: string) => ({ starter: '$29', growth: '$79', pro: '$199' } as Record<string, string>)[id],
       trialDays: () => 7,
@@ -395,6 +402,11 @@ vi.mock('@/hooks/useColors', () => ({
   useColors: () => ({ foreground: '#FFFFFF', mutedForeground: '#C0C0C0', destructive: '#FF3B30', border: '#333333', background: '#000000' }),
 }));
 vi.mock('@/components/AiGeneratedBadge', () => ({ AiGeneratedBadge: () => null }));
+vi.mock('@/components/ui/Icon', () => {
+  const React = require('react') as typeof import('react');
+  return { Icon: (props: Record<string, unknown>) => React.createElement('Icon', props) };
+});
+vi.mock('@/components/ui/BottomSheet', () => ({ BottomSheet: () => null }));
 vi.mock('@/components/ui', () => {
   const React = require('react') as typeof import('react');
   return {
@@ -402,6 +414,7 @@ vi.mock('@/components/ui', () => {
     Input: (props: Record<string, unknown>) => React.createElement('TextInput', { ...props, accessibilityLabel: props.label }, props.right as React.ReactNode),
     Icon: (props: Record<string, unknown>) => React.createElement('Icon', props),
     OptionSheet: () => null,
+    BottomSheet: () => null,
   };
 });
 vi.mock('@/components/branding/BrandthreadLogo', () => ({ default: () => null }));
@@ -525,7 +538,9 @@ async function settle() {
 
 async function tap(renderer: ReactTestRenderer, testID: string) {
   await act(async () => {
-    findByTestId(renderer, testID).props.onPress();
+    // The pressable host, not a wrapper component that only forwards testID.
+    const target = renderer.root.findAll((n) => n.props.testID === testID && typeof n.props.onPress === 'function')[0];
+    (target ?? findByTestId(renderer, testID)).props.onPress();
     await Promise.resolve();
   });
   await settle();
@@ -767,6 +782,39 @@ describe('onboarding entry points and resume', () => {
     expect(has(renderer, 'onboarding-email-input')).toBe(false);
   });
 
+  it('"Start selling" / "Shop as a buyer" (signed in + pending role) goes straight to the name step, with or without postAuth', async () => {
+    for (const postAuth of ['1', undefined]) {
+      resetState();
+      clerkStore.isSignedIn = true;
+      clerkStore.userId = 'user_second_profile';
+      if (postAuth) searchParams.postAuth = postAuth;
+      memoryStorage.set('onboarding_pending_flow', 'seller');
+      renderer = await renderScreen();
+      await settle();
+      expect(has(renderer, 'onboarding-first-name-input')).toBe(true);
+      expect(has(renderer, 'onboarding-account-type-continue')).toBe(false);
+      expect(has(renderer, 'onboarding-email-input')).toBe(false);
+      await type(renderer, 'onboarding-first-name-input', 'Sasha Rivera');
+      await tap(renderer, 'onboarding-name-next');
+      expect(has(renderer, 'onboarding-brand-name-input')).toBe(true); // seller path
+      await act(async () => { renderer?.unmount(); });
+    }
+    renderer = undefined;
+  });
+
+  it('?flow=seller after Start selling skips the buyer/seller question even without a stored pending flow', async () => {
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_second_profile';
+    searchParams.postAuth = '1';
+    searchParams.flow = 'seller';
+    renderer = await renderScreen();
+    await settle();
+    expect(has(renderer, 'onboarding-first-name-input')).toBe(true);
+    await type(renderer, 'onboarding-first-name-input', 'Sasha Rivera');
+    await tap(renderer, 'onboarding-name-next');
+    expect(has(renderer, 'onboarding-brand-name-input')).toBe(true);
+  });
+
   it('reopening mid-sign-up returns to the same step with the email kept', async () => {
     memoryStorage.set('onboarding_pending_draft', JSON.stringify({
       version: 9, flow: 'buyer', stepId: 'CODE', authMethod: 'email', accountCreated: false, email: 'resume@x.test',
@@ -885,7 +933,7 @@ describe('Dev P0: a brand-new email never shows "this email already has an accou
     await toEmailStep(renderer);
     await submitNewEmail(renderer, 'taken@x.test');
     expect(has(renderer, 'onboarding-code-step')).toBe(false);
-    expect(findByTestId(renderer, 'onboarding-step-error').props.children).toBe('This email already has a buyer account.');
+    expect(findByTestId(renderer, 'onboarding-step-error').props.children).toBe('This email already has an account.'); // role unknown off-device: never guessed
     await tap(renderer, 'onboarding-email-use-different');
     expect(findByTestId(renderer, 'onboarding-email-input').props.value).toBe('');
     expect(has(renderer, 'onboarding-email-switch')).toBe(false);

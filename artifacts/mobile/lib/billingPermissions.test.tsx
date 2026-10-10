@@ -247,6 +247,10 @@ vi.mock('@/lib/growthTools', () => ({
   GROWTH_EXTRAS: [],
   getGrowthStudioTools: () => [],
 }));
+vi.mock('@/components/plans/PlanTierCard', () => ({
+  PlanTierCard: ({ footer }: { footer?: unknown }) => footer ?? null,
+}));
+vi.mock('@/components/plans/CompareFeaturesSheet', () => ({ CompareFeaturesSheet: () => null }));
 
 import BillingScreen from '../app/billing';
 import SubscriptionScreen from '../app/subscription';

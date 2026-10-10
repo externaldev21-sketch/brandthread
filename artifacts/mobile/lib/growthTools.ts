@@ -143,6 +143,7 @@ export function getGrowthStudioTools(theme: PlanTheme): GrowthTool[] {
 
 /** Additional Growth perks shown after the Studio tool list (server plan config: planCatalogue.ts). */
 export const GROWTH_EXTRAS = [
+  { icon: 'package' as const, label: 'More active products' },
   { icon: 'video' as const, label: 'Live selling' },
   { icon: 'calendar' as const, label: 'Drops and pre-orders' },
   { icon: 'trending-up' as const, label: 'Boosts and Featured slots' },
