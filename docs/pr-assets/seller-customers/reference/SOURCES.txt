@@ -1,0 +1,8 @@
+Shopify iOS (Mobbin) references used 1:1, reskinned black/white/silver:
+shopify-customers-list.webp        https://mobbin.com/screens/8d012513-7214-4c00-935d-aaa2307452f9
+shopify-customer-detail.webp       https://mobbin.com/screens/c949bb81-635c-49d8-a4f1-5cdda8b069c6
+shopify-discounts-list.webp        https://mobbin.com/screens/5fd5f93b-46c4-4187-8a06-e8b0e9c96973
+shopify-discounts-empty.webp       https://mobbin.com/screens/9051a52a-f2ad-4a8d-81fb-4ac2c7c31434
+shopify-settings-push-notifications-row.webp  https://mobbin.com/screens/7007b793-2530-47a7-945f-9c639a1c010d
+shopify-push-notifications.webp    https://mobbin.com/screens/769bf1fa-74c9-45d5-a70f-9b0c7d24bd73
+shopify-alerts-inbox.webp          https://mobbin.com/screens/b1bd4556-d2f2-4e50-91d4-eea279f21206

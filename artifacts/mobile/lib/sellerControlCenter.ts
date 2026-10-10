@@ -166,6 +166,8 @@ export const SECTIONS: ControlCenterSection[] = [
     title: 'Support',
     icon: 'users',
     items: [
+      // The real customer list (search, amount spent, order history) — this
+      // used to open /customer-accounts, a "not configurable" placeholder.
       { id: 'customers', label: 'Customers', icon: 'users',        route: '/customers', description: 'Browse your customer list' },
       { id: 'team',      label: 'Team',      icon: 'user-plus',    route: '/team', description: 'Invite and manage teammates' },
       { id: 'settings',  label: 'Settings',  icon: 'settings',     route: '/seller-settings', description: 'Account and store settings' },

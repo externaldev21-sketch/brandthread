@@ -31,6 +31,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
 import { PAUSE_OPTIONS, pagesFor, pausedUntilLabel, type Role } from '@/lib/notificationSettingsModel';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 export default function NotificationsSettingsScreen() {
   const router = useRouter();
@@ -47,6 +48,7 @@ export default function NotificationsSettingsScreen() {
   const [sleepSheet, setSleepSheet] = useState(false);
 
   const load = useCallback(() => {
+    if (isSellerDevPreview()) return;
     api.notificationPrefs.get()
       .then((data) => {
         setRole(data.role);
@@ -100,6 +102,7 @@ export default function NotificationsSettingsScreen() {
     if (!preset) return;
     const prior = quietHours;
     setQuietHours({ start: preset.start, end: preset.end });
+    if (isSellerDevPreview()) return;
     try {
       await api.notificationPrefs.update({
         quietHours: preset.start && preset.end ? { start: preset.start, end: preset.end } : null,

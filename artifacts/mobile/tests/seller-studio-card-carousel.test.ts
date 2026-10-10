@@ -202,7 +202,7 @@ describe('navigation animation override plumbing', () => {
       'add-product', 'seller-go-live', 'payouts', 'community', 'taxes-duties',
       'content', 'finance', 'manufacturer-hub', 'design', 'design-mockup-to-model',
       'design-bg-removal', 'design-text-to-design', 'design-campaign',
-      'design-ai-photoshoot', 'customer-accounts',
+      'design-ai-photoshoot', 'customer-accounts', 'customers',
     ];
     destinations.forEach((name) => {
       // A function options either way — add-product's also reads its route
