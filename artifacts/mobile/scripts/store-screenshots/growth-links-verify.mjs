@@ -118,11 +118,22 @@ async function main() {
 
     const signedIn = async (name, role, target, extraQuery = '', full = false) => {
       const { context, page, activity } = await openContext(browser, { device, role, origin, images });
-      await page.goto(`${origin}/?bt_preview=${role}${extraQuery}`);
+      // Program switched on (SELLER_REFERRAL_ENABLED=true) with two referred brands.
+      await context.route(`${DEMO_API}/api/seller-referrals`, (route) => route.fulfill({
+        status: 200,
+        headers: { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true' },
+        contentType: 'application/json',
+        body: JSON.stringify({
+          enabled: true, freeMonths: 1, code: 'K7M2PQ', link: 'https://brandthread.app/invite/K7M2PQ', canApplyCode: false,
+          referred: [
+            { id: 'r1', name: 'Northline Studio', status: 'rewarded', createdAt: '2026-09-02T00:00:00Z' },
+            { id: 'r2', name: 'Field Notes Goods', status: 'pending', createdAt: '2026-10-01T00:00:00Z' },
+          ],
+        }),
+      }));
+      // A full load of the target: lib/devPreview.ts reads bt_preview/demo from the URL.
+      await page.goto(`${origin}${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}${extraQuery}`);
       await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20000 }).catch(() => {});
-      await page.waitForTimeout(2500);
-      const url = extraQuery ? `${target}${target.includes('?') ? '&' : '?'}${extraQuery.replace(/^&/, '')}` : target;
-      await page.evaluate((u) => { history.pushState(history.state, '', u); window.dispatchEvent(new PopStateEvent('popstate', { state: history.state })); }, url);
       await waitForQuietNetwork(activity, 800, 10000);
       await page.waitForTimeout(2000);
       await page.getByText('Necessary only', { exact: true }).first().click({ timeout: 2500 }).catch(() => {});
