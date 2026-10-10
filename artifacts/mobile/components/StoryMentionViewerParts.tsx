@@ -9,6 +9,7 @@
  *  - TaggedPeopleSheet: everyone tagged on the slide (works with invisible stickers).
  */
 import React, { useState } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,8 +22,6 @@ import {
 } from '@/lib/storyMentionSticker';
 import type { StoryOriginal, StoryOverlay } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
-
-const { width: W, height: H } = Dimensions.get('window');
 
 export type MentionTap = { person: TaggedPerson; anchor: { x: number; y: number } };
 
@@ -109,6 +108,7 @@ export function MentionPopover({
 }) {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
+  const { width: W, height: H } = useWindowDimensions();
   if (!target) return null;
   const { person, anchor } = target;
   const cardW = 232;

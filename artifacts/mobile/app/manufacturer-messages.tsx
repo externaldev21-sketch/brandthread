@@ -13,9 +13,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, FlatList, Image, Modal, Platform, Pressable,
+  ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable,
   RefreshControl, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -120,7 +121,7 @@ function MessageBubble({ msg, accent, onAccent, onOpenImage }: { msg: ApiMessage
           <View style={[bub.grid, images.length === 1 && { width: 220 }]}>
             {images.map((uri) => (
               <Pressable key={uri} onPress={() => onOpenImage(uri)} accessibilityRole="imagebutton" accessibilityLabel="Open photo">
-                <Image source={{ uri }} style={images.length === 1 ? bub.imageSingle : bub.imageTile} resizeMode="cover" />
+                <Image cachePolicy="memory-disk" source={{ uri }} style={images.length === 1 ? bub.imageSingle : bub.imageTile} contentFit="cover" />
               </Pressable>
             ))}
           </View>
@@ -469,7 +470,7 @@ export default function ManufacturerMessagesScreen() {
           <View style={s.previewRow} testID="pending-photos">
             {pending.map((asset, index) => (
               <View key={`${asset.uri}-${index}`} style={s.previewTile}>
-                <Image source={{ uri: asset.uri }} style={s.previewImage} />
+                <Image cachePolicy="memory-disk" source={{ uri: asset.uri }} style={s.previewImage} />
                 <TouchableOpacity style={s.previewRemove} onPress={() => setPending((current) => current.filter((_, i) => i !== index))} accessibilityLabel="Remove photo">
                   <Icon name="x" size={12} color={theme.text} />
                 </TouchableOpacity>

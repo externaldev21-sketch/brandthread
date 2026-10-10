@@ -5,7 +5,8 @@ import { radius as ControlRadius } from '@/constants/radii';
  * title, url, toggle, Add pill) re-skinned to the Brandthread palette.
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, Alert, Share, StyleSheet, Image } from 'react-native';
+import { View, Text, ScrollView, Alert, Share, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
@@ -287,7 +288,7 @@ function BioPreview({ page, products }: { page: BioPage; products: { id: string;
   return (
     <View style={[s.phone, { backgroundColor: bg, borderColor: colors.border }]} accessibilityLabel="Page preview">
       {page.avatarUrl
-        ? <Image source={{ uri: page.avatarUrl }} style={[s.pvAvatar, { borderColor: colors.border }]} />
+        ? <Image cachePolicy="memory-disk" source={{ uri: page.avatarUrl }} style={[s.pvAvatar, { borderColor: colors.border }]} />
         : <View style={[s.pvAvatar, s.avatarPh, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Text style={{ color: fg, fontFamily: FONT.bold, fontSize: FS.xl }}>{(page.displayName || 'B').slice(0, 1).toUpperCase()}</Text></View>}
       <Text style={[s.pvName, { color: fg }]}>{page.displayName || 'Your name'}</Text>
       {!!page.bio && <Text style={[s.pvBio, { color: colors.mutedForeground }]}>{page.bio}</Text>}

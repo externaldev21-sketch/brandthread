@@ -36,6 +36,9 @@ vi.mock('react-native', () => ({
   },
 }));
 
+// The screen's item thumbnails render through expo-image (cached), not RN Image.
+vi.mock('expo-image', () => ({ Image: nativeComponent('Image') }));
+
 vi.mock('@expo/vector-icons', () => ({
   Feather: Object.assign(nativeComponent('Feather'), { glyphMap: {} }),
 }));

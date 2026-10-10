@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 /**
  * Brandthread AI Tools — full-screen swipeable result viewer (shared)
  *
@@ -7,16 +8,15 @@
  * this family that shows a results grid.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Image } from 'react-native';
+import {} from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import type { AiResultSlot } from './AiResultTypes';
-
-const { width: SW, height: SH } = Dimensions.get('window');
 
 export interface AiResultViewerAction {
   icon: IconName;
@@ -35,6 +35,7 @@ interface AiResultViewerProps {
 }
 
 export function AiResultViewer({ visible, items, index, onIndexChange, onClose, actions }: AiResultViewerProps) {
+  const { width: SW, height: SH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const [showBefore, setShowBefore] = useState(false);
@@ -46,7 +47,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={s.root}>
+      <View style={[s.root, { width: SW, height: SH }]}>
         <FlatList
           data={items}
           keyExtractor={(item) => String(item.id)}
@@ -62,9 +63,10 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
           renderItem={({ item }) => (
             <View style={{ width: SW, height: SH, alignItems: 'center', justifyContent: 'center' }}>
               <Image
+                cachePolicy="memory-disk"
                 source={{ uri: showBefore && item.id === current.id ? item.sourceUri : item.imageUri }}
-                style={s.image}
-                resizeMode="contain"
+                style={[s.image, { width: SW, height: SH }]}
+                contentFit="contain"
               />
             </View>
           )}
@@ -117,8 +119,8 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, width: SW, height: SH, backgroundColor: '#000' },
-  image: { width: SW, height: SH },
+  root: { flex: 1, backgroundColor: '#000' },
+  image: {},
   topBar: {
     position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

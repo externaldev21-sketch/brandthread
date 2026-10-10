@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Platform, TextInput, Image, Animated, ActivityIndicator,
+  Alert, Platform, TextInput, Animated, ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -478,14 +479,14 @@ export default function EditProfileScreen() {
         <View style={styles.previewCard}>
           <View style={styles.previewBannerWrap}>
             {bannerUri ? (
-              <Image source={{ uri: bannerUri }} style={styles.previewBanner} />
+              <Image cachePolicy="memory-disk" source={{ uri: bannerUri }} style={styles.previewBanner} />
             ) : (
               <LinearGradient colors={theme.heroGradient as any} style={styles.previewBanner} />
             )}
           </View>
           <View style={styles.previewLogoWrap}>
             {(logoUri ?? avatarUri) ? (
-              <Image source={{ uri: (logoUri ?? avatarUri) as string }} style={styles.previewLogo} />
+              <Image cachePolicy="memory-disk" source={{ uri: (logoUri ?? avatarUri) as string }} style={styles.previewLogo} />
             ) : (
               <LinearGradient colors={theme.primaryGradient as any} style={styles.previewLogo}>
                 <Text style={styles.previewLogoText}>{getInitials(fields.name || fields.username, 'B')}</Text>
@@ -512,7 +513,7 @@ export default function EditProfileScreen() {
         >
           <View style={styles.bannerPreviewSlot}>
             {bannerUri ? (
-              <Image source={{ uri: bannerUri }} style={styles.bannerPreviewImage} />
+              <Image cachePolicy="memory-disk" source={{ uri: bannerUri }} style={styles.bannerPreviewImage} />
             ) : (
               <View style={[styles.bannerPreviewImage, styles.bannerPreviewEmpty]}>
                 <Icon name="image" size={20} color={theme.muted} />
@@ -549,7 +550,7 @@ export default function EditProfileScreen() {
               <TouchableOpacity activeOpacity={0.8} onPress={pickLogo} disabled={uploading.logo}>
                 <View style={styles.avatarWrap}>
                   {logoUri ? (
-                    <Image source={{ uri: logoUri }} style={styles.avatar} />
+                    <Image cachePolicy="memory-disk" source={{ uri: logoUri }} style={styles.avatar} />
                   ) : (
                     <View style={[styles.avatar, styles.logoEmpty]}>
                       <Icon name="award" size={22} color={theme.muted} />

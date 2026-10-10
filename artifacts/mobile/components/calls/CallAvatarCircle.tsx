@@ -13,7 +13,8 @@
  * the monochrome theme system.
  */
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { TYPE_SCALE } from '@/constants/typography';
 import { FONT } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -39,6 +40,7 @@ export function CallAvatarCircle({
     <View style={[styles.wrap, { gap }]}>
       {avatarUri ? (
         <Image
+          cachePolicy="memory-disk"
           source={{ uri: avatarUri }}
           accessibilityLabel={`${name}'s avatar`}
           style={{ width: size, height: size, borderRadius: size / 2 }}

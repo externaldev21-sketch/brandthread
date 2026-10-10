@@ -42,8 +42,6 @@ type ApiFollowing = {
   handle: string; initials: string; color: string; followedAt: string;
 };
 
-const { width: SCREEN_W } = Dimensions.get('window');
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string): string {

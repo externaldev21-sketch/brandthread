@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Select products — bulk edit prices and stock, archive and duplicate.
@@ -18,7 +19,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, ScrollView, Image, StyleSheet, ActivityIndicator, Pressable,
+  View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, Pressable,
 } from 'react-native';
 import { Icon, ICON_SIZE } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -810,7 +811,7 @@ function ProductRow({ item, checked, onPress, theme, s }: {
     >
       <Checkbox checked={checked} theme={theme} />
       {item.image ? (
-        <Image source={{ uri: item.image }} style={s.thumb} />
+        <Image cachePolicy="memory-disk" source={{ uri: item.image }} style={s.thumb} />
       ) : (
         <View style={[s.thumb, s.thumbEmpty]}><Icon name="image" size={ICON_SIZE.sm} color={theme.subtle} /></View>
       )}

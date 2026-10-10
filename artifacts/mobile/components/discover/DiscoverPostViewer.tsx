@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { hapticLight } from '@/lib/haptics';
 /**
  * Full-screen Discover post viewer — vertical swipe through the same set of
@@ -14,7 +15,8 @@ import { hapticLight } from '@/lib/haptics';
  * ThreadShareSheet.
  */
 import React, { useEffect, useState } from 'react';
-import { Dimensions, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useWindowDimensions } from 'react-native';
+import { Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -39,8 +41,6 @@ import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { TranslatableCaption } from '@/components/translation/CaptionTranslation';
 
-const { height: WINDOW_HEIGHT } = Dimensions.get('window');
-
 function ActionButton({ icon, label, active, onPress }: {
   icon: IconName; label?: string; active?: boolean; onPress: () => void;
 }) {
@@ -63,6 +63,7 @@ function ViewerPage({
   onRequireSignIn: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { height: WINDOW_HEIGHT } = useWindowDimensions();
   const api = useApi();
   const { isSignedIn } = useAuth();
   const { showToast } = useFeedToast();
@@ -159,7 +160,7 @@ function ViewerPage({
       <View style={[styles.bottomWrap, { paddingBottom: insets.bottom + SP.xl }]}>
         <PressableScale onPress={() => onOpenProfile(post)} style={styles.authorRow}>
           {post.authorAvatarUrl ? (
-            <Image source={{ uri: post.authorAvatarUrl }} style={styles.avatar} />
+            <Image cachePolicy="memory-disk" source={{ uri: post.authorAvatarUrl }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, { backgroundColor: post.authorColor }]}>
               <Text style={styles.avatarInitials}>{post.authorInitials}</Text>
@@ -237,6 +238,8 @@ export function DiscoverPostViewer({
 }) {
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
+  // Each page is one live window tall (re-fits on iPad rotation / split view).
+  const { height: WINDOW_HEIGHT } = useWindowDimensions();
 
   function openProfile(post: DiscoverPost) {
     if (post.authorAccountType === 'seller') {

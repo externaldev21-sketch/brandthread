@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
  * Agora SDK is unavailable (Expo Go / web preview).
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,8 +32,6 @@ import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
 import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
 import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
-
-const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Agora SDK (native-only, gracefully skipped on web/Expo Go) ───────────────
 const AgoraModule = loadAgoraModule();

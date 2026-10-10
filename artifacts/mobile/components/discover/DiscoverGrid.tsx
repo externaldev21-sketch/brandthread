@@ -7,11 +7,13 @@
  * spans two rows at the same 3:4 ratio since doubling both dimensions plus
  * the row gap preserves it. "Just Dropped" and "High Demand" rails are
  * inserted as full-width rows after the first couple of grid rows, and a
- * "People with your style" row every ~20 tiles — all inside one FlatList so
- * scroll position and infinite-scroll stay simple.
+ * "People with your style" row every ~20 tiles — all inside one FlashList so
+ * scroll position and infinite-scroll stay simple. Rows recycle by type
+ * (getItemType), so a tile row is only ever reused as another tile row.
  */
 import React, { forwardRef, useMemo } from 'react';
-import { FlatList, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -64,7 +66,7 @@ function RailHeader({ title, sub }: { title: string; sub?: string }) {
 
 const EMPTY_SPONSORED: ReadonlyArray<{ afterId: string; item: SponsoredFeedItem }> = [];
 
-export const DiscoverGrid = forwardRef<FlatList<Row>, {
+export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   posts: DiscoverPost[];
   loading: boolean;
   loadingMore?: boolean;
@@ -166,13 +168,16 @@ export const DiscoverGrid = forwardRef<FlatList<Row>, {
   ]);
 
   return (
-    <FlatList
+    <FlashList
       ref={ref}
       data={rows}
-      keyExtractor={(row) => row.key}
+      keyExtractor={gridRowKey}
+      getItemType={loading ? skeletonRowType : gridRowType}
+      // FlatList semantics: no auto scroll-anchoring when rows change above.
+      maintainVisibleContentPosition={MVCP_OFF}
       onEndReached={loading ? undefined : onEndReached}
       onEndReachedThreshold={0.6}
-      refreshControl={refreshControl as React.ComponentProps<typeof FlatList>['refreshControl']}
+      refreshControl={refreshControl as React.ComponentProps<typeof FlashList>['refreshControl']}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
       ListHeaderComponent={ListHeaderComponent}
@@ -278,6 +283,11 @@ export const DiscoverGrid = forwardRef<FlatList<Row>, {
     />
   );
 });
+
+const MVCP_OFF = { disabled: true } as const;
+const gridRowKey = (row: Row) => row.key;
+const skeletonRowType = () => 'skeleton';
+const gridRowType = (row: Row) => (row.type === 'rail' ? `rail-${row.kind}` : row.type);
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: GAP, marginBottom: GAP },

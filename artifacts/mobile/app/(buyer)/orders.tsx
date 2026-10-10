@@ -3,8 +3,9 @@ import { copyText } from '@/lib/shareActions';
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Image,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -174,7 +175,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
         <View style={styles.thumbRow}>
           {thumbs.map((item, i) => (
             item.imageUri ? (
-              <Image key={i} source={{ uri: item.imageUri }} style={styles.thumb} resizeMode="cover" accessibilityLabel={item.productName} />
+              <Image cachePolicy="memory-disk" key={i} recyclingKey={item.imageUri} source={{ uri: item.imageUri }} style={styles.thumb} contentFit="cover" accessibilityLabel={item.productName} />
             ) : (
               <View key={i} style={[styles.thumb, styles.thumbFallback]}>
                 <Icon name="image" size={16} color={theme.subtle} />

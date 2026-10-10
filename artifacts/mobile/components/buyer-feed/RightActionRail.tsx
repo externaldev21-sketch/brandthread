@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 /**
  * Buyer Threads Home feed — right action rail.
@@ -17,7 +18,7 @@ import * as Haptics from 'expo-haptics';
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
-import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Text, TouchableOpacity, View, StyleSheet, Platform, type StyleProp, type ViewStyle } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { EngagementButton } from '@/components/EngagementButton';
@@ -174,7 +175,7 @@ export function RightActionRail({
               uses the default. */}
           <LiveHostRing hostId={hostId} size={38} ringGap={1.5} ringWidth={2}>
             {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              <Image cachePolicy="memory-disk" source={{ uri: avatarUri }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
                 <Text style={styles.avatarText}>{initials}</Text>

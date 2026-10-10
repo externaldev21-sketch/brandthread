@@ -10,7 +10,8 @@
  * this against buyer-drop-detail.tsx's rendering.
  */
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,8 +28,6 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState as LayoutEmptyState } from '@/components/layout';
 import { MissingItemState } from '@/components/states/MissingItemState';
 
-const { width: W } = Dimensions.get('window');
-const HERO_H = Math.max(420, Math.min(540, W * 1.2));
 
 interface PreviewProduct {
   id: string;
@@ -56,6 +55,11 @@ export default function SellerDropPreview() {
   const headerTopInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const { dropId } = useLocalSearchParams<{ dropId: string }>();
+  // Live window width so the hero and 2-up tiles re-fit on iPad rotation / split view.
+  const { width: W } = useWindowDimensions();
+  const HERO_H = Math.max(420, Math.min(540, W * 1.2));
+  const tileW = (W - SP.md * 2 - 10) / 2;
+  const tileImageH = (W - SP.md * 2 - 10) * 0.68;
 
   const [drop, setDrop] = useState<PreviewDrop | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,9 +122,9 @@ export default function SellerDropPreview() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
-        <View style={styles.hero}>
+        <View style={[styles.hero, { height: HERO_H }]}>
           {heroUri ? (
-            <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <Image cachePolicy="memory-disk" source={{ uri: heroUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <LinearGradient colors={[theme.cardElevated, theme.background]} style={StyleSheet.absoluteFill} />
           )}
@@ -157,9 +161,9 @@ export default function SellerDropPreview() {
           </Text>
           <View style={styles.grid}>
             {products.map(p => (
-              <View key={p.id} style={[styles.tile, { backgroundColor: theme.card }]}>
+              <View key={p.id} style={[styles.tile, { width: tileW, backgroundColor: theme.card }]}>
                 {p.images?.[0] ? (
-                  <Image source={{ uri: p.images[0] }} style={styles.tileImage} resizeMode="cover" />
+                  <Image cachePolicy="memory-disk" source={{ uri: p.images[0] }} style={[styles.tileImage, { height: tileImageH }]} contentFit="cover" />
                 ) : (
                   <View style={[styles.tileImage, { alignItems: 'center', justifyContent: 'center' }]}>
                     <Icon name="image" size={22} color={theme.muted} />
@@ -185,7 +189,7 @@ export default function SellerDropPreview() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  hero: { height: HERO_H, justifyContent: 'flex-end' },
+  hero: { justifyContent: 'flex-end' },
   header: { position: 'absolute', top: 0, left: SP.md, right: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   roundBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   previewBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 6 },
@@ -196,6 +200,6 @@ const styles = StyleSheet.create({
   live: { color: '#FF3B30', fontFamily: FONT.extrabold, fontSize: FS.md },
   earlyAccess: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: { width: (W - SP.md * 2 - 10) / 2, borderRadius: RADIUS.sm, overflow: 'hidden' },
-  tileImage: { width: '100%', height: (W - SP.md * 2 - 10) * 0.68 },
+  tile: { borderRadius: RADIUS.sm, overflow: 'hidden' },
+  tileImage: { width: '100%' },
 });

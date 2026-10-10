@@ -8,8 +8,9 @@ import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
-  Animated, Platform, Linking, Image, FlatList,
+  Animated, Platform, Linking, FlatList,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';

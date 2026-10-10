@@ -8,7 +8,8 @@ import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { formatCalendarDate } from '@/lib/calendarDate';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Animated, FlatList, Share, Linking, TextInput } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
@@ -345,7 +346,7 @@ function OverviewTab({ product, pricing, coverImage }: {
       <AnimatedEntrance>
         <GradientCard glow style={{ marginHorizontal: SP.md, padding: 0, overflow: 'hidden' }}>
           {coverImage ? (
-            <Image source={{ uri: coverImage.uri }} style={ov.heroImage} resizeMode="cover" />
+            <Image cachePolicy="memory-disk" source={{ uri: coverImage.uri }} style={ov.heroImage} contentFit="cover" />
           ) : (
             <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={ov.heroPlaceholder}>
               <Icon name="package" size={ICON.xxl} color="rgba(255,255,255,0.4)" />
@@ -1235,7 +1236,7 @@ function StoreTab({
       <BrandthreadCard elevated style={{ marginHorizontal: SP.md, padding: 0, overflow: 'hidden' }}>
         {/* Cover */}
         {coverImage ? (
-          <Image source={{ uri: coverImage.uri }} style={st.coverImg} resizeMode="cover" />
+          <Image cachePolicy="memory-disk" source={{ uri: coverImage.uri }} style={st.coverImg} contentFit="cover" />
         ) : (
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.coverPlaceholder}>
             <Icon name="image" size={ICON.xxl} color="rgba(255,255,255,0.4)" />

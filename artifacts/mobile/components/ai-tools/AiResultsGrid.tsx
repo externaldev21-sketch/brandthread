@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 /**
  * Brandthread AI Tools — results grid (shared)
  *
@@ -9,15 +10,13 @@
  * case reuses the same tile visuals at N=1.
  */
 import React from 'react';
-import { ActivityIndicator, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { BORDER, CARD, FG, MUTED, RED, RED_DIM, SP, RADIUS, ICON, FONT, FS, SUBTLE } from '@/lib/theme';
 import type { AiResultSlot } from './AiResultTypes';
-
-const { width: SW } = Dimensions.get('window');
-const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
 
 interface AiResultsGridProps {
   slots: AiResultSlot[];
@@ -64,10 +63,16 @@ function AiResultTile({
   saving: boolean;
   savingToLibrary: boolean;
 }) {
+  // Live window width so the 2-up tiles re-fit on iPad rotation / split view.
+  const { width: SW } = useWindowDimensions();
+  const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
+  const tileW = { width: COL_W };
+  const bodySize = { width: COL_W, height: COL_W * 1.3 };
+
   if (slot.status === 'generating') {
     return (
-      <View style={s.tile}>
-        <View style={s.tileBody}>
+      <View style={[s.tile, tileW]}>
+        <View style={[s.tileBody, bodySize]}>
           <SkeletonBlock width={COL_W} height={COL_W * 1.3} radius={0} style={{ backgroundColor: BORDER }} />
           <View style={s.generatingLabel} pointerEvents="none">
             <Text style={s.generatingLabelText}>Generating…</Text>
@@ -111,14 +116,14 @@ function AiResultTile({
     actions.push({ icon: 'refresh-cw', onPress: onRetry, label: `Regenerate ${slot.label}` });
 
     return (
-      <View style={s.tile}>
+      <View style={[s.tile, tileW]}>
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={onOpen}
           accessibilityLabel={`View ${slot.label} full-screen`}
           accessibilityRole="button"
         >
-          <Image source={{ uri: slot.imageUri }} style={s.image} resizeMode="cover" />
+          <Image cachePolicy="memory-disk" source={{ uri: slot.imageUri }} style={[s.image, bodySize]} contentFit="cover" />
           <View style={s.expandPill}>
             <Icon name="maximize-2" size={11} color="#fff" />
           </View>
@@ -146,8 +151,6 @@ function AiResultTile({
   return null;
 }
 
-export { COL_W as AI_RESULT_COL_W };
-
 const s = StyleSheet.create({
   grid: {
     flexDirection: 'row',
@@ -155,7 +158,6 @@ const s = StyleSheet.create({
     gap: SP.sm,
   },
   tile: {
-    width: COL_W,
     backgroundColor: CARD,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
@@ -165,14 +167,8 @@ const s = StyleSheet.create({
   tileFailed: {
     borderColor: RED,
   },
-  tileBody: {
-    width: COL_W,
-    height: COL_W * 1.3,
-  },
-  image: {
-    width: COL_W,
-    height: COL_W * 1.3,
-  },
+  tileBody: {},
+  image: {},
   expandPill: {
     position: 'absolute',
     top: SP.xs,
@@ -199,8 +195,6 @@ const s = StyleSheet.create({
     color: '#fff',
   },
   failedBody: {
-    width: COL_W,
-    height: COL_W * 1.3,
     alignItems: 'center',
     justifyContent: 'center',
     padding: SP.md,

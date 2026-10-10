@@ -41,6 +41,7 @@ export function DiscoverTileView({
           style={styles.image}
           contentFit="cover"
           cachePolicy="memory-disk"
+          recyclingKey={post.id}
         />
       ) : (
         // Some real posts (e.g. the current public Trending endpoint) carry

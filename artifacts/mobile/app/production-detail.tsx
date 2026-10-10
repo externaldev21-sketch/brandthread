@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 /**
  * Seller's live tracker for a sample or bulk order.
  *
@@ -8,7 +9,7 @@
  * Manufacturers own production-stage transitions.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -279,7 +280,7 @@ export default function ProductionDetailScreen() {
                   {(event.imageUrls?.length ?? 0) > 0 && (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.xs }}>
                       {event.imageUrls!.map((url, i) => (
-                        <Image key={`${event.id}-${i}`} source={{ uri: url }} style={styles.updatePhoto} testID="tracker-update-photo" />
+                        <Image cachePolicy="memory-disk" key={`${event.id}-${i}`} source={{ uri: url }} style={styles.updatePhoto} testID="tracker-update-photo" />
                       ))}
                     </ScrollView>
                   )}

@@ -2,8 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TextInput, StyleSheet, Alert, TouchableOpacity, Image, ActivityIndicator,
+  View, Text, ScrollView, TextInput, StyleSheet, Alert, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
@@ -118,7 +119,7 @@ export default function StoreSEOScreen() {
           </View>
           <View style={se.divider} />
           {seo.socialImageUri && (
-            <Image source={{ uri: seo.socialImageUri }} style={se.socialImagePreview} resizeMode="cover" />
+            <Image cachePolicy="memory-disk" source={{ uri: seo.socialImageUri }} style={se.socialImagePreview} contentFit="cover" />
           )}
           <TouchableOpacity
             style={se.uploadBtn}

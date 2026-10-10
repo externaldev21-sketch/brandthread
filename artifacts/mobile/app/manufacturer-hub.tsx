@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 /**
  * Manufacturer Hub — 6-tab main screen
  */
@@ -7,7 +8,7 @@ import { relativeTime } from '@/lib/activity';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
+  StyleSheet, Alert, Modal, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator,
 } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
@@ -583,7 +584,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
                 >
                   <View style={s.featuredCover}>
                     {mfg.profileImageUri ? (
-                      <Image source={{ uri: mfg.profileImageUri }} style={s.featuredCoverImage} resizeMode="cover" />
+                      <Image cachePolicy="memory-disk" source={{ uri: mfg.profileImageUri }} style={s.featuredCoverImage} contentFit="cover" />
                     ) : (
                       <View style={s.featuredCoverFallback}><Text style={s.featuredCoverFallbackText}>{mfg.name.charAt(0)}</Text></View>
                     )}
@@ -789,7 +790,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
       <View style={card.cover}>
         <TouchableOpacity onPress={onProfile} activeOpacity={0.85} style={card.coverTouch} accessibilityRole="button" accessibilityLabel={`View ${mfg.name} profile`}>
           {mfg.profileImageUri ? (
-            <Image source={{ uri: mfg.profileImageUri }} style={card.coverImage} resizeMode="cover" />
+            <Image cachePolicy="memory-disk" source={{ uri: mfg.profileImageUri }} style={card.coverImage} contentFit="cover" />
           ) : (
             <View style={card.coverFallback}>
               <Text style={card.coverFallbackText}>{mfg.name.charAt(0)}</Text>
@@ -1150,7 +1151,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
           <View style={relCard.root} testID={`relationship-${mfg.id}`}>
             <TouchableOpacity style={relCard.topRow} activeOpacity={0.8} onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)}>
               <View style={relCard.avatar}>
-                {mfg.photo ? <Image source={{ uri: mfg.photo }} style={relCard.avatarImage} /> : <Text style={relCard.avatarText}>{mfg.businessName.charAt(0)}</Text>}
+                {mfg.photo ? <Image cachePolicy="memory-disk" source={{ uri: mfg.photo }} style={relCard.avatarImage} /> : <Text style={relCard.avatarText}>{mfg.businessName.charAt(0)}</Text>}
               </View>
               <View style={relCard.info}>
                 <View style={relCard.nameRow}>

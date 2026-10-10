@@ -10,7 +10,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Platform,
   ScrollView,
   StatusBar,
@@ -33,7 +32,6 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 const EXPLAINER_SEEN_PREFIX = 'thread_explainer_seen:';
-const { width: SW } = Dimensions.get('window');
 
 function explainerSeenKey(userId: string): string {
   return `${EXPLAINER_SEEN_PREFIX}${userId}`;

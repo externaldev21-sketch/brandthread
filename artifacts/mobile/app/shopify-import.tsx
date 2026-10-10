@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 /**
  * Product transfer (A): "Import from Shopify" — connect (read-only scopes),
  * pick products, one tap import. Never touches orders — separate from
@@ -6,7 +7,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList,
-  ActivityIndicator, Alert, Image, Linking, } from 'react-native';
+  ActivityIndicator, Alert, Linking, } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
@@ -210,7 +211,7 @@ export default function ShopifyImportScreen() {
                   hitSlop={item.alreadyImported ? undefined : { top: 4, bottom: 4, left: 4, right: 4 }}
                 >
                   {item.image ? (
-                    <Image source={{ uri: item.image }} style={styles.productImage} />
+                    <Image cachePolicy="memory-disk" source={{ uri: item.image }} style={styles.productImage} />
                   ) : (
                     <View style={[styles.productImage, { backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' }]}>
                       <Icon name="image" size={16} color={colors.mutedForeground} />

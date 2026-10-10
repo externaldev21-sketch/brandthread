@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 /**
  * Fulfill Order — single-order fulfillment wizard
  *
@@ -8,7 +9,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  Alert, ActivityIndicator, Animated, Linking, Image, Share,
+  Alert, ActivityIndicator, Animated, Linking, Share,
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -524,7 +525,7 @@ export default function FulfillOrderScreen() {
               <TouchableOpacity key={li.id} onPress={() => toggleItem(li.id)} activeOpacity={0.8}>
                 <BrandthreadCard style={s.itemCard}>
                   {li.imageUri ? (
-                    <Image source={{ uri: li.imageUri }} style={s.itemThumb} />
+                    <Image cachePolicy="memory-disk" source={{ uri: li.imageUri }} style={s.itemThumb} />
                   ) : (
                     <View style={[s.itemThumb, s.itemThumbPlaceholder]}>
                       <Icon name="image" size={ICON.md} color={SUBTLE} />

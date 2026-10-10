@@ -147,7 +147,6 @@ function SlideMedia({ slide, overlays, original, paused }: {
 export default function StoryMentionViewerScreen() {
   // Live window height (not read once at import) so iPad rotation and Split
   // View keep the swipe-to-dismiss distances right.
-  const { height: H } = useWindowDimensions();
   const router = useRouter();
   const api = useApi();
   const { openReport } = useReportSheet();
@@ -264,6 +263,11 @@ export default function StoryMentionViewerScreen() {
   }, [progress, slideKey, paused, currentUnavailable, !!current, !!slide]);
 
   // ── Swipe down to close, swipe sideways for the next / previous person ─────
+  // Live window height (iPad rotation / split view); the pan responder below is
+  // created once, so it reads the latest value through a ref.
+  const { height: H } = useWindowDimensions();
+  const heightRef = useRef(H);
+  heightRef.current = H;
   const dragY = useRef(new Animated.Value(0)).current;
   const draggingDown = useRef(false);
   const scale = dragY.interpolate({ inputRange: [0, H], outputRange: [1, 0.82], extrapolate: 'clamp' });
@@ -282,7 +286,7 @@ export default function StoryMentionViewerScreen() {
       draggingDown.current = false;
       if (wasDown) {
         if (gesture === 'close') {
-          Animated.timing(dragY, { toValue: H, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true })
+          Animated.timing(dragY, { toValue: heightRef.current, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true })
             .start(() => gestureRef.current.close());
         } else {
           Animated.timing(dragY, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -433,7 +437,7 @@ export default function StoryMentionViewerScreen() {
         {/* Tap zones: left = previous, right = next, hold = pause. Plain
             Pressables with no feedback so hold-to-pause timing is untouched. */}
         <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="box-none">
-          <View style={styles.tapRow}>
+          <View style={[styles.tapRow, { height: H * 0.7 }]}>
             <Pressable
               style={styles.tapLeft}
               onPress={prev}

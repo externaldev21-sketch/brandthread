@@ -1,10 +1,11 @@
+import { Image } from 'expo-image';
 /**
  * Manufacturer Product Detail — full quantity price-tier table, MOQ,
  * customization options, lead time and sample price for one catalog product.
  * Params: manufacturerId, productId
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator} from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -56,7 +57,7 @@ export default function ManufacturerProductScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
           {product.images.length > 0 ? (
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={s.gallery}>
-              {product.images.map((uri, index) => <Image key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />)}
+              {product.images.map((uri, index) => <Image cachePolicy="memory-disk" key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />)}
             </ScrollView>
           ) : (
             <View style={[s.gallery, s.galleryFallback]}><Icon name="package" size={ICON.xxl} color={theme.subtle} /></View>

@@ -7,7 +7,7 @@
 import React, { useCallback, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, Dimensions,
+  View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, useWindowDimensions,
   Modal, TextInput, ActivityIndicator, Share,
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
@@ -36,13 +36,14 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { openPullDownMenu } from '@/lib/contextMenu';
 
-const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
-const TILE_SIZE = (W - SP.md * 2 - GAP) / 2;
 
 export default function BuyerCollection() {
   const { theme } = useAppTheme();
-  const styles = makeStyles(theme);
+  // Live window width so the 2-up grid re-fits on iPad rotation / split view.
+  const { width: W } = useWindowDimensions();
+  const TILE_SIZE = (W - SP.md * 2 - GAP) / 2;
+  const styles = makeStyles(theme, TILE_SIZE);
   const router = useRouter();
   const { collectionId } = useLocalSearchParams<{ collectionId: string }>();
 
@@ -294,7 +295,7 @@ export default function BuyerCollection() {
   );
 }
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], TILE_SIZE: number) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   publicRow: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm,

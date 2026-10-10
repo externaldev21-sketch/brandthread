@@ -1,10 +1,11 @@
+import { Image } from 'expo-image';
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import * as ImagePicker from 'expo-image-picker';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, Image, ActivityIndicator,
+  StyleSheet, Alert, Modal, ActivityIndicator,
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
@@ -381,7 +382,7 @@ export default function StoreCollectionsScreen() {
             {coverUploading ? (
               <ActivityIndicator color={PURPLE} />
             ) : form.coverImage ? (
-              <Image source={{ uri: form.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <Image cachePolicy="memory-disk" source={{ uri: form.coverImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
             ) : (
               <>
                 <Icon name="image" size={ICON.lg} color={MUTED} />
