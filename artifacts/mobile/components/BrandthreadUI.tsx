@@ -400,8 +400,8 @@ export function BrandthreadCard({ children, style, onPress, glow = false, elevat
     borderRadius: RADIUS.lg,
     // No border: cards sit on black (BRANDTHREAD_DESIGN.md, "Surfaces").
     padding: SP.md,
-    // `glow` is a crisp hairline in the accent, never a soft halo.
-    ...(glow ? { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.accent } : {}),
+    // `glow` is a crisp hairline, never a soft halo.
+    ...(glow ? { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border } : {}),
   };
   if (onPress) {
     return (
@@ -432,7 +432,7 @@ export function GradientCard({ children, style, onPress, colors, glow = false }:
       colors={cardColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[gcS.card, glow && { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.accent }, style]}
+      style={[gcS.card, glow && { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border }, style]}
     >
       {children}
     </LinearGradient>
