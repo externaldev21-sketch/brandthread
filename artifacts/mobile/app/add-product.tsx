@@ -42,7 +42,9 @@ import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESET
 import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish, applyBulkEditToVariants } from '@/lib/productUtils';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
-import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
+import { confirmChoice } from '@/lib/confirmChoice';
+import { publishesSoldOut, SOLD_OUT_CONFIRM } from '@/lib/productPublishChecks';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
@@ -247,7 +249,8 @@ export default function AddProductScreen() {
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
-  const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
+  const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string; soldOut?: boolean } | null>(null);
+  const [publishingNow, setPublishingNow] = useState(false);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
   const [sizeChartUploadStatus, setSizeChartUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
@@ -601,6 +604,24 @@ export default function AddProductScreen() {
     if (Platform.OS !== 'web') Alert.alert(title, message);
   }
 
+  // "Publish now" on the Draft saved sheet: the product just created goes live.
+  async function handlePublishNow() {
+    const created = publishSuccess;
+    if (!created || publishingNow) return;
+    if (created.soldOut && !(await confirmChoice(SOLD_OUT_CONFIRM))) return;
+    setPublishingNow(true);
+    try {
+      await api.products.update(created.productId, { status: 'active' });
+      await completeSetupTaskWhen('first_product', true);
+      setDraftData(prev => ({ ...prev, storeSettings: { ...(prev.storeSettings as any), status: 'active' } }));
+      hapticSuccessAction();
+    } catch {
+      showPublishError('Could not publish', 'Your draft is saved. Try again.');
+    } finally {
+      setPublishingNow(false);
+    }
+  }
+
   async function handlePublish() {
     setPublishError(null);
     if (photosUploading) {
@@ -702,6 +723,11 @@ export default function AddProductScreen() {
     // The header status pill (Active/Draft) decides what gets saved — Save
     // always runs this same flow, just with a different final status.
     const finalStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
+    const soldOut = { trackInventory, allowOversell, isPreOrder, totalStock };
+    if (publishesSoldOut({ status: finalStatus, ...soldOut }) && !(await confirmChoice(SOLD_OUT_CONFIRM))) {
+      setPublishing(false);
+      return;
+    }
 
     const productPayload: Partial<Product> = {
       ...draftData,
@@ -783,12 +809,14 @@ export default function AddProductScreen() {
         await deleteDraft(draftId.current);
         setPublishSuccess({ name, kind: 'updated', productId: editProductId });
       } else {
+        // "Add your first product" is done only once buyers can see it.
         const newProduct = await completeSetupTaskAfter(
           'first_product',
           () => api.products.create(serverCreatePayload),
+          () => finalStatus === 'active',
         ) as any;
         await deleteDraft(draftId.current);
-        setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
+        setPublishSuccess({ name, kind: 'created', productId: newProduct.id, soldOut: publishesSoldOut({ status: 'active', ...soldOut }) });
       }
     } catch (err: any) {
       const needsShipDate = err?.code === 'PREORDER_SHIP_DATE_REQUIRED';
@@ -2195,7 +2223,10 @@ export default function AddProductScreen() {
         onClose={() => setPublishSuccess(null)}
         title={publishSuccess?.kind === 'updated' ? 'Product updated!' : currentStatus === 'active' ? 'Product published!' : 'Draft saved!'}
         subtitle={publishSuccess ? `${publishSuccess.name} ${publishSuccess.kind === 'updated' ? 'has been updated.' : currentStatus === 'active' ? 'is now live.' : 'was saved as a draft.'}` : undefined}
-        primaryAction={{
+        primaryAction={publishSuccess?.kind === 'created' && currentStatus === 'draft' ? {
+          label: publishingNow ? 'Publishing…' : 'Publish now',
+          onPress: () => { void handlePublishNow(); },
+        } : {
           label: 'View product',
           onPress: () => {
             const id = publishSuccess?.productId;

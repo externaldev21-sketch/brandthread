@@ -13,6 +13,7 @@ import QRCode from 'react-native-qrcode-svg';
 
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { Button } from '@/components/ui/Button';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
@@ -132,6 +133,8 @@ export default function LaunchPublishScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[s.scroll, { paddingBottom: tabBarInset + SP.xl }]}
         >
+          {/* Live but payouts not set up: buyers can't pay yet (hidden once Stripe is connected). */}
+          <StripeConnectWarning />
           <View style={s.hero}>
             <Animated.View
               style={[s.ring, {
