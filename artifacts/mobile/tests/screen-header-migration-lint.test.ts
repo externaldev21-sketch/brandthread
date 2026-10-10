@@ -137,6 +137,8 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/camera-capture.tsx',
   'app/community-guidelines.tsx',
   'app/design-canvas.tsx',
+  // Editor chrome copied from Linktree's design editor: back, undo/redo, Cancel + Save.
+  'app/store-design.tsx',
   'app/forgot-password.tsx',
   'app/live-feed.tsx',
   'app/live.tsx',
