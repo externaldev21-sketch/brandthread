@@ -10,6 +10,7 @@ import {
   ImageQualityError,
   ImageQualityUnavailableError,
 } from "@workspace/integrations-openai-ai-server/image";
+import { personKeyFor } from "../lib/accountProfiles";
 
 const router = Router();
 router.use(requireAuth);
@@ -46,7 +47,9 @@ export const ONBOARDING_SAMPLE_RESERVATION_LEASE_MS = 15 * 60_000;
 // The onboarding sample is mounted separately from the paid /logo router by
 // routes/index.ts. Its allowance is durable and account-scoped, never a
 // client-side entitlement or an expiring rate-limit bucket.
-async function reserveOnboardingSample(accountId: string): Promise<string> {
+async function reserveOnboardingSample(profileId: string): Promise<string> {
+  // One free sample per PERSON: a login's buyer and seller profiles share it.
+  const accountId = await personKeyFor(profileId);
   const reservationId = randomUUID();
   const reservedAt = new Date();
   const leaseCutoff = new Date(reservedAt.getTime() - ONBOARDING_SAMPLE_RESERVATION_LEASE_MS);
@@ -81,7 +84,8 @@ async function reserveOnboardingSample(accountId: string): Promise<string> {
   throw error;
 }
 
-async function releaseOnboardingSample(accountId: string, reservationId: string): Promise<void> {
+async function releaseOnboardingSample(profileId: string, reservationId: string): Promise<void> {
+  const accountId = await personKeyFor(profileId);
   await db.delete(onboardingAiSamples).where(and(
     eq(onboardingAiSamples.accountId, accountId),
     eq(onboardingAiSamples.reservationId, reservationId),
@@ -89,7 +93,8 @@ async function releaseOnboardingSample(accountId: string, reservationId: string)
   ));
 }
 
-async function completeOnboardingSample(accountId: string, reservationId: string): Promise<boolean> {
+async function completeOnboardingSample(profileId: string, reservationId: string): Promise<boolean> {
+  const accountId = await personKeyFor(profileId);
   const rows = await db.update(onboardingAiSamples)
     .set({ status: "completed", completedAt: new Date() })
     .where(and(

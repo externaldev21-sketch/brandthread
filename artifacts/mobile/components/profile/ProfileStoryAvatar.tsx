@@ -50,6 +50,7 @@ export function ProfileStoryAvatar({
   initials,
   hasActiveStory,
   onPress,
+  onLongPress,
   onPressBadge,
   accessibilityLabel,
   size,
@@ -61,6 +62,8 @@ export function ProfileStoryAvatar({
   initials: string;
   hasActiveStory: boolean;
   onPress?: () => void;
+  /** Own profile: press and hold opens the account switcher (Instagram). */
+  onLongPress?: () => void;
   /** Shows the white "+" badge (own profile) and handles its tap. */
   onPressBadge?: () => void;
   accessibilityLabel: string;
@@ -114,8 +117,10 @@ export function ProfileStoryAvatar({
       {onPress ? (
         <Pressable
           onPress={onPress}
+          onLongPress={onLongPress}
           accessibilityRole="button"
           accessibilityLabel={accessibilityLabel}
+          accessibilityHint={onLongPress ? 'Press and hold to switch accounts' : undefined}
           testID={testID}
           style={({ pressed }) => [pressed && styles.pressed]}
         >

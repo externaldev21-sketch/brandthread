@@ -630,6 +630,10 @@ export default function ProfileScreen() {
           // Accent ring = an unexpired story (verified shows as the check by the name).
           ring: myStoryIds.length > 0,
           onPressStoryBadge: () => nav('/create-post'),
+          onLongPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setAccountSwitcherOpen(true);
+          },
           onPress: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             if (myStoryIds.length > 0) {

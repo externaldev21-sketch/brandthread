@@ -26,6 +26,7 @@ export * from './productBulkSeo';
 export * from './promotions';
 export * from './sellerPushGiveaways';
 export * from './admin';
+export * from './accountProfiles';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { places } from './places';
 import { relations, sql } from 'drizzle-orm';

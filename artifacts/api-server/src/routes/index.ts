@@ -4,6 +4,7 @@ import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
 import healthRouter from "./health";
 import { responseCache, invalidateResponseCache } from "../middlewares/responseCache";
 import authRouter from "./auth";
+import accountsRouter from "./accounts";
 import ageRouter from "./age";
 import productsRouter from "./products";
 import ordersRouter from "./orders";
@@ -223,6 +224,7 @@ router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
 router.use("/auth/data-export", dataExportJobsRouter); // async emailed export (/jobs*, /download); instant POST stays in authRouter
 router.use("/auth",            authRouter);
+router.use("/accounts",        accountsRouter); // one login = one buyer + one seller profile
 router.use("/auth",            ageRouter); // POST /auth/age (age gate)
 // This route is intentionally before paid AI mounts: it is the single,
 // server-enforced sample offered during seller onboarding.

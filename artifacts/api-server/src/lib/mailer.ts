@@ -11,6 +11,7 @@
  * check for the auth flows that must never silently no-op.
  */
 import { Resend } from "resend";
+import { deliveryAddressFor } from "./profileDelivery";
 import { logger } from "./logger";
 import { renderBrandthreadEmail } from "./brandthreadEmail";
 
@@ -51,7 +52,7 @@ async function send(options: { to: string; subject: string; html: string }): Pro
   try {
     const { error } = await client.emails.send({
       from: fromAddress(),
-      to: [options.to],
+      to: [await deliveryAddressFor(options.to)],
       subject: options.subject,
       html: options.html,
     });
@@ -183,7 +184,7 @@ export async function sendRawEmail(options: {
   try {
     const { data, error } = await client.emails.send({
       from,
-      to: [options.to],
+      to: [await deliveryAddressFor(options.to)],
       subject: options.subject,
       html: options.html,
       ...(options.text ? { text: options.text } : {}),

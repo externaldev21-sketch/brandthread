@@ -1155,6 +1155,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           put<{ key: string; enabled: boolean }>('/api/config/features/inviteOnlySignup', { enabled }),
       },
     },
+    /** One login = at most one buyer + one seller profile (server: routes/accounts.ts). */
+    accounts: {
+      profiles: () => get<LinkedProfilesResponse>('/api/accounts/profiles'),
+      /** "Start selling" / "Shop as a buyer": the other-role profile under this login. */
+      createProfile: (role: 'buyer' | 'seller') =>
+        post<{ profile: { clerkId: string; role: 'buyer' | 'seller' }; signInToken: string }>('/api/accounts/profiles', { role }),
+      /** A short-lived token to sign in to another profile of this login on this device. */
+      signInToken: (clerkId: string) =>
+        post<{ signInToken: string }>(`/api/accounts/profiles/${encodeURIComponent(clerkId)}/sign-in-token`, {}),
+      /** "Delete login": every profile of this login, same re-auth as deleting one. */
+      deleteLogin: (reauth: { password?: string; code?: string } = {}) => request<{ ok: true; profiles: number; scheduledFor: string | null; graceDays: number }>(
+        '/api/accounts/login',
+        { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE', ...reauth }) },
+        getToken,
+        false,
+        getCacheScope,
+      ),
+    },
     auth: {
       /** Create the matching local user record after Clerk authentication.
        * During onboarding, pass the name that the person explicitly entered so
@@ -4255,6 +4273,23 @@ export type AdminPromotionItem = {
   window: { startsAt: string; endsAt: string } | null;
 };
 export type AdminPromotionQueue = { items: AdminPromotionItem[]; summary: { pendingBoosts: number; pendingFeatured: number } };
+
+export interface LinkedProfile {
+  clerkId: string;
+  role: 'buyer' | 'seller' | null;
+  username: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  onboardingComplete: boolean;
+  isLogin: boolean;
+  isCurrent: boolean;
+  pendingDeletion: boolean;
+}
+
+export interface LinkedProfilesResponse {
+  profiles: LinkedProfile[];
+  canAdd: { buyer: boolean; seller: boolean };
+}
 
 export function useApi(): BrandthreadApi {
   const { getToken, userId } = useAuth();
