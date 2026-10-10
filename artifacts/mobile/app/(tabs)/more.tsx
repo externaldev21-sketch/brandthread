@@ -76,6 +76,7 @@ const OPERATIONS_ITEMS: NavItem[] = [
   // FIX ↑ previously had no route — now wired to shipping.tsx
   { icon: 'tool', label: 'Manufacturer Hub', desc: 'Find and manage manufacturers', accent: 'accent', badge: true, route: '/manufacturer-hub' },
   { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: 'accentLight', route: '/customers' },
+  // ↑ the real customer list (customers.tsx), not the customer-accounts placeholder
 ];
 
 const GROWTH_ITEMS: NavItem[] = [

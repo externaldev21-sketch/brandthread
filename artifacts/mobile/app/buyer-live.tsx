@@ -21,6 +21,7 @@ import { Icon } from '@/components/ui/Icon';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { useApi } from '@/lib/api';
 import { track } from '@/lib/analytics';
+import { pickDefaultAddress, prefillDelivery } from '@/lib/liveCheckoutPrefill';
 import { useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -114,6 +115,17 @@ function BuyerLiveNativeScreen() {
   const [postalCode, setPostalCode]       = useState('');
   const deliveryRefs = useRef<Record<string, TextInput | null>>({});
   const focusDelivery = (key: string) => () => deliveryRefs.current[key]?.focus();
+  // Fill delivery from the saved default address once the buy sheet opens (BT-416).
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (!purchaseTag || prefilledRef.current || !user) return;
+    prefilledRef.current = true;
+    api.buyer.addresses.list().then((list) => {
+      const next = prefillDelivery({ name: buyerName, phone: buyerPhone, street, city, region, postalCode }, pickDefaultAddress(list));
+      setBuyerName(next.name); setBuyerPhone(next.phone); setStreet(next.street);
+      setCity(next.city); setRegion(next.region); setPostalCode(next.postalCode);
+    }).catch(() => { /* typing still works */ });
+  }, [purchaseTag]); // eslint-disable-line react-hooks/exhaustive-deps
   const lastHighlightedRef = useRef<string | null>(null);
   // Moderation + co-host: pinned comment above chat, co-host tiles, removal.
   const mod = useLiveModeration(params.streamId);

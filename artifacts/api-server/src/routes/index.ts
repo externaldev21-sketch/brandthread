@@ -59,6 +59,7 @@ import {
   buyerPostPurchaseRouter, checkoutProfileRouter, sellerConversionTrackingRouter, sellerPostPurchaseOfferRouter,
 } from "./checkout-extras";
 import subscriptionRouter from "./subscription";
+import subscriptionRetentionRouter from "./subscription-retention";
 import webhooksRouter from "./webhooks";
 import reviewsRouter from "./reviews";
 import productQaRouter from "./product-qa";
@@ -373,6 +374,7 @@ router.use("/seller/connect/onboard",    connectRedirectRouter);
 router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliate / creator program (seller side)
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
+router.use("/seller/subscription-retention", subscriptionRetentionRouter); // pause instead of cancel (Stripe plans)
 router.use("/seller/verification",       tc, sellerVerificationRouter);
 router.use("/seller/push-broadcasts",    tc, pushBroadcastAllowance, sellerPushBroadcastsRouter); // weekly allowance per plan
 router.use("/seller/giveaways",          tc, sellerGiveawaysRouter);

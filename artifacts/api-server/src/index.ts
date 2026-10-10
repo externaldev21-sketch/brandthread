@@ -23,6 +23,7 @@ import { startAdCampaignLifecycleJob } from "./jobs/adCampaignLifecycle";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
 import { startSellerReferralsJob } from "./jobs/sellerReferrals";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
+import { startSellerWinbackJob } from "./jobs/sellerWinback";
 import { startAnalyticsRetentionJob } from "./jobs/analyticsRetention";
 import { startAccountPurgeJob } from "./jobs/accountPurge";
 import { startDataExportJob } from "./jobs/dataExportJob";
@@ -121,6 +122,7 @@ const server = app.listen(port, (err) => {
   startSellerReferralsJob();
   startDeliveryDeadlinesJob();
   startStoryCleanupJob();
+  startSellerWinbackJob(); // one "your store is saved" after a plan ends
   startAnalyticsRetentionJob();
   startAccountPurgeJob();
   startDataExportJob();

@@ -8,6 +8,7 @@ export * from './sellerStoreShares';
 export * from './productVariantsStock';
 export * from './security';
 export * from './realtime';
+export * from './sellerWinback';
 export * from './money';
 export * from './sellerPayouts';
 export * from './productLaunches';
