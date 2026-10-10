@@ -1183,19 +1183,16 @@ router.patch("/:id/read", async (req, res) => {
       )),
   ]);
 
-<<<<<<< HEAD
   // The sender's ticks flip to "Seen" now, not on their next poll.
   const readers = await db.select({ userId: conversationParticipants.userId }).from(conversationParticipants)
     .where(eq(conversationParticipants.conversationId, id));
   emitToUsers(readers.map((r) => r.userId), { type: "conversation.updated", conversationId: id, reason: "read" });
   emitToUsers([userId], { type: "activity.updated" });
 
-=======
   // Realtime read receipt for the other side; my own badge moved everywhere I'm signed in.
   const memberIds = await conversationMemberIds(id);
   emitToUsers(memberIds.filter((m) => m !== userId), { type: "message.read", conversationId: id, readerId: userId, readAt: readAt.toISOString() });
   emitToUsers([userId], { type: "badges.changed" });
->>>>>>> origin/approved-pr-780
   return res.json({ ok: true });
 });
 
@@ -1225,15 +1222,12 @@ router.patch("/:id/typing", rateLimit("mutation"), validateBody(typingBody), asy
     .set({ typingUntil })
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
 
-<<<<<<< HEAD
   const others = await db.select({ userId: conversationParticipants.userId }).from(conversationParticipants)
     .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`));
   emitToUsers(others.map((o) => o.userId), { type: "conversation.updated", conversationId: id, reason: "typing" });
 
-=======
   const memberIds = await conversationMemberIds(id);
   emitToUsers(memberIds.filter((m) => m !== userId), { type: "typing", conversationId: id, userId, typing });
->>>>>>> origin/approved-pr-780
   return res.json({ ok: true });
 });
 
@@ -1571,7 +1565,6 @@ router.delete("/:id", async (req, res) => {
 
   if (!isMember) return res.status(404).json({ error: "Conversation not found" });
 
-<<<<<<< HEAD
   const now = new Date();
   await db.update(conversationParticipants)
     .set({ hiddenAt: now, historyClearedAt: now, unreadCount: 0, archivedAt: null, pinnedAt: null })
@@ -1588,13 +1581,7 @@ router.delete("/:id", async (req, res) => {
     await db.delete(conversations).where(eq(conversations.id, id));
   }
   emitToUsers([userId], { type: "conversation.updated", conversationId: id, reason: "deleted" });
-=======
-  const memberIds = await conversationMemberIds(id);
-  // Hard-delete: cascade removes participants + messages
-  await db.delete(conversations).where(eq(conversations.id, id));
-  emitToUsers(memberIds, { type: "conversation.updated", conversationId: id, reason: "deleted" });
-  emitToUsers(memberIds, { type: "badges.changed" });
->>>>>>> origin/approved-pr-780
+  emitToUsers([userId], { type: "badges.changed" });
   return res.json({ ok: true });
 });
 
