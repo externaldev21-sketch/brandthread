@@ -91,6 +91,7 @@ export const CREATE_CANVAS = {
 
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
 export const ON_DARK_MUTED = '#C0C0C0';   // secondary text on gradient/colored bg — solid, not alpha
+export const ON_LIGHT_MUTED = '#636366';  // secondary text on a white card — solid, not black at 60%
 
 // ─── Primary Emphasis ─────────────────────────────────────────────────────────
 export const ACCENT        = '#FFFFFF';

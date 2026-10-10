@@ -180,6 +180,7 @@ vi.mock('@/lib/theme', () => ({
   MUTED: '#aaaaaa',
   SUBTLE: '#666666',
   TEXT_TERTIARY: '#8E8E93',
+  ON_LIGHT_MUTED: '#636366',
   FILL_ELEVATED: '#1C1C1E',
   PURPLE: '#c7cdd5',
   PURPLE_DIM: '#34383e',
