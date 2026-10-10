@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { AddressInfo } from "node:net";
-import wellKnown, { DEEP_LINK_PATHS } from "../wellKnown";
+import wellKnown, { DEEP_LINK_PATHS, missingAppLinkEnv } from "../wellKnown";
 
 async function aasa(env: Record<string, string | undefined>) {
   for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v as string);
@@ -36,5 +36,22 @@ describe("apple-app-site-association", () => {
   it("stays validly shaped with no team id configured", async () => {
     const r = await aasa({ APPLE_TEAM_ID: "" });
     expect(r.body.applinks.details).toEqual([]);
+  });
+});
+
+describe("app-link configuration (BT-302)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("claims the hosted-checkout return page so Stripe's redirect can open the app", () => {
+    expect(DEEP_LINK_PATHS).toContain("/checkout-return*");
+  });
+
+  it("names exactly the env vars that are still missing", () => {
+    vi.stubEnv("APPLE_TEAM_ID", "");
+    vi.stubEnv("ANDROID_SHA256_CERT_FINGERPRINTS", "");
+    expect(missingAppLinkEnv()).toEqual(["APPLE_TEAM_ID", "ANDROID_SHA256_CERT_FINGERPRINTS"]);
+    vi.stubEnv("APPLE_TEAM_ID", "ABCDE12345");
+    vi.stubEnv("ANDROID_SHA256_CERT_FINGERPRINTS", "AA:BB");
+    expect(missingAppLinkEnv()).toEqual([]);
   });
 });

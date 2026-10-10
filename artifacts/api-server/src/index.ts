@@ -14,6 +14,7 @@ import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
 import { startDisputeEvidenceReminderJob } from "./jobs/disputeEvidenceReminder";
 import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
 import { startMoneySweepJob } from "./jobs/moneySweep";
+import { missingAppLinkEnv } from "./routes/wellKnown";
 import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
 import { startAdCampaignLifecycleJob } from "./jobs/adCampaignLifecycle";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
@@ -81,8 +82,12 @@ const server = app.listen(port, (err) => {
     logger.error({ err }, "ensureWebhookEvents startup call failed"),
   );
 
-  // Background jobs. Each tick runs through jobs/runner.ts: a Postgres
-  // advisory lock makes sure only one instance runs a given job at a time.
+  const missingAppLinks = missingAppLinkEnv();
+  if (missingAppLinks.length && process.env.NODE_ENV === "production") {
+    logger.warn({ missing: missingAppLinks }, "Universal links are off: /.well-known files are empty until these env vars are set");
+  }
+
+  // Background jobs share the Postgres advisory-lock runner.
   startAbandonedCartJob();
   startTrendingJob();
   startSellerRankingJob();
