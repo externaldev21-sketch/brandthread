@@ -65,6 +65,23 @@ The over-the-air update address (`updates.url`) is worked out from that
 project ID by `app.config.js`, so there is nothing else to configure. You do
 **not** need to run `eas update:configure`.
 
+**Run `eas init` before the first store build.** The update address is
+compiled into each binary, so a store build made without it can never receive
+an over-the-air fix, even after the project ID is added later. Production and
+TestFlight builds therefore stop in `eas-build-pre-install`
+(`scripts/verify-launch-config.js`) when no project ID resolves. If you can't
+commit `app.json` (for example in CI), set `EAS_PROJECT_ID` to the project ID
+shown on expo.dev (Project → Overview → *ID*) both in your shell and as an EAS
+environment variable; `app.config.js` uses it only when `app.json` has none.
+
+The runtime version policy is `fingerprint`. By default the fingerprint
+hashes the whole app config, including `updates.url` and `extra.eas`, so
+`fingerprint.config.js` leaves the EAS project fields out
+(`SourceSkips.ExpoConfigEASProject`). Adding the project ID, or supplying it
+through `EAS_PROJECT_ID`, does not change which builds an update reaches.
+`eas.json` **is** part of the fingerprint, which is why nothing edits it
+during a build (see [App Store Connect](#app-store-connect-once)).
+
 ### Production environment variables (once, then whenever a value changes)
 
 These values are compiled into the app. Set them in **expo.dev → Project →
@@ -82,7 +99,7 @@ eas env:create --environment production --name EXPO_PUBLIC_API_BASE_URL --value 
 | `EXPO_PUBLIC_CLERK_PROXY_URL` | Only if the Clerk production instance uses a proxy |
 | `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` | RevenueCat App Store public key |
 | `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` | RevenueCat Play Store public key |
-| `EXPO_PUBLIC_SENTRY_DSN` | Optional. Sentry DSN for crash reports (same value as `SENTRY_DSN`, see [Crash reporting](#crash-and-error-reporting-sentry)) |
+| `EXPO_PUBLIC_SENTRY_DSN` | **Required for production and TestFlight builds** (the build stops without it; optional for preview). Sentry DSN for crash reports: sentry.io → Settings → Projects → your project → **Client Keys (DSN)**. Use the React Native project's DSN (the API's `SENTRY_DSN` is the Node.js project's), see [Crash reporting](#crash-and-error-reporting-sentry) |
 | `EXPO_PUBLIC_POSTHOG_KEY` | Optional. PostHog project key for funnel analytics (`EXPO_PUBLIC_POSTHOG_HOST` optional, defaults to `https://us.i.posthog.com`). See [observability](../reliability/observability.md) |
 | `SENTRY_ORG`, `SENTRY_PROJECT` | Optional. Sentry organisation and project slugs, used to upload source maps |
 | `SENTRY_AUTH_TOKEN` | Optional. Sentry auth token. Create it with visibility **secret** |
@@ -98,16 +115,27 @@ automatically.
 1. Create the app in [App Store Connect](https://appstoreconnect.apple.com) → My Apps → **+** → New App.
    Bundle ID: `com.brandthread.mobile`. If it's not in the list yet, run
    the first `eas build` (step 2), which registers it for you, then come back.
-2. Fill in the three placeholders in `eas.json` → `submit.production.ios`:
+2. Set the three Apple values as environment variables (your shell profile,
+   or CI secrets). `eas.json` can't read environment variables, so they are
+   not committed there:
 
-   | Field | Where to find it |
+   | Variable | Where to find it |
    | --- | --- |
-   | `appleId` | The email you use to sign in to App Store Connect |
-   | `ascAppId` | App Store Connect → your app → **App Information** → *Apple ID* (digits only) |
-   | `appleTeamId` | [developer.apple.com/account](https://developer.apple.com/account) → **Membership details** → *Team ID* (10 characters) |
+   | `EXPO_APPLE_ID` | The email you use to sign in to App Store Connect. eas-cli's own name; `EAS_APPLE_ID` also works |
+   | `EAS_ASC_APP_ID` | App Store Connect → your app → **App Information** → General Information → *Apple ID* (digits only, e.g. `6471234567`) |
+   | `EXPO_APPLE_TEAM_ID` | [developer.apple.com/account](https://developer.apple.com/account) → **Membership details** → *Team ID* (10 characters). eas-cli's own name; `EAS_APPLE_TEAM_ID` also works |
 
-3. Check them: `pnpm run verify:submit-config`. Until they're filled in,
-   `eas submit` refuses to run, so a wrong ID can't be used by accident.
+   ```powershell
+   setx EXPO_APPLE_ID "you@example.com"
+   setx EAS_ASC_APP_ID "6471234567"
+   setx EXPO_APPLE_TEAM_ID "AB12CD34EF"
+   ```
+
+3. Check them: `pnpm run verify:submit-config`. Upload with
+   `pnpm run submit:ios` (`scripts/eas-submit.js`): it checks the values,
+   puts them into `eas.json` → `submit.production.ios` only for the length of
+   the `eas submit` call, and restores `eas.json` afterwards. Values you do
+   commit in `eas.json` still work; the environment wins.
 
 ### Google Play Console (once)
 
@@ -160,10 +188,10 @@ filled in (see [App Store Connect (once)](#app-store-connect-once)):
 pnpm run build:testflight
 ```
 
-It checks `eas.json`, the bundle ID, Apple sign-in and the Xcode image
-first, and stops with a plain explanation if anything is missing (for
-example, the Apple placeholders). Then it builds the iOS app in the cloud
-and submits it to App Store Connect. Apple emails you when it appears in
+It checks the Apple values, the update URL, the bundle ID, Apple sign-in and
+the Xcode image first, and stops with a plain explanation if anything is
+missing. Then it builds the iOS app in the cloud, waits for it, and uploads
+it with `pnpm run submit:ios`. Apple emails you when it appears in
 TestFlight.
 
 ### Preview builds for testers (no store review)
@@ -187,11 +215,13 @@ When it finishes, expo.dev shows a QR code and install link.
 ## 3. Submit
 
 ```powershell
-eas submit --platform ios --profile production --latest
+pnpm run submit:ios
 eas submit --platform android --profile production --latest
 ```
 
-Or build and submit in one go: `eas build --platform all --profile production --auto-submit`.
+`pnpm run submit:ios` submits the latest iOS build; pass `-- --id <build id>`
+for a specific one. Don't use `eas build --auto-submit` for iOS: the Apple
+values are not in the committed `eas.json`.
 
 ## 4. Test before release
 
@@ -322,8 +352,12 @@ launch, exactly like a normal update. Nothing needs a store build.
 ## Crash and error reporting (Sentry)
 
 Crash reporting is built in for iOS, Android, web and the API server, and
-**stays switched off until you add the Sentry values**. Without them the app
-and server run exactly as before and builds still succeed.
+stays switched off until you add the Sentry values. With no beta cohort it is
+the only crash signal at launch, so it is **required for store builds**:
+production and TestFlight builds stop in `eas-build-pre-install` when
+`EXPO_PUBLIC_SENTRY_DSN` is missing, and the API logs an error at boot in
+production when `SENTRY_DSN` is missing (it still starts). Development and
+preview builds work without it.
 
 **One-time setup:**
 

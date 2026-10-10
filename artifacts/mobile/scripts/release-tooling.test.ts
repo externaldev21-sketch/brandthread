@@ -45,7 +45,10 @@ describe("over-the-air updates", () => {
 
   it("derives the EAS Update URL from the project ID once `eas init` has run", () => {
     const base = appJson.expo;
+    const savedProjectId = process.env.EAS_PROJECT_ID;
+    delete process.env.EAS_PROJECT_ID;
     expect(dynamicConfig({ config: base }).updates.url).toBeUndefined();
+    if (savedProjectId !== undefined) process.env.EAS_PROJECT_ID = savedProjectId;
     const linked = { ...base, extra: { eas: { projectId: "abc-123" } } };
     expect(dynamicConfig({ config: linked }).updates).toMatchObject({
       url: "https://u.expo.dev/abc-123",
@@ -53,9 +56,41 @@ describe("over-the-air updates", () => {
     });
   });
 
-  it("never reads environment variables in app.config.js (keeps the fingerprint stable)", () => {
+  it("reads only EAS_PROJECT_ID from the environment in app.config.js", () => {
     const source = readFileSync(path.join(mobileRoot, "app.config.js"), "utf8");
-    expect(source).not.toMatch(/process\.env/);
+    const reads = source.match(/process\.env\.\w+/g) ?? [];
+    expect(new Set(reads)).toEqual(new Set(["process.env.EAS_PROJECT_ID"]));
+  });
+
+  it("falls back to EAS_PROJECT_ID for the update URL and project ID when app.json has none", () => {
+    const saved = process.env.EAS_PROJECT_ID;
+    try {
+      process.env.EAS_PROJECT_ID = " env-project ";
+      const out = dynamicConfig({ config: appJson.expo });
+      expect(out.updates.url).toBe("https://u.expo.dev/env-project");
+      expect(out.extra.eas.projectId).toBe("env-project");
+      // Other extra.eas settings (the Live Activity appExtensions) are kept.
+      expect(out.extra.eas.build).toEqual(appJson.expo.extra.eas.build);
+      // A project ID committed by `eas init` always wins over the env.
+      const linked = { ...appJson.expo, extra: { eas: { projectId: "abc-123" } } };
+      expect(dynamicConfig({ config: linked }).updates.url).toBe("https://u.expo.dev/abc-123");
+    } finally {
+      if (saved === undefined) delete process.env.EAS_PROJECT_ID;
+      else process.env.EAS_PROJECT_ID = saved;
+    }
+  });
+
+  it("keeps the EAS project fields (updates.url, extra.eas) out of the runtime fingerprint", () => {
+    const { SourceSkips, DEFAULT_SOURCE_SKIPS } = require("expo/fingerprint") as {
+      SourceSkips: Record<string, number>;
+      DEFAULT_SOURCE_SKIPS: number;
+    };
+    const fingerprintConfig = require("../fingerprint.config.js") as { sourceSkips: number };
+    expect(fingerprintConfig.sourceSkips & SourceSkips.ExpoConfigEASProject).toBeTruthy();
+    expect(fingerprintConfig.sourceSkips & DEFAULT_SOURCE_SKIPS).toBe(DEFAULT_SOURCE_SKIPS);
+    // Nothing else (versions, names, assets, the whole config) is skipped.
+    expect(fingerprintConfig.sourceSkips & SourceSkips.ExpoConfigAll).toBe(0);
+    expect(fingerprintConfig.sourceSkips & SourceSkips.ExpoConfigExtraSection).toBe(0);
   });
 
   it("starts monitoring and update checks before Expo Router loads", () => {

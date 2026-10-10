@@ -6,8 +6,9 @@ const mobileRoot = path.resolve(__dirname, "..");
 const appConfig = JSON.parse(readFileSync(path.join(mobileRoot, "app.json"), "utf8")).expo;
 const easConfig = JSON.parse(readFileSync(path.join(mobileRoot, "eas.json"), "utf8"));
 const packageJson = JSON.parse(readFileSync(path.join(mobileRoot, "package.json"), "utf8"));
-const { getSubmitConfigErrors, PLACEHOLDER_PREFIX } = require("./verify-submit-config.js") as {
-  getSubmitConfigErrors: (config: unknown) => string[];
+const { getSubmitConfigErrors, resolveIosSubmitValues, PLACEHOLDER_PREFIX } = require("./verify-submit-config.js") as {
+  getSubmitConfigErrors: (config: unknown, env?: Record<string, string | undefined>) => string[];
+  resolveIosSubmitValues: (config: unknown, env?: Record<string, string | undefined>) => { values: Record<string, string>; errors: string[] };
   PLACEHOLDER_PREFIX: string;
 };
 
@@ -120,33 +121,46 @@ describe("EAS production build and submit profiles", () => {
     expect(production.android.buildType).toBe("app-bundle");
   });
 
-  it("defines iOS and Android production submit profiles", () => {
+  it("commits no Apple placeholders: submit values come from the environment", () => {
     const submit = easConfig.submit.production;
-    for (const key of ["appleId", "ascAppId", "appleTeamId"]) {
-      expect(typeof submit.ios[key]).toBe("string");
-    }
+    expect(JSON.stringify(submit)).not.toContain(PLACEHOLDER_PREFIX);
     expect(submit.android.track).toBe("internal");
+    expect(packageJson.scripts["submit:ios"]).toBe("node scripts/eas-submit.js");
   });
 
-  it("refuses to submit until the Apple placeholders are replaced with valid values", () => {
+  it("refuses to submit until valid Apple values are in the environment (or eas.json)", () => {
     const withIos = (ios: Record<string, string>) => ({
       submit: { production: { ios, android: { track: "internal" } } },
     });
+    expect(getSubmitConfigErrors(withIos({}), {})).toHaveLength(3);
     expect(getSubmitConfigErrors(withIos({
       appleId: `${PLACEHOLDER_PREFIX}APPLE_ID_EMAIL`,
       ascAppId: `${PLACEHOLDER_PREFIX}APP_STORE_CONNECT_APP_ID`,
       appleTeamId: `${PLACEHOLDER_PREFIX}APPLE_TEAM_ID`,
-    }))).toHaveLength(3);
-    expect(getSubmitConfigErrors(withIos({
-      appleId: "owner@example.com",
-      ascAppId: "app-id",
-      appleTeamId: "short",
-    }))).toHaveLength(2);
-    expect(getSubmitConfigErrors(withIos({
-      appleId: "owner@example.com",
-      ascAppId: "1234567891",
-      appleTeamId: "AB32CZE81F",
-    }))).toEqual([]);
+    }), {})).toHaveLength(6);
+    expect(getSubmitConfigErrors(withIos({}), {
+      EXPO_APPLE_ID: "owner@example.com",
+      EAS_ASC_APP_ID: "app-id",
+      EXPO_APPLE_TEAM_ID: "short",
+    })).toHaveLength(2);
+    expect(getSubmitConfigErrors(withIos({}), {
+      EXPO_APPLE_ID: "owner@example.com",
+      EAS_ASC_APP_ID: "1234567891",
+      EXPO_APPLE_TEAM_ID: "AB32CZE81F",
+    })).toEqual([]);
+    // EAS_* aliases work, and committed eas.json values still count.
+    expect(getSubmitConfigErrors(withIos({ ascAppId: "1234567891" }), {
+      EAS_APPLE_ID: "owner@example.com",
+      EAS_APPLE_TEAM_ID: "AB32CZE81F",
+    })).toEqual([]);
+  });
+
+  it("prefers the environment over eas.json and the eas-cli names over the aliases", () => {
+    const { values } = resolveIosSubmitValues(
+      { submit: { production: { ios: { appleId: "old@example.com", ascAppId: "111", appleTeamId: "OLDTEAM001" } } } },
+      { EXPO_APPLE_ID: "new@example.com", EAS_APPLE_ID: "alias@example.com", EAS_ASC_APP_ID: "222", EAS_APPLE_TEAM_ID: "NEWTEAM002" },
+    );
+    expect(values).toEqual({ appleId: "new@example.com", ascAppId: "222", appleTeamId: "NEWTEAM002" });
   });
 });
 

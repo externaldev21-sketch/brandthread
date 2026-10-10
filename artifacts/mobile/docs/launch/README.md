@@ -23,10 +23,10 @@ iPad, Android tablets, and the web app at brandthread.app.
       the **App Store Connect App ID** (a numeric id, e.g. `1234567890`).
 - [ ] Give us (or set as env vars / EAS secrets, see §4 and §5) three
       values: your Apple ID email, the App Store Connect App ID, and the
-      Apple Team ID. These go into `eas.json`'s `submit.production.ios`
-      block (currently placeholders `REPLACE_WITH_APPLE_ID_EMAIL`,
-      `REPLACE_WITH_APP_STORE_CONNECT_APP_ID`, `REPLACE_WITH_APPLE_TEAM_ID`)
-      and into the `APPLE_TEAM_ID` env var the API server uses to generate
+      Apple Team ID. These are set as environment variables
+      `EXPO_APPLE_ID`, `EAS_ASC_APP_ID` and `EXPO_APPLE_TEAM_ID`, which
+      `pnpm run submit:ios` hands to `eas submit` (eas.json can't read env),
+      and the Team ID also goes into the `APPLE_TEAM_ID` env var the API server uses to generate
       `apple-app-site-association` (see §7).
 - [ ] Enable "Sign in with Apple" capability for the app identifier
       `com.brandthread.mobile` in the Apple Developer portal (the app

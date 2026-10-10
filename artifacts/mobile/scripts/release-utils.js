@@ -70,16 +70,20 @@ function requireEasCli() {
   }
 }
 
-/** The EAS project ID written by `eas init`, or null before the project is linked. */
-function easProjectId(appJson = readJson('app.json')) {
-  return appJson?.expo?.extra?.eas?.projectId ?? null;
+/**
+ * The EAS project ID written by `eas init`, else the EAS_PROJECT_ID fallback
+ * app.config.js also reads, or null before the project is linked.
+ */
+function easProjectId(appJson = readJson('app.json'), env = process.env) {
+  return appJson?.expo?.extra?.eas?.projectId || env.EAS_PROJECT_ID?.trim() || null;
 }
 
 function requireLinkedProject() {
   if (!easProjectId()) {
     fail([
       'This app is not linked to an Expo (EAS) project yet.',
-      'Run  eas init  once in artifacts/mobile and commit the app.json change it makes.',
+      'Run  eas init  once in artifacts/mobile and commit the app.json change it makes',
+      '(or set EAS_PROJECT_ID to the project ID shown on expo.dev).',
     ]);
   }
 }
