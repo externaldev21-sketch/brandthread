@@ -9,6 +9,7 @@ import { db, emailCampaigns, emailSettings, products, productVariants, storefron
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { logger } from "../logger";
 import { getWebOrigin } from "../webOrigin";
+import { publicProductCoverUrl } from "../publicMedia";
 import { resolveAudience, isSendableStatus } from "./audience";
 import { getEmailProvider, type EmailProvider } from "./provider";
 import { renderCampaign, type RenderProduct } from "./render";
@@ -81,7 +82,7 @@ export async function loadSenderContext(sellerId: string) {
 
 export async function loadRenderProducts(sellerId: string, ids: string[]): Promise<RenderProduct[]> {
   if (ids.length === 0) return [];
-  const rows = await db.select({ id: products.id, name: products.name, images: products.images })
+  const rows = await db.select({ id: products.id, name: products.name, images: products.images, status: products.status, deletedAt: products.deletedAt })
     .from(products).where(and(eq(products.ownerId, sellerId), inArray(products.id, ids)));
   const variants = rows.length
     ? await db.select({ productId: productVariants.productId, priceCents: productVariants.priceCents })
@@ -89,8 +90,14 @@ export async function loadRenderProducts(sellerId: string, ids: string[]): Promi
     : [];
   return ids.map((id) => rows.find((r) => r.id === id)).filter((r): r is NonNullable<typeof r> => Boolean(r)).map((p) => {
     const prices = variants.filter((v) => v.productId === p.id).map((v) => v.priceCents);
-    const imgs = Array.isArray(p.images) ? (p.images as string[]) : [];
-    return { id: p.id, name: p.name, imageUrl: imgs[0] ?? null, priceCents: prices.length ? Math.min(...prices) : null };
+    // Public https photo + the product's own page (BT-314/327).
+    const live = p.status === "active" && !p.deletedAt;
+    return {
+      id: p.id, name: p.name,
+      imageUrl: publicProductCoverUrl(p.id, p.images),
+      priceCents: prices.length ? Math.min(...prices) : null,
+      url: live ? `${getWebOrigin()}/store/product/${p.id}` : null,
+    };
   });
 }
 
@@ -197,6 +204,7 @@ export async function processCampaign(campaignId: string, deps: ProcessDeps = {}
         const { html, text } = renderCampaign({
           storeName: ctx.storeName, subject: campaign.subject, preheader: campaign.preheader,
           body, products: renderProducts, storeUrl: ctx.storeUrl, postalAddress: ctx.postalAddress, unsubscribeUrl: url,
+          campaignId: campaign.id,
         });
         const r = await provider.send({
           to: row.email, subject: campaign.subject, html, text,

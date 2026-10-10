@@ -26,7 +26,7 @@ import express, { Router } from "express";
 import crypto from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
-import { db, metaAdAccounts, metaCampaignInsights, metaCampaigns, metaConversionEvents } from "@workspace/db";
+import { db, metaAdAccounts, metaCampaignInsights, metaCampaigns } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { decryptToken, encryptToken, hasMetaTokenEncryptionKey } from "../lib/metaCrypto";
 import {
@@ -43,9 +43,9 @@ import {
   targetingSearch,
   updateAdSetBudget,
   updateCampaignStatus,
-  sendConversionEvent,
 } from "../lib/metaGraph";
 import { launchCampaign, LaunchError } from "../lib/metaAdsLaunch";
+import { relayConversionEvent } from "../lib/metaCapiRelay";
 
 const router = Router();
 router.use(requireAuth);
@@ -797,76 +797,22 @@ router.post("/campaigns/:id/duplicate", async (req, res) => {
 
 // ─── POST /conversion-events ────────────────────────────────────────────────
 
-const ALLOWED_EVENT_NAMES = new Set(["ViewContent", "AddToCart", "InitiateCheckout", "Purchase"]);
-
+// Older app builds post here signed in. The event is credited to the seller
+// who owns the product, not the caller (the caller is the buyer — BT-325).
+// New builds use the public POST /api/public/meta/conversion-events.
 router.post("/conversion-events", express.json({ limit: "8kb" }), async (req, res) => {
-  const owner = sellerId(req);
-  const { eventId, eventName, occurredAt, productId, valueCents, currency } = req.body as Record<string, any>;
-
-  if (!eventId || !ALLOWED_EVENT_NAMES.has(eventName) || !occurredAt) {
-    res.status(400).json({ error: "eventId, a valid eventName, and occurredAt are required" });
+  const result = await relayConversionEvent(req.body ?? {}, {
+    viewerId: sellerId(req),
+    ip: req.ip,
+    userAgent: req.headers["user-agent"] as string | undefined,
+  }).catch((err) => {
+    req.log?.error?.({ err }, "Meta conversion relay failed");
+    return { ok: true as const, sellers: [] };
+  });
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
     return;
   }
-
-  // Always respond quickly — insert the log row (deduped) first, and treat
-  // any Meta relay failure as best-effort so a Meta outage never blocks the
-  // caller (the mobile client already fired its own client-side Pixel event
-  // with the same eventId, which is what Meta's own dedup relies on).
-  try {
-    await db.insert(metaConversionEvents).values({
-      sellerId: owner,
-      eventId,
-      eventName,
-      occurredAt: new Date(occurredAt),
-      productId: productId ?? null,
-      valueCents: typeof valueCents === "number" ? valueCents : null,
-      currency: currency ?? "USD",
-    }).onConflictDoNothing();
-  } catch (err) {
-    req.log?.error?.({ err }, "Failed to record Meta conversion event");
-  }
-
-  const account = await loadConnectedAccount(owner);
-  if (!account || account.status !== "connected" || !account.pixelId || !account.accessTokenEncrypted) {
-    res.json({ ok: true });
-    return;
-  }
-
-  try {
-    const accessToken = decryptToken(account.accessTokenEncrypted);
-    const result = await sendConversionEvent(accessToken, account.pixelId, {
-      eventName,
-      eventId,
-      eventTime: Math.floor(new Date(occurredAt).getTime() / 1000),
-      userData: {
-        client_ip_address: req.ip,
-        client_user_agent: req.headers["user-agent"] as string | undefined,
-      },
-      customData: {
-        ...(productId ? { content_ids: [productId] } : {}),
-        ...(typeof valueCents === "number" ? { value: valueCents / 100, currency: currency ?? "USD" } : {}),
-      },
-    });
-    await db
-      .update(metaConversionEvents)
-      .set({ sentToMeta: true, metaResponseStatus: `ok:${result.eventsReceived}` })
-      .where(and(
-        eq(metaConversionEvents.sellerId, owner),
-        eq(metaConversionEvents.eventId, eventId),
-        eq(metaConversionEvents.eventName, eventName),
-      ));
-  } catch (err) {
-    const message = err instanceof MetaGraphError ? err.userMessage : String((err as Error)?.message ?? err);
-    await db
-      .update(metaConversionEvents)
-      .set({ sentToMeta: false, metaResponseStatus: message })
-      .where(and(
-        eq(metaConversionEvents.sellerId, owner),
-        eq(metaConversionEvents.eventId, eventId),
-        eq(metaConversionEvents.eventName, eventName),
-      ));
-  }
-
   res.json({ ok: true });
 });
 

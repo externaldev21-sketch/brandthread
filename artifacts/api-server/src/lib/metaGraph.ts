@@ -618,6 +618,7 @@ export async function sendConversionEvent(
       client_user_agent?: string;
       fbc?: string;
       fbp?: string;
+      external_id?: string; // pre-hashed
     };
     customData?: Record<string, unknown>;
   },

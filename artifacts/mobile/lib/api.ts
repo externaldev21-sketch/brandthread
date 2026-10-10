@@ -3947,10 +3947,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         eventName: 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'Purchase';
         occurredAt: string;
         productId?: string;
+        /** Every product in the event (cart / order); the server credits each product's seller. */
+        productIds?: string[];
         valueCents?: number;
         currency?: string;
       }) =>
-        post<{ ok: boolean }>('/api/meta-ads/conversion-events', body),
+        // Public: works for guests too, and the server credits the product's
+        // seller, never the caller (BT-325).
+        post<{ ok: boolean }>('/api/public/meta/conversion-events', body),
     },
     /** Buyer loyalty / rewards points. */
     loyalty: {

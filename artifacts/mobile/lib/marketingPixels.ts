@@ -204,11 +204,16 @@ export function trackAndRelayConversionEvent(
   if (!consentGranted) return false;
   const eventId = relay.eventId ?? randomUUID();
   trackMarketingPixelEvent(event, properties, configuredPixels(), eventId);
+  const contentIds = Array.isArray(properties.content_ids)
+    ? (properties.content_ids as unknown[]).filter((id): id is string => typeof id === 'string')
+    : [];
   void api.metaAds.conversionEvent({
     eventId,
     eventName: event,
     occurredAt: new Date().toISOString(),
     productId: relay.productId,
+    // The server works out each product's seller from these (BT-325).
+    productIds: contentIds.length ? [...new Set(contentIds)].slice(0, 20) : undefined,
     valueCents: relay.valueCents,
     currency: relay.currency,
   }).catch(() => { /* fire-and-forget — never block the UI on this */ });
