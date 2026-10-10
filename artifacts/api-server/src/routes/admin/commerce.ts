@@ -157,6 +157,10 @@ router.get("/disputes", async (req, res) => {
         reason: d.reason,
         status: d.status,
         evidenceDueBy: d.evidenceDueBy?.toISOString() ?? null,
+        // B2B chargebacks (sample/bulk cards, freelancer jobs) have no retail order.
+        sampleOrderId: d.sampleOrderId,
+        freelancerJobId: d.freelancerJobId,
+        clawbackCents: d.clawbackCents,
         createdAt: d.createdAt.toISOString(),
       })),
       hasMore: rows.length > limit,

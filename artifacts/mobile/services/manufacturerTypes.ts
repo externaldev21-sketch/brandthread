@@ -104,6 +104,8 @@ export interface Manufacturer {
   website?: string;
   email?: string;
   phone?: string;
+  /** Contact details withheld until the seller's first paid order with this manufacturer. */
+  contactHidden?: boolean;
   /** IANA zone of the factory, used to show the manufacturer's local time. */
   timeZone?: string | null;
   /** False for private manufacturers only visible to sellers they work with. */

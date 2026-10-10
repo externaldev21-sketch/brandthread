@@ -3,6 +3,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
+import { MANUFACTURER_TERMS_VERSION } from "../../lib/manufacturerTrust";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   db, manufacturers, manufacturerInviteTokens, manufacturerPayments,
@@ -85,7 +86,7 @@ function manufacturerBody(name: string) {
   };
 }
 async function seedManufacturer(overrides: Partial<typeof manufacturers.$inferInsert> = {}) {
-  const [row] = await db.insert(manufacturers).values({
+  const [row] = await db.insert(manufacturers).values({ verificationStatus: "verified",
     ...manufacturerBody(`${prefix}-factory-${createdManufacturerIds.length}`),
     clerkId: `${prefix}-mfr-${createdManufacturerIds.length}`,
     status: "active", isPublicDirectory: true, ...overrides,
@@ -193,7 +194,9 @@ describe("Task 252 manufacturer route integration", () => {
     expect((await request(`/api/manufacturers/invite-tokens/resolve/${invite.token}`)).status).toBe(200);
     expect((await request(`/api/manufacturers/register-via-invite/${invite.token}`, "POST", manufacturerBody("Private Factory"))).status).toBe(401);
     auth.userId = users.manufacturerA;
-    const registered = await request(`/api/manufacturers/register-via-invite/${invite.token}`, "POST", manufacturerBody("Private Factory"));
+    const registered = await request(`/api/manufacturers/register-via-invite/${invite.token}`, "POST", {
+      ...manufacturerBody("Private Factory"), acceptedTermsVersion: MANUFACTURER_TERMS_VERSION,
+    });
     expect(registered.status).toBe(201);
     const registeredBody = await registered.json() as { id: string; invitedBySellerId: string };
     createdManufacturerIds.push(registeredBody.id);
