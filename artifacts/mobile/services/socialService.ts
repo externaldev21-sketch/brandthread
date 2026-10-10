@@ -688,6 +688,14 @@ interface ApiPostProductTagRow {
  * not validated, so every field is optional and read defensively.
  */
 export interface ApiPostRow {
+  videoHlsUrl?: string | null;
+  likedByMe?: boolean | null;
+  savedByMe?: boolean | null;
+  remixOf?: {
+    postId: string;
+    authorId?: string | null;
+    username?: string | null;
+  } | null;
   id: string;
   userId?: string | null;
   authorAccountType?: string | null;

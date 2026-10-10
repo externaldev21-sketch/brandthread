@@ -790,7 +790,6 @@ export interface SendUploadOptions {
 export async function sendUploadBody<T = unknown>(opts: SendUploadOptions): Promise<T> {
   const { path, blob, contentType, onProgress } = opts;
   const reportErrors = opts.reportErrors !== false;
-  rejectSellerPreviewApiRequest();
   await signedOutGate(versionApiPath(path), 'POST', opts.authToken);
   const url = `${BASE}${versionApiPath(path)}`;
   const authHeaders = async (): Promise<Record<string, string>> => {
@@ -2302,6 +2301,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        * resumable chunked session instead of a base64 string held in memory.
        */
       uploadMediaFile: async (file: { uri: string; mimeType: string; extension: string }) => {
+        await signedOutGate(versionApiPath('/api/conversations/upload-media'), 'POST', getToken);
         const isImage = file.mimeType.startsWith('image/');
         const prepared = isImage ? await prepareImageForUpload({ uri: file.uri, mimeType: file.mimeType }, 'message') : file;
         const mimeType = prepared.mimeType || file.mimeType;
@@ -2310,7 +2310,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         if (uploadStrategy(blob.size) === 'single') {
           return post<{ url: string }>('/api/conversations/upload-media', { data: await blobToBase64(blob), mimeType, extension });
         }
-        rejectSellerPreviewApiRequest();
         const authHeaders = async (): Promise<Record<string, string>> => {
           const token = await getCachedToken(getToken);
           return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...storeContextHeaders() };

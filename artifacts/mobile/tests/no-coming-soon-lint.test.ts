@@ -100,7 +100,9 @@ describe('no "coming soon" wording outside the tracked allowlist', () => {
     const newOffenders = offenders.filter((file) => !COMING_SOON_ALLOWLIST.has(file));
 
     expect(newOffenders).toEqual([]);
-  });
+  // This parses every application source file with TypeScript, rather than
+  // matching raw text. Bound the complete-tree audit separately from UI tests.
+  }, 20_000);
 
   it('stale: every allowlisted file still needs to be there', () => {
     const stale = [...COMING_SOON_ALLOWLIST].filter((file) => {

@@ -479,7 +479,7 @@ export default function OrderDetailScreen() {
   // seeds this same cache entry from data it already fetched, and warms it
   // further on press-in. When it's there, paint it immediately instead of
   // the spinner below — `load` still runs on focus and refreshes silently.
-  const cachedOrder = id ? queryClient.getQueryData<unknown>(queryKeys.order(id)) : undefined;
+  const cachedOrder = id ? queryClient.getQueryData<{ sourceLive?: { streamId: string; startedAt: string } | null }>(queryKeys.order(id)) : undefined;
   const [order, setOrder] = useState<Order | null>(() => (cachedOrder ? adaptApiOrder(cachedOrder) : null));
   const [loading, setLoading] = useState(!cachedOrder);
   // Bought from one of this seller's lives (GET /api/orders/:id → sourceLive).

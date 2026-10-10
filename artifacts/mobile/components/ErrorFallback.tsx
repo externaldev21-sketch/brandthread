@@ -8,7 +8,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather } from '@/components/ui/Icon';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { reloadAppAsync } from 'expo';
@@ -46,6 +47,7 @@ export function ErrorFallback({ error, resetError, scope = 'app', onBack }: Erro
   const showBack = isScreen && typeof onBack === 'function';
 
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const headerTopInset = useHeaderTopInset();
 
   const handleRetry = () => {
     if (isScreen) {
@@ -84,14 +86,14 @@ export function ErrorFallback({ error, resetError, scope = 'app', onBack }: Erro
         styles.container,
         { backgroundColor: colors.background },
         isScreen
-          ? { paddingTop: insets.top + SPACING.xl, paddingBottom: insets.bottom + SPACING.xl }
+          ? { paddingTop: headerTopInset + SPACING.xl, paddingBottom: insets.bottom + SPACING.xl }
           : null,
       ]}
     >
       {showBack ? (
         // IconButton applies `style` to its inner icon view, so the absolute
         // positioning lives on this wrapper (keeps it out of the centered flow).
-        <View style={[styles.backButton, { top: insets.top + SPACING.xs }]}>
+        <View style={[styles.backButton, { top: headerTopInset + SPACING.xs }]}>
           <IconButton
             name="arrow-left"
             onPress={onBack}
