@@ -88,6 +88,8 @@ export const users = pgTable('users', {
   // When the Stripe subscription went past_due; the plan's grace period
   // (PAST_DUE_GRACE_DAYS) runs from here. NULL when not past_due.
   subscriptionPastDueSince: timestamp('subscription_past_due_since', { withTimezone: true }),
+  // Stripe cancel_at_period_end: access runs to the period (or trial) end, then stops; no further charge.
+  subscriptionCancelAtPeriodEnd: boolean('subscription_cancel_at_period_end').notNull().default(false),
   // Buyer-only "Watching Threads" gesture coach mark on the feed. Stores the
   // FEED_GESTURES_TIP_VERSION the user has already seen (0 = never shown).
   // Bumping the client-side version constant shows the tip one more time per

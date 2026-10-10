@@ -17,6 +17,7 @@ const {
   const invoices = vi.fn();
   const checkout = vi.fn();
   const subscriptionPortal = vi.fn();
+  const cancel = vi.fn();
   return {
     alertMock: vi.fn(),
     checkoutMock: checkout,
@@ -30,6 +31,7 @@ const {
           invoices,
           checkout,
           portal: subscriptionPortal,
+          cancel,
         },
       },
     },
@@ -252,6 +254,11 @@ async function renderScreen(
   return renderer;
 }
 
+const ENDED_PLAN = {
+  plan: 'starter', amountCents: 2900, renewsOn: 'Sep 30, 2026', trialEnd: null,
+  status: 'canceled', effectiveProvider: 'stripe', paymentMethodLabel: 'Visa ending in 4242',
+};
+
 beforeEach(() => {
   alertMock.mockReset();
   checkoutMock.mockReset();
@@ -321,6 +328,8 @@ describe('owner-only billing actions', () => {
 
   it('shows the owner-only message for the subscription portal', async () => {
     subscriptionPortalMock.mockRejectedValueOnce(roleError());
+    // An ended plan: the button opens the billing portal as before.
+    api.seller.subscription.status.mockResolvedValue({ ...ENDED_PLAN });
     const renderer = await renderScreen(SubscriptionScreen);
 
     await press(renderer, 'seller-subscription-cancel');
@@ -332,11 +341,29 @@ describe('owner-only billing actions', () => {
 
   it('keeps the portal error fallback for non-role failures', async () => {
     subscriptionPortalMock.mockRejectedValueOnce(serverError());
+    api.seller.subscription.status.mockResolvedValue({ ...ENDED_PLAN });
     const renderer = await renderScreen(SubscriptionScreen);
 
     await press(renderer, 'seller-subscription-cancel');
 
     expect(alertMock).toHaveBeenCalledWith('Portal error', 'API 500: Billing service unavailable.');
     renderer.unmount();
+  });
+
+  it('cancels a live web plan in Stripe after the seller confirms (Settings → Plan → Cancel plan)', async () => {
+    const confirmMock = vi.fn(() => true);
+    const windowAlert = vi.fn();
+    vi.stubGlobal('window', { ...(globalThis as any).window, confirm: confirmMock, alert: windowAlert });
+    api.seller.subscription.cancel.mockResolvedValueOnce({ cancelAtPeriodEnd: true, inTrial: true, accessEndsAt: new Date(2026, 9, 20, 12).toISOString() });
+    const renderer = await renderScreen(SubscriptionScreen);
+
+    await press(renderer, 'seller-subscription-cancel');
+
+    expect(confirmMock).toHaveBeenCalledWith(expect.stringContaining('Cancel your plan?'));
+    expect(api.seller.subscription.cancel).toHaveBeenCalledTimes(1);
+    expect(subscriptionPortalMock).not.toHaveBeenCalled();
+    expect(windowAlert).toHaveBeenCalledWith("Plan cancelled. You won't be charged. You can keep selling until Oct 20.");
+    renderer.unmount();
+    vi.unstubAllGlobals();
   });
 });

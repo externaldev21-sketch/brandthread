@@ -99,7 +99,7 @@ describe("the one seller plan config", () => {
   it("Stripe Checkout uses the shared trial length", async () => {
     const { readFileSync } = await import("node:fs");
     const route = readFileSync(new URL("../../routes/subscription.ts", import.meta.url), "utf8");
-    expect(route).toContain("trial_period_days: TRIAL_DAYS,");
+    expect(route).toContain("trial_period_days: TRIAL_DAYS }");
     expect(route).not.toContain("trial_period_days: 5");
   });
 });

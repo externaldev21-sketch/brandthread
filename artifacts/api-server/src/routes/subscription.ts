@@ -25,8 +25,11 @@ import { getWebOrigin } from "../lib/webOrigin";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, TRIAL_DAYS, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
 import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
-import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
+import { buildTrialReminderMessage, isDayFourOfFive } from "../jobs/sellerTrialReminder";
 import { syncProductsToPlanSoon } from "../lib/planProductSync";
+import {
+  installIdFrom, isTrialEligible, manageUrlFor, nativeSubscriptionDetails, recordNativeTrialClaim,
+} from "../lib/sellerTrial";
 
 const router = Router();
 router.use(requireAuth);
@@ -160,6 +163,8 @@ router.get("/status", requireRole("owner"), async (req, res) => {
     }
 
     const effective = await getEffectiveEntitlement(clerkUserId);
+    // Whether checkout would include the free trial (one per person, device and card).
+    const trialEligible = await isTrialEligible({ clerkId: clerkUserId, installId: installIdFrom(req) });
     const nativeMetadata = effective.native ? {
       status: effective.native.status,
       productIdentifier: effective.native.productIdentifier,
@@ -171,6 +176,7 @@ router.get("/status", requireRole("owner"), async (req, res) => {
 
     if (!user.subscriptionId || effective.provider === "revenuecat") {
       const plan = effective.provider === "revenuecat" ? effective.planId : "starter";
+      const native = effective.provider === "revenuecat" ? nativeSubscriptionDetails(effective.native) : null;
       res.json({
         plan, status: effective.provider === "revenuecat" ? effective.status : "none",
         renewsOn: null, trialEnd: null,
@@ -181,6 +187,11 @@ router.get("/status", requireRole("owner"), async (req, res) => {
         paymentMethodLabel: null,
         effectiveProvider: effective.provider,
         native: nativeMetadata,
+        // Cancelling an in-app subscription happens in the store (manageUrl).
+        cancelAtPeriodEnd: native?.willRenew === false,
+        accessEndsAt: native?.willRenew === false ? effective.native?.expiresAt?.toISOString() ?? null : null,
+        manageUrl: native ? manageUrlFor("revenuecat", native) : null,
+        trialEligible,
       });
       return;
     }
@@ -209,13 +220,14 @@ router.get("/status", requireRole("owner"), async (req, res) => {
     const isDayFour = sub.status === "trialing" && trialStartAt && trialEndsAt
       ? isDayFourOfFive(trialStartAt, trialEndsAt, new Date())
       : false;
-    const trialBanner = isDayFour && user.trialBannerDismissedTrialEnd !== trialEndsAt!.toISOString()
+    const trialBanner = isDayFour && sub.cancel_at_period_end !== true && user.trialBannerDismissedTrialEnd !== trialEndsAt!.toISOString()
       ? {
           visible: true,
           day: 4,
           daysRemaining: Math.max(0, Math.ceil((trialEndsAt!.getTime() - Date.now()) / (24 * 60 * 60 * 1000))),
           trialEndsAt: trialEndsAt!.toISOString(),
-          message: `Keep your ${PLAN_CATALOGUE[planId as PlanId]?.name ?? "seller"} tools—including your storefront, products, and checkout—by choosing a plan before your trial ends.`,
+          // Same words as the push / email reminder: what is charged and when.
+          message: buildTrialReminderMessage({ plan: planId, trialEndsAt: trialEndsAt! }).body,
           cta: "Manage subscription",
         }
       : null;
@@ -245,6 +257,14 @@ router.get("/status", requireRole("owner"), async (req, res) => {
       // when an unpaid subscription no longer grants an effective entitlement.
       effectiveProvider: "stripe",
       native: nativeMetadata,
+      // Cancelled (Settings → Plan → Cancel plan, or the Stripe portal): access
+      // runs to accessEndsAt and nothing more is charged.
+      cancelAtPeriodEnd: sub.cancel_at_period_end === true,
+      accessEndsAt: sub.cancel_at_period_end === true
+        ? (sub.status === "trialing" && trialEnd ? trialEnd : periodEnd)?.toISOString() ?? null
+        : null,
+      manageUrl: manageUrlFor("stripe"),
+      trialEligible,
     });
   } catch (err: any) {
     const status = err.status ?? 500;
@@ -299,6 +319,9 @@ router.post("/native/sync", requireRole("owner"), async (req, res) => {
     const entitlement = await reconcileRevenueCatEntitlement(clerkUserId);
     const effective = await getEffectiveEntitlement(clerkUserId);
     syncProductsToPlanSoon(clerkUserId);
+    await recordNativeTrialClaim(clerkUserId, entitlement, installIdFrom(req)).catch((err) => {
+      req.log.warn({ err }, "Could not record the native trial claim");
+    });
     res.json({
       plan: effective.planId,
       status: effective.status,
@@ -365,9 +388,13 @@ router.get("/invoices", requireRole("owner"), async (req, res) => {
  *   in-place (Stripe subscription items update + prorations) instead of creating
  *   a new Checkout session — this prevents concurrent duplicate subscriptions.
  * • If no active subscription exists, creates a Stripe Checkout Session in
- *   subscription mode with a TRIAL_DAYS-day free trial. Card collected upfront so the
- *   trial auto-converts to paid on day 6.
- * Returns { url } for redirect or { updated: true } for in-place update.
+ *   subscription mode with a TRIAL_DAYS-day free trial. The card is collected
+ *   up front, so the trial converts to paid when it ends. One trial per person
+ *   and device (lib/sellerTrial.ts): otherwise the checkout charges today, and
+ *   Stripe's page says so.
+ * • Picking a plan while a cancellation is pending re-subscribes (clears
+ *   cancel_at_period_end): the one-tap re-subscribe.
+ * Returns { url, trial } for redirect or { updated: true } for in-place update.
  */
 router.post("/checkout", requireRole("owner"), async (req, res) => {
   try {
@@ -396,12 +423,13 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
           await (stripe.subscriptions.update as any)(user.subscriptionId, {
             items: [{ id: sub.items.data[0].id, price: priceId }],
             proration_behavior: "create_prorations",
+            cancel_at_period_end: false,
             metadata: { clerkUserId, planId },
           });
           // Sync plan to DB immediately; webhook will re-sync when it arrives.
           await db
             .update(users)
-            .set({ subscriptionPlanId: planId, updatedAt: new Date() })
+            .set({ subscriptionPlanId: planId, subscriptionCancelAtPeriodEnd: false, updatedAt: new Date() })
             .where(eq(users.clerkId, clerkUserId));
           res.json({ updated: true, url: `${returnBase}/seller/subscription/return?status=success&plan=${planId}` });
           return;
@@ -413,9 +441,11 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
     }
 
     // No active subscription — create a new Checkout session.
-    const [priceId, customerId] = await Promise.all([
+    const installId = installIdFrom(req);
+    const [priceId, customerId, trial] = await Promise.all([
       ensurePrice(stripe, planId),
       ensureCustomer(stripe, clerkUserId),
+      isTrialEligible({ clerkId: clerkUserId, installId }),
     ]);
 
     const session = await stripe.checkout.sessions.create({
@@ -426,21 +456,98 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
       // the trial (TRIAL_DAYS, lib/planCatalogue.ts) ends unless cancelled.
       payment_method_collection: "always",
       subscription_data: {
-        trial_period_days: TRIAL_DAYS,
-        metadata:          { clerkUserId, planId },
+        ...(trial ? { trial_period_days: TRIAL_DAYS } : {}),
+        metadata:          { clerkUserId, planId, ...(installId ? { installId } : {}) },
       },
-      success_url:          `${returnBase}/seller/subscription/return?status=success&plan=${planId}`,
+      success_url:          `${returnBase}/seller/subscription/return?status=success&plan=${planId}${trial ? "" : "&trial=0"}`,
       cancel_url:           `${returnBase}/seller/subscription/return?status=cancel`,
       client_reference_id:  clerkUserId,
       metadata:             { clerkUserId, planId },
     });
 
-    res.json({ url: session.url });
+    res.json({ url: session.url, trial });
   } catch (err: any) {
     const status = err.status ?? 500;
     if (status < 500) { res.status(status).json({ error: err.message }); return; }
     req.log.error({ err }, "Failed to create subscription checkout");
     res.status(500).json({ error: "Failed to create subscription checkout" });
+  }
+});
+
+/**
+ * POST /api/seller/subscription/cancel
+ * Settings → Plan → "Cancel plan". Stripe: sets cancel_at_period_end, so
+ * nothing more is charged (cancelling during the trial means no charge at
+ * all) and access continues until accessEndsAt; after that the seller sees
+ * "pick a plan to keep selling", with their data kept. An in-app purchase
+ * can only be cancelled in the App Store / Google Play: 409 with manageUrl.
+ */
+router.post("/cancel", requireRole("owner"), async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const effective = await getEffectiveEntitlement(clerkUserId);
+    if (effective.provider === "revenuecat") {
+      res.status(409).json({
+        error: "Manage in store",
+        code: "MANAGE_IN_STORE",
+        manageUrl: manageUrlFor("revenuecat", nativeSubscriptionDetails(effective.native)),
+        message: "This plan was bought in the app. Cancel it in your App Store or Google Play subscriptions.",
+      });
+      return;
+    }
+    const [user] = await db.select({ subscriptionId: users.subscriptionId })
+      .from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+    if (!user?.subscriptionId || effective.provider !== "stripe") {
+      res.status(400).json({ error: "No plan to cancel", code: "NO_SUBSCRIPTION" });
+      return;
+    }
+    const stripe = requireStripe();
+    const sub = await (stripe.subscriptions.update as any)(user.subscriptionId, { cancel_at_period_end: true });
+    await db.update(users).set({ subscriptionCancelAtPeriodEnd: true, updatedAt: new Date() })
+      .where(eq(users.clerkId, clerkUserId));
+    const inTrial = sub.status === "trialing";
+    const endUnix = inTrial && sub.trial_end ? sub.trial_end : sub.current_period_end;
+    res.json({
+      cancelAtPeriodEnd: true,
+      inTrial,
+      accessEndsAt: typeof endUnix === "number" ? new Date(endUnix * 1000).toISOString() : null,
+    });
+  } catch (err: any) {
+    const status = err.status ?? 500;
+    if (status < 500) { res.status(status).json({ error: err.message }); return; }
+    req.log.error({ err }, "Failed to cancel subscription");
+    res.status(500).json({ error: "Failed to cancel subscription" });
+  }
+});
+
+/**
+ * POST /api/seller/subscription/resume
+ * One-tap re-subscribe while a cancellation is pending: clears
+ * cancel_at_period_end. Once the plan has ended, 409 RESUBSCRIBE_REQUIRED:
+ * the app sends the seller to pick a plan (checkout).
+ */
+router.post("/resume", requireRole("owner"), async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const [user] = await db.select({ subscriptionId: users.subscriptionId })
+      .from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+    const stripe = requireStripe();
+    const sub = user?.subscriptionId
+      ? await (stripe.subscriptions.retrieve as any)(user.subscriptionId).catch(() => null)
+      : null;
+    if (!sub || !["active", "trialing", "past_due"].includes(sub.status)) {
+      res.status(409).json({ error: "Plan has ended", code: "RESUBSCRIBE_REQUIRED", message: "Pick a plan to keep selling." });
+      return;
+    }
+    await (stripe.subscriptions.update as any)(user!.subscriptionId, { cancel_at_period_end: false });
+    await db.update(users).set({ subscriptionCancelAtPeriodEnd: false, updatedAt: new Date() })
+      .where(eq(users.clerkId, clerkUserId));
+    res.json({ cancelAtPeriodEnd: false });
+  } catch (err: any) {
+    const status = err.status ?? 500;
+    if (status < 500) { res.status(status).json({ error: err.message }); return; }
+    req.log.error({ err }, "Failed to resume subscription");
+    res.status(500).json({ error: "Failed to resume subscription" });
   }
 });
 
@@ -493,11 +600,14 @@ router.use(
 
 router.get("/return", (req, res) => {
   const status = (req.query.status as string) ?? "success";
-  const plan   = (req.query.plan   as string) ?? "";
-  const title  = status === "success" ? "✓ Trial started" : "Checkout cancelled";
-  const body   = status === "success"
-    ? `Your <strong>${plan}</strong> plan trial is now active. You won't be charged until your ${TRIAL_DAYS}-day trial ends. Close this window and return to the app.`
-    : "Your checkout was cancelled. Close this window and return to the app.";
+  const plan   = isSellerPlanId(req.query.plan) ? PLAN_CATALOGUE[req.query.plan].label : "";
+  const trial  = req.query.trial !== "0";
+  const title  = status !== "success" ? "Checkout cancelled" : trial ? "✓ Trial started" : "✓ Plan started";
+  const body   = status !== "success"
+    ? "Your checkout was cancelled. Close this window and return to the app."
+    : trial
+      ? `Your <strong>${plan}</strong> plan trial is now active. You won't be charged until your ${TRIAL_DAYS}-day trial ends. Close this window and return to the app.`
+      : `Your <strong>${plan}</strong> plan is now active. Close this window and return to the app.`;
 
   res.setHeader("Content-Type", "text/html");
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Brandthread</title>
