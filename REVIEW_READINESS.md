@@ -48,7 +48,7 @@ Legend: PASS (already compliant) · FIXED (open PR) · RISK (decision needed) ·
 
 **Production env / DB**
 7. Apply migrations: 211 (deletion requests), 230 (IAP purchases), 231 (IP repeat-infringer), 240 (AI media registry) **and 240 (review accounts)** (two files share the `240` prefix — confirm your runner applies both), 260 (promo opt-in). None were run against a database in this environment.
-8. Set `RESEND_API_KEY`, `MAIL_FROM` / `RESEND_FROM_EMAIL` (deletion + seller emails fail without them), `REVENUECAT_PROJECT_ID`, `REVENUECAT_WEBHOOK_AUTHORIZATION`, `AI_INTEGRATIONS_OPENAI_API_KEY` (or `OPENAI_API_KEY`), `AI_OUTPUT_MODERATION_STRICT=1`, optional `IP_REPEAT_INFRINGER_STRIKES`.
+8. Set `RESEND_API_KEY`, `MAIL_FROM` / `RESEND_FROM_EMAIL` (deletion + seller emails fail without them), `REVENUECAT_PROJECT_ID`, `REVENUECAT_WEBHOOK_AUTHORIZATION`, an OpenAI key: `OPENAI_API_KEY` (optional `OPENAI_BASE_URL`, default `https://api.openai.com/v1`; key from platform.openai.com → API keys) or, on a Replit deployment, the `AI_INTEGRATIONS_OPENAI_API_KEY` + `AI_INTEGRATIONS_OPENAI_BASE_URL` pair. The API boots without either, but AI features and image/video moderation stay off: production logs an error at boot and `GET /api/healthz/ready` reports `degraded: true`. Also `SENTRY_DSN` (sentry.io → Project Settings → Client Keys (DSN); production logs an error at boot without it), `AI_OUTPUT_MODERATION_STRICT=1`, optional `IP_REPEAT_INFRINGER_STRIKES`.
 9. Confirm the four test env vars are unset in the production EAS env.
 10. Stand up a `legal@brandthread.app` mailbox; have counsel review the IP notice wording.
 

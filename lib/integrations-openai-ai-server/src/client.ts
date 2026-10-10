@@ -1,20 +1,27 @@
-import OpenAI from "openai";
+import type OpenAI from "openai";
 
-if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
-  throw new Error(
-    "AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?",
-  );
-}
+import { lazyOpenAiClient } from "./config";
 
-if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-  throw new Error(
-    "AI_INTEGRATIONS_OPENAI_API_KEY must be set. Did you forget to provision the OpenAI AI integration?",
-  );
-}
+export {
+  DEFAULT_OPENAI_BASE_URL,
+  OpenAiNotConfiguredError,
+  createOpenAiClient,
+  isOpenAiConfigured,
+  lazyOpenAiClient,
+  resolveOpenAiConfig,
+  type OpenAiConfig,
+  type OpenAiConfigSource,
+} from "./config";
 
-export const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+/**
+ * Shared, metered client. Created on first use (see config.ts), so importing
+ * this package never throws when the AI env is missing; a call without
+ * credentials throws OpenAiNotConfiguredError.
+ */
+export const openai: OpenAI = lazyOpenAiClient((client) => {
+  meter(client.chat.completions, "create", "chat");
+  meter(client.images, "generate", "image");
+  meter(client.images, "edit", "image_edit");
 });
 
 // ─── Usage reporting ─────────────────────────────────────────────────────────
@@ -67,7 +74,3 @@ function meter<T extends object>(
     return result;
   };
 }
-
-meter(openai.chat.completions, "create", "chat");
-meter(openai.images, "generate", "image");
-meter(openai.images, "edit", "image_edit");

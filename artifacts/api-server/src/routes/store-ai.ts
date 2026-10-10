@@ -1,14 +1,12 @@
 import { Router } from "express";
 import { db, storefronts } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import OpenAI from "openai";
 import { requireAuth } from "../middlewares/requireAuth";
 import { generateText } from "@workspace/integrations-openai-ai-server/text";
+import { lazyOpenAiClient } from "@workspace/integrations-openai-ai-server/config";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+// Created on first use: importing this router must not throw without AI env.
+const openai = lazyOpenAiClient();
 
 const router = Router();
 router.use(requireAuth);
