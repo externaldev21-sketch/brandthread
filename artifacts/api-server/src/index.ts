@@ -14,10 +14,10 @@ import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
 import { startDisputeEvidenceReminderJob } from "./jobs/disputeEvidenceReminder";
 import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
 import { startMoneySweepJob } from "./jobs/moneySweep";
-import { startSellerWinbackJob } from "./jobs/sellerWinback";
 import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
+import { startSellerWinbackJob } from "./jobs/sellerWinback";
 import { startAnalyticsRetentionJob } from "./jobs/analyticsRetention";
 import { startAccountPurgeJob } from "./jobs/accountPurge";
 import { startDataExportJob } from "./jobs/dataExportJob";
@@ -84,10 +84,10 @@ const server = app.listen(port, (err) => {
   startDisputeEvidenceReminderJob();
   startDesignStudioObjectCleanupJob();
   startMoneySweepJob();
-  startSellerWinbackJob(); // one "your store is saved" after a plan ends
   startAffiliatePayoutsJob();
   startDeliveryDeadlinesJob();
   startStoryCleanupJob();
+  startSellerWinbackJob(); // one "your store is saved" after a plan ends
   startAnalyticsRetentionJob();
   startAccountPurgeJob();
   startDataExportJob();
