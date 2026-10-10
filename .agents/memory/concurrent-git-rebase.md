@@ -3,6 +3,12 @@ name: Concurrent Git operations in shared checkout
 description: How to protect and verify work when another session changes Git operation state
 ---
 
+Check both the unmerged index and literal conflict markers in source before committing a merge. Resolve modify/delete paths separately from paths that have an "ours" version.
+
+**Why:** A batched `git checkout --ours` that includes a path with no stage-two version can fail without restoring the other paths. Staging afterward can hide the unresolved source markers from Git's unmerged-path list.
+
+**How to apply:** Check the command's exit status, resolve each remaining path deliberately, scan the source for markers, and typecheck the final combined tree before delivering it.
+
 Before acting on a rebase you did not start, inspect its original branch, current HEAD, index, and reflog. Preserve the original branch tip with a backup ref and snapshot any uncommitted conflict worktree before aborting; do not continue another session's rebase or manually delete its metadata when abort succeeds.
 
 **Why:** A concurrent session initiated a rebase in the shared checkout during preview verification, detaching HEAD and leaving a mobile file with conflict markers. The app returned HTTP 500 even though the prior merge commit and checks had passed. The original branch tip still held the completed work.
