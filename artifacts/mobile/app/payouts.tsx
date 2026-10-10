@@ -34,6 +34,7 @@ import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 import { formatCents } from '@/lib/money';
 import { signedBalance, pausedRowCaption } from '@/lib/recoveries';
+import { HeldForDeliverySection } from '@/components/payouts/HeldForDeliveryRow';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -336,6 +337,7 @@ function PayoutsScreenContent() {
           </TouchableOpacity>
         )}
       </View>
+      <HeldForDeliverySection />
 
       {!isPreview && (
         <StripeConnectWarning

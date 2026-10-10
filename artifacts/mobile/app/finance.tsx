@@ -26,6 +26,7 @@ import { API_BASE_URL, storeContextHeaders, versionApiPath } from '@/lib/api';
 import { fetchStatementCsv, statementErrorLabel, statementFilename, STATEMENT_CSV_PATH } from '@/lib/financeStatement';
 import { saveCsvFile } from '@/lib/saveCsvFile';
 import { RecoveryPauseCard } from '@/components/finance/RecoveryPauseCard';
+import { HeldForDeliveryRow } from '@/components/payouts/HeldForDeliveryRow';
 
 function fmtDate(iso: string | number) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -269,6 +270,7 @@ export default function FinanceScreen() {
       {!isReadOnly && (!isSignedOutSellerPreview || isDemoPreview) && (
         <FinanceMoneyFlow summary={summary} loading={loading} error={summaryError} onRetry={load} />
       )}
+      {!loading && (summary || isDemoPreview) && <HeldForDeliveryRow summary={summary} />}
 
       {/* Overview (Stripe balance) — shown when the ledger summary is unavailable */}
       {!isDemoPreview && (isReadOnly || isSignedOutSellerPreview || (!summary && summaryError)) && (
