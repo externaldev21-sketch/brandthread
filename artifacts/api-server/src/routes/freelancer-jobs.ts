@@ -8,18 +8,33 @@
  *     lands on the PLATFORM account (no transfer_data / application fee).
  *  2. platformFeeCents (5%, PLATFORM_COMMISSION_RATE) and
  *     freelancerPayoutCents are recorded on the job row at creation.
- *  3. When the freelancer marks the job complete, the net amount is sent to
- *     their Connect account via a Stripe transfer (source_transaction ties the
- *     payout to the original charge).
- *  4. Cancelling a paid job (pending/accepted only) refunds the PaymentIntent.
+ *  3. The freelancer DELIVERS the work (no money moves). The hirer approves,
+ *     requests a revision (max 3), or reports a problem (→ 'disputed', which
+ *     freezes the payout). An untouched delivery is approved automatically
+ *     after FREELANCER_AUTO_RELEASE_DAYS (default 3).
+ *  4. Only approval (hirer or auto-release) sends the net amount to the
+ *     freelancer's Connect account (lib/freelancerRelease.ts; source_transaction
+ *     ties the payout to the original charge). A freelancer can never trigger
+ *     their own payout.
+ *  5. Cancelling a paid job refunds the PaymentIntent (see the cancel route).
  */
 import { Router } from "express";
 import { db, freelancers, freelancerJobs, users } from "@workspace/db";
-import { and, eq, desc, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, desc, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getWebOrigin } from "../lib/webOrigin";
 import { requireStripe, computeApplicationFeeCents } from "../lib/stripe";
-import { payoutIdempotencyKey, refundJobPayment } from "../lib/freelancerEscrow";
+import { refundJobPayment } from "../lib/freelancerEscrow";
+import {
+  FREELANCER_REVISION_CAP,
+  autoReleaseAtFrom,
+  autoReleaseDays,
+  displayName,
+  formatDays,
+  formatUsd,
+  notifyJob,
+  releaseJobPayout,
+} from "../lib/freelancerRelease";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -48,6 +63,15 @@ function shapeJob(job: JobRow, extras: Record<string, unknown> = {}) {
     platformFeeCents:      job.platformFeeCents,
     freelancerPayoutCents: job.freelancerPayoutCents,
     completedAt:           job.completedAt,
+    deliveredAt:           job.deliveredAt,
+    deliveryNote:          job.deliveryNote,
+    revisionCount:         job.revisionCount,
+    revisionsLeft:         Math.max(0, FREELANCER_REVISION_CAP - job.revisionCount),
+    revisionNote:          job.revisionNote,
+    autoReleaseAt:         job.autoReleaseAt,
+    approvedBy:            job.approvedBy,
+    disputedAt:            job.disputedAt,
+    disputeReason:         job.disputeReason,
     createdAt:             job.createdAt,
     updatedAt:             job.updatedAt,
     ...extras,
@@ -78,7 +102,10 @@ function sendError(req: any, res: any, err: any, fallback: string) {
     err?.status ??
     (typeof err?.statusCode === "number" && err.statusCode < 500 ? 409 : 500);
   if (status < 500) {
-    res.status(status).json({ error: err?.message ?? fallback });
+    res.status(status).json({
+      error: err?.message ?? fallback,
+      ...(typeof err?.code === "string" && err?.status ? { code: err.code } : {}),
+    });
   } else {
     (req.log ?? logger).error({ err }, fallback);
     res.status(500).json({ error: fallback });
@@ -556,23 +583,88 @@ router.patch("/:id/start", async (req, res) => {
 });
 
 /**
- * PATCH /api/freelancer-jobs/:id/complete
- * Freelancer marks the job complete → payout transfer to their Connect account.
- *
- * Double-payout safety:
- *  1. The in_progress → completed flip is a single conditional UPDATE — an
- *     atomic claim only one concurrent request can win. No money moves before
- *     the claim.
- *  2. The transfer uses a deterministic idempotency key per job, so a retry
- *     after a crash — or the losing side of a race — converges on the SAME
- *     Stripe transfer instead of creating a second one.
- *  3. The transfer id is persisted immediately after the transfer; a job left
- *     completed with no transfer id (crash window) is reconciled by calling
- *     this endpoint again.
+ * Freelancer delivers the work (BT-446). No money moves here — the payout is
+ * released only when the hirer approves, or automatically after
+ * FREELANCER_AUTO_RELEASE_DAYS with no hirer action (jobs/freelancerAutoRelease).
+ * Body: { note? } — an optional delivery message (max 2000 chars).
  */
-router.patch("/:id/complete", async (req, res) => {
+async function deliverJob(req: any, res: any, legacyComplete: boolean) {
+  const { id } = req.params;
+  const row = await loadJobWithFreelancer(id);
+  if (!row) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const shapeDelivered = (job: JobRow) =>
+    legacyComplete
+      ? {
+          job: shapeJob(job, { role: "freelancer" }),
+          // Older app builds read `payout` from this response. Nothing is
+          // transferred on delivery; transferId stays null until approval.
+          payout: { amountCents: job.freelancerPayoutCents, transferId: job.stripeTransferId ?? null },
+          delivered: true,
+        }
+      : { job: shapeJob(job, { role: "freelancer" }) };
+
+  // Idempotent: delivering twice (double tap / retry) returns the delivery.
+  if (row.job.status === "delivered" || row.job.status === "completed") {
+    res.json(shapeDelivered(row.job));
+    return;
+  }
+  if (row.job.status !== "in_progress") {
+    res.status(409).json({ error: `Job can't be delivered from status '${row.job.status}'` });
+    return;
+  }
+  if (row.job.paymentStatus !== "paid") {
+    res.status(409).json({ error: "Payment hasn't been confirmed yet", code: "PAYMENT_NOT_CONFIRMED" });
+    return;
+  }
+
+  const rawNote = req.body?.note;
+  if (rawNote !== undefined && rawNote !== null && typeof rawNote !== "string") {
+    res.status(400).json({ error: "note must be text" });
+    return;
+  }
+  const note = typeof rawNote === "string" ? rawNote.trim().slice(0, 2000) : "";
+
+  const now = new Date();
+  const [updated] = await db
+    .update(freelancerJobs)
+    .set({
+      status: "delivered",
+      deliveredAt: now,
+      deliveryNote: note || null,
+      autoReleaseAt: autoReleaseAtFrom(now),
+      autoReleaseRemindedAt: null,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(freelancerJobs.id, id),
+        eq(freelancerJobs.status, "in_progress"),
+        eq(freelancerJobs.paymentStatus, "paid"),
+      ),
+    )
+    .returning();
+  if (!updated) {
+    res.status(409).json({ error: "Job status changed — refresh and try again" });
+    return;
+  }
+
+  const name = await displayName(row.freelancer.userId, "Your freelancer");
+  notifyJob(
+    updated.sellerId,
+    updated.id,
+    "freelancer_job_delivered",
+    "Work delivered",
+    `${name} delivered "${updated.title}". Approve it or request a revision within ${formatDays(autoReleaseDays())}, or it's marked complete and paid out.`,
+  );
+  res.json(shapeDelivered(updated));
+}
+
+router.patch("/:id/deliver", async (req, res) => {
   try {
-    const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
     const { id } = req.params;
     if (!UUID_RE.test(id)) {
@@ -585,202 +677,262 @@ router.patch("/:id/complete", async (req, res) => {
       return;
     }
     if (roleFor(row, clerkUserId) !== "freelancer") {
-      res.status(403).json({ error: "Only the freelancer can complete this job" });
+      res.status(403).json({ error: "Only the freelancer can deliver this job" });
       return;
     }
+    await deliverJob(req, res, false);
+  } catch (err: any) {
+    sendError(req, res, err, "Failed to deliver job");
+  }
+});
 
-    // Idempotent success — already completed and paid out (or nothing to pay).
-    if (
-      row.job.status === "completed" &&
-      (row.job.stripeTransferId || row.job.freelancerPayoutCents <= 0)
-    ) {
-      res.json({
-        job: shapeJob(row.job, { role: "freelancer" }),
-        payout: {
-          amountCents: row.job.freelancerPayoutCents,
-          transferId: row.job.stripeTransferId ?? null,
-        },
+/**
+ * PATCH /api/freelancer-jobs/:id/complete — kept for older app builds.
+ *  - Freelancer: means "deliver" (no payout — see BT-446). A freelancer can
+ *    never trigger their own payout.
+ *  - Hirer: means "approve" (same as /approve).
+ */
+router.patch("/:id/complete", async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    const row = await loadJobWithFreelancer(id);
+    if (!row) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    const role = roleFor(row, clerkUserId);
+    if (role === "freelancer") {
+      await deliverJob(req, res, true);
+      return;
+    }
+    if (role === "hirer") {
+      await approveJob(req, res, row);
+      return;
+    }
+    res.status(403).json({ error: "Not your job" });
+  } catch (err: any) {
+    sendError(req, res, err, "Failed to complete job");
+  }
+});
+
+/**
+ * Hirer approves the delivery → completed + payout transfer (exactly once;
+ * see lib/freelancerRelease.ts). Also retries a payout left unsent by a crash.
+ */
+async function approveJob(
+  req: any,
+  res: any,
+  row: NonNullable<Awaited<ReturnType<typeof loadJobWithFreelancer>>>,
+) {
+  if (row.job.status === "disputed") {
+    res.status(409).json({
+      error: "This job is under review by Brandthread. Payment is on hold until it's resolved.",
+      code: "JOB_DISPUTED",
+    });
+    return;
+  }
+  const stripe = requireStripe();
+  const result = await releaseJobPayout(stripe, row.job.id, { trigger: "hirer" });
+  if (result.claimedNow) {
+    const hirer = await displayName(row.job.sellerId, "The hirer");
+    notifyJob(
+      row.freelancer.userId,
+      row.job.id,
+      "freelancer_job_approved",
+      "Payment released",
+      `${hirer} approved "${row.job.title}". ${formatUsd(result.amountCents)} is on its way to your bank account.`,
+      "payouts",
+    );
+  }
+  res.json({
+    job: shapeJob(result.job, { role: "hirer" }),
+    payout: { amountCents: result.amountCents, transferId: result.transferId },
+  });
+}
+
+router.patch("/:id/approve", async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    const row = await loadJobWithFreelancer(id);
+    if (!row) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    if (roleFor(row, clerkUserId) !== "hirer") {
+      res.status(403).json({ error: "Only the hirer can approve this job" });
+      return;
+    }
+    await approveJob(req, res, row);
+  } catch (err: any) {
+    sendError(req, res, err, "Failed to approve job");
+  }
+});
+
+/**
+ * PATCH /api/freelancer-jobs/:id/request-revision — hirer sends a delivery
+ * back (delivered → in_progress). Body: { note } (required, max 2000).
+ * Capped at FREELANCER_REVISION_CAP (3) per job; after that the hirer can
+ * approve or report a problem.
+ */
+router.patch("/:id/request-revision", async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    const row = await loadJobWithFreelancer(id);
+    if (!row) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    if (roleFor(row, clerkUserId) !== "hirer") {
+      res.status(403).json({ error: "Only the hirer can request a revision" });
+      return;
+    }
+    const note = typeof req.body?.note === "string" ? req.body.note.trim().slice(0, 2000) : "";
+    if (!note) {
+      res.status(400).json({ error: "Tell the freelancer what to change" });
+      return;
+    }
+    if (row.job.status !== "delivered") {
+      res.status(409).json({ error: `A revision can't be requested from status '${row.job.status}'` });
+      return;
+    }
+    if (row.job.revisionCount >= FREELANCER_REVISION_CAP) {
+      res.status(409).json({
+        error: `You've used all ${FREELANCER_REVISION_CAP} revisions. Approve the delivery or report a problem.`,
+        code: "REVISION_LIMIT",
       });
       return;
     }
 
-    // completed + no transfer id = a previous attempt crashed between the
-    // claim and the payout; let the payout step run again.
-    const retryingPayout = row.job.status === "completed" && !row.job.stripeTransferId;
-    if (row.job.status !== "in_progress" && !retryingPayout) {
-      res.status(409).json({ error: `Job can't be completed from status '${row.job.status}'` });
+    const [updated] = await db
+      .update(freelancerJobs)
+      .set({
+        status: "in_progress",
+        revisionCount: sql`${freelancerJobs.revisionCount} + 1`,
+        revisionNote: note,
+        autoReleaseAt: null,
+        autoReleaseRemindedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(freelancerJobs.id, id),
+          eq(freelancerJobs.status, "delivered"),
+          lt(freelancerJobs.revisionCount, FREELANCER_REVISION_CAP),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      res.status(409).json({ error: "Job status changed — refresh and try again" });
+      return;
+    }
+
+    const hirer = await displayName(updated.sellerId, "The hirer");
+    notifyJob(
+      row.freelancer.userId,
+      updated.id,
+      "freelancer_job_revision",
+      "Revision requested",
+      `${hirer} asked for changes to "${updated.title}": ${note.slice(0, 140)}`,
+    );
+    res.json({ job: shapeJob(updated, { role: "hirer" }) });
+  } catch (err: any) {
+    sendError(req, res, err, "Failed to request revision");
+  }
+});
+
+/**
+ * PATCH /api/freelancer-jobs/:id/dispute — hirer reports a problem
+ * (in_progress | delivered → disputed). Freezes the payout: approval and
+ * auto-release never claim a disputed job. Brandthread resolves it from the
+ * admin disputes area (lib/freelancerRelease listOpenFreelancerJobDisputes).
+ * Body: { reason } (required, max 2000).
+ */
+router.patch("/:id/dispute", async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    const row = await loadJobWithFreelancer(id);
+    if (!row) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    if (roleFor(row, clerkUserId) !== "hirer") {
+      res.status(403).json({ error: "Only the hirer can report a problem with this job" });
+      return;
+    }
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 2000) : "";
+    if (!reason) {
+      res.status(400).json({ error: "Describe the problem" });
+      return;
+    }
+    if (row.job.status === "disputed") {
+      res.json({ job: shapeJob(row.job, { role: "hirer" }) });
+      return;
+    }
+    if (row.job.status !== "delivered" && row.job.status !== "in_progress") {
+      res.status(409).json({ error: `A problem can't be reported from status '${row.job.status}'` });
       return;
     }
     if (row.job.paymentStatus !== "paid") {
       res.status(409).json({ error: "Payment hasn't been confirmed yet", code: "PAYMENT_NOT_CONFIRMED" });
       return;
     }
-    if (!row.freelancer.stripeAccountId) {
-      res.status(409).json({ error: "Connect a bank account before completing jobs", code: "NO_CONNECT_ACCOUNT" });
+
+    const now = new Date();
+    const [updated] = await db
+      .update(freelancerJobs)
+      .set({
+        status: "disputed",
+        disputedAt: now,
+        disputeReason: reason,
+        disputeOpenedBy: "hirer",
+        autoReleaseAt: null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(freelancerJobs.id, id),
+          inArray(freelancerJobs.status, ["delivered", "in_progress"]),
+          isNull(freelancerJobs.stripeTransferId),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      res.status(409).json({ error: "Job status changed — refresh and try again" });
       return;
     }
 
-    // 1) Atomic claim — flips the status BEFORE any money moves. Exactly one
-    //    concurrent request wins; everyone else reconciles below.
-    let claimedNow = false;
-    if (!retryingPayout) {
-      const [claimed] = await db
-        .update(freelancerJobs)
-        .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
-        .where(
-          and(
-            eq(freelancerJobs.id, id),
-            eq(freelancerJobs.status, "in_progress"),
-            eq(freelancerJobs.paymentStatus, "paid"),
-          ),
-        )
-        .returning({ id: freelancerJobs.id });
-      claimedNow = !!claimed;
-
-      if (!claimedNow) {
-        const fresh = await loadJobWithFreelancer(id);
-        if (!fresh) {
-          res.status(404).json({ error: "Job not found" });
-          return;
-        }
-        if (fresh.job.status !== "completed") {
-          res.status(409).json({ error: "Job status changed — refresh and try again" });
-          return;
-        }
-        if (fresh.job.stripeTransferId) {
-          // The concurrent winner already paid out — idempotent success.
-          res.json({
-            job: shapeJob(fresh.job, { role: "freelancer" }),
-            payout: {
-              amountCents: fresh.job.freelancerPayoutCents,
-              transferId: fresh.job.stripeTransferId,
-            },
-          });
-          return;
-        }
-        // Claimed by a request whose payout isn't persisted yet — fall
-        // through; the idempotency key converges both on one transfer.
-      }
-    }
-
-    // 2) Payout transfer — deterministic idempotency key per job.
-    let stripeTransferId: string | null = null;
-    if (row.job.freelancerPayoutCents > 0) {
-      // source_transaction ties the payout to this job's escrow charge; a
-      // transfer without it would draw from the platform's GENERAL balance —
-      // unrelated funds. So the charge is mandatory: no charge, no transfer.
-      let sourceCharge: string | undefined;
-      if (row.job.stripePaymentIntentId) {
-        try {
-          const pi = await stripe.paymentIntents.retrieve(row.job.stripePaymentIntentId);
-          sourceCharge =
-            typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id;
-        } catch (piErr) {
-          (req.log ?? logger).warn({ err: piErr, jobId: id }, "Could not retrieve job PaymentIntent");
-        }
-      }
-      if (!sourceCharge) {
-        // Fail safely and stay retryable: roll the claim back instead of
-        // paying out untied funds.
-        if (claimedNow) {
-          await db
-            .update(freelancerJobs)
-            .set({ status: "in_progress", completedAt: null, updatedAt: new Date() })
-            .where(
-              and(
-                eq(freelancerJobs.id, id),
-                eq(freelancerJobs.status, "completed"),
-                isNull(freelancerJobs.stripeTransferId),
-              ),
-            );
-        }
-        res.status(409).json({
-          error: "Couldn't verify the escrow payment for this job — try again shortly.",
-          code: "SOURCE_CHARGE_UNAVAILABLE",
-        });
-        return;
-      }
-
-      try {
-        const transfer = await stripe.transfers.create(
-          {
-            amount:         row.job.freelancerPayoutCents,
-            currency:       "usd",
-            destination:    row.freelancer.stripeAccountId,
-            transfer_group: `freelancer_job_${row.job.id}`,
-            source_transaction: sourceCharge,
-            metadata: {
-              freelancerJobId: row.job.id,
-              freelancerId:    row.freelancer.id,
-              trigger:         "job_complete",
-            },
-          },
-          { idempotencyKey: payoutIdempotencyKey(row.job.id) },
-        );
-        stripeTransferId = transfer.id;
-      } catch (transferErr: any) {
-        const idempotencyConflict =
-          transferErr?.raw?.type === "idempotency_error" ||
-          transferErr?.type === "StripeIdempotencyError";
-        if (idempotencyConflict) {
-          // Same key, different params or still in flight — the transfer
-          // already exists (or is being created); find it by transfer group.
-          const existing = await stripe.transfers.list({
-            transfer_group: `freelancer_job_${row.job.id}`,
-            limit: 10,
-          });
-          const match = existing.data.find(
-            (t) => t.metadata?.["freelancerJobId"] === row.job.id,
-          );
-          if (!match) throw transferErr;
-          stripeTransferId = match.id;
-        } else {
-          // Transfer genuinely failed. Roll the claim back so the freelancer
-          // can retry once the problem (e.g. Connect account) is fixed.
-          if (claimedNow) {
-            await db
-              .update(freelancerJobs)
-              .set({ status: "in_progress", completedAt: null, updatedAt: new Date() })
-              .where(
-                and(
-                  eq(freelancerJobs.id, id),
-                  eq(freelancerJobs.status, "completed"),
-                  isNull(freelancerJobs.stripeTransferId),
-                ),
-              );
-          }
-          throw transferErr;
-        }
-      }
-
-      // 3) Persist the transfer id immediately, before anything else can fail.
-      await db
-        .update(freelancerJobs)
-        .set({ stripeTransferId, updatedAt: new Date() })
-        .where(and(eq(freelancerJobs.id, id), isNull(freelancerJobs.stripeTransferId)));
-    }
-
-    // Stats increment exactly once — tied to winning the claim.
-    if (claimedNow) {
-      await db
-        .update(freelancers)
-        .set({
-          totalJobsCompleted: sql`${freelancers.totalJobsCompleted} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(freelancers.id, row.freelancer.id));
-    }
-
-    const final = await loadJobWithFreelancer(id);
-    res.json({
-      job: shapeJob(final?.job ?? row.job, { role: "freelancer" }),
-      payout: {
-        amountCents: row.job.freelancerPayoutCents,
-        transferId: final?.job.stripeTransferId ?? stripeTransferId,
-      },
-    });
+    const hirer = await displayName(updated.sellerId, "The hirer");
+    notifyJob(
+      row.freelancer.userId,
+      updated.id,
+      "freelancer_job_disputed",
+      "Problem reported",
+      `${hirer} reported a problem with "${updated.title}". Payment is on hold while Brandthread reviews it.`,
+      "disputes",
+    );
+    res.json({ job: shapeJob(updated, { role: "hirer" }) });
   } catch (err: any) {
-    sendError(req, res, err, "Failed to complete job");
+    sendError(req, res, err, "Failed to report a problem");
   }
 });
 
@@ -788,8 +940,13 @@ router.patch("/:id/complete", async (req, res) => {
  * PATCH /api/freelancer-jobs/:id/cancel
  * Hirer or freelancer cancels — from pending/accepted, or from in_progress
  * BEFORE any payout. The in_progress case is the recovery path when a payout
- * can't be delivered (e.g. the freelancer's account became restricted):
- * completion rolls back to in_progress, and cancelling refunds the hirer.
+ * can't be delivered (e.g. the freelancer's account became restricted).
+ * After work has been delivered (BT-446):
+ *  - the freelancer may still cancel (delivered or in revision) → refund;
+ *  - the hirer may not cancel once a delivery exists — they approve, request
+ *    a revision, or report a problem instead (otherwise "receive the work,
+ *    cancel for a refund" would bypass the review step);
+ *  - a disputed job can't be cancelled from the app; Brandthread resolves it.
  *
  * Order matters: the job is atomically claimed as cancelled FIRST, then the
  * Stripe cleanup runs. Paid jobs are refunded (deterministic idempotency
@@ -839,11 +996,26 @@ router.patch("/:id/cancel", async (req, res) => {
       return;
     }
 
-    if (
-      row.job.status !== "pending" &&
-      row.job.status !== "accepted" &&
-      row.job.status !== "in_progress"
-    ) {
+    if (row.job.status === "disputed") {
+      res.status(409).json({
+        error: "This job is under review by Brandthread and can't be cancelled.",
+        code: "JOB_DISPUTED",
+      });
+      return;
+    }
+    const hasDelivery = !!row.job.deliveredAt;
+    if (role === "hirer" && hasDelivery && (row.job.status === "delivered" || row.job.status === "in_progress")) {
+      res.status(409).json({
+        error: "The work has been delivered. Approve it, request a revision, or report a problem.",
+        code: "JOB_DELIVERED",
+      });
+      return;
+    }
+    const cancellable =
+      role === "freelancer"
+        ? ["pending", "accepted", "in_progress", "delivered"]
+        : ["pending", "accepted", "in_progress"];
+    if (!cancellable.includes(row.job.status)) {
       res.status(409).json({
         error: "Only pending, accepted, or in-progress jobs can be cancelled",
       });
@@ -854,12 +1026,15 @@ router.patch("/:id/cancel", async (req, res) => {
     //    concurrent accept/start/complete can't interleave with the cleanup.
     const [claimed] = await db
       .update(freelancerJobs)
-      .set({ status: "cancelled", updatedAt: new Date() })
+      .set({ status: "cancelled", autoReleaseAt: null, updatedAt: new Date() })
       .where(
         and(
           eq(freelancerJobs.id, id),
-          inArray(freelancerJobs.status, ["pending", "accepted", "in_progress"]),
+          inArray(freelancerJobs.status, cancellable),
           isNull(freelancerJobs.stripeTransferId),
+          // Re-checked atomically: a delivery landing mid-request blocks a
+          // hirer cancel just like the pre-check above.
+          ...(role === "hirer" ? [isNull(freelancerJobs.deliveredAt)] : []),
         ),
       )
       .returning();

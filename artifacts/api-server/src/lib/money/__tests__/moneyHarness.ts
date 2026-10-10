@@ -167,7 +167,7 @@ export async function buyLabel(orderId: string, sellerId: string, priceCents: nu
 }
 
 export async function seedManufacturer() {
-  const [manufacturer] = await db.insert(manufacturers).values({
+  const [manufacturer] = await db.insert(manufacturers).values({ verificationStatus: "verified",
     businessName: `Factory ${uid("mfr")}`,
     country: "PT",
     specialty: "Knitwear",

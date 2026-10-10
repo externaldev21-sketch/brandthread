@@ -845,8 +845,11 @@ export async function recordBulkPaidFromHeld(executor: DbExecutor, input: {
   sellerId: string;
   manufacturerId: string;
   amountCents: number;
+  /** Brandthread's 5% kept from the wallet payment (BT-453); 0 for legacy full transfers. */
+  platformFeeCents?: number;
   transferId: string | null;
 }): Promise<boolean> {
+  const feeCents = Math.min(Math.max(0, input.platformFeeCents ?? 0), input.amountCents);
   const { posted } = await postLedgerTransaction(executor, {
     idempotencyKey: `bulk-payment/${input.sampleOrderId}`,
     kind: "bulk_paid_from_held",
@@ -857,7 +860,8 @@ export async function recordBulkPaidFromHeld(executor: DbExecutor, input: {
     memo: "Manufacturer bulk order paid from the drop's held preorder funds",
     postings: [
       { account: "seller_held", partyId: input.sellerId, orderId: null, amountCents: -input.amountCents },
-      { account: "manufacturer_paid", partyId: input.manufacturerId, orderId: null, amountCents: input.amountCents },
+      { account: "manufacturer_paid", partyId: input.manufacturerId, orderId: null, amountCents: input.amountCents - feeCents },
+      { account: "platform_revenue", orderId: null, amountCents: feeCents },
     ],
   });
   if (posted) await advanceDropEscrow(executor, input.dropId, "production");

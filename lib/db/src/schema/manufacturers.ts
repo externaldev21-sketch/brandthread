@@ -32,7 +32,17 @@ export const manufacturers = pgTable('manufacturers', {
   // false = only visible to the seller who invited them
   isPublicDirectory:  boolean('is_public_directory').notNull().default(true),
   verifiedAt:         timestamp('verified_at'),
-  paymentSetup:       boolean('payment_setup').notNull().default(false),
+  // Light vetting (migration 454). 'pending_verification' | 'verified' | 'rejected'.
+  // Pending manufacturers can build their profile but stay out of the public
+  // directory and can't send payable order cards.
+  verificationStatus: text('verification_status').notNull().default('pending_verification'),
+  verificationNote:   text('verification_note'),
+  verificationDecidedBy: text('verification_decided_by'),
+  verificationDecidedAt: timestamp('verification_decided_at', { withTimezone: true }),
+  // Manufacturer Terms version accepted at registration (history: legal_acceptances).
+  termsVersion:       text('terms_version'),
+  termsAcceptedAt:    timestamp('terms_accepted_at', { withTimezone: true }),
+  paymentSetup:      boolean('payment_setup').notNull().default(false),
   // Stripe Connect Express — manufacturer receives payouts here
   stripeAccountId:    text('stripe_account_id'),
   stripeAccountStatus: text('stripe_account_status'), // 'pending' | 'active' | 'restricted'
@@ -148,6 +158,8 @@ export const manufacturerThreads = pgTable('manufacturer_threads', {
   lastMessage:    text('last_message').notNull().default(''),
   lastMessageAt:  timestamp('last_message_at').defaultNow().notNull(),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
+  // Last "new message" email sent to the manufacturer (30-minute throttle, migration 455).
+  manufacturerEmailedAt: timestamp('manufacturer_emailed_at', { withTimezone: true }),
 }, (table) => ({
   manufacturerIdx: index('manufacturer_threads_manufacturer_id_idx').on(table.manufacturerId),
 }));
@@ -169,6 +181,9 @@ export const manufacturerMessages = pgTable('manufacturer_messages', {
   mediaUrls:   json('media_urls').$type<string[]>().notNull().default([]),
   // For sample_card / bulk_card messages
   cardData:    json('card_data').$type<Record<string, unknown> | null>(),
+  // Off-platform contact / payment-steering kinds found by the chat filter
+  // (migration 455). Null when nothing was detected.
+  contactFlags: json('contact_flags').$type<string[] | null>(),
   sentAt:      timestamp('sent_at').defaultNow().notNull(),
 }, (table) => ({
   threadIdx: index('manufacturer_messages_thread_id_idx').on(table.threadId),
@@ -278,7 +293,23 @@ export const sampleOrders = pgTable('sample_orders', {
   createdAt:               timestamp('created_at').defaultNow().notNull(),
   updatedAt:               timestamp('updated_at').defaultNow().notNull(),
   revision:                integer('revision').notNull().default(1),
+  // B2B money (migration 451). Fees are fixed when Checkout opens / the wallet
+  // pays: manufacturerNetCents is what the manufacturer actually receives.
+  processingFeeEstimateCents: integer('processing_fee_estimate_cents').notNull().default(0),
+  manufacturerNetCents:    integer('manufacturer_net_cents'),
+  // 'card' | 'us_bank_account' | 'drop_wallet'; set once payment starts.
+  paymentMethodType:       text('payment_method_type'),
+  paymentFailedAt:         timestamp('payment_failed_at'),
+  refundedCents:           integer('refunded_cents').notNull().default(0),
+  platformFeeRefundedCents: integer('platform_fee_refunded_cents').notNull().default(0),
+  // Seller cancel request on a paid card: 'none' | 'requested' | 'declined' | 'approved'
+  cancelRequestState:      text('cancel_request_state').notNull().default('none'),
+  cancelRequestReason:     text('cancel_request_reason'),
+  cancelRequestedAt:       timestamp('cancel_requested_at'),
+  // The accepted seller quote this card was created from (one card per quote).
+  quoteRequestId:          uuid('quote_request_id'),
 }, (t) => ({
+  quoteRequestUnique: uniqueIndex('sample_orders_quote_request_unique').on(t.quoteRequestId),
   sellerIdx: index('sample_orders_seller_idx').on(t.sellerId),
   mfgIdx:    index('sample_orders_mfg_idx').on(t.manufacturerId),
   threadIdx: index('sample_orders_thread_idx').on(t.threadId),
@@ -311,6 +342,33 @@ export const manufacturerOrderEvents = pgTable('manufacturer_order_events', {
 }, (t) => ({
   orderCreatedIdx: index('manufacturer_order_events_order_created_idx').on(t.sampleOrderId, t.createdAt),
   manufacturerIdx: index('manufacturer_order_events_manufacturer_idx').on(t.manufacturerId),
+}));
+
+// ─── Sample / bulk order refunds (migration 452) ──────────────────────────────
+// One row per refund of a paid B2B card. idempotencyKey makes a retried or
+// double-clicked refund a no-op; the Stripe ids are filled as each call lands.
+export const sampleOrderRefunds = pgTable('sample_order_refunds', {
+  id:                       uuid('id').primaryKey().defaultRandom(),
+  sampleOrderId:            uuid('sample_order_id').notNull().references(() => sampleOrders.id, { onDelete: 'cascade' }),
+  idempotencyKey:           text('idempotency_key').notNull().unique(),
+  amountCents:              integer('amount_cents').notNull(),
+  platformFeeRefundedCents: integer('platform_fee_refunded_cents').notNull().default(0),
+  // 'card_refund' (Stripe refund + transfer reversal) | 'wallet_reversal'
+  method:                   text('method').notNull(),
+  // 'pending' | 'succeeded' | 'failed'
+  state:                    text('state').notNull().default('pending'),
+  stripeRefundId:           text('stripe_refund_id'),
+  stripeTransferReversalId: text('stripe_transfer_reversal_id'),
+  stripeFeeRefundId:        text('stripe_fee_refund_id'),
+  reason:                   text('reason'),
+  // 'manufacturer' | 'admin' | 'cancel_request'
+  initiatedByRole:          text('initiated_by_role').notNull(),
+  initiatedBy:              text('initiated_by'),
+  error:                    text('error'),
+  createdAt:                timestamp('created_at').defaultNow().notNull(),
+  updatedAt:                timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  orderIdx: index('sample_order_refunds_order_idx').on(t.sampleOrderId),
 }));
 
 // ─── Manufacturer Product Catalog (browsable listings, Alibaba-style) ─────────
@@ -408,4 +466,26 @@ export const dropWalletTransactions = pgTable('drop_wallet_transactions', {
   walletIdx: index('dwt_wallet_idx').on(t.walletId),
   orderIdx:  index('dwt_order_idx').on(t.orderId),
   sampleOrderIdx: index('dwt_sample_order_id_idx').on(t.sampleOrderId),
+}));
+
+// ─── Manufacturer chat contact signals (migration 455) ───────────────────────
+// One row per seller↔manufacturer message that tripped the off-platform
+// contact / payment-steering detector. Admin-only: the excerpt is the original
+// text, while the stored message keeps the masked text.
+export const manufacturerContactSignals = pgTable('manufacturer_contact_signals', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  threadId:       uuid('thread_id').notNull().references(() => manufacturerThreads.id, { onDelete: 'cascade' }),
+  messageId:      uuid('message_id').references(() => manufacturerMessages.id, { onDelete: 'set null' }),
+  manufacturerId: uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  sellerId:       text('seller_id').notNull(),
+  senderClerkId:  text('sender_clerk_id').notNull(),
+  senderRole:     text('sender_role').notNull(), // 'seller' | 'manufacturer'
+  kinds:          json('kinds').$type<string[]>().notNull().default([]),
+  masked:         boolean('masked').notNull().default(false),
+  excerpt:        text('excerpt').notNull().default(''),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  senderIdx:  index('manufacturer_contact_signals_sender_idx').on(t.senderClerkId, t.createdAt),
+  createdIdx: index('manufacturer_contact_signals_created_idx').on(t.createdAt),
+  threadIdx:  index('manufacturer_contact_signals_thread_idx').on(t.threadId),
 }));

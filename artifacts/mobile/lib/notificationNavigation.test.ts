@@ -164,6 +164,13 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/payouts');
   });
 
+  it('routes a freelancer job notification to the freelance jobs screen', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('fj-1', { targetType: 'freelancer_job', targetId: 'job-1' }));
+    expect(router.push).toHaveBeenCalledWith('/freelancer-jobs');
+  });
+
   it('routes a dispute notification to the dispute detail screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);

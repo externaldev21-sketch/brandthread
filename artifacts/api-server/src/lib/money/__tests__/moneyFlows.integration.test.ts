@@ -183,7 +183,8 @@ describe("per-order release of held preorder funds", () => {
     const paid = await call(app.base, "POST", `/api/sample-orders/${bulk.id}/pay-from-wallet`, seller, { walletId: wallet.id });
     expect(paid.status).toBe(200);
     expect(fake.state.transfers).toHaveLength(1);
-    expect(fake.state.transfers[0]).toMatchObject({ amount: 6_000, destination: manufacturer.stripeAccountId });
+    // The wallet pays the full 6,000; Brandthread keeps its 5% (BT-453).
+    expect(fake.state.transfers[0]).toMatchObject({ amount: 5_700, destination: manufacturer.stripeAccountId });
     expect(await held(seller, { dropId: drop.id })).toBe(3_120);
     expect((await db.select().from(drops).where(eq(drops.id, drop.id)))[0].escrowState).toBe("production");
 

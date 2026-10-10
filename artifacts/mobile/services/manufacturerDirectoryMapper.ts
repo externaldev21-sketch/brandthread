@@ -35,6 +35,7 @@ export function mapPublicManufacturer(row: any): Manufacturer {
     })) : [],
     isVerified: row.isVerified === true || !!row.verifiedAt, shippingRegions: row.country ? [row.country] : [],
     website: row.website ?? undefined, email: row.contactEmail ?? undefined, phone: row.contactPhone ?? undefined,
+    contactHidden: row.contactHidden === true,
     timeZone: row.timeZone ?? null, isPublicDirectory: row.isPublicDirectory !== false,
     priceRangeLabel: row.priceRange || undefined, sampleTurnaround: row.sampleTurnaround || undefined,
     bulkTurnaround: row.bulkTurnaround || undefined,

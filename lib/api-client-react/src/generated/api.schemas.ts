@@ -128,6 +128,8 @@ export interface ManufacturerInput {
   contactPhone?: string;
   /** @maxLength 64 */
   timeZone?: string;
+  /** Version of the Manufacturer Terms the user ticked at signup. Required by register and register-via-invite (new profiles); must equal the current version. */
+  acceptedTermsVersion?: string;
 }
 
 export interface ManufacturerUpdate {

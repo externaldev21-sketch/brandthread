@@ -11,6 +11,7 @@ import {
 import { formatMoney, isTerminalStatus, localClock, orderStatusLabel, orderTypeLabel, stageIndex, timeZoneOffsetLabel } from "@workspace/manufacturer-flow";
 import { EmptyState, QueryError } from "@/components/query-state";
 import { useConnectStatus } from "@/hooks/use-connect-status";
+import { useVerificationStatus } from "@/hooks/use-verification-status";
 import { cn } from "@/lib/utils";
 
 // Products isn't in the generated dashboard payload yet, so we fetch a lightweight
@@ -47,6 +48,7 @@ export default function Dashboard() {
   const profile = useGetMyManufacturerProfile({ query: { queryKey: getGetMyManufacturerProfileQueryKey(), staleTime: 30_000 } });
   const connect = useConnectStatus();
   const products = useProductsSummary();
+  const verification = useVerificationStatus();
   const [, setTick] = useState(0);
   useEffect(() => { const id = setInterval(() => setTick((tick) => tick + 1), 60_000); return () => clearInterval(id); }, []);
 
@@ -75,6 +77,7 @@ export default function Dashboard() {
   const photos = me?.photos?.length ?? 0;
   const payoutReady = connect.data?.ready === true;
   const paymentsOff = connect.error?.status === 503;
+  const verificationPending = verification.data ? verification.data.status !== "verified" : false;
 
   const stats = [
     { label: "Unread conversations", value: unreadThreads.length, icon: Inbox, href: "/messages" },
@@ -85,11 +88,11 @@ export default function Dashboard() {
   ];
 
   const checklist = [
-    { done: true, label: me?.isPublicDirectory ? "Listed in the public directory" : "Private profile for invited sellers", href: "/profile" },
+    { done: !(me?.isPublicDirectory && verificationPending), label: me?.isPublicDirectory ? (verificationPending ? "Listed once verified" : "Listed in the public directory") : "Private profile for invited sellers", href: "/profile" },
     { done: photos >= 3, label: photos >= 3 ? `${photos} factory photos` : `Add factory photos (${photos}/3 minimum)`, href: "/profile" },
     { done: payoutReady, label: payoutReady ? "Payouts verified" : "Verify your payout account", href: "/payment" },
   ];
-  const setupComplete = checklist.every((item) => item.done);
+  const setupComplete = checklist.every((item) => item.done) && !verificationPending;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -103,7 +106,7 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground" data-testid="status-directory-visibility">
           {me?.isPublicDirectory ? <Eye className="h-3.5 w-3.5 text-primary" /> : <EyeOff className="h-3.5 w-3.5" />}
-          {me?.isPublicDirectory ? "Live in the directory" : "Private listing"}
+          {me?.isPublicDirectory ? (verificationPending ? "Listed once verified" : "Live in the directory") : "Private listing"}
         </div>
       </div>
 
@@ -111,6 +114,9 @@ export default function Dashboard() {
         <section className="rounded-lg border border-primary/30 bg-primary/5 p-5" data-testid="panel-setup-checklist">
           <h2 className="font-semibold">Finish setting up to get paid</h2>
           <p className="mt-1 text-sm text-muted-foreground">Sellers can pay your order cards once your payout account is verified.</p>
+          {verificationPending && verification.data?.message && (
+            <p className="mt-1 text-sm" data-testid="text-verification-missing">{verification.data.message}</p>
+          )}
           <ul className="mt-4 grid gap-2 sm:grid-cols-3">
             {checklist.map((item) => (
               <li key={item.label}>
