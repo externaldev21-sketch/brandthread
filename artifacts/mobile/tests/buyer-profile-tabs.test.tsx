@@ -331,6 +331,12 @@ const { previewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } = vi.hoisted(() =
     },
   },
 }));
+const previewDemo = vi.hoisted(() => ({ on: false }));
+vi.mock('@/lib/devPreview', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/devPreview')>()),
+  isPreviewDemoMode: () => previewDemo.on,
+}));
+
 vi.mock('@/lib/previewThreadCash', () => ({
   isPreviewThreadCashEnabled: () => previewThreadCashEnabled.on,
   PREVIEW_THREAD_CASH_STATUS,
@@ -441,6 +447,7 @@ describe('buyer profile tabs', () => {
     routerMock.push.mockReset();
     signedInUser.current = { id: 'buyer-1' };
     previewThreadCashEnabled.on = false;
+    previewDemo.on = false;
   });
 
   afterEach(async () => {
@@ -582,9 +589,10 @@ describe('buyer profile tabs', () => {
     threadCashFlag.on = false;
   });
 
-  it('shows the Thread Cash streak row (seeded preview data) when no user is signed in', async () => {
+  it('shows the Thread Cash streak row (seeded preview data) under demo=1 when no user is signed in', async () => {
     threadCashFlag.on = true;
     previewThreadCashEnabled.on = true;
+    previewDemo.on = true;
     signedInUser.current = null;
 
     renderer = await renderScreen();
@@ -599,9 +607,10 @@ describe('buyer profile tabs', () => {
     threadCashFlag.on = false;
   });
 
-  it('shows the Thread Cash streak row (seeded preview data) when the API responds with no streak data', async () => {
+  it('shows the Thread Cash streak row (seeded preview data) under demo=1 when the API responds with no streak data', async () => {
     threadCashFlag.on = true;
     previewThreadCashEnabled.on = true;
+    previewDemo.on = true;
     apiMock.threadCash.get.mockResolvedValue({ balanceCents: 1200 });
 
     renderer = await renderScreen();
@@ -613,6 +622,20 @@ describe('buyer profile tabs', () => {
       node => typeof node.props.accessibilityLabel === 'string'
         && node.props.accessibilityLabel.includes('Day 3 of 7 in this Thread Cash week'),
     ).length).toBeGreaterThan(0);
+    threadCashFlag.on = false;
+  });
+
+  it('never shows the seeded streak to a real buyer whose API has no streak data outside demo', async () => {
+    threadCashFlag.on = true;
+    previewThreadCashEnabled.on = true;
+    apiMock.threadCash.get.mockResolvedValue({ balanceCents: 1200 });
+
+    renderer = await renderScreen();
+
+    expect(renderer.root.findAll(
+      node => typeof node.props.accessibilityLabel === 'string'
+        && node.props.accessibilityLabel.includes('Day 3 of 7 in this Thread Cash week'),
+    ).length).toBe(0);
     threadCashFlag.on = false;
   });
 

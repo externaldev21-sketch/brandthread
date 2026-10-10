@@ -391,6 +391,7 @@ let cachedSuggestions: PreviewSuggestedPerson[] | null = null;
 
 /** The seeded "Suggested for you" list. Gate on `isPreviewActivityEnabled()`. */
 export function getPreviewSuggestedPeople(): PreviewSuggestedPerson[] {
+  if (!isPreviewDemoMode()) return [];
   if (cachedSuggestions) return cachedSuggestions;
   // Never name the suggested person as their own mutual (e.g. Astrae's own
   // reason must never read "Followed by Astrae") — each entry here lines up

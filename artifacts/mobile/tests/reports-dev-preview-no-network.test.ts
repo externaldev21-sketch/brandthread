@@ -30,7 +30,7 @@ describe('reports/blocks screens never hit a broken network dependency in dev-pr
 
   it('orderService.getBuyerOrder skips the real single-order fetch in any dev-preview session', () => {
     const src = read('services/orderService.ts');
-    expect(src).toContain("import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';");
+    expect(src).toContain("import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';");
     expect(src).toContain('if (!isSellerDevPreview() && !isBuyerDevPreview()) {');
   });
 });

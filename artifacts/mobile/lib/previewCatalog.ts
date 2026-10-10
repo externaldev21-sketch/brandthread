@@ -145,6 +145,8 @@ let cached: PreviewCatalogProduct[] | null = null;
 /** The full seeded preview catalog (11 products). Callers should still
  *  gate on `isPreviewCatalogEnabled()` before using this. */
 export function getPreviewCatalog(): PreviewCatalogProduct[] {
+  // Sample products are demo-only (`&demo=1`); any other dev build gets the real empty state.
+  if (!isPreviewDemoMode()) return [];
   if (cached) return cached;
   cached = SEED.map((row, i) => ({
     id: `preview-product-${String(i + 1).padStart(2, '0')}`,

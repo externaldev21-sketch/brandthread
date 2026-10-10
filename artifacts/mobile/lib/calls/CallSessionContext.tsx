@@ -37,6 +37,7 @@ import type {
 } from './types';
 
 interface CallSessionContextValue {
+  callsAvailable: boolean;
   session: CallSession | null;
   /** Most recent call-log entries, newest first, keyed by conversationId — read by the two conversation screens to render bubbles. */
   logsByConversation: Record<string, CallLogEntry[]>;
@@ -360,6 +361,7 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
     session,
     logsByConversation,
     refreshCallLog,
+    callsAvailable: provider.id !== 'preview' || isPreviewDemoMode(),
     startCall,
     simulateIncomingCall,
     acceptCall,
@@ -373,7 +375,7 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
     switchCamera,
     rtcEngine,
   }), [
-    session, logsByConversation, refreshCallLog, startCall, simulateIncomingCall, acceptCall,
+    provider, session, logsByConversation, refreshCallLog, startCall, simulateIncomingCall, acceptCall,
     declineOrEndCall, minimize, restore, clearEndedCall, toggleMute, toggleCameraOff, toggleSpeaker,
     switchCamera, rtcEngine,
   ]);

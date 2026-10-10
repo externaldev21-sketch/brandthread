@@ -7,7 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { centsAtPercent, formatCents } from '@/lib/money';
-import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { mapDelivery } from '@/lib/deliveryGuarantee';
 import {
   Order, OrderLineItem, OrderCustomer, OrderAddress, PaymentSummary,
@@ -275,8 +275,9 @@ export async function addTracking(orderId: string, carrier: string, trackingNumb
   try {
     const { api } = await import('@/lib/api');
     return await api.orders.addTracking(orderId, { trackingNumber, carrier });
-  } catch {
-    // Demo fallback (if no real order or API unavailable)
+  } catch (err) {
+    // Real orders surface the failure (fulfill-order alerts); only demo writes a local shipment.
+    if (!isPreviewDemoMode()) throw err;
     await ensureInitialized();
     const o = _orders.find(x => x.id === orderId);
     if (!o) return undefined;

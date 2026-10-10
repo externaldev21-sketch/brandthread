@@ -127,7 +127,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
     };
   });
 
-  const accounts = isPreview ? previewAccounts : realAccounts;
+  const accounts = isPreview ? (isPreviewDemoMode() ? previewAccounts : []) : realAccounts;
   const atCap = !isPreview && isAtAccountCap(activeSessions.length);
 
   async function handleSwitch(account: AccountRow) {

@@ -41,7 +41,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { ProductTile } from '@/components/search/ProductTile';
 import { ShopByCategoryRail } from '@/components/discover/DiscoverShopRails';
@@ -172,6 +172,7 @@ export default function BuyerSearchScreen() {
   const { isSignedIn } = useAuth();
   const inputRef = useRef<TextInput>(null);
   const previewMode = isBuyerDevPreview();
+  const demoFallback = previewMode && isPreviewDemoMode();
 
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -253,13 +254,13 @@ export default function BuyerSearchScreen() {
     if (productRes.status === 'fulfilled' && productRes.value.facets) setFacets(productRes.value.facets);
     else if (productRes.status !== 'fulfilled') setFacets(null);
     let peopleResult = peopleRes.status === 'fulfilled' ? (peopleRes.value as unknown as SearchPerson[]) : [];
-    if (peopleResult.length === 0 && previewMode) {
+    if (peopleResult.length === 0 && demoFallback) {
       const q = term.toLowerCase();
       peopleResult = PREVIEW_ACCOUNTS.filter((p) => p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q));
     }
     setPeople(peopleResult);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewMode, filters]);
+  }, [previewMode, demoFallback, filters]);
 
   useEffect(() => {
     const q = query.trim();
@@ -285,12 +286,12 @@ export default function BuyerSearchScreen() {
   // for this query — matched against name/author/brand, not just caption.
   // Preview mode only (same gate as PREVIEW_ACCOUNTS above): a real
   // account's empty search must stay empty, never show sample posts.
-  const videoResults = useMemo(() => (videoResultsRaw.length > 0 || !previewMode ? videoResultsRaw
+  const videoResults = useMemo(() => (videoResultsRaw.length > 0 || !demoFallback ? videoResultsRaw
     : (resultsQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], resultsQuery)) : [])),
-  [videoResultsRaw, resultsQuery, previewMode]);
-  const productResults = useMemo(() => (productResultsRaw.length > 0 || !previewMode ? productResultsRaw
+  [videoResultsRaw, resultsQuery, demoFallback]);
+  const productResults = useMemo(() => (productResultsRaw.length > 0 || !demoFallback ? productResultsRaw
     : (resultsQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], resultsQuery)) : [])),
-  [productResultsRaw, resultsQuery, activeFilterCount, previewMode]);
+  [productResultsRaw, resultsQuery, activeFilterCount, demoFallback]);
   const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
   // Server-side hashtag search first (real post counts), then tags derived
   // from the matched captions for anything the index does not know yet.

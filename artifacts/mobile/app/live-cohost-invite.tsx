@@ -18,6 +18,7 @@ import { CohostStage, type CohostCreds } from '@/components/live/CohostStage';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, SP } from '@/lib/theme';
 import type { LiveCohostInvite } from '@/lib/live/moderationTypes';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 
 const DEMO_INVITES: LiveCohostInvite[] = [
   { streamId: 'demo', title: 'Autumn drop, first look', hostName: 'Atelier Nord', hostUsername: 'atelier.nord', hostAvatarUrl: null, createdAt: '' },
@@ -29,7 +30,7 @@ export default function LiveCohostInviteScreen() {
   const insets = useSafeAreaInsets();
   const api = useApi();
   const params = useLocalSearchParams<{ streamId?: string; demo?: string }>();
-  const demo = params.demo === '1';
+  const demo = isPreviewDemoMode();
   const focusId = params.streamId ? String(params.streamId) : '';
 
   const [invites, setInvites] = useState<LiveCohostInvite[]>(demo ? DEMO_INVITES : []);

@@ -33,7 +33,7 @@ describe('live moderation screens', () => {
     (file) => {
       const src = read(file);
       expect(src).toContain('<ScreenHeader');
-      expect(src).toMatch(/params\.demo === '1'/);
+      expect(src).toContain('const demo = isPreviewDemoMode();');
       // Every sample-data constant is only ever used when demo is on.
       expect(src).toMatch(/demo \? DEMO_/);
     },

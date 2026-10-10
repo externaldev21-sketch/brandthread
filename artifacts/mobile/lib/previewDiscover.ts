@@ -11,6 +11,7 @@
  */
 import { Asset } from 'expo-asset';
 import { getPreviewCatalog } from './previewCatalog';
+import { isPreviewDemoMode } from './devPreview';
 import { getPreviewSuggestedPeople } from './previewActivity';
 import type { DiscoverPost, DiscoverBrandCard, DiscoverPersonSuggestion, DiscoverDrop } from './discoverFeed';
 
@@ -60,6 +61,7 @@ let cachedPosts: { forYou: DiscoverPost[]; fits: DiscoverPost[] } | null = null;
 
 /** Seeded buyer + brand posts for the For You / Fits grid. */
 export function getPreviewDiscoverPosts(filter: 'forYou' | 'fits'): DiscoverPost[] {
+  if (!isPreviewDemoMode()) return [];
   if (!cachedPosts) {
     const catalog = getPreviewCatalog();
     const fits: DiscoverPost[] = BUYERS.map((buyer, i) => ({
