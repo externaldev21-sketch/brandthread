@@ -20,6 +20,7 @@ export * from './sellerAnalytics';
 export * from './affiliate';
 export * from './liveCommerce';
 export * from './growth';
+export * from './sellerReferrals';
 export * from './emailMarketing';
 export * from './giftCards';
 export * from './productBulkSeo';

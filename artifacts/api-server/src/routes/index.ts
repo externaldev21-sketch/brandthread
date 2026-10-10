@@ -78,6 +78,7 @@ import followRequestsRouter from "./follow-requests";
 import placesRouter from "./places";
 import storyStickersRouter from "./story-stickers";
 import referralsRouter from "./referrals";
+import sellerReferralsRouter from "./seller-referrals";
 import shippingRatesRouter from "./shipping-rates";
 import shippingZonesRouter from "./shipping-zones";
 import shippingLabelsRouter from "./shipping-labels";
@@ -321,6 +322,7 @@ router.use("/social",                    followRequestsRouter);
 router.use("/places",                    placesRouter); // public reads (optional viewer); POST requires auth
 router.use("/social",                    storyStickersRouter);
 router.use("/referrals",                 referralsRouter);
+router.use("/seller-referrals",          sellerReferralsRouter); // brand → brand free month (BT-313, off unless SELLER_REFERRAL_ENABLED=true)
 router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/shipping-rates",            tc, shippingRatesRouter);

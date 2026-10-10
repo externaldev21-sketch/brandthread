@@ -16,6 +16,7 @@ import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectClea
 import { startMoneySweepJob } from "./jobs/moneySweep";
 import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
+import { startSellerReferralsJob } from "./jobs/sellerReferrals";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
 import { startAnalyticsRetentionJob } from "./jobs/analyticsRetention";
 import { startAccountPurgeJob } from "./jobs/accountPurge";
@@ -84,6 +85,7 @@ const server = app.listen(port, (err) => {
   startDesignStudioObjectCleanupJob();
   startMoneySweepJob();
   startAffiliatePayoutsJob();
+  startSellerReferralsJob();
   startDeliveryDeadlinesJob();
   startStoryCleanupJob();
   startAnalyticsRetentionJob();

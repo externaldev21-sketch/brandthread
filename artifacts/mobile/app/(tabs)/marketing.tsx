@@ -17,6 +17,7 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ListRow } from '@/components/ui/ListRow';
+import { SellerReferralRow } from '@/components/marketing/SellerReferralRow';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 type KlaviyoStatus = {
@@ -291,6 +292,7 @@ export default function MarketingScreen() {
         <ListRow icon="link" title="Links" subtitle="Trackable links with clicks and sales" chevron onPress={() => router.push('/growth-links' as never)} />
         <ListRow icon="user" title="Link in bio" subtitle="Your shareable page" chevron onPress={() => router.push('/link-in-bio' as never)} />
         <ListRow icon="activity" title="Pixels" subtitle="Meta and TikTok" chevron onPress={() => router.push('/store-pixels' as never)} />
+        <SellerReferralRow />
       </View>
 
       {/* Email campaigns — list capture from the store site + campaign composer */}
