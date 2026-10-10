@@ -49,6 +49,7 @@ describe("agent-chat rate limit", () => {
     await db.insert(users).values({
       clerkId: TEST_BUYER, email: `${TEST_BUYER}@example.test`, name: "Rate Limit Buyer",
       displayName: "Rate Limit Buyer", accountType: "buyer", onboardingComplete: true,
+      aiDataConsentAt: new Date(), // allowed AI data sharing (requireAiConsent)
     });
     const welcome = await createWelcomeConversationOnce(TEST_BUYER, "buyer", {
       name: "Rate Limit Buyer", handle: "", initials: "RB", color: "#8B5CF6",

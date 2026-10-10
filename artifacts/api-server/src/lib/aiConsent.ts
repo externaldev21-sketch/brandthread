@@ -90,3 +90,14 @@ export function makeAiConsentGate(lookup: (clerkUserId: string) => Promise<boole
 }
 
 export const aiConsentGate = makeAiConsentGate();
+
+// Compatibility for Agent-specific callers; all paths use current, revocable disclosure consent.
+export const AI_CONSENT_REQUIRED_CODE = "AI_CONSENT_REQUIRED";
+export const AI_CONSENT_PROVIDER = "OpenAI";
+export const AI_CONSENT_REQUIRED_MESSAGE = "Allow AI data sharing before chatting with Brandthread Agent.";
+export const isConsentGatedMethod = (method: string | undefined) => ["POST", "PUT", "PATCH"].includes((method ?? "").toUpperCase());
+export const hasConsentTimestamp = (value: Date | string | null | undefined) => !!value && Number.isFinite(new Date(value).getTime());
+export async function readAiConsent(id: string): Promise<Date | null> { const s = await getAiConsent(id); return s.granted && s.grantedAt ? new Date(s.grantedAt) : null; }
+export async function hasAiConsent(id: string) { return (await getAiConsent(id)).granted; }
+export async function recordAiConsent(id: string) { const s = await setAiConsent(id, true); return s.grantedAt ? new Date(s.grantedAt) : null; }
+export async function withdrawAiConsent(id: string) { await setAiConsent(id, false); }

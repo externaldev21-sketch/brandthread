@@ -25,16 +25,16 @@ export class AiConsentRequiredError extends Error {
 export function isAiConsentRequired(error: unknown): boolean {
   if (error instanceof AiConsentRequiredError) return true;
   const e = error as { status?: unknown; body?: unknown; message?: unknown } | null;
-  if (!e || e.status !== 403) return false;
+  if (!e || (e.status !== 403 && e.status !== 428)) return false;
   const body = typeof e.body === 'string' ? e.body : typeof e.message === 'string' ? e.message : '';
   return isAiConsentRequiredBody(403, body);
 }
 
 export function isAiConsentRequiredBody(status: number, body: string): boolean {
-  if (status !== 403 || !body) return false;
+  if ((status !== 403 && status !== 428) || !body) return false;
   try {
     const parsed = JSON.parse(body) as { code?: unknown; error?: { code?: unknown } };
-    return parsed?.code === AI_CONSENT_REQUIRED || parsed?.error?.code === AI_CONSENT_REQUIRED;
+    return [AI_CONSENT_REQUIRED, "AI_CONSENT_REQUIRED"].includes(String(parsed?.code ?? parsed?.error?.code));
   } catch {
     return false;
   }

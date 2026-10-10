@@ -33,4 +33,4 @@ Merge to `dev` -> deploy to staging -> smoke test (sign in, browse, add to cart,
 
 ## Variables that differ per environment
 
-`APP_ENV`, `DATABASE_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SESSION_SECRET`, `SENTRY_ENVIRONMENT`, `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_DOMAIN`, `EXPO_PUBLIC_SENTRY_ENVIRONMENT`, object storage bucket variables. Use a different `SESSION_SECRET` in every environment.
+`APP_ENV`, `DATABASE_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SESSION_SECRET`, `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE` (live video and calls; without them Go Live is hidden), `SENTRY_ENVIRONMENT`, `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_DOMAIN`, `EXPO_PUBLIC_SENTRY_ENVIRONMENT`, object storage bucket variables. Use a different `SESSION_SECRET` in every environment.

@@ -18,6 +18,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { db, conversations, conversationParticipants, messages, users } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
+import { requireAiConsent } from "../middlewares/requireAiConsent";
 import { moderateMessage } from "../lib/contentModerator";
 import {
   BRANDTHREAD_AGENT_CLERK_ID, BRANDTHREAD_AGENT_NAME, BRANDTHREAD_AGENT_INITIALS,
@@ -78,7 +79,9 @@ function pickCard(userText: string) {
   return undefined;
 }
 
-router.post("/message", rateLimit("agent-chat"), async (req: Request, res: Response): Promise<void> => {
+// requireAiConsent: nothing the user typed (or their history) is sent to
+// OpenAI until they allowed it on the consent sheet -> 428 AI_CONSENT_REQUIRED.
+router.post("/message", rateLimit("agent-chat"), requireAiConsent(), async (req: Request, res: Response): Promise<void> => {
   const userId = (req as any).clerkUserId as string;
   const { conversationId, text } = req.body as { conversationId?: string; text?: string };
 

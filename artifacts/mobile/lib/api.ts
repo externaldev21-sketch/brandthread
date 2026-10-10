@@ -1444,6 +1444,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       featureFlags: () =>
         get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
       /** The shared seller plan config (trial length, reminder, prices, checkout mode). */
+      live: () => get<{ liveAvailable: boolean }>('/api/config/live'),
       sellerPlans: () => get<unknown>('/api/config/seller-plans'),
     },
     // ── iOS Live Activity push tokens (lib/nativeSystem.ts) ──────────────────
@@ -1952,6 +1953,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     aiConsent: {
       get: () => freshGet<AiConsentStatus>('/api/ai-consent'),
       set: (granted: boolean) => put<AiConsentStatus>('/api/ai-consent', { granted }),
+      accept: () => post<{ consented: boolean; consentedAt: string | null; provider: string }>('/api/ai-consent', { accept: true }),
     },
     notificationPrefs: {
       get: () =>

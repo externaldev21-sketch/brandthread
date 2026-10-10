@@ -673,7 +673,7 @@ const DEV_FORCE_ONBOARDING_START = false;
 const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
 // Sellers can use the buyer cart; there is no equivalent seller-tab route.
 const SELLER_SHARED_BUYER_ROUTES = new Set(['cart']);
-const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
+const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy', 'help', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
