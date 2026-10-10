@@ -35,7 +35,7 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
-import { FONT, GUTTER, GRID_MAX_WIDTH, ICON, RADIUS } from '@/lib/theme';
+import { FONT, GUTTER, GRID_MAX_WIDTH, ICON, RADIUS, TEXT_SECONDARY } from '@/lib/theme';
 import { ResponsiveContainer, useGridColumns } from '@/components/layout';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
@@ -871,8 +871,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // theme-exempt: fixed 70%-white on this page's fixed-dark chrome, same
   // intentional pattern as the field's #1f1f1f fill and the Follow pill.
   sectionLabel: {
-    ...TYPE_SCALE.caption, fontSize: 11, fontFamily: FONT.semibold,
-    color: 'rgba(255,255,255,0.7)',
+    ...TYPE_SCALE.caption, fontSize: 11, letterSpacing: 1.2, fontFamily: FONT.semibold,
+    color: TEXT_SECONDARY,
     paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.lg, paddingBottom: 12,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },

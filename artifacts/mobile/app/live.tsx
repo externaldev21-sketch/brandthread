@@ -31,7 +31,7 @@ import { buildLiveUrl } from '@/lib/shareLinks';
 import { CachedImage } from '@/components/CachedImage';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { FONT, FS } from '@/lib/theme';
+import { FONT, FS, FG, TEXT_SECONDARY } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { profileHref } from '@/lib/profileNavigation';
 import { useApi } from '@/lib/api';
@@ -541,7 +541,7 @@ export default function LiveScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  loadingText: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.medium, fontSize: FS.sm },
+  loadingText: { color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: FS.sm },
   rtcWrap: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A0A0B' },
   rtcBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: radius.md, paddingHorizontal: 18, height: 42 },
   rtcBtnText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   topIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title: {
-    position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,
+    position: 'absolute', left: 14, right: 14, color: FG, fontFamily: FONT.medium, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3,
   },
   railWrap: { position: 'absolute', right: 8 },

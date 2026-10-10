@@ -33,7 +33,7 @@ import {
   ON_DARK,
   RED,
   SP,
-  RADIUS,
+  RADIUS, TEXT_SECONDARY, TEXT_TERTIARY,
 } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 
@@ -809,7 +809,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   filterChipActive: { borderColor: ACCENT, backgroundColor: `${ACCENT}22` },
-  filterText: { color: 'rgba(255,255,255,0.72)', fontSize: FS.xs, fontFamily: FONT.semibold },
+  filterText: { color: TEXT_SECONDARY, fontSize: FS.xs, fontFamily: FONT.semibold },
   filterTextActive: { color: FG },
 
   // ── Clip chips ──
@@ -882,7 +882,7 @@ const s = StyleSheet.create({
   },
 
   // ── Gesture hint ──
-  gestureHint: { color: 'rgba(255,255,255,0.55)', fontSize: FS.xs },
+  gestureHint: { color: TEXT_TERTIARY, fontSize: FS.xs },
 
   // ── Permissions gate ──
   permBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: SP.md },

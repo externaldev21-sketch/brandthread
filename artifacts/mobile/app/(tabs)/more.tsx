@@ -484,9 +484,6 @@ const createStyles = (theme: any) => {
     alignItems: 'center',
     gap: 6,
   },
-  sectionIcon: {
-    opacity: 0.7,
-  },
   sectionTitle: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,

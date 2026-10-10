@@ -9,7 +9,7 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { CachedImage } from '@/components/CachedImage';
-import { FONT, FS, RADIUS, ON_DARK_MUTED } from '@/lib/theme';
+import { FONT, FS, RADIUS, ON_DARK_MUTED, FG, TEXT_SECONDARY } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { haptics } from '@/lib/haptics';
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   hostNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 15, lineHeight: 18, flexShrink: 1 },
   hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 16, marginTop: 2 },
-  hostMeta: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
+  hostMeta: { color: TEXT_SECONDARY, fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 },
   liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 12 },
   followBtn: {
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
   eventPill: {
     borderRadius: RADIUS.pill, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 5,
   },
-  eventPillText: { color: 'rgba(255,255,255,0.9)', fontFamily: FONT.regular, fontSize: 12 },
+  eventPillText: { color: FG, fontFamily: FONT.regular, fontSize: 12 },
   chatUserMuted: { fontFamily: FONT.semibold, color: '#fff' },
 
   pinned: {

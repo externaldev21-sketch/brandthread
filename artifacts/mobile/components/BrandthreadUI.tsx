@@ -24,7 +24,7 @@ import {
   SUCCESS, SUCCESS_DIM,
   BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, FILL_ELEVATED,
-  SHADOW, SHADOW_SM,
+  SHADOW, SHADOW_SM, TEXT_DISABLED,
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -500,8 +500,8 @@ export function PrimaryButton({
           <ActivityIndicator color={disabled ? palette.mutedForeground : foreground} size="small" />
         ) : (
           <>
-            {icon && <Icon name={icon} size={ICON.sm} color={disabled ? palette.mutedForeground : foreground} />}
-            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
+            {icon && <Icon name={icon} size={ICON.sm} color={disabled ? TEXT_DISABLED : foreground} />}
+            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: TEXT_DISABLED, fontSize: small ? FS.sm : FS.base } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
           </>
         )}
       </LinearGradient>
@@ -537,7 +537,8 @@ interface SecondaryButtonProps {
 
 export function SecondaryButton({ label, onPress, icon, disabled, small, style, accent }: SecondaryButtonProps) {
   const { theme } = useAppTheme();
-  const resolvedAccent = accent ?? theme.accent;
+  // Disabled: solid gray label/outline, not a faded button.
+  const resolvedAccent = disabled ? TEXT_DISABLED : accent ?? theme.accent;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
     <PressableScale
@@ -547,7 +548,7 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
       }}
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
-      style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? 0.5 : 1 }, style]}
+      style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14' }, style]}
     >
       {icon && <Icon name={icon} size={ICON.sm} color={resolvedAccent} />}
       <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]} numberOfLines={1}>{label}</Text>
@@ -575,7 +576,7 @@ interface TertiaryButtonProps {
 
 export function TertiaryButton({ label, onPress, icon, disabled, small, style, accent }: TertiaryButtonProps) {
   const { theme } = useAppTheme();
-  const resolvedAccent = accent ?? theme.accentLight;
+  const resolvedAccent = disabled ? TEXT_DISABLED : accent ?? theme.accentLight;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
     <PressableScale
@@ -585,7 +586,7 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
       }}
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
-      style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: BUTTON_INNER_PADDING_X, opacity: disabled ? 0.4 : 1 }, style]}
+      style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: BUTTON_INNER_PADDING_X }, style]}
     >
       {icon && <Icon name={icon} size={ICON.sm} color={resolvedAccent} />}
       <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent }} numberOfLines={1}>{label}</Text>

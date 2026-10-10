@@ -2,7 +2,7 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 
 export function Field({
@@ -47,12 +47,12 @@ export function SolidButton({ label, onPress, disabled, loading, outline }: {
       style={[
         st.btn,
         outline ? { borderColor: c.foreground, borderWidth: 1 } : { backgroundColor: c.foreground },
-        disabled && { opacity: 0.35 },
+        disabled && (outline ? { borderColor: TEXT_DISABLED } : { backgroundColor: FILL_ELEVATED }),
       ]}
     >
       {loading
-        ? <ActivityIndicator color={outline ? c.foreground : c.background} />
-        : <Text style={[st.btnText, { color: outline ? c.foreground : c.background }]}>{label}</Text>}
+        ? <ActivityIndicator color={disabled ? TEXT_DISABLED : outline ? c.foreground : c.background} />
+        : <Text style={[st.btnText, { color: disabled ? TEXT_DISABLED : outline ? c.foreground : c.background }]}>{label}</Text>}
     </PressableScale>
   );
 }

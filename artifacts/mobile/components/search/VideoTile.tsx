@@ -4,7 +4,8 @@ import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
-import { FONT } from '@/lib/theme';
+import { hapticPrimaryAction } from '@/lib/haptics';
+import { FONT, TEXT_SECONDARY } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -92,7 +93,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   caption: { color: '#FFFFFF', ...TYPE_SCALE.caption, fontFamily: FONT.semibold, marginBottom: 3 },
   authorRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.xxs },
-  authorName: { color: '#FFFFFFCC', ...TYPE_SCALE.caption, fontSize: 11, flex: 1 },
+  authorName: { color: TEXT_SECONDARY, ...TYPE_SCALE.caption, fontSize: 10, flex: 1 },
   likesRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  likesText: { color: '#FFFFFFCC', ...TYPE_SCALE.caption, fontSize: 11 },
+  likesText: { color: TEXT_SECONDARY, ...TYPE_SCALE.caption, fontSize: 10 },
 });

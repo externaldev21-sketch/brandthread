@@ -19,7 +19,7 @@ import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
-import { FONT } from '@/lib/theme';
+import { FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
 type Step = 'email' | 'code' | 'done';
 
@@ -141,20 +141,20 @@ export default function ForgotPasswordScreen() {
               ) : null}
 
               <TouchableOpacity
-                style={[s.primaryWrap, (!email.trim() || isFetching) && { opacity: 0.5 }]}
+                style={s.primaryWrap}
                 onPress={handleSendCode}
                 disabled={!email.trim() || isFetching}
                 activeOpacity={0.88}
               >
                 <LinearGradient
-                  colors={[theme.accent, theme.secondary]}
+                  colors={(!email.trim() || isFetching) ? [FILL_ELEVATED, FILL_ELEVATED] : [theme.accent, theme.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.primaryBtn}
                 >
                   {isFetching
-                    ? <ActivityIndicator color={theme.onAccent} size="small" />
-                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Send reset code</Text>}
+                    ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
+                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme), (!email.trim() || isFetching) && { color: TEXT_DISABLED }]}>Send reset code</Text>}
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -224,20 +224,20 @@ export default function ForgotPasswordScreen() {
               ) : null}
 
               <TouchableOpacity
-                style={[s.primaryWrap, (!code || !password || isFetching) && { opacity: 0.5 }]}
+                style={s.primaryWrap}
                 onPress={handleReset}
                 disabled={!code || !password || isFetching}
                 activeOpacity={0.88}
               >
                 <LinearGradient
-                  colors={[theme.accent, theme.secondary]}
+                  colors={(!code || !password || isFetching) ? [FILL_ELEVATED, FILL_ELEVATED] : [theme.accent, theme.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.primaryBtn}
                 >
                   {isFetching
-                    ? <ActivityIndicator color={theme.onAccent} size="small" />
-                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Reset password</Text>}
+                    ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
+                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme), (!code || !password || isFetching) && { color: TEXT_DISABLED }]}>Reset password</Text>}
                 </LinearGradient>
               </TouchableOpacity>
 

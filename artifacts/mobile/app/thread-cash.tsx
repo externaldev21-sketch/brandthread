@@ -18,7 +18,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { fmtDate } from '@/lib/format';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, TEXT_SECONDARY } from '@/lib/theme';
 import { BrandthreadScreen, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SkeletonBlock } from '@/components/ui';
@@ -402,7 +402,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   balanceHint: {
     fontSize: 12, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 16,
     marginTop: SP.xs, paddingHorizontal: SP.md,
-    color: 'rgba(255,255,255,0.7)', // theme-exempt: fixed dark hero card per spec
+    color: TEXT_SECONDARY, // theme-exempt: fixed dark hero card per spec
   },
   streakCard: { marginTop: SP.md },
   streakHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },

@@ -12,7 +12,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { RecentSearchRow } from '@/components/search/RecentSearchRow';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT } from '@/lib/theme';
+import { FONT, TEXT_DISABLED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { haptics } from '@/lib/haptics';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -90,9 +90,9 @@ export default function BuyerSearchHistoryScreen() {
             accessibilityState={{ disabled: !hasTerms }}
             // justifyContent: PressableScale's 44pt min height otherwise
             // pins the label to the top, above the title's center line.
-            style={{ opacity: hasTerms ? 1 : 0.4, paddingHorizontal: 4, paddingVertical: 4, justifyContent: 'center' }}
+            style={{ paddingHorizontal: 4, paddingVertical: 4, justifyContent: 'center' }}
           >
-            <Text style={[TYPE_SCALE.body, { fontFamily: FONT.semibold, color: theme.text }]}>Clear all</Text>
+            <Text style={[TYPE_SCALE.body, { fontFamily: FONT.semibold, color: hasTerms ? theme.text : TEXT_DISABLED }]}>Clear all</Text>
           </PressableScale>
         ) : undefined}
       />

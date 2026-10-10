@@ -22,7 +22,7 @@ import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/prof
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { SP, FONT } from '@/lib/theme';
+import { SP, FONT, TEXT_DISABLED } from '@/lib/theme';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { canSyncAccountServer, fetchAccountSettings, patchAccountSettings, withTimeout } from '@/lib/accountSettings';
@@ -512,7 +512,7 @@ export default function BuyerEditProfileScreen() {
               {saving ? (
                 <ActivityIndicator size="small" color={theme.accent} />
               ) : (
-                <Text style={[styles.saveText, { color: theme.accent }, (!isDirty || avatarUploading) && { opacity: 0.35 }]}>Save</Text>
+                <Text style={[styles.saveText, { color: theme.accent }, (!isDirty || avatarUploading) && { color: TEXT_DISABLED }]}>Save</Text>
               )}
             </TouchableOpacity>
           }

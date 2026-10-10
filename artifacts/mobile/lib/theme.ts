@@ -67,6 +67,10 @@ export const FG      = '#FFFFFF';
 export const TEXT_PRIMARY   = FG;
 export const TEXT_SECONDARY = '#C0C0C0';
 export const TEXT_TERTIARY  = '#8E8E93'; // tertiary / disabled
+// A disabled control's label/glyph: Apple's dark systemGray2. Solid, so a
+// disabled state reads as clearly dimmer than secondary text without fading
+// the control with opacity.
+export const TEXT_DISABLED  = '#636366';
 export const MUTED   = TEXT_SECONDARY;
 export const SUBTLE  = TEXT_TERTIARY;
 /**
@@ -87,6 +91,7 @@ export const CREATE_CANVAS = {
 
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
 export const ON_DARK_MUTED = '#C0C0C0';   // secondary text on gradient/colored bg — solid, not alpha
+export const ON_LIGHT_MUTED = '#636366';  // secondary text on a white card — solid, not black at 60%
 
 /**
  * Fixed-contrast media/artwork colors. These are deliberately independent of

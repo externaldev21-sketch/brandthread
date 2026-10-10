@@ -12,7 +12,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useApi } from '@/lib/api';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { getEntitlementRejection } from '@/lib/entitlementError';
-import { FONT } from '@/lib/theme';
+import { FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 import { minHitSlop } from '@/lib/hitSlop';
 
@@ -488,10 +488,10 @@ export default function TeamScreen() {
                   onPress={handleInvite}
                   disabled={inviting || !inviteEmail.trim()}
                   activeOpacity={0.8}
-                  style={[styles.addBtn, { backgroundColor: colors.primary, opacity: inviting || !inviteEmail.trim() ? 0.5 : 1 }]}
+                  style={[styles.addBtn, { backgroundColor: inviting || !inviteEmail.trim() ? FILL_ELEVATED : colors.primary }]}
                 >
-                  <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>
-                    {inviting ? 'Creating…' : 'Create invite'}
+                  <Text style={[styles.addBtnText, { color: inviting || !inviteEmail.trim() ? TEXT_DISABLED : colors.primaryForeground }]}>
+                    {inviting ? 'Creating…' : 'Create Invite'}
                   </Text>
                 </TouchableOpacity>
               </View>

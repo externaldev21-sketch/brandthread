@@ -15,7 +15,7 @@ import { MEDIA } from '@/lib/theme';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY } from '@/lib/theme';
 import type { TargetRect } from './types';
 
 export interface SpotlightTipProps {
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   ring: { position: 'absolute', borderRadius: RADIUS.lg, borderWidth: 2, borderColor: MEDIA.foreground },
   captionWrap: { position: 'absolute', left: SP.xl, right: SP.xl, alignItems: 'center' },
   arrow: { marginBottom: 6 },
-  title: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
-  body: { color: mediaAlpha(MEDIA.foreground, 0.75), fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 4 },
-  dismissHint: { color: mediaAlpha(MEDIA.foreground, 0.5), fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14 },
+  title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
+  body: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 4 },
+  dismissHint: { color: TEXT_TERTIARY, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14, letterSpacing: 0.3 },
 });

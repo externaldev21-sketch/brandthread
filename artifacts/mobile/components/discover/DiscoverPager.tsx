@@ -42,8 +42,9 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { FONT, GRID_MAX_WIDTH, SP } from '@/lib/theme';
+import { FONT, GRID_MAX_WIDTH, SP, TEXT_TERTIARY } from '@/lib/theme';
 import { haptics } from '@/lib/haptics';
+import { hapticPrimaryAction } from '@/lib/haptics';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { RADII, radius } from '@/constants/radii';
 import { CachedImage } from '@/components/CachedImage';
@@ -598,7 +599,7 @@ const styles = StyleSheet.create({
   },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6 },
   price: { color: '#FFFFFF', ...TYPE_SCALE.title1 },
-  comparePrice: { color: '#FFFFFF99', ...TYPE_SCALE.body, textDecorationLine: 'line-through' },
+  comparePrice: { color: TEXT_TERTIARY, ...TYPE_SCALE.body, textDecorationLine: 'line-through' },
   actionsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: SP.lg, marginTop: SP.lg },
   secondaryBtn: {
     flex: 1,

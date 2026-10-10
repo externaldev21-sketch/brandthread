@@ -1162,14 +1162,14 @@ export default function StoreEditor() {
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Undo"
               onPress={handleUndo}
               disabled={!undoAvailable}
-              style={[styles.undoBtn, !undoAvailable && styles.undoBtnDisabled]}
+              style={styles.undoBtn}
             >
               <Icon name="corner-up-left" size={ICON.sm} color={undoAvailable ? FG : MUTED} />
             </TouchableOpacity>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Redo"
               onPress={handleRedo}
               disabled={!redoAvailable}
-              style={[styles.undoBtn, !redoAvailable && styles.undoBtnDisabled]}
+              style={styles.undoBtn}
             >
               <Icon name="corner-up-right" size={ICON.sm} color={redoAvailable ? FG : MUTED} />
             </TouchableOpacity>
@@ -1246,7 +1246,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
-  undoBtnDisabled: { opacity: 0.4 },
+  undoBtnDisabled: {},
   // Icon-only (More) — same compact footprint as undoBtn, distinct
   // name to keep intent clear at each call site.
   headerBtn: {

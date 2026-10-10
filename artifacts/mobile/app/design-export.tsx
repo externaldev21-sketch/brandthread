@@ -19,7 +19,7 @@ import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, BLUE, ORANGE, GOLD,
-  FONT, FS, SP, RADIUS, ICON, COMP,
+  FONT, FS, SP, RADIUS, ICON, COMP, TEXT_SECONDARY,
 } from '@/lib/theme';
 import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
@@ -245,7 +245,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme'], SCREEN_W: 
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
   },
   thumbLabel: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginTop: SP.sm },
-  thumbSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 4 },
+  thumbSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: TEXT_SECONDARY, marginTop: 4 },
 
   sectionHeader: { marginTop: SP.lg, marginBottom: SP.sm },
 

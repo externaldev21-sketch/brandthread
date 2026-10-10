@@ -94,7 +94,7 @@ export default function PlanUpsellModal({
           >
             {/* Close button */}
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={s.closeBtn} onPress={handleClose} hitSlop={8}>
-              <Icon name="x" size={18} color={theme.onAccent} style={{ opacity: 0.8 }} />
+              <Icon name="x" size={18} color={theme.onAccent} />
             </TouchableOpacity>
 
             {/* Lock icon */}
@@ -243,7 +243,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   headerSubtitle: {
     color: theme.onAccent,
-    opacity: 0.8,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     textAlign: 'center',

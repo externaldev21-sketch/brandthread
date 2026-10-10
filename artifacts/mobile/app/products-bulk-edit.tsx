@@ -24,7 +24,7 @@ import {
 import { Icon, ICON_SIZE } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS, FILL_ELEVATED } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, FILL_ELEVATED, ICON, TEXT_DISABLED } from '@/lib/theme';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -807,8 +807,8 @@ function SegRow<T extends string>({ options, value, onChange, s }: {
 
 function BarButton({ label, onPress, disabled, s }: { label: string; onPress: () => void; disabled?: boolean; s: ReturnType<typeof makeStyles> }) {
   return (
-    <Pressable onPress={disabled ? undefined : onPress} style={[s.barBtn, disabled && { opacity: 0.5 }]} accessibilityRole="button" accessibilityLabel={label}>
-      <Text style={s.barBtnText}>{label}</Text>
+    <Pressable onPress={disabled ? undefined : onPress} style={s.barBtn} accessibilityRole="button" accessibilityLabel={label}>
+      <Text style={[s.barBtnText, disabled && { color: TEXT_DISABLED }]}>{label}</Text>
     </Pressable>
   );
 }

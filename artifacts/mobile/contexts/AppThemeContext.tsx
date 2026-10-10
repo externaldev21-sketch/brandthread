@@ -25,6 +25,8 @@ export type AppThemePreset = {
 };
 
 export function getOnAccentTextStyle(theme: AppThemePreset): TextStyle {
+  // Just the colour: a soft text shadow under black-on-white labels smeared
+  // every glyph edge ("Crisp everywhere").
   return { color: theme.onAccent };
 }
 

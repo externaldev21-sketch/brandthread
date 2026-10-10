@@ -8,7 +8,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { haptics } from '@/lib/haptics';
-import { FONT } from '@/lib/theme';
+import { hapticToggle } from '@/lib/haptics';
+import { FONT, TEXT_DISABLED } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { radius } from '@/constants/radii';
 
@@ -65,11 +66,11 @@ export function QuantityStepper({
         accessibilityLabel={removeMode ? `Remove${itemLabel ? ` ${itemLabel}` : ''} from cart` : 'Decrease quantity'}
         disabled={!canDecrement}
         onPress={decrement}
-        style={[styles.btn, sm && styles.btnSm, !canDecrement && styles.disabled]}
+        style={[styles.btn, sm && styles.btnSm]}
         hitSlop={8}
         testID={testID ? `${testID}-decrement` : undefined}
       >
-        <Icon name={removeMode ? 'trash-2' : 'minus'} size={sm ? 13 : 16} color={canDecrement ? palette.foreground : palette.mutedForeground} />
+        <Icon name={removeMode ? 'trash-2' : 'minus'} size={sm ? 13 : 16} color={canDecrement ? palette.foreground : TEXT_DISABLED} />
       </Pressable>
       <Text
         style={[TYPE_SCALE.headline, TABULAR_NUMS, { color: palette.foreground, minWidth: sm ? 18 : 22, textAlign: 'center', fontSize: sm ? 13 : undefined }]}
@@ -82,11 +83,11 @@ export function QuantityStepper({
         accessibilityLabel="Increase quantity"
         disabled={!canIncrement}
         onPress={() => step(1)}
-        style={[styles.btn, sm && styles.btnSm, !canIncrement && styles.disabled]}
+        style={[styles.btn, sm && styles.btnSm]}
         hitSlop={8}
         testID={testID ? `${testID}-increment` : undefined}
       >
-        <Icon name="plus" size={sm ? 13 : 16} color={canIncrement ? palette.foreground : palette.mutedForeground} />
+        <Icon name="plus" size={sm ? 13 : 16} color={canIncrement ? palette.foreground : TEXT_DISABLED} />
       </Pressable>
     </View>
   );
@@ -97,5 +98,4 @@ const styles = StyleSheet.create({
   rootSm: { paddingHorizontal: 2, height: 32 },
   btn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   btnSm: { width: 26, height: 26 },
-  disabled: { opacity: 0.4 },
 });

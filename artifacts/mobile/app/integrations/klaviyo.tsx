@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { haptics } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { FS, FONT } from '@/lib/theme';
+import { FS, FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -142,13 +142,13 @@ export default function KlaviyoIntegrationScreen() {
             )}
 
             <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: colors.border, opacity: syncing ? 0.6 : 1 }]}
+              style={[styles.secondaryBtn, { borderColor: colors.border }]}
               onPress={handleSync}
               disabled={syncing}
               activeOpacity={0.8}
             >
-              {syncing ? <ActivityIndicator size="small" color={colors.foreground} /> : <Icon name="refresh-cw" size={15} color={colors.foreground} />}
-              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
+              {syncing ? <ActivityIndicator size="small" color={TEXT_DISABLED} /> : <Icon name="refresh-cw" size={15} color={colors.foreground} />}
+              <Text style={[styles.secondaryBtnText, { color: syncing ? TEXT_DISABLED : colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -174,13 +174,13 @@ export default function KlaviyoIntegrationScreen() {
               secureTextEntry
             />
             <TouchableOpacity
-              style={[styles.connectBtn, { backgroundColor: colors.primary, opacity: connecting ? 0.7 : 1 }]}
+              style={[styles.connectBtn, { backgroundColor: connecting ? FILL_ELEVATED : colors.primary }]}
               onPress={handleConnect}
               disabled={connecting}
               activeOpacity={0.85}
             >
-              {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Icon name="link" size={16} color={colors.primaryForeground} />}
-              <Text style={[styles.connectBtnText, { color: colors.primaryForeground }]}>{connecting ? 'Connecting…' : 'Connect Klaviyo'}</Text>
+              {connecting ? <ActivityIndicator size="small" color={TEXT_DISABLED} /> : <Icon name="link" size={16} color={colors.primaryForeground} />}
+              <Text style={[styles.connectBtnText, { color: connecting ? TEXT_DISABLED : colors.primaryForeground }]}>{connecting ? 'Connecting…' : 'Connect Klaviyo'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
