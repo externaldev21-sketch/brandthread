@@ -154,7 +154,7 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
     return;
   }
   if (notif.targetId && notif.targetType === 'buyer_order') {
-    router.push(('/buyer-order-detail?id=' + encodeURIComponent(notif.targetId)) as any);
+    router.push(('/buyer-order-detail?id=' + encodeURIComponent(notif.targetId) + (notif.type === 'review_request' ? '&review=1' : '')) as any);
     return;
   }
   switch (notif.type) {

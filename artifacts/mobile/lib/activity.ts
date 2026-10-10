@@ -335,10 +335,17 @@ const BUYER_ORDER_TYPES = new Set([
   'order_cancelled', 'order_exception', 'order_returned_to_sender',
   // Delivery guarantee (docs/payments/delivery-guarantee.md)
   'order_preparing', 'order_auto_refunded', 'order_refund_warning',
+  // Post-delivery review request (api-server jobs/reviewRequest.ts)
+  'review_request',
 ]);
 
 export function isBuyerOrderNotification(type: string | undefined | null): boolean {
   return !!type && BUYER_ORDER_TYPES.has(type);
+}
+
+/** The buyer's order screen; a review request opens its review sheet. */
+export function buyerOrderHref(id: string, type?: string | null): string {
+  return `/buyer-order-detail?id=${encodeURIComponent(id)}${type === 'review_request' ? '&review=1' : ''}`;
 }
 // price_drop/back_in_stock/new_product are published under category "stock"
 // (seller alerts) or "social" (buyer alerts) depending on the publisher, but
@@ -586,14 +593,14 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       // targetType "order" too — send those to the buyer's own order screen,
       // not the seller's /order-detail.
       if (isBuyerOrderNotification(row.type)) {
-        return id ? `/buyer-order-detail?id=${q(id)}` : '/(buyer)/orders';
+        return id ? buyerOrderHref(id, row.type) : '/(buyer)/orders';
       }
       return id ? `/order-detail?id=${q(id)}` : '/(tabs)/orders';
     case 'return':
       // Same screen the return-status push opens (lib/notificationNavigation.ts).
       return id ? `/return-detail?returnId=${q(id)}` : null;
     case 'buyer_order':
-      return id ? `/buyer-order-detail?id=${q(id)}` : '/(buyer)/orders';
+      return id ? buyerOrderHref(id, row.type) : '/(buyer)/orders';
     case 'sample_order':
       return id ? `/sample-detail?id=${q(id)}` : null;
     case 'bulk_order':

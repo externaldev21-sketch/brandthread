@@ -15,6 +15,9 @@ const GUEST_BUYER_TABS = new Set(['', 'index', 'feed', 'discover', 'discover-fee
 /** Top-level screens that only read public data. */
 const GUEST_TOP_LEVEL = new Set([
   'buyer-product-detail',
+  'thread-product-detail', // re-exports buyer-product-detail (product taps from discovery grids)
+  'buyer-category', // public: api.publicDiscovery.categoryProducts
+  'buyer-trending', // public: api.publicDiscovery.trendingProducts / trendingBrands
   'buyer-checkout', // guest checkout exists (api.guest.checkout)
   'buyer-search',
   'buyer-post-viewer',

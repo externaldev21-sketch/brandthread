@@ -344,7 +344,24 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
     { productId: product.id, valueCents: itemValueCents, currency: 'usd' },
   );
 
+  // Same choke point: a real add-to-bag is a moment to ask for push, so the
+  // 1-hour cart reminder can reach first-time buyers. Signed-in only; the
+  // helper skips web and non-onboarded accounts and asks at most once.
+  if (_cartUserId !== 'anon') void askPushAfterAddToCart(_cartUserId);
+
   return { success: true, cart };
+}
+
+async function askPushAfterAddToCart(userId: string): Promise<void> {
+  try {
+    const [{ requestContextualPushPermission }, { api }] = await Promise.all([
+      import('@/lib/contextualPushPermission'),
+      import('@/lib/api'),
+    ]);
+    await requestContextualPushPermission(userId, api);
+  } catch {
+    // Push is optional and must never affect adding to the cart.
+  }
 }
 
 export async function updateCartItemQuantity(itemId: string, quantity: number): Promise<Cart> {

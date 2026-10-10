@@ -1,5 +1,5 @@
 import type * as Notifications from 'expo-notifications';
-import { activityHref, isBuyerOrderNotification } from './activity';
+import { activityHref, buyerOrderHref, isBuyerOrderNotification } from './activity';
 
 export type NotificationRouter = {
   push: (href: string) => void;
@@ -45,12 +45,12 @@ export function createNotificationResponseHandler(
       // Buyer order updates (shipped/delivered/…) open the buyer's order
       // screen; only seller-side order pushes open /order-detail.
       router.push(isBuyerOrderNotification(typeof data.type === 'string' ? data.type : null)
-        ? `/buyer-order-detail?id=${encodeURIComponent(data.targetId)}`
+        ? buyerOrderHref(data.targetId, typeof data.type === 'string' ? data.type : null)
         : `/order-detail?id=${encodeURIComponent(data.targetId)}`);
       return;
     }
     if (data?.targetType === 'buyer_order' && typeof data.targetId === 'string' && data.targetId) {
-      router.push(`/buyer-order-detail?id=${encodeURIComponent(data.targetId)}`);
+      router.push(buyerOrderHref(data.targetId, typeof data.type === 'string' ? data.type : null));
       return;
     }
     if (data?.targetType === 'manufacturer_thread' && typeof data.targetId === 'string' && data.targetId) {

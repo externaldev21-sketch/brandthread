@@ -574,7 +574,7 @@ export default function BuyerOrderDetailScreen() {
   const PURPLE_DIM = theme.accentDim;
   const CYAN = theme.secondary;
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, review: reviewParam } = useLocalSearchParams<{ id: string; review?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -707,6 +707,15 @@ export default function BuyerOrderDetailScreen() {
 
   const order = visibleOrderForBuyer(storedOrder, orderOwnerId, userId);
   const visibleLoading = loading || orderOwnerId !== userId;
+
+  // Review-request push/email opens ?review=1: open the review sheet once.
+  const autoReviewOpenedRef = useRef(false);
+  useEffect(() => {
+    if (reviewParam !== '1' || autoReviewOpenedRef.current || !order) return;
+    if (order.status !== 'delivered' || !isRealOrderId(order.id)) return;
+    autoReviewOpenedRef.current = true;
+    setShowReviewSheet(true);
+  }, [reviewParam, order]);
 
   function handleCopyTracking() {
     if (!order?.trackingNumber) return;
