@@ -25,6 +25,7 @@ import {
   DEMO_STORE_SUBDOMAIN, EMPTY_STORE_SUBDOMAIN, canSaveSubdomain, initialSubdomainInput,
   normalizeSubdomainInput, subdomainErrorMessage,
 } from '@/lib/storeSubdomain';
+import type { StoreAddress } from '@/lib/storeAddress.types';
 import { StoreDomain } from '@/services/storeTypes';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
@@ -52,6 +53,14 @@ export default function StoreDomainScreen() {
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   // Signed-out dev web preview: never call protected APIs.
   const inPreview = isSellerDevPreview();
+  // What the server says is actually switched on (BT-307/317/318): nothing is
+  // shown as live or verified until it really serves the store.
+  const [address, setAddress] = useState<StoreAddress | null>(null);
+  const hosting = {
+    subdomainsLive: address?.subdomainsLive === true,
+    customDomainsLive: address?.customDomainsLive === true,
+    cnameTarget: address?.cnameTarget ?? null,
+  };
 
   const leaveSetupDestination = () => {
     // Pop to the exact screen underneath (dashboard / setup checklist / tab);
@@ -79,6 +88,8 @@ export default function StoreDomainScreen() {
   const load = useCallback(async () => {
     // Signed-out web preview: custom domains come from a protected API.
     if (inPreview || isBuyerDevPreview()) { setDomains([]); return; }
+    const nextAddress = await api.store.address().catch(() => null);
+    setAddress(nextAddress);
     try {
       const apiDomains = await (api as any).store.domains() as any[];
       const customFromApi: MergedDomain[] = (apiDomains ?? []).map((d: any) => ({
@@ -190,7 +201,11 @@ export default function StoreDomainScreen() {
       }
       await completeSetupTaskWhen('connect_domain', verifiedDomain?.verified === true);
       await load();
-      Alert.alert('Verified ✓', 'Your domain is verified and SSL is being issued.');
+      // Only the TXT record is checked; the domain serves the store once the
+      // CNAME points at our host (BT-318).
+      Alert.alert('DNS verified', hosting.cnameTarget
+        ? `Point a CNAME for ${verifiedDomain?.domain ?? 'your domain'} to ${hosting.cnameTarget} to finish connecting it.`
+        : 'Your TXT record is in place.');
     } catch {
       Alert.alert('Not verified yet', 'DNS changes can take up to 48 hours to propagate. Check your registrar and try again.');
     } finally {
@@ -252,14 +267,16 @@ export default function StoreDomainScreen() {
               />
               <Text style={dm.urlSuffix}>.brandthread.app</Text>
             </View>
-            {subdomainInput ? (
-              <Text style={dm.urlPreview}>https://{normalizeSubdomainInput(subdomainInput)}.brandthread.app</Text>
+            {hosting.subdomainsLive && subdomainInput ? (
+              <Text style={dm.urlPreview}>https://{subdomainInput}.brandthread.app</Text>
+            ) : address?.liveUrl ? (
+              <Text style={dm.urlPreview}>Store link: {address.liveUrl.replace(/^https:\/\//, '')}</Text>
             ) : null}
             {availabilityError ? <Text style={dm.noteText}>{availabilityError}</Text> : null}
             <View style={dm.badgeRow}>
-              {btState?.status === 'active'
-                ? <StatusBadge label="Active" variant="success" small />
-                : <StatusBadge label="Not claimed" variant="neutral" small />}
+              {hosting.subdomainsLive && btState?.status === 'active'
+                ? <StatusBadge label="Live" variant="success" small />
+                : <StatusBadge label={btState?.status === 'active' ? 'Claimed' : 'Not claimed'} variant="neutral" small />}
             </View>
             {btState?.status === 'active' && btState.url ? (
               <SecondaryButton label="Copy link" small accent={MUTED} onPress={handleCopySubdomain} style={{ marginBottom: SP.sm }} />
@@ -269,7 +286,7 @@ export default function StoreDomainScreen() {
         )}
 
         {/* Custom Domains */}
-        <SectionHeader title="CUSTOM DOMAIN" style={dm.sh} />
+        {(hosting.customDomainsLive || customDomains.length > 0) && <SectionHeader title="CUSTOM DOMAIN" style={dm.sh} />}
         {customDomains.map(cd => (
           <BrandthreadCard key={cd.id} style={dm.card}>
             <View style={dm.domainRow}>
@@ -277,12 +294,9 @@ export default function StoreDomainScreen() {
               {cd.isPrimary && <StatusBadge label="★ Primary" variant="purple" small />}
             </View>
             <View style={dm.badgeRow}>
-              {verificationBadge(cd.verificationStatus)}
-              <StatusBadge
-                label={cd.sslStatus === 'active' ? 'SSL Active' : 'SSL Pending'}
-                variant={cd.sslStatus === 'active' ? 'success' : 'warning'}
-                small
-              />
+              {cd.verificationStatus === 'verified'
+                ? <StatusBadge label="DNS verified" variant="neutral" small />
+                : verificationBadge(cd.verificationStatus)}
             </View>
 
             {cd.verificationStatus === 'pending' && (
@@ -298,10 +312,12 @@ export default function StoreDomainScreen() {
                     <Text style={[dm.dnsHost, { color: CYAN, flexWrap: 'wrap', flex: 1 }]}>{cd.dnsToken}</Text>
                   </View>
                 ) : null}
-                <View style={dm.dnsRow}>
-                  <Text style={dm.dnsType}>CNAME</Text>
-                  <Text style={dm.dnsHost}>www → cname.brandthread.app</Text>
-                </View>
+                {hosting.cnameTarget ? (
+                  <View style={dm.dnsRow}>
+                    <Text style={dm.dnsType}>CNAME</Text>
+                    <Text style={dm.dnsHost}>{cd.customDomain} → {hosting.cnameTarget}</Text>
+                  </View>
+                ) : null}
                 <Text style={dm.dnsNote}>DNS changes can take up to 48 hours to propagate.</Text>
                 <SecondaryButton
                   label={verifying === cd.id ? 'Checking...' : 'Verify DNS'}
@@ -313,7 +329,7 @@ export default function StoreDomainScreen() {
               </BrandthreadCard>
             )}
 
-            {cd.verificationStatus === 'verified' && (
+            {cd.verificationStatus === 'verified' && hosting.customDomainsLive && (
               <BrandthreadCard style={[dm.dnsCard, { borderColor: SUCCESS, backgroundColor: SUCCESS_DIM }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
                   <Icon name="check-circle" size={ICON.sm} color={SUCCESS} />
@@ -336,7 +352,8 @@ export default function StoreDomainScreen() {
           </BrandthreadCard>
         ))}
 
-        {!adding ? (
+        {hosting.customDomainsLive ? (
+        !adding ? (
           <TouchableOpacity style={dm.addDomainBtn} onPress={() => setAdding(true)}>
             <Icon name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={dm.addDomainText}>Connect custom domain</Text>
@@ -364,7 +381,8 @@ export default function StoreDomainScreen() {
               <PrimaryButton label="Add Domain" small onPress={handleConnectDomain} disabled={!newDomain.trim() || connectingDomain} loading={connectingDomain} style={{ flex: 1 }} />
             </View>
           </BrandthreadCard>
-        )}
+        )
+        ) : null}
       </ScrollView>
     </View>
   );

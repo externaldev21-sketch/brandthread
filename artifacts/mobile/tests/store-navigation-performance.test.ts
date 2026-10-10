@@ -43,10 +43,11 @@ describe('local store navigation does not wait for server reads', () => {
     resolveRemote({ status: 'published', publishedAt: '2026-10-06T12:00:00Z', slug: 'verified-store' });
     const verified = await request;
     expect(verified.publishStatus).toBe('published');
-    expect(verified.settings.storeUrl).toBe('verified-store.brandthread.app');
+    // The bare subdomain: screens add ".brandthread.app" themselves (BT-316).
+    expect(verified.settings.storeUrl).toBe('verified-store');
     // Background verification must not mutate the already-painted snapshot.
     expect(snapshots[0].publishStatus).toBe('not_started');
-    expect(snapshots[0].settings.storeUrl).not.toBe('verified-store.brandthread.app');
+    expect(snapshots[0].settings.storeUrl).not.toBe('verified-store');
   });
 
   it('loads pages, menus, collections and editor state without any server reads', async () => {
