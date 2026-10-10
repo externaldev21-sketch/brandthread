@@ -15,13 +15,6 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { shouldReopenStudioMenu } from '@/lib/navigation/studioReturn';
 import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
 import { NAVIGATION_ISOLATION_TEST } from '@/lib/buildFlags';
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  useFonts,
-} from '@expo-google-fonts/inter';
 import { InteractionManager, Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SystemUI from 'expo-system-ui';
@@ -80,6 +73,7 @@ import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
 import { ReportSheetProvider } from '@/components/safety/ReportSheet';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { SaveHeartHost } from '@/components/SaveHeartHost';
+import { ShareStoreSheetHost } from '@/components/store/ShareStoreSheetHost';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
@@ -102,7 +96,7 @@ import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 import { StatusBarMask, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
-import { MUTED } from '@/lib/theme';
+import { FONT, MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
@@ -1300,10 +1294,10 @@ function RootLayoutNav() {
   if (feature && !isEnabled(feature)) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }}>
-        <Text style={{ color: '#F5F5F7', fontFamily: 'Inter_700Bold', fontSize: 22, textAlign: 'center' }}>
+        <Text style={{ color: '#F5F5F7', fontFamily: FONT.bold, fontSize: 22, textAlign: 'center' }}>
           Temporarily unavailable
         </Text>
-        <Text style={{ color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
+        <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
           This feature is paused while we make improvements. Your existing work is still safe.
         </Text>
         <PrimaryButton
@@ -1643,6 +1637,10 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="statements" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        {/* The simple store website (brandthread.app/@handle): home, Design editor, Settings. */}
+        <Stack.Screen name="my-store"           options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-design"       options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT, gestureEnabled: false }} />
+        <Stack.Screen name="store-site-settings" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="launch-checklist"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="launch-publish"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-preview-as-buyer" options={{ headerShown: false, animation: 'fade', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
@@ -1699,14 +1697,6 @@ const AppStack = React.memo(function AppStack() {
 });
 
 function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
-  const [fontGateExpired, setFontGateExpired] = useState(false);
-
   useEffect(() => {
     // Fire-and-forget: warms the Appearance screen's icon/theme thumbnails
     // in the background so it never has to show a loading/fade state for a
@@ -1718,18 +1708,9 @@ function RootLayout() {
     return runAfterFirstPaint(() => { void preloadAppearanceAssets(); });
   }, []);
 
-  useEffect(() => {
-    // Last-resort safety net only: expo-font can occasionally hang (a stale
-    // font cache after a hot reload, a broken preview). Everywhere else, the
-    // app waits for the real Inter faces so text never renders in a system
-    // fallback font — a swap that reads as "blurry" since the fallback's
-    // metrics and hinting don't match the app's type scale. This should
-    // essentially never fire in normal use.
-    const timeout = setTimeout(() => setFontGateExpired(true), 8000);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  const appReady = fontsLoaded || !!fontError || fontGateExpired;
+  // UI text uses the platform system font (BRANDTHREAD_DESIGN.md), so there
+  // are no font files to wait for.
+  const appReady = true;
 
   const appTree = (
     <SafeAreaProvider>
@@ -1759,6 +1740,7 @@ function RootLayout() {
                                     </ReportSheetProvider>
                                     <GlobalCallOverlay />
                                     <SaveHeartHost />
+                                    <ShareStoreSheetHost />
                                   </FirstRunTipsProvider>
                                 </CallSessionProvider>
                               </ThreadPullProvider>

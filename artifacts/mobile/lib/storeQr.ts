@@ -8,11 +8,11 @@ import QRCode from 'qrcode';
 
 import { BRANDTHREAD_ORIGIN } from '@/lib/shareProfile';
 
-/** Public storefront link, same shape share-store.tsx builds. */
+/** The seller's store website link (brandthread.app/@username), same as lib/storeShare. */
 export function buildStoreUrl(handle: string | null | undefined): string | null {
   const clean = (handle ?? '').trim().replace(/^@/, '').toLowerCase();
   if (!/^[a-z0-9_]{3,30}$/.test(clean)) return null;
-  return `${BRANDTHREAD_ORIGIN}/store/${clean}`;
+  return `${BRANDTHREAD_ORIGIN}/@${clean}`;
 }
 
 export function qrMatrix(value: string): boolean[][] {

@@ -13,7 +13,8 @@ const setupDestinations = [
   ['connect_payments', '/payouts', 'app/payouts.tsx'],
   ['first_product', '/add-product', 'app/add-product.tsx'],
   ['shipping_rates', '/shipping', 'app/shipping.tsx'],
-  ['customize_store', '/store-builder', 'app/store-builder.tsx'],
+  // "Customize your store" opens the simple store website (My store).
+  ['customize_store', '/my-store', 'app/my-store.tsx'],
   ['connect_domain', '/store-domain', 'app/store-domain.tsx'],
   ['publish_store', '/store-publish', 'app/store-publish.tsx'],
   ['first_post', '/create-post', 'app/create-post.tsx'],
@@ -67,7 +68,8 @@ describe('seller setup destination navigation', () => {
     // "Product published!" moved from a native Alert to the shared
     // SuccessSheet (components/ui/SuccessSheet.tsx) — its secondary action
     // still returns to the seller-setup origin via leaveProductFlow.
-    expect(addProduct).toContain("secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}");
+    // Done is the second button, or a text button under "Share store" after a first publish.
+    expect(addProduct).toContain("{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }");
     expect(createPost).toContain('leaveSetupFlow(router, params.from);');
     expect(createPost).toContain('onDiscard={leave}');
   });
@@ -79,6 +81,7 @@ describe('seller setup destination navigation', () => {
       ['app/add-product.tsx', '() => api.products.create(serverCreatePayload)', "'first_product'"],
       ['app/shipping.tsx', '() => api.shippingZones.create(payload)', "'shipping_rates'"],
       ['app/store-builder.tsx', "() => applyTheme(THREAD_THEME_ID, 'light')", "'customize_store'"],
+      ['app/store-design.tsx', 'await saveBio({', "completeSetupTaskWhen('customize_store', true)"],
       ['app/store-domain.tsx', "verificationStatus === 'verified'", "'connect_domain'"],
       ['app/store-publish.tsx', 'result.success', "'publish_store'"],
       ['app/create-post.tsx', "completeSetupTaskAfter('first_post', run)", "'first_post'"],

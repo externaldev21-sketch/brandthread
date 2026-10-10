@@ -30,6 +30,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
+import { openShareStoreSheet } from '@/lib/shareStoreSheet';
 
 import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
@@ -248,6 +249,8 @@ export default function AddProductScreen() {
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
+  // "Share store" in the publish sheet opens the Share store sheet once this one has finished closing.
+  const shareStoreAfterClose = useRef(false);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
   const [sizeChartUploadStatus, setSizeChartUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
@@ -2192,7 +2195,14 @@ export default function AddProductScreen() {
 
       <SuccessSheet
         visible={!!publishSuccess}
-        onClose={() => setPublishSuccess(null)}
+        onClose={() => {
+          setPublishSuccess(null);
+          if (shareStoreAfterClose.current) {
+            shareStoreAfterClose.current = false;
+            leaveProductFlow();
+            openShareStoreSheet();
+          }
+        }}
         title={publishSuccess?.kind === 'updated' ? 'Product updated!' : currentStatus === 'active' ? 'Product published!' : 'Draft saved!'}
         subtitle={publishSuccess ? `${publishSuccess.name} ${publishSuccess.kind === 'updated' ? 'has been updated.' : currentStatus === 'active' ? 'is now live.' : 'was saved as a draft.'}` : undefined}
         primaryAction={{
@@ -2203,7 +2213,14 @@ export default function AddProductScreen() {
             if (id) router.replace(('/product-detail?id=' + id) as never);
           },
         }}
-        secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
+        // A newly published product: hand the seller the one Share store sheet
+        // (then Done moves to a text button under it).
+        secondaryAction={publishSuccess?.kind === 'created' && currentStatus === 'active'
+          ? { label: 'Share store', onPress: () => { shareStoreAfterClose.current = true; setPublishSuccess(null); } }
+          : { label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
+        tertiaryAction={publishSuccess?.kind === 'created' && currentStatus === 'active'
+          ? { label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }
+          : undefined}
         testID="add-product-success-sheet"
       />
 

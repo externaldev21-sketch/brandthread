@@ -5,8 +5,8 @@ import { buildStoreUrl, bytesToBase64, encodeQrPng, qrMatrix, storeQrDataUri } f
 
 describe('buildStoreUrl', () => {
   it('builds the canonical store link from a handle', () => {
-    expect(buildStoreUrl('Atelier_21')).toBe('https://brandthread.app/store/atelier_21');
-    expect(buildStoreUrl('@atelier')).toBe('https://brandthread.app/store/atelier');
+    expect(buildStoreUrl('Atelier_21')).toBe('https://brandthread.app/@atelier_21');
+    expect(buildStoreUrl('@atelier')).toBe('https://brandthread.app/@atelier');
   });
 
   it('never guesses a link from a missing or invalid handle', () => {

@@ -133,6 +133,10 @@ function hasHardcodedThemeColor(source: string, file: string): boolean {
 // `useAppTheme()`/`useColors()` tokens, then delete its line here in the
 // same change.
 const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
+  // The store website's own themes (seller-picked colours for THEIR site,
+  // mirrored from the API server) and the QR dark/light pair — colour data,
+  // not app chrome.
+  'lib/storeSiteDesign.ts',
   'app/(buyer)/cart.tsx',
   'app/(buyer)/edit-profile.tsx',
   'app/(buyer)/friends.tsx',
@@ -239,7 +243,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/seller-settings.tsx',
   'app/setup.tsx',
   'app/share-profile.tsx',
-  'app/share-store.tsx',
   'app/shipping.tsx',
   'app/shopping-preferences.tsx',
   'app/sign-in.tsx',
@@ -279,6 +282,8 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/SellerDashboardSections.tsx',
   'components/SellerHomeCommerceDashboard.tsx',
   'components/SellerStudioRadialMenu.tsx',
+  // QR tile: a QR code must stay physically dark-on-white to scan.
+  'components/StoreLinkCard.tsx',
   'components/StudioMenuHints.tsx',
   'components/SellerTutorialOverlay.tsx',
   'components/SetupCelebration.tsx',

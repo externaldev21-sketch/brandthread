@@ -14,6 +14,8 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
+import { useStoreLink } from '@/hooks/useStoreLink';
+import { displayStoreLink } from '@/lib/storeShare';
 import { getStorefront, validateStore, publishStore, unpublishStore, StoreValidationResult } from '@/services/storeService';
 import { Storefront } from '@/services/storeTypes';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
@@ -28,6 +30,7 @@ const ERROR_ROUTES: Record<string, string> = {
 
 export default function StorePublishScreen() {
   const { theme } = useAppTheme();
+  const storeLink = useStoreLink();
   const {
     primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN,
     foreground: FG, mutedForeground: MUTED, subtle: SUBTLE,
@@ -113,10 +116,10 @@ export default function StorePublishScreen() {
 
   const handlePublish = () => {
     if (!store) return;
-    const storeUrl = store.settings.storeUrl || 'yourstore';
     Alert.alert(
       'Publish your store?',
-      `Your store will be live at https://${storeUrl}.brandthread.app`,
+      // One store link (BT-220/BT-316): the store website, not a subdomain.
+      storeLink.url ? `Your store will be live at ${displayStoreLink(storeLink.url)}` : 'Your store will go live.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -157,7 +160,7 @@ export default function StorePublishScreen() {
     );
   };
 
-  const storeUrl = store?.settings.storeUrl || 'yourstore';
+  const storeUrlLabel = storeLink.url ? displayStoreLink(storeLink.url) : null;
 
   return (
     <View style={pub.root}>
@@ -274,9 +277,9 @@ export default function StorePublishScreen() {
                 <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
               <Text style={pub.successTitle}>Your store is live!</Text>
-              <Text style={pub.successUrl}>https://{storeUrl}.brandthread.app</Text>
+              {storeUrlLabel ? <Text style={pub.successUrl}>{storeUrlLabel}</Text> : null}
               <View style={pub.successActions}>
-                <SecondaryButton label="View store" onPress={() => Linking.openURL(`https://${storeUrl}.brandthread.app`).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
+                <SecondaryButton label="View store" onPress={() => { if (storeLink.url) Linking.openURL(storeLink.url).catch(() => Alert.alert("Couldn't open your store", 'Try again.')); }} disabled={!storeLink.url} icon="external-link" style={{ flex: 1 }} />
                 <PrimaryButton
                   label={isSellerSetupOrigin(params.from) ? 'Done' : 'Continue Editing'}
                   onPress={leaveSetupDestination}
@@ -289,7 +292,7 @@ export default function StorePublishScreen() {
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
             <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
             <Text style={[pub.publishStoreName, { color: `${theme.onAccent}CC` }]}>{store?.settings.storeName || 'Your Store'}</Text>
-              <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>https://{storeUrl}.brandthread.app</Text>
+              {storeUrlLabel ? <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>{storeUrlLabel}</Text> : null}
             <PrimaryButton
               label={publishing ? 'Publishing...' : 'Publish Store →'}
               onPress={handlePublish}
