@@ -27,6 +27,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ExpoLinking from 'expo-linking';
+import { buildLiveUrl } from '@/lib/shareLinks';
 import { CachedImage } from '@/components/CachedImage';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { Snackbar } from '@/components/ui/Snackbar';
@@ -316,7 +317,9 @@ export default function LiveScreen() {
   }, []);
 
   const share = useCallback(async (stream: LiveStream) => {
-    const url = ExpoLinking.createURL('/live', { queryParams: { streamId: stream.id } });
+    // https link (BT-320): unfurls in Messages/WhatsApp/IG and opens for
+    // people without the app; brandthread:// and exp:// do neither.
+    const url = buildLiveUrl(stream.id) ?? ExpoLinking.createURL('/live', { queryParams: { streamId: stream.id } });
     try {
       await Share.share({ message: `${stream.host.name} is live on Brandthread: ${stream.title}\n${url}`, url });
     } catch { /* dismissed */ }
