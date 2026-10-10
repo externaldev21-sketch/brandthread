@@ -13,6 +13,7 @@ import { resolveAudience, isSendableStatus } from "./audience";
 import { getEmailProvider, type EmailProvider } from "./provider";
 import { renderCampaign, type RenderProduct } from "./render";
 import { signToken, tokenSecret } from "./tokens";
+import { monthlyEmailsLeft } from "./allowance";
 import type { Audience, CampaignBody } from "./validation";
 
 export const DEFAULT_DAILY_CAP = 1000;
@@ -130,6 +131,8 @@ export type ProcessDeps = {
   cap?: number;
   batchSize?: number;
   maxBatches?: number;
+  /** Monthly plan allowance left (allowance.ts); injectable for tests. */
+  monthlyLeft?: (sellerId: string, now: Date) => Promise<number>;
 };
 
 export async function processCampaign(campaignId: string, deps: ProcessDeps = {}): Promise<ProcessResult> {
@@ -162,7 +165,10 @@ export async function processCampaign(campaignId: string, deps: ProcessDeps = {}
   for (let batch = 0; batch < (deps.maxBatches ?? Number.MAX_SAFE_INTEGER); batch++) {
     const queued = await queuedCount(campaignId);
     if (queued === 0) break;
-    const allowed = planBatch({ cap, sentToday: await sentToday(campaign.sellerId, now()), queued, batchSize: size });
+    const allowed = Math.min(
+      planBatch({ cap, sentToday: await sentToday(campaign.sellerId, now()), queued, batchSize: size }),
+      deps.monthlyLeft ? await deps.monthlyLeft(campaign.sellerId, now()) : await monthlyEmailsLeft(campaign.sellerId, now()),
+    );
     if (allowed === 0) { result.capReached = true; break; }
 
     const claimed = (await db.execute(sql`

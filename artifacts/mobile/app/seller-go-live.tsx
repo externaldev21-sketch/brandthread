@@ -25,6 +25,10 @@ import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { useAgeStatus } from '@/lib/ageGate';
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 import { radius } from '@/constants/radii';
+import PlanUpsellModal from '@/components/PlanUpsellModal';
+import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+import { getEntitlementRejection, type EntitlementRejection } from '@/lib/entitlementError';
+import { LIVE_HOST_MIN_PLAN } from '@/lib/sellerPlans';
 
 const FG = '#FFFFFF';
 const GLASS = 'rgba(0,0,0,0.5)';
@@ -64,6 +68,14 @@ function SellerGoLiveNativeScreen() {
   const [title, setTitle] = useState(typeof launch.title === 'string' ? launch.title : '');
   const [description, setDescription] = useState('');
   const [starting, setStarting] = useState(false);
+  // Hosting needs Growth (server: lib/planFeatures.ts). Starter sees the
+  // upgrade sheet on arrival instead of after filling in the form; a server
+  // PLAN_REQUIRED / PLAN_LIMIT_REACHED opens the same sheet.
+  const { plan } = useSubscriptionPlan();
+  const [upsell, setUpsell] = useState<EntitlementRejection | null>(null);
+  useEffect(() => {
+    if (plan === 'starter') setUpsell({ code: 'PLAN_REQUIRED', requiredPlan: LIVE_HOST_MIN_PLAN, message: '' });
+  }, [plan]);
 
   // ── Products to feature ──
   // Tagging previously only happened mid-broadcast (seller-live.tsx's
@@ -161,6 +173,8 @@ function SellerGoLiveNativeScreen() {
         },
       } as any);
     } catch (e: any) {
+      const rejection = getEntitlementRejection(e);
+      if (rejection) { setUpsell(rejection); return; }
       Alert.alert('Could not start live', e?.message ?? 'Please check your connection and try again.');
     } finally {
       setStarting(false);
@@ -220,6 +234,13 @@ function SellerGoLiveNativeScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
+      <PlanUpsellModal
+        visible={!!upsell}
+        featureName="Live selling"
+        requiredPlan={upsell?.requiredPlan ?? LIVE_HOST_MIN_PLAN}
+        onClose={() => { setUpsell(null); if (plan === 'starter') goBackOr(router); }}
+        onUpgrade={() => { setUpsell(null); router.push('/subscription' as never); }}
+      />
       {/* Live camera preview, full-bleed */}
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: flipAnim, transform: [{ scaleX: flipAnim }] }]}>
         {camGranted && micGranted ? (

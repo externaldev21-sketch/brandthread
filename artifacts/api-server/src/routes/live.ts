@@ -32,6 +32,8 @@ import { notifyFollowersLiveStarted } from "../lib/liveNotifications";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
+import { featureGate } from "../middlewares/featureGate";
+import { checkLiveAllowance } from "../lib/liveAllowance";
 import { evaluateContent } from "../lib/contentModerator";
 import { isBlockedEitherWay, optionalViewerId, publishingRestriction } from "../lib/safety";
 import { rankLiveFeed } from "../lib/liveFeed";
@@ -44,8 +46,8 @@ import { loadEffectiveSettings, loadLastCommentAt, loadRestriction } from "../li
 
 const router = Router();
 
-/** Hosting a live is a Pro feature; watching one is not. */
-const hostPlan = requirePlan("pro");
+/** Hosting a live needs the live_hosting plan (lib/planFeatures.ts, Growth+) and, on Growth, monthly minutes; watching never does. */
+const hostPlan = featureGate("live_hosting", { extra: checkLiveAllowance });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

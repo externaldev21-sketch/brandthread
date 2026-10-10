@@ -11,6 +11,7 @@
  * Every query is scoped to req.clerkUserId (the store owner after team context).
  */
 import { Router } from "express";
+import { checkMonthlyEmailAllowance, monthlyAllowanceView } from "../lib/emailMarketing/allowance";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, emailCampaigns, emailSettings, emailSubscribers } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -63,6 +64,7 @@ router.get("/status", async (req, res) => {
     dailyCap: cap,
     sentToday: used,
     remainingToday: Math.max(0, cap - used),
+    ...(await monthlyAllowanceView(sellerId)),
     tracking: {
       delivered: enabled && isTrackingConfigured(),
       opened: enabled && isTrackingConfigured(),
@@ -313,6 +315,9 @@ router.post("/campaigns/:id/send", async (req, res) => {
   if (recipients.length === 0) {
     res.status(400).json({ error: "No one in this audience can receive email yet.", code: "NO_RECIPIENTS" }); return;
   }
+  // Plan allowance (Starter 500 / Growth 10k / Pro 50k a month): refuse up front instead of stopping mid-campaign.
+  const overLimit = await checkMonthlyEmailAllowance(sellerId, recipients.length);
+  if (overLimit) { res.status(403).json(overLimit); return; }
 
   const rawSchedule = (req.body as { scheduleAt?: unknown } | undefined)?.scheduleAt;
   if (rawSchedule !== undefined && rawSchedule !== null && rawSchedule !== "") {

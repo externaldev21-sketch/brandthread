@@ -81,6 +81,25 @@ export function buildRulesTemplate(i: RulesTemplateInput): string {
   ].join("\n");
 }
 
+/**
+ * Fixed footer added to every giveaway's rules wherever they are shown
+ * (App Store guideline 5.3.3: Apple must be named as not a sponsor). The
+ * seller can't edit it out: it is appended when rules are read, and
+ * stripped first so it never appears twice.
+ */
+export const REQUIRED_RULES_FOOTER =
+  "Apple and Google are not sponsors of, and are not involved in any way with, this giveaway. "
+  + "This giveaway is not sponsored, endorsed or administered by, or associated with, Brandthread.";
+
+export function stripRequiredFooter(rules: string): string {
+  return rules.split(REQUIRED_RULES_FOOTER).join("").trimEnd();
+}
+
+export function withRequiredFooter(rules: string | null | undefined): string {
+  const body = stripRequiredFooter(rules ?? "");
+  return body ? `${body}\n\n${REQUIRED_RULES_FOOTER}` : REQUIRED_RULES_FOOTER;
+}
+
 /** SHA-256 over the sorted eligible ids, so an audit can re-derive the exact pool. */
 export function hashEligible(ids: readonly string[]): string {
   return crypto.createHash("sha256").update([...ids].sort().join("\n")).digest("hex");

@@ -144,7 +144,7 @@ export function getGrowthStudioTools(theme: PlanTheme): GrowthTool[] {
 /** Additional Growth perks shown after the Studio tool list. */
 export const GROWTH_EXTRAS = [
   { icon: 'package' as const, label: 'Unlimited products' },
-  { icon: 'globe' as const, label: 'Custom storefront + domain' },
+  { icon: 'globe' as const, label: 'Custom domain' },
   { icon: 'truck' as const, label: 'Manufacturer Hub access' },
-  { icon: 'bar-chart-2' as const, label: 'Advanced sales analytics' },
+  { icon: 'video' as const, label: 'Live selling, drops, and giveaways' },
 ];
