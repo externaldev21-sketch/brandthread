@@ -4,7 +4,7 @@
  * Covers:
  * - SELLER_PLANS data integrity (ids, prices, highlight flag)
  * - recommendSellerPlan scoring
- * - SellerPlanRecommendationStep renders plan names, CTA, no charge note
+ * - Onboarding PlanStep renders plans, prices and the exact trial copy
  * - plans.tsx renders plan names + trial badge + full-width CTAs
  * - subscription.tsx renders tabs, current plan card, plan ribbons
  * - billing.tsx renders section titles, role-locked view for non-owners
@@ -33,6 +33,7 @@ vi.mock('react-native', () => {
     AppState:           { addEventListener: vi.fn(() => ({ remove: removeMock })) },
     Linking:            { openURL: vi.fn() },
     Platform:           { OS: 'web', select: (obj: any) => obj.web ?? obj.default },
+    Pressable:          nativeComponent('Pressable'),
     ScrollView:         nativeComponent('ScrollView'),
     Share:              { share: vi.fn() },
     StyleSheet:         { create: (s: unknown) => s, absoluteFill: {} },
@@ -136,6 +137,10 @@ vi.mock('@/lib/growthTools', () => ({
   getGrowthStudioTools: () => [],
   GROWTH_EXTRAS: [],
 }));
+vi.mock('@/components/ui', () => {
+  const React = require('react');
+  return { Button: (props: Record<string, unknown>) => React.createElement('Button', props, props.label as string) };
+});
 vi.mock('@/lib/revenueCat', () => ({
   useRevenueCat: () => ({
     available:     true,
@@ -226,81 +231,46 @@ describe('recommendSellerPlan', () => {
 
 // ─── Component render tests ───────────────────────────────────────────────────
 
-describe('SellerPlanRecommendationStep', () => {
-  it('renders plan names', async () => {
-    const { SellerPlanRecommendationStep } = await import('@/components/onboarding/SellerPlanRecommendationStep');
-    let renderer: any;
-    await act(async () => {
-      renderer = create(
-        <SellerPlanRecommendationStep
-          brandStage="selling"
-          goals={['Grow sales']}
-          selectedPlanId="growth"
-          onSelect={vi.fn()}
-          onContinue={vi.fn()}
-        />
-      );
-    });
-    const json = JSON.stringify(renderer.toJSON());
-    expect(json).toContain('Starter');
-    expect(json).toContain('Growth');
-    expect(json).toContain('Pro');
+describe('onboarding PlanStep (after the store preview)', () => {
+  const props = () => ({
+    brandName: 'Noir Field Studio',
+    recommendedId: 'growth' as const,
+    selectedId: 'growth' as const,
+    onSelect: vi.fn(),
+    priceLabel: (id: string) => ({ starter: '$29', growth: '$79', pro: '$199' } as Record<string, string>)[id],
+    trialDays: () => 7,
+    reminderDaysBefore: 2,
+    onStart: vi.fn(),
+    starting: false,
   });
 
-  it('renders no charge note', async () => {
-    const { SellerPlanRecommendationStep } = await import('@/components/onboarding/SellerPlanRecommendationStep');
+  async function render(extra: Record<string, unknown> = {}) {
+    const { PlanStep } = await import('@/components/onboarding/steps/PlanStep');
     let renderer: any;
-    await act(async () => {
-      renderer = create(
-        <SellerPlanRecommendationStep
-          brandStage="idea"
-          goals={[]}
-          selectedPlanId="starter"
-          onSelect={vi.fn()}
-          onContinue={vi.fn()}
-        />
-      );
-    });
-    const json = JSON.stringify(renderer.toJSON());
-    expect(json).toContain('No charge is made on this step');
+    await act(async () => { renderer = create(<PlanStep {...props()} {...extra} />); });
+    return JSON.stringify(renderer.toJSON());
+  }
+
+  it('renders every plan with its price', async () => {
+    const json = await render();
+    for (const text of ['Starter', 'Growth', 'Pro', '$29', '$79', '$199', 'Recommended']) expect(json).toContain(text);
   });
 
-  it('renders trial badge text', async () => {
-    const { SellerPlanRecommendationStep } = await import('@/components/onboarding/SellerPlanRecommendationStep');
-    let renderer: any;
-    await act(async () => {
-      renderer = create(
-        <SellerPlanRecommendationStep
-          brandStage="build"
-          goals={[]}
-          selectedPlanId="starter"
-          onSelect={vi.fn()}
-          onContinue={vi.fn()}
-        />
-      );
-    });
-    const json = JSON.stringify(renderer.toJSON());
-    expect(json).toContain('5-day free trial');
+  it("shows Dev's exact trial sentence under the cards", async () => {
+    const json = await render();
+    expect(json).toMatch(/Free for 7 days\. You won't be charged until [A-Z][a-z]{2} \d{1,2}\. We'll remind you 2 days before\. Cancel anytime\./);
+    expect(json).toContain('Start free trial');
   });
 
-  it('renders continue CTA with selected plan name', async () => {
-    const { SellerPlanRecommendationStep } = await import('@/components/onboarding/SellerPlanRecommendationStep');
-    let renderer: any;
-    await act(async () => {
-      renderer = create(
-        <SellerPlanRecommendationStep
-          brandStage="idea"
-          goals={[]}
-          selectedPlanId="growth"
-          onSelect={vi.fn()}
-          onContinue={vi.fn()}
-        />
-      );
-    });
-    // "Continue with" and "Growth" appear as adjacent React children
-    const json = JSON.stringify(renderer.toJSON());
-    expect(json).toContain('Continue with');
-    expect(json).toContain('"Growth"');
+  it('never promises a trial the store is not offering', async () => {
+    const json = await render({ trialDays: () => null });
+    expect(json).not.toContain('Free for');
+    expect(json).toContain('Subscribe');
+  });
+
+  it('has no way to skip past the plan', async () => {
+    const json = await render();
+    expect(json).not.toMatch(/"Skip|Not now|Maybe later/);
   });
 });
 

@@ -23,18 +23,17 @@ describe("Apple auth end-to-end code contract", () => {
   it("starts onboarding with Apple, activates only a completed session, then asks for role", () => {
     expect(onboardingSource).toContain("strategy: APPLE_OAUTH_STRATEGY");
     expect(onboardingSource).toContain("if (result?.createdSessionId && result?.setActive)");
-    expect(onboardingSource).toContain("if (isOAuthFlowComplete(result))");
-    // After v6 restructure: AccountType is step 0, so after OAuth the user
-    // goes to NAME step (no longer ACCOUNT_TYPE). AccountType still exists.
-    expect(onboardingSource).toContain("BUYER_STEP_INDEX.ACCOUNT_TYPE");
+    expect(onboardingSource).toContain("if (!isOAuthFlowComplete(result))");
+    // A signed-in account with no onboarding answers (e.g. a new Apple
+    // account from the sign-in screen) is asked buyer or seller first.
+    expect(onboardingSource).toContain("setStepId('ACCOUNT_TYPE');");
   });
 
   it("syncs buyer and seller profiles before binding completion to the Clerk user", () => {
     expect(onboardingSource).toContain(
       "const profile = await api.auth.sync({ name });",
     );
-    expect(onboardingSource.match(/const profile = await api\.auth\.sync\(\{ name \}\);/g))
-      .toHaveLength(2);
+    expect(onboardingSource).toContain("const profile = await api.auth.sync({ name: composedName() });");
     const buyerCompletion = onboardingSource.indexOf(
       "await syncBuyerOnboarding(profile.clerkId, styleInterests, api);",
     );

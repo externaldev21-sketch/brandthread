@@ -23,10 +23,8 @@
  *    `typeRole` (from `TYPE_SCALE`) already bottoms out at 11 (`caption`),
  *    so this only bites on a raw `fontSize` override.
  *
- * 3. `weight` only accepts weights Inter is actually loaded at (400/500/600/
- *    700 — see `useFonts` in app/_layout.tsx). Any other weight has no
- *    matching font file, so the browser/OS synthesizes ("faux-bolds") it by
- *    smearing the glyph outlines, which looks blurry rather than bold.
+ * 3. `weight` is one of the FONT weight tokens (400/500/600/700), rendered
+ *    in the platform system font — see lib/systemFont.ts.
  */
 import React from 'react';
 import { Text as RNText, type TextProps, type TextStyle } from 'react-native';
@@ -38,7 +36,7 @@ import { maxFontMultiplierForRole } from '@/lib/dynamicType';
 
 export { flooredFontSize, MIN_FONT_SIZE };
 
-/** Every weight with a loaded Inter font file (app/_layout.tsx's useFonts). No other weight renders crisply on web. */
+/** The system-font weights FONT exposes (lib/theme.ts). */
 export type AppTextWeight = keyof typeof FONT;
 
 export type AppTextTone = 'default' | 'muted' | 'subtle' | 'accent' | 'success' | 'destructive' | 'onAccent';
@@ -49,7 +47,7 @@ export interface AppTextProps extends Omit<TextProps, 'style' | 'role'> {
   typeRole?: TypeRoleName;
   /** Solid color token. Never pass opacity to dim text — use `tone="muted"`/`"subtle"` instead. */
   tone?: AppTextTone;
-  /** One of Inter's loaded weights. Defaults to the role's own weight, or 'regular'. */
+  /** One of FONT's weights. Defaults to the role's own weight, or 'regular'. */
   weight?: AppTextWeight;
   /** Explicit override. Floored at MIN_FONT_SIZE even if a smaller value is passed. */
   fontSize?: number;

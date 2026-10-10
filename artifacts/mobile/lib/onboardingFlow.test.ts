@@ -1,155 +1,140 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BUYER_FLOW_STEPS,
-  BUYER_STEP_INDEX,
+  BUYER_STEPS,
   DRAFT_VERSION,
-  SELLER_FLOW_STEPS,
-  SELLER_STEP_INDEX,
-  canGoBack,
-  clampStep,
+  SELLER_STEPS,
   isStepSkippable,
-  nextStepIndex,
-  prevStepIndex,
-  restoreDraftStep,
-  totalStepsFor,
+  nextStepId,
+  prevStepId,
+  progressFraction,
+  restoreDraftStepId,
+  stepsFor,
+  type FlowContext,
 } from './onboardingFlow';
 
-describe('step sequencing', () => {
-  it('starts both flows at Welcome, then AccountType, then Auth, then Name', () => {
-    expect(BUYER_STEP_INDEX.WELCOME).toBe(0);
-    expect(BUYER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
-    expect(BUYER_STEP_INDEX.AUTH).toBe(2);
-    expect(BUYER_STEP_INDEX.NAME).toBe(3);
-    expect(SELLER_STEP_INDEX.WELCOME).toBe(0);
-    expect(SELLER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
-    expect(SELLER_STEP_INDEX.AUTH).toBe(2);
-    expect(SELLER_STEP_INDEX.NAME).toBe(3);
+const signedOutEmail: FlowContext = { accountReady: false, authMethod: 'email' };
+const signedOutApple: FlowContext = { accountReady: false, authMethod: 'apple' };
+const signedIn: FlowContext = { accountReady: true, authMethod: 'email' };
+
+describe('step order', () => {
+  it('asks buyer or seller first, right after the Welcome opener', () => {
+    expect(BUYER_STEPS.slice(0, 2)).toEqual(['WELCOME', 'ACCOUNT_TYPE']);
+    expect(SELLER_STEPS.slice(0, 2)).toEqual(['WELCOME', 'ACCOUNT_TYPE']);
   });
 
-  it('buyer flow inserts Sizes after Style and Brands-to-follow before Loading', () => {
-    expect(BUYER_STEP_INDEX.STYLE).toBe(4);
-    expect(BUYER_STEP_INDEX.SIZES).toBe(5);
-    expect(BUYER_STEP_INDEX.BRANDS).toBe(6);
-    expect(BUYER_STEP_INDEX.LOADING).toBe(7);
-    expect(BUYER_STEP_INDEX.NOTIFICATIONS).toBe(8);
-    expect(BUYER_STEP_INDEX.SUCCESS).toBe(9);
+  it('buyer follows Instagram: email, code, password, birthday, terms, name, username, photo, welcome, then styles and brands', () => {
+    expect(stepsFor('buyer', signedOutEmail)).toEqual([
+      'WELCOME', 'ACCOUNT_TYPE', 'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
+      'NAME', 'USERNAME', 'PHOTO', 'WELCOME_USER', 'STYLE', 'SIZES', 'BRANDS',
+    ]);
   });
 
-  it('seller flow keeps BrandName/BrandStage/Goals/Plan order after Name', () => {
-    expect(SELLER_STEP_INDEX.BRAND_NAME).toBe(4);
-    expect(SELLER_STEP_INDEX.BRAND_STAGE).toBe(5);
-    expect(SELLER_STEP_INDEX.GOALS).toBe(6);
-    expect(SELLER_STEP_INDEX.PLAN).toBe(7);
-    expect(SELLER_STEP_INDEX.LOADING).toBe(8);
-    expect(SELLER_STEP_INDEX.NOTIFICATIONS).toBe(9);
-    expect(SELLER_STEP_INDEX.SUCCESS).toBe(10);
+  it('buyer onboarding ends with picking styles and following brands', () => {
+    expect(BUYER_STEPS.slice(-3)).toEqual(['STYLE', 'SIZES', 'BRANDS']);
   });
 
-  it('every step id in each flow is unique and total counts match the arrays', () => {
-    expect(new Set(BUYER_FLOW_STEPS.map((s) => s.id)).size).toBe(BUYER_FLOW_STEPS.length);
-    expect(new Set(SELLER_FLOW_STEPS.map((s) => s.id)).size).toBe(SELLER_FLOW_STEPS.length);
-    expect(totalStepsFor('buyer')).toBe(BUYER_FLOW_STEPS.length);
-    expect(totalStepsFor('seller')).toBe(SELLER_FLOW_STEPS.length);
-  });
-});
-
-describe('skip rules', () => {
-  it('marks identity/account/legal-adjacent steps as not skippable', () => {
-    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.WELCOME)).toBe(false);
-    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.ACCOUNT_TYPE)).toBe(false);
-    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.AUTH)).toBe(false);
-    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.NAME)).toBe(false);
-    expect(isStepSkippable('seller', SELLER_STEP_INDEX.BRAND_NAME)).toBe(false);
+  it('seller follows Shopify: questions and location before the account, store preview, then plan', () => {
+    expect(stepsFor('seller', signedOutEmail)).toEqual([
+      'WELCOME', 'ACCOUNT_TYPE', 'STAGE', 'GOALS', 'LOCATION',
+      'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
+      'NAME', 'BRAND_NAME', 'USERNAME', 'BUILDING', 'PLAN',
+    ]);
   });
 
-  it('marks style picks, sizes and brand-follow as skippable', () => {
-    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.STYLE)).toBe(true);
-    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.SIZES)).toBe(true);
-    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.BRANDS)).toBe(true);
+  it('the plan comes right after the store preview, and only sellers see it', () => {
+    expect(SELLER_STEPS.indexOf('PLAN')).toBe(SELLER_STEPS.indexOf('BUILDING') + 1);
+    expect(BUYER_STEPS).not.toContain('PLAN');
+    expect(isStepSkippable('PLAN')).toBe(false);
   });
 
-  it('marks notifications priming as skippable for both flows', () => {
-    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.NOTIFICATIONS)).toBe(true);
-    expect(isStepSkippable('seller', SELLER_STEP_INDEX.NOTIFICATIONS)).toBe(true);
+  it('has no payout or notification step during sign-up', () => {
+    for (const id of [...BUYER_STEPS, ...SELLER_STEPS] as string[]) {
+      expect(['PAYOUTS', 'NOTIFICATIONS']).not.toContain(id);
+    }
   });
 
-  it('out-of-range indices are treated as not skippable', () => {
-    expect(isStepSkippable('buyer', 999)).toBe(false);
-    expect(isStepSkippable('buyer', -1)).toBe(false);
+  it('Apple/Google skip the code and password but still ask birthday and terms first', () => {
+    const steps = stepsFor('buyer', signedOutApple);
+    expect(steps).not.toContain('CODE');
+    expect(steps).not.toContain('PASSWORD');
+    expect(steps.indexOf('BIRTHDAY')).toBeLessThan(steps.indexOf('TERMS'));
+    expect(steps.indexOf('TERMS')).toBeLessThan(steps.indexOf('NAME'));
+  });
+
+  it('a signed-in account sees no account steps at all', () => {
+    for (const flow of ['buyer', 'seller'] as const) {
+      const steps = stepsFor(flow, signedIn);
+      for (const id of ['EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS'] as const) expect(steps).not.toContain(id);
+    }
   });
 });
 
-describe('back navigation and clamping', () => {
-  it('canGoBack is false only at the first step', () => {
-    expect(canGoBack(0)).toBe(false);
-    expect(canGoBack(1)).toBe(true);
+describe('navigation', () => {
+  it('next and previous follow the visible steps', () => {
+    expect(nextStepId('buyer', 'EMAIL', signedOutEmail)).toBe('CODE');
+    expect(nextStepId('buyer', 'EMAIL', signedOutApple)).toBe('BIRTHDAY');
+    expect(prevStepId('buyer', 'BIRTHDAY', signedOutEmail)).toBe('PASSWORD');
+    expect(prevStepId('buyer', 'BIRTHDAY', signedOutApple)).toBe('EMAIL');
+    expect(nextStepId('seller', 'LOCATION', signedOutEmail)).toBe('EMAIL');
+    expect(nextStepId('seller', 'LOCATION', signedIn)).toBe('NAME');
+    expect(nextStepId('buyer', 'BRANDS', signedIn)).toBeNull();
   });
 
-  it('prevStepIndex never goes below 0', () => {
-    expect(prevStepIndex('buyer', 0)).toBe(0);
-    expect(prevStepIndex('buyer', 1)).toBe(0);
+  it('there is no way back into the account steps once the account exists', () => {
+    expect(prevStepId('buyer', 'NAME', signedIn)).toBeNull();
+    expect(prevStepId('seller', 'NAME', signedIn)).toBeNull();
+    expect(prevStepId('seller', 'BRAND_NAME', signedIn)).toBe('NAME');
   });
 
-  it('nextStepIndex never exceeds the last step', () => {
-    const last = totalStepsFor('seller') - 1;
-    expect(nextStepIndex('seller', last)).toBe(last);
-    expect(nextStepIndex('seller', last - 1)).toBe(last);
+  it('Welcome has no back', () => {
+    expect(prevStepId('buyer', 'WELCOME', signedOutEmail)).toBeNull();
   });
 
-  it('clampStep clamps both directions', () => {
-    expect(clampStep('buyer', -5)).toBe(0);
-    expect(clampStep('buyer', 999)).toBe(totalStepsFor('buyer') - 1);
+  it('only the questions, photo and personalization steps can be skipped', () => {
+    for (const id of ['STAGE', 'GOALS', 'PHOTO', 'STYLE', 'SIZES', 'BRANDS'] as const) expect(isStepSkippable(id)).toBe(true);
+    for (const id of ['EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS', 'NAME', 'USERNAME', 'BRAND_NAME'] as const) expect(isStepSkippable(id)).toBe(false);
+  });
+
+  it('progress grows step by step', () => {
+    const a = progressFraction('seller', 'STAGE', signedOutEmail);
+    const b = progressFraction('seller', 'GOALS', signedOutEmail);
+    const c = progressFraction('seller', 'LOCATION', signedOutEmail);
+    expect(a).toBeGreaterThan(0);
+    expect(b).toBeGreaterThan(a);
+    expect(c).toBeGreaterThan(b);
+    expect(progressFraction('seller', 'PLAN', signedOutEmail)).toBe(1);
   });
 });
 
-describe('draft migration / resumption', () => {
-  it('is a no-op for the current draft version', () => {
-    expect(restoreDraftStep('buyer', BUYER_STEP_INDEX.STYLE, DRAFT_VERSION)).toBe(BUYER_STEP_INDEX.STYLE);
-    expect(restoreDraftStep('seller', SELLER_STEP_INDEX.GOALS, DRAFT_VERSION)).toBe(SELLER_STEP_INDEX.GOALS);
+describe('draft migration', () => {
+  it('v9 drafts keep their step id', () => {
+    expect(restoreDraftStepId('buyer', { version: DRAFT_VERSION, stepId: 'PHOTO' })).toBe('PHOTO');
+    expect(restoreDraftStepId('seller', { version: DRAFT_VERSION, stepId: 'LOCATION' })).toBe('LOCATION');
   });
 
-  it('migrates a v7 buyer draft: steps before Sizes stay, Brands and later shift by one', () => {
-    expect(restoreDraftStep('buyer', 3, 7)).toBe(BUYER_STEP_INDEX.NAME);
-    expect(restoreDraftStep('buyer', 4, 7)).toBe(BUYER_STEP_INDEX.STYLE);
-    expect(restoreDraftStep('buyer', 5, 7)).toBe(BUYER_STEP_INDEX.BRANDS);
-    expect(restoreDraftStep('buyer', 6, 7)).toBe(BUYER_STEP_INDEX.LOADING);
-    expect(restoreDraftStep('buyer', 8, 7)).toBe(BUYER_STEP_INDEX.SUCCESS);
+  it('a v9 step id that does not exist in the flow falls back through the legacy path', () => {
+    expect(restoreDraftStepId('buyer', { version: DRAFT_VERSION, stepId: 'BUILDING' })).toBe('ACCOUNT_TYPE');
   });
 
-  it('leaves a v7 seller draft unchanged', () => {
-    expect(restoreDraftStep('seller', SELLER_STEP_INDEX.PLAN, 7)).toBe(SELLER_STEP_INDEX.PLAN);
-    expect(restoreDraftStep('seller', SELLER_STEP_INDEX.SUCCESS, 7)).toBe(SELLER_STEP_INDEX.SUCCESS);
+  it('v8 index drafts (always signed in) map onto the new ids', () => {
+    // v8 buyer: 0 Welcome, 1 AccountType, 2 Auth, 3 Name, 4 Style, 5 Sizes, 6 Brands, 7 Loading, 8 Notifications, 9 Success
+    expect(restoreDraftStepId('buyer', { version: 8, step: 2 })).toBe('NAME');
+    expect(restoreDraftStepId('buyer', { version: 8, step: 4 })).toBe('STYLE');
+    expect(restoreDraftStepId('buyer', { version: 8, step: 8 })).toBe('BRANDS');
+    // v8 seller: 4 BrandName, 5 BrandStage, 6 Goals, 7 Plan … 10 Success
+    expect(restoreDraftStepId('seller', { version: 8, step: 4 })).toBe('BRAND_NAME');
+    expect(restoreDraftStepId('seller', { version: 8, step: 5 })).toBe('STAGE');
+    expect(restoreDraftStepId('seller', { version: 8, step: 7 })).toBe('PLAN');
+    expect(restoreDraftStepId('seller', { version: 8, step: 9 })).toBe('BUILDING');
   });
 
-  it('migrates a v6 buyer draft (no Welcome/Brands) into current indices', () => {
-    // v6: AccountType=0, Auth=1, Name=2, Style=3, Loading=4, Notifications=5, Success=6
-    expect(restoreDraftStep('buyer', 0, 6)).toBe(BUYER_STEP_INDEX.ACCOUNT_TYPE);
-    expect(restoreDraftStep('buyer', 1, 6)).toBe(BUYER_STEP_INDEX.AUTH);
-    expect(restoreDraftStep('buyer', 3, 6)).toBe(BUYER_STEP_INDEX.STYLE);
-    expect(restoreDraftStep('buyer', 4, 6)).toBe(BUYER_STEP_INDEX.LOADING);
-    expect(restoreDraftStep('buyer', 6, 6)).toBe(BUYER_STEP_INDEX.SUCCESS);
+  it('v7 and older drafts still migrate (v7 buyer Brands was index 5)', () => {
+    expect(restoreDraftStepId('buyer', { version: 7, step: 5 })).toBe('BRANDS');
+    expect(restoreDraftStepId('seller', { version: 6, step: 3 })).toBe('BRAND_NAME');
   });
 
-  it('migrates a v6 seller draft into v7 indices', () => {
-    expect(restoreDraftStep('seller', 3, 6)).toBe(SELLER_STEP_INDEX.BRAND_NAME);
-    expect(restoreDraftStep('seller', 6, 6)).toBe(SELLER_STEP_INDEX.PLAN);
-    expect(restoreDraftStep('seller', 9, 6)).toBe(SELLER_STEP_INDEX.SUCCESS);
-  });
-
-  it('migrates a v5 draft (Auth before AccountType) through v6 into v7', () => {
-    // v5 buyer: 0=Auth, 1=AccountType, 2=Name
-    expect(restoreDraftStep('buyer', 0, 5)).toBe(BUYER_STEP_INDEX.AUTH);
-    expect(restoreDraftStep('buyer', 1, 5)).toBe(BUYER_STEP_INDEX.ACCOUNT_TYPE);
-    expect(restoreDraftStep('buyer', 2, 5)).toBe(BUYER_STEP_INDEX.NAME);
-  });
-
-  it('falls back to AccountType for an unrecognized legacy step', () => {
-    expect(restoreDraftStep('buyer', 999, 5)).toBe(BUYER_STEP_INDEX.ACCOUNT_TYPE);
-    expect(restoreDraftStep('seller', 999, undefined)).toBe(SELLER_STEP_INDEX.ACCOUNT_TYPE);
-  });
-
-  it('treats a missing version as the oldest legacy shape without throwing', () => {
-    expect(() => restoreDraftStep('buyer', 0, undefined)).not.toThrow();
-    expect(() => restoreDraftStep('seller', 0, undefined)).not.toThrow();
+  it('garbage falls back to the buyer/seller question', () => {
+    expect(restoreDraftStepId('buyer', {})).toBe('ACCOUNT_TYPE');
+    expect(restoreDraftStepId('seller', { step: 'x' })).toBe('ACCOUNT_TYPE');
   });
 });

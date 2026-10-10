@@ -82,7 +82,6 @@ const COMING_SOON_ALLOWLIST = new Set([
   'app/quote-detail.tsx',
   'app/seller-settings.tsx',
   'components/ShopProductSheet.tsx',
-  'components/onboarding/BrandsToFollowStep.tsx',
   'components/settings/SettingsKit.tsx',
   'lib/financeSummary.ts',
   'lib/previewNotes.ts',

@@ -1,20 +1,21 @@
 /**
- * Buyer onboarding — "Brands to follow" step. Shown after the style/vibe
+ * Buyer onboarding — "Brands to follow" step, laid out like Instagram's
+ * "Try following 5+ people" (rows with a select circle). Title, subtitle
+ * and buttons come from the shared onboarding StepScreen. Shown after the style/vibe
  * picks. Loads a lightweight list of active brands from the discover-brands
  * endpoint and lets the buyer follow any/all of them before entering the
  * app, using the same follow mechanism as the rest of the app
  * (socialService.setSellerFollowing) — no parallel follow system.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Icon } from '@/components/ui';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { discoverBrands, type DiscoverBrand } from '@/services/discoverService';
 import { setSellerFollowing } from '@/services/socialService';
-import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
-import { SPACE, TYPE } from './onboardingTokens';
-import { radius } from '@/constants/radii';
+import { SPACE } from './onboardingTokens';
+import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
 
 export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
   const { theme } = useAppTheme();
@@ -78,26 +79,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
   const followedCount = Object.values(following).filter(Boolean).length;
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <StepHeadline>Follow a few{'\n'}brands to start.</StepHeadline>
-      <StepSub>Your Thread gets better with every brand you follow. You can skip this for now.</StepSub>
-
-      {brands.length > 0 && (
-        <Reveal index={2}>
-          <PressableScale
-            testID="onboarding-brands-follow-all"
-            style={[styles.followAllBtn, { borderColor: theme.border }]}
-            onPress={followAll}
-            accessibilityRole="button"
-          >
-            <Feather name="plus" size={15} color={theme.text} />
-            <Text style={[styles.followAllText, { color: theme.text }]}>
-              Follow all{followedCount > 0 ? ` (${followedCount}/${brands.length})` : ''}
-            </Text>
-          </PressableScale>
-        </Reveal>
-      )}
-
+    <View testID="onboarding-brands-list">
       {loading && (
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={theme.text} />
@@ -105,83 +87,86 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
       )}
 
       {!loading && loadError && (
-        <Text style={styles.emptyText}>Couldn't load brands right now. You can follow brands anytime from Discover.</Text>
+        <Text style={styles.emptyText}>Couldn't load brands. You can follow brands from Discover.</Text>
       )}
 
       {!loading && !loadError && brands.length === 0 && (
-        <Text style={styles.emptyText}>No brands to show yet — check back soon.</Text>
+        <Text style={styles.emptyText}>No brands to follow yet. Brands you follow from Discover show up in your feed.</Text>
       )}
 
-      <View style={styles.grid}>
-        {brands.map((brand, i) => {
-          const isFollowing = !!following[brand.sellerId];
-          const isPending = !!pending[brand.sellerId];
-          return (
-            <Reveal key={brand.id} index={Math.min(i, 9) + 3} style={styles.cardWrap}>
-              <PressableScale
-                testID={`onboarding-brand-card-${brand.sellerId}`}
-                style={[styles.card, isFollowing && { borderColor: theme.text, borderWidth: 1, backgroundColor: theme.accentDim }]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isFollowing, disabled: isPending }}
-                accessibilityLabel={`${isFollowing ? 'Unfollow' : 'Follow'} ${brand.name}`}
-                onPress={() => { void toggleFollow(brand); }}
-                disabled={isPending}
-              >
-                <View style={styles.cardTop}>
-                  {brand.logoUrl ? (
-                    <Image source={{ uri: brand.logoUrl }} style={styles.logo} />
-                  ) : (
-                    <View style={[styles.logoFallback, { backgroundColor: theme.surface }]}>
-                      <Text style={[styles.logoFallbackText, { color: theme.text }]}>
-                        {(brand.name || '?').slice(0, 1).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={[styles.followBadge, isFollowing && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
-                    {isPending ? (
-                      <ActivityIndicator size="small" color={isFollowing ? theme.onAccent : theme.muted} />
-                    ) : (
-                      <Feather name={isFollowing ? 'check' : 'plus'} size={13} color={isFollowing ? theme.onAccent : theme.muted} />
-                    )}
-                  </View>
-                </View>
-                <View style={styles.nameRow}>
-                  <Text numberOfLines={1} style={styles.cardName}>{brand.name}</Text>
-                  {brand.verified && <Feather name="check-circle" size={11} color={theme.text} />}
-                </View>
-              </PressableScale>
-            </Reveal>
-          );
-        })}
-      </View>
-    </ScrollView>
+      {brands.length > 1 && (
+        <Pressable
+          testID="onboarding-brands-follow-all"
+          style={styles.followAll}
+          onPress={followAll}
+          accessibilityRole="button"
+          hitSlop={8}
+        >
+          <Text style={[styles.followAllText, { color: theme.text }]}>
+            Follow all{followedCount > 0 ? ` (${followedCount}/${brands.length})` : ''}
+          </Text>
+        </Pressable>
+      )}
+
+      {brands.map((brand) => {
+        const isFollowing = !!following[brand.sellerId];
+        const isPending = !!pending[brand.sellerId];
+        return (
+          <Pressable
+            key={brand.id}
+            testID={`onboarding-brand-card-${brand.sellerId}`}
+            style={styles.row}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isFollowing, disabled: isPending }}
+            accessibilityLabel={`${isFollowing ? 'Unfollow' : 'Follow'} ${brand.name}`}
+            onPress={() => { void toggleFollow(brand); }}
+            disabled={isPending}
+          >
+            {brand.logoUrl ? (
+              <Image source={{ uri: brand.logoUrl }} style={styles.logo} />
+            ) : (
+              <View style={[styles.logo, styles.logoFallback]}>
+                <Text style={[styles.logoFallbackText, { color: theme.text }]}>
+                  {(brand.name || '?').slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.rowText}>
+              <View style={styles.nameRow}>
+                <Text numberOfLines={1} style={styles.name}>{brand.name}</Text>
+                {brand.verified && <Icon name="check-circle" size={13} color={theme.text} />}
+              </View>
+              {brand.brandType ? <Text numberOfLines={1} style={styles.handle}>{brand.brandType}</Text> : null}
+            </View>
+            <View style={[styles.select, isFollowing && { backgroundColor: theme.text, borderColor: theme.text }]}>
+              {isPending ? (
+                <ActivityIndicator size="small" color={isFollowing ? theme.background : theme.muted} />
+              ) : isFollowing ? (
+                <Icon name="check" size={14} color={theme.background} />
+              ) : null}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
-  followAllBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
-    borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 40,
-    marginTop: SPACE.lg, marginBottom: SPACE.md,
-  },
-  followAllText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   loadingWrap: { paddingVertical: SPACE.xxl, alignItems: 'center' },
-  emptyText: { ...TYPE.label, color: theme.muted, paddingVertical: SPACE.lg, textAlign: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SPACE.xs },
-  cardWrap: { width: '31%' },
-  card: {
-    backgroundColor: theme.card, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border, padding: 10, gap: 8,
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  logo: { width: 36, height: 36, borderRadius: 18 },
-  logoFallback: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  logoFallbackText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
-  followBadge: {
-    width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: theme.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
-  },
+  emptyText: { ...TEXT.subhead, color: theme.muted, paddingVertical: SPACE.lg },
+  followAll: { alignSelf: 'flex-end', paddingVertical: SPACE.xs },
+  followAllText: { ...TEXT.subhead, fontFamily: FONT.semibold },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, minHeight: 60, paddingVertical: SPACE.xs },
+  logo: { width: 44, height: 44, borderRadius: 22 },
+  logoFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: FILL_ELEVATED },
+  logoFallbackText: { fontSize: 17, fontFamily: FONT.bold },
+  rowText: { flex: 1, minWidth: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cardName: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.text },
+  name: { ...TEXT.headline, color: theme.text, flexShrink: 1 },
+  handle: { ...TEXT.footnote, color: theme.muted, marginTop: 1 },
+  select: {
+    width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: theme.muted,
+    alignItems: 'center', justifyContent: 'center',
+  },
 });
