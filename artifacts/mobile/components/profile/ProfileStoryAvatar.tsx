@@ -15,7 +15,7 @@
  */
 import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CachedImage } from '@/components/CachedImage';
@@ -137,7 +137,7 @@ export function ProfileStoryAvatar({
             pressed && styles.pressed,
           ]}
         >
-          <Feather name="plus" size={12} color="#000000" /* theme-exempt: fixed black glyph on the white badge per spec */ />
+          <Icon name="plus" size={12} color="#000000" /* theme-exempt: fixed black glyph on the white badge per spec */ />
         </Pressable>
       ) : null}
     </View>

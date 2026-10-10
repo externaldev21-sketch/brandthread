@@ -8,7 +8,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import * as Haptics from 'expo-haptics';
@@ -18,7 +18,7 @@ import { isStripeFullyConnected, normalizeConnectStatus, type ConnectStatus } fr
 interface IntegrationDef {
   key: string;
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   description: string;
   route?: string;
   /** Connect/Disconnect is a Stripe Connect onboarding link, not the generic flow. */
@@ -143,7 +143,7 @@ export default function IntegrationsScreen() {
             <View style={s.loadingRow}><ActivityIndicator color={colors.primary} /></View>
           ) : loadError ? (
             <View style={s.errorBox}>
-              <Feather name="alert-circle" size={ICON.md} color={colors.mutedForeground} />
+              <Icon name="alert-circle" size={ICON.md} color={colors.mutedForeground} />
               <Text style={[s.errorText, { color: colors.mutedForeground }]}>Couldn't load your integrations.</Text>
               <Button label="Retry" variant="secondary" size="compact" onPress={load} style={s.retryBtn} />
             </View>
@@ -160,7 +160,7 @@ export default function IntegrationsScreen() {
                     style={[s.row, i !== INTEGRATION_DEFS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
                     <View style={s.iconWrap}>
-                      <Feather name={item.icon} size={ICON.sm} color="#FFFFFF" />
+                      <Icon name={item.icon} size={ICON.sm} color="#FFFFFF" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.rowLabel, { color: colors.foreground }]}>{item.label}</Text>
@@ -170,7 +170,7 @@ export default function IntegrationsScreen() {
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : connected ? (
                        <View style={[s.connectedPill, { borderColor: colors.border }]}>
-                         <Feather name="check" size={11} color={colors.foreground} />
+                         <Icon name="check" size={11} color={colors.foreground} />
                          <Text style={[s.connectedText, { color: colors.foreground }]}>Connected</Text>
                       </View>
                     ) : (

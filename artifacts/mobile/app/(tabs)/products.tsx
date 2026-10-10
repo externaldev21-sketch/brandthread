@@ -12,7 +12,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
@@ -157,7 +157,7 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
 
   interface ActionItem {
     label: string;
-    icon: keyof typeof Feather.glyphMap;
+    icon: IconName;
     accent?: string;
     onPress: () => void;
   }
@@ -204,10 +204,10 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
           {actions.map((item, idx) => (
             <PressableScale key={idx} style={sh.actionItem} onPress={item.onPress} accessibilityLabel={`${item.label}, ${p.name}`}>
               <View style={[sh.actionIcon, { backgroundColor: (item.accent ?? theme.accent) + '18' }]}>
-                <Feather name={item.icon} size={ICON.sm} color={item.accent ?? MUTED} />
+                <Icon name={item.icon} size={ICON.sm} color={item.accent ?? MUTED} />
               </View>
               <Text style={[sh.actionLabel, item.accent ? { color: item.accent } : {}]}>{item.label}</Text>
-              <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
+              <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />
             </PressableScale>
           ))}
         </ScrollView>
@@ -408,7 +408,7 @@ function SortModal({
             <Text style={[sh.sortOptionText, current === key && sh.sortOptionTextActive]}>
               {label}
             </Text>
-            {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
+            {current === key && <Icon name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
           </PressableScale>
         ))}
       </SheetRise>

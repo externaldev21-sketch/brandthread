@@ -7,7 +7,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Modal, ScrollView,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import {
   CARD, FG, MUTED, FONT, FS, RADIUS,
 } from '@/lib/theme';
@@ -19,7 +19,7 @@ interface Props {
   onDismiss: () => void;
 }
 
-const HIGHLIGHTS: { icon: keyof typeof Feather.glyphMap; title: string; desc: string; color?: string }[] = [
+const HIGHLIGHTS: { icon: IconName; title: string; desc: string; color?: string }[] = [
   { icon: 'package', title: 'Products', desc: 'Add, edit, and manage your inventory — sizes, variants, images, and pricing.' },
   { icon: 'shopping-bag', title: 'Orders', desc: 'Track, fulfill, and ship customer orders. See real-time status updates.' },
   {
@@ -57,7 +57,7 @@ export default function SellerTutorialOverlay({ visible, onDismiss }: Props) {
           {/* Header */}
           <View style={s.headerRow}>
             <View style={[s.iconWrap, { backgroundColor: theme.accentDim }]}>
-              <Feather name="zap" size={22} color={theme.accent} />
+              <Icon name="zap" size={22} color={theme.accent} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.title}>Welcome to your workspace 👋</Text>
@@ -70,7 +70,7 @@ export default function SellerTutorialOverlay({ visible, onDismiss }: Props) {
             {highlights.map((h) => (
               <View key={h.title} style={s.item}>
                 <View style={[s.itemIcon, { backgroundColor: h.color + '22' }]}>
-                  <Feather name={h.icon} size={18} color={h.color} />
+                  <Icon name={h.icon} size={18} color={h.color} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.itemTitle}>{h.title}</Text>

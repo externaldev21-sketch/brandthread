@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CachedImage } from '@/components/CachedImage';
@@ -151,7 +151,7 @@ export default function ProductVideoScreen() {
               accessibilityRole="button"
               accessibilityLabel="Add video"
             >
-              <Feather name="video" size={28} color={colors.foreground} />
+              <Icon name="video" size={28} color={colors.foreground} />
               <Text style={s.dropTitle}>Add video</Text>
               <Text style={s.hint}>MP4, MOV or WebM. Up to 60 seconds, 100 MB.</Text>
             </TouchableOpacity>
@@ -167,7 +167,7 @@ export default function ProductVideoScreen() {
           {video && !uploading ? (
             <View style={s.actions}>
               <TouchableOpacity style={s.secondaryBtn} onPress={pick} disabled={offline || demo} accessibilityRole="button" accessibilityLabel="Replace video">
-                <Feather name="refresh-cw" size={16} color={colors.foreground} />
+                <Icon name="refresh-cw" size={16} color={colors.foreground} />
                 <Text style={s.secondaryLabel}>Replace</Text>
               </TouchableOpacity>
               <Button label="Remove" icon="trash-2" variant="destructive" size="compact" onPress={remove} disabled={removing} loading={removing} accessibilityLabel="Remove video" style={s.secondaryBtn} />
@@ -196,12 +196,12 @@ function Preview({ video, s, colors }: { video: ProductVideoInfo; s: ReturnType<
             accessibilityRole="button"
             accessibilityLabel="Play preview"
           >
-            <View style={s.play}><Feather name="play" size={22} color={colors.foreground} style={{ marginLeft: 2 }} /></View>
+            <View style={s.play}><Icon name="play" size={22} color={colors.foreground} style={{ marginLeft: 2 }} /></View>
           </TouchableOpacity>
           {length ? <View style={s.length}><Text style={s.lengthText}>{length}</Text></View> : null}
         </>
       )}
-      {!video.posterUrl && !playing ? <Feather name="video" size={28} color={colors.mutedForeground} /> : null}
+      {!video.posterUrl && !playing ? <Icon name="video" size={28} color={colors.mutedForeground} /> : null}
     </View>
   );
 }

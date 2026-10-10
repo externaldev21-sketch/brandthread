@@ -8,7 +8,8 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Animated, {
   interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
@@ -69,7 +70,7 @@ export function HeartToggle({ liked, onChange, size = 22, accessibilityLabel, on
       <Animated.View style={style}>
         {liked
           ? <FontAwesome name="heart" size={size} color={RED} />
-          : <Feather name="heart" size={size} color={palette.mutedForeground} />}
+          : <Icon name="heart" size={size} color={palette.mutedForeground} />}
       </Animated.View>
     </Pressable>
   );

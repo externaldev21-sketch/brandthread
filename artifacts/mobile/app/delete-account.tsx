@@ -21,7 +21,8 @@ import {
   View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, Platform, Linking,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -189,7 +190,7 @@ export default function DeleteAccountScreen() {
     return (
       <View style={[s.root, { paddingTop: headerTopInset + SP.xxl, paddingBottom: insets.bottom + SP.lg }]}>
         <View style={s.doneBody}>
-          <View style={s.doneIcon}><Feather name="check" size={30} color={theme.onAccent} /></View>
+          <View style={s.doneIcon}><Icon name="check" size={30} color={theme.onAccent} /></View>
           <Text style={s.title}>Your account is scheduled for deletion</Text>
           <Text style={s.lead}>
             {`Your account is hidden and you’ve been signed out on every device. It will be permanently deleted on ${formatScheduledDate(scheduledFor)}. Sign back in before then to cancel.`}
@@ -209,7 +210,7 @@ export default function DeleteAccountScreen() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl + tabBarInset }} keyboardShouldPersistTaps="handled">
         {step === 'overview' ? (
           <>
-            <View style={s.heroIcon}><Feather name="trash-2" size={24} color={theme.error} /></View>
+            <View style={s.heroIcon}><Icon name="trash-2" size={24} color={theme.error} /></View>
             <Text style={s.title}>Delete your Brandthread account</Text>
             <Text style={s.lead}>
               {`Your account${isSeller ? ' and storefront are' : ' is'} hidden right away and permanently deleted after ${graceDays} days. Sign back in before then to cancel.`}
@@ -217,7 +218,7 @@ export default function DeleteAccountScreen() {
 
             {check?.deletionCancelledAt ? (
               <View style={s.readyCard}>
-                <Feather name="check-circle" size={16} color={theme.success} />
+                <Icon name="check-circle" size={16} color={theme.success} />
                 <Text style={s.readyText}>Deletion cancelled. You signed back in, so your account is active.</Text>
               </View>
             ) : null}
@@ -229,7 +230,7 @@ export default function DeleteAccountScreen() {
               </View>
             ) : checkError ? (
               <View style={s.errorCard}>
-                <Feather name="wifi-off" size={16} color={theme.error} />
+                <Icon name="wifi-off" size={16} color={theme.error} />
                 <Text style={s.errorText}>{checkError}</Text>
                 <PressableScale onPress={loadCheck} accessibilityRole="button"><Text style={s.link}>Retry</Text></PressableScale>
                 {/* Never a dead end: if the check can't run, support deletes it for you. */}
@@ -243,7 +244,7 @@ export default function DeleteAccountScreen() {
             ) : blockers.length > 0 ? (
               <View style={s.blockerCard}>
                 <View style={s.blockerHeader}>
-                  <Feather name="alert-triangle" size={16} color={theme.warning} />
+                  <Icon name="alert-triangle" size={16} color={theme.warning} />
                   <Text style={s.blockerHeading}>Settle these first</Text>
                 </View>
                 <Text style={s.blockerIntro}>
@@ -268,13 +269,13 @@ export default function DeleteAccountScreen() {
                   </View>
                 ))}
                 <PressableScale onPress={loadCheck} style={s.recheck} accessibilityRole="button">
-                  <Feather name="refresh-cw" size={14} color={theme.text} />
+                  <Icon name="refresh-cw" size={14} color={theme.text} />
                   <Text style={s.recheckText}>Check again</Text>
                 </PressableScale>
               </View>
             ) : (
               <View style={s.readyCard}>
-                <Feather name="check-circle" size={16} color={theme.success} />
+                <Icon name="check-circle" size={16} color={theme.success} />
                 <Text style={s.readyText}>Nothing is holding up deletion.</Text>
               </View>
             )}
@@ -282,7 +283,7 @@ export default function DeleteAccountScreen() {
             {check?.subscriptionNotice ? (
               <View style={s.blockerCard}>
                 <View style={s.blockerHeader}>
-                  <Feather name="credit-card" size={16} color={theme.text} />
+                  <Icon name="credit-card" size={16} color={theme.text} />
                   <Text style={s.blockerHeading}>{check.subscriptionNotice.title}</Text>
                 </View>
                 <Text style={s.blockerIntro}>{check.subscriptionNotice.detail}</Text>
@@ -305,7 +306,7 @@ export default function DeleteAccountScreen() {
                 <View style={s.listCard}>
                   {check.willDelete.map((line) => (
                     <View key={line} style={s.listRow}>
-                      <Feather name="x" size={14} color={theme.muted} style={{ marginTop: 3 }} />
+                      <Icon name="x" size={14} color={theme.muted} style={{ marginTop: 3 }} />
                       <Text style={s.listText}>{line}</Text>
                     </View>
                   ))}
@@ -315,7 +316,7 @@ export default function DeleteAccountScreen() {
                 <View style={s.listCard}>
                   {check.willRetain.map((line) => (
                     <View key={line} style={s.listRow}>
-                      <Feather name="archive" size={14} color={theme.muted} style={{ marginTop: 3 }} />
+                      <Icon name="archive" size={14} color={theme.muted} style={{ marginTop: 3 }} />
                       <Text style={s.listText}>{line}</Text>
                     </View>
                   ))}
@@ -333,9 +334,9 @@ export default function DeleteAccountScreen() {
               style={s.exportRow}
               accessibilityRole="button"
             >
-              <Feather name="download" size={16} color={theme.text} />
+              <Icon name="download" size={16} color={theme.text} />
               <Text style={s.exportText}>Download a copy of your data first</Text>
-              <Feather name="chevron-right" size={16} color={theme.subtle} />
+              <Icon name="chevron-right" size={16} color={theme.subtle} />
             </PressableScale>
 
             <PrimaryButton
@@ -350,7 +351,7 @@ export default function DeleteAccountScreen() {
           </>
         ) : (
           <>
-            <View style={s.heroIcon}><Feather name="alert-octagon" size={24} color={theme.error} /></View>
+            <View style={s.heroIcon}><Icon name="alert-octagon" size={24} color={theme.error} /></View>
             <Text style={s.title}>Are you absolutely sure?</Text>
             <Text style={s.lead}>
               {`Your account will be hidden now and permanently deleted after ${graceDays} days. Signing back in before then cancels it.`}
@@ -370,7 +371,7 @@ export default function DeleteAccountScreen() {
 
             {usesCode && reauthPlan.alreadyConfirmed ? (
               <View style={s.readyCard}>
-                <Feather name="check-circle" size={16} color={theme.success} />
+                <Icon name="check-circle" size={16} color={theme.success} />
                 <Text style={s.readyText}>You just signed in, so it’s confirmed it’s you.</Text>
               </View>
             ) : usesCode ? (
@@ -378,7 +379,7 @@ export default function DeleteAccountScreen() {
                 <Text style={s.fieldLabel}>Confirm it’s you</Text>
                 {appleProof ? (
                   <View style={s.readyCard}>
-                    <Feather name="check-circle" size={16} color={theme.success} />
+                    <Icon name="check-circle" size={16} color={theme.success} />
                     <Text style={s.readyText}>Confirmed with Apple.</Text>
                   </View>
                 ) : reauthPlan.showApple ? (
@@ -454,7 +455,7 @@ export default function DeleteAccountScreen() {
               accessibilityState={{ checked: acknowledged }}
             >
               <View style={[s.checkbox, acknowledged && s.checkboxOn]}>
-                {acknowledged ? <Feather name="check" size={14} color={theme.onAccent} /> : null}
+                {acknowledged ? <Icon name="check" size={14} color={theme.onAccent} /> : null}
               </View>
               <Text style={s.ackText}>
                 I understand my {isSeller ? 'storefront, listings, ' : ''}profile, posts, comments and messages will be permanently deleted after {graceDays} days.
@@ -463,7 +464,7 @@ export default function DeleteAccountScreen() {
 
             {deleteError ? (
               <View style={s.errorCard}>
-                <Feather name="alert-circle" size={16} color={theme.error} />
+                <Icon name="alert-circle" size={16} color={theme.error} />
                 <Text style={s.errorText}>{deleteError}</Text>
               </View>
             ) : null}

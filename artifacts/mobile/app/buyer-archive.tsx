@@ -7,7 +7,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
   FlatList, RefreshControl, Modal,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { haptics } from '@/lib/haptics';
@@ -76,7 +76,7 @@ export default function BuyerArchive() {
     await loadData();
   };
 
-  const postTypeIcon = (type: BuyerPost['type']): keyof typeof Feather.glyphMap => {
+  const postTypeIcon = (type: BuyerPost['type']): IconName => {
     if (type === 'photo') return 'image';
     if (type === 'slideshow') return 'layers';
     return 'video';
@@ -104,12 +104,12 @@ export default function BuyerArchive() {
           colors={(item.mediaColors?.length >= 2 ? item.mediaColors : [SURFACE, BG]) as [string, string]}
           style={styles.cellInner}
         >
-          <Feather name={postTypeIcon(item.type)} size={ICON.md} color={MUTED} />
+          <Icon name={postTypeIcon(item.type)} size={ICON.md} color={MUTED} />
           {item.caption ? (
             <Text style={styles.cellCaption} numberOfLines={1}>{item.caption}</Text>
           ) : null}
           <View style={styles.archivedBadge}>
-            <Feather name="archive" size={10} color={MUTED} />
+            <Icon name="archive" size={10} color={MUTED} />
           </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -129,7 +129,7 @@ export default function BuyerArchive() {
             onPress={() => setTab(t)}
             hitSlop={TAB_PILL_HIT_SLOP}
           >
-            <Feather
+            <Icon
               name={t === 'posts' ? 'grid' : 'clock'}
               size={ICON.sm}
               color={tab === t ? PURPLE : MUTED}
@@ -181,7 +181,7 @@ export default function BuyerArchive() {
               <Text style={styles.sheetTitle} numberOfLines={1}>{selectedPost?.caption || 'Archived post'}</Text>
 
               <TouchableOpacity style={styles.sheetRow} onPress={handleRestore}>
-                <Feather name="rotate-ccw" size={20} color={PURPLE} />
+                <Icon name="rotate-ccw" size={20} color={PURPLE} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.sheetRowLabel}>Restore to profile</Text>
                   <Text style={styles.sheetRowSub}>Move this post back to your profile grid</Text>
@@ -191,7 +191,7 @@ export default function BuyerArchive() {
               <View style={styles.sheetDivider} />
 
               <TouchableOpacity style={styles.sheetRow} onPress={handleDelete}>
-                <Feather name="trash-2" size={20} color={RED} />
+                <Icon name="trash-2" size={20} color={RED} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.sheetRowLabel, { color: RED }]}>Delete permanently</Text>
                   <Text style={styles.sheetRowSub}>Cannot be undone</Text>

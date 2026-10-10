@@ -14,11 +14,11 @@ const cartSource = readFileSync(
 describe('Thread shop drawer purchase actions', () => {
   it('labels cart with its icon; Buy now is text-only (no icon)', () => {
     expect(sheetSource).toContain("phase === 'added' ? 'View cart' : 'Add to cart'");
-    expect(sheetSource).toContain('<Feather name="shopping-cart"');
+    expect(sheetSource).toContain('<Icon name="shopping-cart"');
     expect(sheetSource).toContain('<Text style={[ss.buyBtnText, { color: theme.onAccent }]}>Buy now</Text>');
     // Buy now dropped its circle-arrow icon — text only (single-product
     // rework item 6). Add to cart keeps shopping-cart above.
-    expect(sheetSource).not.toContain('<Feather name="arrow-right-circle"');
+    expect(sheetSource).not.toContain('<Icon name="arrow-right-circle"');
   });
 
   it('shows size chips directly under the price, then the description, then any remaining options and quantity', () => {

@@ -16,7 +16,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, ActivityIndicator, Platform,
 } from 'react-native';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, Icon as AppIcon } from '@/components/ui/Icon';
 import { InlineSlider } from '@/components/InlineSlider';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -40,7 +40,6 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { PrimaryButton, HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
 import { DayPickerSheet } from '@/components/DayPickerSheet';
 import { formatDayKey, isoToDayKey, resolveDiscountDates, toDayKey } from '@/lib/discountDates';
 
@@ -715,7 +714,7 @@ export default function DiscountsScreen() {
                   hitSlop={8}
                   accessibilityLabel={startDate ? 'Clear start date' : 'Choose start date'}
                 >
-                  <Feather name={startDate ? 'x' : 'calendar'} size={16} color={MUTED} />
+                  <AppIcon name={startDate ? 'x' : 'calendar'} size={16} color={MUTED} />
                 </TouchableOpacity>
               </View>
               <View style={[s.switchRow, { marginTop: SP.sm }]}>
@@ -725,7 +724,7 @@ export default function DiscountsScreen() {
               {hasEnd && (
                 <TouchableOpacity style={[s.pickerRow, { marginTop: 0 }]} onPress={() => setDatePickerFor('end')} accessibilityRole="button" accessibilityLabel="End date">
                   <Text style={[s.pickerRowText, !endDate && { color: MUTED }]}>{endDate ? `Through ${formatDayKey(endDate)}` : 'Choose end date'}</Text>
-                  <Feather name="calendar" size={16} color={MUTED} />
+                  <AppIcon name="calendar" size={16} color={MUTED} />
                 </TouchableOpacity>
               )}
             </View>

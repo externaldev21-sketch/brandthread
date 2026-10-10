@@ -9,7 +9,7 @@ import { futureDateInputError, toDateInputValue } from '@/lib/calendarDate';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -194,7 +194,7 @@ export default function VacationModeScreen() {
             { icon: 'bell-off',       text: 'Drop announcements are paused automatically',    color: MUTED },
           ].map((item, i) => (
             <View key={i} style={s.infoBullet}>
-              <Feather name={item.icon as any} size={14} color={item.color} />
+              <Icon name={item.icon as any} size={14} color={item.color} />
               <Text style={s.infoBulletText}>{item.text}</Text>
             </View>
           ))}

@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale, ProductGridSkeleton } from '@/components/BrandthreadUI';
@@ -130,7 +130,7 @@ export default function ProfileProductsScreen() {
                 {item.imageUri ? (
                   <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
                 ) : (
-                  <Feather name="image" size={26} color={theme.muted} />
+                  <Icon name="image" size={26} color={theme.muted} />
                 )}
                 {!item.inStock ? <View style={styles.soldOutVeil} pointerEvents="none" /> : null}
               </View>

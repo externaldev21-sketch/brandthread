@@ -1,7 +1,7 @@
 import { radius as ControlRadius } from '@/constants/radii';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -30,7 +30,7 @@ export function AiCreditsChip({ overview: given }: { overview?: AiCreditsOvervie
       style={styles.chip}
     >
       <View style={styles.row}>
-        <Feather name="zap" size={14} color={theme.text} />
+        <Icon name="zap" size={14} color={theme.text} />
         <Text style={[styles.text, TABULAR_NUMS]} numberOfLines={1}>{label}</Text>
       </View>
     </PressableScale>

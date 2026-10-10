@@ -13,7 +13,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, MUTED, RADIUS, SP, SUBTLE, SUCCESS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
@@ -37,7 +37,7 @@ export function RfqSummaryCardBubble({
     <View style={[styles.row, fromMe ? styles.right : styles.left]}>
       <TouchableOpacity activeOpacity={0.85} style={styles.card} onPress={() => onOpenCompare(rfq)} testID={`rfq-card-bubble-${rfq.id}`}>
         <View style={styles.head}>
-          <View style={styles.icon}><Feather name="send" size={18} color={FG} /></View>
+          <View style={styles.icon}><Icon name="send" size={18} color={FG} /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.kicker}>REQUEST FOR QUOTATION</Text>
             <Text style={styles.title} numberOfLines={2}>{rfq.garmentType}</Text>
@@ -54,7 +54,7 @@ export function RfqSummaryCardBubble({
             {rfq.bestPriceCents != null && <Text style={styles.price}>from {formatCents(rfq.bestPriceCents)}</Text>}
           </View>
           <TouchableOpacity style={[styles.primary, { backgroundColor: theme.accent }]} onPress={() => onOpenCompare(rfq)}>
-            <Feather name="bar-chart-2" size={14} color={theme.onAccent} />
+            <Icon name="bar-chart-2" size={14} color={theme.onAccent} />
             <Text style={[styles.primaryText, { color: theme.onAccent }]}>Compare quotes</Text>
           </TouchableOpacity>
         </View>
@@ -81,7 +81,7 @@ export function SampleRequestCardBubble({
     <View style={[styles.row, fromMe ? styles.right : styles.left]}>
       <TouchableOpacity activeOpacity={0.85} style={styles.card} onPress={() => onOpen(request)} testID={`sample-request-card-bubble-${request.id}`}>
         <View style={styles.head}>
-          <View style={styles.icon}><Feather name="scissors" size={18} color={FG} /></View>
+          <View style={styles.icon}><Icon name="scissors" size={18} color={FG} /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.kicker}>SAMPLE REQUEST</Text>
             <Text style={styles.title} numberOfLines={2}>{request.productName}</Text>
@@ -91,7 +91,7 @@ export function SampleRequestCardBubble({
         </View>
         <View style={styles.bodyPad}>
           <TouchableOpacity style={[styles.primary, { backgroundColor: theme.accent }]} onPress={() => onOpen(request)}>
-            <Feather name="eye" size={14} color={theme.onAccent} />
+            <Icon name="eye" size={14} color={theme.onAccent} />
             <Text style={[styles.primaryText, { color: theme.onAccent }]}>View sample request</Text>
           </TouchableOpacity>
         </View>

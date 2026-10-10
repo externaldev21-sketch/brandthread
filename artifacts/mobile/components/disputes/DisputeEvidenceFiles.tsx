@@ -1,7 +1,7 @@
 import { radius as ControlRadius } from '@/constants/radii';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useColors } from '@/hooks/useColors';
@@ -99,7 +99,7 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
               testID={`dispute-file-${f.id}`}
             >
               <View style={[styles.fileIcon, { backgroundColor: colors.secondary }]}>
-                <Feather
+                <Icon
                   name={f.contentType === 'application/pdf' ? 'file-text' : 'image'}
                   size={16}
                   color={colors.mutedForeground}
@@ -111,7 +111,7 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
                   {fileTypeLabel(f.evidenceType)}, {formatBytes(f.sizeBytes)}, {shortDate(f.uploadedAt)}
                 </Text>
               </View>
-              <Feather name="check" size={16} color={colors.foreground} />
+              <Icon name="check" size={16} color={colors.foreground} />
             </View>
           ))}
         </View>
@@ -151,7 +151,7 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
               style={[styles.action, { borderColor: colors.border }]}
               accessibilityRole="button"
             >
-              <Feather name="image" size={16} color={colors.foreground} />
+              <Icon name="image" size={16} color={colors.foreground} />
               <Text style={[styles.actionText, { color: colors.foreground }]}>Photo</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -160,7 +160,7 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
               style={[styles.action, { borderColor: colors.border }]}
               accessibilityRole="button"
             >
-              <Feather name="file-text" size={16} color={colors.foreground} />
+              <Icon name="file-text" size={16} color={colors.foreground} />
               <Text style={[styles.actionText, { color: colors.foreground }]}>PDF or file</Text>
             </TouchableOpacity>
           </View>

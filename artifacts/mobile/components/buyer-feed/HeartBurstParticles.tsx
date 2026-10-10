@@ -17,7 +17,7 @@
 import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, Easing, type SharedValue } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ON_DARK } from '@/lib/theme';
 
 // 8 particles, evenly spaced around the tap point, each with a slightly
@@ -57,7 +57,7 @@ function Particle({ dx, dy, size, delay, progress }: { dx: number; dy: number; s
   });
   return (
     <Animated.View pointerEvents="none" style={[styles.particle, style]}>
-      <Feather name="heart" size={size} color={ON_DARK} />
+      <Icon name="heart" size={size} color={ON_DARK} />
     </Animated.View>
   );
 }

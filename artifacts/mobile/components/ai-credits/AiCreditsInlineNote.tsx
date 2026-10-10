@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -41,7 +41,7 @@ export function AiCreditsInlineNote({ overview: given }: { overview?: AiCreditsO
     >
       <View style={styles.emptyRow}>
         <Text style={styles.emptyLabel}>Top up or upgrade</Text>
-        <Feather name="chevron-right" size={18} color={theme.text} />
+        <Icon name="chevron-right" size={18} color={theme.text} />
       </View>
     </PressableScale>
   );

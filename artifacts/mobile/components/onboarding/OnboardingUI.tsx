@@ -31,7 +31,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { identityOrNone } from '@/lib/animationUtils';
 import { MOTION, PRESS_SCALE, RADIUS, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
@@ -344,13 +344,13 @@ export const FloatingInput = forwardRef<TextInput, FloatingInputProps>(function 
         />
         {right ?? (valid && !error ? (
           <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(160)} style={styles.fieldAccessory}>
-            <Feather name="check" size={16} color={theme.text} />
+            <Icon name="check" size={16} color={theme.text} />
           </Animated.View>
         ) : null)}
       </Animated.View>
       {message ? (
         <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(160)} style={styles.messageRow}>
-          {error ? <Feather name="alert-circle" size={12} color={theme.error} /> : null}
+          {error ? <Icon name="alert-circle" size={12} color={theme.error} /> : null}
           <Text style={[TYPE.caption, { color: error ? theme.error : theme.muted, flex: 1 }]}>{message}</Text>
         </Animated.View>
       ) : null}
@@ -369,7 +369,7 @@ export function RevealToggle({ shown, onToggle }: { shown: boolean; onToggle: ()
       accessibilityRole="button"
       accessibilityLabel={shown ? 'Hide password' : 'Show password'}
     >
-      <Feather name={shown ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
+      <Icon name={shown ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
     </Pressable>
   );
 }

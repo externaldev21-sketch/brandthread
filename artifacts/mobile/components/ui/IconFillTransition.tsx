@@ -24,6 +24,7 @@
 import React, { useEffect } from 'react';
 import { StyleProp, StyleSheet, TextStyle } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Animated, {
   Easing, useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
@@ -83,7 +84,7 @@ export function IconFillTransition({
   return (
     <Animated.View style={styles.stack} testID={testID}>
       <Animated.View style={outlineStyle}>
-        <Feather name={outlineName} size={size} color={inactiveColor} style={style} />
+        <Icon name={outlineName} size={size} color={inactiveColor} style={style} />
       </Animated.View>
       <Animated.View style={[styles.overlay, solidStyle]}>
         <FontAwesome name={solidName} size={size} color={activeColor} style={style} />

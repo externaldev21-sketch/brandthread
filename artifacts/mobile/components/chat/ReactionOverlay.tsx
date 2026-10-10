@@ -16,7 +16,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Modal, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Glass } from '@/components/ui/Glass';
@@ -33,7 +33,7 @@ export type ReactionOverlayAnchor = { x: number; y: number; width: number; heigh
 export type ReactionOverlayMenuItem = {
   key: string;
   label: string;
-  icon: React.ComponentProps<typeof Feather>['name'];
+  icon: IconName;
   destructive?: boolean;
   onPress: () => void;
 };
@@ -164,7 +164,7 @@ export function ReactionOverlay({
                   testID={`reaction-menu-${item.key}`}
                 >
                   <Text style={[s.menuLabel, item.destructive && { color: theme.error }]}>{item.label}</Text>
-                  <Feather name={item.icon} size={16} color={item.destructive ? theme.error : '#fff'} />
+                  <Icon name={item.icon} size={16} color={item.destructive ? theme.error : '#fff'} />
                 </PressableScale>
               ))}
             </Glass>

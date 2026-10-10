@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   SURFACE,
@@ -316,7 +316,7 @@ export default function StoreDomainScreen() {
             {cd.verificationStatus === 'verified' && (
               <BrandthreadCard style={[dm.dnsCard, { borderColor: SUCCESS, backgroundColor: SUCCESS_DIM }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
-                  <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
+                  <Icon name="check-circle" size={ICON.sm} color={SUCCESS} />
                   <Text style={{ color: SUCCESS, fontFamily: FONT.semibold, fontSize: FS.sm }}>
                     Domain is live at https://{cd.customDomain}
                   </Text>
@@ -338,7 +338,7 @@ export default function StoreDomainScreen() {
 
         {!adding ? (
           <TouchableOpacity style={dm.addDomainBtn} onPress={() => setAdding(true)}>
-            <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Icon name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={dm.addDomainText}>Connect custom domain</Text>
           </TouchableOpacity>
         ) : (

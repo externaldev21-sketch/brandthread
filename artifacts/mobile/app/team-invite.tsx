@@ -11,7 +11,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'rea
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -108,7 +108,7 @@ export default function TeamInviteScreen() {
         ) : invite?.expired ? (
           <>
             <View style={[styles.icon, { backgroundColor: colors.warning + '22' }]}>
-              <Feather name="clock" size={26} color={colors.warning} />
+              <Icon name="clock" size={26} color={colors.warning} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite link expired</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
@@ -121,7 +121,7 @@ export default function TeamInviteScreen() {
         ) : error ? (
           <>
             <View style={[styles.icon, { backgroundColor: colors.secondary }]}>
-              <Feather name="x-circle" size={26} color={colors.mutedForeground} />
+              <Icon name="x-circle" size={26} color={colors.mutedForeground} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite not available</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>{error}</Text>
@@ -132,7 +132,7 @@ export default function TeamInviteScreen() {
         ) : accepted ? (
           <>
             <View style={[styles.icon, { backgroundColor: colors.success + '22' }]}>
-              <Feather name="check-circle" size={26} color={colors.success} />
+              <Icon name="check-circle" size={26} color={colors.success} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>You're on the team</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
@@ -145,7 +145,7 @@ export default function TeamInviteScreen() {
         ) : invite?.alreadyAccepted ? (
           <>
             <View style={[styles.icon, { backgroundColor: colors.primary + '22' }]}>
-              <Feather name="info" size={26} color={colors.primary} />
+              <Icon name="info" size={26} color={colors.primary} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite already accepted</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
@@ -158,7 +158,7 @@ export default function TeamInviteScreen() {
         ) : (
           <>
             <View style={[styles.icon, { backgroundColor: colors.primary + '22' }]}>
-              <Feather name="users" size={26} color={colors.primary} />
+              <Icon name="users" size={26} color={colors.primary} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Join {brand}</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
@@ -166,7 +166,7 @@ export default function TeamInviteScreen() {
               {ROLE_DESC[invite?.role] ? ` — ${ROLE_DESC[invite.role].toLowerCase()}` : ''}.
             </Text>
             <View style={[styles.inviteMeta, { borderColor: colors.border }]}>
-              <Feather name="mail" size={13} color={colors.mutedForeground} />
+              <Icon name="mail" size={13} color={colors.mutedForeground} />
               <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Invite sent to {invite?.email}</Text>
             </View>
             {!isLoaded ? (

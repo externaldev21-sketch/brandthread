@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Platform } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -85,14 +85,14 @@ export function PollComposer({ visible, onClose, onAdd }: {
               onPress={() => setOptions((prev) => prev.filter((_, k) => k !== i))}
               style={s.iconBtn} accessibilityRole="button" accessibilityLabel={`Remove option ${i + 1}`}
             >
-              <Feather name="x" size={18} color={theme.muted} />
+              <Icon name="x" size={18} color={theme.muted} />
             </Pressable>
           ) : null}
         </View>
       ))}
       {options.length < 4 ? (
         <Pressable onPress={() => setOptions((prev) => [...prev, ''])} style={[s.addRow, { borderColor: theme.border }]} accessibilityRole="button" accessibilityLabel="Add option">
-          <Feather name="plus" size={16} color={theme.text} />
+          <Icon name="plus" size={16} color={theme.text} />
           <Text style={[s.addText, { color: theme.text }]}>Add option</Text>
         </Pressable>
       ) : null}
@@ -164,7 +164,7 @@ export function CountdownPicker({ visible, onClose, onPick }: {
                   {new Date(d.releaseAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                 </Text>
               </View>
-              <Feather name="chevron-right" size={18} color={theme.muted} />
+              <Icon name="chevron-right" size={18} color={theme.muted} />
             </Pressable>
           ))}
         </ScrollView>

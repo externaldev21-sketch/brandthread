@@ -21,7 +21,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import Svg, { Circle } from 'react-native-svg';
@@ -387,7 +387,7 @@ export function CreateCamera({
       {showPrompt ? (
         <View style={s.promptWrap} pointerEvents="box-none">
           <View style={[s.promptCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <Feather name="camera" size={22} color={theme.text} />
+            <Icon name="camera" size={22} color={theme.text} />
             <Text style={[s.promptTitle, { color: theme.text }]}>Camera and microphone</Text>
             <Text style={[s.promptBody, { color: theme.muted }]}>Brandthread records video and sound only while you create.</Text>
             <Button
@@ -420,7 +420,7 @@ export function CreateCamera({
           accessibilityRole="button"
           testID="create-camera-close"
         >
-          <Feather name="x" size={24} color={theme.text} style={shadow} />
+          <Icon name="x" size={24} color={theme.text} style={shadow} />
         </Pressable>
         <View style={s.topTitleWrap} pointerEvents="box-none">
           <Pressable
@@ -433,7 +433,7 @@ export function CreateCamera({
             testID="create-camera-mode-title"
           >
             <Text style={[s.topTitle, { color: theme.text }, shadow]}>{CREATE_MODE_LABELS[mode]}</Text>
-            <Feather name="chevron-down" size={18} color={theme.text} style={[shadow, { marginTop: 1 }]} />
+            <Icon name="chevron-down" size={18} color={theme.text} style={[shadow, { marginTop: 1 }]} />
           </Pressable>
         </View>
         <View style={s.topBtn} />
@@ -472,7 +472,7 @@ export function CreateCamera({
                 testID={`create-camera-mode-${option}`}
               >
                 <Text style={[s.menuText, { color: theme.text }]}>{CREATE_MODE_LABELS[option]}</Text>
-                {selected ? <Feather name="check" size={16} color={theme.text} /> : null}
+                {selected ? <Icon name="check" size={16} color={theme.text} /> : null}
               </Pressable>
             );
           })}
@@ -494,10 +494,10 @@ export function CreateCamera({
       {!isRecording ? (
         <View style={[s.rail, { top: topInset + 64 }]} pointerEvents="box-none">
           <Pressable style={s.railBtn} onPress={() => setFacing((v) => (v === 'back' ? 'front' : 'back'))} accessibilityLabel="Flip camera" accessibilityRole="button">
-            <Feather name="refresh-cw" size={22} color={theme.text} style={shadow} />
+            <Icon name="refresh-cw" size={22} color={theme.text} style={shadow} />
           </Pressable>
           <Pressable style={s.railBtn} onPress={() => setFlash((v) => (v === 'off' ? 'on' : 'off'))} accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'} accessibilityRole="button">
-            <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={22} color={theme.text} style={shadow} />
+            <Icon name={flash === 'off' ? 'zap-off' : 'zap'} size={22} color={theme.text} style={shadow} />
           </Pressable>
           <Pressable
             style={s.railBtn}
@@ -506,7 +506,7 @@ export function CreateCamera({
             accessibilityRole="button"
             testID="create-camera-timer"
           >
-            <Feather name="clock" size={22} color={theme.text} style={shadow} />
+            <Icon name="clock" size={22} color={theme.text} style={shadow} />
             {timer > 0 ? <Text style={[s.railBadge, { color: theme.text }, shadow]}>{timer}s</Text> : null}
           </Pressable>
         </View>
@@ -565,7 +565,7 @@ export function CreateCamera({
               {rollThumb ? (
                 <Image source={{ uri: rollThumb }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : (
-                <Feather name="image" size={18} color={theme.text} />
+                <Icon name="image" size={18} color={theme.text} />
               )}
             </Pressable>
           ) : <View style={s.rollSpacer} />}
@@ -619,7 +619,7 @@ export function CreateCamera({
               accessibilityRole="button"
               testID="create-camera-flip"
             >
-              <Feather name="refresh-cw" size={20} color={theme.text} />
+              <Icon name="refresh-cw" size={20} color={theme.text} />
             </Pressable>
           ) : <View style={s.flipSpacer} />}
         </View>

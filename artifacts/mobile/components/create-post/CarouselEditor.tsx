@@ -8,7 +8,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -189,7 +189,7 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
         renderItem={(sl, i) => (
           <View style={[ed.thumb, i === activeIndex && ed.thumbOn]}>
             <SlideThumb slide={sl} style={{ width: '100%', height: '100%' }} />
-            {sl.kind === 'video' ? <View style={ed.thumbBadge}><Feather name="play" size={9} color={CP.black} /></View> : null}
+            {sl.kind === 'video' ? <View style={ed.thumbBadge}><Icon name="play" size={9} color={CP.black} /></View> : null}
           </View>
         )}
       />
@@ -217,7 +217,7 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
               <Pressable key={t.key} onPress={() => { tap(); setEditKey(t.key); setDraftValue(active.adjust); }} style={ed.preset} accessibilityRole="button" testID={`edit-${t.key}`}>
                 <Text style={[ed.presetLabel, { color: live[t.key] ? CP.white : CP.silverDim }]}>{t.label}</Text>
                 <View style={[ed.toolCircle, live[t.key] !== 0 && { borderColor: CP.white }]}>
-                  <Feather name={t.icon as any} size={22} color={CP.white} />
+                  <Icon name={t.icon as any} size={22} color={CP.white} />
                   {live[t.key] !== 0 ? <Text style={ed.toolValue}>{live[t.key]}</Text> : null}
                 </View>
               </Pressable>
@@ -269,7 +269,7 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
             accessibilityState={{ selected: tool === t.id }}
             testID={`tool-${t.id}`}
           >
-            <Feather name={t.icon as any} size={20} color={tool === t.id ? CP.black : CP.white} />
+            <Icon name={t.icon as any} size={20} color={tool === t.id ? CP.black : CP.white} />
             <Text style={[ed.toolText, { color: tool === t.id ? CP.black : CP.white }]}>{t.label}</Text>
           </Pressable>
         ))}
@@ -277,7 +277,7 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
 
       <View style={[ed.bottom, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <Pressable onPress={() => { tap(); if (!atCap) onAdd(); }} disabled={atCap} style={[ed.add, atCap && { opacity: 0.4 }]} accessibilityRole="button" accessibilityLabel="Add more" testID="slide-add">
-          <Feather name="plus" size={22} color={CP.white} />
+          <Icon name="plus" size={22} color={CP.white} />
         </Pressable>
         <View style={{ flex: 1 }} />
         <PillButton label="Next" icon="arrow-right" onPress={onNext} testID="edit-next" flex={false} style={{ paddingHorizontal: 28, minWidth: 132 }} />

@@ -19,7 +19,6 @@ import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'ex
 import { useQueryClient } from '@tanstack/react-query';
 import { DETAIL_STALE_TIME_MS, queryKeys } from '@/lib/queryClient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
@@ -80,7 +79,7 @@ import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
 import { ProductSellerRow } from '@/components/products/ProductSellerRow';
 import { SizeSheet } from '@/components/products/SizeSheet';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, Icon as AppIcon, type IconName } from '@/components/ui/Icon';
 import { primaryOption, sizeCells } from '@/lib/sizeSheet';
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import { productTransitionKey } from '@/lib/tileTransition';
@@ -348,7 +347,7 @@ function ZoomableGalleryImage({ uri, onZoomChange }: { uri: string; onZoomChange
         </Reanimated.View>
         {zoomed && (
           <TouchableOpacity style={galleryStyles.resetZoom} onPress={resetZoom} accessibilityRole="button" accessibilityLabel="Reset product photo zoom">
-            <Feather name="minimize-2" size={14} color={ON_DARK} />
+            <AppIcon name="minimize-2" size={14} color={ON_DARK} />
             <Text style={galleryStyles.resetZoomText}>Reset</Text>
           </TouchableOpacity>
         )}
@@ -391,7 +390,7 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
   if (!images.length) {
     return (
       <View style={[galleryStyles.gallery, galleryStyles.galleryEmpty]}>
-        <Feather name="image" size={ICON.xxl} color={MUTED} />
+        <AppIcon name="image" size={ICON.xxl} color={MUTED} />
         <Text style={galleryStyles.emptyText}>Product image unavailable</Text>
       </View>
     );
@@ -953,7 +952,7 @@ export default function BuyerProductDetailScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <View style={{ height: GALLERY_HEIGHT, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.lg }}>
-          <Feather name="alert-circle" size={ICON.xl} color={RED} />
+          <AppIcon name="alert-circle" size={ICON.xl} color={RED} />
           <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>{loadFailed ? "Couldn't load this product" : 'Product not found'}</Text>
           <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
             {loadFailed ? 'Check your connection and try again.' : 'This product may be unavailable or the link may have expired.'}
@@ -1229,7 +1228,7 @@ export default function BuyerProductDetailScreen() {
               testID="product-seller-preview-marker"
             >
               <View style={s.previewMarker}>
-                <Feather name="eye" size={12} color="#FFFFFF" />
+                <AppIcon name="eye" size={12} color="#FFFFFF" />
                 <Text style={s.previewMarkerText}>Preview</Text>
               </View>
             </View>
@@ -1263,7 +1262,7 @@ export default function BuyerProductDetailScreen() {
           <View style={s.badgeRow}>
             {product.isPreOrder && (
               <View style={s.preOrderBadge}>
-                <Feather name="clock" size={12} color={CYAN} />
+                <AppIcon name="clock" size={12} color={CYAN} />
                 <Text style={s.preOrderBadgeText}>PRE-ORDER</Text>
               </View>
             )}
@@ -1324,7 +1323,7 @@ export default function BuyerProductDetailScreen() {
 
            {paymentUnavailable && (
              <View style={s.paymentWarningBanner} accessibilityRole="alert">
-               <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />
+               <AppIcon name="alert-triangle" size={ICON.xs} color={ORANGE} />
                <View style={s.paymentWarningCopy}>
                  <Text style={s.paymentWarningTitle}>Payments unavailable</Text>
                  <Text style={s.paymentWarningText}>
@@ -1335,7 +1334,7 @@ export default function BuyerProductDetailScreen() {
            )}
           {sellerVacationMessage && (
             <View style={s.vacationBanner} accessibilityRole="alert">
-              <Feather name="sun" size={ICON.sm} color={ORANGE} />
+              <AppIcon name="sun" size={ICON.sm} color={ORANGE} />
               <View style={{ flex: 1 }}>
                 <Text style={s.vacationTitle}>Seller is away</Text>
                 <Text style={s.vacationText}>{sellerVacationMessage}</Text>
@@ -1347,7 +1346,7 @@ export default function BuyerProductDetailScreen() {
           {product.isPreOrder && (
             <View style={s.preOrderCard}>
               <View style={s.preOrderRow}>
-                <Feather name="clock" size={ICON.sm} color={CYAN} />
+                <AppIcon name="clock" size={ICON.sm} color={CYAN} />
                 <Text style={s.preOrderTitle}>Pre-Order Item</Text>
               </View>
               {product.preOrderClosingDate && (
@@ -1408,7 +1407,7 @@ export default function BuyerProductDetailScreen() {
                 )}
                 {isUnselected && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -SP.sm, marginBottom: SP.sm }}>
-                    <Feather name="alert-circle" size={12} color={RED} />
+                    <AppIcon name="alert-circle" size={12} color={RED} />
                     <Text style={{ fontSize: FS.xs, fontFamily: FONT.medium, color: RED }}>
                       Please select a {option.name.toLowerCase()}
                     </Text>
@@ -1431,7 +1430,7 @@ export default function BuyerProductDetailScreen() {
               accessibilityLabel="Size guide"
               testID="product-size-guide-link"
             >
-              <Feather name="maximize" size={13} color={PURPLE_LIGHT} />
+              <AppIcon name="maximize" size={13} color={PURPLE_LIGHT} />
               <Text style={[s.sizeGuideLinkText, { color: PURPLE_LIGHT }]}>Size guide</Text>
             </TouchableOpacity>
           )}
@@ -1475,7 +1474,7 @@ export default function BuyerProductDetailScreen() {
                 <ActivityIndicator size="small" color={PURPLE_LIGHT} />
               ) : (
                 <>
-                  <Feather name={waitlistJoined ? 'check' : 'bell'} size={14} color={waitlistJoined ? SUCCESS : PURPLE_LIGHT} />
+                  <AppIcon name={waitlistJoined ? 'check' : 'bell'} size={14} color={waitlistJoined ? SUCCESS : PURPLE_LIGHT} />
                   <Text style={[wl.text, waitlistJoined && { color: SUCCESS }]}>
                     {waitlistJoined ? "You're on the waitlist" : 'Notify me when back in stock'}
                   </Text>
@@ -1505,7 +1504,7 @@ export default function BuyerProductDetailScreen() {
                 accessibilityState={{ expanded: sizeChartOpen }}
               >
                 <Text style={[sz.label, { color: theme.text }]}>Size Chart</Text>
-                <Feather name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
+                <AppIcon name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
               </TouchableOpacity>
               {sizeChartOpen && <SizeChartViewer chart={(product as any).sizeChart} />}
             </>
@@ -1588,7 +1587,7 @@ export default function BuyerProductDetailScreen() {
               hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
             >
-              <Feather name="flag" size={11} color={SUBTLE} />
+              <AppIcon name="flag" size={11} color={SUBTLE} />
               <Text style={{ color: SUBTLE, fontFamily: FONT.medium, fontSize: FS.meta }}>Report listing</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1641,7 +1640,7 @@ export default function BuyerProductDetailScreen() {
               <CachedImage source={{ uri: product.imageUris[0] }} style={s.addedSheetImage} contentFit="cover" />
             ) : (
               <View style={[s.addedSheetImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-                <Feather name="image" size={18} color={SUBTLE} />
+                <AppIcon name="image" size={18} color={SUBTLE} />
               </View>
             )}
             <View style={{ flex: 1 }}>
@@ -1962,11 +1961,11 @@ function WornInVideos({ productId, productName }: { productId: string; productNa
               <CachedImage source={{ uri: video.thumbnailUrl }} style={wv.thumb} contentFit="cover" />
             ) : (
               <View style={[wv.thumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated }]}>
-                <Feather name="video" size={20} color={theme.muted} />
+                <AppIcon name="video" size={20} color={theme.muted} />
               </View>
             )}
             <View style={wv.playBadge}>
-              <Feather name="play" size={12} color="#FFFFFF" />
+              <AppIcon name="play" size={12} color="#FFFFFF" />
             </View>
             <Text style={[wv.authorName, { color: theme.muted }]} numberOfLines={1}>{video.authorName}</Text>
           </TouchableOpacity>
@@ -2075,7 +2074,7 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
                 <CachedImage source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={p.images[0]} />
               ) : (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="image" size={24} color={MUTED} />
+                  <AppIcon name="image" size={24} color={MUTED} />
                 </View>
               )}
             </View>
@@ -2114,11 +2113,11 @@ const makeSizeChartStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => 
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function PolicyRow({ icon, label, value }: { icon: keyof typeof Feather.glyphMap; label: string; value: string }) {
+function PolicyRow({ icon, label, value }: { icon: IconName; label: string; value: string }) {
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
   return (
     <View style={pr.root}>
-      <Feather name={icon} size={14} color={theme.muted} />
+      <AppIcon name={icon} size={14} color={theme.muted} />
       <View style={{ flex: 1 }}>
         <Text style={[pr.label, { color: theme.muted }]}>{label}</Text>
         <Text style={[pr.value, { color: theme.subtle }]}>{value}</Text>

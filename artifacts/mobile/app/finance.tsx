@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Linking, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -249,7 +249,7 @@ export default function FinanceScreen() {
                   : subPlan.hasPlan ? 'Manage' : 'Choose a plan'}
               </Text>
             </View>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} style={{ marginTop: 8 }} />
+            <Icon name="chevron-right" size={16} color={colors.mutedForeground} style={{ marginTop: 8 }} />
           </View>
         </TouchableOpacity>
       )}
@@ -280,7 +280,7 @@ export default function FinanceScreen() {
         ) : (
           overviewCards.map((card) => (
             <View key={card.label} style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name={card.icon} size={16} color={card.color} />
+              <Icon name={card.icon} size={16} color={card.color} />
               <Text style={[styles.overviewVal, TABULAR_NUMS, { color: card.color }]}>{card.value}</Text>
               <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>{card.label}</Text>
             </View>
@@ -356,12 +356,12 @@ export default function FinanceScreen() {
             {documents.map((item, i) => (
               <TouchableOpacity key={item.label} onPress={() => item.onPress()} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.docIcon, { backgroundColor: colors.secondary }]}>
-                  <Feather name={item.icon} size={15} color={colors.mutedForeground} />
+                  <Icon name={item.icon} size={15} color={colors.mutedForeground} />
                 </View>
                 <Text style={[styles.docLabel, { color: colors.foreground }]}>{item.label}</Text>
                 {item.onPress === handleDownloadStatement && statementDownloading
                   ? <ActivityIndicator size="small" color={colors.mutedForeground} />
-                  : <Feather name={'trailing' in item ? item.trailing : 'download'} size={15} color={colors.mutedForeground} />}
+                  : <Icon name={('trailing' in item ? item.trailing : undefined) ?? 'download'} size={15} color={colors.mutedForeground} />}
               </TouchableOpacity>
             ))}
             {statementError && (

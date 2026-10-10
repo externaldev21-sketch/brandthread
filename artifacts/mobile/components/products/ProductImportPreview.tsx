@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -37,7 +37,7 @@ export function ProductImportPreview({ visible, preview, result, busy, error, on
         <View style={s.top}>
           <Text style={s.title}>{result ? 'Import finished' : 'Review import'}</Text>
           <TouchableOpacity onPress={onClose} style={s.close} accessibilityRole="button" accessibilityLabel="Close">
-            <Feather name="x" size={18} color={theme.text} />
+            <Icon name="x" size={18} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -56,13 +56,13 @@ export function ProductImportPreview({ visible, preview, result, busy, error, on
               <Text style={s.line}>New products are saved as drafts. Review and publish them from Products.</Text>
               {result.results.filter((r) => r.action === 'failed' || r.action === 'skipped' || r.notes?.length).slice(0, 30).map((r, i) => (
                 <View key={`${r.name}-${i}`} style={s.issue}>
-                  <Feather name="alert-triangle" size={14} color={theme.muted} style={s.issueIcon} />
+                  <Icon name="alert-triangle" size={14} color={theme.muted} style={s.issueIcon} />
                   <Text style={s.issueText}><Text style={s.issueName}>{r.name}</Text>{'  '}{r.reason ?? r.notes?.join(' ')}</Text>
                 </View>
               ))}
               {result.issues.filter((i) => i.severity === 'error').slice(0, 30).map((i, n) => (
                 <View key={`e${n}`} style={s.issue}>
-                  <Feather name="alert-triangle" size={14} color={theme.muted} style={s.issueIcon} />
+                  <Icon name="alert-triangle" size={14} color={theme.muted} style={s.issueIcon} />
                   <Text style={s.issueText}>Row {i.line}{i.product ? ` · ${i.product}` : ''}  {i.message}</Text>
                 </View>
               ))}
@@ -89,7 +89,7 @@ export function ProductImportPreview({ visible, preview, result, busy, error, on
                   <Text style={s.section}>{preview.counts.errors} error{preview.counts.errors === 1 ? '' : 's'}, {preview.counts.warnings} warning{preview.counts.warnings === 1 ? '' : 's'}</Text>
                   {preview.issues.map((i, n) => (
                     <View key={n} style={s.issue}>
-                      <Feather name={i.severity === 'error' ? 'x-circle' : 'alert-triangle'} size={14} color={i.severity === 'error' ? theme.text : theme.muted} style={s.issueIcon} />
+                      <Icon name={i.severity === 'error' ? 'x-circle' : 'alert-triangle'} size={14} color={i.severity === 'error' ? theme.text : theme.muted} style={s.issueIcon} />
                       <Text style={s.issueText}>
                         {i.line > 0 ? `Row ${i.line}` : 'File'}{i.product ? ` · ${i.product}` : ''}{'  '}{i.message}
                       </Text>

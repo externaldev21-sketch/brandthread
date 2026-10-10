@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -155,7 +155,7 @@ export default function StoreGeneratingScreen() {
         activeOpacity={0.75}
         style={{ position: 'absolute', top: headerTopInset + 12, left: SP.md, width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
       >
-        <Feather name="arrow-left" size={ICON.sm} color={FG} />
+        <Icon name="arrow-left" size={ICON.sm} color={FG} />
       </TouchableOpacity>
 
       <View style={gen.inner}>
@@ -167,7 +167,7 @@ export default function StoreGeneratingScreen() {
         <View style={gen.spinnerWrap}>
           <Animated.View style={[gen.spinnerRing, { transform: [{ rotate: spin }] }]} />
           <View style={gen.spinnerIconCenter}>
-            <Feather
+            <Icon
               name={GEN_STEPS[Math.min(currentStep, GEN_STEPS.length - 1)].icon as any}
               size={ICON.lg}
               color={PURPLE}
@@ -191,7 +191,7 @@ export default function StoreGeneratingScreen() {
               <View key={idx} style={gen.stepRow}>
                 <View style={gen.stepBullet}>
                   {isDone ? (
-                    <Feather name="check" size={12} color={SUCCESS} />
+                    <Icon name="check" size={12} color={SUCCESS} />
                   ) : isCurrent ? (
                     <Animated.View style={[gen.activeDot, { opacity: stepFadeAnim }]} />
                   ) : (
@@ -219,7 +219,7 @@ export default function StoreGeneratingScreen() {
         {/* Error state */}
         {error && (
           <View style={gen.errorCard}>
-            <Feather name="alert-circle" size={ICON.sm} color={RED} />
+            <Icon name="alert-circle" size={ICON.sm} color={RED} />
             <Text style={gen.errorText}>{error}</Text>
             <View
               style={gen.retryBtn}

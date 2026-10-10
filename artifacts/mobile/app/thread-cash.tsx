@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -54,7 +54,7 @@ function historyLabel(entry: ThreadCashEntry): string {
 function historyGlyph(
   entry: ThreadCashEntry,
   theme: AppThemePreset,
-): { icon: React.ComponentProps<typeof Feather>['name']; color: string } {
+): { icon: IconName; color: string } {
   switch (entry.source) {
     case 'daily_checkin': return { icon: 'check-circle', color: theme.success };
     case 'streak_bonus': return { icon: 'zap', color: theme.accent };
@@ -321,7 +321,7 @@ export default function ThreadCashScreen() {
                     ]}
                   >
                     <View style={[styles.historyIcon, { backgroundColor: theme.cardElevated }]}>
-                      <Feather name={glyph.icon} size={16} color={glyph.color} />
+                      <Icon name={glyph.icon} size={16} color={glyph.color} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.historyLabel, { color: theme.text }]} numberOfLines={1}>{historyLabel(entry)}</Text>
@@ -350,7 +350,7 @@ export default function ThreadCashScreen() {
             style={[styles.ledgerRow, { borderColor: theme.borderSubtle }]}
           >
             <Text style={[styles.historyLabel, { color: theme.text, flex: 1 }]}>Full ledger</Text>
-            <Feather name="chevron-right" size={ICON.md} color={theme.muted} />
+            <Icon name="chevron-right" size={ICON.md} color={theme.muted} />
           </Pressable>
 
           {/* Rules */}

@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus, Modal, Platform, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -128,7 +128,7 @@ export default function AppLockGate() {
                 <Text style={[styles.markText, { color: theme.onAccent }]}>B</Text>
               </View>
               <View style={[styles.lockBadge, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <Feather name="lock" size={14} color={theme.text} />
+                <Icon name="lock" size={14} color={theme.text} />
               </View>
               <Text style={[styles.title, { color: theme.text }]}>Brandthread is locked</Text>
               <Text style={[styles.body, { color: theme.muted }]}>
@@ -138,7 +138,7 @@ export default function AppLockGate() {
               </Text>
               {message ? (
                 <View style={[styles.message, { borderColor: theme.error + '55', backgroundColor: theme.card }]}>
-                  <Feather name="alert-circle" size={14} color={theme.error} />
+                  <Icon name="alert-circle" size={14} color={theme.error} />
                   <Text style={[styles.messageText, { color: theme.text }]}>{message}</Text>
                 </View>
               ) : null}

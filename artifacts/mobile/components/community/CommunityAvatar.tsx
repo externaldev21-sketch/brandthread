@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Text, View } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { useColors } from '@/hooks/useColors';
@@ -34,7 +35,7 @@ export function CommunityAvatar({ community, size = 52 }: CommunityAvatarProps) 
     );
   }
   const icon = community.iconKey && community.iconKey in Feather.glyphMap
-    ? (community.iconKey as keyof typeof Feather.glyphMap)
+    ? (community.iconKey as IconName)
     : null;
   return (
     <View
@@ -45,7 +46,7 @@ export function CommunityAvatar({ community, size = 52 }: CommunityAvatarProps) 
       }}
     >
       {icon ? (
-        <Feather name={icon} size={Math.round(size * 0.46)} color={colors.foreground} />
+        <Icon name={icon} size={Math.round(size * 0.46)} color={colors.foreground} />
       ) : (
         <Text style={{ fontFamily: FONT.semibold, fontSize: Math.round(size * 0.36), color: colors.foreground }}>
           {initialsOf(community.name)}

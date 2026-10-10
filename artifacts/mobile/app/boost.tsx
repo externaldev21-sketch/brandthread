@@ -29,7 +29,7 @@ import {
   Alert, ActivityIndicator, PanResponder, LayoutChangeEvent,
   } from 'react-native';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics } from '@/lib/haptics';
@@ -342,12 +342,12 @@ function PostThumbnail({ target }: { target: BoostTarget }) {
       <View style={tc.badgeRow}>
         {target.mediaKind === 'video' ? (
           <View style={tc.badge}>
-            <Feather name="play" size={8} color="#fff" />
+            <Icon name="play" size={8} color="#fff" />
             <Text style={tc.badgeText}>Video</Text>
           </View>
         ) : (
           <View style={tc.badge}>
-            <Feather name="grid" size={8} color="#fff" />
+            <Icon name="grid" size={8} color="#fff" />
             <Text style={tc.badgeText}>Slideshow</Text>
           </View>
         )}
@@ -885,7 +885,7 @@ export default function BoostScreen() {
             <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-              <Feather name="film" size={ICON.xs} color={MUTED} />
+              <Icon name="film" size={ICON.xs} color={MUTED} />
             </View>
           )}
         </View>
@@ -1070,7 +1070,7 @@ export default function BoostScreen() {
                   </Text>
                   {selectedTarget?.id === t.id && (
                     <View style={s.gridCheck}>
-                      <Feather name="check" size={12} color={BG} />
+                      <Icon name="check" size={12} color={BG} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -1085,12 +1085,12 @@ export default function BoostScreen() {
             accessibilityLabel="Get featured on Discover"
             testID="boost-featured-row"
           >
-            <Feather name="star" size={ICON.md} color={FG} />
+            <Icon name="star" size={ICON.md} color={FG} />
             <View style={{ flex: 1 }}>
               <Text style={s.featuredRowTitle}>Featured on Discover</Text>
               <Text style={s.historyMetaSmall}>Put your brand at the top of Discover</Text>
             </View>
-            <Feather name="chevron-right" size={ICON.md} color={MUTED} />
+            <Icon name="chevron-right" size={ICON.md} color={MUTED} />
           </TouchableOpacity>
 
           {renderHistory()}
@@ -1151,7 +1151,7 @@ export default function BoostScreen() {
           {/* Estimated reach */}
           <View style={s.reachCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
-              <Feather name="users" size={ICON.xs} color={MUTED} />
+              <Icon name="users" size={ICON.xs} color={MUTED} />
               <Text style={s.reachLabel}>Estimated reach</Text>
             </View>
             <Text style={s.reachValue}>
@@ -1183,7 +1183,7 @@ export default function BoostScreen() {
             ) : (
               <>
                 <Text style={s.primaryBtnText}>Boost post · {formatCents(budgetCents)}</Text>
-                <Feather name="zap" size={ICON.sm} color="#000" />
+                <Icon name="zap" size={ICON.sm} color="#000" />
               </>
             )}
           </TouchableOpacity>
@@ -1209,7 +1209,7 @@ export default function BoostScreen() {
           contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad, alignItems: 'center' }}
         >
           <View style={s.successIcon}>
-            <Feather name="zap" size={32} color={FG} />
+            <Icon name="zap" size={32} color={FG} />
           </View>
           <Text style={s.successTitle}>{b?.status === 'in_review' ? 'Boost in review' : 'Boost active'}</Text>
           <Text style={s.successSub}>

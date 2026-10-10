@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
@@ -84,7 +84,7 @@ export default function BuyerQRCode() {
             </View>
           ) : (
             <View style={[s.qrWrap, { alignItems: 'center', justifyContent: 'center' }]}>
-              <Feather name="user-x" size={40} color={MUTED} />
+              <Icon name="user-x" size={40} color={MUTED} />
               <Text style={[s.hint, { marginTop: 8, marginBottom: 0 }]}>Set a username to generate your QR code</Text>
               <Button
                 label="Set username"
@@ -117,7 +117,7 @@ export default function BuyerQRCode() {
           style={[s.shareBtnWrap, !canonicalUrl && { opacity: 0.4 }]}
         >
           <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.shareBtn}>
-            <Feather name="share-2" size={18} color={theme.onAccent} />
+            <Icon name="share-2" size={18} color={theme.onAccent} />
             <Text style={[s.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Share QR code</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -128,7 +128,7 @@ export default function BuyerQRCode() {
           <View style={s.infoCard}>
             {displayName ? (
               <View style={s.infoRow}>
-                <Feather name="user" size={17} color={PURPLE} />
+                <Icon name="user" size={17} color={PURPLE} />
                 <Text style={s.infoLabel}>Profile</Text>
                 <Text style={s.infoValue}>{displayName}</Text>
               </View>
@@ -136,7 +136,7 @@ export default function BuyerQRCode() {
             {displayName && canonicalUrl ? <View style={s.divider} /> : null}
             {canonicalUrl ? (
               <View style={s.infoRow}>
-                <Feather name="link" size={17} color={PURPLE} />
+                <Icon name="link" size={17} color={PURPLE} />
                 <Text style={s.infoLabel}>Link</Text>
                 <Text style={s.infoValue} numberOfLines={1}>{qrValue}</Text>
               </View>

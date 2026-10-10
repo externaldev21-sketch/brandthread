@@ -8,7 +8,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useFeeSchedule } from '@/hooks/useFeeSchedule';
@@ -64,7 +64,7 @@ export function FeeBreakdown({ priceCents, shippingCents, collapsible, flat, sch
       >
         <Text style={styles.toggleLabel}>You receive</Text>
         <Text style={styles.toggleValue}>{formatCents(quote.sellerNetCents)}</Text>
-        <Feather name={open ? 'chevron-up' : 'chevron-down'} size={16} color={theme.muted} />
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={theme.muted} />
       </TouchableOpacity>
       {open ? <View style={styles.expanded}>{rows}</View> : null}
     </View>

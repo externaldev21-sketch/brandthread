@@ -8,7 +8,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { CREATE_CANVAS, FONT } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -23,7 +23,7 @@ export function tap() {
 export function PillButton({
   label, onPress, icon, variant = 'primary', disabled, loading, style, testID, flex = true,
 }: {
-  label: string; onPress: () => void; icon?: keyof typeof Feather.glyphMap;
+  label: string; onPress: () => void; icon?: IconName;
   variant?: 'primary' | 'secondary'; disabled?: boolean; loading?: boolean;
   style?: StyleProp<ViewStyle>; testID?: string; flex?: boolean;
 }) {
@@ -42,7 +42,7 @@ export function PillButton({
     >
       {loading ? <ActivityIndicator color={fg} /> : (
         <>
-          {icon ? <Feather name={icon} size={18} color={fg} style={{ marginRight: 8 }} /> : null}
+          {icon ? <Icon name={icon} size={18} color={fg} style={{ marginRight: 8 }} /> : null}
           <Text style={[s.pillText, { color: fg }]}>{label}</Text>
         </>
       )}
@@ -52,7 +52,7 @@ export function PillButton({
 
 /** Right-hand tool rail item: white icon over a tiny label. */
 export function RailButton({ icon, label, onPress, testID, active }: {
-  icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; testID?: string; active?: boolean;
+  icon: IconName; label: string; onPress: () => void; testID?: string; active?: boolean;
 }) {
   return (
     <Pressable
@@ -63,14 +63,14 @@ export function RailButton({ icon, label, onPress, testID, active }: {
       hitSlop={6}
       style={s.rail}
     >
-      <Feather name={icon} size={26} color={active ? CP.white : CP.white} />
+      <Icon name={icon} size={26} color={active ? CP.white : CP.white} />
       <Text style={s.railLabel}>{label}</Text>
     </Pressable>
   );
 }
 
 export function IconButton({ icon, onPress, label, size = 26, testID }: {
-  icon: keyof typeof Feather.glyphMap; onPress: () => void; label: string; size?: number; testID?: string;
+  icon: IconName; onPress: () => void; label: string; size?: number; testID?: string;
 }) {
   return (
     <Pressable
@@ -81,7 +81,7 @@ export function IconButton({ icon, onPress, label, size = 26, testID }: {
       hitSlop={10}
       style={s.iconBtn}
     >
-      <Feather name={icon} size={size} color={CP.white} />
+      <Icon name={icon} size={size} color={CP.white} />
     </Pressable>
   );
 }

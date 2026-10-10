@@ -10,7 +10,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -31,7 +31,7 @@ interface VerificationState {
 // ─── Status display config ────────────────────────────────────────────────────
 
 const statusConfig = (theme: ReturnType<typeof useAppTheme>['theme']): Record<VerificationStatus, {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   color: string;
   bg: string;
   title: string;
@@ -225,7 +225,7 @@ export default function SellerVerificationScreen() {
         {/* ── Status card ── */}
         <View style={[s.statusCard, { backgroundColor: cfg.bg, borderColor: cfg.color + '40' }]}>
           <View style={[s.statusIconWrap, { backgroundColor: cfg.color + '20' }]}>
-            <Feather name={cfg.icon} size={ICON.lg} color={cfg.color} />
+            <Icon name={cfg.icon} size={ICON.lg} color={cfg.color} />
           </View>
           <Text style={[s.statusTitle, { color: cfg.color }]}>{cfg.title}</Text>
           <Text style={s.statusBody}>{cfg.body}</Text>
@@ -235,7 +235,7 @@ export default function SellerVerificationScreen() {
         {status === 'verified' && (
           <GradientCard style={s.verifiedCard}>
             <View style={s.verifiedRow}>
-              <Feather name="check-circle" size={ICON.md} color={theme.success} />
+              <Icon name="check-circle" size={ICON.md} color={theme.success} />
               <Text style={s.verifiedLabel}>Verified Seller Badge</Text>
             </View>
             <Text style={s.verifiedSub}>
@@ -251,7 +251,7 @@ export default function SellerVerificationScreen() {
             {BENEFITS.map((b, i) => (
               <View key={i} style={s.benefitRow}>
                 <View style={s.benefitIconWrap}>
-                  <Feather name={b.icon} size={ICON.sm} color={PURPLE} />
+                  <Icon name={b.icon} size={ICON.sm} color={PURPLE} />
                 </View>
                 <Text style={s.benefitText}>{b.text}</Text>
               </View>
@@ -282,7 +282,7 @@ export default function SellerVerificationScreen() {
         {/* ── Privacy note ── */}
         {(status === 'unverified' || status === 'failed') && (
           <View style={s.privacyNote}>
-            <Feather name="lock" size={14} color={theme.muted} style={{ marginTop: 1 }} />
+            <Icon name="lock" size={14} color={theme.muted} style={{ marginTop: 1 }} />
             <Text style={s.privacyText}>
               Verification is processed securely by Stripe. Brandthread does not store your ID documents. Stripe's{' '}
               <Text

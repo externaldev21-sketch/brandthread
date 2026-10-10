@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, TextInput } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/hooks/useApi';
@@ -91,7 +91,7 @@ export default function ShopifyFulfillmentScreen() {
         <BrandthreadCard>
           <View style={styles.rowHeader}>
             <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}18` }]}>
-              <Feather name="shopping-bag" size={18} color={colors.primary} />
+              <Icon name="shopping-bag" size={18} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Fulfill orders through my Shopify store</Text>
@@ -125,7 +125,7 @@ export default function ShopifyFulfillmentScreen() {
         <BrandthreadCard style={{ marginTop: 16 }}>
           <View style={styles.rowHeader}>
             <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}18` }]}>
-              <Feather name="package" size={18} color={colors.primary} />
+              <Icon name="package" size={18} color={colors.primary} />
             </View>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Using Tapstitch, Printful, or Printify?</Text>
           </View>

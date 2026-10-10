@@ -22,7 +22,8 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import type { PaymentPath } from '@/lib/checkoutPayment';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -115,7 +116,7 @@ function ExpressMark() {
   const t = useCheckoutT();
   return (
     <View style={walletStyles.walletMark}>
-      <Feather name="zap" size={16} color={WALLET_FG} />
+      <Icon name="zap" size={16} color={WALLET_FG} />
       <Text style={walletStyles.walletLead}>{t('Express checkout')}</Text>
     </View>
   );
@@ -192,7 +193,7 @@ export function PaymentSection({
     return (
       <CheckoutSection title={t('Payment')} testID="checkout-payment">
         <View style={styles.noteRow} testID="checkout-preview-note">
-          <Feather name="info" size={14} color={ck.muted} style={styles.noteIcon} />
+          <Icon name="info" size={14} color={ck.muted} style={styles.noteIcon} />
           {/* No mention of "preview"/"demo" here — the dev/demo preview
               bypass must have zero user-visible tells (Dev's explicit
               request). The underlying `path === 'preview'` code path stays;
@@ -207,7 +208,7 @@ export function PaymentSection({
     return (
       <CheckoutSection title={t('Payment')} testID="checkout-payment">
         <View style={styles.cardRow}>
-          <View style={styles.cardIcon}><Feather name="credit-card" size={16} color={ck.text} /></View>
+          <View style={styles.cardIcon}><Icon name="credit-card" size={16} color={ck.text} /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>{t('Card, Apple Pay or Google Pay')}</Text>
             <Text style={styles.cardSub}>{t('Entered on Stripe’s secure page after you tap Pay')}</Text>
@@ -269,7 +270,7 @@ function SecureLine({ sellerCount, hosted, ck, styles }: {
   const t = useCheckoutT();
   return (
     <View style={styles.secure}>
-      <Feather name="lock" size={13} color={ck.muted} style={styles.noteIcon} />
+      <Icon name="lock" size={13} color={ck.muted} style={styles.noteIcon} />
       <Text style={styles.secureText}>
         {hosted && sellerCount > 1
           ? t('Secured by Stripe. Items from {count} sellers are paid in {count} separate secure payments.', { count: sellerCount })

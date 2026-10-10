@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSheetTransition } from '@/components/ui/BottomSheet';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
@@ -157,7 +157,7 @@ export function VariantPickerSheet({
         <View style={s.header}>
           <Text style={s.title}>Choose options</Text>
           <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={s.closeBtn}>
-            <Feather name="x" size={18} color={theme.text} />
+            <Icon name="x" size={18} color={theme.text} />
           </TouchableOpacity>
         </View>
         </Animated.View>
@@ -173,13 +173,13 @@ export function VariantPickerSheet({
               <View style={s.productRow}>
                 {product.imageUris[0] ? (
                   <CachedImage source={{ uri: product.imageUris[0] }} style={s.thumb} contentFit="cover" />
-                ) : <View style={[s.thumb, s.thumbPlaceholder]}><Feather name="image" size={18} color={theme.subtle} /></View>}
+                ) : <View style={[s.thumb, s.thumbPlaceholder]}><Icon name="image" size={18} color={theme.subtle} /></View>}
                 <View style={{ flex: 1 }}>
                   <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
                   <Text style={s.productPrice}>{formatCents(price)}</Text>
                   {lowStock && (
                     <View style={s.lowStockRow}>
-                      <Feather name="alert-circle" size={11} color={theme.warning} />
+                      <Icon name="alert-circle" size={11} color={theme.warning} />
                       <Text style={s.lowStockText}>Only {variant!.inventoryQuantity} left</Text>
                     </View>
                   )}
@@ -217,7 +217,7 @@ export function VariantPickerSheet({
                               accessibilityState={{ selected, disabled: !available }}
                             >
                               <View style={[s.colorDot, { backgroundColor: val.colorHex }]} />
-                              {!available && <Feather name="slash" size={13} color={theme.subtle} style={s.colorSlash} />}
+                              {!available && <Icon name="slash" size={13} color={theme.subtle} style={s.colorSlash} />}
                             </TouchableOpacity>
                           );
                         }

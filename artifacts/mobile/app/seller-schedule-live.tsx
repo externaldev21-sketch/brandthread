@@ -8,7 +8,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -155,11 +155,11 @@ export default function SellerScheduleLiveScreen() {
           accessibilityRole="button"
           accessibilityLabel="Products"
         >
-          <Feather name="shopping-bag" size={18} color={theme.text} />
+          <Icon name="shopping-bag" size={18} color={theme.text} />
           <Text style={[styles.rowText, { color: theme.text }]}>
             {picked.length > 0 ? `${picked.length} product${picked.length === 1 ? '' : 's'}` : 'Add products'}
           </Text>
-          <Feather name={showProducts ? 'chevron-up' : 'chevron-down'} size={18} color={theme.muted} />
+          <Icon name={showProducts ? 'chevron-up' : 'chevron-down'} size={18} color={theme.muted} />
         </Pressable>
         {showProducts && (
           <View style={[styles.list, { borderColor: theme.border }]}>
@@ -180,7 +180,7 @@ export default function SellerScheduleLiveScreen() {
                     <Text style={[styles.note, { color: theme.muted }]}>{formatCents(p.priceCents ?? 0)}</Text>
                   </View>
                   <View style={[styles.check, { borderColor: on ? theme.text : theme.border, backgroundColor: on ? theme.text : 'transparent' }]}>
-                    {on && <Feather name="check" size={13} color={theme.background} />}
+                    {on && <Icon name="check" size={13} color={theme.background} />}
                   </View>
                 </Pressable>
               );

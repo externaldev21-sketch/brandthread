@@ -30,7 +30,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { View, Text, ScrollView, StyleSheet, TextInput, Image, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandthreadCard, BrandthreadScreen, EmptyState } from '@/components/BrandthreadUI';
@@ -181,7 +181,7 @@ export default function ReturnDetailScreen() {
                     step.state === 'done' && { backgroundColor: theme.accent, borderColor: theme.accent },
                     step.state === 'current' && { borderColor: theme.accent },
                   ]}>
-                    {step.state === 'done' ? <Feather name="check" size={12} color={theme.onAccent} /> : null}
+                    {step.state === 'done' ? <Icon name="check" size={12} color={theme.onAccent} /> : null}
                     {step.state === 'current' ? <View style={s.dotInner} /> : null}
                   </View>
                   {i < steps.length - 1 ? <View style={[s.connector, step.state === 'done' && { backgroundColor: theme.accent }]} /> : null}
@@ -208,7 +208,7 @@ export default function ReturnDetailScreen() {
             </Text>
             {actionError ? (
               <View style={s.inlineError} accessibilityRole="alert" testID="return-action-error">
-                <Feather name="alert-circle" size={14} color={theme.text} />
+                <Icon name="alert-circle" size={14} color={theme.text} />
                 <Text style={s.inlineErrorText}>{actionError}</Text>
               </View>
             ) : null}
@@ -312,7 +312,7 @@ export default function ReturnDetailScreen() {
           testID="return-view-order"
         />
         <View style={s.footNote}>
-          <Feather name="info" size={ICON.xs} color={theme.subtle} />
+          <Icon name="info" size={ICON.xs} color={theme.subtle} />
           <Text style={s.footNoteText}>
             {viewer === 'seller'
               ? 'Refunds go back to the buyer’s original payment. Your payout for this order is adjusted automatically.'

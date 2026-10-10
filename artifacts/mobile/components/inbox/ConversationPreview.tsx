@@ -1,12 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 import { FONT, FS } from '@/lib/theme';
 import type { MessageAttachmentType } from '@/services/socialTypes';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 
-const ATTACHMENT_META: Record<MessageAttachmentType, { icon: keyof typeof Feather.glyphMap; label: string }> = {
+const ATTACHMENT_META: Record<MessageAttachmentType, { icon: IconName; label: string }> = {
   image: { icon: 'image', label: 'Photo' },
   video: { icon: 'video', label: 'Video' },
   voice: { icon: 'mic', label: 'Voice message' },
@@ -49,7 +49,7 @@ export function ConversationPreview({ text, attachmentType, isFromMe, color, bol
         {attachmentType === 'thread_cash' ? (
           <ThreadCashBillIcon size={13} style={styles.icon} />
         ) : (
-          <Feather name={meta.icon} size={13} color={color} style={styles.icon} />
+          <Icon name={meta.icon} size={13} color={color} style={styles.icon} />
         )}
         <Text style={[styles.text, { color, fontFamily }]} numberOfLines={1}>{meta.label}{suffix}</Text>
       </View>

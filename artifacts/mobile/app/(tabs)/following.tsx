@@ -11,7 +11,7 @@ import {
   FlatList,
 } from 'react-native';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
@@ -137,7 +137,7 @@ function DropCard({ drop, onPress }: { drop: DropItem; onPress: () => void }) {
           style={[c.shopBtn, { backgroundColor: color }]}
           onPress={() => { onPress(); }}
         >
-          <Feather name="shopping-bag" size={14} color="#FFF" />
+          <Icon name="shopping-bag" size={14} color="#FFF" />
           <Text style={[TYPE_SCALE.callout, c.shopBtnText]}>{live ? 'Shop drop' : 'View drop'}</Text>
         </PressableScale>
       </View>

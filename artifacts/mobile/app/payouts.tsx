@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAgeStatus } from '@/lib/ageGate';
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { haptics } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
@@ -330,9 +330,9 @@ function PayoutsScreenContent() {
             accessibilityLabel={`Payouts paused. ${pausedRowCaption(balance?.recoveryOwedCents ?? 0)}`}
             testID="payouts-paused-row"
           >
-            <Feather name="pause-circle" size={14} color={theme.muted} />
+            <Icon name="pause-circle" size={14} color={theme.muted} />
             <Text style={styles.pausedRowText} numberOfLines={2}>{pausedRowCaption(balance?.recoveryOwedCents ?? 0)}</Text>
-            <Feather name="chevron-right" size={14} color={theme.muted} />
+            <Icon name="chevron-right" size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
       </View>
@@ -407,7 +407,7 @@ function PayoutsScreenContent() {
       ) : (
         <View style={styles.list}>
            <View style={styles.bankCard}>
-             <Feather name="credit-card" size={20} color={theme.accent} />
+             <Icon name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
                 <Text style={styles.bankLabel}>
                   {isPreview
@@ -454,7 +454,7 @@ function PayoutsScreenContent() {
                accessibilityLabel="Open payout setup checklist"
              >
                <Text style={styles.settingsValue}>Payout setup checklist</Text>
-               <Feather name="chevron-right" size={16} color={theme.muted} />
+               <Icon name="chevron-right" size={16} color={theme.muted} />
              </TouchableOpacity>
            )}
 
@@ -467,7 +467,7 @@ function PayoutsScreenContent() {
                accessibilityRole="button"
                accessibilityLabel="Add bank account with Stripe"
              >
-                <Feather name="plus" size={16} color={theme.accent} />
+                <Icon name="plus" size={16} color={theme.accent} />
                 <Text style={styles.addBankText}>
                   {isPreview
                     ? 'Bank setup unavailable'
@@ -488,7 +488,7 @@ function PayoutsScreenContent() {
                  connectStatus.requirementsDue.map((field) => (
                    <View key={field} style={styles.settingsRow}>
                      <Text style={styles.settingsLabel}>{requirementLabel(field)}</Text>
-                     <Feather name="alert-circle" size={14} color={theme.warning} />
+                     <Icon name="alert-circle" size={14} color={theme.warning} />
                    </View>
                  ))
                )}
@@ -500,7 +500,7 @@ function PayoutsScreenContent() {
                    accessibilityRole="button"
                    accessibilityLabel="Finish Stripe verification"
                  >
-                   <Feather name="arrow-right-circle" size={16} color={theme.accent} />
+                   <Icon name="arrow-right-circle" size={16} color={theme.accent} />
                    <Text style={styles.addBankText}>Finish verification</Text>
                  </TouchableOpacity>
                )}
@@ -541,7 +541,7 @@ function PayoutsScreenContent() {
              onPress={() => { router.push('/fees' as never); }}
            >
              <Text style={styles.feesLinkLabel}>Fees &amp; payments</Text>
-             <Feather name="chevron-right" size={18} color={theme.muted} />
+             <Icon name="chevron-right" size={18} color={theme.muted} />
            </TouchableOpacity>
 
            {/* Tax info status */}

@@ -29,7 +29,8 @@ import * as AuthSession from 'expo-auth-session';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { Button } from '@/components/ui/Button';
@@ -442,7 +443,7 @@ export default function SignInScreen() {
 
             {totpError ? (
               <View style={s.errorBox}>
-                <Feather name="alert-circle" size={14} color={theme.error} />
+                <Icon name="alert-circle" size={14} color={theme.error} />
                 <Text style={s.errorText}>{totpError}</Text>
               </View>
             ) : null}
@@ -516,7 +517,7 @@ export default function SignInScreen() {
 
             {codeError ? (
               <View style={s.errorBox}>
-                <Feather name="alert-circle" size={14} color={theme.error} />
+                <Icon name="alert-circle" size={14} color={theme.error} />
                 <Text style={s.errorText}>{codeError}</Text>
               </View>
             ) : null}
@@ -619,7 +620,7 @@ export default function SignInScreen() {
 
             {error ? (
               <View style={s.errorBox}>
-                <Feather name="alert-circle" size={14} color={theme.error} />
+                <Icon name="alert-circle" size={14} color={theme.error} />
                 <Text style={s.errorText}>{error}</Text>
               </View>
             ) : null}
@@ -763,7 +764,7 @@ export default function SignInScreen() {
           {/* ── Error ──────────────────────────────────────────────────────────── */}
           {error ? (
             <View style={s.errorBox}>
-              <Feather name="alert-circle" size={14} color={theme.error} />
+              <Icon name="alert-circle" size={14} color={theme.error} />
               <Text style={s.errorText}>{error}</Text>
             </View>
           ) : null}

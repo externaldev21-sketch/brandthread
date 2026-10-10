@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -46,7 +46,7 @@ export function ReplyBanner({ fromName, previewText, onCancel, theme, testID }: 
         },
       ]}
     >
-      <Feather name="corner-up-left" size={ICON.sm} color={theme.accent} />
+      <Icon name="corner-up-left" size={ICON.sm} color={theme.accent} />
       <View style={{ flex: 1, marginLeft: SP.sm }}>
         <Text style={s.fromName} numberOfLines={1}>Replying to {fromName}</Text>
         <Text style={s.previewText} numberOfLines={1}>{previewText}</Text>

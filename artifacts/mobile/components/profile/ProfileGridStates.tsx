@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { type IconName } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -39,11 +39,11 @@ export function ProfileGridPlaceholder({
   error: boolean;
   onRetry: () => void;
   layout: ProfileLayout;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
   illustration?: ThreadMotif;
   title: string;
   description?: string;
-  action?: { label: string; onPress: () => void; icon?: keyof typeof Feather.glyphMap };
+  action?: { label: string; onPress: () => void; icon?: IconName };
   testID?: string;
   /** Tighter icon/padding — for a screen tight on height above a floating tab bar. */
   compact?: boolean;

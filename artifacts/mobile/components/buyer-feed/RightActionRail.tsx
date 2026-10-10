@@ -18,7 +18,8 @@ import * as Haptics from 'expo-haptics';
  */
 import React from 'react';
 import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform, type StyleProp, type ViewStyle } from 'react-native';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
 import { haptics } from '@/lib/haptics';
@@ -211,7 +212,7 @@ export function RightActionRail({
               onPress={async () => { haptics.light(); await onFollow(); }}
               testID={`follow-btn-${testIdBase}`}
             >
-              <Feather
+              <Icon
                 name={showCheck ? 'check' : 'plus'}
                 size={11}
                 color={showCheck ? ON_DARK : '#000000'}

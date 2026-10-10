@@ -10,7 +10,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
@@ -45,9 +45,9 @@ export function OrderRiskBadge({ risk }: { risk: OrderRisk | null | undefined })
         testID="order-risk-badge"
         style={[styles.pill, { backgroundColor: highest ? WHITE : SILVER }]}
       >
-        <Feather name="shield" size={12} color={BLACK} />
+        <Icon name="shield" size={12} color={BLACK} />
         <Text style={[styles.pillText, { color: BLACK }]}>{label}</Text>
-        <Feather name={open ? 'chevron-up' : 'chevron-down'} size={12} color={BLACK} />
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={12} color={BLACK} />
       </Pressable>
 
       {open && (

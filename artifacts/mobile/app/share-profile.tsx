@@ -19,7 +19,7 @@ import {
   ScrollView, ActivityIndicator, Platform, AccessibilityInfo,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -200,7 +200,7 @@ export default function ShareProfileScreen() {
           </View>
         ) : error ? (
           <View style={styles.centeredState}>
-            <Feather name="wifi-off" size={40} color={theme.muted} />
+            <Icon name="wifi-off" size={40} color={theme.muted} />
             <Text style={styles.errorTitle}>Couldn't load profile</Text>
             <Text style={styles.errorDesc}>Check your connection and try again.</Text>
             <Button label="Retry" variant="secondary" size="small" style={styles.actionBtn} onPress={loadProfile} accessibilityLabel="Retry loading profile" />
@@ -209,7 +209,7 @@ export default function ShareProfileScreen() {
           /* ── No username state ── */
           <View style={styles.centeredState}>
             <View style={styles.noUserIcon}>
-              <Feather name="user-x" size={36} color={theme.muted} />
+              <Icon name="user-x" size={36} color={theme.muted} />
             </View>
             <Text style={styles.noUserTitle}>No username set</Text>
             <Text style={styles.noUserDesc}>
@@ -221,7 +221,7 @@ export default function ShareProfileScreen() {
               accessibilityRole="button"
               accessibilityLabel="Set username in profile settings"
             >
-              <Feather name="edit-3" size={ICON.sm} color={theme.onAccent} />
+              <Icon name="edit-3" size={ICON.sm} color={theme.onAccent} />
               <Text style={[styles.primaryBtnText, { color: theme.onAccent }]}>Set Username</Text>
             </TouchableOpacity>
           </View>
@@ -236,7 +236,7 @@ export default function ShareProfileScreen() {
             >
               {statusMsg ? (
                 <>
-                  <Feather name="check-circle" size={ICON.sm} color={theme.success} />
+                  <Icon name="check-circle" size={ICON.sm} color={theme.success} />
                   <Text style={[styles.statusText, { color: theme.success }]}>{statusMsg}</Text>
                 </>
               ) : null}
@@ -282,7 +282,7 @@ export default function ShareProfileScreen() {
               accessibilityLabel={(copied || autoCopied) ? 'Link copied' : 'Copy profile link'}
               accessibilityHint="Copies the profile URL to your clipboard"
             >
-              <Feather
+              <Icon
                 name={(copied || autoCopied) ? 'check' : 'copy'}
                 size={ICON.sm}
                 color={theme.onAccent}
@@ -301,7 +301,7 @@ export default function ShareProfileScreen() {
               accessibilityLabel="Share profile"
               accessibilityHint="Opens the system share sheet to share your profile link"
             >
-              <Feather name="share-2" size={ICON.sm} color={theme.text} />
+              <Icon name="share-2" size={ICON.sm} color={theme.text} />
               <Text style={styles.shareBtnText}>Share Profile</Text>
             </TouchableOpacity>
 

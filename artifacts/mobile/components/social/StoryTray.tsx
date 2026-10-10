@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -87,12 +87,12 @@ export function StoryRing({
       </View>
       {showPlusBadge && (
         <View style={[styles.plusBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-          <Feather name="plus" size={11} color={theme.onAccent} />
+          <Icon name="plus" size={11} color={theme.onAccent} />
         </View>
       )}
       {closeFriendsOnly && !showPlusBadge && (
         <View style={[styles.closeFriendsBadge, { borderColor: theme.background }]} pointerEvents="none">
-          <Feather name="star" size={9} color="#000000" />
+          <Icon name="star" size={9} color="#000000" />
         </View>
       )}
     </TouchableOpacity>

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Badge } from '@/components/Badge';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -181,7 +181,7 @@ export default function UsersScreen() {
                     activeOpacity={0.8}
                     style={[styles.actionBtn, { backgroundColor: colors.secondary }]}
                   >
-                    <Feather name="shield" size={14} color={colors.foreground} />
+                    <Icon name="shield" size={14} color={colors.foreground} />
                     <Text style={[styles.actionText, { color: colors.foreground }]}>Change Role</Text>
                   </TouchableOpacity>
                 )}
@@ -191,7 +191,7 @@ export default function UsersScreen() {
                   activeOpacity={0.8}
                   style={[styles.actionBtn, { backgroundColor: colors.destructive + '22' }]}
                 >
-                  <Feather name="user-x" size={14} color={colors.destructive} />
+                  <Icon name="user-x" size={14} color={colors.destructive} />
                   <Text style={[styles.actionText, { color: colors.destructive }]}>
                     {member.status === 'pending' ? 'Revoke Invite' : 'Remove'}
                   </Text>
@@ -241,7 +241,7 @@ export default function UsersScreen() {
               activeOpacity={0.7}
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
-              <Feather name="more-horizontal" size={17} color={colors.foreground} />
+              <Icon name="more-horizontal" size={17} color={colors.foreground} />
             </TouchableOpacity>
           </View>
         }
@@ -279,7 +279,7 @@ export default function UsersScreen() {
                     color: m.status === 'active' ? colors.success : colors.mutedForeground,
                   }]}>{m.status === 'active' ? 'Active' : m.status === 'pending' ? 'Invited' : m.status}</Text>
                 </View>
-                <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
             ))
           )}

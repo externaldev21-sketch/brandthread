@@ -7,7 +7,7 @@
  */
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -66,7 +66,7 @@ export function UploadProgressPill({ topInset }: { topInset: number }) {
           <Image source={{ uri: entry.thumbnailUri }} style={styles.thumb} />
         ) : (
           <View style={[styles.thumb, styles.thumbFallback]}>
-            <Feather name="image" size={14} color="#fff" />
+            <Icon name="image" size={14} color="#fff" />
           </View>
         )}
         <View style={styles.textCol}>
@@ -84,9 +84,9 @@ export function UploadProgressPill({ topInset }: { topInset: number }) {
         </View>
         {entry.status === 'success' ? (
           // Success check is always white — no colored accent, monochrome only.
-          <Feather name="check" size={16} color="#fff" />
+          <Icon name="check" size={16} color="#fff" />
         ) : entry.status === 'failed' ? (
-          <Feather name="alert-circle" size={16} color="#fff" />
+          <Icon name="alert-circle" size={16} color="#fff" />
         ) : null}
       </PressableScale>
     </View>

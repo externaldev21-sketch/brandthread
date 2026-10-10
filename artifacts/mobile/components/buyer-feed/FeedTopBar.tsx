@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, ON_DARK } from '@/lib/theme';
@@ -60,7 +60,7 @@ export function FeedTopBar({
         // playing video behind it every frame — same class of glitch as the
         // old shop pill's frosted background (see ShopSideTab).
         <View style={styles.searchRow}>
-          <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
+          <Icon name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
           <TextInput
             style={[styles.searchInput, WEB_INPUT_RESET]}
             value={searchQuery}
@@ -79,7 +79,7 @@ export function FeedTopBar({
             accessibilityRole="button"
             accessibilityLabel="Close search"
           >
-            <Feather name="x" size={18} color={ON_DARK} />
+            <Icon name="x" size={18} color={ON_DARK} />
           </TouchableOpacity>
         </View>
       ) : (
@@ -118,7 +118,7 @@ export function FeedTopBar({
               hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
               testID="buyer-home-friends"
             >
-              <Feather name="users" size={19} color={ON_DARK} />
+              <Icon name="users" size={19} color={ON_DARK} />
             </TouchableOpacity>
           </View>
 
@@ -147,7 +147,7 @@ export function FeedTopBar({
             hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
             testID="buyer-home-search"
           >
-            <Feather name="search" size={20} color={ON_DARK} />
+            <Icon name="search" size={20} color={ON_DARK} />
           </TouchableOpacity>
         </View>
       )}

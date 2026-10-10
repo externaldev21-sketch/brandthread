@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -104,7 +104,7 @@ function CameraCaptureWeb() {
   return (
     <View style={[s.root, s.webFallback, { backgroundColor: colors.background, paddingTop: topPad + 24, paddingBottom: insets.bottom + 24 }]}>
       <View style={[s.webFallbackIcon, { backgroundColor: `${ACCENT}22` }]}>
-        <Feather name="camera-off" size={34} color={ACCENT} />
+        <Icon name="camera-off" size={34} color={ACCENT} />
       </View>
       <Text style={[s.webFallbackTitle, { color: colors.foreground }]}>Camera capture is mobile-only</Text>
       <Text style={[s.webFallbackText, { color: colors.mutedForeground }]}>
@@ -290,7 +290,7 @@ export default function CameraCapture() {
       <View style={[s.root, { backgroundColor: CHROME, paddingTop: insets.top }]}>
         <View style={s.permBox}>
           <View style={s.permIconWrap}>
-            <Feather name="camera-off" size={28} color={MUTED} />
+            <Icon name="camera-off" size={28} color={MUTED} />
           </View>
           <Text style={s.permTitle}>Camera access required</Text>
           <Text style={s.permSub}>Brandthread needs camera and microphone access to record video clips.</Text>
@@ -367,7 +367,7 @@ export default function CameraCapture() {
             }}
             accessibilityLabel="Close camera"
           >
-            <Feather name="x" size={20} color={FG} />
+            <Icon name="x" size={20} color={FG} />
           </TouchableOpacity>
 
           {/* Flash · speed · timer mini row */}
@@ -377,7 +377,7 @@ export default function CameraCapture() {
               onPress={() => setFlash((v) => v === 'off' ? 'on' : 'off')}
               accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'}
             >
-              <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={16} color={flash === 'on' ? '#FBBF24' : FG} />
+              <Icon name={flash === 'off' ? 'zap-off' : 'zap'} size={16} color={flash === 'on' ? '#FBBF24' : FG} />
             </TouchableOpacity>
 
             {captureMode === 'video' ? (
@@ -391,7 +391,7 @@ export default function CameraCapture() {
               onPress={() => setActivePanel((v) => v === 'length' ? null : 'length')}
               accessibilityLabel="Open length and timer options"
             >
-              <Feather name="clock" size={16} color={activePanel === 'length' ? ACCENT : FG} />
+              <Icon name="clock" size={16} color={activePanel === 'length' ? ACCENT : FG} />
             </TouchableOpacity>
           </View>
 
@@ -401,7 +401,7 @@ export default function CameraCapture() {
             onPress={() => void Haptics.selectionAsync()}
             accessibilityLabel="Camera settings"
           >
-            <Feather name="settings" size={19} color={FG} />
+            <Icon name="settings" size={19} color={FG} />
           </TouchableOpacity>
         </View>
 
@@ -418,7 +418,7 @@ export default function CameraCapture() {
           onPress={() => void Haptics.selectionAsync()}
           accessibilityLabel="Add audio"
         >
-          <Feather name="music" size={13} color={FG} />
+          <Icon name="music" size={13} color={FG} />
           <Text style={s.addAudioText}>Add audio</Text>
         </TouchableOpacity>
 
@@ -437,14 +437,14 @@ export default function CameraCapture() {
           onPress={() => setRailExpanded((v) => !v)}
           accessibilityLabel={railExpanded ? 'Collapse tools' : 'Expand tools'}
         >
-          <Feather name={railExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={FG} />
+          <Icon name={railExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={FG} />
         </TouchableOpacity>
 
         {railExpanded ? (
           <>
             {/* Audio — placeholder, no audio-library feature exists yet */}
             <TouchableOpacity style={s.railBtn} onPress={() => void Haptics.selectionAsync()} accessibilityLabel="Audio tools">
-              <Feather name="music" size={19} color={FG} />
+              <Icon name="music" size={19} color={FG} />
               <Text style={s.railLabel}>Audio</Text>
             </TouchableOpacity>
 
@@ -454,13 +454,13 @@ export default function CameraCapture() {
               onPress={() => setActivePanel((v) => v === 'effects' ? null : 'effects')}
               accessibilityLabel="Effects: filters and speed"
             >
-              <Feather name="sliders" size={19} color={activePanel === 'effects' ? ACCENT : FG} />
+              <Icon name="sliders" size={19} color={activePanel === 'effects' ? ACCENT : FG} />
               <Text style={[s.railLabel, activePanel === 'effects' && { color: ACCENT }]}>Effects</Text>
             </TouchableOpacity>
 
             {/* Layout — placeholder, no multi-photo layout feature exists yet */}
             <TouchableOpacity style={s.railBtn} onPress={() => void Haptics.selectionAsync()} accessibilityLabel="Layout">
-              <Feather name="grid" size={19} color={FG} />
+              <Icon name="grid" size={19} color={FG} />
               <Text style={s.railLabel}>Layout</Text>
             </TouchableOpacity>
 
@@ -471,7 +471,7 @@ export default function CameraCapture() {
               accessibilityLabel="Clip length"
               disabled={isRecording}
             >
-              <Feather name="film" size={19} color={activePanel === 'length' ? ACCENT : (isRecording ? MUTED : FG)} />
+              <Icon name="film" size={19} color={activePanel === 'length' ? ACCENT : (isRecording ? MUTED : FG)} />
               <Text style={[s.railLabel, activePanel === 'length' && { color: ACCENT }]}>Length</Text>
             </TouchableOpacity>
 
@@ -481,7 +481,7 @@ export default function CameraCapture() {
               onPress={() => setShowRemaining((v) => !v)}
               accessibilityLabel={showRemaining ? 'Hide remaining time' : 'Show remaining time'}
             >
-              <Feather name="clock" size={19} color={showRemaining ? ACCENT : FG} />
+              <Icon name="clock" size={19} color={showRemaining ? ACCENT : FG} />
               <Text style={[s.railLabel, showRemaining && { color: ACCENT }]}>Timer</Text>
             </TouchableOpacity>
           </>
@@ -546,10 +546,10 @@ export default function CameraCapture() {
         {/* Error banner */}
         {captureError ? (
           <View style={s.errorBanner}>
-            <Feather name="alert-circle" size={14} color={ERROR} />
+            <Icon name="alert-circle" size={14} color={ERROR} />
             <Text style={s.errorText}>{captureError}</Text>
             <TouchableOpacity onPress={() => setCaptureError(null)} accessibilityLabel="Dismiss error">
-              <Feather name="x" size={14} color={ERROR} />
+              <Icon name="x" size={14} color={ERROR} />
             </TouchableOpacity>
           </View>
         ) : null}
@@ -568,7 +568,7 @@ export default function CameraCapture() {
                 accessibilityLabel={`Delete clip ${index + 1}`}
               >
                 <Text style={s.clipChipText}>{index + 1} · {effectiveClipDuration(clip).toFixed(1)}s</Text>
-                <Feather name="trash-2" size={11} color={ERROR} />
+                <Icon name="trash-2" size={11} color={ERROR} />
               </TouchableOpacity>
             ))}
           </View>
@@ -588,9 +588,9 @@ export default function CameraCapture() {
             }}
             accessibilityLabel="Tag product listing"
           >
-            <Feather name="tag" size={14} color={ACCENT} />
+            <Icon name="tag" size={14} color={ACCENT} />
             <Text style={s.tagProductText}>Tag Product Listing</Text>
-            <Feather name="chevron-right" size={14} color={ACCENT} />
+            <Icon name="chevron-right" size={14} color={ACCENT} />
           </TouchableOpacity>
         ) : null}
 
@@ -602,7 +602,7 @@ export default function CameraCapture() {
             onPress={() => setCaptureMode((v) => v === 'video' ? 'picture' : 'video')}
             accessibilityLabel={captureMode === 'video' ? 'Switch to photo' : 'Switch to video'}
           >
-            <Feather
+            <Icon
               name={captureMode === 'video' ? 'camera' : 'video'}
               size={14}
               color={clips.length > 0 ? MUTED : FG}
@@ -620,7 +620,7 @@ export default function CameraCapture() {
             onPress={() => goBackOr(router)}
             accessibilityLabel="Back to gallery"
           >
-            <Feather name="image" size={18} color={FG} />
+            <Icon name="image" size={18} color={FG} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -648,7 +648,7 @@ export default function CameraCapture() {
             onPress={() => setFacing((v) => v === 'back' ? 'front' : 'back')}
             accessibilityLabel="Flip camera"
           >
-            <Feather name="refresh-cw" size={22} color={isRecording ? MUTED : FG} />
+            <Icon name="refresh-cw" size={22} color={isRecording ? MUTED : FG} />
           </TouchableOpacity>
         </View>
 

@@ -20,7 +20,7 @@ import {
   Platform, Pressable, StyleSheet, TextInput, View,
   type NativeSyntheticEvent, type StyleProp, type TextInputKeyPressEventData, type ViewStyle,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Animated, {
   interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming,
 } from 'react-native-reanimated';
@@ -181,7 +181,7 @@ export default function Composer({
             >
               {busy && !onStop
                 ? <InlineSpinner />
-                : <Feather name={busy ? 'square' : 'arrow-up'} size={busy ? 14 : 18} color={theme.onAccent} />}
+                : <Icon name={busy ? 'square' : 'arrow-up'} size={busy ? 14 : 18} color={theme.onAccent} />}
             </Pressable>
           </Animated.View>
         </View>

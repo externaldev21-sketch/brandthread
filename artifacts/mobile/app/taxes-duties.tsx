@@ -4,7 +4,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking } 
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HapticSwitch } from '@/components/BrandthreadUI';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
@@ -180,7 +180,7 @@ export default function TaxesDutiesScreen() {
             </TouchableOpacity>
           </View>
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <Icon name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Managed in Stripe Tax</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -196,7 +196,7 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax-inclusive pricing</Text>
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="tag" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <Icon name="tag" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Prices are tax-exclusive</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -212,7 +212,7 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>International duties</Text>
           <View style={[styles.unavailableCard, { marginTop: 12 }, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <Icon name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>International orders ship DAP</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -228,14 +228,14 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <View style={styles.rowStart}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Registrations and filing</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+            <Icon name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
             Brandthread doesn't determine nexus, register you, or file returns. Review your obligations with a qualified accountant.
           </Text>
 
           <View style={[styles.reportCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="bar-chart-2" size={17} color={colors.foreground} style={styles.rowIcon} />
+            <Icon name="bar-chart-2" size={17} color={colors.foreground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>1099-K preparation</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>

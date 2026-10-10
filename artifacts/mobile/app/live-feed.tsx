@@ -28,7 +28,7 @@ import { getLiveViewerPrefs, setLiveViewerPrefs } from '@/lib/live/liveViewerPre
 import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -304,7 +304,7 @@ export default function LiveFeedScreen() {
               onBrowse={close}
             />
             <Pressable onPress={close} style={[styles.emptyClose, { top: topInset + 8 }]} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads">
-              <Feather name="x" size={22} color="#888" />
+              <Icon name="x" size={22} color="#888" />
             </Pressable>
           </>
         ) : (
@@ -632,7 +632,7 @@ function LiveRoomPage({
         <ExpoImage source={{ uri: room.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.thumbFallback]}>
-          <Feather name="video" size={36} color="rgba(255,255,255,0.4)" />
+          <Icon name="video" size={36} color="rgba(255,255,255,0.4)" />
         </View>
       )}
 
@@ -678,7 +678,7 @@ function LiveRoomPage({
                 <View style={styles.liveBadge}>
                   <Text style={styles.liveBadgeText}>LIVE</Text>
                 </View>
-                <Feather name="eye" size={11} color="rgba(255,255,255,0.85)" />
+                <Icon name="eye" size={11} color="rgba(255,255,255,0.85)" />
                 <Text style={styles.viewerText}>
                   {formatCompactCount(room.viewerCount)}
                 </Text>
@@ -703,7 +703,7 @@ function LiveRoomPage({
             accessibilityRole="button"
             accessibilityLabel="Close live"
           >
-            <Feather name="x" size={22} color="#fff" />
+            <Icon name="x" size={22} color="#fff" />
           </PressableScale>
         </View>
         {room.title.length > 0 && (
@@ -717,7 +717,7 @@ function LiveRoomPage({
           fixed mid-screen offset. */}
       <View style={[styles.rail, { bottom: insetBottom + 56 + (room.productName != null ? 72 : 0) }]}>
         <PressableScale style={styles.railBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share this live">
-          <Feather name="share" size={26} color="#fff" style={styles.railIconShadow} />
+          <Icon name="share" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
         <PressableScale style={styles.railBtn} onPress={() => setThreadCashOpen(true)} accessibilityRole="button" accessibilityLabel="Send Thread Cash">
           {/* ThreadCashBillIcon, not the full <ThreadCashBill/> — below its
@@ -726,7 +726,7 @@ function LiveRoomPage({
           <ThreadCashBillIcon size={26} />
         </PressableScale>
         <PressableScale style={styles.railBtn} onPress={() => setMoreOpen(true)} accessibilityRole="button" accessibilityLabel="More options">
-          <Feather name="more-vertical" size={26} color="#fff" style={styles.railIconShadow} />
+          <Icon name="more-vertical" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
       </View>
 

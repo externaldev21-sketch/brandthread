@@ -4,7 +4,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { haptics } from '@/lib/haptics';
@@ -284,7 +284,7 @@ export default function TeamScreen() {
           >
             {isRegenerating
               ? <ActivityIndicator size="small" color={colors.primary} />
-              : <Feather name={isExpired ? 'refresh-cw' : 'link'} size={13} color={isExpired ? colors.warning : colors.mutedForeground} />}
+              : <Icon name={isExpired ? 'refresh-cw' : 'link'} size={13} color={isExpired ? colors.warning : colors.mutedForeground} />}
           </TouchableOpacity>
         )}
         {isExpired && currentRole === 'owner' && (
@@ -297,7 +297,7 @@ export default function TeamScreen() {
           >
             {isDismissing
               ? <ActivityIndicator size="small" color={colors.destructive} />
-              : <Feather name="x" size={14} color={colors.destructive} />}
+              : <Icon name="x" size={14} color={colors.destructive} />}
           </TouchableOpacity>
         )}
         <Badge
@@ -322,7 +322,7 @@ export default function TeamScreen() {
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Staff accounts</Text>
         <TouchableOpacity onPress={openInvite} style={[styles.addBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8} hitSlop={INVITE_HIT_SLOP} accessibilityRole="button" accessibilityLabel="Invite staff member">
-          <Feather name="user-plus" size={14} color={colors.primaryForeground} />
+          <Icon name="user-plus" size={14} color={colors.primaryForeground} />
           <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>Invite</Text>
         </TouchableOpacity>
       </View>
@@ -333,7 +333,7 @@ export default function TeamScreen() {
         ) : loadError ? (
           <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
             <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-              <Feather name="alert-triangle" size={22} color={colors.mutedForeground} />
+              <Icon name="alert-triangle" size={22} color={colors.mutedForeground} />
             </View>
             <Text style={{ color: colors.foreground, fontSize: 15, fontFamily: FONT.semibold, textAlign: 'center' }}>Couldn't load your team</Text>
             <TouchableOpacity
@@ -349,7 +349,7 @@ export default function TeamScreen() {
         ) : currentMembers.length === 0 ? (
           <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
             <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-              <Feather name="user-plus" size={22} color={colors.mutedForeground} />
+              <Icon name="user-plus" size={22} color={colors.mutedForeground} />
             </View>
             <Text style={{ color: colors.foreground, fontSize: 15, fontFamily: FONT.semibold, textAlign: 'center' }}>No team members yet</Text>
             <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: 'center' }}>Invite someone to help you run your store.</Text>
@@ -377,12 +377,12 @@ export default function TeamScreen() {
             accessibilityLabel={`${showExpired ? 'Hide' : 'Show'} ${expiredInvites.length} expired invite${expiredInvites.length === 1 ? '' : 's'}`}
           >
             <View style={styles.expiredTitleRow}>
-              <Feather name="clock" size={15} color={colors.warning} />
+              <Icon name="clock" size={15} color={colors.warning} />
               <Text style={[styles.expiredTitle, { color: colors.foreground }]}>
                 Expired invites ({expiredInvites.length})
               </Text>
             </View>
-            <Feather name={showExpired ? 'chevron-up' : 'chevron-down'} size={17} color={colors.mutedForeground} />
+            <Icon name={showExpired ? 'chevron-up' : 'chevron-down'} size={17} color={colors.mutedForeground} />
           </TouchableOpacity>
           {showExpired && expiredInvites.map((member, index) => renderMemberRow(member, currentMembers.length + index))}
         </View>
@@ -499,7 +499,7 @@ export default function TeamScreen() {
           ) : (
             <>
               <View style={[styles.successIcon, { backgroundColor: colors.success + '22' }]}>
-                <Feather name="check" size={22} color={colors.success} />
+                <Icon name="check" size={22} color={colors.success} />
               </View>
               <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: 'center' }]}>Invite created</Text>
               <Text style={[styles.modalSub, { color: colors.mutedForeground, textAlign: 'center' }]}>
@@ -516,7 +516,7 @@ export default function TeamScreen() {
                   activeOpacity={0.8}
                   style={[styles.addBtn, { backgroundColor: colors.secondary }]}
                 >
-                  <Feather name="share-2" size={14} color={colors.foreground} />
+                  <Icon name="share-2" size={14} color={colors.foreground} />
                   <Text style={[styles.addBtnText, { color: colors.foreground }]}>Share</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -524,7 +524,7 @@ export default function TeamScreen() {
                   activeOpacity={0.8}
                   style={[styles.addBtn, { backgroundColor: colors.secondary }]}
                 >
-                  <Feather name="copy" size={14} color={colors.foreground} />
+                  <Icon name="copy" size={14} color={colors.foreground} />
                   <Text style={[styles.addBtnText, { color: colors.foreground }]}>Copy link</Text>
                 </TouchableOpacity>
                 <View style={{ flex: 1 }} />

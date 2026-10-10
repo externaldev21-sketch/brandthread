@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
@@ -97,7 +97,7 @@ export default function ForgotPasswordScreen() {
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-               <Feather name="arrow-left" size={20} color={theme.muted} />
+               <Icon name="arrow-left" size={20} color={theme.muted} />
             </TouchableOpacity>
           )}
 
@@ -132,7 +132,7 @@ export default function ForgotPasswordScreen() {
 
               {error ? (
                 <View style={s.errorBox}>
-                   <Feather name="alert-circle" size={14} color={theme.error} />
+                   <Icon name="alert-circle" size={14} color={theme.error} />
                   <Text style={s.errorText}>{error}</Text>
                 </View>
               ) : null}
@@ -200,7 +200,7 @@ export default function ForgotPasswordScreen() {
                     autoComplete="new-password"
                   />
                   <TouchableOpacity accessibilityLabel={showPw ? 'Hide password' : 'Show password'} accessibilityRole="button" style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
-                     <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
+                     <Icon name={showPw ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
                   </TouchableOpacity>
                 </View>
                 {password.length > 0 && password.length < 8 && (
@@ -210,7 +210,7 @@ export default function ForgotPasswordScreen() {
 
               {error ? (
                 <View style={s.errorBox}>
-                   <Feather name="alert-circle" size={14} color={theme.error} />
+                   <Icon name="alert-circle" size={14} color={theme.error} />
                   <Text style={s.errorText}>{error}</Text>
                 </View>
               ) : null}
@@ -263,7 +263,7 @@ export default function ForgotPasswordScreen() {
                       end={{ x: 1, y: 1 }}
                       style={s.successIconGrad}
                     >
-                       <Feather name="check" size={28} color={theme.onAccent} />
+                       <Icon name="check" size={28} color={theme.onAccent} />
                     </LinearGradient>
                   </View>
                   <Text style={s.successTitle}>Password updated.</Text>

@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert, useWindowDimensions } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -128,7 +128,7 @@ export default function BuyerHighlightStories() {
           : <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.cardElevated }]} />}
         <Text style={s.date}>{dayLabel(item.createdAt)}</Text>
         <View style={[s.check, on && s.checkOn]}>
-          {on ? <Feather name="check" size={14} color={theme.background} /> : null}
+          {on ? <Icon name="check" size={14} color={theme.background} /> : null}
         </View>
       </Pressable>
     );

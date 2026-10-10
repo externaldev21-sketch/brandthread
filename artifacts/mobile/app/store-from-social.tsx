@@ -8,7 +8,7 @@ import {
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, CARD, SURFACE,
@@ -220,13 +220,13 @@ export default function StoreFromSocialScreen() {
                 <View key={uri + idx} style={ss.gridWrap}>
                   <Image source={{ uri }} style={ss.gridImg} resizeMode="cover" />
                   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove screenshot" style={ss.removeBtn} onPress={() => removeScreenshot(idx)}>
-                    <Feather name="x" size={10} color={FG} />
+                    <Icon name="x" size={10} color={FG} />
                   </TouchableOpacity>
                 </View>
               ))}
               {screenshots.length < 12 && (
                 <TouchableOpacity style={ss.addTile} onPress={addScreenshots} activeOpacity={0.7}>
-                  <Feather name="plus" size={ICON.md} color={PURPLE_LIGHT} />
+                  <Icon name="plus" size={ICON.md} color={PURPLE_LIGHT} />
                   <Text style={ss.addTileLabel}>Add</Text>
                 </TouchableOpacity>
               )}
@@ -234,7 +234,7 @@ export default function StoreFromSocialScreen() {
             {analysisFailure && (
               <BrandthreadCard style={[ss.card, ss.importFailureCard]}>
                 <View style={ss.bannerRow}>
-                  <Feather name="image" size={ICON.sm} color={PURPLE_LIGHT} />
+                  <Icon name="image" size={ICON.sm} color={PURPLE_LIGHT} />
                   <View style={ss.failureCopy}>
                     <Text style={ss.failureTitle}>Images too large</Text>
                     <Text style={ss.failureText}>{analysisFailure.message}</Text>
@@ -247,7 +247,7 @@ export default function StoreFromSocialScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Retry analyzing these screenshots"
                 >
-                  <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+                  <Icon name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
                   <Text style={ss.retryText}>Retry analysis</Text>
                 </TouchableOpacity>
               </BrandthreadCard>
@@ -282,7 +282,7 @@ export default function StoreFromSocialScreen() {
                   return (
                     <TouchableOpacity key={post.id} style={[ss.postRow, selected && ss.postRowSelected]} onPress={() => togglePost(post.id)}>
                       <View style={[ss.postCheck, selected && ss.postCheckActive]}>
-                        {selected && <Feather name="check" size={12} color={theme.onAccent} />}
+                        {selected && <Icon name="check" size={12} color={theme.onAccent} />}
                       </View>
                       <View style={ss.postMeta}>
                         <Text style={ss.postTitle}>{post.title}</Text>

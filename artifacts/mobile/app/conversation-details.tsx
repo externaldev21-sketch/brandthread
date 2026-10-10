@@ -17,7 +17,7 @@ import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Modal } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -438,12 +438,12 @@ export default function ConversationDetailsScreen() {
 
 function ActionButton({
   icon, label, theme, onPress, testID,
-}: { icon: keyof typeof Feather.glyphMap; label: string; theme: AppThemePreset; onPress: () => void; testID?: string }) {
+}: { icon: IconName; label: string; theme: AppThemePreset; onPress: () => void; testID?: string }) {
   const s = makeStyles(theme);
   return (
     <PressableScale rippleEnabled={false} style={s.actionBtn} onPress={onPress} testID={testID} accessibilityRole="button" accessibilityLabel={label}>
       <View style={[s.actionIconWrap, { backgroundColor: theme.cardElevated }]}>
-        <Feather name={icon} size={ICON.md} color={theme.text} />
+        <Icon name={icon} size={ICON.md} color={theme.text} />
       </View>
       <Text style={[s.actionLabel, { color: theme.muted }]}>{label}</Text>
     </PressableScale>
@@ -453,13 +453,13 @@ function ActionButton({
 function ListRow({
   icon, theme, title, subtitle, pill, right, onPress, last, testID,
 }: {
-  icon: keyof typeof Feather.glyphMap; theme: AppThemePreset; title: string; subtitle?: string;
+  icon: IconName; theme: AppThemePreset; title: string; subtitle?: string;
   pill?: string; right?: React.ReactNode; onPress?: () => void; last?: boolean; testID?: string;
 }) {
   const s = makeStyles(theme);
   const content = (
     <View style={[s.row, !last && { borderBottomWidth: StyleSheetHairline, borderBottomColor: theme.border }]}>
-      <Feather name={icon} size={ICON.md} color={theme.text} style={{ width: 28 }} />
+      <Icon name={icon} size={ICON.md} color={theme.text} style={{ width: 28 }} />
       <View style={{ flex: 1 }}>
         <Text style={[s.rowTitle, { color: theme.text }]}>{title}</Text>
         {!!subtitle && <Text style={[s.rowSubtitle, { color: theme.muted }]}>{subtitle}</Text>}
@@ -469,7 +469,7 @@ function ListRow({
           <Text style={[s.pillText, { color: theme.onAccent }]}>{pill}</Text>
         </View>
       )}
-      {right ?? (onPress && <Feather name="chevron-right" size={ICON.sm} color={theme.subtle} />)}
+      {right ?? (onPress && <Icon name="chevron-right" size={ICON.sm} color={theme.subtle} />)}
     </View>
   );
   if (!onPress) return content;

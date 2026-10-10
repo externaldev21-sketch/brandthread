@@ -23,13 +23,13 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder, ScrollView, Share,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import {
   BG, SURFACE, CARD_ELEVATED, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrushDef, groupBrushesByCategory } from '@/lib/brushLibraryModel';
 
-const CATEGORY_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
+const CATEGORY_ICONS: Record<string, IconName> = {
   Sketching: 'edit-3',
   Inking: 'feather',
   Painting: 'droplet',
@@ -81,7 +81,7 @@ export default function BrushLibrary(props: BrushLibraryProps) {
               onPress={() => { setSelectedCategory(g.category); setOpenSwipeId(null); }}
               testID={`brush-category-${g.category}`}
             >
-              <Feather
+              <Icon
                 name={CATEGORY_ICONS[g.category] ?? 'edit-3'}
                 size={ICON.sm}
                 color={selectedCategory === g.category ? FG : SUBTLE}
@@ -201,10 +201,10 @@ function BrushRow(props: BrushRowProps) {
     <View style={s.rowWrap} testID={`brush-row-${brush.id}`}>
       <View style={s.swipeActions} pointerEvents={isSwipeOpen ? 'auto' : 'none'}>
         <TouchableOpacity style={s.swipeBtn} onPress={onShare} testID={`brush-share-${brush.id}`} accessibilityLabel={`Share ${brush.name}`}>
-          <Feather name="share" size={ICON.sm} color={FG} />
+          <Icon name="share" size={ICON.sm} color={FG} />
         </TouchableOpacity>
         <TouchableOpacity style={s.swipeBtn} onPress={onDuplicate} testID={`brush-duplicate-${brush.id}`} accessibilityLabel={`Duplicate ${brush.name}`}>
-          <Feather name="copy" size={ICON.sm} color={FG} />
+          <Icon name="copy" size={ICON.sm} color={FG} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.swipeBtn, s.swipeBtnDelete, !canDelete && s.swipeBtnDisabled]}
@@ -212,7 +212,7 @@ function BrushRow(props: BrushRowProps) {
           testID={`brush-delete-${brush.id}`}
           accessibilityLabel={`Delete ${brush.name}`}
         >
-          <Feather name="trash-2" size={ICON.sm} color={FG} />
+          <Icon name="trash-2" size={ICON.sm} color={FG} />
         </TouchableOpacity>
       </View>
 

@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { formatCalendarDate } from '@/lib/calendarDate';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,7 +41,7 @@ function StarRow({ rating, count, styles, theme }: { rating: number; count?: num
   return (
     <View style={styles.starRow}>
       {[1, 2, 3, 4, 5].map(i => (
-        <Feather
+        <Icon
           key={i}
           name="star"
           size={ICON.xs}
@@ -65,7 +65,7 @@ function AccordionSection({ title, children, styles, theme }: { title: string; c
         activeOpacity={0.7}
       >
         <Text style={styles.accordionTitle}>{title}</Text>
-        <Feather name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={theme.muted} />
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={theme.muted} />
       </TouchableOpacity>
       {open && <View style={styles.accordionBody}>{children}</View>}
       <View style={styles.accordionDivider} />
@@ -367,7 +367,7 @@ export default function ProductStoreScreen() {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Feather name="image" size={ICON.xxl} color={SUBTLE} />
+              <Icon name="image" size={ICON.xxl} color={SUBTLE} />
               <Text style={s.galleryPlaceholderText}>{product.category}</Text>
             </LinearGradient>
           )}
@@ -402,7 +402,7 @@ export default function ProductStoreScreen() {
               <View style={s.sellerInfo}>
                 <View style={s.sellerNameRow}>
                   <Text style={s.sellerName}>{sellerName}</Text>
-                  {sellerVerified && <Feather name="check-circle" size={ICON.xs} color={BLUE} />}
+                  {sellerVerified && <Icon name="check-circle" size={ICON.xs} color={BLUE} />}
                 </View>
                 {sellerVerified && <Text style={s.sellerSub}>Verified Brand</Text>}
               </View>
@@ -416,7 +416,7 @@ export default function ProductStoreScreen() {
                 style={s.followBtn}
               />
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Message seller" style={s.msgIconBtn} onPress={handleMessageSeller} activeOpacity={0.75}>
-                <Feather name="mail" size={ICON.sm} color={ACCENT_LIGHT} />
+                <Icon name="mail" size={ICON.sm} color={ACCENT_LIGHT} />
               </TouchableOpacity>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="More options"
                 style={s.msgIconBtn}
@@ -431,7 +431,7 @@ export default function ProductStoreScreen() {
                 )}
                 activeOpacity={0.75}
               >
-                <Feather name="more-horizontal" size={ICON.sm} color={MUTED} />
+                <Icon name="more-horizontal" size={ICON.sm} color={MUTED} />
               </TouchableOpacity>
             </View>
           );
@@ -513,7 +513,7 @@ export default function ProductStoreScreen() {
               </View>
               {preorder.closeDate && (
                 <View style={s.preorderRow}>
-                  <Feather name="calendar" size={ICON.xs} color={MUTED} />
+                  <Icon name="calendar" size={ICON.xs} color={MUTED} />
                   <Text style={s.preorderLabel}>Order closes:</Text>
                   <Text style={s.preorderValue}>
                     {new Date(preorder.closeDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -522,7 +522,7 @@ export default function ProductStoreScreen() {
               )}
               {preorder.estimatedShippingDate && (
                 <View style={s.preorderRow}>
-                  <Feather name="truck" size={ICON.xs} color={MUTED} />
+                  <Icon name="truck" size={ICON.xs} color={MUTED} />
                   <Text style={s.preorderLabel}>Est. shipping:</Text>
                   <Text style={s.preorderValue}>
                     {formatCalendarDate(preorder.estimatedShippingDate)}
@@ -599,7 +599,7 @@ export default function ProductStoreScreen() {
                   onPress={() => router.push(('/product-store?id=' + rpId) as never)}
                 >
                   <View style={[s.relatedThumb, { backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Feather name="image" size={ICON.lg} color={SUBTLE} />
+                    <Icon name="image" size={ICON.lg} color={SUBTLE} />
                   </View>
                   <Text style={s.relatedName} numberOfLines={1}>View product</Text>
                 </TouchableOpacity>
@@ -617,13 +617,13 @@ export default function ProductStoreScreen() {
               onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)}
             >
               <View style={s.sellerProfileIcon}>
-                <Feather name="user" size={ICON.md} color={ACCENT_LIGHT} />
+                <Icon name="user" size={ICON.md} color={ACCENT_LIGHT} />
               </View>
               <View style={s.sellerProfileInfo}>
                 <Text style={s.sellerProfileLabel}>Shop {product.vendor}</Text>
                 <Text style={s.sellerProfileDesc}>View full collection</Text>
               </View>
-              <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+              <Icon name="chevron-right" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
           </View>
         ) : null}
@@ -649,7 +649,7 @@ export default function ProductStoreScreen() {
             end={{ x: 1, y: 0 }}
             style={s.stickyBtnGrad}
           >
-            <Feather name="shopping-bag" size={ICON.sm} color={theme.onAccent} />
+            <Icon name="shopping-bag" size={ICON.sm} color={theme.onAccent} />
             <Text style={[s.stickyBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Add to cart</Text>
           </LinearGradient>
         </TouchableOpacity>

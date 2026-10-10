@@ -10,7 +10,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { haptics } from '@/lib/haptics';
@@ -99,7 +99,7 @@ export default function BuyerProblemReportScreen() {
   if (submitted) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-        <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
+        <View style={s.successIcon}><Icon name="check" size={32} color={ON_DARK} /></View>
         <Text style={s.successTitle}>Report submitted</Text>
         <Text style={s.successSub}>Your problem report has been received. Our team will review it and reach out if needed.</Text>
         <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
@@ -126,7 +126,7 @@ export default function BuyerProblemReportScreen() {
                 onPress={() => { haptics.selection(); setProblemType(opt.key); }}
                 activeOpacity={0.8}
               >
-                <Feather name={opt.icon as any} size={20} color={problemType === opt.key ? PURPLE_LIGHT : MUTED} />
+                <Icon name={opt.icon as any} size={20} color={problemType === opt.key ? PURPLE_LIGHT : MUTED} />
                 <Text style={[s.typeLabel, problemType === opt.key && { color: FG }]}>{opt.label}</Text>
               </TouchableOpacity>
             ))}
@@ -155,7 +155,7 @@ export default function BuyerProblemReportScreen() {
           onPress={pickEvidence}
           activeOpacity={0.8}
         >
-          <Feather name="camera" size={16} color={PURPLE_LIGHT} />
+          <Icon name="camera" size={16} color={PURPLE_LIGHT} />
           <Text style={[s.evidenceNoteText, { color: PURPLE_LIGHT }]}>
             Add photo evidence ({evidencePhotos.length}/5)
           </Text>
@@ -170,7 +170,7 @@ export default function BuyerProblemReportScreen() {
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
                   >
-                    <Feather name="x" size={10} color="#fff" />
+                    <Icon name="x" size={10} color="#fff" />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -197,7 +197,7 @@ export default function BuyerProblemReportScreen() {
                 onPress={() => router.push(('/buyer-conversation?participantId=' + order?.sellerId + '&type=buyer_to_seller_order') as never)}
                 activeOpacity={0.8}
               >
-                <Feather name="message-circle" size={14} color={PURPLE_LIGHT} />
+                <Icon name="message-circle" size={14} color={PURPLE_LIGHT} />
                 <Text style={s.contactBtnText}>Message seller first</Text>
               </TouchableOpacity>
             )}
@@ -206,7 +206,7 @@ export default function BuyerProblemReportScreen() {
 
         {/* Dispute note */}
         <View style={s.disputeNote}>
-          <Feather name="info" size={13} color={MUTED} />
+          <Icon name="info" size={13} color={MUTED} />
           <Text style={s.disputeNoteText}>
             If the seller doesn't resolve your issue, your report may escalate to a dispute. We will contact you if further information is needed.
           </Text>

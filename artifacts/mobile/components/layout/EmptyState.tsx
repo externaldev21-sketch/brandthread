@@ -2,6 +2,7 @@ import { radius as ControlRadius } from '@/constants/radii';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { type IconName } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
@@ -43,7 +44,7 @@ export function EmptyState({
    *  secondary next step; default keeps the original 44pt pill. */
   actionSize = 'default',
 }: {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   title?: string;
   /** Omit for a title-only empty state (no filler sentence). */
   message?: string;

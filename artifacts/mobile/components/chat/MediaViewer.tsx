@@ -3,7 +3,7 @@ import {
   Alert, Animated, Modal, PanResponder, Platform, Share, StyleSheet,
   Text, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
 import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -124,14 +124,14 @@ export default function MediaViewer({
       <Animated.View style={[s.backdrop, { opacity: backdropOpacity }]}>
         <View style={[s.topBar, { paddingTop: headerTopInset + 12 }]}>
           <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" style={s.iconBtn} onPress={handleClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Feather name="x" size={22} color="#fff" />
+            <Icon name="x" size={22} color="#fff" />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity accessibilityLabel="Share" accessibilityRole="button" style={s.iconBtn} onPress={handleShare} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Feather name="share" size={20} color="#fff" />
+              <Icon name="share" size={20} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity accessibilityLabel="Save to device" accessibilityRole="button" style={s.iconBtn} onPress={handleSave} disabled={isSaving} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Feather name="download" size={20} color="#fff" />
+              <Icon name="download" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>

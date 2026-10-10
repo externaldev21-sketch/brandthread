@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
@@ -68,7 +68,7 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
         />
       ) : (
         <View style={styles.permissionState}>
-          <Feather name="camera-off" size={40} color="#FFFFFF" />
+          <Icon name="camera-off" size={40} color="#FFFFFF" />
           <Text style={styles.permissionTitle}>Camera unavailable</Text>
           <Text style={styles.permissionBody}>
             {Platform.OS === 'web'
@@ -106,7 +106,7 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
           accessibilityLabel="Back"
           testID="qr-scanner-back"
         >
-          <Feather name="chevron-left" size={ICON.lg} color="#FFFFFF" />
+          <Icon name="chevron-left" size={ICON.lg} color="#FFFFFF" />
         </Pressable>
         <Pressable
           onPress={onClose}
@@ -114,7 +114,7 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
           accessibilityRole="button"
           accessibilityLabel="Close scanner"
         >
-          <Feather name="x" size={ICON.md} color="#FFFFFF" />
+          <Icon name="x" size={ICON.md} color="#FFFFFF" />
         </Pressable>
       </View>
 

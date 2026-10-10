@@ -8,7 +8,7 @@ import { MEDIA } from '@/lib/theme';
  */
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, ON_DARK, SP } from '@/lib/theme';
 import { withAt, type MentionStyle } from '@/lib/storyMentionSticker';
 import { RESHARE_CARD_RADIUS } from '@/lib/storyReshare';
@@ -40,7 +40,7 @@ export function ReshareCard({
     <View style={[styles.card, { borderRadius: radius }]}>
       {unavailable || !imageUri ? (
         <View style={styles.cardUnavailable}>
-          <Feather name="slash" size={28} color="rgba(255,255,255,0.7)" />
+          <Icon name="slash" size={28} color="rgba(255,255,255,0.7)" />
           <Text style={styles.cardUnavailableText}>Story unavailable</Text>
         </View>
       ) : (

@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
@@ -112,7 +112,7 @@ export function PostPicker({ modes, mode, onChangeMode, onClose, onNext, onOpenC
           accessibilityLabel={item.kind === 'camera' ? 'Camera' : 'Browse files'}
           testID={item.kind === 'camera' ? 'picker-camera' : 'picker-browse'}
         >
-          <Feather name={item.kind === 'camera' ? 'camera' : 'plus'} size={24} color={CP.white} />
+          <Icon name={item.kind === 'camera' ? 'camera' : 'plus'} size={24} color={CP.white} />
         </Pressable>
       );
     }
@@ -166,10 +166,10 @@ export function PostPicker({ modes, mode, onChangeMode, onClose, onNext, onOpenC
       <View style={s.recentsRow}>
         <Pressable onPress={() => { tap(); setAlbumPage(true); }} style={s.recents} accessibilityRole="button" accessibilityLabel="Choose album" testID="picker-album">
           <Text style={s.recentsText}>{media.isWeb ? 'Files' : media.album.title}</Text>
-          {!media.isWeb ? <Feather name="chevron-down" size={18} color={CP.white} /> : null}
+          {!media.isWeb ? <Icon name="chevron-down" size={18} color={CP.white} /> : null}
         </Pressable>
         <Pressable onPress={toggleMulti} style={[s.chip, multi && { backgroundColor: CP.white }]} accessibilityRole="button" accessibilityState={{ selected: multi }} accessibilityLabel="Select multiple" testID="picker-multi">
-          <Feather name="copy" size={18} color={multi ? CP.black : CP.white} />
+          <Icon name="copy" size={18} color={multi ? CP.black : CP.white} />
         </Pressable>
       </View>
       {message ? <Text style={s.message} testID="picker-message" accessibilityLiveRegion="polite">{message}</Text> : null}
@@ -203,7 +203,7 @@ export function PostPicker({ modes, mode, onChangeMode, onClose, onNext, onOpenC
           {media.albums.map((a) => (
             <Pressable key={a.id ?? 'recents'} style={s.albumRow} onPress={() => { tap(); media.selectAlbum(a); setAlbumPage(false); }} accessibilityRole="button">
               <Text style={s.albumTitle}>{a.title}</Text>
-              {a.id === media.album.id ? <Feather name="check" size={20} color={CP.white} /> : null}
+              {a.id === media.album.id ? <Icon name="check" size={20} color={CP.white} /> : null}
             </Pressable>
           ))}
         </SubPage>

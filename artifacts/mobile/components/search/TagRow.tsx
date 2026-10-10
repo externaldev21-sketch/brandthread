@@ -1,6 +1,6 @@
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -30,7 +30,7 @@ export function TagRow({ tag, onPress }: { tag: SearchTag; onPress: () => void }
     >
       <Animated.View style={[styles.rowInner, { transform: [{ scale }] }]}>
         <View style={[styles.avatar, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Feather name="hash" size={18} color={theme.muted} />
+          <Icon name="hash" size={18} color={theme.muted} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>#{tag.tag}</Text>

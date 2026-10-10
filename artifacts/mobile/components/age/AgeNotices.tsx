@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
@@ -97,7 +97,7 @@ export function AgeRestrictedInline({ testID = 'age-restricted-inline' }: { test
   const colors = useColors();
   return (
     <View testID={testID} style={[styles.inline, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <Feather name="lock" size={16} color={colors.foreground} />
+      <Icon name="lock" size={16} color={colors.foreground} />
       <Text style={[styles.inlineText, { color: colors.foreground }]}>{AGE_RESTRICTED_COPY}</Text>
     </View>
   );

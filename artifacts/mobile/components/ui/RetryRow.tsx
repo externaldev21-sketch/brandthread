@@ -16,7 +16,7 @@
  */
 import React from 'react';
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FONT } from '@/lib/theme';
@@ -42,7 +42,7 @@ export function RetryRow({ label = "Couldn't load", onRetry, style, testID }: Re
       testID={testID}
       noMinHeight
     >
-      <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
+      <Icon name="refresh-cw" size={14} color={colors.mutedForeground} />
       <Text style={[TYPE_SCALE.footnote, styles.text, { color: colors.mutedForeground }]} numberOfLines={1}>
         {label} — Tap to retry
       </Text>

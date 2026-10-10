@@ -21,7 +21,7 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { BG, FG, MUTED, BORDER, CARD, FONT, FS, SP, ICON, GRAD_DARK_FADE } from '@/lib/theme';
 import { radius } from '@/constants/radii';
@@ -31,7 +31,7 @@ const PRIMARY_HEIGHT = 52;
 interface AiPrimaryButtonProps {
   label: string;
   onPress: () => void;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
   disabled?: boolean;
   loading?: boolean;
   /** Small trailing detail, e.g. a credit/cost readout ("· 2 credits"). */
@@ -60,7 +60,7 @@ export function AiPrimaryButton({
         <ActivityIndicator size="small" color={BG} />
       ) : (
         <>
-          {icon && <Feather name={icon} size={ICON.md} color={inactive ? MUTED : BG} />}
+          {icon && <Icon name={icon} size={ICON.md} color={inactive ? MUTED : BG} />}
           <Text style={[pS.label, inactive && pS.labelDisabled]}>{label}</Text>
           {detail ? <Text style={[pS.detail, inactive && pS.labelDisabled]}>{detail}</Text> : null}
         </>
@@ -88,7 +88,7 @@ export function AiButtonDock({ children, bottomInset, style }: {
 interface AiSecondaryButtonProps {
   label: string;
   onPress: () => void;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
   disabled?: boolean;
   loading?: boolean;
   variant?: 'plain' | 'outline';
@@ -114,7 +114,7 @@ export function AiSecondaryButton({
         <ActivityIndicator size="small" color={FG} />
       ) : (
         <>
-          {icon && <Feather name={icon} size={ICON.sm} color={inactive ? MUTED : FG} />}
+          {icon && <Icon name={icon} size={ICON.sm} color={inactive ? MUTED : FG} />}
           <Text style={[sS.label, inactive && sS.labelDisabled]}>{label}</Text>
         </>
       )}

@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList,
   ActivityIndicator, Alert, Image, Linking, } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -135,7 +135,7 @@ export default function ShopifyImportScreen() {
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
           <BrandthreadCard style={styles.hero}>
             <View style={[styles.heroIcon, { backgroundColor: colors.muted }]}>
-              <Feather name="shopping-bag" size={22} color={colors.foreground} />
+              <Icon name="shopping-bag" size={22} color={colors.foreground} />
             </View>
             <Text style={[styles.heroTitle, { color: colors.foreground }]}>Bring your Shopify catalog over</Text>
             <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
@@ -213,7 +213,7 @@ export default function ShopifyImportScreen() {
                     <Image source={{ uri: item.image }} style={styles.productImage} />
                   ) : (
                     <View style={[styles.productImage, { backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Feather name="image" size={16} color={colors.mutedForeground} />
+                      <Icon name="image" size={16} color={colors.mutedForeground} />
                     </View>
                   )}
                   <View style={{ flex: 1 }}>
@@ -223,7 +223,7 @@ export default function ShopifyImportScreen() {
                     </Text>
                   </View>
                   {!item.alreadyImported && (
-                    <Feather
+                    <Icon
                       name={selected.has(item.shopifyProductId) ? 'check-square' : 'square'}
                       size={20}
                       color={selected.has(item.shopifyProductId) ? colors.primary : colors.mutedForeground}

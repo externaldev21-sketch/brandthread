@@ -39,7 +39,7 @@ describe('Shop trigger — pill in the caption stack, no count badge, no blur/sh
 
   it('shows the real product thumbnail when available, falling back to a bag icon', () => {
     expect(shopTab).toContain('tag.imageUri ? (');
-    expect(shopTab).toContain('<Feather name="shopping-bag"');
+    expect(shopTab).toContain('<Icon name="shopping-bag"');
   });
 });
 
@@ -61,7 +61,7 @@ describe('Expanded pill tap target — whole strip opens the sheet, no stray cli
     // TouchableOpacity above.
     expect(shopTab).not.toMatch(/<Text style=\{styles\.name\}[^>]*onPress/);
     expect(shopTab).not.toMatch(/<View style=\{styles\.thumb\}[^>]*onPress/);
-    expect(shopTab).toContain('<Feather name="chevron-right" size={12} color={ON_DARK} pointerEvents="none" />');
+    expect(shopTab).toContain('<Icon name="chevron-right" size={12} color={ON_DARK} pointerEvents="none" />');
   });
 
   it('never reads or writes the clipboard — no legitimate reason for a copy action on this pill', () => {

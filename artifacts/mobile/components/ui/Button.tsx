@@ -21,7 +21,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { haptics } from '@/lib/haptics';
-import { COMP, FONT, RED } from '@/lib/theme';
+import { COMP, FILL_ELEVATED, FONT, RED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';

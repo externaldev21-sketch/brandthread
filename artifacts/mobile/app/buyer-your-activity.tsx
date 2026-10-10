@@ -4,7 +4,7 @@
  */
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -109,7 +109,7 @@ export default function BuyerYourActivity() {
             <View style={s.statsGrid}>
               {activityItems.map(item => (
                 <Card key={item.label} style={s.statCard}>
-                  <Feather name={item.icon} size={ICON.md} color={item.color} />
+                  <Icon name={item.icon} size={ICON.md} color={item.color} />
                   <Text style={s.statValue}>{item.value}</Text>
                   <Text style={s.statLabel}>{item.label}</Text>
                   <Text style={s.statSub}>{item.sub}</Text>

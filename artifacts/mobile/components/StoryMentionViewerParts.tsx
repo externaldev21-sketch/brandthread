@@ -10,7 +10,7 @@
  */
 import React, { useState } from 'react';
 import { Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { CARD, BORDER, FG, FONT, FS, MUTED, ON_DARK, RADIUS, SP } from '@/lib/theme';
@@ -168,7 +168,7 @@ export function TaggedPeopleSheet({
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Tagged people</Text>
             <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
-              <Feather name="x" size={22} color={FG} />
+              <Icon name="x" size={22} color={FG} />
             </Pressable>
           </View>
           <FlatList
@@ -181,7 +181,7 @@ export function TaggedPeopleSheet({
                   <Text style={styles.popoverHandle} numberOfLines={1}>{withAt(item.handle)}</Text>
                   {item.name ? <Text style={styles.popoverName} numberOfLines={1}>{item.name}</Text> : null}
                 </View>
-                <Feather name="chevron-right" size={18} color={MUTED} />
+                <Icon name="chevron-right" size={18} color={MUTED} />
               </Pressable>
             )}
           />

@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FONT, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -44,7 +44,7 @@ export function ProfileAccountSwitcher({
           <Text style={[styles.switcherText, { color: theme.text }, overMedia && styles.overMedia]} numberOfLines={1}>
             {label}
           </Text>
-          <Feather name="chevron-down" size={16} color={theme.text} />
+          <Icon name="chevron-down" size={16} color={theme.text} />
         </>
       )}
     </PressableScale>
@@ -60,7 +60,7 @@ export function ProfileTopBarIcon({
   badge,
   testID,
 }: {
-  name: keyof typeof Feather.glyphMap;
+  name: IconName;
   /** Receives the press event so a ⋯ button can anchor its pull-down menu. */
   onPress: (event?: GestureResponderEvent) => void;
   accessibilityLabel: string;
@@ -79,7 +79,7 @@ export function ProfileTopBarIcon({
       hitSlop={10}
       style={styles.iconButton}
     >
-      <Feather name={name} size={24} color={theme.text} />
+      <Icon name={name} size={24} color={theme.text} />
       {badge ? <View style={[styles.iconBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} /> : null}
     </Pressable>
   );

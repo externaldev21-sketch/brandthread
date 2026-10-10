@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { recheckConnectivity, useIsOffline } from '@/hooks/useIsOffline';
@@ -54,7 +54,7 @@ export default function OfflineBanner() {
         testID="offline-banner"
         style={[styles.pill, { backgroundColor: theme.card, borderColor: theme.border }]}
       >
-        <Feather name="wifi-off" size={14} color={theme.text} />
+        <Icon name="wifi-off" size={14} color={theme.text} />
         <Text style={[TYPE_SCALE.footnote, styles.text, { color: theme.text }]} numberOfLines={1}>
           You're offline
         </Text>

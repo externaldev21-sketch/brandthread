@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -183,7 +183,7 @@ export default function FreelancerApplyScreen() {
                         setServiceType(t.value);
                       }}
                     >
-                      <Feather name={t.icon} size={18} color={active ? colors.primary : MUTED} />
+                      <Icon name={t.icon} size={18} color={active ? colors.primary : MUTED} />
                       <Text style={[styles.typeLabel, active && { color: FG }]}>{t.label}</Text>
                     </TouchableOpacity>
                   );

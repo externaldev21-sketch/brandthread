@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -14,7 +14,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { EmailExportSection } from '@/components/security/EmailExportSection';
 
-type DataCategory = { key: string; label: string; sub: string; icon: keyof typeof Feather.glyphMap; selected: boolean };
+type DataCategory = { key: string; label: string; sub: string; icon: IconName; selected: boolean };
 
 const DEFAULT_CATEGORIES: DataCategory[] = [
   { key: 'profile', label: 'Profile & account', sub: 'Name, bio, settings', icon: 'user', selected: true },
@@ -78,7 +78,7 @@ export default function BuyerDownloadData() {
       <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (requested ? 40 : 120) }}>
         {requested ? (
           <View style={s.successCard}>
-            <Feather name="check-circle" size={40} color={theme.success} />
+            <Icon name="check-circle" size={40} color={theme.success} />
             <Text style={s.successTitle}>Export ready</Text>
             {formattedDate && <Text style={s.successDate}>Generated {formattedDate}</Text>}
             <Text style={s.successDesc}>
@@ -109,7 +109,7 @@ export default function BuyerDownloadData() {
             </Card>
 
             <View style={s.note}>
-              <Feather name="info" size={14} color={palette.mutedForeground} />
+              <Icon name="info" size={14} color={palette.mutedForeground} />
               <Text style={s.noteText}>
                 Only records your account owns are included.
               </Text>

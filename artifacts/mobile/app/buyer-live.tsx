@@ -16,7 +16,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import * as ExpoLinking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { useApi } from '@/lib/api';
 import { track } from '@/lib/analytics';
@@ -519,7 +519,7 @@ function BuyerLiveNativeScreen() {
     return (
       <View style={[s.root, s.center]}>
         <View style={[s.endedIcon, { backgroundColor: `${LIVE_RED}20` }]}>
-          <Feather name="video-off" size={32} color={LIVE_RED} />
+          <Icon name="video-off" size={32} color={LIVE_RED} />
         </View>
         <Text style={[s.endedTitle, { color: FG }]}>Stream ended</Text>
         {replayStatus !== 'unavailable' && (
@@ -544,7 +544,7 @@ function BuyerLiveNativeScreen() {
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, s.videoPlaceholder]}>
-          <Feather name="video" size={40} color={MUTED} />
+          <Icon name="video" size={40} color={MUTED} />
           <Text style={s.videoPlaceholderText}>
             {AgoraModule ? 'Connecting…' : 'Live video works in the Brandthread app.'}
           </Text>
@@ -576,7 +576,7 @@ function BuyerLiveNativeScreen() {
         </View>
         <View style={s.topRight}>
           <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-            <Feather name="eye" size={13} color="#fff" />
+            <Icon name="eye" size={13} color="#fff" />
             <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
           </View>
           <IconButton
@@ -624,7 +624,7 @@ function BuyerLiveNativeScreen() {
                 accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
                 style={[s.productChip, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
               >
-                <Feather name="shopping-bag" size={12} color={LIVE_RED} />
+                <Icon name="shopping-bag" size={12} color={LIVE_RED} />
                 <Text style={s.productChipName} numberOfLines={1}>{tag.productName}</Text>
                 <Text style={s.productChipPrice}>{formatCents(tag.priceCents)}</Text>
               </PressableScale>
@@ -692,7 +692,7 @@ function BuyerLiveNativeScreen() {
               accessibilityRole="button"
               accessibilityLabel="Close purchase sheet"
             >
-              <Feather name="x" size={20} color={FG} />
+              <Icon name="x" size={20} color={FG} />
             </PressableScale>
           </View>
           {purchaseLoading ? (

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import type { SellerShareCardData, ShareCardVariant } from '@/lib/shareCard';
@@ -34,7 +34,7 @@ export const SellerShareCard = React.forwardRef<View, SellerShareCardProps>(
 
         {hasRating ? (
           <View style={[styles.statPill, { borderColor: theme.border, backgroundColor: theme.cardGlass }]}>
-            <Feather name="star" size={13} color={theme.text} />
+            <Icon name="star" size={13} color={theme.text} />
             <Text style={[styles.statText, { color: theme.text }]}>
               {data.rating!.avgRating.toFixed(1)} ({data.rating!.totalCount})
             </Text>

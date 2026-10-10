@@ -8,7 +8,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CachedImage } from '@/components/CachedImage';
 import { useColors } from '@/hooks/useColors';
@@ -69,7 +69,7 @@ function Tile({ posterUri, length, onPress }: { posterUri: string | null; length
     >
       {posterUri ? <CachedImage source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
       <View style={s.playWrap}>
-        <View style={s.play}><Feather name="play" size={22} color={colors.foreground} style={{ marginLeft: 2 }} /></View>
+        <View style={s.play}><Icon name="play" size={22} color={colors.foreground} style={{ marginLeft: 2 }} /></View>
       </View>
       {length ? <View style={s.length}><Text style={s.lengthText}>{length}</Text></View> : null}
     </TouchableOpacity>
@@ -87,7 +87,7 @@ function PlayableTile({ video }: { video: ProductVideoInfo }) {
     <View style={s.tile}>
       <InlinePlayer uri={video.videoUrl} />
       <TouchableOpacity style={s.close} onPress={() => setPlaying(false)} accessibilityRole="button" accessibilityLabel="Close product video">
-        <Feather name="x" size={16} color={colors.foreground} />
+        <Icon name="x" size={16} color={colors.foreground} />
       </TouchableOpacity>
     </View>
   );

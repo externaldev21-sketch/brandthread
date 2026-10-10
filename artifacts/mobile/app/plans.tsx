@@ -43,7 +43,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -504,7 +504,7 @@ export default function PlansScreen() {
             activeOpacity={0.7}
           >
             <Text style={styles.skipText}>Not now</Text>
-            <Feather name="arrow-right" size={14} color={theme.muted} />
+            <Icon name="arrow-right" size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
         {Platform.OS !== 'web' && (

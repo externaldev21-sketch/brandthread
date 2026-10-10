@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { BORDER, CARD, FG, MUTED, RADIUS } from '@/lib/theme';
 
 const TILE_SIZE = 88;
@@ -34,7 +34,7 @@ export function ReferencePhotoTiles({ uris, max, onAdd, onRemove, label = 'refer
             accessibilityLabel={`Remove ${label} ${idx + 1}`}
             accessibilityRole="button"
           >
-            <Feather name="x" size={12} color="#fff" />
+            <Icon name="x" size={12} color="#fff" />
           </TouchableOpacity>
         </View>
       ))}
@@ -45,7 +45,7 @@ export function ReferencePhotoTiles({ uris, max, onAdd, onRemove, label = 'refer
           accessibilityLabel={`Add ${label} photo`}
           accessibilityRole="button"
         >
-          <Feather name="plus" size={22} color={MUTED} />
+          <Icon name="plus" size={22} color={MUTED} />
         </TouchableOpacity>
       )}
     </View>

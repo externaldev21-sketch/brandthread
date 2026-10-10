@@ -4,7 +4,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Header } from '@/components/layout';
 import { PrimaryButton } from '@/components/BrandthreadUI';
@@ -97,10 +97,10 @@ export default function SizeChartTemplateApplyScreen() {
                 <TouchableOpacity style={s.row} onPress={() => toggle(item.id)} accessibilityRole="checkbox" accessibilityState={{ checked: on }}>
                   {item.images?.[0]
                     ? <Image source={{ uri: item.images[0] }} style={s.thumb} />
-                    : <View style={[s.thumb, s.thumbEmpty]}><Feather name="image" size={ICON.sm} color={colors.mutedForeground} /></View>}
+                    : <View style={[s.thumb, s.thumbEmpty]}><Icon name="image" size={ICON.sm} color={colors.mutedForeground} /></View>}
                   <Text style={s.name} numberOfLines={1}>{item.name}</Text>
                   <View style={[s.check, on && s.checkOn]}>
-                    {on ? <Feather name="check" size={14} color={colors.background} /> : null}
+                    {on ? <Icon name="check" size={14} color={colors.background} /> : null}
                   </View>
                 </TouchableOpacity>
               );

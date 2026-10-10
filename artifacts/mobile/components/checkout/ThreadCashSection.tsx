@@ -9,7 +9,7 @@
  */
 import React, { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
@@ -61,13 +61,13 @@ export function ThreadCashSection({ state }: { state: CheckoutThreadCash }) {
 
       {state.notice && !state.error ? (
         <View style={styles.noteRow} testID="checkout-thread-cash-notice">
-          <Feather name="refresh-cw" size={13} color={ck.muted} style={styles.noteIcon} />
+          <Icon name="refresh-cw" size={13} color={ck.muted} style={styles.noteIcon} />
           <Text style={[styles.note, { color: ck.muted }]}>{state.notice}</Text>
         </View>
       ) : null}
       {state.error ? (
         <View style={styles.noteRow} accessibilityRole="alert" testID="checkout-thread-cash-error">
-          <Feather name="alert-circle" size={13} color={ck.text} style={styles.noteIcon} />
+          <Icon name="alert-circle" size={13} color={ck.text} style={styles.noteIcon} />
           <Text style={styles.note}>{state.error}</Text>
         </View>
       ) : null}

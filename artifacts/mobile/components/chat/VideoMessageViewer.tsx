@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -36,7 +36,7 @@ export default function VideoMessageViewer({
             accessibilityLabel="Close video"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Feather name="x" size={22} color={theme.text} />
+            <Icon name="x" size={22} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>

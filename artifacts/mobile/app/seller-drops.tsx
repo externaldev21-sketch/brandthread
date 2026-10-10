@@ -5,7 +5,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -89,7 +89,7 @@ export default function SellerDrops() {
               style={[styles.emptyCta, { backgroundColor: theme.accent }]}
               onPress={() => router.push('/seller-drop-create' as never)}
             >
-              <Feather name="plus" size={16} color={theme.onAccent} />
+              <Icon name="plus" size={16} color={theme.onAccent} />
               <Text style={{ color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.sm }}>New drop</Text>
             </TouchableOpacity>
           </View>
@@ -108,7 +108,7 @@ export default function SellerDrops() {
                 </Text>
               </View>
               <StatusBadge label={row.status.toUpperCase()} variant={statusVariant(row.status)} small />
-              <Feather name="chevron-right" size={18} color={theme.muted} />
+              <Icon name="chevron-right" size={18} color={theme.muted} />
             </TouchableOpacity>
           ))
         )}

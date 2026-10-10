@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
 import { appVersion } from '@/lib/appVersion';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { Feather } from '@expo/vector-icons';
+import { type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, SP } from '@/lib/theme';
@@ -25,7 +25,7 @@ import { TRANSLATION_LANGUAGES, translationLanguageName } from '@/lib/translatio
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = {
-  label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void;
+  label: string; sub?: string; icon?: IconName; toggle?: ToggleKey; value?: string; action?: () => void;
   /** A switch backed by the server (account interaction settings), not the local buyer settings. */
   remoteToggle?: { value: boolean; onChange: (value: boolean) => void };
 };

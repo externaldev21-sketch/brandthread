@@ -9,7 +9,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { haptics } from '@/lib/haptics';
@@ -204,7 +204,7 @@ export default function AiHelperScreen() {
                 {result.captions.map((c, i) => (
                   <TouchableOpacity key={i} onPress={() => setPick(i)} style={[s.card, pick === i && s.cardOn]} accessibilityRole="radio" accessibilityState={{ selected: pick === i }}>
                     <Text style={s.cardText}>{c}</Text>
-                    <Feather name={pick === i ? 'check-circle' : 'circle'} size={20} color={colors.foreground} />
+                    <Icon name={pick === i ? 'check-circle' : 'circle'} size={20} color={colors.foreground} />
                   </TouchableOpacity>
                 ))}
                 <View style={s.tags}>{result.hashtags.map((h) => <Text key={h} style={s.tag}>{h}</Text>)}</View>

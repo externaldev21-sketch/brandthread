@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
@@ -88,7 +88,7 @@ export function LiveCodesHostSheet({ streamId, onClose }: { streamId: string; on
           <ScrollView style={styles.list} contentContainerStyle={{ gap: SP.sm }}>
             {codes.map(c => (
               <View key={c.id} style={[styles.codeRow, { borderColor: theme.border }]}>
-                <Feather name="tag" size={16} color={theme.text} />
+                <Icon name="tag" size={16} color={theme.text} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.code, { color: theme.text }]}>{c.code}</Text>
                   <Text style={[styles.meta, { color: theme.muted }]}>

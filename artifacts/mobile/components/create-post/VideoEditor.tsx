@@ -9,7 +9,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
 import { MAX_VIDEO_SECONDS } from '@/constants/postLimits';
@@ -92,7 +92,7 @@ export function VideoEditor({ video, onChange, onBack, onNext }: {
 
       <Pressable style={s.stage} onPress={() => setPaused((p) => !p)} accessibilityRole="button" accessibilityLabel={paused ? 'Play' : 'Pause'} testID="video-stage">
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />
-        {paused ? <View style={s.playGlyph} pointerEvents="none"><Feather name="play" size={34} color={CP.white} /></View> : null}
+        {paused ? <View style={s.playGlyph} pointerEvents="none"><Icon name="play" size={34} color={CP.white} /></View> : null}
       </Pressable>
 
       <View style={s.timeRow}>

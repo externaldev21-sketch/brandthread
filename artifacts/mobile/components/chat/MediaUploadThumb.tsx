@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { CachedImage } from '@/components/CachedImage';
 import UploadRing from './UploadRing';
 import { RADIUS } from '@/lib/theme';
@@ -51,7 +51,7 @@ export default function MediaUploadThumb({
         <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} recyclingKey={uri} />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.placeholder]}>
-          <Feather name={type === 'video' ? 'video' : 'image'} size={size * 0.46} color={iconColor} />
+          <Icon name={type === 'video' ? 'video' : 'image'} size={size * 0.46} color={iconColor} />
         </View>
       )}
       {uploading && (

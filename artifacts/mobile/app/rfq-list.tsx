@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -81,11 +81,11 @@ export default function RfqListScreen() {
             <Text style={s.meta}>{item.quantity.toLocaleString('en-US')} units{item.category ? ` · ${item.category}` : ''}{item.deadline ? ` · due ${fmtDate(item.deadline)}` : ''}</Text>
             <View style={s.countsRow}>
               <View style={s.countPill}>
-                <Feather name="users" size={12} color={theme.muted} />
+                <Icon name="users" size={12} color={theme.muted} />
                 <Text style={s.countText}>{item.manufacturersCount} sent</Text>
               </View>
               <View style={[s.countPill, item.quotesReceivedCount > 0 && s.countPillActive]}>
-                <Feather name="file-text" size={12} color={item.quotesReceivedCount > 0 ? theme.accentLight : theme.muted} />
+                <Icon name="file-text" size={12} color={item.quotesReceivedCount > 0 ? theme.accentLight : theme.muted} />
                 <Text style={[s.countText, item.quotesReceivedCount > 0 && { color: theme.accentLight, fontFamily: FONT.semibold }]}>
                   {item.quotesReceivedCount} quoted
                 </Text>

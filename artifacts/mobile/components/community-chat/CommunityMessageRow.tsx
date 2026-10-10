@@ -6,7 +6,7 @@
  */
 import React, { memo, useCallback, useRef } from 'react';
 import { Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
@@ -160,7 +160,7 @@ function CommunityMessageRowImpl({
               {(isLastInGroup || pending) && (
                 <View style={s.meta}>
                   <Text style={[s.time, { color: subColor }]}>{formatTime(msg.ts)}</Text>
-                  {pending === 'sending' && <Feather name="clock" size={11} color={subColor} />}
+                  {pending === 'sending' && <Icon name="clock" size={11} color={subColor} />}
                 </View>
               )}
             </PressableScale>
@@ -179,7 +179,7 @@ function CommunityMessageRowImpl({
               accessibilityLabel="Retry sending"
               testID={`community-retry-${msg.clientId}`}
             >
-              <Feather name="alert-circle" size={12} color={theme.error} />
+              <Icon name="alert-circle" size={12} color={theme.error} />
               <Text style={[s.failedText, { color: theme.error }]}>Couldn’t send. Tap to retry</Text>
             </PressableScale>
             <PressableScale

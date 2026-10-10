@@ -18,7 +18,7 @@ import {
   TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
@@ -282,7 +282,7 @@ export default function ProductBundleEditScreen() {
             accessibilityState={{ disabled: isNew }}
             activeOpacity={0.7}
           >
-            <Feather name="plus" size={14} color={PURPLE_LIGHT} />
+            <Icon name="plus" size={14} color={PURPLE_LIGHT} />
             <Text style={s.addItemBtnText}>Add product</Text>
           </TouchableOpacity>
           )}
@@ -290,7 +290,7 @@ export default function ProductBundleEditScreen() {
 
         {isNew && items.length === 0 && (
           <View style={s.newBundleHint}>
-            <Feather name="info" size={14} color={MUTED} />
+            <Icon name="info" size={14} color={MUTED} />
             <Text style={s.newBundleHintText}>Save the bundle first, then add products.</Text>
           </View>
         )}
@@ -298,7 +298,7 @@ export default function ProductBundleEditScreen() {
         {items.map(item => (
           <View key={item.id} style={s.itemRow}>
             <View style={s.itemImg}>
-              <Feather name="image" size={ICON.sm} color={MUTED} />
+              <Icon name="image" size={ICON.sm} color={MUTED} />
             </View>
             <View style={s.itemInfo}>
               <Text style={s.itemName} numberOfLines={1}>{item.productName ?? 'Product'}</Text>
@@ -308,7 +308,7 @@ export default function ProductBundleEditScreen() {
               <Text style={s.itemPrice}>{formatCents(item.priceCents ?? 0)}</Text>
             </View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove item" onPress={() => removeItem(item.id)} style={s.removeBtn}>
-              <Feather name="trash-2" size={14} color={RED} />
+              <Icon name="trash-2" size={14} color={RED} />
             </TouchableOpacity>
           </View>
         ))}

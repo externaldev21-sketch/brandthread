@@ -13,7 +13,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/layout/EmptyState';
 import Composer from '@/components/ui/Composer';
@@ -356,7 +356,7 @@ export default function AIPhotographyChatScreen() {
             accessibilityState={{ selected: mode === 'free' }}
             style={[styles.modeChip, { borderColor: colors.border }, mode === 'free' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
-            <Feather name="edit-3" size={14} color={mode === 'free' ? colors.primaryForeground : colors.mutedForeground} />
+            <Icon name="edit-3" size={14} color={mode === 'free' ? colors.primaryForeground : colors.mutedForeground} />
             <Text style={[styles.modeChipText, { color: mode === 'free' ? colors.primaryForeground : colors.mutedForeground }]}>
               Photography
             </Text>
@@ -370,7 +370,7 @@ export default function AIPhotographyChatScreen() {
             accessibilityState={{ selected: mode === 'outfitSwap' }}
             style={[styles.modeChip, { borderColor: colors.border }, mode === 'outfitSwap' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
-            <Feather name="refresh-cw" size={14} color={mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground} />
+            <Icon name="refresh-cw" size={14} color={mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground} />
             <Text style={[styles.modeChipText, { color: mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground }]}>
               Outfit Swap
             </Text>
@@ -380,7 +380,7 @@ export default function AIPhotographyChatScreen() {
 
       {mode === 'outfitSwap' && (
         <View style={[styles.outfitNotice, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <Feather name="lock" size={14} color={colors.primary} />
+          <Icon name="lock" size={14} color={colors.primary} />
           <Text style={[styles.outfitNoticeText, { color: colors.mutedForeground }]}>
             {heroPhoto
               ? 'Hero locked — upload garment mockups to keep the same scene.'
@@ -495,7 +495,7 @@ export default function AIPhotographyChatScreen() {
             accessibilityLabel="Start a new Outfit Swap"
             accessibilityHint="Releases this hero photo so you can lock a different scene"
           >
-            <Feather name="rotate-ccw" size={13} color={colors.mutedForeground} />
+            <Icon name="rotate-ccw" size={13} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
       )}
@@ -515,7 +515,7 @@ export default function AIPhotographyChatScreen() {
                 testID={`ai-photography-remove-${p.id}`}
                 accessibilityLabel="Remove photo"
               >
-                <Feather name="x" size={11} color={colors.destructiveForeground} />
+                <Icon name="x" size={11} color={colors.destructiveForeground} />
               </TouchableOpacity>
             </View>
           ))}
@@ -544,7 +544,7 @@ export default function AIPhotographyChatScreen() {
             accessibilityLabel="Add photos"
             testID="ai-photography-attach"
           >
-            <Feather
+            <Icon
               name="camera"
               size={20}
               color={(mode === 'free' ? photos.length >= MAX_PHOTOS : (heroPhoto ? garments.length >= MAX_GARMENTS : false))

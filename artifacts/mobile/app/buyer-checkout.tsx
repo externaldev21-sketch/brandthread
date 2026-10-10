@@ -47,7 +47,7 @@ import { useStableCallback } from '@/hooks/useStableCallback';
 import {
   KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics } from '@/lib/haptics';
@@ -1205,7 +1205,7 @@ export default function BuyerCheckoutScreen() {
         >
           {error ? (
             <View style={styles.errorBanner} accessibilityRole="alert" accessibilityLiveRegion="assertive" testID="checkout-error">
-              <Feather name="alert-circle" size={18} color={ck.text} style={{ marginTop: 1 }} />
+              <Icon name="alert-circle" size={18} color={ck.text} style={{ marginTop: 1 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.errorTitle}>{t(error.title)}</Text>
                 <Text style={styles.errorText}>{t(error.message)}</Text>
@@ -1360,7 +1360,7 @@ export default function BuyerCheckoutScreen() {
                   rippleEnabled={false}
                 >
                   <View style={[styles.checkbox, { borderColor: ack.acknowledged ? ck.text : ck.subtle }]}>
-                    {ack.acknowledged ? <Feather name="check" size={13} color={ck.text} /> : null}
+                    {ack.acknowledged ? <Icon name="check" size={13} color={ck.text} /> : null}
                   </View>
                   <Text style={styles.ackText}>{ack.label}</Text>
                 </PressableScale>
@@ -1393,7 +1393,7 @@ export default function BuyerCheckoutScreen() {
           <View onLayout={event => setFooterHeight(event.nativeEvent.layout.height + footerBottomPad + SP.sm + 4)} testID="checkout-footer">
             {!payWithWallet && !ready && nextStepText ? (
               <View style={styles.hintRow} testID="checkout-next-step">
-                <Feather name="info" size={13} color={ck.muted} />
+                <Icon name="info" size={13} color={ck.muted} />
                 <Text style={styles.hint}>{nextStepText}</Text>
               </View>
             ) : null}

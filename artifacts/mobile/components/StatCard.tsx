@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { FONT } from '@/lib/theme';
 
 interface StatCardProps {
@@ -9,7 +9,7 @@ interface StatCardProps {
   value: string;
   change?: string;
   positive?: boolean;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
 }
 
 export function StatCard({ label, value, change, positive = true, icon }: StatCardProps) {
@@ -17,7 +17,7 @@ export function StatCard({ label, value, change, positive = true, icon }: StatCa
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
-        <Feather name={icon} size={16} color={colors.primary} />
+        <Icon name={icon} size={16} color={colors.primary} />
       </View>
       <Text style={[styles.value, { color: colors.foreground }]}>{value}</Text>
       <Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>

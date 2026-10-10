@@ -28,7 +28,7 @@ import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Activi
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useApi } from '@/lib/api';
@@ -231,7 +231,7 @@ function CheckoutScreen() {
             </Text>
             <TouchableOpacity onPress={() => { void load(); }} activeOpacity={0.7} style={[styles.selectBox, { borderColor: colors.border }]}>
               <Text style={[styles.selectValue, { color: colors.foreground }]}>Try again</Text>
-              <Feather name="refresh-cw" size={16} color={colors.mutedForeground} />
+              <Icon name="refresh-cw" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
         ) : (
@@ -251,7 +251,7 @@ function CheckoutScreen() {
 
   const checkbox = (checked: boolean) => (
     <View style={[styles.checkbox, { borderColor: checked ? colors.primary : colors.border, backgroundColor: checked ? colors.primary : 'transparent' }]}>
-      {checked && <Feather name="check" size={12} color={colors.primaryForeground} />}
+      {checked && <Icon name="check" size={12} color={colors.primaryForeground} />}
     </View>
   );
 
@@ -270,7 +270,7 @@ function CheckoutScreen() {
             testID="checkout-mode"
           >
             <Text style={[styles.selectValue, { color: colors.foreground }]}>{mode.label}</Text>
-            <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+            <Icon name="chevron-down" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>{mode.description}</Text>
         </View>
@@ -280,7 +280,7 @@ function CheckoutScreen() {
         <View style={styles.section}>
           <View style={styles.rowStart}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tipping</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+            <Icon name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
             Customers can choose between 3 presets or enter a custom amount
@@ -340,7 +340,7 @@ function CheckoutScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+                <Icon name="chevron-down" size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
 
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Discount</Text>
@@ -362,7 +362,7 @@ function CheckoutScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+                <Icon name="chevron-down" size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
               {guestOnly ? (
                 <Text style={[styles.note, { color: colors.mutedForeground }]}>
@@ -401,7 +401,7 @@ function CheckoutScreen() {
                       {connected ? `Connected · ${values.id}` : values.id ? 'Add the secret to connect' : 'Not connected'}
                     </Text>
                   </View>
-                  <Feather name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedForeground} />
+                  <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedForeground} />
                 </TouchableOpacity>
                 {open ? (
                   <View style={styles.providerForm}>
@@ -434,7 +434,7 @@ function CheckoutScreen() {
                     </View>
                     {draftError ? (
                       <View style={styles.errorRow}>
-                        <Feather name="alert-circle" size={13} color={colors.foreground} />
+                        <Icon name="alert-circle" size={13} color={colors.foreground} />
                         <Text style={[styles.errorText, { color: colors.foreground }]}>{draftError}</Text>
                       </View>
                     ) : null}
@@ -480,7 +480,7 @@ function CheckoutScreen() {
             accessibilityHint="Opens your store language settings"
           >
             <Text style={[styles.langText, { color: colors.foreground }]}>{storeLanguageName(settings.storeLanguage)}</Text>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
       </ScrollView>
