@@ -40,10 +40,6 @@ export const PLAN_CATALOGUE: Record<SellerPlanId, {
 
 export const PLAN_IDS = Object.keys(PLAN_CATALOGUE) as SellerPlanId[];
 
-export function isSellerPlanId(value: unknown): value is SellerPlanId {
-  return typeof value === "string" && value in PLAN_CATALOGUE;
-}
-
 // ─── Tier differences besides price and the product cap ──────────────────
 // Dev's plan tiers. Read by the plan gates (lib/planFeatures.ts →
 // middlewares/featureGate.ts), the email allowance and the app
@@ -99,4 +95,8 @@ export function planTierFeatures(): Record<SellerPlanId, TierFeatures> {
       payoutSpeed: "faster", prioritySupport: true,
     },
   };
+}
+
+export function isSellerPlanId(value: unknown): value is SellerPlanId {
+  return typeof value === "string" && value in PLAN_CATALOGUE;
 }
