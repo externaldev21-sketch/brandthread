@@ -345,6 +345,7 @@ export default function DiscoverScreen() {
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header as never}
           ListFooterExtra={<RecentlyViewedRow style={{ paddingHorizontal: SP.md, marginTop: SP.lg }} />}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         />
       )}
 
@@ -365,6 +366,7 @@ export default function DiscoverScreen() {
           onTileLongPress={setSafetyMenuPost}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header as never}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         />
       )}
 

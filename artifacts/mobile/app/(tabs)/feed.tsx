@@ -32,6 +32,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { useFeedWatchSignals } from '@/hooks/useFeedWatchSignals';
+import { useAppActive } from '@/hooks/useAppActive';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
 import {
@@ -1214,6 +1215,12 @@ function LiveVideoVisual({
     p.muted = muted;
     if (progressBottom != null) p.timeUpdateEventInterval = 0.25;
   });
+  const appActive = useAppActive();
+  // The setup callback above only runs when the player is created, so the
+  // sound toggle has to reach already-playing (and preloaded) clips here.
+  useEffect(() => {
+    player.muted = muted;
+  }, [player, muted]);
   const [hasStarted, setHasStarted] = useState(false);
   // Kept mounted (opacity-only), not conditionally rendered — conditional
   // mount/unmount can only pop the pause glyph in, never fade it out on
@@ -1296,7 +1303,9 @@ function LiveVideoVisual({
     });
     return () => subscription.remove();
   }, [isActive, player, progressBottom]);
-  const isScreenFocused = useIsFocused();
+  // Background/lock screen pauses the clip (and its watch timer) the same
+  // way leaving the screen does.
+  const isScreenFocused = useIsFocused() && appActive;
   useMeaningfulVideoWatch(player, isActive && !paused && isScreenFocused, onWatched);
   useFeedWatchSignals(player, isActive, signalPostId);
   React.useEffect(() => {

@@ -89,6 +89,8 @@ export const DiscoverGrid = forwardRef<FlatList<Row>, {
   /** Sponsored ads (hooks/useFeedAds), each placed after the row holding `afterId`. */
   sponsored?: ReadonlyArray<{ afterId: string; item: SponsoredFeedItem }>;
   renderSponsored?: (item: SponsoredFeedItem) => React.ReactElement;
+  /** Pull-to-refresh control for the grid. */
+  refreshControl?: React.ReactElement;
 }>(function DiscoverGrid({
   posts,
   loading,
@@ -112,6 +114,7 @@ export const DiscoverGrid = forwardRef<FlatList<Row>, {
   ListFooterExtra,
   sponsored = EMPTY_SPONSORED,
   renderSponsored,
+  refreshControl,
 }, ref) {
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
@@ -169,6 +172,7 @@ export const DiscoverGrid = forwardRef<FlatList<Row>, {
       keyExtractor={(row) => row.key}
       onEndReached={loading ? undefined : onEndReached}
       onEndReachedThreshold={0.6}
+      refreshControl={refreshControl as React.ComponentProps<typeof FlatList>['refreshControl']}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
       ListHeaderComponent={ListHeaderComponent}
