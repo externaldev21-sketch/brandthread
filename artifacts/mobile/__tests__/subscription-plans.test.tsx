@@ -241,7 +241,7 @@ describe('onboarding PlanStep (after the store preview)', () => {
     { id: 'starter', name: 'Starter', amountCents: 1999, limits: { activeProducts: 10, staffSeats: 1 }, features: { analytics: 'basic' } },
     { id: 'growth', name: 'Growth', amountCents: 4900, limits: { activeProducts: 50, staffSeats: 3 }, features: { analytics: 'advanced', liveSelling: true } },
     { id: 'pro', name: 'Pro', amountCents: 12900, limits: { activeProducts: null, staffSeats: null }, features: { analytics: 'full', liveSelling: true, prioritySupport: true } },
-  ];
+  ] as import('@/lib/planTiers').PlanTier[];
   const props = () => ({
     brandName: 'Noir Field Studio',
     tiers,

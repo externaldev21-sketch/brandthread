@@ -84,7 +84,7 @@ function parseLimits(plan: Record<string, unknown>): PlanTierLimits | null {
   if (seats !== undefined) limits.staffSeats = seats;
   const ai = capOf(plan.aiCreditsMonthly);
   if (typeof ai === 'number') limits.aiCreditsPerMonth = ai; // never shown as unlimited
-  const emails = capOf(features.emailSendsMonthly);
+  const emails = capOf('emailSendsMonthly' in features ? features.emailSendsMonthly : features.emailSendsPerMonth);
   if (emails !== undefined) limits.marketingEmailsPerMonth = emails;
   return limits;
 }
@@ -95,12 +95,14 @@ function parseFeatures(raw: unknown): PlanTierFeatures {
   if (raw.analytics === 'basic' || raw.analytics === 'advanced' || raw.analytics === 'full') out.analytics = raw.analytics as AnalyticsLevel;
   if (typeof raw.analyticsExport === 'boolean') out.analyticsExport = raw.analyticsExport;
   if (raw.payoutSpeed === 'standard' || raw.payoutSpeed === 'faster') out.payoutSpeed = raw.payoutSpeed as PayoutSpeed;
-  const flags: [keyof PlanTierFeatures, string][] = [
-    ['liveSelling', 'liveSelling'], ['dropsPreorders', 'dropsEscrow'], ['boostSlots', 'boostFeatured'],
-    ['customDomain', 'customDomain'], ['manufacturerHub', 'manufacturerHub'], ['prioritySupport', 'prioritySupport'],
+  // #766 and #834 name two of these differently; either is read.
+  const flags: [keyof PlanTierFeatures, string[]][] = [
+    ['liveSelling', ['liveSelling']], ['dropsPreorders', ['dropsEscrow', 'drops']], ['boostSlots', ['boostFeatured', 'boosts']],
+    ['customDomain', ['customDomain']], ['manufacturerHub', ['manufacturerHub']], ['prioritySupport', ['prioritySupport']],
   ];
-  for (const [key, wire] of flags) {
-    if (typeof raw[wire] === 'boolean') (out as Record<string, unknown>)[key] = raw[wire];
+  for (const [key, names] of flags) {
+    const wire = names.find((name) => typeof raw[name] === 'boolean');
+    if (wire) (out as Record<string, unknown>)[key] = raw[wire];
   }
   return out;
 }
