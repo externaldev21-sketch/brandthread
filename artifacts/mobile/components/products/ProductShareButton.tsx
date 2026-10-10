@@ -8,7 +8,8 @@
  * on page load) and cached for the session. When the link is copied instead
  * of shared (desktop web), the icon turns into a check for a moment.
  *
- * Reference: SSENSE product page — share sits with the other floating
+ * Reference: GOAT product page (mobbin.com/screens/fcfcd85a-3191-4e0e-b0cb-02ac3f076210)
+ * — share sits with the other floating
  * controls over the photo and opens the system share sheet.
  */
 import React, { useRef, useState } from 'react';
