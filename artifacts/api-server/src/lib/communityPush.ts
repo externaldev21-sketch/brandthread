@@ -15,6 +15,7 @@
  * never selected, so muting really does stop notifications.
  */
 import { db } from "@workspace/db";
+import { connectedUserIdsEverywhere } from "../ws/communityHub";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { sendPushToUser } from "./push";
@@ -74,7 +75,7 @@ export async function flushCommunityPush(communityId: string, windowMs = COMMUNI
   if (!row) return 0;
 
   const lastSeq = Number(row.last_seq);
-  const live = connectedUserIds(communityId);
+  const live = await connectedUserIdsEverywhere(communityId);
   const body = communityPushBody({ name: row.name, count: row.count, sender: row.sender, preview: row.preview });
   let pushed = 0;
   let cursor = "";

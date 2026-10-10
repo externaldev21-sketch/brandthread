@@ -9,6 +9,7 @@ import { db, posts, users } from "@workspace/db";
 import { eq, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { redirectToPublicMedia } from "../lib/mediaDelivery";
 import { ObjectPermission } from "../lib/objectAcl";
 
 const router = Router();
@@ -671,6 +672,7 @@ router.get("/media/*path", async (req, res) => {
       objectFile: file, requestedPermission: ObjectPermission.READ,
     });
     if (!allowed) return res.status(404).end();
+    if (await redirectToPublicMedia(res, objectPath)) return; // CDN / signed URL, not Express (BT-473)
     const [metadata] = await file.getMetadata();
     const size = Number(metadata.size ?? 0);
     if (!Number.isSafeInteger(size) || size <= 0) return res.status(404).end();

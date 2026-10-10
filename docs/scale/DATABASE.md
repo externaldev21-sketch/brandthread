@@ -1,17 +1,36 @@
 # Database scaling (phase 2)
 
-Everything is opt-in by env var. With none set, connection behavior is identical to before.
+In production (`NODE_ENV=production`) the pool now has safe defaults (BT-474); outside production, with nothing set, connection behavior is identical to before. Every value is overridable; `0` or `off` turns one off. `DB_POOL_DEFAULTS=off` restores the old no-defaults behavior in production, `DB_POOL_DEFAULTS=on` applies the defaults anywhere.
 
 ## Env
 
-| Var | Default | Meaning |
+| Var | Production default | Elsewhere | Meaning |
+| --- | --- | --- | --- |
+| `DB_POOL_MAX` | 10 | pg default (10) | Max connections **per API instance** |
+| `DB_POOL_IDLE_MS` | 30000 | pg default (10 s) | Close idle connections after this long |
+| `DB_CONNECT_TIMEOUT_MS` | 10000 | none | Fail a request fast instead of queueing forever for a connection |
+| `DB_STATEMENT_TIMEOUT_MS` | 15000 | none | Server-side cap on any one statement |
+| `DB_IDLE_IN_TX_TIMEOUT_MS` | 60000 | none | Kill transactions left open and idle (60 s leaves room for a Stripe call inside a transaction) |
+| `DB_POOL_DEFAULTS` | on | off | Force the defaults above on or off |
+| `DATABASE_READ_URL` | unset | unset | Read replica (opt-in). `readDb` uses it; unset means `readDb === db` |
+
+If a background job ever logs `canceling statement due to statement timeout`, raise `DB_STATEMENT_TIMEOUT_MS` (or set it to `off`) while that query is fixed; requests are better served failing at 15 s than queueing behind it.
+
+## Rate limiter storage (BT-474)
+
+The app-wide limiter no longer writes Postgres on every request.
+
+| Setup | Where requests are counted | Postgres writes |
 | --- | --- | --- |
-| `DB_POOL_MAX` | pg default (10) | Max connections **per API instance** |
-| `DB_POOL_IDLE_MS` | pg default (10 s) | Close idle connections after this long |
-| `DB_CONNECT_TIMEOUT_MS` | none | Fail a request fast instead of queueing forever for a connection |
-| `DB_STATEMENT_TIMEOUT_MS` | none | Server-side cap on any one statement (recommended: 15000) |
-| `DB_IDLE_IN_TX_TIMEOUT_MS` | none | Kill transactions left open and idle (recommended: 10000) |
-| `DATABASE_READ_URL` | unset | Read replica. `readDb` uses it; unset means `readDb === db` |
+| `REDIS_URL` set | Redis (one atomic call) | none; if Redis errors the request falls back to memory |
+| No Redis (default) | This instance's memory | Security/money buckets only, batched every `RATE_LIMIT_FLUSH_MS` (default 5000) in one statement |
+| `RATE_LIMIT_STORE=postgres` | Old behavior: one `INSERT ... ON CONFLICT` per request | every request |
+
+Buckets synced to Postgres (shared across instances and deploys, with up to one flush interval of lag): `authentication`, `access-code`, `access-waitlist`, `gift-card-lookup`, `contact-match`, `checkout`, `money-transfer`, `community-create`, `email-subscribe`. Every other bucket (reads, mutations, uploads, AI) is per instance: with N instances a client can make up to N times the limit if the load balancer spreads it out, which is acceptable for abuse limits and is fixed by setting `REDIS_URL`.
+
+Fail closed (503 `RATE_LIMIT_UNAVAILABLE` if counting itself throws) only where the limit is a security control: `authentication`, `access-code`, `gift-card-lookup`, `contact-match`. Everything else fails open, so a store problem can no longer take checkout, subscriptions or browsing down. With the memory store, counting cannot fail on the request path; this only matters for Redis edge cases and `RATE_LIMIT_STORE=postgres`.
+
+Limits, bucket names and the 429 response (`{ error, code: "RATE_LIMITED", message, retryAfterSeconds }` plus `RateLimit-*` and `Retry-After` headers) are unchanged. Route-level calls to `consumeRateLimitBucket` (gift-card code checks, email test sends, growth click dedupe) still use Postgres directly; they are per action, not per request.
 
 ## Sizing with a pooler
 

@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
+import { getMemoryRateLimitStore } from "../lib/rateLimitMemory";
 import { sql } from "drizzle-orm";
 import { consumeRateLimitRedis } from "../lib/rateLimitStore";
 import type { Request, RequestHandler } from "express";
@@ -341,6 +342,47 @@ export async function consumeRateLimitBucket(
   };
 }
 
+/**
+ * Where the middleware counts (BT-474). RATE_LIMIT_STORE:
+ *   auto (default)  Redis when REDIS_URL works, else per-instance memory with
+ *                   a batched Postgres sync for global buckets
+ *                   (lib/rateLimitMemory.ts). Test runs keep the Postgres
+ *                   bucket so suites that reset `rate_limit_buckets` still work.
+ *   memory          as auto, also under test
+ *   postgres        the previous behavior: Redis, else one Postgres write per request
+ */
+export type RateLimitStoreMode = "memory" | "postgres";
+
+export function rateLimitStoreMode(env: Record<string, string | undefined> = process.env): RateLimitStoreMode {
+  const raw = (env.RATE_LIMIT_STORE ?? "").trim().toLowerCase();
+  if (raw === "postgres" || raw === "memory") return raw;
+  return env.NODE_ENV === "test" ? "postgres" : "memory";
+}
+
+/**
+ * Buckets that are a security control. If counting itself throws, these
+ * answer 503 (fail closed); every other bucket lets the request through
+ * (fail open), so a store problem never takes checkout or browsing down.
+ */
+export const FAIL_CLOSED_RATE_LIMIT_POLICIES: ReadonlySet<string> = new Set([
+  "authentication",
+  "access-code",
+  "gift-card-lookup",
+  "contact-match",
+]);
+
+/** One hit on `bucketKey`: Redis first, then the configured fallback. */
+export async function consumeRateLimitCounter(
+  bucketKey: string,
+  policy: RateLimitPolicy,
+  mode: RateLimitStoreMode = rateLimitStoreMode(),
+): Promise<{ count: number; resetAt: Date }> {
+  const redis = await consumeRateLimitRedis(bucketKey, policy.windowMs);
+  if (redis) return redis;
+  if (mode === "postgres") return consumeRateLimitBucket(bucketKey, policy);
+  return getMemoryRateLimitStore().consume(bucketKey, policy.windowMs);
+}
+
 function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandler {
   return async (req, res, next) => {
     if ((req as Request & { rateLimitApplied?: boolean }).rateLimitApplied) {
@@ -368,7 +410,7 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
     const identity = rateLimitIdentity(req, policy);
     const key = `${policy.id}:${identity}`;
     try {
-      const counter = (await consumeRateLimitRedis(key, policy.windowMs)) ?? (await consumeRateLimitBucket(key, policy));
+      const counter = await consumeRateLimitCounter(key, policy);
       const remaining = Math.max(0, policy.limit - counter.count);
       const retryAfterSeconds = Math.max(
         1,
@@ -389,7 +431,7 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
         return;
       }
       if (userId && policy.ipLimit) {
-        const ipCounter = await consumeRateLimitBucket(ipCeilingKey(req, policy), {
+        const ipCounter = await consumeRateLimitCounter(ipCeilingKey(req, policy), {
           ...policy,
           limit: policy.ipLimit,
         });
@@ -414,6 +456,12 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
       next();
     } catch (err) {
       req.log?.error({ err, policy: policy.id }, "Persistent rate limit check failed");
+      if (!FAIL_CLOSED_RATE_LIMIT_POLICIES.has(policy.id)) {
+        // Fail open: a counting problem must not block checkout or browsing.
+        if (explicitPolicy) (req as Request & { rateLimitApplied?: boolean }).rateLimitApplied = true;
+        next();
+        return;
+      }
       res.status(503).json({
         error: "Request rate could not be verified",
         code: "RATE_LIMIT_UNAVAILABLE",
