@@ -31,7 +31,7 @@ export default function MediaViewer({
   const dragStartY = useRef(0);
   const [isSaving, setIsSaving] = useState(false);
 
-  const distance = (touches: readonly any[]) => {
+  const distance = (touches: readonly { pageX: number; pageY: number }[]) => {
     if (touches.length < 2) return 0;
     const dx = touches[0].pageX - touches[1].pageX;
     const dy = touches[0].pageY - touches[1].pageY;

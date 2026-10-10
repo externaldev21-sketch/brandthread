@@ -4,7 +4,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { statusBadgeRepeatsHeadline } from '@/lib/buyerOrderCardStatus';
 import { Feather } from '@expo/vector-icons';
@@ -275,7 +275,7 @@ function BuyerOrderCardSkeleton() {
         <SkeletonBlock width="100%" height={10} />
       </View>
       <View style={styles.statusRow}>
-        <SkeletonBlock width={56} height={14} style={{ marginLeft: 'auto' as any }} />
+        <SkeletonBlock width={56} height={14} style={{ marginLeft: 'auto' }} />
       </View>
     </View>
   );
@@ -292,7 +292,7 @@ function BuyerOrdersListSkeleton() {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerOrdersScreen() {
-  const scrollResetRef = useScrollReset<any>(true, false);
+  const scrollResetRef = useScrollReset<FlashListRef<BuyerOrderView>>(true, false);
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
@@ -650,7 +650,7 @@ function cardStyles(theme: AppThemePreset) {
       letterSpacing: 0.4,
     },
     totalText: {
-      marginLeft: 'auto' as any,
+      marginLeft: 'auto',
       fontSize: FS.base,
       fontFamily: FONT.bold,
       color: theme.text,

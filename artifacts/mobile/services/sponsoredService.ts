@@ -8,16 +8,17 @@
  * API is touched from the signed-out preview).
  */
 import { hasServiceToken, serviceRequest } from '@/lib/serviceConfig';
+import type { FeedPostApiRow } from '@/services/socialService';
 
 /** One id per app session: a promoted post is never repeated within it. */
 const SESSION_ID = `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
 
-export type SponsoredSlot = { afterIndex: number; boostId: string; post: any };
+export type SponsoredSlot = { afterIndex: number; boostId: string; post: FeedPostApiRow };
 
 export async function fetchSponsoredSlots(organicOffset: number, organicCount: number): Promise<SponsoredSlot[]> {
   try {
     if (!(await hasServiceToken())) return [];
-    const res = await serviceRequest<{ slots: Array<{ afterIndex: number; boostId: string; post: any }> }>(
+    const res = await serviceRequest<{ slots: SponsoredSlot[] }>(
       `/api/promotions/sponsored?sessionId=${SESSION_ID}&organicOffset=${organicOffset}&organicCount=${organicCount}`,
       {},
       false,

@@ -21,6 +21,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  *    the recipient) with a one-line "sent as a request" banner.
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { errorMessageOr } from '@/lib/errorMessage';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
@@ -1915,8 +1916,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                 await api.threadCash.claim({ transferId });
                 setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
                 celebrateThreadCash({ amount: amountCents, from: displayName });
-              } catch (e: any) {
-                Alert.alert('Could not claim', e?.message ?? 'Please try again.');
+              } catch (e: unknown) {
+                Alert.alert('Could not claim', errorMessageOr(e, 'Please try again.'));
                 throw e;
               }
             }}
@@ -1924,8 +1925,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               try {
                 await api.threadCash.cancel({ transferId });
                 setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
-              } catch (e: any) {
-                Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+              } catch (e: unknown) {
+                Alert.alert('Could not cancel', errorMessageOr(e, 'Please try again.'));
                 throw e;
               }
             } : undefined}

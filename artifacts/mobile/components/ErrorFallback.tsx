@@ -22,13 +22,38 @@ import { FONT } from '@/lib/theme';
 export type ErrorFallbackProps = {
   error: Error;
   resetError: () => void;
+  /**
+   * 'app' (default) — the root, whole-app boundary: "Try again" reloads the
+   * app, since the provider tree itself may be what broke.
+   * 'screen' — a per-screen / per-tab boundary (Expo Router's
+   * `unstable_screenErrorBoundary`): "Try again" re-renders just the failed
+   * screen via `resetError` (the router's `retry`) and content respects the
+   * safe area.
+   */
+  scope?: 'app' | 'screen';
+  /**
+   * Screen scope only: when set, a back arrow is shown that calls it, so
+   * the user is never stuck on a crashed screen. The route adapters pass
+   * it only when the screen's navigator can actually go back.
+   */
+  onBack?: () => void;
 };
 
-export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
+export function ErrorFallback({ error, resetError, scope = 'app', onBack }: ErrorFallbackProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const isScreen = scope === 'screen';
+  const showBack = isScreen && typeof onBack === 'function';
 
   const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const handleRetry = () => {
+    if (isScreen) {
+      resetError();
+      return;
+    }
+    void handleRestart();
+  };
 
   const handleRestart = async () => {
     try {
@@ -54,7 +79,29 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   });
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background },
+        isScreen
+          ? { paddingTop: insets.top + SPACING.xl, paddingBottom: insets.bottom + SPACING.xl }
+          : null,
+      ]}
+    >
+      {showBack ? (
+        // IconButton applies `style` to its inner icon view, so the absolute
+        // positioning lives on this wrapper (keeps it out of the centered flow).
+        <View style={[styles.backButton, { top: insets.top + SPACING.xs }]}>
+          <IconButton
+            name="arrow-left"
+            onPress={onBack}
+            accessibilityLabel="Go back"
+            color={colors.foreground}
+            variant="plain"
+            testID="error-fallback-back"
+          />
+        </View>
+      ) : null}
       <View style={styles.content}>
         <View style={[styles.iconCircle, { borderColor: colors.border, backgroundColor: colors.card }]}>
           <Feather name="alert-triangle" size={28} color={colors.mutedForeground} />
@@ -71,7 +118,8 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         <View style={styles.actions}>
           <Button
             label="Try again"
-            onPress={handleRestart}
+            onPress={handleRetry}
+            testID="error-fallback-retry"
             variant="primary"
             style={styles.button}
           />
@@ -175,6 +223,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.xl,
+  },
+  backButton: {
+    position: 'absolute',
+    left: SPACING.md,
+    zIndex: 1,
   },
   content: {
     alignItems: 'center',
