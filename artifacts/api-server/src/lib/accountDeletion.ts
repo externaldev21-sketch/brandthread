@@ -262,6 +262,8 @@ export async function purgeAccount(clerkUserId: string): Promise<boolean> {
     // Pending Thread Cash sends to or from the account go back to their
     // senders as cancels; the ledger itself is financial history and stays.
     await cancelPendingThreadCashForAccount(tx, clerkUserId);
+    // Recent searches (declared as Search History in the App Store privacy labels).
+    await tx.execute(sql`DELETE FROM search_log WHERE user_id = ${clerkUserId}`);
     // Reports the person filed stay in the moderation record without
     // their identity; reports about their content keep the snapshot.
     await tx.execute(sql`UPDATE reports SET reporter_id = ${deletedSubject} WHERE reporter_id = ${clerkUserId}`);

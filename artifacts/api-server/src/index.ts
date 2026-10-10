@@ -41,6 +41,7 @@ import { startOrderChangeListener, stopOrderChangeListener } from "./lib/orderCh
 import { startCommunityPushJob } from "./lib/communityPush";
 import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
 import { startFreelancerAutoReleaseJob } from "./jobs/freelancerAutoRelease";
+import { startReportEscalationJob } from "./jobs/reportEscalation";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
 import { attachUserWebSocket } from "./ws/userHub";
@@ -127,6 +128,7 @@ const server = app.listen(port, (err) => {
   startScheduledPostPublisherJob();
   startPayoutReviewJob();
   startFreelancerAutoReleaseJob();
+  startReportEscalationJob();
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────

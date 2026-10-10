@@ -1,4 +1,16 @@
-export { openai, setAiUsageReporter, type AiUsageReport } from "./client";
+export {
+  openai,
+  setAiUsageReporter,
+  type AiUsageReport,
+  DEFAULT_OPENAI_BASE_URL,
+  OpenAiNotConfiguredError,
+  createOpenAiClient,
+  isOpenAiConfigured,
+  lazyOpenAiClient,
+  resolveOpenAiConfig,
+  type OpenAiConfig,
+  type OpenAiConfigSource,
+} from "./client";
 export { generateImageBuffer, editImages } from "./image";
 export {
   buildFashionPrompt,

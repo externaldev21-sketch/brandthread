@@ -3,7 +3,9 @@
  * new create paths: posts, stories, DM attachments, avatar/banner/logo.
  *
  * Extends lib/imageModeration.ts (community photos keep their own fail-closed
- * behaviour, untouched) and sits behind the same AI integration config:
+ * behaviour, untouched) and sits behind the shared OpenAI config
+ * (@workspace/integrations-openai-ai-server/config):
+ *   OPENAI_API_KEY (+ optional OPENAI_BASE_URL), or the Replit pair
  *   AI_INTEGRATIONS_OPENAI_BASE_URL / AI_INTEGRATIONS_OPENAI_API_KEY
  *   MEDIA_MODERATION_ENABLED  (optional kill switch; "false" | "0" | "off")
  *
@@ -26,6 +28,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { isOpenAiConfigured } from "@workspace/integrations-openai-ai-server/config";
 import { logger } from "./logger";
 
 const exec = promisify(execFile);
@@ -104,10 +107,44 @@ export function setMediaModerationProvider(next?: MediaModerationProvider): void
 export function setTextModerationProvider(next?: TextModerationProvider): void { textProviderOverride = next ?? null; }
 export function setVideoFrameExtractor(next?: VideoFrameExtractor): void { frameExtractorOverride = next ?? null; }
 
-export function mediaModerationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export type MediaModerationStatus =
+  | { enabled: true; reason: null }
+  | { enabled: false; reason: "kill_switch" | "no_provider" };
+
+/** Whether screening runs, and if not, why. */
+export function mediaModerationStatus(env: NodeJS.ProcessEnv = process.env): MediaModerationStatus {
   const flag = (env.MEDIA_MODERATION_ENABLED ?? "").trim().toLowerCase();
-  if (flag === "false" || flag === "0" || flag === "off") return false;
-  return !!(env.AI_INTEGRATIONS_OPENAI_BASE_URL?.trim() && env.AI_INTEGRATIONS_OPENAI_API_KEY?.trim());
+  if (flag === "false" || flag === "0" || flag === "off") return { enabled: false, reason: "kill_switch" };
+  if (!isOpenAiConfigured(env)) return { enabled: false, reason: "no_provider" };
+  return { enabled: true, reason: null };
+}
+
+export function mediaModerationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return mediaModerationStatus(env).enabled;
+}
+
+/**
+ * Production must never run with screening silently off (App Store guideline
+ * 1.2). Logged at error level once at boot and reported as degraded by
+ * GET /api/healthz/ready. Returns true when the warning was logged.
+ */
+export function reportMediaModerationAtBoot(
+  env: NodeJS.ProcessEnv = process.env,
+  log: Pick<typeof logger, "error" | "info"> = logger,
+): boolean {
+  const status = mediaModerationStatus(env);
+  if (status.enabled) {
+    log.info("Media moderation is on: uploaded images and video frames are screened");
+    return false;
+  }
+  if (env.NODE_ENV !== "production") return false;
+  log.error(
+    { reason: status.reason },
+    status.reason === "kill_switch"
+      ? "Media moderation is OFF in production (MEDIA_MODERATION_ENABLED is false). Uploaded images and videos are not screened."
+      : "Media moderation is OFF in production: set OPENAI_API_KEY (or the Replit AI_INTEGRATIONS_OPENAI_* pair). Uploaded images and videos are not screened.",
+  );
+  return true;
 }
 
 function screeningOn(custom: unknown): boolean {
@@ -121,7 +158,7 @@ const SKIPPED: MediaVerdict = {
 // ─── Provider (OpenAI omni-moderation) ───────────────────────────────────────
 
 async function callOpenAi(input: unknown): Promise<FrameScores> {
-  // Lazy: the client throws at import when the env is missing.
+  // Lazy import keeps this module light; the client itself is created on first use.
   const { openai } = await import("@workspace/integrations-openai-ai-server");
   const result = await openai.moderations.create({ model: "omni-moderation-latest", input: input as never });
   const first = result.results?.[0];

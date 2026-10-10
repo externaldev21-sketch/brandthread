@@ -31,6 +31,7 @@ import {
   VIOLENCE_TERMS,
 } from "./denylist";
 import { logger } from "../logger";
+import { DEFAULT_OPENAI_BASE_URL, resolveOpenAiConfig } from "@workspace/integrations-openai-ai-server/config";
 
 export type PromptCategory =
   | "minor_safety"
@@ -193,11 +194,11 @@ const OPENAI_BLOCKED: Record<string, PromptCategory> = {
 };
 
 function openAiKey(): string | null {
-  return process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || null;
+  return resolveOpenAiConfig()?.apiKey ?? null;
 }
 
 function openAiBase(): string {
-  return (process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+  return (resolveOpenAiConfig()?.baseURL ?? DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
 }
 
 /** Returns null when unavailable (no key, network error, bad response). */

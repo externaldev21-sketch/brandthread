@@ -8,6 +8,9 @@
  */
 import { logger } from "./logger";
 import { assertStagingIsSafe, resolveAppEnv } from "./appEnv";
+import { isOpenAiConfigured } from "@workspace/integrations-openai-ai-server/config";
+import { resolveDsn } from "./monitoring";
+import { reportMediaModerationAtBoot } from "./mediaModeration";
 
 type RequiredVar = {
   name: string;
@@ -43,7 +46,6 @@ const OPTIONAL_VARS = [
   "AGORA_RECORDING_S3_SECRET_KEY",
   "AGORA_RECORDING_S3_VENDOR",
   "AGORA_RECORDING_PUBLIC_URL_BASE",
-  "AI_INTEGRATIONS_OPENAI_API_KEY",
   "GOOGLE_MAPS_API_KEY",
   "RESEND_API_KEY",
   "RESEND_FROM_EMAIL",
@@ -51,9 +53,30 @@ const OPTIONAL_VARS = [
   "REVENUECAT_PROJECT_ID",
   "REVENUECAT_WEBHOOK_AUTHORIZATION",
   "SHIPPO_WEBHOOK_SECRET",
-  "SENTRY_DSN",
   "POSTHOG_API_KEY",
 ];
+
+// Not needed to boot, and never a boot failure (an existing deploy without
+// them keeps running), but production without them is flying blind or
+// unmoderated: logged at ERROR level in production (which also reaches
+// Sentry when it is configured), WARN elsewhere.
+type RecommendedCheck = { name: string; configured: (env: NodeJS.ProcessEnv) => boolean; impact: string };
+export const PRODUCTION_RECOMMENDED: RecommendedCheck[] = [
+  {
+    name: "SENTRY_DSN",
+    configured: (env) => resolveDsn(env.SENTRY_DSN) !== null,
+    impact: "server errors are not reported (sentry.io: Project Settings > Client Keys (DSN))",
+  },
+  {
+    name: "OPENAI_API_KEY (or AI_INTEGRATIONS_OPENAI_API_KEY + AI_INTEGRATIONS_OPENAI_BASE_URL)",
+    configured: (env) => isOpenAiConfigured(env),
+    impact: "image/video moderation and AI features are off",
+  },
+];
+
+export function missingRecommended(env: NodeJS.ProcessEnv = process.env): RecommendedCheck[] {
+  return PRODUCTION_RECOMMENDED.filter((check) => !check.configured(env));
+}
 
 /**
  * Throws with every missing required var listed at once (not one at a time)
@@ -74,6 +97,13 @@ export function validateEnv(): void {
         "The server cannot start without these — see docs/launch/README.md.",
     );
   }
+
+  for (const check of missingRecommended()) {
+    const message = `${check.name} is not set: ${check.impact}`;
+    if (isProduction) logger.error({ missing: check.name }, message);
+    else logger.warn({ missing: check.name }, message);
+  }
+  reportMediaModerationAtBoot();
 
   const missingOptional = OPTIONAL_VARS.filter((name) => !process.env[name]?.trim());
   if (missingOptional.length > 0) {

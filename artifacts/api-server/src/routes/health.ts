@@ -4,6 +4,7 @@ import { pool } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { redisStatus } from "../lib/redis";
 import { realtimeBusStatus } from "../lib/realtime/bus";
+import { mediaModerationStatus } from "../lib/mediaModeration";
 
 const router: IRouter = Router();
 
@@ -54,9 +55,28 @@ router.get("/live", (_req, res) => {
  * (Postgres). Returns 503 (not 200) when a dependency is down so traffic is
  * routed away from this instance instead of erroring on every request.
  */
+/**
+ * Feature checks that never make an instance unready (routing traffic away
+ * would not fix them) but must be visible: in production, image/video
+ * screening being off is reported as `degraded`.
+ */
+export function mediaModerationCheck(env: NodeJS.ProcessEnv = process.env): {
+  status: "on" | "off";
+  reason: string | null;
+  degraded: boolean;
+} {
+  const status = mediaModerationStatus(env);
+  return {
+    status: status.enabled ? "on" : "off",
+    reason: status.reason,
+    degraded: !status.enabled && env.NODE_ENV === "production",
+  };
+}
+
 router.get("/ready", async (_req, res) => {
   const database = await checkDatabase();
   const ready = database.ok;
+  const mediaModeration = mediaModerationCheck();
 
   if (!ready) {
     logger.warn({ checks: { database } }, "Readiness check failed");
@@ -64,8 +84,9 @@ router.get("/ready", async (_req, res) => {
 
   res.status(ready ? 200 : 503).json({
     status: ready ? "ok" : "unavailable",
-    // Informational only: a missing or down cache never makes an instance unready.
-    checks: { database, cache: { status: redisStatus() }, realtime: realtimeBusStatus() ?? { status: "idle" } },
+    degraded: mediaModeration.degraded,
+    // Cache, bus and screening availability are reported independently of database readiness.
+    checks: { database, cache: { status: redisStatus() }, realtime: realtimeBusStatus() ?? { status: "idle" }, mediaModeration },
   });
 });
 

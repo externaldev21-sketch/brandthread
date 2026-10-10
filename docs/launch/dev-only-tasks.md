@@ -17,9 +17,14 @@ one-time setup this overlaps with).
 - [ ] **Create the app record** in App Store Connect → My Apps → + → New App. Bundle ID
       `com.brandthread.mobile` (must be registered first — the first `eas build` run does
       this automatically per `release-flow.md`).
-- [ ] **Fill in `eas.json` → `submit.production.ios`** with `appleId`, `ascAppId`,
-      `appleTeamId` (values only obtainable from the App Store Connect/developer.apple.com
-      UI — see `release-flow.md`'s table for exactly where each one lives).
+- [ ] **Set the App Store submit values as environment variables** `EXPO_APPLE_ID`
+      (Apple ID email), `EAS_ASC_APP_ID` (App Store Connect → app → App Information →
+      Apple ID) and `EXPO_APPLE_TEAM_ID` (developer.apple.com → Membership details →
+      Team ID). eas.json can't read env, so `pnpm run submit:ios` passes them to
+      `eas submit`; see `release-flow.md` → "App Store Connect (once)".
+- [ ] **Run `eas init` before the first store build** and commit `app.json` (or set
+      `EAS_PROJECT_ID`). The OTA update URL is baked into each binary; production and
+      TestFlight builds stop without it.
 - [ ] **APNs key / push notification certificate** — EAS can generate this during the
       first build, but it requires signing in with the real Apple Developer account
       interactively once.
@@ -84,9 +89,11 @@ one-time setup this overlaps with).
 - [ ] **Stripe Connect / Stripe account review** for real payouts to go live — separate
       from the App Store/Play accounts entirely, but blocking for sellers to receive real
       money.
-- [ ] **Sentry account + DSN** (optional but recommended before launch) — crash reporting
-      stays off until a human creates the Sentry project and sets
-      `EXPO_PUBLIC_SENTRY_DSN`/`SENTRY_AUTH_TOKEN` per `release-flow.md`.
+- [ ] **Sentry account + DSN** (required for store builds) — production and TestFlight
+      builds stop until `EXPO_PUBLIC_SENTRY_DSN` is set in the EAS production environment
+      (sentry.io → Settings → Projects → project → Client Keys (DSN)); the API logs an
+      error at boot in production without `SENTRY_DSN`. `SENTRY_AUTH_TOKEN` (source maps)
+      stays optional. Steps in `release-flow.md` → "Crash and error reporting".
 - [ ] **PostHog project** (optional) — funnel analytics stay off until a human creates the
       project and sets `EXPO_PUBLIC_POSTHOG_KEY` (app) and `POSTHOG_API_KEY` (API). See
       `docs/reliability/observability.md`.

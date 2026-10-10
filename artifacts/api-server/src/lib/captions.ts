@@ -12,6 +12,7 @@ import { createWriteStream, promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
+import { isOpenAiConfigured } from "@workspace/integrations-openai-ai-server/config";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
@@ -34,7 +35,7 @@ const FLAG_CACHE_MS = 30_000;
 // ─── Gating ───────────────────────────────────────────────────────────────────
 
 export function captionsEnvConfigured(): boolean {
-  return Boolean(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY);
+  return isOpenAiConfigured();
 }
 
 let flagCache: { value: boolean; at: number } | null = null;

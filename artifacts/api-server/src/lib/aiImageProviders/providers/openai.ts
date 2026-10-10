@@ -10,7 +10,8 @@
  * is new code being written after that migration was already flagged.
  */
 import fs from "node:fs";
-import OpenAI, { toFile } from "openai";
+import { toFile } from "openai";
+import { createOpenAiClient, isOpenAiConfigured } from "@workspace/integrations-openai-ai-server/config";
 import type { GenerationInput, GenerationResult, ImageProvider } from "../types";
 import { getOpenAiImageModel } from "../config";
 
@@ -22,7 +23,7 @@ import { getOpenAiImageModel } from "../config";
 const ESTIMATED_COST_USD = 0.167;
 
 function isConfigured(): boolean {
-  return Boolean(process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL);
+  return isOpenAiConfigured();
 }
 
 async function toOpenAiFile(filePath: string) {
@@ -33,10 +34,7 @@ async function toOpenAiFile(filePath: string) {
 
 async function generate(input: GenerationInput): Promise<GenerationResult> {
   const start = Date.now();
-  const client = new OpenAI({
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  });
+  const client = createOpenAiClient();
   const allImages = [...input.productImages, ...input.referenceImages];
   const images = await Promise.all(allImages.map(toOpenAiFile));
   const response = await client.images.edit({

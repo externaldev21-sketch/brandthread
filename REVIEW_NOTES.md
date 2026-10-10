@@ -4,7 +4,11 @@ Paste the rendered version of this file into App Store Connect (App Review
 Information, Notes) and the Play Console "App access" instructions. The
 `{{...}}` values are filled from environment variables when you run
 `pnpm --filter @workspace/api-server run seed:review-accounts -- --render-notes`
-(stdout only; never commit the rendered output).
+(stdout only; never commit the rendered output). Before pasting, run
+`pnpm --filter @workspace/api-server run verify:reviewer-sign-in` with the
+production `pk_live_` key: the "no email or SMS code" promise below holds only
+when Clerk Device Trust is off for the production instance
+(`docs/launch/reviewer-sign-in.md`).
 
 ## Sign in
 
