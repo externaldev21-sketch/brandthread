@@ -924,11 +924,22 @@ export interface FreelancerJob {
   title: string;
   description: string;
   agreedPriceCents: number;
-  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'accepted' | 'in_progress' | 'delivered' | 'completed' | 'disputed' | 'cancelled';
   paymentStatus: 'unpaid' | 'paid' | 'refunded';
   platformFeeCents: number;
   freelancerPayoutCents: number;
   completedAt: string | null;
+  /** Delivery + hirer review (BT-446). Optional so older API responses still type-check. */
+  deliveredAt?: string | null;
+  deliveryNote?: string | null;
+  revisionCount?: number;
+  revisionsLeft?: number;
+  revisionNote?: string | null;
+  /** When an untouched delivery is approved automatically. */
+  autoReleaseAt?: string | null;
+  approvedBy?: 'hirer' | 'auto' | 'admin' | null;
+  disputedAt?: string | null;
+  disputeReason?: string | null;
   createdAt: string;
   updatedAt: string;
   /** Extras returned by list/get endpoints. */
@@ -4123,6 +4134,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       accept:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/accept`, {}),
       start:       (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/start`, {}),
       complete:    (id: string) => patch<{ job: FreelancerJob; payout: { amountCents: number; transferId: string | null } }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/complete`, {}),
+      /** Freelancer delivers the work — no payout until the hirer approves. */
+      deliver:     (id: string, note?: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/deliver`, { note }),
+      /** Hirer approves the delivery — releases the freelancer's payout. */
+      approve:     (id: string) => patch<{ job: FreelancerJob; payout: { amountCents: number; transferId: string | null } }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/approve`, {}),
+      requestRevision: (id: string, note: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/request-revision`, { note }),
+      /** Hirer reports a problem — the payout is held while Brandthread reviews. */
+      dispute:     (id: string, reason: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/dispute`, { reason }),
       cancel:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/cancel`, {}),
       syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
     },
