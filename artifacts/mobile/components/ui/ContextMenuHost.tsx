@@ -130,7 +130,9 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={() => close()}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
         <BlurView intensity={Platform.OS === 'ios' ? 60 : 40} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, styles.previewScrim, { backgroundColor: theme.surfaceGlass }]} />
+        {/* A dim over the blur (Instagram) — the theme background at ~45%, so
+            the blurred screen stays visible behind the card. */}
+        <View style={[StyleSheet.absoluteFill, styles.previewScrim, { backgroundColor: `${theme.background}73` }]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={() => close()} accessibilityRole="button" accessibilityLabel="Close menu" />
       </Animated.View>
       <View pointerEvents="box-none" style={[styles.previewColumn, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>

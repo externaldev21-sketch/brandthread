@@ -38,7 +38,7 @@ import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives';
 import { isPreviewCheckoutGroup } from '@/lib/previewCheckout';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
-import SwipeRow, { type SwipeRowAction } from '@/components/ui/SwipeRow';
+import SwipeableActions, { type SwipeAction } from '@/components/SwipeableActions';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
   FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
@@ -143,31 +143,31 @@ function CartItemRow({
   // bag (row swiped left → SAVE / DELETE side by side). Same shared
   // SwipeableActions as Activity rows; both actions run the exact handlers
   // the row's own Save / Remove buttons use (same API, same undo toast).
-  // Apple Mail swipe (full swipe left removes). Monochrome: Save dark grey,
-  // Remove white with a black trash (the screen's one solid "act" color,
-  // like the Checkout pill) — no red.
-  const swipeActions = useMemo<SwipeRowAction[]>(() => [
+  // Monochrome: Save on a light-gray tint of the card (ZARA's dark SAVE), Remove
+  // white with a black trash (the screen's one solid "act" color, like the
+  // Checkout pill) — no red.
+  const swipeActions = useMemo<SwipeAction[]>(() => [
     {
       key: 'save',
-      label: 'Save',
       icon: 'bookmark',
-      tone: 'muted',
+      color: 'rgba(255,255,255,0.14)',
+      iconColor: theme.text,
       accessibilityLabel: `Save ${item.productName} for later`,
       onPress: onSaveForLater,
     },
     {
       key: 'remove',
-      label: 'Remove',
       icon: 'trash-2',
-      tone: 'light',
+      color: '#FFFFFF',
+      iconColor: '#000000',
       accessibilityLabel: `Remove ${item.productName} from cart`,
       onPress: onRemove,
     },
-  ], [item.productName, onRemove, onSaveForLater]);
+  ], [item.productName, onRemove, onSaveForLater, theme.text]);
 
   return (
     <View style={ir.swipeBleed} testID={`cart-row-${item.id}`}>
-    <SwipeRow rowId={item.id} trailing={swipeActions} disabled={isRowBusy}>
+    <SwipeableActions actions={swipeActions} disabled={isRowBusy}>
     <View style={[ir.root, ir.swipeFront, isRowBusy && ir.rowBusy]}>
       {/* Pending overlay for remove/save */}
       {isRowBusy && (
@@ -297,7 +297,7 @@ function CartItemRow({
         </View>
       </View>
     </View>
-    </SwipeRow>
+    </SwipeableActions>
     </View>
   );
 }

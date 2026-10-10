@@ -22,7 +22,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { SPRING } from '@/constants/motion';
-import { FONT } from '@/lib/theme';
+import { FILL_ELEVATED, FONT } from '@/lib/theme';
 import { haptics } from '@/lib/haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -40,10 +40,11 @@ export type SwipeTone = 'neutral' | 'muted' | 'destructive' | 'light';
  *  "no red" remove. */
 function toneColors(theme: AppThemePreset, tone: SwipeTone): { bg: string; fg: string } {
   switch (tone) {
-    case 'muted': return { bg: theme.card, fg: theme.text };
+    case 'muted': return { bg: FILL_ELEVATED, fg: theme.text };
     case 'destructive': return { bg: theme.error, fg: theme.onAccent };
     case 'light': return { bg: theme.accent, fg: theme.onAccent };
-    default: return { bg: theme.cardElevated, fg: theme.text };
+    // Silver square, black ink — Mail's grey "More", in the palette.
+    default: return { bg: theme.muted, fg: theme.background };
   }
 }
 
@@ -186,6 +187,10 @@ export default function SwipeRow({
     );
   };
 
+  // Panels only exist while the row is moved toward them, so a closed row
+  // never shows a sliver of an action past a rounded / inset card.
+  const trailingOpacity = translateX.interpolate({ inputRange: [-1, 0], outputRange: [1, 0], extrapolate: 'clamp' });
+  const leadingOpacity = translateX.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' });
   const outerTrailing = trailing[trailing.length - 1];
   const outerLeading = leading[0];
 
@@ -201,18 +206,18 @@ export default function SwipeRow({
       }}
     >
       {leading.length > 0 ? (
-        <View style={[styles.panel, styles.leadingPanel, { width: armedSide === 'leading' ? '100%' : leadingWidth }]}>
+        <Animated.View style={[styles.panel, styles.leadingPanel, { width: armedSide === 'leading' ? '100%' : leadingWidth, opacity: leadingOpacity }]}>
           {armedSide === 'leading' && outerLeading
             ? renderButton(outerLeading, styles.fullAction)
             : leading.map((a) => renderButton(a, { width: SWIPE_ACTION_WIDTH }))}
-        </View>
+        </Animated.View>
       ) : null}
       {trailing.length > 0 ? (
-        <View style={[styles.panel, styles.trailingPanel, { width: armedSide === 'trailing' ? '100%' : trailingWidth }]}>
+        <Animated.View style={[styles.panel, styles.trailingPanel, { width: armedSide === 'trailing' ? '100%' : trailingWidth, opacity: trailingOpacity }]}>
           {armedSide === 'trailing' && outerTrailing
             ? renderButton(outerTrailing, [styles.fullAction, styles.fullActionTrailing])
             : trailing.map((a) => renderButton(a, { width: SWIPE_ACTION_WIDTH }))}
-        </View>
+        </Animated.View>
       ) : null}
       <Animated.View style={[styles.foreground, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
         {children}
