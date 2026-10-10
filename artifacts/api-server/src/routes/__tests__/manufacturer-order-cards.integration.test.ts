@@ -42,6 +42,9 @@ vi.mock("../../middlewares/requireAuth", () => ({
   },
   requirePlan: () => (_req: any, _res: any, next: () => void) => next(),
 }));
+vi.mock("../../middlewares/featureGate", () => ({
+  featureGate: () => (_req: any, _res: any, next: () => void) => next(),
+}));
 vi.mock("../../middlewares/requireRole", () => ({
   teamContext: () => (_req: any, _res: any, next: () => void) => next(),
 }));

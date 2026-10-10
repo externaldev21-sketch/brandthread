@@ -17,6 +17,7 @@ import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectClea
 import { startMoneySweepJob } from "./jobs/moneySweep";
 import { missingAppLinkEnv } from "./routes/wellKnown";
 import { startPlatformBalanceJob } from "./jobs/platformBalance";
+import { startPlanProductSyncJob } from "./jobs/planProductSync";
 import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
 import { startAdCampaignLifecycleJob } from "./jobs/adCampaignLifecycle";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
@@ -114,6 +115,7 @@ const server = app.listen(port, (err) => {
   startDesignStudioObjectCleanupJob();
   startMoneySweepJob();
   startPlatformBalanceJob();
+  startPlanProductSyncJob();
   startAffiliatePayoutsJob();
   startAdCampaignLifecycleJob();
   startSellerReferralsJob();

@@ -14,6 +14,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
@@ -123,6 +124,7 @@ export default function RfqPostScreen() {
       haptics.success();
       router.replace(`/rfq-compare?rfqId=${rfq.id}` as never);
     } catch (e: any) {
+      if (promptUpgradeOnPlanGate(e, router)) return;
       Alert.alert('Could not post RFQ', e?.message ?? 'Please try again.');
     } finally {
       setSubmitting(false);

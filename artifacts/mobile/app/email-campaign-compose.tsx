@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useApi, type EmailAudience, type EmailCampaignBody, type EmailMarketingStatus } from '@/lib/api';
@@ -124,6 +125,7 @@ export default function EmailCampaignComposeScreen() {
       const r = await api.emailMarketing.send(cid, scheduleAt);
       router.replace(`/email-campaign-results?id=${r.id}` as never);
     } catch (e: any) {
+      if (promptUpgradeOnPlanGate(e, router)) return;
       Alert.alert('Not sent', typeof e?.message === 'string' && e.message.length < 140 ? e.message : "Couldn't send this campaign.");
     }
   });

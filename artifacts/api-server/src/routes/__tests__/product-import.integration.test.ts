@@ -238,22 +238,18 @@ describe("csv commit", () => {
     expect(variants[0]).toMatchObject({ sku: first, stock: 4 });
   });
 
-  it("honours the plan product limit exactly like hasProductCapacity", async () => {
+  it("imports drafts past the plan's live-product cap (drafts don't count)", async () => {
     plan.limit = 2;
     const csv = "name,price\nA,1\nB,2\nC,3\n";
     const preview: any = await (await call(sellerA, "/csv/preview", { csv })).json();
-    expect(preview.capacity).toMatchObject({ limit: 2, used: 0, remaining: 2, newProducts: 3, wouldExceed: true });
+    expect(preview.capacity).toMatchObject({ limit: 2, used: 0, remaining: 2, newProducts: 3, wouldExceed: false });
+    expect(preview.notes.join(" ")).toContain("you can publish 2 more");
     const res: any = await (await call(sellerA, "/csv/commit", { csv })).json();
-    expect(res.counts).toMatchObject({ created: 2, skipped: 1 });
-    expect(res.planLimitReached).toBe(true);
-    expect((await productsOf(sellerA)).rows).toHaveLength(2);
-    // Nothing left to import -> same 403 shape products.ts returns.
-    const blocked = await call(sellerA, "/csv/commit", { csv: "name,price\nD,4\n" });
-    expect(blocked.status).toBe(403);
-    expect((await blocked.json() as any).code).toBe("PLAN_LIMIT_REACHED");
-    // Updates to existing products still work at the limit.
-    const upd: any = await (await call(sellerA, "/csv/commit", { csv: "name,price\nA,9\n" })).json();
-    expect(upd.counts.updated).toBe(1);
+    expect(res.counts).toMatchObject({ created: 3, skipped: 0 });
+    expect(res.planLimitReached).toBe(false);
+    const { rows } = await productsOf(sellerA);
+    expect(rows).toHaveLength(3);
+    expect(rows.every((r: any) => r.status === "draft")).toBe(true);
   });
 
   it("scopes everything to the owner: same file, two sellers, no cross-talk", async () => {

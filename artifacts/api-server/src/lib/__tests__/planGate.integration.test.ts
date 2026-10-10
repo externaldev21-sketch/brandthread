@@ -1,7 +1,8 @@
 /**
- * BT-002: a seller without paid access sells and publishes within the free
- * limits (planCatalogue FREE_TIER_LIMITS); a trialing/active seller gets the
- * plan's limits; past_due keeps the plan only during the grace period.
+ * Plan gate on real Postgres: a seller with no live trial or plan can't sell
+ * (NO_PLAN_LIMITS); a trialing/active seller sells up to the plan's active
+ * product cap; past_due keeps the plan only during the grace period; App
+ * Review demo accounts keep full access.
  */
 import { afterAll, describe, expect, it } from "vitest";
 import crypto from "node:crypto";
@@ -9,7 +10,7 @@ import { inArray } from "drizzle-orm";
 import { db, products, users } from "@workspace/db";
 import { productsBeyondSellerPlan } from "../planGate";
 import { getVerifiedPlanAccess, nextPlanFor } from "../planAccess";
-import { FREE_TIER_LIMITS, PAST_DUE_GRACE_DAYS, PLAN_CATALOGUE } from "../planCatalogue";
+import { NO_PLAN_LIMITS, PAST_DUE_GRACE_DAYS, PLAN_CATALOGUE } from "../planCatalogue";
 
 const suffix = crypto.randomBytes(5).toString("hex");
 const sellers: string[] = [];
@@ -39,31 +40,25 @@ afterAll(async () => {
   await db.delete(users).where(inArray(users.clerkId, sellers));
 });
 
-describe("free tier (BT-002)", () => {
-  it("an unpaid seller gets the free limits and needs Starter next", async () => {
-    const id = await seller("free");
+describe("plan gate", () => {
+  it("a seller with no live trial or plan can't sell anything and needs Starter", async () => {
+    const id = await seller("none");
+    const ids = await listings(id, 2);
     const access = await getVerifiedPlanAccess(id);
-    expect(access).toMatchObject({ paid: false, limits: FREE_TIER_LIMITS });
+    expect(access).toMatchObject({ paid: false, limits: NO_PLAN_LIMITS });
     expect(nextPlanFor(access)).toBe("starter");
+    expect(await productsBeyondSellerPlan(id, ids)).toEqual(ids);
   });
 
-  it("only the first free-limit listings can be bought; the newest wait for a plan", async () => {
-    const id = await seller("over");
-    const ids = await listings(id, FREE_TIER_LIMITS.products! + 1);
-    const newest = ids[ids.length - 1];
-    expect(await productsBeyondSellerPlan(id, ids)).toEqual([newest]);
-    expect(await productsBeyondSellerPlan(id, ids.slice(0, 2))).toEqual([]);
-  });
-
-  it("a trialing seller sells everything Starter includes", async () => {
+  it("a trialing Starter seller sells their first 10 live listings; the newest over the cap waits", async () => {
     const id = await seller("trial", { subscriptionStatus: "trialing", subscriptionPlanId: "starter" });
-    const ids = await listings(id, FREE_TIER_LIMITS.products! + 1);
-    const access = await getVerifiedPlanAccess(id);
-    expect(access).toMatchObject({ paid: true, limits: PLAN_CATALOGUE.starter.limits });
-    expect(await productsBeyondSellerPlan(id, ids)).toEqual([]);
+    const cap = PLAN_CATALOGUE.starter.limits.products!;
+    const ids = await listings(id, cap + 1);
+    expect(await getVerifiedPlanAccess(id)).toMatchObject({ paid: true, limits: PLAN_CATALOGUE.starter.limits });
+    expect(await productsBeyondSellerPlan(id, ids)).toEqual([ids[ids.length - 1]]);
   });
 
-  it("past_due keeps the plan during the grace period, then drops to the free limits", async () => {
+  it("past_due keeps the plan during the grace period, then selling stops", async () => {
     const day = 24 * 60 * 60 * 1000;
     const inGrace = await seller("grace", {
       subscriptionStatus: "past_due", subscriptionPlanId: "growth",
@@ -74,6 +69,11 @@ describe("free tier (BT-002)", () => {
       subscriptionPastDueSince: new Date(Date.now() - (PAST_DUE_GRACE_DAYS + 1) * day),
     });
     expect(await getVerifiedPlanAccess(inGrace)).toMatchObject({ paid: true, planId: "growth" });
-    expect(await getVerifiedPlanAccess(lapsed)).toMatchObject({ paid: false, limits: FREE_TIER_LIMITS });
+    expect(await getVerifiedPlanAccess(lapsed)).toMatchObject({ paid: false, limits: NO_PLAN_LIMITS });
+  });
+
+  it("App Review demo accounts keep full seller access without a purchase", async () => {
+    const id = await seller("review", { isReviewAccount: true });
+    expect(await getVerifiedPlanAccess(id)).toMatchObject({ paid: true, planId: "pro" });
   });
 });

@@ -95,13 +95,13 @@ describe("buildPlanPerks", () => {
       expect(perk.productLimit).toBe(PLAN_CATALOGUE[perk.planId].limits.products);
       expect(perk.teamSeats).toBe(PLAN_CATALOGUE[perk.planId].limits.teamSeats);
     }
-    expect(perks.find((p) => p.planId === "starter")).toMatchObject({ productLimit: 25, teamSeats: 0 });
+    expect(perks.find((p) => p.planId === "starter")).toMatchObject({ productLimit: 10, teamSeats: 1 });
     expect(perks.find((p) => p.planId === "pro")).toMatchObject({ productLimit: null, teamSeats: null });
   });
 
-  it("only Pro has advanced analytics", () => {
+  it("gives Growth and Pro advanced analytics (planCatalogue.ts tiers)", () => {
     expect(hasAdvancedAnalytics("pro")).toBe(true);
-    expect(hasAdvancedAnalytics("growth")).toBe(false);
+    expect(hasAdvancedAnalytics("growth")).toBe(true);
     expect(hasAdvancedAnalytics("starter")).toBe(false);
     expect(hasAdvancedAnalytics(null)).toBe(false);
   });

@@ -26,6 +26,7 @@ import { Image } from 'expo-image';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
+import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 import * as ImagePicker from 'expo-image-picker';
 import { haptics } from '@/lib/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -385,7 +386,9 @@ export default function SellerDropCreate() {
       } else {
         goBackOr(router);
       }
-    } catch {
+    } catch (e) {
+      // Drops are on Growth+ (server plan config): show the upgrade prompt, not a field error.
+      if (promptUpgradeOnPlanGate(e, router)) return;
       Alert.alert('Could not save', 'Please check the fields and try again.');
     } finally {
       setSaving(false);

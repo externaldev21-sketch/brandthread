@@ -32,6 +32,9 @@ export async function seedSeller(tag: string, options: { stripeAccount?: boolean
     role: "seller",
     stripeAccountId: options.stripeAccount === false ? null : `acct_${clerkId.replace(/-/g, "_")}`,
     stripeAccountStatus: options.stripeAccount === false ? null : "active",
+    // Sellers need a live plan to sell (lib/planGate.ts).
+    subscriptionStatus: "trialing",
+    subscriptionPlanId: "starter",
   });
   return clerkId;
 }

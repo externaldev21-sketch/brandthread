@@ -1,28 +1,44 @@
 /**
  * How many more products a seller's plan allows (Starter caps the catalogue;
  * see planCatalogue.ts). Counts the same rows POST /api/products counts —
- * every non-archived, non-deleted product, drafts included — under the same
+ * active, non-deleted product — under the same
  * advisory lock, so imports and manual creation can't race past the cap.
  * Call inside a transaction; returns null when the plan has no limit.
  */
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { products } from "@workspace/db";
 
 export async function remainingProductCapacity(tx: any, ownerId: string, limit: number | null): Promise<number | null> {
   if (limit === null) return null;
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"product-limit:" + ownerId}))`);
-  const [result] = await tx
-    .select({ count: sql<number>`count(*)::int` })
-    .from(products)
-    .where(and(
-      eq(products.ownerId, ownerId),
-      ne(products.status, "archived"),
-      isNull(products.deletedAt),
-    ));
-  return Math.max(0, limit - (result?.count ?? 0));
+  return Math.max(0, limit - await countActiveProducts(tx, ownerId));
 }
 
+/**
+ * The plan's product cap counts ACTIVE (published, live) products only.
+ * Drafts, archived, sold-out-hidden and deleted products don't count, and a
+ * product's variants (sizes/colours) are one product. Publishing is what is
+ * limited; drafts can always be saved (Dev's plan-tier spec).
+ */
+export function activeProductsWhere(ownerId: string) {
+  return and(eq(products.ownerId, ownerId), eq(products.status, "active"), isNull(products.deletedAt));
+}
+
+export async function countActiveProducts(executor: any, ownerId: string): Promise<number> {
+  const [result] = await executor
+    .select({ count: sql<number>`count(*)::int` })
+    .from(products)
+    .where(activeProductsWhere(ownerId));
+  return result?.count ?? 0;
+}
+
+/**
+ * True when `requested` more products can go live under `limit` (null =
+ * unlimited). Takes the per-owner advisory lock first, so concurrent
+ * publishes can't both slip under the cap. `requested` 0 always fits.
+ */
 export async function hasProductCapacity(tx: any, ownerId: string, limit: number | null, requested: number): Promise<boolean> {
-  const remaining = await remainingProductCapacity(tx, ownerId, limit);
-  return remaining === null || requested <= remaining;
+  if (limit === null || requested <= 0) return true;
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"product-limit:" + ownerId}))`);
+  return (await countActiveProducts(tx, ownerId)) + requested <= limit;
 }

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { reviewTextModeration } from "../middlewares/reviewTextModeration";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
+import { featureGate } from "../middlewares/featureGate";
+import { pushBroadcastAllowance } from "../middlewares/pushBroadcastAllowance";
 import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
 import { requireAiConsent } from "../middlewares/requireAiConsent";
 import healthRouter from "./health";
@@ -120,6 +122,7 @@ import sellerEmailsPublicRouter from "./seller-emails-public";
 import emailMarketingWebhookRouter from "./email-marketing-webhook";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
+import emailOptInRouter from "./email-opt-in";
 import salesRouter from "./sales";
 import returnsRouter from "./returns";
 import returnLabelsRouter from "./return-labels";
@@ -299,7 +302,7 @@ router.use("/onboarding-sample", aiSafetyGuard("onboarding-logo"), onboardingSam
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);
-router.use("/drops",           tc, dropsRouter);
+router.use("/drops",           tc, featureGate("drops", { only: [{ method: "POST", path: "/" }] }), dropsRouter); // new drops: Growth+
 router.use("/analytics/insights", tc, analyticsInsightsRouter);
 router.use("/analytics",       tc, analyticsRouter);
 router.use("/integrations",    tc, integrationsRouter);
@@ -321,7 +324,7 @@ router.use("/manufacturers",   tc, manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
 router.use("/product-variants", tc, productVariantsRouter);
 router.use("/catalog-public",   catalogPublicRouter);
-router.use("/seller-hub",      tc, sellerHubRouter);
+router.use("/seller-hub",      tc, featureGate("manufacturer_hub", { only: [{ method: "POST", path: "/quote-requests", when: (req) => req.body?.type !== "sample" }, { method: "POST", path: "/rfqs" }] }), sellerHubRouter); // quotes + RFQs: Growth+, sample requests: every plan
 router.use("/push",            pushRouter);
 router.use("/live-activities", liveActivitiesRouter); // iOS Live Activity APNs tokens; requireAuth per route, no team context
 router.use("/notification-prefs", notificationPrefsRouter);
@@ -371,7 +374,7 @@ router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliat
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
-router.use("/seller/push-broadcasts",    tc, sellerPushBroadcastsRouter);
+router.use("/seller/push-broadcasts",    tc, pushBroadcastAllowance, sellerPushBroadcastsRouter); // weekly allowance per plan
 router.use("/seller/giveaways",          tc, sellerGiveawaysRouter);
 router.use("/seller/launch-checklist",   tc, sellerLaunchChecklistRouter);
 // Checkout settings: post-purchase offer + conversion tracking ("Additional scripts").
@@ -417,7 +420,7 @@ router.use("/discount-codes",            tc, discountCodesRouter);
 router.use("/sales",                     tc, salesRouter);
 router.use("/returns",                   tc, returnsRouter);
 router.use("/return-labels",             returnLabelsRouter);
-router.use("/sample-orders",             tc, sampleOrdersRouter);
+router.use("/sample-orders",             tc, featureGate("manufacturer_hub", { only: [{ method: "POST", path: "/", when: (req) => req.body?.orderType === "bulk" }] }), sampleOrdersRouter); // bulk orders: Growth+, samples: every plan
 router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
 router.use("/finance/statements",        financeStatementsRouter);
@@ -430,8 +433,9 @@ router.use("/seller/payment-settings",    tc, sellerPaymentSettingsRouter);
 router.use("/team",                      teamRouter);
 router.use("/store/ai",                  tc, aiSafetyGuard("store-ai", { mode: "chat", scan: "all" }), storeAiRouter);
 router.use("/store",                     tc, storeAddressRouter); // /address, /slug, custom-domain gate (BT-307/317/318) — before storeRouter
-router.use("/store",                     tc, storeRouter);
+router.use("/store",                     tc, featureGate("custom_domain", { only: [{ method: "POST", path: "/domains" }] }), storeRouter); // adding a domain: Growth+
 router.use("/marketing/email",           tc, emailMarketingRouter);
+router.use("/buyer/email-opt-in",         emailOptInRouter); // "Get emails from {store}" at checkout / on Follow
 router.use("/design-studio",             requireAuth, tc, designStudioRouter);
 router.use("/shopify-imports",           tc, shopifyImportRouter);
 // Etsy redirects the browser to the callback with no session; it is mounted before the authenticated group.
@@ -457,7 +461,7 @@ import liveCommerceRouter from "./live-commerce";
 import liveAnalyticsRouter from "./live-analytics";
 router.use("/live",                      tc, liveAnalyticsRouter);
 // Watching is open to every signed-in user; the host-only routes inside
-// (start / end / products) apply requirePlan("pro") themselves.
+// (start / products / pins) apply the live_hosting gate (middlewares/featureGate.ts) themselves.
 // Moderation + co-host routers MUST be mounted before liveRouter: they own
 // literal paths (/moderation-defaults, /cohost-*) that liveRouter's GET /:id would otherwise swallow.
 import liveModerationRouter from "./live-moderation";
@@ -472,9 +476,9 @@ router.use("/live-replays",              tc, liveReplaysRouter);
 router.use("/live-tips",                 tc, liveTipsRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
-router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
+router.use("/boosts",                    tc, featureGate("boosts", { only: [{ method: "POST", path: "/" }] }), boostsRouter); // buying a boost: Growth+
 router.use("/promotions",                promotionsRouter); // viewer-scoped Sponsored delivery; no tc
-router.use("/featured-slots",            tc, featuredSlotsRouter); // /active is public; seller routes require auth
+router.use("/featured-slots",            tc, featureGate("boosts", { only: [{ method: "POST", path: "/" }] }), featuredSlotsRouter); // /active is public; booking a slot: Growth+
 router.use("/admin/promotions",          adminPromotionsRouter); // platform admins only
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
 router.use("/iap-promotions",            tc, iapPromotionsRouter);

@@ -17,6 +17,8 @@ import { Card, CardDivider, SectionTitle } from '@/components/analytics/Analytic
 import { SegmentedPills, useReportBottomInset } from '@/components/analytics/InsightFrame';
 import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, previewMode, requestExport, type ExportSectionKey, type InsightRange } from '@/services/sellerInsightsService';
 import { saveExportFile } from '@/lib/saveExportFile';
+import { useRouter } from 'expo-router';
+import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 
 const SECTIONS: { key: ExportSectionKey; label: string; detail: string }[] = [
   { key: 'orders', label: 'Orders', detail: 'One row per order with totals, refunds and location' },
@@ -31,6 +33,7 @@ export default function ExportReport() {
   const colors = useColors();
   const s = React.useMemo(() => styles(colors), [colors]);
   const bottom = useReportBottomInset();
+  const router = useRouter();
   const [range, setRange] = useState<InsightRange>(DEFAULT_INSIGHT_RANGE);
   const [format, setFormat] = useState<'csv' | 'pdf'>('csv');
   const [picked, setPicked] = useState<ExportSectionKey[]>(['orders', 'products', 'analytics']);
@@ -45,7 +48,9 @@ export default function ExportReport() {
       const file = await requestExport(format, range, picked);
       const done = await saveExportFile(file);
       if (!done) Alert.alert('Export ready', 'Sharing is not available on this device.');
-    } catch {
+    } catch (e) {
+      // Export is part of Pro's full analytics (server plan config).
+      if (promptUpgradeOnPlanGate(e, router)) return;
       Alert.alert('Export failed', 'Could not generate the export. Check your connection and try again.');
     } finally { setBusy(false); }
   }

@@ -9,6 +9,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
+import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   SURFACE,
@@ -181,7 +182,8 @@ export default function StoreDomainScreen() {
       setAdding(false);
       const instructions = result?.verificationInstructions ?? `Add a TXT record _brandthread-verify.${parsed.domain} pointing to your verification token.`;
       Alert.alert('Domain Added', instructions);
-    } catch {
+    } catch (e) {
+      if (promptUpgradeOnPlanGate(e, router)) return;
       Alert.alert('Error', 'Failed to connect domain. Check your internet connection and try again.');
     } finally {
       setConnectingDomain(false);

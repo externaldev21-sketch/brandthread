@@ -156,10 +156,10 @@ function applyCreditHandler(kind: PromoKind): express.RequestHandler {
 }
 
 const json4kb = express.json({ limit: "4kb" });
-router.post("/boost/:id/verify", requirePlan("pro"), json4kb, verifyHandler("boost"));
+router.post("/boost/:id/verify", requireSellerAccount, json4kb, verifyHandler("boost")); // Creation enforces the plan; verified purchases still need fulfillment.
 router.post("/campaign/:id/verify", requirePermission("marketing"), json4kb, verifyHandler("ad_campaign"));
 router.post("/featured/:id/verify", requireSellerAccount, json4kb, verifyHandler("featured_slot"));
-router.post("/boost/:id/apply-credit", requirePlan("pro"), applyCreditHandler("boost"));
+router.post("/boost/:id/apply-credit", requireSellerAccount, applyCreditHandler("boost"));
 router.post("/campaign/:id/apply-credit", requirePermission("marketing"), applyCreditHandler("ad_campaign"));
 router.post("/featured/:id/apply-credit", requireSellerAccount, applyCreditHandler("featured_slot"));
 

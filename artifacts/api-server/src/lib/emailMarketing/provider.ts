@@ -1,10 +1,12 @@
 /**
  * Provider seam for seller email. The default (and only built-in) provider is
- * Resend, through lib/mailer.ts (RESEND_API_KEY, MAIL_FROM). klaviyo.ts only
+ * Resend on the separate marketing sender (marketingMailer.ts:
+ * MARKETING_MAIL_FROM, never the auth MAIL_FROM). klaviyo.ts only
  * validates a seller's own Klaviyo key and reads counts; it cannot send, so it
  * is not a provider here. Tests inject a mock with setEmailProvider().
  */
-import { isMailerConfigured, sendRawEmail, type RawEmailResult } from "../mailer";
+import type { RawEmailResult } from "../mailer";
+import { isMarketingMailerConfigured, sendMarketingEmail } from "./marketingMailer";
 
 export type OutboundEmail = {
   to: string;
@@ -24,8 +26,8 @@ export interface EmailProvider {
 
 export const resendProvider: EmailProvider = {
   name: "resend",
-  isConfigured: isMailerConfigured,
-  send: (email) => sendRawEmail(email),
+  isConfigured: () => isMarketingMailerConfigured(),
+  send: (email) => sendMarketingEmail(email),
 };
 
 let override: EmailProvider | null = null;

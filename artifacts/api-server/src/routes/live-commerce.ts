@@ -19,6 +19,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
+import { featureGate } from "../middlewares/featureGate";
 import { optionalViewerId } from "../lib/safety";
 import { broadcastToRoom } from "../ws/liveHub";
 import {
@@ -26,7 +27,7 @@ import {
 } from "../lib/liveCommerce";
 
 const router = Router();
-const hostPlan = requirePlan("pro");
+const hostPlan = featureGate("live_hosting"); // lib/planFeatures.ts (Growth+)
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ─── Pinned product ───────────────────────────────────────────────────────────

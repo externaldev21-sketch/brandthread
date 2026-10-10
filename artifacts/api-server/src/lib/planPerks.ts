@@ -11,6 +11,7 @@
 import { creditPolicyForPlan } from "./aiCredits/catalogue";
 import { PLATFORM_FEE_BPS } from "./money/fees";
 import { PLAN_CATALOGUE, PLAN_IDS, isSellerPlanId, type SellerPlanId } from "./planCatalogue";
+import { planIncludes } from "./planFeatures";
 
 export type PlanPerkConfig = {
   /** Brandthread commission on item + shipping, in basis points. Always PLATFORM_FEE_BPS. */
@@ -32,7 +33,8 @@ export function platformFeeBpsForPlan(planId: string | null | undefined): number
 }
 
 export function hasAdvancedAnalytics(planId: string | null | undefined): boolean {
-  return isSellerPlanId(planId) && PLAN_PERKS[planId].advancedAnalytics;
+  // The analytics level per plan lives in planCatalogue.ts (features.analytics).
+  return isSellerPlanId(planId) && planIncludes(planId, "advanced_analytics");
 }
 
 /**
@@ -72,7 +74,7 @@ export function buildPlanPerks(): PlanPerksPayload[] {
     platformFeeBps: PLAN_PERKS[planId].platformFeeBps,
     monthlyAiCredits: monthlyAiCreditsForPlan(planId),
     unlimitedAiCredits: monthlyAiCreditsForPlan(planId) === null,
-    advancedAnalytics: PLAN_PERKS[planId].advancedAnalytics,
+    advancedAnalytics: hasAdvancedAnalytics(planId),
     productLimit: PLAN_CATALOGUE[planId].limits.products,
     teamSeats: PLAN_CATALOGUE[planId].limits.teamSeats,
   }));

@@ -1,12 +1,12 @@
 /**
- * Selling within the seller's plan (BT-002). A seller without paid access
- * keeps a store, but only their first FREE_TIER_LIMITS.products live listings
- * (oldest first) can be bought; the rest wait until they start a plan. Paid
- * plans with a product cap behave the same way, so a lapsed or downgraded
- * seller can never sell more listings than the plan includes.
+ * Checkout-side backstop for the plan's product cap. Only the seller's first
+ * N live listings (oldest first) can be bought, where N is the plan's cap
+ * (0 with no live trial or plan). lib/planProductSync.ts normally moves any
+ * extra listings to drafts after a downgrade; this check covers the window
+ * before that runs, so a lapsed or downgraded seller can never sell more
+ * listings than the plan includes.
  *
- * Publishing is limited separately by the product capacity checks in
- * routes/products.ts (and bulk/import), which read the same limits.
+ * Publishing is limited separately by lib/productCapacity.ts.
  */
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db, products } from "@workspace/db";

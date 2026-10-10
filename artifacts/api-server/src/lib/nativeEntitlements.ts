@@ -157,7 +157,8 @@ export async function reconcileRevenueCatEntitlement(clerkUserId: string) {
 export type EffectiveEntitlement = {
   planId: SellerPlanId;
   status: string;
-  provider: "stripe" | "revenuecat" | "none";
+  /** "review": an App Review demo account (users.is_review_account), which needs full seller access without a purchase. */
+  provider: "stripe" | "revenuecat" | "review" | "none";
   native: typeof sellerSubscriptionEntitlements.$inferSelect | null;
 };
 
@@ -166,6 +167,7 @@ type LegacySubscription = {
   status: string | null;
   /** When the Stripe subscription went past_due (null: not past_due, or not yet stamped). */
   pastDueSince?: Date | null;
+  isReviewAccount?: boolean | null;
 } | null | undefined;
 
 type NativeSubscription = typeof sellerSubscriptionEntitlements.$inferSelect | null | undefined;
@@ -230,6 +232,10 @@ export function resolveEffectiveEntitlement(
     };
   }
 
+  if (legacy?.isReviewAccount) {
+    return { planId: "pro", status: "review", provider: "review", native: native ?? null };
+  }
+
   return { planId: "starter", status: "none", provider: "none", native: native ?? null };
 }
 
@@ -240,6 +246,7 @@ export async function getEffectiveEntitlement(clerkUserId: string): Promise<Effe
       planId: users.subscriptionPlanId,
       status: users.subscriptionStatus,
       pastDueSince: users.subscriptionPastDueSince,
+      isReviewAccount: users.isReviewAccount,
     }).from(users).where(eq(users.clerkId, clerkUserId)).limit(1),
     db.select().from(sellerSubscriptionEntitlements)
       .where(and(eq(sellerSubscriptionEntitlements.clerkUserId, clerkUserId), eq(sellerSubscriptionEntitlements.provider, "revenuecat")))

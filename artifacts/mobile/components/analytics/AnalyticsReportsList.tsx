@@ -16,9 +16,9 @@ export const ANALYTICS_REPORTS: { label: string; icon: IconName; href: string; b
   { label: 'Threads and videos', icon: 'play-circle', href: '/analytics-reports?report=content' },
   { label: 'Audience', icon: 'users', href: '/analytics-reports?report=audience' },
   { label: 'Goals', icon: 'target', href: '/analytics-reports?report=goals' },
-  { label: 'Export', icon: 'download', href: '/analytics-reports?report=export' },
-  { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-reports?report=advanced', badge: 'PRO' },
-  { label: 'Customer cohorts and lifetime value', icon: 'users', href: '/analytics-reports?report=cohorts', badge: 'PRO' },
+  { label: 'Export', icon: 'download', href: '/analytics-reports?report=export', badge: 'PRO' },
+  { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-reports?report=advanced', badge: 'GROWTH' },
+  { label: 'Customer cohorts and lifetime value', icon: 'users', href: '/analytics-reports?report=cohorts', badge: 'GROWTH' },
 ];
 
 /** Entry points to the seller reports; appended to the Analytics tab. */

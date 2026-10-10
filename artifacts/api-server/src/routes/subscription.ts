@@ -2,15 +2,13 @@
  * Seller subscription / platform billing endpoints.
  * Mounted at /api/seller/subscription — all routes require Clerk auth.
  *
- * Three tiers:
- *   starter  $29/mo  — storefront, AI store builder, 25 products, standard checkout
- *   growth   $79/mo  — everything in starter + unlimited products, AI Design Studio,
- *                       manufacturer hub, live shopping, 3 team seats, boosts
- *   pro     $199/mo  — everything in growth + unlimited team seats, advanced analytics,
- *                       priority manufacturer intros, white-glove support, early access
+ * Three tiers (Starter / Growth / Pro). Prices, the active-product cap,
+ * staff seats and every other tier gate live in lib/planCatalogue.ts, the one
+ * plan config (served to the app at GET /api/config/seller-plans).
  *
- * All subscriptions start with a TRIAL_DAYS-day free trial (lib/planCatalogue.ts, 7 by default). Card is collected upfront so the
- * trial auto-converts to paid on day 6 without any further seller action.
+ * Every subscription starts with a TRIAL_DAYS-day free trial (7 by default).
+ * The card is collected up front, so the trial converts to paid when it ends
+ * unless the seller cancels first.
  *
  * These charges go directly to the seller's own payment method via a standard
  * Stripe Subscription. They are completely separate from Stripe Connect, which
@@ -31,6 +29,7 @@ import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
 import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
 import { cancellationDetailsFor, isCancelReasonId } from "../lib/cancelReasons";
 import { personHadTrial, withPersonTrialRule } from "../lib/personTrial";
+import { syncProductsToPlanSoon } from "../lib/planProductSync";
 
 const router = Router();
 router.use(requireAuth);
@@ -324,6 +323,7 @@ router.post("/native/sync", requireRole("owner"), async (req, res) => {
     const clerkUserId = (req as any).clerkUserId as string;
     const entitlement = await reconcileRevenueCatEntitlement(clerkUserId);
     const effective = await getEffectiveEntitlement(clerkUserId);
+    syncProductsToPlanSoon(clerkUserId);
     res.json({
       plan: effective.planId,
       status: effective.status,
