@@ -18,7 +18,15 @@ export const DEFERRED_INVITE_CHECKED_KEY = 'bt_deferred_invite_checked_v1';
 
 const INVITE_URL_RE = /^https:\/\/(?:www\.)?brandthread\.app\/invite\/([A-Za-z0-9]{4,12})\/?(?:[?#].*)?$/;
 
-export function deferredInviteEnabled(env: Record<string, string | undefined> = process.env): boolean {
+// Expo inlines EXPO_PUBLIC_* only when written out as process.env.EXPO_PUBLIC_X,
+// so the defaults below name each variable literally.
+const BUILD_ENV = {
+  EXPO_PUBLIC_DEFERRED_INVITE: process.env.EXPO_PUBLIC_DEFERRED_INVITE,
+  EXPO_PUBLIC_APP_STORE_URL: process.env.EXPO_PUBLIC_APP_STORE_URL,
+  EXPO_PUBLIC_PLAY_STORE_URL: process.env.EXPO_PUBLIC_PLAY_STORE_URL,
+};
+
+export function deferredInviteEnabled(env: Record<string, string | undefined> = BUILD_ENV): boolean {
   return (env.EXPO_PUBLIC_DEFERRED_INVITE ?? '').trim() !== '0';
 }
 
@@ -44,7 +52,7 @@ export function shouldCheckDeferredInvite(input: {
 }
 
 /** Store pages for the "Download" buttons; unset until the apps are listed. */
-export function appStoreLinks(env: Record<string, string | undefined> = process.env): { ios: string | null; android: string | null } {
+export function appStoreLinks(env: Record<string, string | undefined> = BUILD_ENV): { ios: string | null; android: string | null } {
   const pick = (v: string | undefined) => {
     const s = (v ?? '').trim();
     return /^https:\/\/\S+$/i.test(s) ? s : null;
