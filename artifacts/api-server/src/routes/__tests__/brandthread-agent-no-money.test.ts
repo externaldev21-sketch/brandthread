@@ -85,6 +85,7 @@ describe("agent chat never moves a real Thread Cash balance", () => {
     await db.insert(users).values({
       clerkId: TEST_BUYER, email: `${TEST_BUYER}@example.test`, name: "No Money Buyer",
       displayName: "No Money Buyer", accountType: "buyer", onboardingComplete: true,
+      aiDataConsentAt: new Date(), // allowed AI data sharing (requireAiConsent)
     });
     // Give the buyer a starting Thread Cash balance the same way the real
     // daily check-in would, so a real, nonzero balance is at risk.

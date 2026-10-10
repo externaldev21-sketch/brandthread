@@ -656,7 +656,9 @@ const DEV_FORCE_ONBOARDING_START = false;
 
 // Screens that don't require authentication
 const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
-const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
+// 'help' is the App Store Support URL (https://brandthread.app/help): it must
+// show contact info to signed-out visitors (BT-374).
+const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy', 'help', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {

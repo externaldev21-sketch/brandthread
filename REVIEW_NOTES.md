@@ -6,6 +6,13 @@ Information, Notes) and the Play Console "App access" instructions. The
 `pnpm --filter @workspace/api-server run seed:review-accounts -- --render-notes`
 (stdout only; never commit the rendered output).
 
+Blocks wrapped in `<!-- if:live -->` ... `<!-- endif:live -->` are only kept
+when `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE` are set in the environment you
+render from (the production API values). Without them the app hides every Go
+Live entry point (`GET /api/config/live` returns `liveAvailable: false`), so
+the reviewer must not be told to Go Live. If you paste this file by hand,
+delete those blocks yourself when Agora is not configured.
+
 ## Sign in
 
 Brandthread is a social marketplace. Two demo accounts are provided. Both are
@@ -27,18 +34,24 @@ processing, cancelled) and follows the seller.
 
 - **Shopping (buyer):** Home feed, then tap a product tag on a post, or
   Discover / Search. Add to cart, check out, then see it under Profile, Orders.
+<!-- if:live -->
 - **Live video:** a seller starts it from Studio, Go live (camera and microphone
   prompts appear). A buyer joins a live stream when a followed seller is live (Home feed
   and the seller's profile). No live stream is scheduled at review time; Go live with the
   seller account to see the camera flow.
-- **Camera:** Studio, Create (photo, video, story) and Go live. The buyer story
-  composer also uses the camera.
 - **Calls:** 1:1 voice and video calls start from the call button in a
   conversation (Inbox). Calls need two devices or accounts.
+<!-- endif:live -->
+- **Camera:** Studio, Create (photo, video, story). The buyer story
+  composer also uses the camera.
 - **AI features (seller):** Studio, AI Studio and Design Studio (photoshoot,
   background removal, text-to-design, mockups). They call our server, which
   calls a third-party model provider. Output is generated for the user's own
   products and is not shared unless the user posts it. AI is optional.
+- **Brandthread Agent (Inbox):** an AI assistant conversation. Before the first
+  message is sent, a sheet asks the user to allow sending their messages and
+  conversation history to OpenAI to generate replies (Guideline 5.1.2(i)).
+  Nothing is sent to OpenAI until the user taps Allow.
 
 ## Payments
 

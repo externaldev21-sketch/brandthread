@@ -176,6 +176,10 @@ export const users = pgTable('users', {
   // transactional category toggles in notificationPreferences and OFF by
   // default; enforced server-side in lib/pushPolicy.ts / sendPushToUser.
   promoPushOptIn: boolean('promo_push_opt_in').notNull().default(false),
+  // AI data-sharing consent (App Store 5.1.2(i)). Set when the user taps Allow
+  // on the consent sheet; null = not given. Brandthread Agent messages are
+  // only forwarded to the AI provider when this is set (middlewares/requireAiConsent.ts).
+  aiDataConsentAt: timestamp('ai_data_consent_at', { withTimezone: true }),
   // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
   // A push falling inside the window is suppressed (feed row still written);
   // null start/end means quiet hours are off.
