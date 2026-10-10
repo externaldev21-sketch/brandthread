@@ -179,6 +179,8 @@ vi.mock('@/lib/theme', () => ({
   FG: '#ffffff',
   MUTED: '#aaaaaa',
   SUBTLE: '#666666',
+  TEXT_TERTIARY: '#8E8E93',
+  FILL_ELEVATED: '#1C1C1E',
   PURPLE: '#c7cdd5',
   PURPLE_DIM: '#34383e',
   PURPLE_LIGHT: '#f8fafc',

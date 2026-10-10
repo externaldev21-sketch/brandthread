@@ -15,7 +15,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard, HapticSwitch} from '@/components/BrandthreadUI';
@@ -966,17 +966,17 @@ export default function StoreGenerateScreen() {
         {step < TOTAL_STEPS ? (
           <TouchableOpacity
             onPress={continueEnabled ? handleContinue : undefined}
-            style={[st.navContinueBtn, !continueEnabled && st.navContinueBtnDisabled]}
+            style={st.navContinueBtn}
             activeOpacity={continueEnabled ? 0.8 : 1}
           >
             <LinearGradient
-              colors={continueEnabled ? [...theme.primaryGradient] : [CARD_ELEVATED, CARD_ELEVATED]}
+              colors={continueEnabled ? [...theme.primaryGradient] : [FILL_ELEVATED, FILL_ELEVATED]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={st.navContinueGrad}
             >
-              <Text style={[st.navContinueText, continueEnabled && getOnAccentTextStyle(theme)]}>Continue</Text>
-              <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
+              <Text style={[st.navContinueText, continueEnabled ? getOnAccentTextStyle(theme) : { color: TEXT_TERTIARY }]}>Continue</Text>
+              <Feather name="arrow-right" size={ICON.sm} color={continueEnabled ? theme.onAccent : TEXT_TERTIARY} />
             </LinearGradient>
           </TouchableOpacity>
         ) : (
@@ -1317,7 +1317,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   navBackText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   navStepText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   navContinueBtn: { borderRadius: RADIUS.md, overflow: 'hidden' },
-  navContinueBtnDisabled: { opacity: 0.5 },
   navContinueGrad: {
     flexDirection: 'row',
     alignItems: 'center',

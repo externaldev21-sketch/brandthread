@@ -9,7 +9,7 @@ import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, EmptyState, FormInput } from '@/components/BrandthreadUI';
 
@@ -280,13 +280,13 @@ export default function ProductImportScreen() {
               else void connectEtsy();
             }}
           >
-            <View style={[s.methodRow, !providers.etsy.enabled && { opacity: 0.6 }]}>
+            <View style={s.methodRow}>
               <View style={[s.methodIconWrap, { backgroundColor: theme.secondaryDim }]}>
-                <Feather name="tag" size={ICON.md} color={theme.secondary} />
+                <Feather name="tag" size={ICON.md} color={providers.etsy.enabled ? theme.secondary : TEXT_TERTIARY} />
               </View>
               <View style={s.methodInfo}>
-                <Text style={s.methodTitle}>Import from Etsy</Text>
-                <Text style={s.methodDesc}>
+                <Text style={[s.methodTitle, !providers.etsy.enabled && { color: TEXT_TERTIARY }]}>Import from Etsy</Text>
+                <Text style={[s.methodDesc, !providers.etsy.enabled && { color: TEXT_TERTIARY }]}>
                   {!providers.etsy.enabled
                     ? (providers.etsy.reason ?? "Etsy import isn't enabled on this server.")
                     : providers.etsy.connected
@@ -413,12 +413,12 @@ export default function ProductImportScreen() {
             autoCorrect={false}
           />
           <TouchableOpacity
-            style={{ marginTop: 16, backgroundColor: theme.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: !csvText.trim() ? 0.5 : 1, shadowColor: theme.shadowColor }}
+            style={{ marginTop: 16, backgroundColor: !csvText.trim() ? FILL_ELEVATED : theme.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', shadowColor: theme.shadowColor }}
             disabled={!csvText.trim() || reviewBusy}
             activeOpacity={0.85}
             onPress={importCsv}
           >
-            <Text style={{ fontSize: 15, fontFamily: FONT.bold, color: theme.onAccent }}>
+            <Text style={{ fontSize: 15, fontFamily: FONT.bold, color: !csvText.trim() ? TEXT_TERTIARY : theme.onAccent }}>
               Review import
             </Text>
           </TouchableOpacity>

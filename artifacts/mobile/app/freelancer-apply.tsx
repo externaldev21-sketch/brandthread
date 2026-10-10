@@ -20,7 +20,7 @@ import { useApi } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, apiErrorMessage } from '@/lib/freelancer';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, RED,
+  FONT, FS, SP, RADIUS, RED, FILL_ELEVATED, TEXT_TERTIARY,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
@@ -290,15 +290,15 @@ export default function FreelancerApplyScreen() {
             onPress={step === 2 ? submit : next}
           >
             <LinearGradient
-              colors={[colors.primary, colors.accentForeground] as const}
+              colors={(!stepValid || submitting) ? [FILL_ELEVATED, FILL_ELEVATED] as const : [colors.primary, colors.accentForeground] as const}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.nextBtn, (!stepValid || submitting) && { opacity: 0.4 }]}
+              style={styles.nextBtn}
             >
               {submitting ? (
-                <ActivityIndicator color={colors.primaryForeground} size="small" />
+                <ActivityIndicator color={TEXT_TERTIARY} size="small" />
               ) : (
-                <Text style={[styles.nextBtnText, { color: colors.primaryForeground }]}>
+                <Text style={[styles.nextBtnText, { color: colors.primaryForeground }, !stepValid && { color: TEXT_TERTIARY }]}>
                   {step === 2 ? (isEdit ? 'Save Profile' : 'Submit Application') : 'Continue'}
                 </Text>
               )}

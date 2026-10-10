@@ -104,9 +104,6 @@
   "app/checkout.tsx": {
     "hairline": 1
   },
-  "app/connections.tsx": {
-    "disabledOpacity": 1
-  },
   "app/delete-account.tsx": {
     "hairline": 1
   },
@@ -216,8 +213,7 @@
     "rnImage": 1
   },
   "app/product-pairings.tsx": {
-    "hairline": 1,
-    "disabledOpacity": 1
+    "hairline": 1
   },
   "app/product-store.tsx": {
     "rnImage": 1
@@ -227,8 +223,7 @@
   },
   "app/products-bulk-edit.tsx": {
     "hairline": 1,
-    "rnImage": 1,
-    "disabledOpacity": 1
+    "rnImage": 1
   },
   "app/return-detail.tsx": {
     "rnImage": 1
@@ -445,8 +440,7 @@
     "disabledOpacity": 1
   },
   "components/create-post/CarouselEditor.tsx": {
-    "hairline": 1,
-    "disabledOpacity": 1
+    "hairline": 1
   },
   "components/create-post/CreateCamera.tsx": {
     "hairline": 1
@@ -488,9 +482,6 @@
   },
   "components/disputes/DisputeTimeline.tsx": {
     "hairline": 1
-  },
-  "components/email/EmailUI.tsx": {
-    "disabledOpacity": 1
   },
   "components/feed/UploadProgressPill.tsx": {
     "fractionalRadius": 2,

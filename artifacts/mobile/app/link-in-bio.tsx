@@ -8,7 +8,7 @@ import { View, Text, ScrollView, Alert, Share, StyleSheet, Image } from 'react-n
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP, TEXT_TERTIARY } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PrimaryButton, SecondaryButton, PressableScale, HapticSwitch } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -172,7 +172,7 @@ export default function LinkInBioScreen() {
               <Text style={{ color: colors.mutedForeground, fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.md }}>No links yet. Tap Add to create your first.</Text>
             )}
             {page.links.map((l, i) => (
-              <Card key={l.id} style={{ marginBottom: SP.sm, opacity: l.enabled ? 1 : 0.6 }}>
+              <Card key={l.id} style={{ marginBottom: SP.sm }}>
                 <View style={s.linkRow}>
                   <View style={s.arrows}>
                     <PressableScale onPress={() => move(i, -1)} disabled={i === 0} accessibilityRole="button" accessibilityLabel={`Move ${l.title} up`} style={s.arrowBtn}>
@@ -186,8 +186,8 @@ export default function LinkInBioScreen() {
                     style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel={`Edit ${l.title}`}
                     onPress={() => { setEditing(l.id); setAdding(false); setDraft({ title: l.title, url: l.url }); scroll.current?.scrollTo({ y: 0, animated: true }); }}
                   >
-                    <Text style={[s.linkTitle, { color: colors.foreground }]} numberOfLines={1}>{l.title}</Text>
-                    <Text style={[s.linkUrl, { color: colors.mutedForeground }]} numberOfLines={1}>{l.url}</Text>
+                    <Text style={[s.linkTitle, { color: l.enabled ? colors.foreground : TEXT_TERTIARY }]} numberOfLines={1}>{l.title}</Text>
+                    <Text style={[s.linkUrl, { color: l.enabled ? colors.mutedForeground : TEXT_TERTIARY }]} numberOfLines={1}>{l.url}</Text>
                     <Text style={[s.linkUrl, { color: colors.subtle }]}>{l.clicks30 ?? 0} clicks, 30 days</Text>
                   </PressableScale>
                   <View style={s.linkSide}>

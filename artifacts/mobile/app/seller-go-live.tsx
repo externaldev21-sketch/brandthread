@@ -304,14 +304,14 @@ function SellerGoLiveNativeScreen() {
               onPressOut={onGoLivePressOut}
               disabled={starting || !title.trim()}
               activeOpacity={0.9}
-              style={[s.goLiveBtn, { backgroundColor: LIVE_RED, opacity: starting || !title.trim() ? 0.5 : 1 }]}
+              style={[s.goLiveBtn, { backgroundColor: starting || !title.trim() ? FILL_ELEVATED : LIVE_RED }]}
             >
               {starting ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={TEXT_TERTIARY} />
               ) : (
                 <>
-                  <View style={s.liveDot} />
-                  <Text style={s.goLiveBtnText}>Go Live</Text>
+                  <View style={[s.liveDot, !title.trim() && { backgroundColor: TEXT_TERTIARY }]} />
+                  <Text style={[s.goLiveBtnText, !title.trim() && { color: TEXT_TERTIARY }]}>Go Live</Text>
                 </>
               )}
             </TouchableOpacity>

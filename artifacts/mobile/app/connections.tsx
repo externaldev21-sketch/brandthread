@@ -30,7 +30,7 @@ import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
 import { useUser } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { ListSkeleton } from '@/components/layout';
@@ -490,11 +490,11 @@ function FollowPill({
         following
           ? { backgroundColor: 'transparent', borderColor: theme.text, borderWidth: 1 }
           : { backgroundColor: theme.accent, borderColor: theme.accent, borderWidth: 1 },
-        disabled && { opacity: 0.5 },
+        disabled && (following ? { borderColor: TEXT_TERTIARY } : { backgroundColor: FILL_ELEVATED, borderColor: FILL_ELEVATED }),
       ]}
     >
       {() => (
-        <Text style={[pillStyles.text, { color: following ? theme.text : theme.onAccent }]}>
+        <Text style={[pillStyles.text, { color: disabled ? TEXT_TERTIARY : following ? theme.text : theme.onAccent }]}>
           {label}
         </Text>
       )}

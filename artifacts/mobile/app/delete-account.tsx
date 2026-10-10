@@ -23,7 +23,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, FILL_ELEVATED, TEXT_TERTIARY } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { clearAccountLifecycleState } from '@/lib/accountService';
@@ -354,13 +354,13 @@ export default function DeleteAccountScreen() {
             <PressableScale
               onPress={deleteNow}
               disabled={!confirmValid || deleting}
-              style={[s.deleteBtn, (!confirmValid || deleting) && { opacity: 0.4 }]}
+              style={[s.deleteBtn, (!confirmValid || deleting) && { backgroundColor: FILL_ELEVATED }]}
               accessibilityRole="button"
               accessibilityLabel="Delete account"
             >
               {deleting
-                ? <ActivityIndicator color={theme.onAccent} />
-                : <Text style={s.deleteText}>Delete account</Text>}
+                ? <ActivityIndicator color={TEXT_TERTIARY} />
+                : <Text style={[s.deleteText, !confirmValid && { color: TEXT_TERTIARY }]}>Delete account</Text>}
             </PressableScale>
             <SecondaryButton label="Cancel" onPress={goBack} accent={theme.text} style={{ marginTop: SP.sm }} />
           </>
