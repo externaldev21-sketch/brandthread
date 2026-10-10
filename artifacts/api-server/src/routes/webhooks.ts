@@ -1755,8 +1755,8 @@ async function handleDisputeEvent(event: { id: string; type: string; created?: n
 
 /**
  * checkout.session.completed for a freelancer job escrow payment.
- * Marks the job paid; the payout transfer happens later, when the freelancer
- * completes the job (see routes/freelancer-jobs.ts).
+ * Marks the job paid; the payout transfer happens later, when the hirer
+ * approves the delivery or it auto-releases (see lib/freelancerRelease.ts).
  */
 async function handleFreelancerJobPaid(session: any, jobIdOverride?: string) {
   const jobId: string = jobIdOverride ?? session.metadata?.["freelancerJobId"] ?? "";
