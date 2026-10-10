@@ -714,7 +714,16 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
                 action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }}
                 style={s.emptyState}
               />
-            ) : (
+            ) : !favoritesOnly && !searchQuery.trim() && activeFilterCount(filters) === 0 ? (
+            // Nothing listed yet: sellers bring their own factory (private invite).
+            <EmptyState
+              icon="user-plus"
+              title="No manufacturers here yet"
+              description="Invite the factory you already work with."
+              action={{ label: 'Invite your factory', onPress: () => router.push('/invite-manufacturer' as never) }}
+              testID="directory-empty-invite"
+            />
+          ) : (
             <EmptyState
               icon={favoritesOnly ? 'heart' : 'search'}
               title={favoritesOnly ? 'No favorite manufacturers yet' : 'No manufacturers found'}

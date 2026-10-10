@@ -35,7 +35,8 @@ export type OrderStatus =
   | "cancelled"
   | (typeof SAMPLE_DECISION_STATUSES)[number]
   | "complete"
-  | "completed";
+  | "completed"
+  | "refunded";
 
 export type OrderActor = "seller" | "manufacturer" | "payment_system";
 
@@ -54,6 +55,7 @@ const STAGE_LABELS: Record<string, string> = {
   revision_requested: "Revision requested",
   complete: "Complete",
   completed: "Complete",
+  refunded: "Refunded",
 };
 
 const STAGE_DESCRIPTIONS: Record<ProductionStage, string> = {
@@ -87,7 +89,7 @@ export function stageIndex(status: string): number {
 
 /** Orders that no longer need work from either side. */
 export function isTerminalStatus(status: string): boolean {
-  return ["delivered", "cancelled", "approved", "rejected", "complete", "completed"].includes(status);
+  return ["delivered", "cancelled", "approved", "rejected", "complete", "completed", "refunded"].includes(status);
 }
 
 export function nextProductionStage(status: string): ProductionStage | null {
@@ -282,6 +284,9 @@ export function deriveCardState(order: CardOrderSnapshot, viewer: CardViewer): C
 
   if (order.status === "cancelled") {
     return { phase: "cancelled", headline: "Cancelled", detail: "This card was withdrawn or declined before payment.", completedStages: 0, actions: [] };
+  }
+  if (order.status === "refunded") {
+    return { phase: "cancelled", headline: "Refunded", detail: "This order was cancelled and the payment refunded.", completedStages: 0, actions: [] };
   }
 
   const index = stageIndex(order.status);
