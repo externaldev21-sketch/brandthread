@@ -36,6 +36,8 @@ export interface SellerPaywallExitDrawerProps {
   getPricing: (plan: SellerPlanDefinition) => PlanPricing;
   selectedPlan: SellerPlanDefinition;
   hasRealTrialOffer: boolean;
+  /** From the shared plan config (lib/sellerPlanConfig.ts). */
+  trialDays?: number;
   onStartTrial: ButtonProps['onPress'];
   loading?: boolean;
   ctaDisabled?: boolean;
@@ -47,7 +49,7 @@ const OFFSCREEN_Y = 700;
 
 export function SellerPaywallExitDrawer({
   visible, onClose, theme, plans, recommendedId, currentPlanId, isOnboarding,
-  selectedId, onSelect, getPricing, selectedPlan, hasRealTrialOffer, onStartTrial, loading, ctaDisabled,
+  selectedId, onSelect, getPricing, selectedPlan, hasRealTrialOffer, trialDays = 7, onStartTrial, loading, ctaDisabled,
 }: SellerPaywallExitDrawerProps) {
   const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(visible);
@@ -121,7 +123,7 @@ export function SellerPaywallExitDrawer({
             <View style={{ marginTop: SP.lg }}>
               <SellerPaywallCTA
                 theme={theme}
-                label={hasRealTrialOffer ? 'Start my 5-day free trial' : `Choose ${selectedPlan.name}`}
+                label={hasRealTrialOffer ? `Start my ${trialDays}-day free trial` : `Choose ${selectedPlan.name}`}
                 onPress={onStartTrial}
                 icon={hasRealTrialOffer ? 'chevron-right' : undefined}
                 loading={loading}

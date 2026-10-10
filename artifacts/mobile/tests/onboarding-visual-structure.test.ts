@@ -1,36 +1,38 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BUYER_STEP_INDEX, DRAFT_VERSION } from '../lib/onboardingFlow';
+import { DRAFT_VERSION } from '../lib/onboardingFlow';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
 describe('onboarding visual structure', () => {
-  it('uses compact progress dots with the original progress colors', () => {
+  it('every step shares one layout: bare back chevron, left-aligned title1, one input, button under it', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('function StepDots');
-    expect(onboarding).not.toContain('function GradientBar');
-    expect(onboarding).toContain("backgroundColor: 'rgba(255,255,255,0.08)'");
-    expect(onboarding).toContain('colors={theme.heroGradient}');
+    const screen = read('components/onboarding/steps/StepScreen.tsx');
+    expect(onboarding).toContain('<Icon name="chevron-left" size={24}');
+    expect(onboarding).not.toContain('ThreadWeave');
+    expect(onboarding).not.toContain('StepDots');
+    expect(screen).toContain('title: { ...TEXT.title1 }');
+    expect(screen).toContain("import { Button } from '@/components/ui';");
   });
 
-  it('uses hairline default borders for onboarding inputs and choices', () => {
+  it('inputs and choice rows sit on the one solid #1C1C1E fill (no translucent overlays, no gradient footers)', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(onboarding.match(/borderWidth: StyleSheet\.hairlineWidth/g)?.length).toBeGreaterThanOrEqual(5);
+    const seller = read('components/onboarding/steps/SellerSteps.tsx');
+    const accountType = read('app/account-type.tsx');
+    expect(onboarding).toContain("import { Icon, Input } from '@/components/ui';");
+    expect(seller).toContain('backgroundColor: FILL_ELEVATED');
+    expect(onboarding).not.toContain('LinearGradient');
+    expect(accountType).not.toContain('LinearGradient');
   });
 
-  it('uses reduced-chrome cards in account type and seller plans', () => {
-    expect(read('app/account-type.tsx')).toContain('borderWidth: StyleSheet.hairlineWidth');
-    expect(read('components/onboarding/SellerPlanRecommendationStep.tsx')).toContain(
-      'borderWidth: StyleSheet.hairlineWidth',
-    );
-  });
-
-  it('buyer step 1 is account-type, after the Welcome opener, before Clerk account creation', () => {
-    // Step ordering now lives in lib/onboardingFlow.ts (v7): 0=Welcome, 1=AccountType, 2=Auth.
-    expect(BUYER_STEP_INDEX.WELCOME).toBe(0);
-    expect(BUYER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
-    expect(BUYER_STEP_INDEX.AUTH).toBe(2);
+  it('seller questions follow Shopify: cards with checkbox/radio, a thin progress bar, Next plus equal Skip all / Skip', () => {
+    const seller = read('components/onboarding/steps/SellerSteps.tsx');
+    expect(seller).toContain('label="Skip all"');
+    expect(seller).toContain('label="Skip"');
+    expect(seller).toContain("skipBtn: { flex: 1 }");
+    expect(seller).toContain("accessibilityRole={multi ? 'checkbox' : 'radio'}");
+    expect(seller).toContain('accessibilityRole="progressbar"');
   });
 
   it('splash is a logo-only auto-advancing screen with no CTA button', () => {
@@ -41,40 +43,6 @@ describe('onboarding visual structure', () => {
     expect(splash).toContain('setTimeout(continueForward');
     // No ctaWrap or cta style (no explicit CTA)
     expect(splash).not.toContain('ctaWrap');
-  });
-
-  it('buyer style interests use emoji and solid-fill selected state with checkmark', () => {
-    const onboarding = read('app/onboarding.tsx');
-    // Emoji data present
-    expect(onboarding).toContain('STYLE_INTERESTS_WITH_EMOJI');
-    // StyleChip with emoji prop
-    expect(onboarding).toContain('function StyleChip');
-    // Feather check icon rendered when selected
-    expect(onboarding).toContain('name="check"');
-    // Solid fill selected state (backgroundColor on selected chip)
-    expect(onboarding).toContain('backgroundColor: theme.accentDim');
-  });
-
-  it('uses one shared account form for buyer and seller with the seller field structure', () => {
-    const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('function SharedAuthStep');
-    expect(onboarding.match(/<SharedAuthStep/g)?.length).toBe(2);
-    expect(onboarding).not.toContain('<BuyerAuthStep');
-    expect(onboarding).not.toContain('<SellerAuthStep');
-    expect(onboarding).toContain('First name');
-    expect(onboarding).toContain('Last name');
-    expect(onboarding).toContain('Confirm password');
-    expect(onboarding).toContain('formFirstName');
-    expect(onboarding).toContain('formLastName');
-    expect(onboarding).toContain('confirmPassword');
-    expect(onboarding).toContain('passwordsMatch');
-    expect(onboarding).toContain('Continue with Google');
-    expect(onboarding).toContain('Continue with Apple');
-    expect(onboarding).toContain('<Text style={ssa.divText}>or</Text>');
-    expect(onboarding).toContain('disabled={!!oauthLoading || loading}');
-    expect(onboarding).not.toContain('disabled={!!oauthLoading || loading || !isUsernameValid}');
-    // OAuth options are pill-shaped secondary buttons (onboarding restyle).
-    expect(onboarding).toContain("oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md");
   });
 
   it('thread explainer screen exists and routes buyers to the feed', () => {
@@ -88,45 +56,25 @@ describe('onboarding visual structure', () => {
     expect(layout).toContain("router.replace('/thread-explainer'");
   });
 
-  it('draft version incremented to 7, migration lives in lib/onboardingFlow.ts', () => {
-    const onboarding = read('app/onboarding.tsx');
+  it('draft version is 9 and step ids (not indexes) are stored', () => {
     const flowModule = read('lib/onboardingFlow.ts');
-    expect(DRAFT_VERSION).toBe(8);
-    expect(flowModule).toContain('export const DRAFT_VERSION = 8');
+    expect(DRAFT_VERSION).toBe(9);
+    expect(flowModule).toContain('export const DRAFT_VERSION = 9');
     expect(flowModule).toContain('version === 5');
-    expect(onboarding).toContain("PENDING_FLOW_KEY = 'onboarding_pending_flow'");
-    expect(onboarding).toContain('[PENDING_FLOW_KEY, selectedFlow]');
+    expect(read('lib/onboardingDraft.ts')).toContain("export const PENDING_DRAFT_KEY = 'onboarding_pending_draft'");
   });
 
-  it('uses one immediate native-driver transition for every onboarding step', () => {
+  it('uses one 230ms transition for every step', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('function transitionTo(next: number, dir: 1 | -1, initiatedAt = performance.now())');
-    expect(onboarding).toContain('transitionProgress.setValue(0);\n    setStep(next);\n    requestAnimationFrame');
+    expect(onboarding).toContain('transitionProgress.setValue(0);\n    setStepError(null);\n    setStepId(next);\n    requestAnimationFrame');
     expect(onboarding).toContain('duration: 230');
-    expect(onboarding).toContain('useNativeDriver: true');
     expect(onboarding).not.toContain('duration: 220');
-    expect(onboarding).not.toContain('isAuthStep ? sm.interactiveStepWrap');
-    expect(onboarding).toContain('onDone={() => transitionTo(BUYER_STEP_INDEX.NOTIFICATIONS, 1)}');
-    expect(onboarding).toContain('onDone={() => transitionTo(SELLER_STEP_INDEX.NOTIFICATIONS, 1)}');
   });
 
-  it('keeps account-type storage and draft persistence off the transition path', () => {
+  it('does not navigate backward from the Welcome opener, nor back into account steps', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('void AsyncStorage.multiSet([');
-    expect(onboarding).toContain('const timer = setTimeout(() => {\n      saveDraft().catch(() => {});\n    }, 350);');
-  });
-
-  it('delays name-field focus until the incoming screen transition completes', () => {
-    const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('firstNameInputRef.current?.focus()');
-    expect(onboarding).toContain('brandNameInputRef.current?.focus()');
-    expect(onboarding).toContain('}, 260);');
-  });
-  it('does not navigate backward from the root Welcome step', () => {
-    const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('if (!canGoBack(step)) return;');
-    expect(onboarding).toContain('{!isAccountTypeStep && (');
-    expect(onboarding).not.toContain("if (step === 0) { router.back(); return; }");
+    expect(onboarding).toContain("const fullBleed = stepId === 'WELCOME';");
+    expect(read('lib/onboardingFlow.ts')).toContain('if (ctx.accountReady && current === firstStepAfterAccount(flow, ctx)) return null;');
   });
 
   it('keeps the native beta transition probe development-only and release-required', () => {

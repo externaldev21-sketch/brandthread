@@ -67,11 +67,14 @@ describe('legal documents (single source)', () => {
 });
 
 describe('agreement at sign-up', () => {
-  it('shows one linked line under the sign-up buttons and records agreement on continue', () => {
+  it('shows Instagram-style terms before the account exists and records agreement on "I agree"', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect((onboarding.match(/<LegalContinueNotice /g) ?? []).length).toBe(3);
-    // email, Google and Apple sign-up each remember the agreement when continuing
-    expect((onboarding.match(/recordConsent\(\);/g) ?? []).length).toBe(4);
+    const steps = read('components/onboarding/steps/AccountSteps.tsx');
+    expect(steps).toContain("Agree to Brandthread's terms and policies");
+    for (const route of ["'/terms'", "'/privacy'", "'/community-guidelines'"]) expect(steps).toContain(route);
+    expect(steps).toContain("label: 'I agree'");
+    // Email, Apple and Google all pass through the terms step, which remembers the agreement.
+    expect(onboarding).toContain('void rememberPendingConsent();');
     expect(onboarding).not.toContain('agreedToTerms');
     const consent = read('components/legal/LegalConsent.tsx');
     const notice = consent.slice(consent.indexOf('export function LegalContinueNotice'));

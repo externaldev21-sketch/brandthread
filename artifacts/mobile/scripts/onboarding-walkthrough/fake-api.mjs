@@ -24,10 +24,22 @@ function clerkIdFromAuthHeader(authorization) {
   return match ? match[1] : null;
 }
 
-export function createFakeOnboardingApi() {
+/** Seeded only with --demo, so the brands step can be shown with brands in it. */
+const DEMO_BRANDS = [
+  { id: 'b1', sellerId: 'seller_demo_1', name: 'Noir Field', brandType: 'Streetwear', logoUrl: null, verified: true },
+  { id: 'b2', sellerId: 'seller_demo_2', name: 'Atelier Rue', brandType: 'Luxury', logoUrl: null, verified: false },
+  { id: 'b3', sellerId: 'seller_demo_3', name: 'Common Thread', brandType: 'Basics', logoUrl: null, verified: false },
+  { id: 'b4', sellerId: 'seller_demo_4', name: 'Second Hand Club', brandType: 'Vintage', logoUrl: null, verified: true },
+  { id: 'b5', sellerId: 'seller_demo_5', name: 'Mono Lab', brandType: 'Minimal', logoUrl: null, verified: false },
+];
+
+export function createFakeOnboardingApi({ demo = false } = {}) {
   /** @type {any} */
   let dbUser = null;
   const calls = [];
+  // Becomes 'trialing' once a checkout session is opened (Stripe would do
+  // this through its webhook after the card is added).
+  let subscriptionStatus = 'none';
 
   function ensureUser(name, clerkId) {
     if (!dbUser) {
@@ -106,10 +118,16 @@ export function createFakeOnboardingApi() {
       return { status: 200, body: user };
     }
     if (p === '/seller/onboarding/data' && method === 'POST') {
-      const user = ensureUser();
+      const user = ensureUser(undefined, clerkId);
       if (body?.goals != null) user.goals = body.goals;
       if (body?.brandStage != null) user.brandStage = body.brandStage;
       return { status: 200, body: { ok: true } };
+    }
+    if (p === '/public/username-check' && get) {
+      return { status: 200, body: { available: true } };
+    }
+    if (p === '/public/email-check' && get) {
+      return { status: 200, body: { available: true } };
     }
     if (p === '/auth/username/check' && get) {
       return { status: 200, body: { available: true } };
@@ -125,7 +143,12 @@ export function createFakeOnboardingApi() {
     }
     if (p === '/public/brands/discover' && get) {
       // Empty is a valid, gracefully-handled state for BrandsToFollowStep.
-      return { status: 200, body: [] };
+      return { status: 200, body: { brands: demo ? DEMO_BRANDS : [] } };
+    }
+    if (p === '/shipping-zones/settings' && method === 'PATCH') {
+      const user = ensureUser();
+      user.shipFromCountry = body?.shipFromCountry ?? null;
+      return { status: 200, body: { shipFromCountry: user.shipFromCountry } };
     }
     if (p === '/config/features' && get) {
       return { status: 200, body: { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null } };
@@ -157,8 +180,29 @@ export function createFakeOnboardingApi() {
     }
     if (get && p === '/orders') return { status: 200, body: [] };
     if (get && p === '/conversations') return { status: 200, body: [] };
+    if (p === '/seller/subscription/checkout' && method === 'POST') {
+      subscriptionStatus = 'trialing';
+      const user = ensureUser();
+      user.subscriptionPlanId = body?.planId ?? null;
+      return { status: 200, body: { url: 'https://checkout.stripe.test/c/pay/stub' } };
+    }
+    if (get && p === '/config/seller-plans') {
+      // Dev's tier decision in the shape GET /api/config/seller-plans sends
+      // (Revenue P0, #766). AI credits are left out until the catalogue sets them.
+      const plan = (id, amountCents, productLimit, staffSeats, tier) => ({
+        id, name: id.charAt(0).toUpperCase() + id.slice(1), amountCents, interval: 'month', productLimit, staffSeats,
+        features: {
+          analytics: ['basic', 'advanced', 'full'][tier], analyticsExport: tier === 2, liveSelling: tier > 0, dropsEscrow: tier > 0,
+          boostFeatured: tier > 0, customDomain: tier > 0, manufacturerHub: tier > 0,
+          payoutSpeed: tier === 2 ? 'faster' : 'standard', prioritySupport: tier === 2,
+        },
+      });
+      return { status: 200, body: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', commissionPercent: 5, plans: [
+        plan('starter', 1999, 10, 1, 0), plan('growth', 4900, 50, 3, 1), plan('pro', 12900, null, null, 2),
+      ] } };
+    }
     if (get && p === '/seller/subscription/status') {
-      return { status: 200, body: { plan: 'starter', status: 'trialing', trialEnd: null, trialStartAt: null, trialEndAt: null, trialBanner: null, renewsOn: null, amountCents: 0, paymentMethodLabel: null, effectiveProvider: 'stripe' } };
+      return { status: 200, body: { plan: dbUser?.subscriptionPlanId ?? 'starter', status: subscriptionStatus, trialEnd: null, trialStartAt: null, trialEndAt: null, trialBanner: null, renewsOn: null, amountCents: 0, paymentMethodLabel: null, effectiveProvider: 'stripe' } };
     }
     if (get && p === '/team/context') return { status: 200, body: { role: 'owner', storeOwnerId: dbUser?.clerkId ?? null, teamMembershipId: null } };
     if (get && p === '/team/my-memberships') return { status: 200, body: { memberships: [] } };

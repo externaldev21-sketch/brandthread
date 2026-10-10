@@ -7,7 +7,8 @@
  *   Pro     $199/mo  — everything in Growth + unlimited team, advanced analytics, white-glove
  *
  * Platform commission on sales depends on the plan (GET /seller/subscription/perks).
- * Every new subscription starts with a 5-day free trial (card required upfront).
+ * Every new subscription starts with a free trial (card required upfront); its
+ * length comes from the shared plan config (lib/sellerPlanConfig.ts, 7 days).
  *
  * The recommended tier is personalized based on the seller's brand-stage answer from onboarding.
  *
@@ -58,6 +59,9 @@ import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
 import { displayPriceFor } from '@/lib/sellerPlansDisplay';
+import { formatPlanPrice, useSellerPlanConfig } from '@/lib/sellerPlanConfig';
+import { PlanTierCard } from '@/components/plans/PlanTierCard';
+import { CompareFeaturesSheet } from '@/components/plans/CompareFeaturesSheet';
 import { commissionSummary, wantsProHighlight, DEMO_PERKS, type PerksResponse } from '@/lib/proPerks';
 import { isPreviewDemoMode, isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
@@ -67,7 +71,7 @@ import {
 import { SellerPaywallHeadline } from '@/components/paywall/SellerPaywallHeadline';
 import { SellerPaywallBullets } from '@/components/paywall/SellerPaywallBullets';
 import { SellerPaywallSocialProof } from '@/components/paywall/SellerPaywallSocialProof';
-import { SellerPlanSelector, type PlanPricing } from '@/components/paywall/SellerPlanSelector';
+import type { PlanPricing } from '@/components/paywall/SellerPlanSelector';
 import { SellerTrialTimeline, type TrialTimelineStep } from '@/components/paywall/SellerTrialTimeline';
 import { SellerPaywallCTA } from '@/components/paywall/SellerPaywallCTA';
 import { SellerPaywallExitDrawer } from '@/components/paywall/SellerPaywallExitDrawer';
@@ -104,6 +108,8 @@ export default function PlansScreen() {
   const isOnboarding = fromOnboarding === 'true';
   const { currentRole } = useTeamRole();
   const { available: revenueCatAvailable, packages, purchase, restore } = useRevenueCat();
+  const { trialDays, tiers, commissionPercent } = useSellerPlanConfig();
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const [loadingId,         setLoadingId]         = useState<string | null>(null);
   const [awaitingReturn,    setAwaitingReturn]    = useState(false);
@@ -205,7 +211,7 @@ export default function PlansScreen() {
               } else {
                 setCurrentPlanId(status.plan ?? null);
                 setAwaitingReturn(false);
-                Alert.alert('Plan updated', `You're now on the ${capitalize(status.plan)} plan — enjoy your 5-day free trial!`);
+                Alert.alert('Plan updated', `You're now on the ${capitalize(status.plan)} plan — enjoy your ${trialDays}-day free trial.`);
               }
               return;
             }
@@ -377,8 +383,10 @@ export default function PlansScreen() {
   function getPricing(plan: SellerPlanDefinition): PlanPricing {
     const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
     const webPrice = displayPriceFor(plan);
+    // Web prices come from the shared plan config; native from the store.
+    const configCents = tiers.find((t) => t.id === plan.id)?.amountCents;
     const priceLabel = Platform.OS === 'web'
-      ? webPrice.price
+      ? (configCents ? formatPlanPrice(configCents) : webPrice.price)
       : revenueCatPackage?.product.priceString ?? null;
     return {
       priceLabel,
@@ -432,16 +440,28 @@ export default function PlansScreen() {
 
         <SellerPaywallSocialProof theme={theme} text="Trusted by independent brands building on Brandthread" />
 
-        <SellerPlanSelector
-          theme={theme}
-          plans={SELLER_PLANS}
-          recommendedId={recommendedId}
-          currentPlanId={currentPlanId}
-          isOnboarding={isOnboarding}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          getPricing={getPricing}
-        />
+        {/* Plan cards: the active-product count is the headline (shared plan config). */}
+        <View style={{ gap: SP.sm }}>
+          {tiers.map((tier, i) => {
+            const plan = SELLER_PLANS.find((p) => p.id === tier.id);
+            const isCurrent = !isOnboarding && tier.id === currentPlanId && currentPlanStatus !== 'none';
+            return (
+              <PlanTierCard
+                key={tier.id}
+                testID={`seller-plan-card-${tier.id}`}
+                tier={tier}
+                below={tiers[i - 1] ?? null}
+                selected={tier.id === selectedPlan.id}
+                onSelect={() => { haptic(); setSelectedId(tier.id); }}
+                priceLabel={plan ? getPricing(plan).priceLabel : null}
+                badge={isCurrent ? 'Current plan' : tier.id === recommendedId ? 'Recommended' : null}
+              />
+            );
+          })}
+          <TouchableOpacity onPress={() => setCompareOpen(true)} accessibilityRole="button" testID="seller-plans-compare" style={styles.compareRow}>
+            <Text style={styles.compareText}>Compare all features</Text>
+          </TouchableOpacity>
+        </View>
 
         <SellerPaywallCTA
           theme={theme}
@@ -451,7 +471,7 @@ export default function PlansScreen() {
               : isCurrentSelected
                 ? 'Current plan'
                 : hasRealTrialOffer
-                  ? 'Start my 5-day free trial'
+                  ? `Start my ${trialDays}-day free trial`
                   : `Choose ${selectedPlan.name}`
           }
           onPress={() => handleSelect(selectedPlan)}
@@ -462,7 +482,7 @@ export default function PlansScreen() {
           subtext="No commitment. Cancel anytime."
           billingLine={
             hasRealTrialOffer && !selectedPricing.failed
-              ? `Free for 5 days, then ${selectedPricing.priceLabel ?? selectedPlan.priceLabel}/month`
+              ? `Free for ${trialDays} days, then ${selectedPricing.priceLabel ?? selectedPlan.priceLabel}/month`
               : null
           }
         />
@@ -523,6 +543,8 @@ export default function PlansScreen() {
 
       </ScrollView>
 
+      <CompareFeaturesSheet visible={compareOpen} onClose={() => setCompareOpen(false)} tiers={tiers} commissionPercent={commissionPercent} />
+
       <SellerPaywallExitDrawer
         visible={exitDrawerVisible}
         onClose={handleExitDrawerClose}
@@ -536,6 +558,7 @@ export default function PlansScreen() {
         getPricing={getPricing}
         selectedPlan={selectedPlan}
         hasRealTrialOffer={hasRealTrialOffer}
+        trialDays={trialDays}
         onStartTrial={handleExitDrawerStartTrial}
         loading={loadingId === selectedPlan.id}
         ctaDisabled={selectedCtaDisabled}
@@ -631,6 +654,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   restoreRow: { alignItems: 'center', paddingVertical: SP.sm },
+  compareRow: { alignSelf: 'flex-start', paddingVertical: SP.xs },
+  compareText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, textDecorationLine: 'underline' },
 
   // Legal footer (Apple 3.1.2 — auto-renew disclosure + Terms/Privacy)
   legalFooter: { paddingTop: SP.sm, paddingHorizontal: SP.xs, gap: 10 },
