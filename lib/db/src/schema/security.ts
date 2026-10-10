@@ -107,6 +107,24 @@ export const sellerTrialReminderEvents = pgTable("seller_trial_reminder_events",
   trialEndIdx: index("seller_trial_reminder_events_trial_end_idx").on(table.trialEndAt),
 }));
 /**
+ * One free trial per person, device and card. Written when a seller's trial
+ * starts on any rail; read by subscription checkout and the Stripe webhook.
+ */
+export const sellerTrialClaims = pgTable("seller_trial_claims", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clerkId: text("clerk_id").notNull(),
+  provider: text("provider").notNull(),
+  subscriptionRef: text("subscription_ref").notNull(),
+  installId: text("install_id"),
+  cardFingerprint: text("card_fingerprint"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  refUnique: uniqueIndex("seller_trial_claims_ref_unique").on(table.provider, table.subscriptionRef),
+  clerkIdx: index("seller_trial_claims_clerk_idx").on(table.clerkId),
+  installIdx: index("seller_trial_claims_install_idx").on(table.installId).where(sql`${table.installId} IS NOT NULL`),
+  cardIdx: index("seller_trial_claims_card_idx").on(table.cardFingerprint).where(sql`${table.cardFingerprint} IS NOT NULL`),
+}));
+/**
  * Public web account-deletion requests (Google Play account-deletion URL).
  * Only the SHA-256 hash of the emailed token is stored. A request becomes
  * `completed` only after the owner confirms the emailed link and the deletion

@@ -2446,11 +2446,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           amountCents: number;        // monthly charge in cents (0 for starter)
           paymentMethodLabel: string | null; // e.g. "Visa ···4242"
           effectiveProvider: 'stripe' | 'revenuecat' | 'none';
+          /** Cancelled: nothing more is charged; access runs until accessEndsAt. */
+          cancelAtPeriodEnd?: boolean;
+          accessEndsAt?: string | null;
+          /** Where to manage / cancel: the store page for an in-app purchase. */
+          manageUrl?: string | null;
+          /** Whether checkout would include the free trial (one per person, device and card). */
+          trialEligible?: boolean;
         }>('/api/seller/subscription/status'),
         /** What each plan includes (price, commission, AI credits, advanced analytics) plus the caller's plan. */
         perks: () => get<import('./proPerks').PerksResponse>('/api/seller/subscription/perks'),
         dismissTrialBanner: (trialEndAt: string) =>
           post<{ ok: boolean; trialEndAt: string }>('/api/seller/subscription/trial-banner/dismiss', { trialEndAt }),
+        /** Settings → Plan → Cancel plan (web / Stripe plans). An in-app purchase answers 409 MANAGE_IN_STORE with manageUrl. */
+        cancel: () =>
+          post<{ cancelAtPeriodEnd: true; inTrial: boolean; accessEndsAt: string | null }>('/api/seller/subscription/cancel', {}),
+        /** One-tap resubscribe while a cancellation is pending; 409 RESUBSCRIBE_REQUIRED once the plan has ended. */
+        resume: () =>
+          post<{ cancelAtPeriodEnd: false }>('/api/seller/subscription/resume', {}),
         /** Read-only invoice summaries for the active seller store. */
         invoices: () => get<{
           invoices: Array<{

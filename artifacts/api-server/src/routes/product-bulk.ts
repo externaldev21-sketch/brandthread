@@ -295,15 +295,16 @@ router.post("/status", requireRole("manager"), async (req, res): Promise<void> =
             code: "PRODUCT_MODERATION_LOCKED", lockedIds,
           });
         }
-        const reviving = owned.filter((p) => p.status === "archived").length;
-        if (reviving > 0 && access && !await hasProductCapacity(tx, ownerId, access.limits.products, reviving)) {
+        // Only going live counts against the plan's product cap.
+        const publishing = target === "active" ? owned.filter((p) => p.status !== "active").length : 0;
+        if (publishing > 0 && access && !await hasProductCapacity(tx, ownerId, access.limits.products, publishing)) {
           throw new BulkRefusal(403, { code: "PLAN_LIMIT_REACHED", limit: access.limits.products, limited: true });
         }
       }
       const changing = owned.filter((p) => p.status !== target);
       if (changing.length > 0) {
         await tx.update(products)
-          .set({ status: target, updatedAt: new Date() })
+          .set({ status: target, planHiddenAt: null, updatedAt: new Date() })
           .where(inArray(products.id, changing.map((p) => p.id)));
       }
       return { owned, changing };
@@ -352,9 +353,7 @@ router.post("/duplicate", requireRole("manager"), async (req, res): Promise<void
   try {
     const created = await db.transaction(async (tx) => {
       const owned = await loadOwned(tx, ownerId, parsed.ids, true);
-      if (!await hasProductCapacity(tx, ownerId, access.limits.products, owned.length)) {
-        throw new BulkRefusal(403, { code: "PLAN_LIMIT_REACHED", limited: true });
-      }
+      // Copies are saved as drafts, which the plan cap never counts.
       const sources = await tx.select().from(products).where(inArray(products.id, parsed.ids));
       const variants = await tx.select().from(productVariants).where(inArray(productVariants.productId, parsed.ids));
       const compareAtRows = variants.length === 0 ? [] : await tx.select().from(productVariantCompareAt)

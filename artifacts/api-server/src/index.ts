@@ -28,6 +28,7 @@ import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
 import { startThreadCashExpiryJob } from "./jobs/threadCashExpiry";
 import { startScheduledLiveReminderJob } from "./jobs/scheduledLiveReminders";
 import { startEmailCampaignJob } from "./jobs/emailCampaigns";
+import { startPlanProductSyncJob } from "./jobs/planProductSync";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
@@ -89,6 +90,7 @@ const server = app.listen(port, (err) => {
   startDisputeEvidenceReminderJob();
   startDesignStudioObjectCleanupJob();
   startMoneySweepJob();
+  startPlanProductSyncJob();
   startAffiliatePayoutsJob();
   startDeliveryDeadlinesJob();
   startStoryCleanupJob();

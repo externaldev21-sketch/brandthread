@@ -40,6 +40,7 @@ import {
   isSubscriptionPaymentRecoveryRequired,
   type SubscriptionBillingProvider,
 } from '@/lib/subscriptionRecovery';
+import { accessEndLabel, cancelConfirmCopy, planCancelAction } from '@/lib/planCancel';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 // Note: there is no real usage-metrics API in this codebase yet, so the Usage
@@ -77,6 +78,9 @@ export default function SubscriptionScreen() {
     effectiveProvider:  'none' as SubscriptionBillingProvider,
     amountCents:        0,
     paymentMethodLabel: null as string | null,
+    cancelAtPeriodEnd:  false,
+    accessEndsAt:       null as string | null,
+    manageUrl:          null as string | null,
   });
 
   // Derive the active plan id from loaded data
@@ -101,6 +105,9 @@ export default function SubscriptionScreen() {
       effectiveProvider:  data.effectiveProvider,
       amountCents:        data.amountCents,
       paymentMethodLabel: data.paymentMethodLabel,
+      cancelAtPeriodEnd:  data.cancelAtPeriodEnd === true,
+      accessEndsAt:       data.accessEndsAt ?? null,
+      manageUrl:          data.manageUrl ?? null,
     });
   }, []);
 
@@ -230,6 +237,73 @@ export default function SubscriptionScreen() {
     }
   }
 
+  const cancelAction = planCancelAction(currentPlan);
+
+  /** Settings → Plan → "Cancel plan" / "Resubscribe" (lib/planCancel.ts). */
+  function handleCancelButton() {
+    if (isSellerPreview) return;
+    if (cancelAction === 'manage') { handleOpenPortal(); return; }
+    haptic();
+    if (cancelAction === 'resubscribe') { void resubscribe(); return; }
+    const copy = cancelConfirmCopy(currentPlan);
+    const confirm = () => { void cancelPlan(); };
+    if (Platform.OS === 'web') {
+      // Alert buttons don't run on react-native-web.
+      if (typeof window !== 'undefined' && window.confirm(`${copy.title}\n\n${copy.message}`)) confirm();
+      return;
+    }
+    Alert.alert(copy.title, copy.message, [
+      { text: 'Keep plan', style: 'cancel' },
+      { text: 'Cancel plan', style: 'destructive', onPress: confirm },
+    ]);
+  }
+
+  async function openStoreSubscriptions() {
+    const url = currentPlan.manageUrl ?? managementURL;
+    if (url) await Linking.openURL(url);
+    else handleOpenPortal();
+  }
+
+  async function cancelPlan() {
+    try {
+      if (currentPlan.effectiveProvider === 'revenuecat') {
+        // In-app purchases are cancelled in the App Store / Google Play.
+        externalSessionOpenedRef.current = { kind: 'portal' };
+        await openStoreSubscriptions();
+        return;
+      }
+      const result = await api.seller.subscription.cancel();
+      invalidatePlanCache();
+      await fetchStatus();
+      const until = accessEndLabel(result.accessEndsAt);
+      const done = `${result.inTrial ? "You won't be charged." : "You won't be charged again."}${until ? ` You can keep selling until ${until}.` : ''}`;
+      if (Platform.OS === 'web') window.alert(`Plan cancelled. ${done}`);
+      else Alert.alert('Plan cancelled', done);
+    } catch (e: any) {
+      externalSessionOpenedRef.current = null;
+      if (parseRoleError(e)) { Alert.alert('Only the store owner can do this'); return; }
+      Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+    }
+  }
+
+  async function resubscribe() {
+    try {
+      if (currentPlan.effectiveProvider === 'revenuecat') {
+        externalSessionOpenedRef.current = { kind: 'portal' };
+        await openStoreSubscriptions();
+        return;
+      }
+      await api.seller.subscription.resume();
+      invalidatePlanCache();
+      await fetchStatus();
+    } catch (e: any) {
+      externalSessionOpenedRef.current = null;
+      if (e?.code === 'RESUBSCRIBE_REQUIRED') { router.push('/plans' as never); return; }
+      if (parseRoleError(e)) { Alert.alert('Only the store owner can do this'); return; }
+      Alert.alert('Could not resubscribe', e?.message ?? 'Please try again.');
+    }
+  }
+
   async function handleRestore() {
     if (isSellerPreview) return;
     haptic();
@@ -320,9 +394,9 @@ export default function SubscriptionScreen() {
                   </View>
 
                   {/* Trial end or renewal line */}
-                  {currentPlan.status === 'canceled' ? (
-                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                      Access continues until {currentPlan.renewsOn}
+                  {currentPlan.status === 'canceled' || currentPlan.cancelAtPeriodEnd ? (
+                    <Text testID="seller-subscription-access-ends" style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                      {currentPlan.cancelAtPeriodEnd ? 'Cancelled · ' : ''}Access continues until {accessEndLabel(currentPlan.accessEndsAt) ?? currentPlan.renewsOn}
                     </Text>
                   ) : currentPlan.trialEnd ? (
                     <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
@@ -475,8 +549,12 @@ export default function SubscriptionScreen() {
             </View>
 
               {!isReadOnly && !isSellerPreview && (
-                <TouchableOpacity testID="seller-subscription-cancel" style={styles.cancelBtn} onPress={handleOpenPortal}>
-                  <Text style={styles.cancelText}>{Platform.OS === 'web' ? 'Manage or cancel subscription' : 'Manage subscription'}</Text>
+                <TouchableOpacity testID="seller-subscription-cancel" style={styles.cancelBtn} onPress={handleCancelButton}>
+                  <Text style={styles.cancelText}>
+                    {cancelAction === 'cancel' ? 'Cancel plan'
+                      : cancelAction === 'resubscribe' ? 'Resubscribe'
+                      : Platform.OS === 'web' ? 'Manage or cancel subscription' : 'Manage subscription'}
+                  </Text>
                </TouchableOpacity>
              )}
               {!isReadOnly && !isSellerPreview && Platform.OS !== 'web' && (

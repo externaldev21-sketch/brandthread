@@ -28,6 +28,8 @@ import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
 import { reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
+import { checkStripeTrial, recordNativeTrialClaim } from "../lib/sellerTrial";
+import { syncProductsToPlanSoon } from "../lib/planProductSync";
 import { revenueCatSubscriptionEvent, stripeSubscriptionEndedEvent, stripeSubscriptionEvents } from "../lib/subscriptionAnalytics";
 import { grantPromotionPurchase, iapPromotionsEnabled, promotionPurchaseFromWebhookEvent } from "../lib/iapPromotions";
 import { drizzlePromoStore } from "../lib/iapPromotionsStore";
@@ -552,7 +554,11 @@ router.post("/revenuecat", async (req: Request, res: Response): Promise<void> =>
     }
     // Reconciliation reads the current provider state, so stale/out-of-order
     // webhook payloads cannot overwrite a newer entitlement.
-    await reconcileRevenueCatEntitlement(appUserId);
+    const nativeRecord = await reconcileRevenueCatEntitlement(appUserId);
+    syncProductsToPlanSoon(appUserId);
+    await recordNativeTrialClaim(appUserId, nativeRecord).catch((err) => {
+      req.log.warn({ err, appUserId }, "Could not record the native trial claim");
+    });
     const funnel = revenueCatSubscriptionEvent(event);
     if (funnel) captureServerEvent(funnel.event, appUserId, funnel.props);
     res.json({ received: true });
@@ -1453,8 +1459,21 @@ async function handleSubscriptionUpdated(sub: any, previousAttributes: Record<st
     subscriptionPastDueSince: sub.status === "past_due"
       ? sql`COALESCE(${users.subscriptionPastDueSince}, now())`
       : null,
+    subscriptionCancelAtPeriodEnd: sub.cancel_at_period_end === true,
     updatedAt: new Date(),
   }).where(eq(users.stripeCustomerId, customerId));
+
+  // One trial per person, device and card (lib/sellerTrial.ts).
+  if (before?.clerkId && sub.status === "trialing" && stripe) {
+    try {
+      await checkStripeTrial(stripe as any, sub, before.clerkId);
+    } catch (err) {
+      logger.error({ err, subscriptionId: sub.id }, "Trial claim check failed");
+    }
+  }
+
+  // Downgrade / upgrade / lapse: fit live listings to the plan (lib/planProductSync.ts).
+  syncProductsToPlanSoon(before?.clerkId);
 
   if (before?.clerkId) {
     for (const { event, props } of stripeSubscriptionEvents({
@@ -1687,8 +1706,11 @@ async function handleSubscriptionDeleted(sub: any) {
     subscriptionStatus: "canceled",
     subscriptionPlanId: "starter",
     subscriptionPastDueSince: null,
+    subscriptionCancelAtPeriodEnd: false,
     updatedAt: new Date(),
   }).where(eq(users.stripeCustomerId, customerId));
+
+  syncProductsToPlanSoon(seller?.clerkId);
 
   if (seller?.clerkId) {
     const ended = stripeSubscriptionEndedEvent(seller.planId);
