@@ -30,8 +30,6 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
-import { StoreLinkCard } from '@/components/StoreLinkCard';
-import { useStoreLink } from '@/hooks/useStoreLink';
 import { openShareStoreSheet } from '@/lib/shareStoreSheet';
 
 import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
@@ -251,9 +249,7 @@ export default function AddProductScreen() {
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
-  // The store link handed out in the publish sheet (Copy / Share).
-  const storeLink = useStoreLink();
-  // "Share" in the publish sheet opens the Share store sheet once this one has finished closing.
+  // "Share store" in the publish sheet opens the Share store sheet once this one has finished closing.
   const shareStoreAfterClose = useRef(false);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
@@ -2218,19 +2214,12 @@ export default function AddProductScreen() {
           },
         }}
         secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
+        // A newly published product: hand the seller the one Share store sheet.
+        tertiaryAction={publishSuccess?.kind === 'created' && currentStatus === 'active'
+          ? { label: 'Share store', onPress: () => { shareStoreAfterClose.current = true; setPublishSuccess(null); } }
+          : undefined}
         testID="add-product-success-sheet"
-      >
-        {/* A newly published product: hand the seller their store link to
-            share right away (Share opens the Share store sheet). */}
-        {publishSuccess?.kind === 'created' && currentStatus === 'active' ? (
-          <StoreLinkCard
-            link={storeLink}
-            compact
-            onShare={() => { shareStoreAfterClose.current = true; setPublishSuccess(null); }}
-            testID="add-product-store-link"
-          />
-        ) : null}
-      </SuccessSheet>
+      />
 
       {cropTargetId && (() => {
         const cropItem = (draftData.media ?? []).find(m => m.id === cropTargetId);
