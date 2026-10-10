@@ -1637,6 +1637,10 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="statements" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        {/* The simple store website (brandthread.app/@handle): home, Design editor, Settings. */}
+        <Stack.Screen name="my-store"           options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-design"       options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT, gestureEnabled: false }} />
+        <Stack.Screen name="store-site-settings" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="launch-checklist"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="launch-publish"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-preview-as-buyer" options={{ headerShown: false, animation: 'fade', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />

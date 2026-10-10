@@ -150,8 +150,9 @@ const s = StyleSheet.create({
   bio: { fontSize: 15, lineHeight: 21, textAlign: 'center', marginTop: 6, maxWidth: 320 },
   socials: { flexDirection: 'row', gap: 4, marginTop: 12 },
   social: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginTop: 28, columnGap: 12, rowGap: 20 },
-  cell: { width: (SITE_WIDTH - 32 - 12) / 2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 28, rowGap: 20 },
+  // Two columns with a ~12pt gutter at any width (the site's grid).
+  cell: { width: '48.4%' },
   tile: { width: '100%', aspectRatio: 3 / 4 },
   pn: { fontSize: 15, fontWeight: '600', marginTop: 8 },
   pp: { fontSize: 15, marginTop: 2, fontVariant: ['tabular-nums'] },
