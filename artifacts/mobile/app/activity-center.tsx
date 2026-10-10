@@ -1353,7 +1353,7 @@ export default function ActivityCenterScreen() {
             testID="activity-new-pill"
             noMinHeight
           >
-            <Glass variant="regular" tint="dark" radius={radius.md} style={StyleSheet.absoluteFill} />
+            <Glass solid radius={radius.md} style={StyleSheet.absoluteFill} />
             <Feather name="arrow-up" size={ICON.sm} color={theme.text} />
             <Text style={styles.livePillText}>New activity</Text>
           </PressableScale>

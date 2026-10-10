@@ -1,9 +1,9 @@
 /**
  * `fullscreen` variant — for complex screens (Design Studio, Studio menu
- * scrub). Blurred/dimmed full-screen background, title/subtitle, and a
+ * scrub). Dimmed full-screen background, title/subtitle, and a
  * vertical list of animated gesture icons + labels. Matches the house style
  * already established by components/FeedGestureGuide.tsx (the feed's own
- * first-run overlay Dev pointed to) — same blur/dim treatment, same
+ * first-run overlay Dev pointed to) — same dim treatment, same
  * animation timing, same "tap anywhere to continue" dismiss affordance —
  * generalized here into a reusable, content-driven component instead of a
  * one-off per screen.
@@ -14,8 +14,7 @@
  * references cited in the PR.
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
 import { GestureGlyph } from './GestureGlyph';
 import type { GestureKind } from './types';
@@ -55,7 +54,6 @@ export function FullScreenGuideTip({
       testID={testID ?? 'first-run-tip-fullscreen'}
     >
       <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} accessibilityRole="button" accessibilityLabel={dismissLabel}>
-        <BlurView intensity={Platform.OS === 'ios' ? 46 : 60} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={[StyleSheet.absoluteFill, styles.dim]} />
         <View style={styles.content} pointerEvents="none">
           <Text style={styles.title}>{title}</Text>
@@ -84,7 +82,8 @@ export function FullScreenGuideTip({
 
 const styles = StyleSheet.create({
   root: { zIndex: 9999, elevation: 9999 },
-  dim: { backgroundColor: 'rgba(0,0,0,0.38)' },
+  // A solid dim over the video (no blur), dark enough to read the rows.
+  dim: { backgroundColor: 'rgba(0,0,0,0.8)' },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.xxl, textAlign: 'center' },
   subtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 6, marginBottom: 40 },

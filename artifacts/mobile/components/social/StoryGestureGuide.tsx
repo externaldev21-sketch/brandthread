@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   Easing,
@@ -77,7 +76,7 @@ type Props = {
 
 /**
  * First-time story-viewer coach screen, modeled on Instagram's "Watching
- * stories" overlay: dimmed blurred backdrop, title/subtitle, four gesture
+ * stories" overlay: dimmed backdrop, title/subtitle, four gesture
  * rows with looping line-art icon animations, dismissed by any tap.
  */
 export default function StoryGestureGuide({ userId, onDismiss }: Props) {
@@ -94,7 +93,6 @@ export default function StoryGestureGuide({ userId, onDismiss }: Props) {
       accessibilityRole="button"
       accessibilityLabel="Watching stories gesture guide. Tap to continue."
     >
-      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, styles.dim]} />
       <View style={styles.content}>
         <Text style={styles.title}>Watching stories</Text>
@@ -119,7 +117,8 @@ export default function StoryGestureGuide({ userId, onDismiss }: Props) {
 }
 
 const styles = StyleSheet.create({
-  dim: { backgroundColor: 'rgba(0,0,0,0.55)' },
+  // A solid dim over the story (no blur), dark enough to read the rows.
+  dim: { backgroundColor: 'rgba(0,0,0,0.8)' },
   content: {
     flex: 1,
     alignItems: 'center',

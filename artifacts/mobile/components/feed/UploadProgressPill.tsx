@@ -61,7 +61,7 @@ export function UploadProgressPill({ topInset }: { topInset: number }) {
               : 'Posting your Thread'
         }
       >
-        <Glass variant="regular" tint="dark" radius={radius.sm} style={StyleSheet.absoluteFill} />
+        <Glass solid radius={radius.sm} style={StyleSheet.absoluteFill} />
         {entry.thumbnailUri ? (
           <Image source={{ uri: entry.thumbnailUri }} style={styles.thumb} />
         ) : (

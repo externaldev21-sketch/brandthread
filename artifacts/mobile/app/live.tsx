@@ -172,7 +172,7 @@ function LivePage({
           </>
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.rtcWrap]}>
-            {video.posterUri ? <CachedImage source={{ uri: video.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={18} /> : null}
+            {video.posterUri ? <CachedImage source={{ uri: video.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
             {/* Real streams need a native RTC SDK (Agora) to render video —
                 hand off to the existing Agora viewer until a vendor-backed
                 renderer is plugged into the provider. */}

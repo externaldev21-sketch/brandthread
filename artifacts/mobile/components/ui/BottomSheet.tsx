@@ -35,6 +35,7 @@ import Animated, {
   type AnimatedStyle,
 } from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
+import { FILL_ELEVATED } from '@/lib/theme';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
@@ -226,7 +227,9 @@ export function BottomSheet({ visible, onClose, children, testID, reduceMotion }
               styles.sheet,
               isWebShell && styles.sheetWebShell,
               {
-                backgroundColor: palette.card,
+                // Sheets are one solid elevated gray (BRANDTHREAD_DESIGN.md,
+                // Dev's addendum) — never translucent.
+                backgroundColor: FILL_ELEVATED,
                 borderColor: palette.border,
                 paddingBottom: Math.max(insets.bottom, SPACING.md),
               },
