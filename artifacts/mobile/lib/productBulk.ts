@@ -399,10 +399,10 @@ export function applyLocalPrice(
     : v))));
 }
 
-/** Product-level stock marker for list rows: "Out of stock", "Low stock · N" or "N in stock". */
+/** Product-level stock marker for list rows: "Out of stock", "Low stock, N left" or "N in stock". */
 export function stockStatusLabel(total: number, threshold: number | null): { level: StockLevel; label: string } {
   if (total <= 0) return { level: 'out_of_stock', label: 'Out of stock' };
-  if (threshold !== null && total <= threshold) return { level: 'low_stock', label: `Low stock · ${total}` };
+  if (threshold !== null && total <= threshold) return { level: 'low_stock', label: `Low stock, ${total} left` };
   return { level: 'in_stock', label: `${total} in stock` };
 }
 

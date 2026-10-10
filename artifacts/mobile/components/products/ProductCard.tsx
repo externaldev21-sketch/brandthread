@@ -15,10 +15,10 @@
 import React, { useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Feather } from '@expo/vector-icons';
+import { Icon, ICON_SIZE } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
@@ -101,14 +101,14 @@ export const ProductCard = React.memo(function ProductCard({
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); closeSwipe(); onQuickArchive(product); }}
           accessibilityLabel={isArchived ? `Unarchive ${product.name}` : `Archive ${product.name}`}
         >
-          <Feather name={isArchived ? 'rotate-ccw' : 'archive'} size={ICON.md} color={theme.background} />
+          <Icon name={isArchived ? 'rotate-ccw' : 'archive'} size={ICON_SIZE.md} color={theme.background} />
         </PressableScale>
         <PressableScale
           style={[s.swipeBtn, { backgroundColor: theme.error }]}
           onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); closeSwipe(); onQuickDelete(product); }}
           accessibilityLabel={`Delete ${product.name}`}
         >
-          <Feather name="trash-2" size={ICON.md} color={theme.background} />
+          <Icon name="trash-2" size={ICON_SIZE.md} color={theme.background} />
         </PressableScale>
       </View>
     );
@@ -155,7 +155,7 @@ export const ProductCard = React.memo(function ProductCard({
               accessibilityLabel={`More actions for ${product.name}`}
             >
               <View style={[s.moreBtnInner, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-                <Feather name="more-horizontal" size={ICON.sm} color="#FFFFFF" />
+                <Icon name="more-horizontal" size={ICON_SIZE.sm} color="#FFFFFF" />
               </View>
             </PressableScale>
 

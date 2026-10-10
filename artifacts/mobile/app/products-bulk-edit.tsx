@@ -19,10 +19,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, TextInput, ScrollView, Image, StyleSheet, ActivityIndicator, Pressable,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, ICON_SIZE } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, FILL_ELEVATED } from '@/lib/theme';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -227,7 +227,7 @@ export default function ProductsBulkEditScreen() {
 
       <View style={s.searchWrap}>
         <View style={s.search}>
-          <Feather name="search" size={ICON.sm} color={theme.subtle} />
+          <Icon name="search" size={ICON_SIZE.sm} color={theme.subtle} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -241,7 +241,7 @@ export default function ProductsBulkEditScreen() {
           />
           {query.length > 0 && (
             <Pressable onPress={() => setQuery('')} accessibilityLabel="Clear search" hitSlop={10}>
-              <Feather name="x" size={ICON.sm} color={theme.subtle} />
+              <Icon name="x" size={ICON_SIZE.sm} color={theme.subtle} />
             </Pressable>
           )}
         </View>
@@ -346,7 +346,7 @@ export default function ProductsBulkEditScreen() {
       {summary && (
         <View style={[s.fullPanel, { paddingTop: topInset }]}>
           <View style={s.summaryBody}>
-            <View style={s.summaryIcon}><Feather name="check" size={28} color={theme.onAccent} /></View>
+            <View style={s.summaryIcon}><Icon name="check" size={ICON_SIZE.lg} color={theme.onAccent} /></View>
             <Text style={s.summaryTitle}>{summary.title}</Text>
             {summary.lines.map(l => <Text key={l} style={s.summaryLine}>{l}</Text>)}
           </View>
@@ -470,7 +470,7 @@ function StockEditor({ productIds, local, onDone }: {
     ? [
       preview.summary.outAfter > 0 ? `${preview.summary.outAfter} out of stock` : null,
       preview.summary.lowAfter > 0 ? `${preview.summary.lowAfter} low` : null,
-    ].filter(Boolean).join(' · ')
+    ].filter(Boolean).join(', ')
     : '';
 
   return (
@@ -492,7 +492,7 @@ function StockEditor({ productIds, local, onDone }: {
             accessibilityRole="button"
             accessibilityLabel="Decrease quantity"
           >
-            <Feather name="minus" size={ICON.md} color={theme.text} />
+            <Icon name="minus" size={ICON_SIZE.md} color={theme.text} />
           </Pressable>
           <TextInput
             value={input}
@@ -510,7 +510,7 @@ function StockEditor({ productIds, local, onDone }: {
             accessibilityRole="button"
             accessibilityLabel="Increase quantity"
           >
-            <Feather name="plus" size={ICON.md} color={theme.text} />
+            <Icon name="plus" size={ICON_SIZE.md} color={theme.text} />
           </Pressable>
         </View>
         <Text style={s.qtyCaption}>Applies to every variant</Text>
@@ -526,7 +526,7 @@ function StockEditor({ productIds, local, onDone }: {
               {it.image ? (
                 <Image source={{ uri: it.image }} style={s.previewThumb} />
               ) : (
-                <View style={[s.previewThumb, s.thumbEmpty]}><Feather name="image" size={ICON.sm} color={theme.subtle} /></View>
+                <View style={[s.previewThumb, s.thumbEmpty]}><Icon name="image" size={ICON_SIZE.sm} color={theme.subtle} /></View>
               )}
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={s.previewName} numberOfLines={1}>{it.name}</Text>
@@ -542,7 +542,7 @@ function StockEditor({ productIds, local, onDone }: {
               {!it.skipped && (
                 <View style={s.previewPrices}>
                   <Text style={s.beforeQty}>{it.beforeTotal}</Text>
-                  <Feather name="arrow-right" size={ICON.xs ?? 12} color={theme.subtle} />
+                  <Icon name="arrow-right" size={ICON_SIZE.sm} color={theme.subtle} />
                   <Text style={s.afterQty}>{it.afterTotal}</Text>
                 </View>
               )}
@@ -695,7 +695,7 @@ function PriceEditor({ productIds, local, onDone }: {
               {!it.skipped && (
                 <View style={s.previewPrices}>
                   <Text style={s.before}>{priceRangeLabel(it.beforeMin, it.beforeMax, formatCents)}</Text>
-                  <Feather name="arrow-right" size={ICON.xs ?? 12} color={theme.subtle} />
+                  <Icon name="arrow-right" size={ICON_SIZE.sm} color={theme.subtle} />
                   <Text style={s.after}>{priceRangeLabel(it.afterMin, it.afterMax, formatCents)}</Text>
                 </View>
               )}
@@ -751,7 +751,7 @@ function Checkbox({ checked, theme }: { checked: boolean; theme: any }) {
       width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
       borderColor: checked ? theme.text : theme.subtle, backgroundColor: checked ? theme.text : 'transparent',
     }}>
-      {checked && <Feather name="check" size={14} color={theme.background} />}
+      {checked && <Icon name="check" size={ICON_SIZE.sm} color={theme.background} />}
     </View>
   );
 }
@@ -791,14 +791,14 @@ function BarButton({ label, onPress, disabled, s }: { label: string; onPress: ()
 function ProductRow({ item, checked, onPress, theme, s }: {
   item: BulkProduct; checked: boolean; onPress: () => void; theme: any; s: ReturnType<typeof makeStyles>;
 }) {
-  // Shopify's picker row: price · status · "N available" — the stock count
+  // Shopify's picker row: price, status, "N available" — the stock count
   // reads in silver like the rest of the line.
   const meta = [
     priceRangeLabel(item.minPriceCents, item.maxPriceCents, formatCents),
     item.status === 'active' ? null : item.status[0].toUpperCase() + item.status.slice(1),
     stockStatusLabel(item.totalStock, null).label,
     item.variantCount > 1 ? `${item.variantCount} variants` : null,
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).join(', ');
   return (
     <PressableScale
       style={[s.row, checked && s.rowChecked]}
@@ -811,7 +811,7 @@ function ProductRow({ item, checked, onPress, theme, s }: {
       {item.image ? (
         <Image source={{ uri: item.image }} style={s.thumb} />
       ) : (
-        <View style={[s.thumb, s.thumbEmpty]}><Feather name="image" size={ICON.sm} color={theme.subtle} /></View>
+        <View style={[s.thumb, s.thumbEmpty]}><Icon name="image" size={ICON_SIZE.sm} color={theme.subtle} /></View>
       )}
       <View style={{ flex: 1 }}>
         <Text style={s.name} numberOfLines={1}>{item.name}</Text>
@@ -829,17 +829,17 @@ function makeStyles(theme: any) {
     searchWrap: { paddingHorizontal: SP.md, paddingTop: SP.sm },
     search: {
       flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: 44, paddingHorizontal: SP.md,
-      borderRadius: RADIUS.md, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
+      borderRadius: RADIUS.md, backgroundColor: FILL_ELEVATED,
     },
     tabs: { paddingHorizontal: SP.md, paddingBottom: SP.xs },
     stepperRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: SP.lg },
     stepBtn: {
       width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
-      backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
+      backgroundColor: FILL_ELEVATED,
     },
     qtyInput: {
-      flex: 1, minWidth: 0, height: 80, borderRadius: 40, borderWidth: 1, borderColor: theme.border,
-      backgroundColor: theme.card, textAlign: 'center', ...TYPE_SCALE.title1, fontSize: 40, lineHeight: 46,
+      flex: 1, minWidth: 0, height: 80, borderRadius: 40,
+      backgroundColor: FILL_ELEVATED, textAlign: 'center', ...TYPE_SCALE.title1, fontSize: 40, lineHeight: 46,
       color: theme.text, padding: 0, outlineWidth: 0, ...TABULAR_NUMS,
     } as any,
     qtyCaption: { ...TYPE_SCALE.footnote, color: theme.muted, textAlign: 'center', marginTop: SP.sm },
@@ -900,7 +900,7 @@ function makeStyles(theme: any) {
     wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     valueBox: {
       flexDirection: 'row', alignItems: 'center', height: 64, marginTop: SP.md, paddingHorizontal: SP.md,
-      borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, gap: 6,
+      borderRadius: RADIUS.md, backgroundColor: FILL_ELEVATED, gap: 6,
     },
     unit: { fontFamily: FONT.semibold, fontSize: 24, color: theme.muted },
     valueInput: { flex: 1, minWidth: 0, width: '100%', fontFamily: FONT.bold, fontSize: 28, color: theme.text, padding: 0, outlineWidth: 0 } as any,

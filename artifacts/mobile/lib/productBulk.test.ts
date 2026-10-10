@@ -85,7 +85,7 @@ describe('local stock rules (mirror api-server bulkStock.ts)', () => {
   });
   it('labels list rows', () => {
     expect(stockStatusLabel(0, 5).label).toBe('Out of stock');
-    expect(stockStatusLabel(3, 5)).toEqual({ level: 'low_stock', label: 'Low stock · 3' });
+    expect(stockStatusLabel(3, 5)).toEqual({ level: 'low_stock', label: 'Low stock, 3 left' });
     expect(stockStatusLabel(12, 5).label).toBe('12 in stock');
     expect(stockStatusLabel(2, null).label).toBe('2 in stock');
   });
