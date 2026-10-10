@@ -47,7 +47,9 @@ export const ONBOARDING_SAMPLE_RESERVATION_LEASE_MS = 15 * 60_000;
 // The onboarding sample is mounted separately from the paid /logo router by
 // routes/index.ts. Its allowance is durable and account-scoped, never a
 // client-side entitlement or an expiring rate-limit bucket.
-async function reserveOnboardingSample(accountId: string): Promise<string> {
+async function reserveOnboardingSample(profileId: string): Promise<string> {
+  // One free sample per PERSON: a login's buyer and seller profiles share it.
+  const accountId = await personKeyFor(profileId);
   const reservationId = randomUUID();
   const reservedAt = new Date();
   const leaseCutoff = new Date(reservedAt.getTime() - ONBOARDING_SAMPLE_RESERVATION_LEASE_MS);
@@ -82,7 +84,8 @@ async function reserveOnboardingSample(accountId: string): Promise<string> {
   throw error;
 }
 
-async function releaseOnboardingSample(accountId: string, reservationId: string): Promise<void> {
+async function releaseOnboardingSample(profileId: string, reservationId: string): Promise<void> {
+  const accountId = await personKeyFor(profileId);
   await db.delete(onboardingAiSamples).where(and(
     eq(onboardingAiSamples.accountId, accountId),
     eq(onboardingAiSamples.reservationId, reservationId),
@@ -90,7 +93,8 @@ async function releaseOnboardingSample(accountId: string, reservationId: string)
   ));
 }
 
-async function completeOnboardingSample(accountId: string, reservationId: string): Promise<boolean> {
+async function completeOnboardingSample(profileId: string, reservationId: string): Promise<boolean> {
+  const accountId = await personKeyFor(profileId);
   const rows = await db.update(onboardingAiSamples)
     .set({ status: "completed", completedAt: new Date() })
     .where(and(
@@ -168,11 +172,9 @@ router.post("/logo", async (req, res) => {
     return;
   }
 
-  // One free sample per PERSON: a login's buyer and seller profiles share it.
-  const sampleKey = await personKeyFor(userId);
   let reservationId: string;
   try {
-    reservationId = await reserveOnboardingSample(sampleKey);
+    reservationId = await reserveOnboardingSample(userId);
   } catch (error: any) {
     const status = error?.code === "onboarding_sample_in_progress" ? 409 : 429;
     res.status(status).json({ error: error?.message || "The onboarding sample is unavailable.", code: error?.code });
@@ -196,7 +198,7 @@ router.post("/logo", async (req, res) => {
       "Create a crisp fashion-brand logo on a clean background. It must remain legible at small sizes and contain no invented words.",
     );
   } catch (error: any) {
-    await releaseOnboardingSample(sampleKey, reservationId).catch(() => {});
+    await releaseOnboardingSample(userId, reservationId).catch(() => {});
     res.status(400).json({ error: error?.message || "Invalid onboarding sample request." });
     return;
   }
@@ -211,7 +213,7 @@ router.post("/logo", async (req, res) => {
     });
   } catch (err) {
     // A failed provider or QA attempt must not consume the allowance.
-    await releaseOnboardingSample(sampleKey, reservationId).catch(() => {});
+    await releaseOnboardingSample(userId, reservationId).catch(() => {});
     if (err instanceof ImageQualityError) {
       res.status(422).json({ error: "The generated logo did not meet the quality check. Please try again.", retryable: true });
     } else if (err instanceof ImageQualityUnavailableError) {
@@ -224,7 +226,7 @@ router.post("/logo", async (req, res) => {
 
   // Completion is the durable success boundary. If this update cannot be
   // recorded, do not release the reservation or risk a second success.
-  const completed = await completeOnboardingSample(sampleKey, reservationId);
+  const completed = await completeOnboardingSample(userId, reservationId);
   if (!completed) {
     res.status(503).json({ error: "The sample could not be recorded. Please try again.", retryable: true });
     return;

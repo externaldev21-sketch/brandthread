@@ -259,7 +259,7 @@ describe("per-person limits are shared by linked profiles", () => {
       state.userId = linkedSeller;
       const res = await fetch(`${tcBase}/tc/check-in`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timezone: "UTC" }) });
       expect(res.status).toBe(409);
-      expect((await res.json()).code).toBe("THREAD_CASH_CLAIMED_ON_LINKED_PROFILE");
+      expect(((await res.json()) as { code?: string }).code).toBe("THREAD_CASH_CLAIMED_ON_LINKED_PROFILE");
     } finally {
       await new Promise<void>((resolve) => tcServer.close(() => resolve()));
     }
