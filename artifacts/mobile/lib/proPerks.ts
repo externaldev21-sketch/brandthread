@@ -27,9 +27,15 @@ export function formatFeeRate(bps: number): string {
   return `${Number.isInteger(pct) ? pct : pct.toFixed(2).replace(/0$/, '')}%`;
 }
 
-/** "5% Starter · 4% Growth · 3% Pro", or null until perks have loaded. */
+/**
+ * "5% on every plan" when the server reports one rate for all plans (the
+ * owner's rule), otherwise "5% Starter · 4% Growth · 3% Pro"; null until
+ * perks have loaded.
+ */
 export function commissionSummary(perks: PerksResponse | null | undefined): string | null {
   if (!perks || perks.plans.length === 0) return null;
+  const rates = new Set(perks.plans.map((p) => p.platformFeeBps));
+  if (rates.size === 1) return `${formatFeeRate(perks.plans[0].platformFeeBps)} on every plan`;
   return perks.plans
     .map((p) => `${formatFeeRate(p.platformFeeBps)} ${p.name.replace(/^Brandthread\s+/, '').replace(/\s+Plan$/, '')}`)
     .join(' · ');
@@ -62,8 +68,8 @@ export const DEMO_PERKS: PerksResponse = {
   hasAdvancedAnalytics: false,
   plans: [
     { planId: 'starter', name: 'Brandthread Starter Plan', amountCents: 2900, platformFeeBps: 500, monthlyAiCredits: 1000, unlimitedAiCredits: false, advancedAnalytics: false },
-    { planId: 'growth', name: 'Brandthread Growth Plan', amountCents: 7900, platformFeeBps: 400, monthlyAiCredits: 4000, unlimitedAiCredits: false, advancedAnalytics: false },
-    { planId: 'pro', name: 'Brandthread Pro Plan', amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true },
+    { planId: 'growth', name: 'Brandthread Growth Plan', amountCents: 7900, platformFeeBps: 500, monthlyAiCredits: 4000, unlimitedAiCredits: false, advancedAnalytics: false },
+    { planId: 'pro', name: 'Brandthread Pro Plan', amountCents: 19900, platformFeeBps: 500, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true },
   ],
 };
 

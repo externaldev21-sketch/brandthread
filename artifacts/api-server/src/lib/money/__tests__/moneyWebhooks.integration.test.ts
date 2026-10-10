@@ -72,7 +72,7 @@ async function openCheckout() {
   const seller = await seedSeller("wh");
   const buyer = await seedBuyer("wh");
   const product = await seedProduct(seller, { priceCents: 4_200 });
-  const fee = destinationApplicationFeeCents({ merchandiseCents: 4_200, preTaxTotalCents: 4_200 });
+  const fee = destinationApplicationFeeCents({ merchandiseCents: 4_200, shippingCents: 0, preTaxTotalCents: 4_200 });
   const sessionId = `cs_${uid("whs").replace(/-/g, "_")}`;
   const [checkout] = await db.insert(checkoutSessions).values({
     buyerId: buyer,

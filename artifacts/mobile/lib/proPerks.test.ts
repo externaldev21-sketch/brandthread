@@ -24,8 +24,12 @@ describe('formatFeeRate', () => {
 });
 
 describe('commissionSummary', () => {
-  it('lists each plan rate from the server perks', () => {
+  it('lists each plan rate from the server perks when they differ', () => {
     expect(commissionSummary(perks)).toBe('5% Starter · 4% Growth · 3% Pro');
+  });
+  it('says one rate on every plan when the server reports a flat commission', () => {
+    const flat = { ...perks, plans: perks.plans.map((p) => ({ ...p, platformFeeBps: 500 })) };
+    expect(commissionSummary(flat)).toBe('5% on every plan');
   });
   it('is null until perks load', () => {
     expect(commissionSummary(null)).toBeNull();

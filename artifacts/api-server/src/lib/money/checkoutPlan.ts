@@ -145,6 +145,8 @@ export function paymentIntentMoney(input: {
   plan: ChargePlan;
   sellerStripeAccountId: string;
   merchandiseCents: number;
+  /** Shipping charged to the buyer: the 5% is on merchandise + shipping. */
+  shippingCents: number;
   preTaxTotalCents: number;
   /** Seller-plan commission in bps (lib/planPerks); defaults to the standard rate. */
   platformFeeBps?: number | null;
@@ -157,6 +159,7 @@ export function paymentIntentMoney(input: {
 } {
   const fee = destinationApplicationFeeCents({
     merchandiseCents: input.merchandiseCents,
+    shippingCents: input.shippingCents,
     preTaxTotalCents: input.preTaxTotalCents,
     platformFeeBps: input.platformFeeBps,
   });

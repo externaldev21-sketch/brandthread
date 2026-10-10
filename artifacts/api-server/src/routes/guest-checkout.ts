@@ -292,6 +292,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
       merchandiseCents: afterBundlesCents,
+      shippingCents,
       preTaxTotalCents: afterBundlesCents + shippingCents,
       platformFeeBps,
     });

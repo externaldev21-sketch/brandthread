@@ -91,6 +91,8 @@ export const affiliateCommissions = pgTable('affiliate_commissions', {
   amountCents:   integer('amount_cents').notNull(),
   reversedCents: integer('reversed_cents').notNull().default(0),
   paidCents:     integer('paid_cents').notNull().default(0),
+  // Taken back from the seller's payout before the creator is paid (lib/affiliate/funding.ts).
+  sellerFundedCents: integer('seller_funded_cents').notNull().default(0),
   status:        text('status').notNull().default('pending'),
   eligibleAt:    timestamp('eligible_at', { withTimezone: true }),
   // The open payout currently covering this commission, if any.

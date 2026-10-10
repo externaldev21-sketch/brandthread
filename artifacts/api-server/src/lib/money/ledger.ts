@@ -90,6 +90,14 @@ export const LEDGER_ACCOUNTS = {
   platform_dispute_losses: "platform_dispute_losses",
   /** Stripe's dispute fees (positive = paid to Stripe; negative = returned). */
   stripe_dispute_fees: "stripe_dispute_fees",
+  /**
+   * Affiliate commission the seller has funded (taken back from their order
+   * payout) and Brandthread holds until it is paid to the creator (party =
+   * seller, per order) — see lib/affiliate/funding.ts.
+   */
+  affiliate_commission_reserve: "affiliate_commission_reserve",
+  /** Affiliate commission transferred to a creator (party = creator). */
+  affiliate_paid_out: "affiliate_paid_out",
 } as const;
 export type LedgerAccount = keyof typeof LEDGER_ACCOUNTS;
 

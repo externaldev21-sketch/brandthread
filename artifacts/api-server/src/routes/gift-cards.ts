@@ -33,7 +33,7 @@ import {
   GiftCardError, assertValidAmount, claimCard, effectiveStatus, findCardByCode, issueSellerCard, listBuyerCards, listSellerCards,
   listTransactions, presentCard, voidCard,
 } from "../lib/giftCards/service";
-import { getGiftCardSettings, saveGiftCardSettings, expiryFromMonths } from "../lib/giftCards/settings";
+import { assertSellerMayIssue, getGiftCardSettings, saveGiftCardSettings, expiryFromMonths } from "../lib/giftCards/settings";
 import { confirmGiftCardPurchase, createGiftCardPurchase, deliverGiftCard, storeNameFor } from "../lib/giftCards/purchase";
 import { guardCodeLookup } from "../lib/giftCards/checkout";
 import { looksLikeGiftCardCode } from "../lib/giftCards/codes";
@@ -227,6 +227,7 @@ router.post("/seller/issue", requirePermission("marketing"), validateRequest({ b
   const body = req.body as z.infer<typeof issueSchema>;
   try {
     assertValidAmount(body.amountCents);
+    await assertSellerMayIssue(sellerId);
     const settings = await getGiftCardSettings(sellerId);
     const { card, code } = await db.transaction((tx) => issueSellerCard(tx, {
       sellerId,

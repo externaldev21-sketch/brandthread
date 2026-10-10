@@ -14,6 +14,12 @@
  *  C. (DB) mark the payout paid and settle the commissions exactly once,
  *     guarded by `state = 'processing'`.
  *
+ * The seller funds every commission (./funding.ts): before Phase A each
+ * payable commission is taken back from the seller's payout for its order,
+ * only fully funded commissions are paid, and a payout never exceeds the
+ * seller's affiliate_commission_reserve. Brandthread's own balance never pays
+ * a creator.
+ *
  * Nothing here runs unless AFFILIATE_PAYOUTS_ENABLED=true and a Stripe key is
  * configured; without either, commissions keep tracking and the API reports
  * payouts as unavailable.
@@ -25,8 +31,10 @@ import {
 } from "@workspace/db";
 import { stripe as defaultStripe } from "../stripe";
 import { logger } from "../logger";
+import { accountBalanceCents, postLedgerTransaction, type LedgerPosting } from "../money/ledger";
 import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode } from "../money/stripeMoney";
 import { owedCents, planPayout, statusAfterChange, type PayoutPlanRow } from "./commission";
+import { fundCommissionFromSeller, returnAllUnneededFunding } from "./funding";
 import { promoteEligibleCommissions, reconcileReversals } from "./service";
 
 export type StripeTransfers = Pick<Stripe, "transfers" | "accounts">;
@@ -67,15 +75,17 @@ export type PayoutOutcome =
   | { status: "paid"; payoutId: string; amountCents: number; transferId: string }
   | { status: "failed"; payoutId: string; code: string }
   | { status: "unconfirmed"; payoutId: string }
-  | { status: "skipped"; reason: "unavailable" | "no_account" | "below_minimum" | "nothing_owed" | "in_progress" | "not_due" };
+  | { status: "skipped"; reason: "unavailable" | "no_account" | "below_minimum" | "nothing_owed" | "in_progress" | "not_due" | "not_funded" };
 
 type Candidate = { id: string; owed: number; status: "pending" | "payable" | "paid" | "reversed" };
 
+/** Payable commissions the seller has funded in full, plus clawback debts. */
 async function lockCandidates(tx: Pick<typeof db, "execute">, sellerId: string, creatorId: string): Promise<Candidate[]> {
   const res = await tx.execute(sql`
     SELECT id, status, amount_cents, reversed_cents, paid_cents FROM affiliate_commissions
     WHERE seller_id = ${sellerId} AND creator_id = ${creatorId} AND payout_id IS NULL
-      AND (status = 'payable' OR amount_cents - reversed_cents - paid_cents < 0)
+      AND ((status = 'payable' AND seller_funded_cents >= amount_cents - reversed_cents)
+           OR amount_cents - reversed_cents - paid_cents < 0)
     ORDER BY created_at, id FOR UPDATE
   `);
   return ((res as unknown as { rows?: any[] }).rows ?? []).map((r) => ({
@@ -99,6 +109,18 @@ export async function runCreatorPayout(input: {
   if (!enabled || !stripeClient) return { status: "skipped", reason: "unavailable" };
 
   const account = input.accountState ?? await creatorAccountState(input.creatorId, stripeClient);
+
+  // ── Funding: the seller pays the commission, before anyone pays the creator.
+  if (account.ready && account.accountId) {
+    const unfunded = await db.select({ id: affiliateCommissions.id }).from(affiliateCommissions).where(and(
+      eq(affiliateCommissions.sellerId, input.sellerId),
+      eq(affiliateCommissions.creatorId, input.creatorId),
+      eq(affiliateCommissions.status, "payable"),
+      sql`${affiliateCommissions.payoutId} IS NULL`,
+      sql`${affiliateCommissions.sellerFundedCents} < ${affiliateCommissions.amountCents} - ${affiliateCommissions.reversedCents}`,
+    ));
+    for (const row of unfunded) await fundCommissionFromSeller(stripeClient, row.id);
+  }
 
   // ── Phase A ────────────────────────────────────────────────────────────
   const phaseA = await db.transaction(async (tx) => {
@@ -158,6 +180,13 @@ export async function runCreatorPayout(input: {
       payoutsAvailable: true,
     });
     if (!plan.eligible) return { kind: "skip" as const, reason: plan.reason === "ok" ? ("nothing_owed" as const) : plan.reason };
+    // Never more than the seller has funded: Brandthread's balance never pays a creator.
+    const reserve = await accountBalanceCents(tx, { account: "affiliate_commission_reserve", partyId: input.sellerId });
+    if (reserve < plan.amountCents) {
+      logger.error({ sellerId: input.sellerId, creatorId: input.creatorId, reserve, amount: plan.amountCents },
+        "Affiliate payout exceeds the seller-funded reserve; not paid");
+      return { kind: "skip" as const, reason: "not_funded" as const };
+    }
 
     const [payout] = await tx.insert(affiliatePayouts).values({
       sellerId: input.sellerId, creatorId: input.creatorId, amountCents: plan.amountCents, state: "processing", attempt: 1,
@@ -206,9 +235,13 @@ export async function runCreatorPayout(input: {
     }).where(and(eq(affiliatePayouts.id, payout.id), eq(affiliatePayouts.state, "processing"))).returning();
     if (!settled) return; // already settled by a concurrent run
     const items = await tx.select().from(affiliatePayoutItems).where(eq(affiliatePayoutItems.payoutId, payout.id));
+    // Paid out of each order's seller-funded reserve (a clawback row puts the
+    // creator's repayment back into its order's reserve).
+    const postings: LedgerPosting[] = [{ account: "affiliate_paid_out", partyId: input.creatorId, amountCents: payout.amountCents }];
     for (const item of items) {
       const [c] = (await tx.execute(sql`SELECT * FROM affiliate_commissions WHERE id = ${item.commissionId}::uuid FOR UPDATE`) as unknown as { rows: any[] }).rows;
       if (!c) continue;
+      postings.push({ account: "affiliate_commission_reserve", partyId: input.sellerId, orderId: c.order_id, amountCents: -item.amountCents });
       const paidCents = Number(c.paid_cents) + item.amountCents;
       const status = statusAfterChange({
         amountCents: Number(c.amount_cents), reversedCents: Number(c.reversed_cents), paidCents,
@@ -222,6 +255,14 @@ export async function runCreatorPayout(input: {
                 ${item.amountCents}, ${JSON.stringify({ payoutId: payout.id, transferId: transfer.id })}::jsonb)
       `);
     }
+    await postLedgerTransaction(tx, {
+      idempotencyKey: `affiliate-payout/${payout.id}`,
+      kind: "affiliate_creator_payout",
+      sellerId: input.sellerId,
+      stripeObjectId: transfer.id,
+      memo: "Creator commission paid from the seller-funded reserve",
+      postings,
+    });
   });
   return { status: "paid", payoutId: payout.id, amountCents: payout.amountCents, transferId: transfer.id };
 }
@@ -239,6 +280,11 @@ export async function runAffiliatePayouts(options: { now?: Date; stripe?: Stripe
   const enabled = options.enabled ?? payoutsConfigured(process.env, stripeClient);
   const result: PayoutRunResult = { promoted, reversed, paid: 0, failed: 0, unconfirmed: 0, skipped: 0, available: enabled && Boolean(stripeClient) };
   if (!result.available) return result;
+
+  // Refunds that reversed an already-funded commission: the seller gets it back.
+  await returnAllUnneededFunding(stripeClient!).catch((err) => {
+    logger.error({ err }, "Returning unneeded affiliate funding failed; the next run retries");
+  });
 
   const pairs = ((await db.execute(sql`
     SELECT DISTINCT seller_id, creator_id FROM affiliate_commissions

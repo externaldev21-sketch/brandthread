@@ -173,7 +173,11 @@ export async function activateCard(
   return { card: activated, code };
 }
 
-/** Seller-issued card: live immediately, no payment, no liability (the store is giving its own credit). */
+/**
+ * Seller-issued card: live immediately, no payment, no liability (the store is
+ * giving its own credit). Redeeming it is a seller-funded discount: payout.ts
+ * never pays it out from Brandthread's balance.
+ */
 export async function issueSellerCard(exec: Exec, input: Omit<NewCardInput, "source">): Promise<{ card: GiftCardRow; code: string }> {
   const pending = await createPendingCard(exec, { ...input, source: "seller_issued" });
   const { card, code } = await activateCard(exec, pending.id, { actorId: input.actorId, liabilityLedger: false });

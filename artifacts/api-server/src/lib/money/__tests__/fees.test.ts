@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  assertCents, bpsOfCents, destinationApplicationFeeCents, estimateProcessingFeeCents, MoneyError,
+  assertCents, bpsOfCents, commissionBaseCents, destinationApplicationFeeCents, estimateProcessingFeeCents, MoneyError,
   platformFeeCents, platformFeeRefundCents, runningProRataShareCents, splitOrder,
 } from "../fees";
 import { computeApplicationFeeCents } from "../../stripe";
@@ -89,20 +89,20 @@ describe("splitOrder", () => {
     expect(split).toEqual({
       grossCents: 10_000,
       merchandiseCents: 9_000,
-      platformFeeCents: 450,
+      platformFeeCents: 475, // 5% of 9 000 + 500 shipping
       processingFeeCents: 320,
       processingFeeSource: "actual",
-      sellerNetCents: 9_230,
+      sellerNetCents: 9_205,
     });
     expect(split.platformFeeCents + split.processingFeeCents + split.sellerNetCents).toBe(split.grossCents);
   });
 
-  it("charges 5% on merchandise after discounts, never on tax or shipping", () => {
+  it("charges 5% on merchandise after discounts plus shipping, never on tax", () => {
     const split = splitOrder({
       subtotalCents: 5_000, discountCents: 1_000, shippingCents: 700, taxCents: 300, grossCents: 5_000,
     });
     expect(split.merchandiseCents).toBe(4_000);
-    expect(split.platformFeeCents).toBe(200);
+    expect(split.platformFeeCents).toBe(235); // 5% of 4 700
     expect(split.processingFeeSource).toBe("estimate");
     expect(split.processingFeeCents).toBe(estimateProcessingFeeCents(5_000));
   });
@@ -135,17 +135,57 @@ describe("splitOrder", () => {
 });
 
 describe("destinationApplicationFeeCents", () => {
-  it("adds the processing estimate to the 5% fee", () => {
-    expect(destinationApplicationFeeCents({ merchandiseCents: 10_000, preTaxTotalCents: 10_500 })).toEqual({
-      platformFeeCents: 500,
+  it("adds the processing estimate to the 5% fee on item + shipping", () => {
+    expect(destinationApplicationFeeCents({ merchandiseCents: 10_000, shippingCents: 500, preTaxTotalCents: 10_500 })).toEqual({
+      platformFeeCents: 525,
       processingFeeEstimateCents: 335, // 304.5 → 305 + 30
-      applicationFeeCents: 835,
+      applicationFeeCents: 860,
     });
   });
 
   it("caps the fee at the charge", () => {
-    const fee = destinationApplicationFeeCents({ merchandiseCents: 10, preTaxTotalCents: 10 });
+    const fee = destinationApplicationFeeCents({ merchandiseCents: 10, shippingCents: 0, preTaxTotalCents: 10 });
     expect(fee.applicationFeeCents).toBeLessThanOrEqual(10);
+  });
+
+  it("never charges 5% on more than the pre-tax total (free-shipping discount counted once)", () => {
+    // $20 item, $5 shipping, free-shipping code: the discount is already in merchandise.
+    const fee = destinationApplicationFeeCents({ merchandiseCents: 1_500, shippingCents: 500, preTaxTotalCents: 2_000 });
+    expect(fee.platformFeeCents).toBe(100);
+  });
+});
+
+describe("commission base: item after discounts + shipping (BT-059)", () => {
+  it("moving price into shipping does not lower the fee", () => {
+    const honest = destinationApplicationFeeCents({ merchandiseCents: 5_000, shippingCents: 0, preTaxTotalCents: 5_000 });
+    const gamed = destinationApplicationFeeCents({ merchandiseCents: 500, shippingCents: 4_500, preTaxTotalCents: 5_000 });
+    expect(gamed.platformFeeCents).toBe(honest.platformFeeCents);
+    expect(gamed.platformFeeCents).toBe(250);
+    const split = splitOrder({ subtotalCents: 500, discountCents: 0, shippingCents: 4_500, taxCents: 0, grossCents: 5_000 });
+    expect(split.platformFeeCents).toBe(250);
+  });
+
+  it("commissionBaseCents adds shipping and rejects bad input", () => {
+    expect(commissionBaseCents({ merchandiseCents: 4_000, shippingCents: 700 })).toBe(4_700);
+    expect(() => commissionBaseCents({ merchandiseCents: -1, shippingCents: 0 })).toThrow(MoneyError);
+  });
+});
+
+describe("gift card and Thread Cash funded orders still pay 5% on the full value (BT-075)", () => {
+  it("a gift card covering most of the order: 5% of item + shipping comes out of the card part", () => {
+    // $80 item + $20 shipping, $90 paid by gift card, $10 on the card.
+    // Gift cards are not a discount (routes/webhooks.ts), so the base is $100.
+    const split = splitOrder({
+      subtotalCents: 8_000, discountCents: 0, shippingCents: 2_000, taxCents: 0, grossCents: 1_000, processingFeeCents: 59,
+    });
+    expect(split.platformFeeCents).toBe(500);
+    expect(split.sellerNetCents).toBe(1_000 - 500 - 59);
+  });
+
+  it("Thread Cash is carved out of the discount, so the base stays item + shipping", () => {
+    // buyer.ts passes merchandise after loyalty/codes only, never Thread Cash.
+    const fee = destinationApplicationFeeCents({ merchandiseCents: 6_000, shippingCents: 1_000, preTaxTotalCents: 7_000 });
+    expect(fee.platformFeeCents).toBe(350);
   });
 });
 

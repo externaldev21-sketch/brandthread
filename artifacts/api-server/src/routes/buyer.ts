@@ -928,7 +928,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     );
 
     // ── Fees (lib/money/fees.ts) ──────────────────────────────────────────
-    // In-stock: application fee = 5% of merchandise + Stripe processing
+    // In-stock: application fee = 5% of merchandise + shipping + Stripe processing
     // estimate, withheld by Stripe. Held preorders: the exact split is made
     // from Stripe's real fee when the payment is confirmed.
     const subtotalCents = cartItems.reduce(
@@ -1132,6 +1132,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
       merchandiseCents: Math.max(0, afterBundlesCents - combinedDiscountCents),
+      shippingCents,
       preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents),
       platformFeeBps,
     });
