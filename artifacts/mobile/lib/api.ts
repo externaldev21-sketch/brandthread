@@ -2425,9 +2425,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Platform subscription — billed to the seller's own payment method (sellers only).
        *  Completely separate from Stripe Connect (buyer payouts). */
       subscription: {
-        /** Stripe Checkout on the optional web-only yearly price (STRIPE_PRICE_<TIER>_ANNUAL_WEB); used by app/subscribe.tsx. */
-        checkoutAnnualWeb: (planId: 'starter' | 'growth' | 'pro') =>
-          post<{ url: string }>('/api/seller/subscription/checkout', { planId, billing: 'annual' }),
         /** Returns the seller's current plan, subscription status, renewal date,
          *  and payment-method label. */
         status: () => get<{
@@ -2451,6 +2448,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>('/api/seller/subscription/status'),
         /** What each plan includes (price, commission, AI credits, advanced analytics) plus the caller's plan. */
         perks: () => get<import('./proPerks').PerksResponse>('/api/seller/subscription/perks'),
+        /** Stripe Checkout on the optional web-only yearly price (STRIPE_PRICE_<TIER>_ANNUAL_WEB); used by app/subscribe.tsx. */
+        checkoutAnnualWeb: (planId: 'starter' | 'growth' | 'pro') =>
+          post<{ url: string }>('/api/seller/subscription/checkout', { planId, billing: 'annual' }),
         dismissTrialBanner: (trialEndAt: string) =>
           post<{ ok: boolean; trialEndAt: string }>('/api/seller/subscription/trial-banner/dismiss', { trialEndAt }),
         /** Read-only invoice summaries for the active seller store. */
