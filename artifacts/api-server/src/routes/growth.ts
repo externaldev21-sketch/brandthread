@@ -19,6 +19,7 @@ import {
   normalizeStoreSiteTheme, resolveStoreSiteThemeKey,
 } from "../lib/growth/storeSiteDesign";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { siteProductTiles } from "./storeSite";
 import {
   BIO_SLUG_RE, MAX_BIO_LINKS, MAX_FEATURED, cleanText, normalizeAccent, normalizeBioLinkUrl, normalizeSocials, slugifyBio,
 } from "../lib/growth/bioValidation";
@@ -312,6 +313,7 @@ async function serializeBio(sellerId: string) {
     buttonStyle: buttonStyleOf(page?.buttonStyle),
     font: fontOf(page?.font),
     themes: STORE_SITE_THEMES,
+    products: await siteProductTiles(sellerId, page?.featuredProductIds ?? []),
     fonts: Object.entries(STORE_SITE_FONTS).map(([key, f]) => ({ key, label: f.label })),
     published: page?.published ?? true,
     displayName: page?.displayName ?? defaults.displayName,
