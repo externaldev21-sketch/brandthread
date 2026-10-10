@@ -14,6 +14,7 @@
  *   node scripts/crisp/crawl.mjs --only /buyer-settings,/(tabs)/orders
  *   node scripts/crisp/crawl.mjs --roles seller --modes demo
  *   node scripts/crisp/crawl.mjs --strict        exit 1 on any blocking finding
+ *   node scripts/crisp/crawl.mjs --build-dir DIR use (or build into) another export
  *
  * Output (scratch, not committed): .crisp-crawl/
  *   shots/<role>-<mode>/<route>.jpg   every screen at 1170×2532
@@ -40,7 +41,7 @@ export const BLOCKING = ['blur', 'text-opacity', 'text-scale', 'image-upscaled',
 export const ALLOW_SELECTORS = ['[data-crisp-allow]', '[data-testid="seller-global-tab-bar"]', '[data-testid="buyer-bottom-tab-bar"]'];
 
 function parse(argv) {
-  const o = { skipBuild: false, only: null, roles: ['buyer', 'seller'], modes: ['fresh', 'demo'], strict: false, out: path.join(MOBILE_ROOT, '.crisp-crawl'), workers: 3, settle: 1800 };
+  const o = { skipBuild: false, only: null, roles: ['buyer', 'seller'], modes: ['fresh', 'demo'], strict: false, out: path.join(MOBILE_ROOT, '.crisp-crawl'), workers: 3, settle: 1800, buildDir: DEFAULT_BUILD_DIR };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--skip-build') o.skipBuild = true;
@@ -51,11 +52,13 @@ function parse(argv) {
     else if (a === '--out') o.out = path.resolve(argv[++i]);
     else if (a === '--workers') o.workers = Number(argv[++i]);
     else if (a === '--settle') o.settle = Number(argv[++i]);
+    else if (a === '--build-dir') o.buildDir = path.resolve(argv[++i]);
   }
   return o;
 }
 
-const IGNORABLE_ERRORS = [/Failed to load resource/i, /net::ERR/i, /favicon/i];
+// The preview runs offline, so Clerk's script never loads; that is expected.
+const IGNORABLE_ERRORS = [/Failed to load resource/i, /net::ERR/i, /favicon/i, /Failed to load Clerk JS/i];
 
 async function openPage(browser, origin, role, mode) {
   const context = await browser.newContext({
@@ -141,11 +144,11 @@ function markdown(report) {
 
 async function main() {
   const opts = parse(process.argv.slice(2));
-  if (!opts.skipBuild) buildPreviewWeb();
+  if (!opts.skipBuild) buildPreviewWeb(opts.buildDir);
   rmSync(path.join(opts.out, 'shots'), { recursive: true, force: true });
   mkdirSync(path.join(opts.out, 'sheets'), { recursive: true });
   const routes = listRoutes(path.join(MOBILE_ROOT, 'app')).filter((r) => !opts.only || opts.only.includes(r.route));
-  const server = await serveBuild(DEFAULT_BUILD_DIR);
+  const server = await serveBuild(opts.buildDir);
   const browser = await launchBrowser();
 
   const combos = opts.roles.flatMap((role) => opts.modes.map((mode) => ({ role, mode })));
