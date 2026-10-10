@@ -60,8 +60,9 @@ export function identifierTakenMessage(err: unknown): string | null {
   return 'Check what you entered and try again.';
 }
 
-export function existingAccountCopy(role: 'buyer' | 'seller'): string {
-  return role === 'seller'
-    ? 'This email already has a seller account.'
-    : 'This email already has a buyer account.';
+/** `role` is null unless the account is known (signed in on this device). */
+export function existingAccountCopy(role: 'buyer' | 'seller' | null): string {
+  if (role === 'seller') return 'This email already has a seller account.';
+  if (role === 'buyer') return 'This email already has a buyer account.';
+  return 'This email already has an account.';
 }
