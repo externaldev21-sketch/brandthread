@@ -35,10 +35,10 @@ const objectStorage = new ObjectStorageService();
 /** Signed image URLs on public pages stay valid for a day of shares and back-navigations. */
 const IMAGE_URL_TTL_SEC = 24 * 60 * 60;
 
-const usd = (cents: number) => `$${(Math.max(0, cents) / 100).toFixed(2)}`;
+export const usd = (cents: number) => `$${(Math.max(0, cents) / 100).toFixed(2)}`;
 
 /** An image reference a browser can load: https URLs as-is, private /objects/ paths signed. */
-async function publicImage(ref: unknown): Promise<string | null> {
+export async function publicImage(ref: unknown): Promise<string | null> {
   if (typeof ref !== "string" || !ref) return null;
   if (/^https:\/\//i.test(ref)) return ref;
   if (ref.startsWith("/objects/")) return objectStorage.getObjectEntityDownloadURL(ref, IMAGE_URL_TTL_SEC).catch(() => null);
@@ -104,8 +104,16 @@ export async function loadStoreSite(rawHandle: unknown): Promise<LoadedSite | nu
 
 type SiteProduct = { id: string; name: string; description: string | null; images: string[]; priceCents: number | null };
 
+/** The product tiles the site shows, as the site shows them (for in-app previews). */
+export async function siteProductTiles(sellerId: string, featuredIds: string[]) {
+  const rows = await loadSiteProducts(sellerId, featuredIds.filter((id) => UUID_RE.test(id)));
+  return Promise.all(rows.map(async (p) => ({
+    id: p.id, name: p.name, image: await publicImage(p.images[0]), priceLabel: p.priceCents == null ? "" : usd(p.priceCents),
+  })));
+}
+
 /** Active products, featured ones first in the seller's order, then newest. */
-async function loadSiteProducts(sellerId: string, featuredIds: string[]): Promise<SiteProduct[]> {
+export async function loadSiteProducts(sellerId: string, featuredIds: string[]): Promise<SiteProduct[]> {
   const rows = await db.select({ id: products.id, name: products.name, description: products.description, images: products.images })
     .from(products)
     .where(and(eq(products.ownerId, sellerId), eq(products.status, "active"), isNull(products.deletedAt)))

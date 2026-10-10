@@ -191,6 +191,9 @@ describe("Design editor fields on /api/growth/bio", () => {
     expect(r.body.showBanner).toBe(true);
     expect(r.body.themes.map((t: any) => t.key)).toContain("silver");
     expect(r.body.fonts.map((f: any) => f.key)).toEqual(["system", "serif", "mono"]);
+    // the same tiles the site shows, for the in-app preview
+    expect(r.body.products.map((p: any) => p.name)).toEqual(["Old tee", "New knit"]);
+    expect(r.body.products[1]).toMatchObject({ image: "https://cdn.test/knit.jpg", priceLabel: "$99.00" });
   });
 
   it("saves and validates theme, buttons, font and banner", async () => {
