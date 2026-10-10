@@ -35,6 +35,10 @@ vi.mock("../../middlewares/requireAuth", () => ({
   },
   requirePlan: () => (_req: any, _res: any, next: () => void) => next(),
 }));
+// Hosting is plan-gated (live_hosting); these tests are about realtime, not plans.
+vi.mock("../../middlewares/featureGate", () => ({
+  featureGate: () => (_req: any, _res: any, next: () => void) => next(),
+}));
 
 vi.mock("../../ws/auth", () => ({
   // Test stand-in for Clerk's verifyToken: the token *is* the user id.
