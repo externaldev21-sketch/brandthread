@@ -16,8 +16,9 @@
  *     POST /v1/projects/<id>/messages:send with android.priority HIGH and a
  *     data-only message (all values strings, as FCM requires).
  *
- * Feature-flagged by configuration: with the APNs or FCM env vars missing
- * that transport is simply off (never throws). A token APNs answers 410 /
+ * Feature-flagged by configuration: without AGORA_APP_ID/AGORA_APP_CERTIFICATE
+ * (calls unavailable, lib/callAvailability.ts) nothing is sent at all; with
+ * the APNs or FCM env vars missing that transport is simply off (never throws). A token APNs answers 410 /
  * BadDeviceToken for, or FCM answers UNREGISTERED for, is deleted.
  *
  * Env:
@@ -36,6 +37,7 @@ import { callPushTokens, db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { isWithinQuietHours, preferenceKey } from "./push";
+import { isCallingConfigured } from "./callAvailability";
 
 // ─── Payload ─────────────────────────────────────────────────────────────────
 
@@ -395,7 +397,7 @@ export type VoipSendDeps = {
   skipRecipientCheck?: boolean;
 };
 
-export type VoipSendResult = { apns: number; fcm: number; removed: number; skipped?: "disabled" | "recipient" | "no_tokens" };
+export type VoipSendResult = { apns: number; fcm: number; removed: number; skipped?: "calls_unavailable" | "disabled" | "recipient" | "no_tokens" };
 
 /** Ring (or stop ringing) every native call token the user has. Never throws. */
 export async function sendCallVoipPush(
@@ -405,7 +407,11 @@ export async function sendCallVoipPush(
 ): Promise<VoipSendResult> {
   const result: VoipSendResult = { apns: 0, fcm: 0, removed: 0 };
   try {
-    const cfg = readVoipConfig(deps.env ?? process.env);
+    const env = deps.env ?? process.env;
+    // Calls are hidden without Agora credentials (lib/callAvailability.ts):
+    // nothing may ring a phone for a call that can never connect.
+    if (!isCallingConfigured(env)) return { ...result, skipped: "calls_unavailable" };
+    const cfg = readVoipConfig(env);
     if (!cfg.apns && !cfg.fcm) return { ...result, skipped: "disabled" };
     const store = deps.store ?? dbCallPushTokenStore;
     const tokens = await store.list(userId);

@@ -41,6 +41,7 @@ import { sendCallEvent } from "../ws/callHub";
 import { evaluateCallPolicy } from "../lib/callPolicy";
 import { onUserBlocked } from "../lib/blockEvents";
 import { sendCallVoipPush, type CallVoipPayload } from "../lib/voipPush";
+import { isCallingConfigured } from "../lib/callAvailability";
 import {
   LIVE_CALL_STATUSES,
   RING_TIMEOUT_SECONDS,
@@ -158,9 +159,7 @@ export function isValidCallClientEventId(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{8,128}$/.test(value);
 }
 
-export function isCallingConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
-  return Boolean(env.AGORA_APP_ID?.trim() && env.AGORA_APP_CERTIFICATE?.trim());
-}
+export { isCallingConfigured };
 
 // ─── GET /api/call/availability ───────────────────────────────────────────────
 // Lets clients show a "calls coming soon" state instead of buttons that fail.

@@ -24,7 +24,13 @@ const rsa = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
 const P8 = ec.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 const RSA_PEM = rsa.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 
+// Calls are only available with Agora credentials (lib/callAvailability.ts).
+const AGORA_ENV = {
+  AGORA_APP_ID: "test-agora-app-id",
+  AGORA_APP_CERTIFICATE: "test-agora-certificate",
+} as NodeJS.ProcessEnv;
 const APNS_ENV = {
+  ...AGORA_ENV,
   APNS_KEY_ID: "KEY123ABCD",
   APNS_TEAM_ID: "TEAM98765X",
   // As pasted into a secret store: literal "\n" escapes.
@@ -32,6 +38,7 @@ const APNS_ENV = {
   APNS_BUNDLE_ID: "com.brandthread.mobile",
 } as NodeJS.ProcessEnv;
 const FCM_ENV = {
+  ...AGORA_ENV,
   FCM_PROJECT_ID: "brandthread-test",
   FCM_CLIENT_EMAIL: "pusher@brandthread-test.iam.gserviceaccount.com",
   FCM_PRIVATE_KEY: RSA_PEM,
@@ -202,9 +209,26 @@ describe("sendCallVoipPush", () => {
   it("does nothing (and never throws) when no transport is configured", async () => {
     const store = memoryStore([iosToken, androidToken]);
     const apnsSend = vi.fn();
-    const result = await sendCallVoipPush("callee", incoming, { env: {} as NodeJS.ProcessEnv, store, apnsSend, skipRecipientCheck: true });
+    const result = await sendCallVoipPush("callee", incoming, { env: { ...AGORA_ENV }, store, apnsSend, skipRecipientCheck: true });
     expect(result).toMatchObject({ apns: 0, fcm: 0, skipped: "disabled" });
     expect(apnsSend).not.toHaveBeenCalled();
+  });
+
+  it("never rings when calls are unavailable (no Agora credentials), even with APNs + FCM configured", async () => {
+    const store = memoryStore([iosToken, androidToken]);
+    const list = vi.spyOn(store, "list");
+    const apnsSend = vi.fn();
+    const fetchImpl = vi.fn();
+    const { AGORA_APP_ID: _id, AGORA_APP_CERTIFICATE: _cert, ...transportsOnly } = { ...APNS_ENV, ...FCM_ENV };
+    for (const env of [transportsOnly, { ...transportsOnly, AGORA_APP_ID: "id-only" }, { ...transportsOnly, AGORA_APP_CERTIFICATE: "cert-only" }]) {
+      const result = await sendCallVoipPush("callee", incoming, {
+        env: env as NodeJS.ProcessEnv, store, apnsSend, fetchImpl: fetchImpl as unknown as typeof fetch, skipRecipientCheck: true,
+      });
+      expect(result).toEqual({ apns: 0, fcm: 0, removed: 0, skipped: "calls_unavailable" });
+    }
+    expect(list).not.toHaveBeenCalled();
+    expect(apnsSend).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("sends APNs to voip tokens and FCM to android tokens", async () => {

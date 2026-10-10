@@ -176,6 +176,37 @@ describe("muted chat still rings", () => {
   });
 });
 
+describe("calls unavailable (no Agora credentials)", () => {
+  it("refuses to create a call before any push, VoIP ring or socket event, and reports unavailable", async () => {
+    const savedId = process.env.AGORA_APP_ID;
+    const savedCert = process.env.AGORA_APP_CERTIFICATE;
+    try {
+      for (const missing of ["AGORA_APP_ID", "AGORA_APP_CERTIFICATE"] as const) {
+        process.env.AGORA_APP_ID = savedId;
+        process.env.AGORA_APP_CERTIFICATE = savedCert;
+        delete process.env[missing];
+        // The callee has native ringing tokens; nothing may reach them.
+        await as(CALLEE, "/api/push/voip-token", "POST", { token: "d".repeat(64), platform: "ios" });
+        const availability = await as(CALLER, "/api/call/availability");
+        expect(await availability.json()).toMatchObject({ configured: false });
+
+        const conversationId = await makeConversation();
+        const res = await as(CALLER, "/api/call/dm/calls", "POST", { conversationId, mode: "video" });
+        expect(res.status).toBe(503);
+        expect(await res.json()).toMatchObject({ code: "CALLING_NOT_CONFIGURED" });
+        await settle();
+        expect(spies.pushes).toHaveLength(0);
+        expect(spies.voip).toHaveLength(0);
+        expect(spies.socket).toHaveLength(0);
+        expect(await db.select().from(dmCalls).where(eq(dmCalls.conversationId, conversationId))).toHaveLength(0);
+      }
+    } finally {
+      process.env.AGORA_APP_ID = savedId;
+      process.env.AGORA_APP_CERTIFICATE = savedCert;
+    }
+  });
+});
+
 describe("block stops calls", () => {
   it("refuses when the callee blocked the caller", async () => {
     const conversationId = await makeConversation();
