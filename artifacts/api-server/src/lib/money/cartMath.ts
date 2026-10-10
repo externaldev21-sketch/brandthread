@@ -22,6 +22,8 @@ export class CartCheckoutError extends Error {
 export type GroupAmounts = {
   items: Array<{ priceCents: number; quantity: number; bundleDiscountCents?: number }>;
   subtotalCents: number;
+  /** Bundle savings are independent from the seller's promo code. */
+  bundleDiscountCents?: number;
   shippingCents: number;
   /** Promo on merchandise + any free-shipping part. */
   discountCents: number;
@@ -71,8 +73,8 @@ export function taxableAmounts(
  * What one group still costs before tax once its promo and any loyalty
  * discount are off. Thread Cash is taken from this.
  */
-export function groupPreTaxRemainingCents(group: Pick<GroupAmounts, "subtotalCents" | "shippingCents" | "discountCents">, loyaltyCents = 0): number {
-  return Math.max(0, group.subtotalCents + group.shippingCents - group.discountCents - Math.max(0, loyaltyCents));
+export function groupPreTaxRemainingCents(group: Pick<GroupAmounts, "subtotalCents" | "shippingCents" | "discountCents" | "bundleDiscountCents">, loyaltyCents = 0): number {
+  return Math.max(0, group.subtotalCents + group.shippingCents - (group.bundleDiscountCents ?? 0) - group.discountCents - Math.max(0, loyaltyCents));
 }
 
 /**

@@ -19,7 +19,6 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { springTo } from '@/constants/motion';
 import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -129,7 +128,7 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={() => close()}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
-        <BlurView intensity={Platform.OS === 'ios' ? 60 : 40} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)' }]} />
         {/* A dim over the blur (Instagram) — the theme background at ~45%, so
             the blurred screen stays visible behind the card. */}
         <View style={[StyleSheet.absoluteFill, styles.previewScrim, { backgroundColor: `${theme.background}73` }]} />
@@ -238,9 +237,9 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     overflow: 'hidden',
     shadowOpacity: 0.5,
-    shadowRadius: 24,
+    shadowRadius: 0,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
+    elevation: 0,
   },
   pullDownTitle: {
     fontSize: 13, fontFamily: FONT.regular,

@@ -11,6 +11,7 @@ import { eq } from "drizzle-orm";
 import { db, users, conversations, conversationParticipants, messages, agentConversations } from "@workspace/db";
 import { createWelcomeConversationOnce } from "../../lib/brandthreadAgent";
 import { RATE_LIMIT_POLICIES } from "../../middlewares/rateLimit";
+import { setAiConsent } from "../../lib/aiConsent";
 
 const TEST_BUYER = `agent-rate-limit-buyer-${process.pid}`;
 
@@ -51,6 +52,7 @@ describe("agent-chat rate limit", () => {
       displayName: "Rate Limit Buyer", accountType: "buyer", onboardingComplete: true,
       aiDataConsentAt: new Date(), // allowed AI data sharing (requireAiConsent)
     });
+    await setAiConsent(TEST_BUYER, true);
     const welcome = await createWelcomeConversationOnce(TEST_BUYER, "buyer", {
       name: "Rate Limit Buyer", handle: "", initials: "RB", color: "#8B5CF6",
     });

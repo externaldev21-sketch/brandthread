@@ -36,7 +36,7 @@ function adminQueueUrl(): string {
   return origin ? `${origin.replace(/\/$/, "")}/manufacturers/admin/moderation` : "";
 }
 
-export function moderatorAlertEmailsFromEnv(raw = process.env.MODERATOR_ALERT_EMAILS): string[] {
+export function moderatorAlertEmailsFromEnv(raw = process.env.MODERATOR_ALERT_EMAILS ?? process.env.MODERATION_ALERT_EMAIL): string[] {
   return [...new Set((raw ?? "").split(",").map((s) => s.trim().toLowerCase()).filter((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)))];
 }
 

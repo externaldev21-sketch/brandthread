@@ -2178,7 +2178,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                 shadowColor: theme.shadowColor,
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: isOwn ? 0.16 : 0.08,
-                shadowRadius: 6,
+                shadowRadius: 0,
                 elevation: 2,
               },
             ]}

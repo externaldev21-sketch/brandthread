@@ -18,6 +18,7 @@ import express from "express";
 import { eq } from "drizzle-orm";
 import { db, users, conversations, conversationParticipants, messages, agentConversations, threadCashEntries } from "@workspace/db";
 import { createWelcomeConversationOnce, BRANDTHREAD_AGENT_CLERK_ID } from "../../lib/brandthreadAgent";
+import { setAiConsent } from "../../lib/aiConsent";
 
 const FORBIDDEN_IMPORT_PATTERNS = [
   /from\s+["']\.\.\/lib\/threadCash/,
@@ -87,6 +88,7 @@ describe("agent chat never moves a real Thread Cash balance", () => {
       displayName: "No Money Buyer", accountType: "buyer", onboardingComplete: true,
       aiDataConsentAt: new Date(), // allowed AI data sharing (requireAiConsent)
     });
+    await setAiConsent(TEST_BUYER, true);
     // Give the buyer a starting Thread Cash balance the same way the real
     // daily check-in would, so a real, nonzero balance is at risk.
     await db.insert(threadCashEntries).values({

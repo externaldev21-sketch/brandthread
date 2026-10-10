@@ -6,6 +6,23 @@ import {
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 
+describe("bundle and reward integration", () => {
+  it("caps rewards against the amount left after both bundle and promo savings", () => {
+    expect(groupPreTaxRemainingCents({
+      subtotalCents: 10_000, shippingCents: 500,
+      bundleDiscountCents: 3_000, discountCents: 1_000,
+    }, 2_000)).toBe(4_500);
+  });
+
+  it("applies bundle savings before spreading merchandise promotions for tax", () => {
+    expect(taxableAmounts({
+      items: [{ priceCents: 10_000, quantity: 1, bundleDiscountCents: 3_000 }],
+      shippingCents: 0,
+      merchandiseDiscountCents: 1_000, shippingDiscountCents: 0,
+    }, 0)).toEqual({ lineAmounts: [6_000], shippingCents: 0 });
+  });
+});
+
 describe("allocateThreadCash (BT-270)", () => {
   it("gives a single store everything it asked for", () => {
     expect(allocateThreadCash(700, [1_950])).toEqual([700]);

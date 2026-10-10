@@ -2018,6 +2018,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       >
         <View style={s.composeBackdrop}>
           <Glass
+            solid
             variant="regular"
             tint="dark"
             radius={RADIUS.xl}
@@ -2179,7 +2180,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
   noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14, textAlign: 'center' },
   noteBubbleTail: {
-    width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
+    width: 7, height: 7, marginTop: -4, borderRadius: 2,
     borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],
   },
 

@@ -26,7 +26,6 @@ import {
 import { isAgentUserId } from "../lib/brandthreadAgent";
 import { cappedUnknown, LIMITS, looseBody, validateBody } from "../middlewares/bodySchemas";
 import { z } from "@workspace/api-zod";
-import { notifyModeratorsOfReport } from "../lib/moderatorAlertsDelivery";
 import { notifyModerators } from "../lib/moderation/alerts";
 
 const router = Router();
@@ -182,13 +181,11 @@ router.post("/", rateLimit("report"), validateBody(createReportBody), async (req
       })
       .returning();
 
-    // Fire-and-forget: alerting moderators never delays or fails the report.
-    notifyModeratorsOfReport(report);
-
     if (targetType === "community") {
       await db.update(communities).set({ reportCount: sql`${communities.reportCount} + 1` }).where(eq(communities.id, target.targetId));
     }
-    // BT-369: a person has to see it, not just the queue.
+    // One durable, throttled delivery path for email, push, in-app and Slack.
+    // Calling the legacy immediate path too sends duplicate alerts.
     notifyModerators(report);
 
     return res.status(201).json(serializeReportForClient(report));

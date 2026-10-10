@@ -35,6 +35,8 @@ vi.mock("drizzle-orm", async (importOriginal) => {
 });
 
 vi.mock("@clerk/express", () => ({ clerkClient: {} }));
+// This SQL-focused unit test isolates the separately tested wallet closeout.
+vi.mock("../threadCash/wallet", () => ({ cancelPendingThreadCashForAccount: async () => 0 }));
 vi.mock("../mailer", () => ({ isMailerConfigured: () => false, sendAccountDeletionCodeEmail: async () => false }));
 
 describe("purgeAccount", () => {

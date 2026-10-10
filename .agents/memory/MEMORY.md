@@ -28,6 +28,7 @@
 - [Buyer post privacy](buyer-post-privacy.md) — buyer profile posts are friend-only until the database has an enforceable per-post visibility field; never infer public visibility.
 - [useApi hook and api singleton](use-api-exports.md) — api.ts exports useApi() (Clerk hook) + configureApi/api singleton; ServiceConfigurer calls configureApi; screens must use useApi(), not singleton, unless non-component context.
 - [AI Brain conversation contract](ai-brain-wiring.md) — one canonical chat uses verified account context; never auto-send, persist blank rows, or substitute fabricated business answers.
+- [Versioned AI consent](versioned-ai-consent.md) — compatibility APIs must use account-scoped, versioned permission; timestamps and device caches cannot authorize provider requests.
 - [Live Shopping Architecture](live-shopping-architecture.md) — Agora streams support seller-featured products and an in-stream Stripe Checkout overlay that keeps the broadcast mounted.
 - [Seller vacation enforcement](seller-vacation-enforcement.md) — vacation mode is a server-side commerce and buyer-to-seller messaging boundary; public surfaces expose its effective status and message.
 - [Freelancer marketplace payments](freelancer-marketplace.md) — escrow transfer-on-complete; live payout-readiness gate; source_transaction mandatory; claim-then-pay idempotency; 5% fee pending.
