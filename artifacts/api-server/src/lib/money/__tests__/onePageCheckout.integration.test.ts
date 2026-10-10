@@ -110,7 +110,7 @@ function body(groups: Array<{ items: Array<{ variantId: string; productId: strin
   };
 }
 
-/** Two sellers, one buyer, one product each (stock 5), $12 flat shipping at seller A. */
+/** Two sellers, one buyer, one product each (stock 5), $12 flat shipping at seller A, free at seller B. */
 async function seedCart(tag: string) {
   const sellerA = await seedSeller(`${tag}-a`);
   const sellerB = await seedSeller(`${tag}-b`);
@@ -118,6 +118,8 @@ async function seedCart(tag: string) {
   const productA = await seedProduct(sellerA, { priceCents: 5_000, stock: 5 });
   const productB = await seedProduct(sellerB, { priceCents: 2_500, stock: 5 });
   await db.insert(shippingRates).values({ id: uid("rate"), sellerId: sellerA, name: "Standard", flatRateCents: 1_200 });
+  // Seller B offers free shipping explicitly (no rate at all now means the standard rate, lib/defaultShipping.ts).
+  await db.insert(shippingRates).values({ id: uid("rate"), sellerId: sellerB, name: "Free shipping", flatRateCents: 0 });
   const groups = [
     { items: [{ variantId: productA.variantId, productId: productA.productId, quantity: 2 }] },
     { items: [{ variantId: productB.variantId, productId: productB.productId, quantity: 1 }] },

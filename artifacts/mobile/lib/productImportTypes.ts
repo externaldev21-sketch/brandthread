@@ -35,7 +35,7 @@ export type ImportCommitResult = {
   source: string;
   counts: { created: number; updated: number; unchanged: number; failed: number; skipped: number; invalid: number };
   planLimitReached: boolean;
-  results: Array<{ name: string; action: string; reason?: string; notes?: string[] }>;
+  results: Array<{ name: string; action: string; productId?: string; reason?: string; notes?: string[] }>;
   issues: ImportIssue[];
 };
 

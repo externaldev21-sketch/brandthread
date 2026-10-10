@@ -1,8 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useRouter } from 'expo-router';
+
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
+import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 /**
@@ -27,6 +30,30 @@ export function SellerDashboardSetupCard({
   onOpenSetup: () => void;
   hasSetupChecklist: boolean;
 }) {
+  const router = useRouter();
+  // Products are live but nothing has sold yet: the next step is sharing the
+  // store, not adding a first product (first_product counts live products only).
+  const { checklist } = useLaunchChecklist();
+  const hasLiveProduct = checklist?.steps.find((step) => step.id === 'first_product')?.done ?? false;
+  if (hasLiveProduct) {
+    const share = () => router.push('/share-store' as never);
+    return (
+      <View
+        style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}
+        testID="seller-dashboard-share-card"
+      >
+        <PressableScale onPress={share} accessibilityRole="button" accessibilityLabel="Share your store to get your first sale">
+          <View style={styles.cardContent}>
+            <Text style={[styles.title, { color: theme.text }]}>Share your store</Text>
+            <Text style={[styles.body, { color: theme.muted }]}>
+              Your products are live. Share your store link to get your first sale.
+            </Text>
+          </View>
+        </PressableScale>
+        <PrimaryButton label="Share your store" icon="share" small onPress={share} style={styles.button} testID="seller-dashboard-share-store" />
+      </View>
+    );
+  }
   return (
     <View
       style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}

@@ -23,6 +23,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { publishProducts } from '@/lib/bulkPublish';
 import {
   PRICE_EDIT_MODES, buildPriceChange, bulkErrorMessage, priceRangeLabel,
   type BulkPriceResult, type BulkProduct, type BulkRounding, type BulkStatusFilter, type PriceEditMode,
@@ -108,6 +109,23 @@ export default function ProductsBulkEditScreen() {
   const allSelected = selectable.length > 0 && selectable.every(i => selected.has(i.id));
   const selectedItems = items.filter(i => selected.has(i.id));
   const allArchived = selectedItems.length > 0 && selectedItems.every(i => i.status === 'archived');
+  const someNotLive = selectedItems.some(i => i.status === 'draft');
+
+  // Publish the selected drafts (e.g. a CSV / Etsy / Shopify import) in one go.
+  async function runPublish() {
+    setBusy(true);
+    try {
+      const ids = selectedItems.filter(i => i.status === 'draft').map(i => i.id);
+      const { published } = await publishProducts(api, ids);
+      setSummary({ title: 'Products published', lines: [`${published} ${published === 1 ? 'product is' : 'products are'} live in your store`] });
+      setSelected(new Set());
+      void load();
+    } catch (err) {
+      setError(bulkErrorMessage(err, 'Could not publish these products. Nothing was changed.'));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -243,6 +261,11 @@ export default function ProductsBulkEditScreen() {
         <View style={[s.bar, { bottom: barBottom + SP.sm }]}>
           <View style={s.barTop}>
             <Text style={s.barCount}>{selected.size} selected</Text>
+            {someNotLive && !busy && (
+              <Pressable onPress={() => { void runPublish(); }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Publish selected drafts">
+                <Text style={[s.barCount, { fontFamily: FONT.semibold }]}>Publish</Text>
+              </Pressable>
+            )}
             {busy && <ActivityIndicator color={theme.background} size="small" />}
           </View>
           <View style={s.barActions}>

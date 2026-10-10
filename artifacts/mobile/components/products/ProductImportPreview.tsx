@@ -16,16 +16,23 @@ type Props = {
   onClose: () => void;
   onCommit: () => void;
   onViewProducts: () => void;
+  /** Publish the products this import created (they arrive as drafts). */
+  onPublishCreated?: () => void;
+  publishing?: boolean;
+  /** How many were published, once done. */
+  published?: number | null;
 };
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function ProductImportPreview({ visible, preview, result, busy, error, onClose, onCommit, onViewProducts }: Props) {
+export function ProductImportPreview({ visible, preview, result, busy, error, onClose, onCommit, onViewProducts, onPublishCreated, publishing = false, published = null }: Props) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   if (!preview && !result) return null;
   const importable = preview ? preview.counts.create + preview.counts.update : 0;
+  const drafts = result ? result.results.filter((r) => r.action === 'created' && r.productId).length : 0;
+  const canPublish = !!onPublishCreated && drafts > 0 && published == null;
   const cap = preview?.capacity;
   const toWrite = preview
     ? Math.min(importable, cap?.remaining != null ? preview.counts.update + cap.remaining : importable)
@@ -53,7 +60,11 @@ export function ProductImportPreview({ visible, preview, result, busy, error, on
               {result.planLimitReached ? (
                 <Text style={s.line}>Your plan's product limit was reached, so some new products were skipped. Upgrade to add more.</Text>
               ) : null}
-              <Text style={s.line}>New products are saved as drafts. Review and publish them from Products.</Text>
+              <Text style={s.line}>
+                {published != null
+                  ? `${published} new product${published === 1 ? ' is' : 's are'} live in your store.`
+                  : 'New products are saved as drafts. Publish them now or from Products.'}
+              </Text>
               {result.results.filter((r) => r.action === 'failed' || r.action === 'skipped' || r.notes?.length).slice(0, 30).map((r, i) => (
                 <View key={`${r.name}-${i}`} style={s.issue}>
                   <Feather name="alert-triangle" size={14} color={theme.muted} style={s.issueIcon} />
@@ -123,7 +134,18 @@ export function ProductImportPreview({ visible, preview, result, busy, error, on
         </ScrollView>
 
         <View style={s.footer}>
-          {result ? (
+          {result && canPublish ? (
+            <>
+              <PrimaryButton
+                label={`Publish ${drafts} product${drafts === 1 ? '' : 's'}`}
+                onPress={onPublishCreated!}
+                loading={publishing}
+                disabled={publishing}
+                style={s.btn}
+              />
+              <SecondaryButton label="View products" onPress={onViewProducts} disabled={publishing} style={s.btn} />
+            </>
+          ) : result ? (
             <>
               <PrimaryButton label="View products" onPress={onViewProducts} style={s.btn} />
               <SecondaryButton label="Done" onPress={onClose} style={s.btn} />

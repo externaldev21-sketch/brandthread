@@ -24,6 +24,7 @@
  * number or CVC, so a buggy client can't leak one into our logs or database.
  */
 import { and, eq, isNull } from "drizzle-orm";
+import { flatRateShipping } from "../defaultShipping";
 import type Stripe from "stripe";
 import {
   db, productVariants, products, shippingRates, shippingZones, shippingZoneWeightTiers, users,
@@ -252,8 +253,7 @@ export async function priceCartGroup(input: {
   } else {
     const [rate] = await db.select().from(shippingRates)
       .where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true))).limit(1);
-    shippingCents = !rate || (rate.freeAboveCents != null && subtotalCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
-    shippingLineName = rate?.name ?? "Shipping";
+    ({ cents: shippingCents, name: shippingLineName } = flatRateShipping(rate, subtotalCents)); // no rate → standard rate, not $0
   }
 
   let discount: Awaited<ReturnType<typeof validateDiscountCode>> | null = null;

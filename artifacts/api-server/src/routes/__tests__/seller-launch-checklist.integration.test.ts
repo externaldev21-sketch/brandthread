@@ -81,7 +81,7 @@ describe("seller launch checklist API", () => {
       socialLinks: { instagram: "atelier" },
       stripeAccountStatus: "active",
     }).where(eq(users.clerkId, sellerA));
-    await db.insert(products).values({ ownerId: sellerA, name: "Tee" } as any);
+    await db.insert(products).values({ ownerId: sellerA, name: "Tee", status: "active" } as any);
     await db.insert(storefronts).values({ ownerId: sellerA, slug: `slug-${suffix}`, status: "published" });
 
     const { body } = await get();
@@ -93,9 +93,11 @@ describe("seller launch checklist API", () => {
     expect(body.handle).toBe(`atelier_${suffix}`);
   });
 
-  it("a soft-deleted product does not count, and a draft storefront is unpublished", async () => {
+  it("a soft-deleted, draft or archived product does not count, and a draft storefront is unpublished", async () => {
     authState.clerkUserId = sellerB;
-    await db.insert(products).values({ ownerId: sellerB, name: "Gone", deletedAt: new Date() } as any);
+    await db.insert(products).values({ ownerId: sellerB, name: "Gone", status: "active", deletedAt: new Date() } as any);
+    await db.insert(products).values({ ownerId: sellerB, name: "Draft tee", status: "draft" } as any);
+    await db.insert(products).values({ ownerId: sellerB, name: "Old tee", status: "archived" } as any);
     await db.insert(storefronts).values({ ownerId: sellerB, slug: `slug-b-${suffix}`, status: "draft" });
     const { body } = await get();
     expect(stepDone(body, "first_product")).toBe(false);
