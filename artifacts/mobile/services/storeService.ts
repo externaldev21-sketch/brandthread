@@ -381,6 +381,9 @@ export async function getStorefront(options: {
     const raw = await AsyncStorage.getItem(STORE_KEY);
     const local: Storefront = raw ? JSON.parse(raw) as Storefront : defaultStorefront();
     let migratedToThread = false;
+    // Older builds saved "slug.brandthread.app", which screens then showed as
+    // "slug.brandthread.app.brandthread.app" (BT-316).
+    if (local.settings?.storeUrl) local.settings.storeUrl = bareStoreSlug(local.settings.storeUrl);
 
     // Stores created before Thread Theme existed used Vertex as the implicit
     // starter. Only untouched stores are migrated; established stores keep
@@ -413,9 +416,10 @@ export async function getStorefront(options: {
         local.publishStatus = 'unpublished';
       }
       local.sharePreviewRevokedAt = remote?.sharePreviewRevokedAt ?? null;
-      // Sync server title/slug if we don't have one locally
+      // Sync server title/slug if we don't have one locally. storeUrl is the
+      // bare subdomain ("northline"); screens add ".brandthread.app" (BT-316).
       if (!local.settings.storeUrl && remote?.slug) {
-        local.settings.storeUrl = `${remote.slug}.brandthread.app`;
+        local.settings.storeUrl = remote.slug;
       }
     } catch { /* no-op — API may not be reachable */ }
 
@@ -832,6 +836,11 @@ export async function updateMenu(id: string, items: StoreMenuItem[]): Promise<St
 }
 
 // ─── Domains ──────────────────────────────────────────────────────────────────
+/** "https://Northline.brandthread.app/" → "northline" (the subdomain only). */
+export function bareStoreSlug(value: string): string {
+  return value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/\.brandthread\.app$/, '');
+}
+
 export async function updateDomain(id: string, data: Partial<StoreDomain>): Promise<Storefront> {
   const store = await getStorefront();
   const idx = store.domains.findIndex(d => d.id === id);

@@ -97,6 +97,7 @@ import notificationEventsRouter from "./notification-events";
  *  is a safe no-op on the second call. */
 const tc = teamContext();
 import storeRouter from "./store";
+import storeAddressRouter from "./store-address";
 import emailMarketingRouter from "./email-marketing";
 import emailMarketingPublicRouter from "./email-marketing-public";
 import emailMarketingWebhookRouter from "./email-marketing-webhook";
@@ -342,6 +343,7 @@ router.use("/seller/payment-settings",    tc, sellerPaymentSettingsRouter);
 // actual caller before any store-context rewrite.
 router.use("/team",                      teamRouter);
 router.use("/store/ai",                  tc, aiSafetyGuard("store-ai", { mode: "chat", scan: "all" }), storeAiRouter);
+router.use("/store",                     tc, storeAddressRouter); // /address, /slug, custom-domain gate (BT-307/317/318) — before storeRouter
 router.use("/store",                     tc, storeRouter);
 router.use("/marketing/email",           tc, emailMarketingRouter);
 router.use("/design-studio",             requireAuth, tc, designStudioRouter);
