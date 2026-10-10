@@ -1,8 +1,10 @@
 /**
  * Integration tests for the freelancer escrow payment-integrity guarantees:
- *  A. concurrent completion cannot double-pay (atomic claim + idempotency key)
- *  B. a crash between the completion claim and persisting the transfer is
+ *  A. concurrent approval cannot double-pay (atomic claim + idempotency key)
+ *  B. a crash between the approval claim and persisting the transfer is
  *     reconciled on retry without creating a second transfer
+ *  (Since BT-446 the payout is released by the HIRER approving a delivery —
+ *  see freelancer-delivery.integration.test.ts for the delivery lifecycle.)
  *  C. cancellation expires the checkout link, and payments that land after
  *     cancellation are refunded — never recorded as paid
  *
@@ -233,13 +235,13 @@ afterAll(async () => {
   await db.execute(sql`DELETE FROM users WHERE clerk_id IN (${FREELANCER_USER}, ${HIRER_USER})`);
 });
 
-describe("job completion payout", () => {
-  it("A: two concurrent complete calls produce exactly one transfer", async () => {
-    const job = await seedJob();
+describe("job approval payout", () => {
+  it("A: two concurrent approve calls produce exactly one transfer", async () => {
+    const job = await seedJob({ status: "delivered", deliveredAt: new Date() });
     fake.setTransferDelay(40);
     const [r1, r2] = await Promise.all([
-      call(`/api/freelancer-jobs/${job.id}/complete`, { method: "PATCH" }),
-      call(`/api/freelancer-jobs/${job.id}/complete`, { method: "PATCH" }),
+      call(`/api/freelancer-jobs/${job.id}/approve`, { method: "PATCH", user: HIRER_USER }),
+      call(`/api/freelancer-jobs/${job.id}/approve`, { method: "PATCH", user: HIRER_USER }),
     ]);
     fake.setTransferDelay(0);
 
@@ -259,15 +261,15 @@ describe("job completion payout", () => {
     // Simulate: the status flip won, but the process died before the payout
     // transfer was created/persisted.
     const job = await seedJob({ status: "completed", completedAt: new Date() });
-    const r1 = await call(`/api/freelancer-jobs/${job.id}/complete`, { method: "PATCH" });
+    const r1 = await call(`/api/freelancer-jobs/${job.id}/approve`, { method: "PATCH", user: HIRER_USER });
     expect(r1.status).toBe(200);
     const created = fake.transfers.filter(
       (t) => t.transfer_group === `freelancer_job_${job.id}`,
     );
     expect(created).toHaveLength(1);
 
-    // Completing again is an idempotent success, not a second payout.
-    const r2 = await call(`/api/freelancer-jobs/${job.id}/complete`, { method: "PATCH" });
+    // Approving again is an idempotent success, not a second payout.
+    const r2 = await call(`/api/freelancer-jobs/${job.id}/approve`, { method: "PATCH", user: HIRER_USER });
     expect(r2.status).toBe(200);
     expect(
       fake.transfers.filter((t) => t.transfer_group === `freelancer_job_${job.id}`),
@@ -275,18 +277,18 @@ describe("job completion payout", () => {
     expect(r2.body.payout.transferId).toBe(created[0].id);
   });
 
-  it("failed transfer rolls the claim back so completion can be retried", async () => {
-    const job = await seedJob();
+  it("failed transfer rolls the claim back so approval can be retried", async () => {
+    const job = await seedJob({ status: "delivered", deliveredAt: new Date() });
     fake.setFailTransfers(true);
-    const r1 = await call(`/api/freelancer-jobs/${job.id}/complete`, { method: "PATCH" });
+    const r1 = await call(`/api/freelancer-jobs/${job.id}/approve`, { method: "PATCH", user: HIRER_USER });
     fake.setFailTransfers(false);
     expect(r1.status).toBeGreaterThanOrEqual(400);
 
     const [row] = await db.select().from(freelancerJobs).where(eq(freelancerJobs.id, job.id));
-    expect(row.status).toBe("in_progress"); // retryable, not stuck
+    expect(row.status).toBe("delivered"); // retryable, not stuck
     expect(row.stripeTransferId).toBeNull();
 
-    const r2 = await call(`/api/freelancer-jobs/${job.id}/complete`, { method: "PATCH" });
+    const r2 = await call(`/api/freelancer-jobs/${job.id}/approve`, { method: "PATCH", user: HIRER_USER });
     expect(r2.status).toBe(200);
   });
 });
@@ -487,21 +489,21 @@ describe("connect payout readiness and source-charge integrity", () => {
       .where(eq(freelancers.id, freelancerId));
   });
 
-  it("E2: completion fails safely and stays retryable when the escrow charge can't be verified", async () => {
-    const job = await seedJob();
+  it("E2: approval fails safely and stays retryable when the escrow charge can't be verified", async () => {
+    const job = await seedJob({ status: "delivered", deliveredAt: new Date() });
     fake.setFailPIRetrieve(true);
-    const r1 = await call(`/api/freelancer-jobs/${job.id}/complete`, { method: "PATCH" });
+    const r1 = await call(`/api/freelancer-jobs/${job.id}/approve`, { method: "PATCH", user: HIRER_USER });
     fake.setFailPIRetrieve(false);
     expect(r1.status).toBe(409);
     expect(r1.body.code).toBe("SOURCE_CHARGE_UNAVAILABLE");
 
     const [row] = await db.select().from(freelancerJobs).where(eq(freelancerJobs.id, job.id));
-    expect(row.status).toBe("in_progress"); // rolled back, retryable
+    expect(row.status).toBe("delivered"); // rolled back, retryable
     expect(row.stripeTransferId).toBeNull();
     expect(fake.transfers.filter((t) => t.transfer_group === `freelancer_job_${job.id}`)).toHaveLength(0);
 
     // retry once Stripe is reachable → exactly one transfer, tied to the charge
-    const r2 = await call(`/api/freelancer-jobs/${job.id}/complete`, { method: "PATCH" });
+    const r2 = await call(`/api/freelancer-jobs/${job.id}/approve`, { method: "PATCH", user: HIRER_USER });
     expect(r2.status).toBe(200);
     const created = fake.transfers.filter((t) => t.transfer_group === `freelancer_job_${job.id}`);
     expect(created).toHaveLength(1);

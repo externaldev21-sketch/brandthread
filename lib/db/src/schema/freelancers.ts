@@ -30,8 +30,13 @@ export const freelancers = pgTable('freelancers', {
   updatedAt:           timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Job lifecycle: pending → accepted → in_progress → completed.
-// Cancellation allowed from pending/accepted only (refunds the payment).
+// Job lifecycle: pending → accepted → in_progress → delivered → completed.
+// The freelancer delivers; the hirer approves (→ completed + payout), requests
+// a revision (→ in_progress, max 3) or reports a problem (→ disputed, release
+// frozen). An untouched delivery auto-approves after
+// FREELANCER_AUTO_RELEASE_DAYS (default 3). See migration 453.
+// Cancellation (refunds the payment): pending/accepted/in_progress, and a
+// freelancer may cancel a delivered job.
 export const freelancerJobs = pgTable('freelancer_jobs', {
   id:                      uuid('id').primaryKey().defaultRandom(),
   freelancerId:            uuid('freelancer_id').notNull().references(() => freelancers.id, { onDelete: 'cascade' }),
@@ -39,14 +44,25 @@ export const freelancerJobs = pgTable('freelancer_jobs', {
   title:                   text('title').notNull(),
   description:             text('description').notNull().default(''),
   agreedPriceCents:        integer('agreed_price_cents').notNull(),
-  status:                  text('status').notNull().default('pending'),        // pending | accepted | in_progress | completed | cancelled
+  status:                  text('status').notNull().default('pending'),        // pending | accepted | in_progress | delivered | completed | disputed | cancelled
   paymentStatus:           text('payment_status').notNull().default('unpaid'), // unpaid | paid | refunded
   stripeCheckoutSessionId: text('stripe_checkout_session_id'),
   stripePaymentIntentId:   text('stripe_payment_intent_id'),
-  stripeTransferId:        text('stripe_transfer_id'), // set when the completion payout is sent
+  stripeTransferId:        text('stripe_transfer_id'), // NULL until the payout is sent (hirer approval / auto-release)
   platformFeeCents:        integer('platform_fee_cents').notNull().default(0),
   freelancerPayoutCents:   integer('freelancer_payout_cents').notNull().default(0),
   completedAt:             timestamp('completed_at'),
+  // Delivery + hirer review (migration 453)
+  deliveredAt:             timestamp('delivered_at'),
+  deliveryNote:            text('delivery_note'),
+  revisionCount:           integer('revision_count').notNull().default(0),
+  revisionNote:            text('revision_note'),
+  autoReleaseAt:           timestamp('auto_release_at'),
+  autoReleaseRemindedAt:   timestamp('auto_release_reminded_at'),
+  approvedBy:              text('approved_by'),        // hirer | auto | admin
+  disputedAt:              timestamp('disputed_at'),
+  disputeReason:           text('dispute_reason'),
+  disputeOpenedBy:         text('dispute_opened_by'),  // hirer | chargeback
   createdAt:               timestamp('created_at').defaultNow().notNull(),
   updatedAt:               timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

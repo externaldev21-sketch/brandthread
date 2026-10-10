@@ -681,6 +681,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
     case 'recovery':
       // Lost-chargeback recovery opened / cleared (seller).
       return '/recoveries';
+    case 'freelancer_job':
+      return '/freelancer-jobs';
     case 'subscription_invoice':
       return '/subscription';
     default:
