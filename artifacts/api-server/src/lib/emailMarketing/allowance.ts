@@ -1,13 +1,13 @@
 /**
  * Monthly marketing-email allowance per plan (planCatalogue.ts →
- * emailSendsPerMonth: Starter 0, Growth 10,000, Pro 50,000 by default).
- * A plan with 0 gets the "on Growth" upgrade prompt. Counted from email_campaign_sends this calendar month (UTC);
+ * features.emailSendsMonthly). A plan with 0, or no paid plan, gets the
+ * "on Growth" upgrade prompt. Counted from email_campaign_sends this calendar month (UTC);
  * queued and in-flight sends count, so two campaigns can't both squeeze under
  * the cap. The daily cap in sender.ts still applies on top.
  */
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { getEffectiveEntitlement } from "../nativeEntitlements";
+import { getVerifiedPlanAccess } from "../planAccess";
 import { planAllowances, planForMore } from "../planFeatures";
 import type { SellerPlanId } from "../planCatalogue";
 
@@ -67,9 +67,14 @@ export function emailLimitBody(plan: SellerPlanId, cap: number, used: number, re
 }
 
 /** null when the campaign fits this month's allowance, else the 403 body. */
+/** The seller's plan and this month's cap; no paid plan means no marketing email. */
+async function sellerEmailCap(sellerId: string) {
+  const { planId: plan, paid } = await getVerifiedPlanAccess(sellerId);
+  return { plan, cap: paid ? monthlyEmailCap(plan) : 0 };
+}
+
 export async function checkMonthlyEmailAllowance(sellerId: string, recipients: number, now = new Date()) {
-  const plan = (await getEffectiveEntitlement(sellerId)).planId;
-  const cap = monthlyEmailCap(plan);
+  const { plan, cap } = await sellerEmailCap(sellerId);
   if (cap === null) return null;
   const used = await emailsUsedThisMonth(sellerId, now, { includeQueued: true });
   return used + recipients > cap ? emailLimitBody(plan, cap, used, recipients) : null;
@@ -77,15 +82,14 @@ export async function checkMonthlyEmailAllowance(sellerId: string, recipients: n
 
 /** How many more may go out right now (sender.ts batches). */
 export async function monthlyEmailsLeft(sellerId: string, now = new Date()): Promise<number> {
-  const plan = (await getEffectiveEntitlement(sellerId)).planId;
-  return emailsLeft(monthlyEmailCap(plan), await emailsUsedThisMonth(sellerId, now));
+  const { cap } = await sellerEmailCap(sellerId);
+  return emailsLeft(cap, await emailsUsedThisMonth(sellerId, now));
 }
 
 /** For GET /marketing/email/status: this month's plan allowance. */
 export async function monthlyAllowanceView(sellerId: string, now = new Date()) {
   try {
-    const plan = (await getEffectiveEntitlement(sellerId)).planId;
-    const cap = monthlyEmailCap(plan);
+    const { plan, cap } = await sellerEmailCap(sellerId);
     const used = await emailsUsedThisMonth(sellerId, now, { includeQueued: true });
     return { plan, monthlyCap: cap, sentThisMonth: used, remainingThisMonth: cap === null ? null : Math.max(0, cap - used) };
   } catch {

@@ -7,8 +7,9 @@ import { inArray } from "drizzle-orm";
 import { db, liveStreams, sellerPushBroadcasts } from "@workspace/db";
 
 const plans = new Map<string, "starter" | "growth" | "pro">();
+const unpaid = new Set<string>();
 vi.mock("../../lib/nativeEntitlements", () => ({
-  getEffectiveEntitlement: async (id: string) => ({ planId: plans.get(id) ?? "starter" }),
+  getEffectiveEntitlement: async (id: string) => ({ planId: plans.get(id) ?? "starter", provider: unpaid.has(id) ? "none" : "stripe" }),
 }));
 
 const { featureGate } = await import("../featureGate");
@@ -143,5 +144,17 @@ describe("analytics levels", () => {
     expect(exp.status).toBe(403);
     expect(await exp.json()).toMatchObject({ feature: "analytics_export", requiredPlan: "pro" });
     expect((await call("/analytics/export", pro)).status).toBe(200);
+  });
+});
+
+describe("no paid plan", () => {
+  it("turns every gate off, whatever plan id the entitlement last carried", async () => {
+    const lapsed = `gate-lapsed-${suffix}`;
+    plans.set(lapsed, "pro");
+    unpaid.add(lapsed);
+    const res = await call("/boosts", lapsed);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "PLAN_REQUIRED", requiredPlan: "growth" });
+    expect((await call("/analytics/export", lapsed)).status).toBe(403);
   });
 });

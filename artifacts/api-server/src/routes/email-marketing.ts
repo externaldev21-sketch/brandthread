@@ -318,7 +318,7 @@ router.post("/campaigns/:id/send", async (req, res) => {
   if (recipients.length === 0) {
     res.status(400).json({ error: "No one in this audience can receive email yet.", code: "NO_RECIPIENTS" }); return;
   }
-  // Plan allowance (planCatalogue.ts emailSendsPerMonth): refuse up front instead of stopping mid-campaign.
+  // Plan allowance (planCatalogue.ts features.emailSendsMonthly): refuse up front instead of stopping mid-campaign.
   const overLimit = await checkMonthlyEmailAllowance(sellerId, recipients.length);
   if (overLimit) { res.status(403).json(overLimit); return; }
 

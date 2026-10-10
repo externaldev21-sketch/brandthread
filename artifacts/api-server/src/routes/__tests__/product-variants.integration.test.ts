@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
-import { db, products, productVariants, productStockRules } from "@workspace/db";
+import { db, products, productVariants, productStockRules, users } from "@workspace/db";
 
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: unknown, next: () => void) => {
@@ -43,6 +43,8 @@ async function productStatus(id: string) {
 }
 
 beforeAll(async () => {
+  // Restock brings a hidden product back only within the plan's product cap.
+  await db.insert(users).values({ clerkId: seller, email: `${seller}@pv.invalid`, name: "PV seller", role: "seller", subscriptionStatus: "trialing", subscriptionPlanId: "pro" });
   const { default: variantsRouter } = await import("../product-variants");
   const { default: publicRouter } = await import("../catalog-public");
   const { default: inventoryRouter } = await import("../inventory");
@@ -57,6 +59,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.delete(products).where(inArray(products.id, productIds));
+  await db.delete(users).where(eq(users.clerkId, seller));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 

@@ -1,7 +1,7 @@
 /**
  * Which plan unlocks each seller tool, and the monthly allowances. The values
- * come from the one plan config (planCatalogue.ts → planTierFeatures); this
- * file only turns them into gates. Routes enforce them
+ * come from the one plan config (planCatalogue.ts → PLAN_CATALOGUE[plan].features);
+ * this file only turns them into gates. Routes enforce them
  * (middlewares/featureGate.ts, the email sender, push broadcasts) and the app
  * reads them from GET /api/config/plan-features so the plan screen's copy and
  * lock icons match what the server allows.
@@ -10,8 +10,8 @@
  * domain, an RFQ). Managing, ending or cancelling what a seller already has
  * always works, so a downgrade never strands buyers.
  */
-import type { SellerPlanId, TierFeatures } from "./planCatalogue";
-import { PLAN_CATALOGUE, PLAN_IDS, planTierFeatures } from "./planCatalogue";
+import type { SellerPlanFeatures, SellerPlanId } from "./planCatalogue";
+import { PLAN_CATALOGUE, PLAN_IDS } from "./planCatalogue";
 
 export type PlanFeature =
   | "live_hosting"
@@ -22,15 +22,17 @@ export type PlanFeature =
   | "advanced_analytics"
   | "analytics_export";
 
-const UNLOCKS: Record<PlanFeature, (t: TierFeatures) => boolean> = {
+const UNLOCKS: Record<PlanFeature, (t: SellerPlanFeatures) => boolean> = {
   live_hosting: (t) => t.liveSelling,
-  drops: (t) => t.drops,
-  boosts: (t) => t.boosts,
+  drops: (t) => t.dropsEscrow,
+  boosts: (t) => t.boostFeatured,
   custom_domain: (t) => t.customDomain,
   manufacturer_hub: (t) => t.manufacturerHub,
   advanced_analytics: (t) => t.analytics !== "basic",
-  analytics_export: (t) => t.analytics === "full",
+  analytics_export: (t) => t.analyticsExport,
 };
+
+const tierFeatures = (plan: SellerPlanId) => PLAN_CATALOGUE[plan].features;
 
 function envInt(name: string, fallback: number | null): number | null {
   const raw = process.env[name];
@@ -46,29 +48,28 @@ function plansByRank(): SellerPlanId[] {
 
 /** The cheapest plan that includes each feature (Pro when none does, so the gate stays shut). */
 export function featureMinPlans(): Record<PlanFeature, SellerPlanId> {
-  const tiers = planTierFeatures();
   const order = plansByRank();
   const out = {} as Record<PlanFeature, SellerPlanId>;
   for (const feature of Object.keys(UNLOCKS) as PlanFeature[]) {
-    out[feature] = order.find((plan) => UNLOCKS[feature](tiers[plan])) ?? "pro";
+    out[feature] = order.find((plan) => UNLOCKS[feature](tierFeatures(plan))) ?? "pro";
   }
   return out;
 }
 
 export function planIncludes(plan: SellerPlanId, feature: PlanFeature): boolean {
-  return UNLOCKS[feature](planTierFeatures()[plan]);
+  return UNLOCKS[feature](tierFeatures(plan));
 }
 
 export type PlanAllowance = "marketing_emails_per_month" | "push_broadcasts_per_week" | "live_minutes_per_month";
 
 /** null = unlimited, 0 = not on this plan. */
 export function planAllowances(): Record<PlanAllowance, Record<SellerPlanId, number | null>> {
-  const tiers = planTierFeatures();
+  const tiers = { starter: tierFeatures("starter"), growth: tierFeatures("growth"), pro: tierFeatures("pro") };
   return {
     marketing_emails_per_month: {
-      starter: tiers.starter.emailSendsPerMonth,
-      growth: tiers.growth.emailSendsPerMonth,
-      pro: tiers.pro.emailSendsPerMonth,
+      starter: tiers.starter.emailSendsMonthly,
+      growth: tiers.growth.emailSendsMonthly,
+      pro: tiers.pro.emailSendsMonthly,
     },
     push_broadcasts_per_week: { starter: 1, growth: 3, pro: 7 },
     live_minutes_per_month: {
@@ -96,18 +97,9 @@ export function planForMore(allowance: PlanAllowance, current: SellerPlanId, use
   return null;
 }
 
-/** What the app reads: the gates, the allowances and every tier's row for "Compare all features". */
+/** Lock icons and allowances for the app. Each tier's own values come from GET /api/config/seller-plans. */
 export function publicPlanFeatures() {
-  const tiers = planTierFeatures();
-  return {
-    minPlan: featureMinPlans(),
-    allowances: planAllowances(),
-    tiers: Object.fromEntries(plansByRank().map((plan) => [plan, {
-      ...tiers[plan],
-      productLimit: PLAN_CATALOGUE[plan].limits.products,
-      staffSeats: PLAN_CATALOGUE[plan].limits.teamSeats,
-    }])),
-  };
+  return { minPlan: featureMinPlans(), allowances: planAllowances() };
 }
 
 const LABEL: Record<PlanFeature, string> = {

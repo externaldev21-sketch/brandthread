@@ -8,6 +8,7 @@ import { logActivity, reqActor } from "../lib/activityLog";
 import crypto from "crypto";
 import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
+import { hasProductCapacity } from "../lib/productCapacity";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { notifyNewProduct } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
@@ -49,20 +50,6 @@ async function getProductAccess(req: any, res: any) {
     sendPlanLookupUnavailable(req, res, error);
     return null;
   }
-}
-
-async function hasProductCapacity(tx: any, ownerId: string, limit: number | null, requested: number): Promise<boolean> {
-  if (limit === null) return true;
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"product-limit:" + ownerId}))`);
-  const [result] = await tx
-    .select({ count: sql<number>`count(*)::int` })
-    .from(products)
-    .where(and(
-      eq(products.ownerId, ownerId),
-      ne(products.status, "archived"),
-      isNull(products.deletedAt),
-    ));
-  return (result?.count ?? 0) + requested <= limit;
 }
 
 // POST /api/products/images — upload a raw product photo, return its object
@@ -220,7 +207,8 @@ router.post("/", requireRole("manager"), async (req, res) => {
   // Serialize quota admission with insertion so concurrent requests cannot
   // push Starter above its catalogue allowance.
   const product = await db.transaction(async (tx) => {
-    if (!await hasProductCapacity(tx, ownerId, access.limits.products, status === "archived" ? 0 : 1)) return null;
+    // Only publishing is capped; a draft can always be saved.
+    if (!await hasProductCapacity(tx, ownerId, access.limits.products, status === "active" ? 1 : 0)) return null;
     const [prod] = await tx
       .insert(products)
       .values({
@@ -244,7 +232,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
   if (!product) {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });
@@ -316,7 +304,8 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       ...(name         && { name }),
       ...(description  !== undefined && { description }),
       ...(category     && { category }),
-      ...(status       && { status }),
+      // A seller choosing the status themselves takes it back from the plan sync.
+      ...(status       && { status, planHiddenAt: null }),
       ...(images       && { images }),
       ...(tags         && { tags }),
       ...(styleTags    !== undefined && { styleTags }),
@@ -331,8 +320,9 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       updatedAt: new Date(),
   };
 
-  const access = status && status !== "archived" ? await getProductAccess(req, res) : null;
-  if (status && status !== "archived" && !access) return;
+  // Only going live is capped by the plan (drafts and archiving are free).
+  const access = status === "active" ? await getProductAccess(req, res) : null;
+  if (status === "active" && !access) return;
   const result = await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({ status: products.status, deletedAt: products.deletedAt, removalKind: products.removalKind })
@@ -350,9 +340,8 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
     }
     if (
       !existing.deletedAt
-      && existing.status === "archived"
-      && status !== undefined
-      && status !== "archived"
+      && existing.status !== "active"
+      && status === "active"
       && access
       && !await hasProductCapacity(tx, ownerId, access.limits.products, 1)
     ) {
@@ -388,7 +377,7 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
   if (result.limited && access) {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });
@@ -461,7 +450,7 @@ router.post("/:id/restore", requireRole("manager"), async (req, res) => {
     if (!existing.deletedAt) return { kind: "unchanged" as const, product: existing };
     if (!canRestoreProduct(existing, now)) return { kind: "expired" as const };
     if (
-      existing.status !== "archived"
+      existing.status === "active"
       && !await hasProductCapacity(tx, ownerId, access.limits.products, 1)
     ) {
       return { kind: "limited" as const };
@@ -490,7 +479,7 @@ router.post("/:id/restore", requireRole("manager"), async (req, res) => {
   if (result.kind === "limited") {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });
@@ -625,7 +614,7 @@ router.post("/import", requireRole("manager"), async (req, res) => {
   const access = await getProductAccess(req, res);
   if (!access) return;
   const inserted = await db.transaction(async (tx) => {
-    if (!await hasProductCapacity(tx, ownerId, access.limits.products, validRows.length)) return null;
+    // Rows are saved as drafts, which the plan cap never counts.
     const created: Array<{ name: string; productId: string }> = [];
     for (const row of validRows) {
       const [product] = await tx.insert(products).values({
@@ -656,7 +645,7 @@ router.post("/import", requireRole("manager"), async (req, res) => {
   if (!inserted) {
     sendPlanLimitReached(res, {
       resource: "products",
-      currentPlan: access.planId,
+      currentPlan: access.planId, paid: access.paid,
       requiredPlan: "growth",
       limit: access.limits.products!,
     });

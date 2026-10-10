@@ -1,6 +1,7 @@
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { db, sellerSubscriptionEntitlements, users } from "@workspace/db";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { PAST_DUE_GRACE_DAYS } from "./planCatalogue";
 
 export type NativeEntitlementStatus = "active" | "trial" | "grace" | "expired";
 export type SellerPlanId = "starter" | "growth" | "pro";
@@ -156,13 +157,17 @@ export async function reconcileRevenueCatEntitlement(clerkUserId: string) {
 export type EffectiveEntitlement = {
   planId: SellerPlanId;
   status: string;
-  provider: "stripe" | "revenuecat" | "none";
+  /** "review": an App Review demo account (users.is_review_account), which needs full seller access without a purchase. */
+  provider: "stripe" | "revenuecat" | "review" | "none";
   native: typeof sellerSubscriptionEntitlements.$inferSelect | null;
 };
 
 type LegacySubscription = {
   planId: string | null;
   status: string | null;
+  /** When the Stripe subscription went past_due (null: not past_due, or not yet stamped). */
+  pastDueSince?: Date | null;
+  isReviewAccount?: boolean | null;
 } | null | undefined;
 
 type NativeSubscription = typeof sellerSubscriptionEntitlements.$inferSelect | null | undefined;
@@ -198,7 +203,12 @@ export function resolveEffectiveEntitlement(
 
   const legacyPlan = sellerPlanId(legacy?.planId);
   const legacyStatus = typeof legacy?.status === "string" ? legacy.status.toLowerCase() : "";
-  const stripeActive = !!legacyPlan && ["active", "trialing", "past_due"].includes(legacyStatus);
+  // past_due keeps the plan for PAST_DUE_GRACE_DAYS while Stripe retries the
+  // card, then the seller falls back to the free limits (BT-002).
+  const pastDueInGrace = legacyStatus === "past_due"
+    && (!legacy?.pastDueSince
+      || now.valueOf() - legacy.pastDueSince.valueOf() < PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000);
+  const stripeActive = !!legacyPlan && (["active", "trialing"].includes(legacyStatus) || pastDueInGrace);
 
   if (
     nativeActive
@@ -222,14 +232,22 @@ export function resolveEffectiveEntitlement(
     };
   }
 
+  if (legacy?.isReviewAccount) {
+    return { planId: "pro", status: "review", provider: "review", native: native ?? null };
+  }
+
   return { planId: "starter", status: "none", provider: "none", native: native ?? null };
 }
 
 /** Shared effective access calculation. Stripe data remains untouched for all legacy web subscribers. */
 export async function getEffectiveEntitlement(clerkUserId: string): Promise<EffectiveEntitlement> {
   const [[legacy], [native]] = await Promise.all([
-    db.select({ planId: users.subscriptionPlanId, status: users.subscriptionStatus })
-      .from(users).where(eq(users.clerkId, clerkUserId)).limit(1),
+    db.select({
+      planId: users.subscriptionPlanId,
+      status: users.subscriptionStatus,
+      pastDueSince: users.subscriptionPastDueSince,
+      isReviewAccount: users.isReviewAccount,
+    }).from(users).where(eq(users.clerkId, clerkUserId)).limit(1),
     db.select().from(sellerSubscriptionEntitlements)
       .where(and(eq(sellerSubscriptionEntitlements.clerkUserId, clerkUserId), eq(sellerSubscriptionEntitlements.provider, "revenuecat")))
       .orderBy(desc(sellerSubscriptionEntitlements.lastSyncedAt)).limit(1),

@@ -7,7 +7,7 @@
  *   "unchanged" when the content hash matches) instead of duplicating.
  * - One transaction per product, so a bad product never rolls back the rest.
  * - New products honour the plan's product limit exactly like
- *   `hasProductCapacity` in routes/products.ts (same advisory lock + count).
+ *   lib/productCapacity.ts (the plan cap counts live products only).
  * - Always created as drafts (archived stays archived): publishing is the
  *   seller's decision and goes through the existing publish flow.
  */
@@ -16,6 +16,7 @@ import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db, products, productVariants, productImportMappings } from "@workspace/db";
 import type { ImportProduct, ImportSource, Issue } from "./types";
 import { sha } from "./util";
+import { countActiveProducts } from "../productCapacity";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -35,21 +36,9 @@ export function contentHash(p: ImportProduct): string {
   }), 24);
 }
 
-/** Same rule as products.ts#hasProductCapacity (non-archived, non-deleted count under an advisory lock). */
-export async function hasProductCapacity(tx: Tx | typeof db, ownerId: string, limit: number | null, requested: number): Promise<boolean> {
-  if (limit === null) return true;
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"product-limit:" + ownerId}))`);
-  const [result] = await tx
-    .select({ count: sql<number>`count(*)::int` })
-    .from(products)
-    .where(and(eq(products.ownerId, ownerId), ne(products.status, "archived"), isNull(products.deletedAt)));
-  return (result?.count ?? 0) + requested <= limit;
-}
-
+/** Live products against the plan's cap. Imports land as drafts, so they never use it up. */
 export async function readCapacity(ownerId: string, limit: number | null): Promise<Capacity> {
-  const [result] = await db.select({ count: sql<number>`count(*)::int` }).from(products)
-    .where(and(eq(products.ownerId, ownerId), ne(products.status, "archived"), isNull(products.deletedAt)));
-  const used = result?.count ?? 0;
+  const used = await countActiveProducts(db, ownerId);
   return { limit, used, remaining: limit === null ? null : Math.max(0, limit - used) };
 }
 
@@ -165,7 +154,7 @@ async function saveOne(
 
     if (!productId) {
       const archived = p.sourceStatus === "archived";
-      if (!archived && !await hasProductCapacity(tx, ownerId, planLimit, 1)) return { kind: "plan_limit" } as Saved;
+      // Imported products are saved as drafts: the plan cap only limits publishing.
       const [created] = await tx.insert(products).values({
         id: crypto.randomUUID(), ownerId, name: p.name, description: p.description, category: p.category,
         status: archived ? "archived" : "draft", images: p.images, tags: p.tags,

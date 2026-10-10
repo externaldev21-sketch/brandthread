@@ -92,9 +92,9 @@ describe("GET /api/seller/subscription/perks", () => {
     expect(body.currentPlan).toBe("growth");
     expect(body.hasAdvancedAnalytics).toBe(true);
     expect(body.plans).toEqual([
-      expect.objectContaining({ planId: "starter", amountCents: 2900, platformFeeBps: 500, monthlyAiCredits: 1000, advancedAnalytics: false }),
-      expect.objectContaining({ planId: "growth", amountCents: 7900, platformFeeBps: 400, monthlyAiCredits: 4000, advancedAnalytics: true }),
-      expect.objectContaining({ planId: "pro", amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true }),
+      expect.objectContaining({ planId: "starter", amountCents: 1999, platformFeeBps: 500, monthlyAiCredits: 1000, advancedAnalytics: false }),
+      expect.objectContaining({ planId: "growth", amountCents: 4900, platformFeeBps: 400, monthlyAiCredits: 4000, advancedAnalytics: true }),
+      expect.objectContaining({ planId: "pro", amountCents: 12900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true }),
     ]);
   });
 

@@ -5,12 +5,11 @@
  *
  * `only` limits the gate to the requests that start something new (e.g.
  * POST /), leaving list / manage / cancel open after a downgrade. Which plan
- * a feature needs comes from planCatalogue.ts (planTierFeatures).
+ * a feature needs comes from planCatalogue.ts (PLAN_CATALOGUE[plan].features).
  */
 import type { NextFunction, Request, Response } from "express";
-import { getEffectiveEntitlement } from "../lib/nativeEntitlements";
 import { featureLabel, featureMinPlans, hasPlan, type PlanFeature } from "../lib/planFeatures";
-import { sendPlanLookupUnavailable } from "../lib/planAccess";
+import { getVerifiedPlanAccess, sendPlanLookupUnavailable } from "../lib/planAccess";
 import type { SellerPlanId } from "../lib/planCatalogue";
 
 const ALLOW_TEST_SUBSCRIPTION_BYPASS =
@@ -46,13 +45,15 @@ export function featureGate(feature: PlanFeature, options: { only?: GateMatch[];
     const ownerId = (req as any).clerkUserId as string | undefined;
     if (!ownerId) return void res.status(401).json({ error: "Unauthorized" });
     let plan: SellerPlanId;
+    let paid: boolean;
     try {
-      plan = (await getEffectiveEntitlement(ownerId)).planId;
+      ({ planId: plan, paid } = await getVerifiedPlanAccess(ownerId));
     } catch (err) {
       return sendPlanLookupUnavailable(req, res, err);
     }
     const required = featureMinPlans()[feature];
-    if (!hasPlan(plan, required)) return void res.status(403).json(planRequiredBody(feature, required, plan));
+    // No paid plan (no trial, cancelled, expired, past the past_due grace): every gate is off.
+    if (!paid || !hasPlan(plan, required)) return void res.status(403).json(planRequiredBody(feature, required, plan));
     if (options.extra && !(await options.extra(req, res, { ownerId, plan }))) return;
     next();
   };

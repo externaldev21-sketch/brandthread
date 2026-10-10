@@ -31,7 +31,7 @@ export function platformFeeBpsForPlan(planId: string | null | undefined): number
 }
 
 export function hasAdvancedAnalytics(planId: string | null | undefined): boolean {
-  // The analytics level per plan lives in planCatalogue.ts (planTierFeatures).
+  // The analytics level per plan lives in planCatalogue.ts (features.analytics).
   return isSellerPlanId(planId) && planIncludes(planId, "advanced_analytics");
 }
 

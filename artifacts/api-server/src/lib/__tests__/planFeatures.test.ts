@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { featureMinPlans, hasPlan, planAllowances, planForMore, planIncludes, publicPlanFeatures } from "../planFeatures";
-import { PLAN_CATALOGUE, planTierFeatures } from "../planCatalogue";
+import { PLAN_CATALOGUE } from "../planCatalogue";
 import { liveAllowanceBlock, monthStartUtc } from "../liveAllowance";
 import { emailLimitBody, emailsLeft } from "../emailMarketing/allowance";
 import { isMarketingMailerConfigured, marketingFrom, marketingFromHeader } from "../emailMarketing/marketingMailer";
@@ -21,10 +21,8 @@ describe("plan features", () => {
       advanced_analytics: "growth",
       analytics_export: "pro",
     });
-    const tiers = planTierFeatures();
-    expect([tiers.starter.analytics, tiers.growth.analytics, tiers.pro.analytics]).toEqual(["basic", "advanced", "full"]);
-    expect([tiers.starter.prioritySupport, tiers.growth.prioritySupport, tiers.pro.prioritySupport]).toEqual([false, false, true]);
-    expect([tiers.starter.payoutSpeed, tiers.pro.payoutSpeed]).toEqual(["standard", "faster"]);
+    // Values belong to planCatalogue.ts (PLAN_CATALOGUE[plan].features); gates only follow them.
+    expect(["starter", "growth", "pro"].map((p) => PLAN_CATALOGUE[p as "starter"].features.analytics)).toEqual(["basic", "advanced", "full"]);
   });
   it("answers per plan", () => {
     expect(planIncludes("starter", "live_hosting")).toBe(false);
@@ -35,10 +33,16 @@ describe("plan features", () => {
     expect(hasPlan("pro", "growth")).toBe(true);
     expect(hasPlan("starter", "growth")).toBe(false);
   });
-  it("gives Starter no marketing email and names the cheapest plan with room for more", () => {
-    expect(planAllowances().marketing_emails_per_month).toEqual({ starter: 0, growth: 10_000, pro: 50_000 });
+  it("takes marketing email caps from the plan config and names the cheapest plan with room for more", () => {
+    const caps = planAllowances().marketing_emails_per_month;
+    expect(caps).toEqual({
+      starter: PLAN_CATALOGUE.starter.features.emailSendsMonthly,
+      growth: PLAN_CATALOGUE.growth.features.emailSendsMonthly,
+      pro: PLAN_CATALOGUE.pro.features.emailSendsMonthly,
+    });
+    expect(caps.starter).toBe(0);
     expect(planForMore("marketing_emails_per_month", "starter", 1)).toBe("growth");
-    expect(planForMore("marketing_emails_per_month", "starter", 20_000)).toBe("pro");
+    expect(planForMore("marketing_emails_per_month", "starter", caps.growth! + 1)).toBe("pro");
     expect(planForMore("push_broadcasts_per_week", "pro", 7)).toBeNull();
   });
   it("has no live-minute cap on Growth unless one is set", () => {
@@ -46,15 +50,8 @@ describe("plan features", () => {
     process.env.LIVE_GROWTH_MINUTES_PER_MONTH = "240";
     expect(planForMore("live_minutes_per_month", "growth", 300)).toBe("pro");
   });
-  it("reads email caps from env, including unlimited", () => {
-    process.env.EMAIL_MONTHLY_CAP_PRO = "unlimited";
-    process.env.EMAIL_MONTHLY_CAP_STARTER = "250";
-    expect(planAllowances().marketing_emails_per_month).toEqual({ starter: 250, growth: 10_000, pro: null });
-  });
-  it("publishes every tier for the plan screen, with the product cap and seats from the same config", () => {
-    const pub = publicPlanFeatures();
-    expect(Object.keys(pub.tiers)).toEqual(["starter", "growth", "pro"]);
-    expect(pub.tiers.starter).toMatchObject({ analytics: "basic", emailSendsPerMonth: 0, productLimit: PLAN_CATALOGUE.starter.limits.products, staffSeats: PLAN_CATALOGUE.starter.limits.teamSeats });
+  it("publishes the lock icons and allowances (tier values come from /api/config/seller-plans)", () => {
+    expect(publicPlanFeatures()).toEqual({ minPlan: featureMinPlans(), allowances: planAllowances() });
   });
 });
 
@@ -81,7 +78,7 @@ describe("email allowance", () => {
       code: "PLAN_LIMIT_REACHED", requiredPlan: "growth", resource: "marketing_emails",
       message: "This campaign goes to 400 people and your plan has 200 emails left this month. Upgrade to send it.",
     });
-    expect(emailLimitBody("growth", 10_000, 10_000, 1).message).toBe("You've sent this month's 10,000 marketing emails. Upgrade to send more.");
+    expect(emailLimitBody("growth", 2_500, 2_500, 1).message).toBe("You've sent this month's 2,500 marketing emails. Upgrade to send more.");
   });
   it("shows the upgrade prompt, not a used-up count, on a plan without email", () => {
     expect(emailLimitBody("starter", 0, 0, 1)).toMatchObject({
