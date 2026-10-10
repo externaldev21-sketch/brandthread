@@ -21,7 +21,8 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 const MAX_PAIRINGS = 6;
 
@@ -162,7 +163,7 @@ export default function ProductPairingsScreen() {
             return (
               <TouchableOpacity
                 key={c.id}
-                style={[s.row, blocked && { opacity: 0.4 }]}
+                style={s.row}
                 disabled={blocked}
                 onPress={() => toggle(c.id)}
                 accessibilityRole="checkbox"
@@ -170,7 +171,7 @@ export default function ProductPairingsScreen() {
                 accessibilityLabel={c.name}
               >
                 <Thumb uri={c.image} s={s} colors={colors} />
-                <Text style={s.name}>{c.name}</Text>
+                <Text style={[s.name, blocked && { color: TEXT_DISABLED }]}>{c.name}</Text>
                 <View style={[s.checkbox, checked && s.checkboxOn]}>
                   {checked ? <Feather name="check" size={14} color={colors.primaryForeground} /> : null}
                 </View>
@@ -218,15 +219,15 @@ export default function ProductPairingsScreen() {
             </View>
           ))}
           <TouchableOpacity
-            style={[s.row, paired.length >= MAX_PAIRINGS && { opacity: 0.4 }]}
+            style={s.row}
             disabled={paired.length >= MAX_PAIRINGS || offline}
             onPress={openPicker}
             accessibilityRole="button"
             accessibilityLabel="Add product"
           >
-            <View style={[s.thumb, s.addThumb]}><Feather name="plus" size={20} color={colors.foreground} /></View>
-            <Text style={s.name}>Add product</Text>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            <View style={[s.thumb, s.addThumb]}><Feather name="plus" size={20} color={paired.length >= MAX_PAIRINGS ? TEXT_DISABLED : colors.foreground} /></View>
+            <Text style={[s.name, paired.length >= MAX_PAIRINGS && { color: TEXT_DISABLED }]}>Add product</Text>
+            <Feather name="chevron-right" size={16} color={paired.length >= MAX_PAIRINGS ? TEXT_DISABLED : colors.mutedForeground} />
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -247,8 +248,8 @@ function IconBtn({ name, onPress, label, disabled, colors, s }: {
   colors: ReturnType<typeof useColors>; s: ReturnType<typeof makeStyles>;
 }) {
   return (
-    <TouchableOpacity style={[s.iconBtn, disabled && { opacity: 0.25 }]} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
-      <Feather name={name} size={18} color={colors.foreground} />
+    <TouchableOpacity style={s.iconBtn} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
+      <Feather name={name} size={18} color={disabled ? TEXT_DISABLED : colors.foreground} />
     </TouchableOpacity>
   );
 }
@@ -274,7 +275,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
     paddingHorizontal: SP.md, height: 44, borderRadius: RADIUS.md, backgroundColor: c.card,
   },
   searchInput: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: c.foreground, height: 44 },
-  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: crispPx(1.5), borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
   checkboxOn: { backgroundColor: c.primary, borderColor: c.primary },
   empty: { fontSize: FS.base, fontFamily: FONT.medium, color: c.mutedForeground, textAlign: 'center', padding: SP.lg },
   retry: { paddingVertical: SP.sm, paddingHorizontal: SP.md },

@@ -17,6 +17,7 @@ import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
 import { hapticLight } from '@/lib/haptics';
 import { LAUNCH_STEP_META, nextLaunchStep, type LaunchStepId } from '@/lib/launchChecklist';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 export default function LaunchChecklistScreen() {
   const { theme } = useAppTheme();
@@ -113,7 +114,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   rowDivider: { borderTopWidth: 1, borderTopColor: theme.borderSubtle },
   rowHead: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52 },
   check: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  checkOpen: { borderWidth: 1.5, borderColor: theme.muted, borderStyle: 'dashed' },
+  checkOpen: { borderWidth: crispPx(1.5), borderColor: theme.muted, borderStyle: 'dashed' },
   checkDone: { backgroundColor: theme.accent },
   rowTitle: { flex: 1, fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
   rowTitleDone: { color: theme.muted },

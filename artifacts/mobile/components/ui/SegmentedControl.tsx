@@ -110,7 +110,7 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
       testID={testID}
     >
       {glass && (
-        <Glass variant="regular" tint="dark" radius={radius.md} style={StyleSheet.absoluteFill} />
+        <Glass solid radius={radius.md} style={StyleSheet.absoluteFill} />
       )}
       {segmentWidth > 0 && (
         <Animated.View

@@ -5,16 +5,15 @@
  * slim single-line composer "matching whatever slim composer style is
  * already used elsewhere app-wide" rather than a boxed multi-line
  * textarea. Reuses `components/ai/AiComposer.tsx`'s frosted-pill visual
- * language (rounded pill, subtle border, blurred/tinted fill) — the only
+ * language (rounded pill, subtle border, solid #1C1C1E input fill) — the only
  * slim single-line composer pattern already in this codebase — without
  * its send/stop-button chat plumbing, since this is a plain form field,
  * not a chat input.
  */
 import React, { useState } from 'react';
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { CARD, FG, SUBTLE, BORDER, FONT, FS } from '@/lib/theme';
+import { FG, SUBTLE, BORDER, FONT, FS, FILL_ELEVATED } from '@/lib/theme';
 
 interface AiSlimComposerProps {
   value: string;
@@ -28,10 +27,6 @@ export function AiSlimComposer({ value, onChangeText, placeholder, icon = 'edit-
   const [focused, setFocused] = useState(false);
   return (
     <View style={[s.pill, focused && s.pillFocused]}>
-      {Platform.OS !== 'android' && (
-        <BlurView pointerEvents="none" intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
-      )}
-      <View pointerEvents="none" style={s.tint} />
       <Feather name={icon} size={15} color={SUBTLE} style={s.icon} />
       <TextInput
         style={s.input}
@@ -60,13 +55,10 @@ const s = StyleSheet.create({
     borderColor: BORDER,
     paddingHorizontal: 16,
     gap: 10,
+    backgroundColor: FILL_ELEVATED,
   },
   pillFocused: {
     borderColor: FG,
-  },
-  tint: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: `${CARD}CC`,
   },
   icon: { zIndex: 1 },
   input: {

@@ -47,6 +47,7 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { crispPx } from '@/lib/crispPixel';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -2479,7 +2480,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   variantRow: { gap: SP.sm },
   variantTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   variantCheckbox: {
-    width: 18, height: 18, borderRadius: RADIUS.xs, borderWidth: 1.5, borderColor: BORDER,
+    width: 18, height: 18, borderRadius: RADIUS.xs, borderWidth: crispPx(1.5), borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
   variantTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },

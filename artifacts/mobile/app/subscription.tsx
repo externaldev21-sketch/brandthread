@@ -21,7 +21,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ON_LIGHT_MUTED } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
@@ -339,7 +339,7 @@ export default function SubscriptionScreen() {
                   )}
 
                   {/* Commission reminder */}
-                  <Text style={[styles.currentPlanRenews, { color: theme.onAccent, marginTop: 8, opacity: 0.6 }, getOnAccentTextStyle(theme)]}>
+                  <Text style={[styles.currentPlanRenews, getOnAccentTextStyle(theme), { color: ON_LIGHT_MUTED, marginTop: 8 }]}>
                     + 5% platform commission on sales
                   </Text>
                 </>
@@ -604,12 +604,8 @@ const createStyles = (theme: AppThemePreset) => {
     borderColor: PURPLE,
     backgroundColor: CARD_ELEVATED,
     borderWidth: 2,
-    shadowColor: PURPLE,
-    shadowOpacity: 0.32,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 7,
-    transform: [{ scale: 1.015 }],
+    // The 2pt border carries the emphasis: no soft halo, and no resting
+    // scale (a 1.015x card re-samples every line of text in it).
   },
    growthComparison:   { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
    growthComparisonHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.lg },

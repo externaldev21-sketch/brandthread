@@ -67,6 +67,8 @@ vi.mock('@/lib/theme', () => ({
   ICON: { md: 20, lg: 24 },
   RADIUS: { md: 14, pill: 999 },
   SP: { xs: 4, sm: 8, md: 16, xl: 32 },
+  TEXT_SECONDARY: '#C0C0C0',
+  TEXT_TERTIARY: '#8E8E93',
 }));
 
 vi.mock('@/lib/shareProfile', () => ({

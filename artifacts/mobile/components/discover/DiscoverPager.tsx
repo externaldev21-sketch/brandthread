@@ -6,23 +6,21 @@
  * ranking endpoint being built in parallel).
  *
  * Layout is a single horizontal FlatList of full-bleed "pages": each page is a
- * floating hero product cutout over a heavily blurred, tinted copy of the same
- * photo. Reanimated worklets (not JS onScroll callbacks) drive the crossfade
- * between backgrounds, the foreground parallax/scale, and the idle float —
- * so all of it stays on the UI thread at 60fps.
+ * floating hero product cutout straight on black (no blurred backdrop:
+ * every screen stays sharp). Reanimated worklets (not JS onScroll callbacks)
+ * drive the foreground parallax/scale and the idle float — so all of it
+ * stays on the UI thread at 60fps.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated as RNAnimated,
   Dimensions,
-  Platform,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -44,7 +42,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { FONT, GRID_MAX_WIDTH, SP } from '@/lib/theme';
+import { FONT, GRID_MAX_WIDTH, SP, TEXT_TERTIARY } from '@/lib/theme';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { RADII, radius } from '@/constants/radii';
@@ -269,8 +267,6 @@ export function DiscoverPager() {
         </View>
       ) : (
         <>
-          <DiscoverBackground items={items} activeIndex={activeIndex} scrollX={scrollX} snapInterval={snapInterval} viewportWidth={viewport.width} />
-
           <Animated.FlatList
             data={items}
             keyExtractor={(item: DiscoverFeedItem) => item.productId}
@@ -388,83 +384,6 @@ function DiscoverSkeleton({ cardWidth }: { cardWidth: number }) {
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: topInset }}>
       <CardSkeleton width={cardWidth * 0.72} />
     </View>
-  );
-}
-
-// ─── Background layer — heavy blur + tint + crossfade + parallax ─────────────
-
-const BACKGROUND_PARALLAX = 0.4; // background moves slower than the finger
-
-function DiscoverBackground({
-  items, activeIndex, scrollX, snapInterval, viewportWidth,
-}: {
-  items: DiscoverFeedItem[];
-  activeIndex: number;
-  scrollX: SharedValue<number>;
-  snapInterval: number;
-  viewportWidth: number;
-}) {
-  const lo = Math.max(0, activeIndex - 1);
-  const hi = Math.min(items.length - 1, activeIndex + 1);
-  const windowed: number[] = [];
-  for (let i = lo; i <= hi; i++) windowed.push(i);
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {windowed.map(index => (
-        <BackgroundLayer
-          key={items[index].productId}
-          uri={pickImage(items[index])}
-          index={index}
-          scrollX={scrollX}
-          snapInterval={snapInterval}
-          viewportWidth={viewportWidth}
-        />
-      ))}
-      <LinearGradient
-        colors={['rgba(0,0,0,0.42)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
-        locations={[0, 0.35, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-    </View>
-  );
-}
-
-function BackgroundLayer({
-  uri, index, scrollX, snapInterval, viewportWidth,
-}: {
-  uri?: string;
-  index: number;
-  scrollX: SharedValue<number>;
-  snapInterval: number;
-  viewportWidth: number;
-}) {
-  const style = useAnimatedStyle(() => {
-    const center = index * snapInterval;
-    const distance = scrollX.value - center;
-    const opacity = interpolate(
-      distance,
-      [-snapInterval, 0, snapInterval],
-      [0, 1, 0],
-      Extrapolation.CLAMP,
-    );
-    // Background tracks the drag at a fraction of the foreground's speed —
-    // the classic parallax cue that this is a layer behind the hero image.
-    const translateX = -distance * BACKGROUND_PARALLAX;
-    return { opacity, transform: [{ translateX }, { scale: 1.4 }] };
-  });
-
-  if (!uri) return null;
-
-  return (
-    <Animated.View style={[StyleSheet.absoluteFill, style, { width: viewportWidth }]}>
-      <CachedImage
-        source={{ uri }}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        blurRadius={Platform.OS === 'android' ? 25 : 60}
-      />
-    </Animated.View>
   );
 }
 
@@ -647,7 +566,7 @@ const styles = StyleSheet.create({
   },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6 },
   price: { color: '#FFFFFF', ...TYPE_SCALE.title1 },
-  comparePrice: { color: '#FFFFFF99', ...TYPE_SCALE.body, textDecorationLine: 'line-through' },
+  comparePrice: { color: TEXT_TERTIARY, ...TYPE_SCALE.body, textDecorationLine: 'line-through' },
   actionsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: SP.lg, marginTop: SP.lg },
   secondaryBtn: {
     flex: 1,

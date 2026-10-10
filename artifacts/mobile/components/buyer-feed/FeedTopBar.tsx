@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Glass } from '@/components/ui/Glass';
-import { FONT, ON_DARK } from '@/lib/theme';
+import { FONT, ON_DARK, TEXT_SECONDARY } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 import { radius } from '@/constants/radii';
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
   liveText: {
-    fontSize: 11, letterSpacing: 0.6, fontFamily: FONT.bold, color: 'rgba(255,255,255,0.85)',
+    fontSize: 11, letterSpacing: 0.6, fontFamily: FONT.bold, color: TEXT_SECONDARY,
   },
   liveTextActive: { color: ON_DARK },
   searchRow: {

@@ -66,6 +66,7 @@ import {
   type CartFlightPoint,
   type CartFlightSource,
 } from '@/lib/cartFlight';
+import { crispPx } from '@/lib/crispPixel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -230,7 +231,7 @@ function OptionChip({
       accessibilityState={{ selected, disabled: !available }}
       style={[
         chipS.chip,
-        recommended && !selected && available && { borderColor: theme.text, borderWidth: 1.5 },
+        recommended && !selected && available && { borderColor: theme.text, borderWidth: crispPx(1.5) },
         selected && { borderColor: accentColor, borderWidth: 2, backgroundColor: `${accentColor}1A` },
         !available && chipS.unavail,
       ]}
@@ -2145,8 +2146,6 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: theme.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   descriptionText: {
     fontSize: FS.sm,

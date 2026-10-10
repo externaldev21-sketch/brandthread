@@ -7,6 +7,7 @@ import { useApi } from '@/lib/api';
 import { RetryRow } from '@/components/ui/RetryRow';
 import type { DisputeTimelineStep } from '@/lib/disputeTypes';
 import { demoSteps, shortDateTime } from './disputeUi';
+import { crispPx } from '@/lib/crispPixel';
 
 interface Props {
   disputeId: string;
@@ -110,7 +111,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: SP.md },
   rail: { alignItems: 'center', width: DOT },
   dot: {
-    width: DOT, height: DOT, borderRadius: DOT / 2, borderWidth: 1.5,
+    width: DOT, height: DOT, borderRadius: DOT / 2, borderWidth: crispPx(1.5),
     alignItems: 'center', justifyContent: 'center',
   },
   innerDot: { width: 6, height: 6, borderRadius: 3 },

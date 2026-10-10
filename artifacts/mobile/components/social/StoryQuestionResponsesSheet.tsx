@@ -10,6 +10,7 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { Avatar } from '@/components/ui';
 import { FONT, FS } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 export interface QuestionResponses {
   questions: Array<{ overlayId: string; prompt: string; answers: Array<{
@@ -72,10 +73,10 @@ const s = StyleSheet.create({
   title: { fontFamily: FONT.bold, fontSize: FS.lg },
   center: { height: 96, alignItems: 'center', justifyContent: 'center' },
   empty: { fontFamily: FONT.regular, fontSize: FS.sm, paddingVertical: 24, textAlign: 'center' },
-  prompt: { fontFamily: FONT.semibold, fontSize: FS.meta, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 },
+  prompt: { fontFamily: FONT.semibold, fontSize: FS.meta, marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
   answer: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
-  replyBtn: { height: 36, minWidth: 72, borderRadius: RADII.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  replyBtn: { height: 36, minWidth: 72, borderRadius: RADII.pill, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   replyText: { fontFamily: FONT.semibold, fontSize: FS.sm },
 });

@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 
 export type FollowState = {
@@ -80,11 +80,13 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       onPress={handlePress}
       style={({ pressed }) => [
         styles.base,
-        isPrimary
-          ? { backgroundColor: theme.accent }
-          : { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
+        // Disabled: solid gray fill + gray label, never a faded button.
+        disabled
+          ? { backgroundColor: FILL_ELEVATED }
+          : isPrimary
+            ? { backgroundColor: theme.accent }
+            : { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
         pressed && styles.pressed,
-        (disabled) && styles.disabled,
         style,
       ]}
     >
@@ -93,9 +95,9 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       ) : (
         <>
           {state.isFollowing && (
-            <Feather name="check" size={14} color={isPrimary ? theme.onAccent : theme.text} style={styles.icon} />
+            <Feather name="check" size={14} color={disabled ? TEXT_DISABLED : isPrimary ? theme.onAccent : theme.text} style={styles.icon} />
           )}
-          <Text style={[styles.label, { color: isPrimary ? theme.onAccent : theme.text }]}>{label}</Text>
+          <Text style={[styles.label, { color: disabled ? TEXT_DISABLED : isPrimary ? theme.onAccent : theme.text }]}>{label}</Text>
         </>
       )}
     </Pressable>
@@ -112,7 +114,6 @@ const makeStyles = (theme: AppThemePreset, size: 'default' | 'compact') => Style
     justifyContent: 'center',
   },
   pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
-  disabled: { opacity: 0.5 },
   icon: { marginRight: 4 },
   label: { fontFamily: FONT.semibold, fontSize: size === 'compact' ? FS.xs : FS.sm },
 });

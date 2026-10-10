@@ -16,6 +16,7 @@ import React, { useEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FONT, FS } from '@/lib/theme';
 import { useLiveStreamForHost, useOpenLive } from '@/lib/live/useLiveDirectory';
+import { crispPx } from '@/lib/crispPixel';
 
 // #D32F2F, not the brighter #FF3B30 this used to be: white text on that
 // brighter red only hit 3.55:1 contrast (need 4.5:1) at the tiny badge sizes
@@ -173,7 +174,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 5,
     paddingVertical: 2,
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
     borderColor: '#000',
   },
   tagText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },

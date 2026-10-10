@@ -1,0 +1,439 @@
+{
+  "app/(buyer)/cart.tsx": {
+    "fadedText": 1
+  },
+  "app/(buyer)/edit-profile.tsx": {
+    "fractionalFont": 7
+  },
+  "app/(buyer)/inbox.tsx": {
+    "fractionalRadius": 1,
+    "rnImage": 6
+  },
+  "app/(buyer)/orders.tsx": {
+    "rnImage": 1
+  },
+  "app/(tabs)/feed.tsx": {
+    "fractionalRadius": 1,
+    "fractionalFont": 1
+  },
+  "app/(tabs)/orders.tsx": {
+    "fractionalRadius": 1
+  },
+  "app/add-product.tsx": {
+    "rnImage": 4
+  },
+  "app/ai-mockup-chat.tsx": {
+    "fractionalRadius": 1,
+    "rnImage": 1
+  },
+  "app/ai-photography-chat.tsx": {
+    "fractionalRadius": 1,
+    "rnImage": 4
+  },
+  "app/boost.tsx": {
+    "smearShadow": 1
+  },
+  "app/brand.tsx": {
+    "rnImage": 1
+  },
+  "app/buyer-account-center.tsx": {
+    "fractionalFont": 1
+  },
+  "app/buyer-conversation.tsx": {
+    "smearShadow": 1
+  },
+  "app/buyer-drop-detail.tsx": {
+    "rnImage": 2
+  },
+  "app/buyer-order-detail.tsx": {
+    "rnImage": 2
+  },
+  "app/buyer-post-comments.tsx": {
+    "fractionalRadius": 1
+  },
+  "app/buyer-post-viewer.tsx": {
+    "smearShadow": 4
+  },
+  "app/buyer-problem-report.tsx": {
+    "rnImage": 1
+  },
+  "app/buyer-product-detail.tsx": {
+    "smearShadow": 4
+  },
+  "app/buyer-refund-request.tsx": {
+    "rnImage": 1
+  },
+  "app/buyer-return-request.tsx": {
+    "rnImage": 2
+  },
+  "app/buyer-story-create.tsx": {
+    "rnImage": 3
+  },
+  "app/c/[collectionId].tsx": {
+    "rnImage": 2
+  },
+  "app/design-ai-photoshoot.tsx": {
+    "rnImage": 2
+  },
+  "app/design-bg-removal.tsx": {
+    "rnImage": 4
+  },
+  "app/design-bg-replace.tsx": {
+    "hairline": 2,
+    "rnImage": 3
+  },
+  "app/design-brand-assets.tsx": {
+    "rnImage": 1
+  },
+  "app/design-canvas.tsx": {
+    "hairline": 1,
+    "smearShadow": 4,
+    "disabledOpacity": 4
+  },
+  "app/design-garment.tsx": {
+    "hairline": 3
+  },
+  "app/design-mockup-to-model.tsx": {
+    "rnImage": 2
+  },
+  "app/design-prompt-edit.tsx": {
+    "rnImage": 3
+  },
+  "app/design-text-to-design.tsx": {
+    "rnImage": 4,
+    "disabledOpacity": 1
+  },
+  "app/design-upload-sketch.tsx": {
+    "rnImage": 3
+  },
+  "app/design.tsx": {
+    "hairline": 1
+  },
+  "app/edit-profile.tsx": {
+    "fractionalFont": 3,
+    "rnImage": 4
+  },
+  "app/email-campaign-compose.tsx": {
+    "rnImage": 2
+  },
+  "app/forgot-password.tsx": {
+    "smearShadow": 2
+  },
+  "app/freelancer-profile.tsx": {
+    "rnImage": 1
+  },
+  "app/fulfill-order.tsx": {
+    "rnImage": 1
+  },
+  "app/lifestyle-images.tsx": {
+    "rnImage": 3
+  },
+  "app/link-in-bio.tsx": {
+    "rnImage": 2
+  },
+  "app/manufacturer-hub.tsx": {
+    "rnImage": 3,
+    "smearShadow": 1
+  },
+  "app/manufacturer-messages.tsx": {
+    "rnImage": 3
+  },
+  "app/manufacturer-product.tsx": {
+    "rnImage": 1
+  },
+  "app/manufacturer-profile.tsx": {
+    "rnImage": 3
+  },
+  "app/onboarding.tsx": {
+    "rnImage": 1,
+    "smearShadow": 2
+  },
+  "app/payments.tsx": {
+    "smearShadow": 1
+  },
+  "app/product-detail.tsx": {
+    "rnImage": 2,
+    "smearShadow": 2
+  },
+  "app/product-launches.tsx": {
+    "rnImage": 1
+  },
+  "app/product-store.tsx": {
+    "rnImage": 1
+  },
+  "app/production-detail.tsx": {
+    "rnImage": 1
+  },
+  "app/products-bulk-edit.tsx": {
+    "rnImage": 1
+  },
+  "app/return-detail.tsx": {
+    "rnImage": 1
+  },
+  "app/sample-detail.tsx": {
+    "rnImage": 2
+  },
+  "app/seller-drop-create.tsx": {
+    "rnImage": 2
+  },
+  "app/seller-drop-preview.tsx": {
+    "rnImage": 2
+  },
+  "app/seller-go-live.tsx": {
+    "rnImage": 1
+  },
+  "app/seller-inbox.tsx": {
+    "rnImage": 1
+  },
+  "app/shopify-import.tsx": {
+    "rnImage": 1
+  },
+  "app/size-chart-template-apply.tsx": {
+    "rnImage": 1
+  },
+  "app/store-collections.tsx": {
+    "rnImage": 1
+  },
+  "app/store-editor.tsx": {
+    "smearShadow": 2
+  },
+  "app/store-from-logo.tsx": {
+    "rnImage": 1
+  },
+  "app/store-from-moodboard.tsx": {
+    "rnImage": 1
+  },
+  "app/store-from-social.tsx": {
+    "rnImage": 1
+  },
+  "app/store-seo.tsx": {
+    "rnImage": 1
+  },
+  "app/store-theme-picker.tsx": {
+    "smearShadow": 2
+  },
+  "app/tech-pack-generator.tsx": {
+    "rnImage": 1
+  },
+  "app/thread-cash.tsx": {
+    "smearShadow": 2
+  },
+  "app/u/[username].tsx": {
+    "rnImage": 1
+  },
+  "components/AIBrainFAB.tsx": {
+    "smearShadow": 3
+  },
+  "components/BrandthreadUI.tsx": {
+    "smearShadow": 1,
+    "disabledOpacity": 1
+  },
+  "components/CommerceSignal.tsx": {
+    "fractionalRadius": 2
+  },
+  "components/EngagementButton.tsx": {
+    "smearShadow": 1
+  },
+  "components/FeedGestureGuide.tsx": {
+    "fractionalRadius": 1,
+    "smearShadow": 1
+  },
+  "components/InlineSlider.tsx": {
+    "smearShadow": 1
+  },
+  "components/MentionPickerSheet.tsx": {
+    "rnImage": 1
+  },
+  "components/OfflineBanner.tsx": {
+    "smearShadow": 1
+  },
+  "components/SellerCreateFAB.tsx": {
+    "smearShadow": 2
+  },
+  "components/SellerDashboardTopProducts.tsx": {
+    "rnImage": 1
+  },
+  "components/SellerListHeader.tsx": {
+    "smearShadow": 2
+  },
+  "components/SellerStudioRadialMenu.tsx": {
+    "hairline": 1,
+    "fractionalRadius": 2,
+    "rnImage": 1,
+    "smearShadow": 2
+  },
+  "components/ShareProfileSheet.tsx": {
+    "rnImage": 2,
+    "smearShadow": 2
+  },
+  "components/ShopProductSheet.tsx": {
+    "fractionalRadius": 1,
+    "rnImage": 1,
+    "smearShadow": 4
+  },
+  "components/StoryMentionSticker.tsx": {
+    "rnImage": 1,
+    "smearShadow": 3
+  },
+  "components/StudioMenuHints.tsx": {
+    "smearShadow": 1
+  },
+  "components/SupportChatBubble.tsx": {
+    "fractionalRadius": 1,
+    "smearShadow": 2
+  },
+  "components/ai-tools/AiResultViewer.tsx": {
+    "rnImage": 1
+  },
+  "components/ai-tools/AiResultsGrid.tsx": {
+    "rnImage": 1
+  },
+  "components/ai-tools/BgRemovalGlowSweep.tsx": {
+    "fractionalRadius": 1,
+    "rnImage": 1,
+    "smearShadow": 1
+  },
+  "components/ai-tools/ReferencePhotoTiles.tsx": {
+    "rnImage": 1
+  },
+  "components/ai/AuroraGlow.tsx": {
+    "blur": 1
+  },
+  "components/branding/BrandthreadLogo.tsx": {
+    "rnImage": 1
+  },
+  "components/buyer-feed/RightActionRail.tsx": {
+    "rnImage": 1
+  },
+  "components/calls/CallAvatarCircle.tsx": {
+    "rnImage": 1
+  },
+  "components/calls/GlobalCallOverlay.tsx": {
+    "smearShadow": 1
+  },
+  "components/chat/ReactionOverlay.tsx": {
+    "smearShadow": 2
+  },
+  "components/checkout/OrderConfetti.tsx": {
+    "smearShadow": 1
+  },
+  "components/checkout/OrderSummarySection.tsx": {
+    "rnImage": 1
+  },
+  "components/checkout/PaymentSection.tsx": {
+    "disabledOpacity": 1
+  },
+  "components/checkout/StripePayment.tsx": {
+    "disabledOpacity": 1
+  },
+  "components/checkout/StripePayment.web.tsx": {
+    "disabledOpacity": 1
+  },
+  "components/create-post/CropFrame.tsx": {
+    "rnImage": 1
+  },
+  "components/create-post/GalleryPicker.tsx": {
+    "rnImage": 1
+  },
+  "components/create-post/ModeBar.tsx": {
+    "fractionalRadius": 1
+  },
+  "components/create-post/PostScreen.tsx": {
+    "rnImage": 2
+  },
+  "components/create-post/SlideEditor.tsx": {
+    "rnImage": 1
+  },
+  "components/design-studio/LayersPanel.tsx": {
+    "hairline": 1
+  },
+  "components/discover/DiscoverPager.tsx": {
+    "smearShadow": 2
+  },
+  "components/discover/DiscoverPeopleRow.tsx": {
+    "rnImage": 1
+  },
+  "components/discover/DiscoverPostViewer.tsx": {
+    "rnImage": 1
+  },
+  "components/feed/UploadProgressPill.tsx": {
+    "fractionalRadius": 2,
+    "rnImage": 1
+  },
+  "components/first-run-tips/AnchoredCardTip.tsx": {
+    "smearShadow": 1
+  },
+  "components/first-run-tips/FullScreenGuideTip.tsx": {
+    "smearShadow": 1
+  },
+  "components/first-run-tips/GestureHintTip.tsx": {
+    "smearShadow": 1
+  },
+  "components/layout/ScreenChrome.tsx": {
+    "smearShadow": 1
+  },
+  "components/layout/StickyFooter.tsx": {
+    "smearShadow": 1
+  },
+  "components/live/LiveAvatarRing.tsx": {
+    "smearShadow": 2
+  },
+  "components/live/LiveProductsSheet.tsx": {
+    "fractionalFont": 1
+  },
+  "components/notifications/NotificationBanner.tsx": {
+    "smearShadow": 2
+  },
+  "components/onboarding/BrandsToFollowStep.tsx": {
+    "rnImage": 1
+  },
+  "components/paywall/SellerPlanSelector.tsx": {
+    "smearShadow": 2
+  },
+  "components/profile/BrandHero.tsx": {
+    "rnImage": 3
+  },
+  "components/profile/ProfileControls.tsx": {
+    "smearShadow": 2
+  },
+  "components/share-cards/BuyerShareCard.tsx": {
+    "rnImage": 2
+  },
+  "components/share-cards/SellerShareCard.tsx": {
+    "rnImage": 2
+  },
+  "components/social/CreateButton.tsx": {
+    "blur": 1
+  },
+  "components/social/QuotedPostCard.tsx": {
+    "rnImage": 1
+  },
+  "components/tab-bar/TabBarParts.tsx": {
+    "hairline": 1
+  },
+  "components/thread-cash/CelebrationHost.tsx": {
+    "rnImage": 1,
+    "smearShadow": 3
+  },
+  "components/thread-cash/ChatAttachThreadCash.tsx": {
+    "disabledOpacity": 1
+  },
+  "components/thread-cash/ThreadCashBill.tsx": {
+    "rnImage": 3
+  },
+  "components/ui/AppleEmoji.tsx": {
+    "rnImage": 1
+  },
+  "components/ui/Snackbar.tsx": {
+    "rnImage": 1
+  },
+  "contexts/CookieConsentContext.tsx": {
+    "smearShadow": 1
+  },
+  "lib/appleEmoji.tsx": {
+    "rnImage": 1
+  },
+  "lib/theme.ts": {
+    "smearShadow": 3
+  }
+}

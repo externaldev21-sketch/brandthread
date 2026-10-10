@@ -13,7 +13,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT } from '@/lib/theme';
+import { FONT, TEXT_DISABLED } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ASPECT_RATIO_VALUE, MAX_SLIDES_BY_MODE } from '@/constants/postLimits';
 import { DEFAULT_SLIDE_CROP } from '@/lib/createPost/crop';
@@ -23,6 +23,7 @@ import { CP, IconButton, PillButton, tap } from '@/components/create-post/ui';
 import { CropFrame } from '@/components/create-post/CropFrame';
 import { ReorderStrip } from '@/components/create-post/ReorderStrip';
 import { formatDuration, MediaThumb } from '@/components/create-post/GalleryPicker';
+import { crispPx } from '@/lib/crispPixel';
 
 function SlideThumb({ slide, style, adjust }: { slide: SlideDraft; style: any; adjust?: Adjust }) {
   const f = adjust ? previewFilter(adjust) : undefined;
@@ -276,8 +277,8 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
       </View>
 
       <View style={[ed.bottom, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <Pressable onPress={() => { tap(); if (!atCap) onAdd(); }} disabled={atCap} style={[ed.add, atCap && { opacity: 0.4 }]} accessibilityRole="button" accessibilityLabel="Add more" testID="slide-add">
-          <Feather name="plus" size={22} color={CP.white} />
+        <Pressable onPress={() => { tap(); if (!atCap) onAdd(); }} disabled={atCap} style={[ed.add, atCap && { borderColor: TEXT_DISABLED }]} accessibilityRole="button" accessibilityLabel="Add more" testID="slide-add">
+          <Feather name="plus" size={22} color={atCap ? TEXT_DISABLED : CP.white} />
         </Pressable>
         <View style={{ flex: 1 }} />
         <PillButton label="Next" icon="arrow-right" onPress={onNext} testID="edit-next" flex={false} style={{ paddingHorizontal: 28, minWidth: 132 }} />
@@ -314,7 +315,7 @@ const ed = StyleSheet.create({
   preset: { width: '25%', alignItems: 'center', gap: 5, paddingBottom: 8 },
   presetLabel: { fontFamily: FONT.semibold, fontSize: 13 },
   presetThumb: { width: 56, height: 56, borderRadius: 28, overflow: 'hidden', borderWidth: 2, borderColor: CP.line },
-  toolCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderColor: CP.line, alignItems: 'center', justifyContent: 'center' },
+  toolCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: crispPx(1.5), borderColor: CP.line, alignItems: 'center', justifyContent: 'center' },
   toolValue: { position: 'absolute', bottom: 6, color: CP.silver, fontFamily: FONT.semibold, fontSize: 10 },
   sliderBox: { paddingHorizontal: 24, paddingTop: 12 },
   sliderLabel: { color: CP.white, fontFamily: FONT.bold, fontSize: 15, textAlign: 'center', marginBottom: 6 },

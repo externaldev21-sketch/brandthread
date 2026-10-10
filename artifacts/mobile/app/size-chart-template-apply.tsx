@@ -13,6 +13,7 @@ import { useColors } from '@/hooks/useColors';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, GUTTER, ICON, RADIUS, SP } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 type Row = { id: string; name: string; status: string; images?: string[] };
 
@@ -129,7 +130,7 @@ function makeStyles(c: ReturnType<typeof useColors>) {
     thumb: { width: 44, height: 44, borderRadius: RADIUS.sm, backgroundColor: c.card },
     thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
     name: { flex: 1, fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
-    check: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+    check: { width: 24, height: 24, borderRadius: 12, borderWidth: crispPx(1.5), borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
     checkOn: { backgroundColor: c.foreground, borderColor: c.foreground },
     empty: { textAlign: 'center', marginTop: SP.xl, fontFamily: FONT.regular, fontSize: FS.base, color: c.mutedForeground },
     footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: GUTTER, paddingTop: SP.sm, backgroundColor: c.background },

@@ -1763,7 +1763,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   rfqCtaIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }, // theme-exempt: overlay on gradient
   rfqCtaBody:   { flex: 1 },
   rfqCtaTitle:  { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },
-  rfqCtaSubtitle:{ fontSize: FS.xs, fontFamily: FONT.regular, color: theme.onAccent, marginTop: 2, opacity: 0.9 },
+  rfqCtaSubtitle:{ fontSize: FS.xs, fontFamily: FONT.regular, color: theme.onAccent, marginTop: 2 },
   rfqSecondaryRow: { flexDirection: 'row', gap: SP.sm },
   rfqSecondaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs, height: 40, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardGlass },
   rfqSecondaryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },

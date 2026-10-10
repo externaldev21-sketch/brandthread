@@ -27,6 +27,7 @@ import { activeToken, CAPTION_MAX, replaceToken, tokenizeCaption } from '@/lib/c
 import type { MediaDraft, PostDetails, PublishInput } from '@/lib/createPost/types';
 import { CP, CreateHeader, PillButton, SubPage, tap } from '@/components/create-post/ui';
 import { formatCents } from '@/lib/money';
+import { crispPx } from '@/lib/crispPixel';
 
 const MAX_PRODUCT_TAGS = 5;
 const isPreview = () => isSellerDevPreview() || isBuyerDevPreview();
@@ -554,7 +555,7 @@ const s = StyleSheet.create({
   emptyTitle: { color: CP.white, fontFamily: FONT.bold, fontSize: 17, textAlign: 'center' },
   emptyBody: { color: CP.silver, fontFamily: FONT.regular, fontSize: 14, textAlign: 'center', marginTop: 6 },
   productRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, minHeight: 64, paddingVertical: 10 },
-  check: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: CP.silver, alignItems: 'center', justifyContent: 'center' },
+  check: { width: 24, height: 24, borderRadius: 12, borderWidth: crispPx(1.5), borderColor: CP.silver, alignItems: 'center', justifyContent: 'center' },
   checkOn: { backgroundColor: CP.white, borderColor: CP.white },
   hintCenter: { color: CP.silver, fontFamily: FONT.regular, fontSize: 13, textAlign: 'center', marginVertical: 10, paddingHorizontal: 16 },
   coverGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, padding: 2 },

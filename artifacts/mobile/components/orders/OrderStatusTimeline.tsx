@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import type { OrderStatus } from '@/services/orderTypes';
+import { crispPx } from '@/lib/crispPixel';
 
 /**
  * Live horizontal status tracker used on both the seller and buyer order
@@ -128,7 +129,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dotCompact: { width: 10, height: 10, borderWidth: 1.5 },
+  dotCompact: { width: 10, height: 10, borderWidth: crispPx(1.5) },
   stageLabel: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: SP.xs, textAlign: 'center' },
   connector: { flex: 1, height: 2, marginTop: 11, borderRadius: 1 },
   connectorCompact: { marginTop: 4, height: 1.5, minWidth: 8, flex: 0.5 },

@@ -37,6 +37,7 @@ import {
   STORE_PRODUCT_FOR_PACK, buildCreditsReturnUrl, entryLabel, formatDelta, formatPackPrice, formatResetDate,
   type AiCreditEntry, type AiCreditsOverview,
 } from '@/lib/aiCredits';
+import { crispPx } from '@/lib/crispPixel';
 
 const POPULAR_PACK_ID = 'credits_1500';
 const DEMO_TOOLS = [
@@ -340,7 +341,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     borderRadius: RADIUS.pill, backgroundColor: theme.text,
   },
   popularText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.background },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
   radioOn: { borderColor: theme.text },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: theme.text },
   packTitle: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },

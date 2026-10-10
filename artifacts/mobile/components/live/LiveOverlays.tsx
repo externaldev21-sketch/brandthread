@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
-import { FONT, FS, RADIUS, ON_DARK_MUTED } from '@/lib/theme';
+import { FONT, FS, RADIUS, ON_DARK_MUTED, FG, TEXT_SECONDARY } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
@@ -21,6 +21,7 @@ import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LIVE_RED } from './LiveAvatarRing';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 const ND = Platform.OS !== 'web';
 /** One consistent rail-icon treatment (point 4): every icon the same size on
@@ -425,7 +426,7 @@ const styles = StyleSheet.create({
   hostNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 14, lineHeight: 18, flexShrink: 1 },
   hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 16, marginTop: 2 },
-  hostMeta: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
+  hostMeta: { color: TEXT_SECONDARY, fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 },
   liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 12, letterSpacing: 0.8 },
   followBtn: {
@@ -443,7 +444,7 @@ const styles = StyleSheet.create({
   viewerStack: { flexDirection: 'row', alignItems: 'center', width: 56, flexShrink: 0 },
   viewerDot: {
     width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden', flexShrink: 0,
+    borderWidth: crispPx(1.5), borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden', flexShrink: 0,
   },
   viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   viewerCountPill: { marginLeft: 6 },
@@ -471,7 +472,7 @@ const styles = StyleSheet.create({
   eventPill: {
     borderRadius: RADIUS.pill, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 5,
   },
-  eventPillText: { color: 'rgba(255,255,255,0.9)', fontFamily: FONT.regular, fontSize: 12 },
+  eventPillText: { color: FG, fontFamily: FONT.regular, fontSize: 12 },
   chatUserMuted: { fontFamily: FONT.semibold, color: '#fff' },
 
   pinned: {

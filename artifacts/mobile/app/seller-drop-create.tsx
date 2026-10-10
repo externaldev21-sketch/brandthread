@@ -37,6 +37,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 interface SellerProductRow {
   id: string;
@@ -688,7 +689,7 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   productRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.sm, padding: 8 },
   productThumb: { width: 36, height: 36, borderRadius: RADIUS.xs },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
   saveBtn: { minHeight: 52, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.sm },
   secondaryBtn: { flexDirection: 'row', minHeight: 46, borderWidth: 1, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: 8 },
   tzHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },

@@ -25,7 +25,9 @@ export type AppThemePreset = {
 };
 
 export function getOnAccentTextStyle(theme: AppThemePreset): TextStyle {
-  return { color: theme.onAccent, textShadowColor: '#00000055', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 };
+  // Just the colour: a soft text shadow under black-on-white labels smeared
+  // every glyph edge ("Crisp everywhere").
+  return { color: theme.onAccent };
 }
 
 type Palette = Omit<AppThemePreset, 'id' | 'name'>;
@@ -37,8 +39,10 @@ const palette = (
   status: Pick<AppThemePreset, 'success' | 'warning' | 'error'>,
 ): Palette => ({
   background, surface, card, cardElevated: card,
-  surfaceGlass: `${surface}E8`, cardGlass: `${card}E8`, cardElevatedGlass: `${card}F2`,
-  border: '#C0C0C047', borderSubtle: '#C0C0C024',
+  // Surfaces are opaque (no glass fills) and hairlines are white at 14%
+  // (BRANDTHREAD_DESIGN.md, "Surfaces" / "Color usage").
+  surfaceGlass: surface, cardGlass: card, cardElevatedGlass: card,
+  border: '#FFFFFF24', borderSubtle: '#FFFFFF14',
   text: '#FFFFFF', muted: '#C0C0C0', subtle: '#B0B0B0',
   accent, accentLight: accent, accentDim: `${accent}2E`, onAccent,
   secondary: accent, secondaryDim: `${accent}24`,
@@ -47,7 +51,10 @@ const palette = (
 });
 const STATUS = { success: '#7FF0B0', warning: '#FFD580', error: '#FFB4B4' } as const;
 // Black, white, and silver: pure black bg/surface/card, white accent.
+// Tertiary text is #8E8E93 on pure black (BRANDTHREAD_DESIGN.md); the tinted
+// presets keep a lighter tertiary so it still clears 4.5:1 on their grounds.
 const MONOCHROME = palette('#000000', '#000000', '#000000', '#FFFFFF', '#000000', ['#FFFFFF', '#FFFFFF'], ['#000000', '#000000'], ['#FFFFFF0F', '#FFFFFF03'], STATUS);
+MONOCHROME.subtle = '#8E8E93';
 const PRESET_PALETTES: Record<Exclude<AppThemeId, 'monochrome'>, Palette> = {
   purple: palette('#281235', '#321844', '#3B1B4B', '#D990FF', '#190A24', ['#A24EDD', '#D990FF'], ['#281235', '#5A2670'], ['#A24EDD44', '#A24EDD0A'], STATUS),
   olive: palette('#2C311E', '#353B25', '#3B4129', '#C9D8A7', '#1C2113', ['#8D9B70', '#C9D8A7'], ['#2C311E', '#59633B'], ['#A5B38844', '#A5B3880A'], STATUS),

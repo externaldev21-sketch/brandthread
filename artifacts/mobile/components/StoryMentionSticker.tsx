@@ -11,6 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { FONT, FS, ON_DARK, SP } from '@/lib/theme';
 import { withAt, type MentionStyle } from '@/lib/storyMentionSticker';
 import { RESHARE_CARD_RADIUS } from '@/lib/storyReshare';
+import { crispPx } from '@/lib/crispPixel';
 
 export const RESHARE_CARD_WIDTH = 252;
 export const RESHARE_CARD_HEIGHT = 448; // 9:16
@@ -64,7 +65,7 @@ export function ReshareCard({
 }
 
 const styles = StyleSheet.create({
-  base: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5, borderColor: 'transparent' },
+  base: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: crispPx(1.5), borderColor: 'transparent' },
   text: { fontSize: FS.md, fontFamily: FONT.bold },
 
   card: {

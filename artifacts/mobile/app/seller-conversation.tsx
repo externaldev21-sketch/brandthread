@@ -2206,7 +2206,7 @@ export default function SellerConversationScreen() {
           onPress={() => setShowBuyerContext(false)}
         />
         <SheetRise style={[s.buyerContextSheetWrap, { paddingBottom: insets.bottom + SP.md }]}>
-          <Glass variant="regular" tint="dark" radius={RADIUS.xl} style={StyleSheet.absoluteFill} />
+          <Glass solid radius={RADIUS.xl} style={StyleSheet.absoluteFill} />
           <View style={s.sheetHandle} />
           <View style={s.buyerContextHeader}>
             {other && (

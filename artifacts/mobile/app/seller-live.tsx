@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS, FG, TEXT_SECONDARY } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -27,6 +27,7 @@ import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationO
 import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
 import { radius } from '@/constants/radii';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
+import { crispPx } from '@/lib/crispPixel';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -558,7 +559,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   livePill:         { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5 },
   liveDot:          { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
   livePillText:     { color: '#fff', fontFamily: FONT.bold, fontSize: 12, letterSpacing: 1.5 },
-  durationText:     { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 13 },
+  durationText:     { color: TEXT_SECONDARY, fontFamily: FONT.semibold, fontSize: 13 },
   endBtn:           { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   endBtnText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 13 },
   viewerRow:        { position: 'absolute', top: 0, left: 16, zIndex: 9 },
@@ -573,23 +574,23 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   productStripContent: { paddingHorizontal: 12, gap: 8 },
   productChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7 },
   productChipText:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 100 },
-  productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
+  productChipPrice: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: 11 },
   featuredLabel: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
   bottomSection:    { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 },
   commentScroll:    { maxHeight: 200, marginHorizontal: 12 },
   commentContent:   { gap: 4, paddingBottom: 8 },
   commentBubble:    { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, paddingVertical: 4 },
   commentAuthor:    { color: '#fff', fontFamily: FONT.bold, fontSize: 12 },
-  commentText:      { color: 'rgba(255,255,255,0.9)', fontFamily: FONT.regular, fontSize: 12 },
+  commentText:      { color: FG, fontFamily: FONT.regular, fontSize: 12 },
   // Product picker
   pickerModal:      { backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 20, justifyContent: 'flex-end' },
-  pickerSheet:      { backgroundColor: BG, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
+  pickerSheet:      { backgroundColor: FILL_ELEVATED, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
   pickerHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
   pickerTitle:      { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   pickerRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   pickerRowName:    { fontSize: FS.sm, fontFamily: FONT.semibold },
   pickerRowPrice:   { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   emptyText:        { textAlign: 'center', padding: 24, fontFamily: FONT.regular, fontSize: FS.sm },
   });
 };

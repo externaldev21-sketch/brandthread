@@ -12,7 +12,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, TEXT_DISABLED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { HapticSwitch, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
@@ -27,6 +27,7 @@ import {
   PRICE_EDIT_MODES, buildPriceChange, bulkErrorMessage, priceRangeLabel,
   type BulkPriceResult, type BulkProduct, type BulkRounding, type BulkStatusFilter, type PriceEditMode,
 } from '@/lib/productBulk';
+import { crispPx } from '@/lib/crispPixel';
 
 const STATUS_CHIPS: Array<{ key: BulkStatusFilter; label: string }> = [
   { key: 'all', label: 'All' },
@@ -443,7 +444,7 @@ function PriceEditPanel({ productIds, topInset, onClose, onDone }: {
 function Checkbox({ checked, theme }: { checked: boolean; theme: any }) {
   return (
     <View style={{
-      width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
+      width: 22, height: 22, borderRadius: 6, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center',
       borderColor: checked ? theme.text : theme.subtle, backgroundColor: checked ? theme.text : 'transparent',
     }}>
       {checked && <Feather name="check" size={14} color={theme.background} />}
@@ -477,8 +478,8 @@ function SegRow<T extends string>({ options, value, onChange, s }: {
 
 function BarButton({ label, onPress, disabled, s }: { label: string; onPress: () => void; disabled?: boolean; s: ReturnType<typeof makeStyles> }) {
   return (
-    <Pressable onPress={disabled ? undefined : onPress} style={[s.barBtn, disabled && { opacity: 0.5 }]} accessibilityRole="button" accessibilityLabel={label}>
-      <Text style={s.barBtnText}>{label}</Text>
+    <Pressable onPress={disabled ? undefined : onPress} style={s.barBtn} accessibilityRole="button" accessibilityLabel={label}>
+      <Text style={[s.barBtnText, disabled && { color: TEXT_DISABLED }]}>{label}</Text>
     </Pressable>
   );
 }

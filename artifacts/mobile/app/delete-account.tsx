@@ -23,7 +23,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { clearAccountLifecycleState } from '@/lib/accountService';
@@ -32,6 +32,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 type Step = 'overview' | 'confirm' | 'done';
 
@@ -354,13 +355,13 @@ export default function DeleteAccountScreen() {
             <PressableScale
               onPress={deleteNow}
               disabled={!confirmValid || deleting}
-              style={[s.deleteBtn, (!confirmValid || deleting) && { opacity: 0.4 }]}
+              style={[s.deleteBtn, (!confirmValid || deleting) && { backgroundColor: FILL_ELEVATED }]}
               accessibilityRole="button"
               accessibilityLabel="Delete account"
             >
               {deleting
-                ? <ActivityIndicator color={theme.onAccent} />
-                : <Text style={s.deleteText}>Delete account</Text>}
+                ? <ActivityIndicator color={TEXT_DISABLED} />
+                : <Text style={[s.deleteText, !confirmValid && { color: TEXT_DISABLED }]}>Delete account</Text>}
             </PressableScale>
             <SecondaryButton label="Cancel" onPress={goBack} accent={theme.text} style={{ marginTop: SP.sm }} />
           </>
@@ -433,7 +434,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   codeLink: { alignSelf: 'flex-start', marginTop: SP.sm, minHeight: 28, justifyContent: 'center' },
   ackRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginTop: SP.lg },
   checkbox: {
-    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: theme.muted,
+    width: 22, height: 22, borderRadius: 6, borderWidth: crispPx(1.5), borderColor: theme.muted,
     alignItems: 'center', justifyContent: 'center', marginTop: 1,
   },
   checkboxOn: { backgroundColor: theme.accent, borderColor: theme.accent },
