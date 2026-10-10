@@ -43,8 +43,10 @@ describe('seller Profile tab navigation', () => {
     expect(sellerProfile).toContain("import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar'");
     expect(sellerProfile).toContain('<ProfileAccountSwitcher');
     expect(sellerProfile).toContain('<ProfileTopBarIconRow>');
-    expect(sellerProfile).toContain('<ProfileTopBarIcon name="bell"');
-    expect(sellerProfile).toContain('name="share-2"');
+    // At most two header icons (⋯ + settings); Activity and Share are rows in the ⋯ sheet.
+    expect(sellerProfile).not.toContain('<ProfileTopBarIcon name="bell"');
+    expect(sellerProfile).toContain("key: 'activity', icon: 'bell'");
+    expect(sellerProfile).toContain("key: 'share', icon: 'share-2'");
     expect(sellerProfile).toContain('<ProfileTopBarIcon name="settings"');
     expect(sellerProfile).not.toContain('ProfileGlassButton');
     // The old pill-switcher style is gone entirely, not just unused.
