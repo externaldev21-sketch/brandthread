@@ -8,7 +8,7 @@ const read = (relativePath: string) =>
 /**
  * Half-done audit follow-up (activity/notifications core: activity-center
  * (shared by (buyer)/activity), activity-people, buyer-your-activity, and
- * the shared LoginActivity component (login-activity, buyer-login-activity)).
+ * the shared LoginActivity component (login-activity)).
  * Same root cause as tests/messaging-dev-preview-no-network.test.ts and
  * tests/profile-dev-preview-no-network.test.ts: a "try the real API first,
  * fall back to preview data on failure" loader still makes the real,
@@ -42,7 +42,7 @@ describe('activity/login-activity screens never hit the real API in dev-preview,
     expect(src).toContain('if (!userId || isBuyerDevPreview()) {');
   });
 
-  it('components/security/LoginActivity.tsx (shared by login-activity.tsx and buyer-login-activity.tsx): the real Clerk session list is skipped in any dev-preview session', () => {
+  it('components/security/LoginActivity.tsx (login-activity.tsx, the buyer and seller route): the real Clerk session list is skipped in any dev-preview session', () => {
     const src = read('components/security/LoginActivity.tsx');
     expect(src).toContain("import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';");
     expect(src).toContain('if (isSellerDevPreview() || isBuyerDevPreview()) {');

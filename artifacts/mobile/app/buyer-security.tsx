@@ -93,7 +93,7 @@ export default function BuyerSecurity() {
             title="Where you're logged in"
             subtitle="Review active sessions"
             chevron
-            onPress={() => router.push('/buyer-login-activity' as never)}
+            onPress={() => router.push('/login-activity' as never)}
           />
         </Card>
       </ScrollView>

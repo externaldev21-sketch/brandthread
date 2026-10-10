@@ -126,6 +126,8 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   // Renders the shared components/chat/ConversationThread.tsx (own chat header).
   'app/buyer-conversation.tsx',
   'app/buyer-live.tsx',
+  'app/buyer-other-profile.tsx',
+  'app/buyer-post-comments.tsx',
   'app/buyer-product-detail.tsx',
   'app/buyer-story-create.tsx',
   'app/buyer-story-viewer.tsx',

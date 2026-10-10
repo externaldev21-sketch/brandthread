@@ -233,7 +233,7 @@ export default function BuyerSettingsDetail() {
   ) : [], [cfg, settings, router, remote, display]);
 
   return <View style={styles.page}>
-    <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings-menu')} />
+    <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings')} />
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
       {!loading && loadError && !settings ? <ErrorState message="Couldn't load your settings." onRetry={() => { setLoading(true); load(); }} /> : null}
