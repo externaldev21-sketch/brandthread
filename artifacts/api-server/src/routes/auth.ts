@@ -35,6 +35,7 @@ import {
   preserveExistingEmail,
 } from "../lib/authProfile";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
+import { isEmailUniqueViolation, releaseStaleEmailClaims } from "../lib/staleEmailClaim";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
 import { AGE_RESTRICTED_MESSAGE, bandMaySellOrEarn, denyIfAgeRestricted } from "../lib/ageGate";
 import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSource } from "../lib/legalAcceptance";
@@ -144,7 +145,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
     // Sync runs both during app startup and explicitly during onboarding. Use a
     // conflict-safe insert so concurrent first requests cannot turn a real
     // account into a transient 500/error screen.
-    const { user, created, deletionCancelled } = await db.transaction(async (tx) => {
+    const syncOnce = () => db.transaction(async (tx) => {
       const [inserted] = await tx
         .insert(users)
         .values({
@@ -209,6 +210,24 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
       if (!updated) throw new Error("User record disappeared during sync");
       return { user: updated, created: false, deletionCancelled: cancelledDeletion };
     });
+    let synced: Awaited<ReturnType<typeof syncOnce>>;
+    try {
+      synced = await syncOnce();
+    } catch (err) {
+      // The email may still sit on a local row whose Clerk user was deleted or
+      // moved to another email. Clerk verified this person owns it, so free a
+      // stale claim and retry once; a live owner still gets EMAIL_TAKEN below.
+      if (
+        isEmailUniqueViolation(err)
+        && await releaseStaleEmailClaims(email, clerkUserId, (id) => clerkClient.users.getUser(id))
+      ) {
+        req.log.warn({ clerkUserId }, "Released a stale local email claim during sync");
+        synced = await syncOnce();
+      } else {
+        throw err;
+      }
+    }
+    const { user, created, deletionCancelled } = synced;
     if (created) {
       void sendWelcomeEmail({
         to: user.email,
@@ -235,7 +254,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
     // only differ by case). Never silently attach this session to the
     // other account; the person must log into the account that already
     // owns that email.
-    if (isUniqueViolation(err) && violatedConstraint(err) === "users_email_ci_unique") {
+    if (isEmailUniqueViolation(err)) {
       res.status(409).json({
         error: "An account with this email already exists. Log in instead.",
         code: "EMAIL_TAKEN",
