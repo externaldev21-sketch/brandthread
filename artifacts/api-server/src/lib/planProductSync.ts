@@ -101,7 +101,9 @@ export async function syncProductsToPlan(ownerId: string, now = new Date()): Pro
       const { publishNotification } = await import("../routes/notifications-feed");
       await publishNotification({
         userId: ownerId,
-        category: "system",
+        // "system" has no push mapping (lib/push.ts) and throws outside production.
+        category: "subscription",
+        pushCategory: "subscription",
         type: change.hidden.length > 0 ? "plan_products_hidden" : "plan_products_restored",
         title: notice.title,
         body: notice.body,
