@@ -1,6 +1,6 @@
 # Cache and Redis (phase 3)
 
-Everything here is **off until `REDIS_URL` is set**. With it unset, no code path changes: the response cache is a pass-through, rate limiting stays in Postgres.
+Everything here is **off until `REDIS_URL` is set**. With it unset, no code path changes: the response cache is a pass-through, and rate limiting counts per instance in memory with a batched Postgres sync for security and money buckets (see `DATABASE.md`, BT-474).
 
 ## Env
 
@@ -40,7 +40,7 @@ If many requests miss the same key at once (a trending search, a viral product),
 
 ## Rate limits in Redis
 
-`lib/rateLimitStore.ts` implements the same fixed-window counter as the Postgres bucket in one atomic Lua call. The limiter tries Redis first and falls back to Postgres if Redis is unset or errors, so a cache outage is never a 503 storm. Policies and numbers are unchanged (session 01Ct4Yvx owns those). Counters are not migrated between stores: switching `REDIS_URL` on or off resets everyone's current window once.
+`lib/rateLimitStore.ts` implements the same fixed-window counter as the Postgres bucket in one atomic Lua call. The limiter tries Redis first and falls back to the per-instance memory store (`lib/rateLimitMemory.ts`) if Redis is unset or errors, so a cache outage is never a 503 storm. `RATE_LIMIT_STORE=postgres` restores the old one-write-per-request fallback. Policies and numbers are unchanged (session 01Ct4Yvx owns those). Counters are not migrated between stores: switching `REDIS_URL` on or off resets everyone's current window once.
 
 ## Health
 

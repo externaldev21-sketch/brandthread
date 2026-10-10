@@ -25,6 +25,9 @@ import { db, communityMembers, communities } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { verifyWsToken } from "./auth";
 import { logger } from "../lib/logger";
+import { createRoomFanout } from "../lib/realtime/fanout";
+import { getRealtimeBus } from "../lib/realtime/bus";
+import { getRoomPresence } from "../lib/realtime/presence";
 
 const WS_PATH = "/ws/community";
 
@@ -42,6 +45,7 @@ function leaveRoom(ws: CommunitySocket): void {
 
 export function broadcastToCommunity(communityId: string, payload: Record<string, unknown>): void {
   const room = rooms.get(communityId);
+  communityFanout.publish("broadcast", communityId, payload); // other instances' sockets (lib/realtime)
   if (!room || room.size === 0) return;
   const data = JSON.stringify(payload);
   for (const socket of room) {
@@ -61,6 +65,7 @@ export function communitySocketCount(communityId: string): number {
 }
 
 export function kickFromCommunity(communityId: string, userId: string): void {
+  communityFanout.publish("kick", communityId, { userId });
   const room = rooms.get(communityId);
   if (!room) return;
   for (const s of [...room]) {
@@ -73,6 +78,7 @@ export function kickFromCommunity(communityId: string, userId: string): void {
 }
 
 export function closeCommunityRoom(communityId: string): void {
+  communityFanout.publish("close", communityId, {});
   const room = rooms.get(communityId);
   if (!room) return;
   for (const s of room) { try { s.close(4404, "deleted"); } catch { /* ignore */ } }
@@ -110,6 +116,7 @@ export function attachCommunityWebSocket(
 ): WebSocketServer {
   const verify = opts.verifyToken ?? verifyWsToken;
   const wss = new WebSocketServer({ noServer: true });
+  communityFanout.start();
 
   httpServer.on("upgrade", (req, socket, head) => {
     const url = parseUpgradeUrl(req);
@@ -146,9 +153,11 @@ export function attachCommunityWebSocket(
     let room = rooms.get(ctx.communityId);
     if (!room) { room = new Set(); rooms.set(ctx.communityId, room); }
     room.add(ws);
+    communityPresence().join(ctx.communityId, ctx.userId);
 
     ws.on("pong", () => { ws.isAlive = true; });
     ws.on("close", () => leaveRoom(ws));
+    ws.on("close", () => communityPresence().leave(ctx.communityId, ctx.userId));
     ws.on("error", (err) => logger.warn({ err, communityId: ctx.communityId }, "Community WebSocket error"));
   });
 
@@ -165,4 +174,28 @@ export function attachCommunityWebSocket(
   wss.on("close", () => clearInterval(pingInterval));
 
   return wss;
+}
+
+/**
+ * Cross-instance delivery and presence (BT-472, lib/realtime). A broadcast,
+ * kick or room close on one instance reaches the sockets on every instance.
+ */
+const communityFanout = createRoomFanout({
+  topic: "community",
+  apply: {
+    broadcast: (communityId, payload) => broadcastToCommunity(communityId, payload),
+    kick: (communityId, payload) => kickFromCommunity(communityId, String(payload.userId ?? "")),
+    close: (communityId) => closeCommunityRoom(communityId),
+  },
+});
+
+function communityPresence() {
+  return getRoomPresence("community", getRealtimeBus().instanceId);
+}
+
+/** Users with this chat open on ANY instance (falls back to this instance's view). */
+export async function connectedUserIdsEverywhere(communityId: string): Promise<Set<string>> {
+  const all = await communityPresence().members(communityId);
+  for (const id of connectedUserIds(communityId)) all.add(id);
+  return all;
 }

@@ -127,5 +127,5 @@ AWS (ECS Fargate + RDS + ElastiCache) is the right answer above ~300k DAU if you
 ## 8. Risks to know about now
 
 - Today, with exactly one instance, the duplicate-job problem is invisible. **Do not raise Autoscale max instances above 1 until Phase 4 lands**, or abandoned-cart and money-sweep jobs run on each instance. Check whether your deployment already runs more than one.
-- The rate limiter fails closed (503) if Postgres is slow. Under load that turns a DB slowdown into a full outage. Phase 2 and 3 change that.
+- ~~The rate limiter fails closed (503) if Postgres is slow.~~ Fixed by BT-474: counting is in Redis or per-instance memory, Postgres only gets a batched sync for security/money buckets, and only security buckets fail closed (`DATABASE.md`). Cross-instance WebSockets (`REALTIME.md`), media redirects (`MEDIA_CDN.md`) and the deployment split plan (`DEPLOYMENTS.md`) shipped with it.
 - Clerk and Mux bills scale with users and minutes, not servers; set billing alerts before launch campaigns.

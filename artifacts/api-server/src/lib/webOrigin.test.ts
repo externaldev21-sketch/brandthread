@@ -49,3 +49,18 @@ describe("Expo web API origin", () => {
     expect(isAllowedWebOrigin("https://example.expo.replit.dev")).toBe(false);
   });
 });
+
+describe("CORS_EXTRA_ORIGINS (split deployments)", () => {
+  it("admits listed https origins exactly and ignores malformed entries", () => {
+    process.env.NODE_ENV = "production";
+    process.env.CORS_EXTRA_ORIGINS = "https://manufacturers.brandthread.app/, http://insecure.example, not a url,https://Tour.brandthread.app";
+    try {
+      expect(isAllowedWebOrigin("https://manufacturers.brandthread.app")).toBe(true);
+      expect(isAllowedWebOrigin("https://tour.brandthread.app")).toBe(true);
+      expect(isAllowedWebOrigin("http://insecure.example")).toBe(false);
+      expect(isAllowedWebOrigin("https://evil.brandthread.app")).toBe(false);
+    } finally {
+      delete process.env.CORS_EXTRA_ORIGINS;
+    }
+  });
+});

@@ -15,6 +15,7 @@ import { sql } from "drizzle-orm";
 import { verifyWsToken } from "./auth";
 import { logger } from "../lib/logger";
 import { loadRestriction } from "../lib/liveModerationState";
+import { createRoomFanout } from "../lib/realtime/fanout";
 
 const WS_PATH = "/ws/live";
 
@@ -51,6 +52,7 @@ export function broadcastToRoom(
   opts: { skipUserIds?: ReadonlySet<string> } = {},
 ): void {
   const room = rooms.get(streamId);
+  liveFanout.publish("broadcast", streamId, payload); // other instances' sockets (lib/realtime)
   if (!room || room.size === 0) return;
   const data = JSON.stringify(payload);
   for (const socket of room) {
@@ -63,6 +65,7 @@ export function broadcastToRoom(
 
 /** Closes every socket `userId` holds in `streamId`'s room (used when the host bans a viewer). */
 export function disconnectUserFromRoom(streamId: string, userId: string): void {
+  liveFanout.publish("kick", streamId, { userId }); // the viewer may be on another instance
   const room = rooms.get(streamId);
   if (!room) return;
   for (const socket of [...room]) {
@@ -150,6 +153,7 @@ function originIsUpgradeForLivePath(req: IncomingMessage): URL | null {
  */
 export function attachLiveWebSocket(httpServer: HttpServer): WebSocketServer {
   const wss = new WebSocketServer({ noServer: true });
+  liveFanout.start();
 
   httpServer.on("upgrade", (req, socket, head) => {
     const url = originIsUpgradeForLivePath(req);
@@ -264,3 +268,17 @@ export function attachLiveWebSocket(httpServer: HttpServer): WebSocketServer {
 
   return wss;
 }
+
+/**
+ * Cross-instance delivery (BT-472, lib/realtime/bus.ts). Every instance runs
+ * the viewer-count job itself and broadcasts the shared live_viewers count to
+ * its own sockets, so those events are never re-published.
+ */
+const liveFanout = createRoomFanout({
+  topic: "live",
+  apply: {
+    broadcast: (streamId, payload) => broadcastToRoom(streamId, payload),
+    kick: (streamId, payload) => disconnectUserFromRoom(streamId, String(payload.userId ?? "")),
+  },
+  localOnly: (kind, payload) => kind === "broadcast" && payload.type === "viewerCount",
+});
