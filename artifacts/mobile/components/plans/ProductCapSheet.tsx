@@ -14,7 +14,7 @@ import { productCapCopy, type PlanTier } from '@/lib/planTiers';
 import type { SellerPlanId } from '@/lib/sellerBilling';
 
 export function ProductCapSheet({
-  visible, onClose, tiers, currentPlanId, used, onUpgrade, onSaveDraft,
+  visible, onClose, tiers, currentPlanId, used, serverMessage, onUpgrade, onSaveDraft,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -22,6 +22,8 @@ export function ProductCapSheet({
   currentPlanId: SellerPlanId;
   /** Active products the server counted. */
   used: number;
+  /** The 403 PLAN_LIMIT_REACHED `message` (Dev's copy, from the server). Shown verbatim when present. */
+  serverMessage?: string | null;
   onUpgrade: (planId: SellerPlanId) => void;
   onSaveDraft?: () => void;
 }) {
@@ -31,7 +33,9 @@ export function ProductCapSheet({
   return (
     <BottomSheet visible={visible} onClose={onClose} testID="product-cap-sheet">
       <Text accessibilityRole="header" style={[styles.title, { color: palette.foreground }]}>{copy.title}</Text>
-      <Text testID="product-cap-sheet-body" style={[styles.body, { color: palette.mutedForeground }]}>{copy.body}</Text>
+      <Text testID="product-cap-sheet-body" style={[styles.body, { color: palette.mutedForeground }]}>
+        {serverMessage ? `${serverMessage} You can still save this as a draft.` : copy.body}
+      </Text>
       <View style={styles.actions}>
         {copy.next ? (
           <Button label={`Upgrade to ${copy.next.name}`} onPress={() => onUpgrade(copy.next!.id)} fullWidth testID="product-cap-upgrade" />
