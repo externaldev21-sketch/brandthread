@@ -103,6 +103,7 @@ vi.mock('@/components/orders/OrderStatusTimeline', () => ({
 
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
   useTabBarMetrics: () => ({ occupiedHeight: 0 }),
+  useTabBarClearance: () => 0,
 }));
 
 vi.mock('@/components/SwipeActionRow', () => ({

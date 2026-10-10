@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/Button';
 import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useTabBarClearance, useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { filterOrders, sortOrders } from '@/services/orderService';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus } from '@/lib/orderStatusAdapter';
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
@@ -682,6 +682,7 @@ export default function OrdersScreen() {
   // grows on iPad so the list doesn't stretch edge to edge.
   const listSidePad = Math.max(0, useCenteredContentPadding() - SP.md);
   const tabBarMetrics = useTabBarMetrics();
+  const tabBarClearance = useTabBarClearance(2); // seller bar: Studio + AI side circles
 
   const api = useApi();
   const queryClient = useQueryClient();
@@ -1178,7 +1179,7 @@ export default function OrdersScreen() {
           contentContainerStyle={[
             s.listContent,
             filtered.length === 0 && { flexGrow: 1 },
-            { paddingHorizontal: listSidePad, paddingBottom: tabBarMetrics.occupiedHeight + (selectedIds.length > 0 ? 80 : SP.md) },
+            { paddingHorizontal: listSidePad, paddingBottom: tabBarClearance + (selectedIds.length > 0 ? 64 : 0) },
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={

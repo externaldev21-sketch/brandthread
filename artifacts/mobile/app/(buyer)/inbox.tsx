@@ -7,7 +7,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
-import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -274,7 +274,7 @@ export default function InboxScreen() {
   // so the search-mode header row sits at the identical vertical position
   // as the title/icon row it swaps with.
   const headerTopPad = useHeaderTopInset();
-  const barInset = useBuyerTabBarInset();
+  const tabBarClearance = useTabBarClearance();
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
@@ -1441,7 +1441,7 @@ export default function InboxScreen() {
 
   const requestsTabContent = (
     <ScrollView
-      contentContainerStyle={[{ paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}
+      contentContainerStyle={[{ paddingBottom: tabBarClearance, paddingHorizontal: gutter }]}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
     >
@@ -1719,7 +1719,7 @@ export default function InboxScreen() {
 
       {/* Tab content */}
       {loading ? (
-        <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}>
+        <View style={[s.listSurface, s.listContent, { paddingBottom: tabBarClearance, paddingHorizontal: gutter }]}>
           <ListSkeleton rows={6} />
         </View>
       ) : activeTab === 'requests' ? (
@@ -1728,7 +1728,7 @@ export default function InboxScreen() {
         <ScrollView
           ref={scrollResetRef}
           style={s.listSurface}
-          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
+          contentContainerStyle={[s.listContent, { paddingBottom: tabBarClearance }, s.listEmptyContainer]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
           <View style={{ paddingHorizontal: gutter }}>
@@ -1743,7 +1743,7 @@ export default function InboxScreen() {
             data={inboxRows}
             keyExtractor={item => item.key}
             renderItem={renderInboxRow}
-            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.lg, paddingHorizontal: gutter }])}
+            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: tabBarClearance + SP.sm, paddingHorizontal: gutter }])}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
