@@ -38,6 +38,7 @@ vi.mock("../../middlewares/requireRole", () => ({
 }));
 
 vi.mock("../notifications-feed", () => ({ publishNotification: async () => undefined }));
+vi.mock("../../lib/admin/payoutControls", () => ({ isPayoutHeld: async () => false }));
 
 vi.mock("drizzle-orm", () => {
   const fn = (...args: unknown[]) => args;

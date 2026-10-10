@@ -50,6 +50,7 @@ import {
 } from "../lib/buyerCancellationPolicy";
 import { consumeBuyerAddressListFailure } from "./release-test-control";
 import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
+import { CHECKOUT_PAUSED_ERROR, isThreadCashPaused } from "../lib/threadCash/killSwitch";
 
 const router = Router();
 router.use(requireAuth);
@@ -512,6 +513,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       typeof threadCashToken === "string" && threadCashToken.trim()
         ? threadCashToken.trim().toUpperCase()
         : null;
+    if (normalizedThreadCashToken && (await isThreadCashPaused("checkout"))) {
+      res.status(403).json(CHECKOUT_PAUSED_ERROR);
+      return;
+    }
     if (normalizedThreadCashToken && !(await isFeatureEnabled("threadCashCheckoutDiscount"))) {
       res.status(403).json({
         error: "Using Thread Cash at checkout isn't available yet.",

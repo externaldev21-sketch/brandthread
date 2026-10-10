@@ -16,6 +16,7 @@ import commerceRouter from "./commerce";
 import insightsRouter from "./insights";
 import growthRouter from "./growth";
 import accessRouter from "./access";
+import moneyRouter from "./money";
 
 const router = Router();
 router.use(requireAuth);
@@ -33,6 +34,7 @@ router.use("/users", usersRouter);
 router.use(commerceRouter);
 router.use(insightsRouter);
 router.use(growthRouter);
+router.use(moneyRouter); // refunds, dispute evidence, payout holds, Thread Cash, risk
 router.use("/access", accessRouter); // invite-only launch waitlist
 
 export default router;
