@@ -61,6 +61,9 @@ import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import { CompleteTheFit } from '@/components/products/CompleteTheFit';
 import { ProductVideo } from '@/components/products/ProductVideo';
+import { ProductShareButton } from '@/components/products/ProductShareButton';
+import { ProductShippingLine } from '@/components/products/ProductShippingLine';
+import { POLICY_NOT_LISTED, readSellerPolicies, readSellerShipping } from '@/lib/productTrust';
 import { ProductQuestionsSection } from '@/components/ProductQuestionsSection';
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
 import { BundleSaveSection } from '@/components/bundles/BundleSaveSection';
@@ -181,8 +184,8 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     isPreOrder:           row.isPreOrder           ?? false,
     preOrderClosingDate:  row.preOrderClosingDate ? new Date(row.preOrderClosingDate).toISOString() : undefined,
     preOrderEstShipDate:  row.preOrderEstShipDate ? new Date(row.preOrderEstShipDate).toISOString() : undefined,
-    cancellationPolicy:   'All sales final. Returns accepted only for damaged or incorrect items.',
-    refundPolicy:       'Contact the seller within 7 days of delivery to start a return.',
+    ...readSellerPolicies(row), // seller's own text; '' when none (row says "Not listed")
+    sellerShipping:     readSellerShipping(row),
     options,
     variants,
     isActive:           true,
@@ -1220,6 +1223,8 @@ export default function BuyerProductDetailScreen() {
             style={[s.mediaChromeBtn, { position: 'absolute', top: headerTopInset + SP.sm, right: SP.md + insets.right + 44 + SP.sm, borderWidth: 0 }]}
             testID="product-save-heart"
           />
+          {/* Share stays in buyer chrome, separate from the seller preview marker. */}
+          <ProductShareButton productId={product.id} productName={product.name} iconColor="#FFFFFF" buttonStyle={s.mediaChromeBtn} wrapStyle={{ position: 'absolute', top: headerTopInset + SP.sm, right: SP.md + insets.right + (44 + SP.sm) * 2 }} />
           </>}
           {sellerPreview && (
             <View
@@ -1285,6 +1290,7 @@ export default function BuyerProductDetailScreen() {
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
+          <ProductShippingLine shipping={product.sellerShipping} />
 
           {!sellerPreview && <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />}
 
@@ -1546,8 +1552,8 @@ export default function BuyerProductDetailScreen() {
 
           {/* Returns & cancellation */}
           <View style={s.divider} />
-          <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
-          <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} />
+          <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy || POLICY_NOT_LISTED} />
+          <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy || POLICY_NOT_LISTED} />
 
           {/* Purchase protection — exactly once (it also rendered, compact,
               under the seller row). */}

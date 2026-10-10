@@ -39,6 +39,7 @@ import { applySalesToVariants } from "../lib/pricing/salesRuntime";
 import { suggestedPostsSnoozed } from "../lib/interactionSettings";
 import { remixCredits } from "../lib/remix";
 import { productReadAccess } from "../lib/productPreviewAccess";
+import { loadPublicProductTrust } from "../lib/publicProductTrust";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -506,6 +507,8 @@ router.get("/products/:id", async (req, res) => {
       sellerVacationMessage: vacation.active ? vacation.message : null,
       sellerVacationUntil: vacation.until?.toISOString() ?? null,
       claimedUnits: Math.max(0, Number(claimedRow?.claimedUnits ?? 0)),
+      // Seller's own return/cancellation policy + domestic shipping summary (null when unset).
+      ...(await loadPublicProductTrust(product.ownerId)),
       variants: variants.map(toPublicVariant),
       ...(previewOnly ? { previewOnly: true } : {}),
     });
