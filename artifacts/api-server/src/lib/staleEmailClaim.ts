@@ -48,9 +48,14 @@ export async function classifyEmailClaim(
   }
 }
 
-/** Placeholder that keeps the row (and all its data) while freeing the email. */
+/**
+ * Placeholder that keeps the row (and all its data) while freeing the email.
+ * Same production domain as account deletion's tombstones so the test-data
+ * purge tooling (lib/db/src/testing/signatures.ts) never mistakes it for a
+ * test row.
+ */
 export function releasedEmailFor(rowId: string): string {
-  return `released+${rowId}@released.brandthread.invalid`;
+  return `deleted+released-${rowId}@deleted.brandthread.invalid`;
 }
 
 /**

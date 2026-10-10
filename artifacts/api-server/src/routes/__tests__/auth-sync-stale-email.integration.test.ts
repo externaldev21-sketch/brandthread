@@ -89,7 +89,7 @@ describe("POST /api/auth/sync with an email a local row still carries", () => {
 
     const [old] = await db.select().from(users).where(eq(users.clerkId, ghost));
     expect(old).toBeDefined();
-    expect(old!.email).toMatch(/@released\.brandthread\.invalid$/);
+    expect(old!.email).toMatch(/^deleted\+released-.*@deleted\.brandthread\.invalid$/);
   });
 
   it("creates the new account when the old Clerk user moved to a different email", async () => {
