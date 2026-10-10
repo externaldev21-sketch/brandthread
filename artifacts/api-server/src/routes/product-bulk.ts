@@ -5,6 +5,7 @@
  *   POST /api/product-bulk/price     — set / raise / lower prices (preview or apply)
  *   POST /api/product-bulk/status    — archive / unarchive / draft / active
  *   POST /api/product-bulk/duplicate — copy products + variants as drafts
+ *   POST /api/product-bulk/stock     — set / add / remove stock (preview or apply)
  *
  * Every write is all-or-nothing: the whole selection is validated and applied
  * inside one transaction, and any refusal (unknown id, plan limit, moderation
@@ -23,7 +24,9 @@ import { logActivity, reqActor } from "../lib/activityLog";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
 import { hasProductCapacity } from "../lib/productCapacity";
 import { notifyNewProduct } from "../lib/activityEvents";
-import { notifyPriceDrop } from "../lib/stockNotifications";
+import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
+import { afterStockChange } from "../lib/stockRules";
+import { isValidStockChange, planProductStock, type ProductStockPlan } from "../lib/bulkStock";
 import {
   isValidPriceChange, planProductPrices, uniqueCopySku,
   type CompareAtMode, type PriceChange, type PriceRounding, type ProductPricePlan,
@@ -265,6 +268,110 @@ router.post("/price", requireRole("manager"), async (req, res): Promise<void> =>
     if (sendRefusal(res, err)) return;
     req.log?.error({ err, ownerId }, "Bulk price edit failed");
     res.status(500).json({ error: "Bulk price edit failed" });
+  }
+});
+
+// ─── POST /stock ─────────────────────────────────────────────────────────────
+// Body: { productIds, change: { mode: "set" | "add" | "remove", value }, preview? }
+// Applies to every variant of each selected product, all-or-nothing.
+router.post("/stock", requireRole("manager"), async (req, res): Promise<void> => {
+  const ownerId = ownerOf(req);
+  const parsed = parseIds(req.body);
+  if ("status" in parsed) { res.status(parsed.status).json(parsed.body); return; }
+  const change = req.body?.change;
+  if (!isValidStockChange(change)) {
+    res.status(400).json({ error: "Invalid stock change", code: "VALIDATION_ERROR" }); return;
+  }
+  const preview = req.body?.preview === true;
+
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      const owned = await loadOwned(tx, ownerId, parsed.ids, !preview);
+      const variantQuery = tx
+        .select({
+          productId: productVariants.productId,
+          variantId: productVariants.id,
+          sku: productVariants.sku,
+          stock: productVariants.stock,
+          lowStockThreshold: productVariants.lowStockThreshold,
+        })
+        .from(productVariants)
+        .where(inArray(productVariants.productId, parsed.ids))
+        .orderBy(productVariants.createdAt);
+      const variantRows = preview ? await variantQuery : await variantQuery.for("update");
+
+      const items = owned.map((p) => {
+        const rows = variantRows.filter((v) => v.productId === p.id);
+        const plan: ProductStockPlan | null = planProductStock(rows, change);
+        return { product: p, plan };
+      });
+
+      if (!preview) {
+        const now = new Date();
+        for (const { plan } of items) {
+          if (!plan) continue;
+          for (const v of plan.variants) {
+            if (v.before === v.after) continue;
+            await tx.update(productVariants)
+              .set({ stock: v.after, updatedAt: now })
+              .where(eq(productVariants.id, v.variantId));
+          }
+        }
+      }
+      return items;
+    });
+
+    const result = outcome.map(({ product, plan }) => ({
+      productId: product.id,
+      name: product.name,
+      status: product.status,
+      image: Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : null,
+      skipped: plan ? null : "no_variants",
+      changed: plan?.changed ?? false,
+      beforeTotal: plan?.beforeTotal ?? null,
+      afterTotal: plan?.afterTotal ?? null,
+      lowAfter: plan?.lowAfter ?? 0,
+      outAfter: plan?.outAfter ?? 0,
+      variants: plan?.variants ?? [],
+    }));
+    const summary = {
+      products: result.length,
+      changedProducts: result.filter((r) => r.changed).length,
+      skippedProducts: result.filter((r) => r.skipped).length,
+      variants: result.reduce((n, r) => n + r.variants.filter((v) => v.before !== v.after).length, 0),
+      lowAfter: result.reduce((n, r) => n + r.lowAfter, 0),
+      outAfter: result.reduce((n, r) => n + r.outAfter, 0),
+    };
+
+    if (!preview) {
+      const actor = reqActor(req);
+      for (const { product, plan } of outcome) {
+        if (!plan?.changed) continue;
+        void logActivity(
+          actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+          `Bulk stock edit on "${product.name}" (${plan.beforeTotal} → ${plan.afterTotal})`,
+          "inventory", product.id, { bulk: true, change },
+        );
+        for (const v of plan.variants) {
+          if (v.before === v.after) continue;
+          void notifyStockLevelChanged({
+            productId: product.id, ownerId, productName: product.name,
+            previousStock: v.before, newStock: v.after, lowStockThreshold: v.lowStockThreshold,
+          });
+          void notifyBackInStock({
+            productId: product.id, ownerId, productName: product.name,
+            previousStock: v.before, newStock: v.after, variantId: v.variantId,
+          });
+        }
+        await afterStockChange(product.id);
+      }
+    }
+
+    res.json({ preview, summary, items: result });
+  } catch (err) {
+    if (sendRefusal(res, err)) return;
+    req.log?.error({ err, ownerId }, "Bulk stock edit failed");
+    res.status(500).json({ error: "Bulk stock edit failed" });
   }
 });
 
