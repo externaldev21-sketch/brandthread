@@ -36,6 +36,7 @@ import { checklistProgress, currentStep, storeSiteChecklist, type StoreSiteStepI
 import { readStoreSiteFlags, updateStoreSiteFlags, type StoreSiteFlags } from '@/lib/storeSiteFlags';
 import { RADII } from '@/constants/radii';
 import { leaveSetupFlow } from '@/lib/setupNavigation';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 const PREVIEW_HEIGHT_RATIO = 1.9;
 
@@ -43,6 +44,8 @@ export default function MyStoreScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string }>();
+  // The setup checklist is a bottom sheet (Linktree): the tab bar steps aside.
+  useHideTabBar();
   const insets = useSafeAreaInsets();
   const bottomInset = useScreenBottomInset();
   const { width } = useWindowDimensions();
@@ -138,7 +141,7 @@ export default function MyStoreScreen() {
             { key: 'settings', label: 'Settings', icon: 'settings', go: () => router.push('/store-site-settings' as never) },
           ] as const).map((p) => (
             <View key={p.key} style={s.pill}>
-              <Button label={p.label} icon={p.icon} variant="secondary" size="small" onPress={p.go} fullWidth testID={`my-store-${p.key}`} />
+              <Button label={p.label} icon={p.icon} variant="secondary" size="compact" onPress={p.go} fullWidth style={s.pillBtn} testID={`my-store-${p.key}`} />
             </View>
           ))}
         </View>
@@ -237,6 +240,7 @@ const s = StyleSheet.create({
   link: { fontSize: 17, flexShrink: 1 },
   pills: { flexDirection: 'row', gap: 8, marginTop: 16 },
   pill: { flex: 1, minWidth: 0 },
+  pillBtn: { paddingHorizontal: 8 },
   previewWrap: { alignItems: 'center', marginTop: 24 },
   previewFrame: { borderWidth: 1, borderRadius: 22, padding: 1 },
   reopen: { marginTop: 24 },

@@ -23,7 +23,7 @@ import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { ShareStoreToast, useToast } from '@/components/store/ShareStoreSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useStoreSite } from '@/hooks/useStoreSite';
-import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FILL_ELEVATED } from '@/lib/theme';
 import { MAX_STORE_SITE_LINKS } from '@/lib/storeSiteDesign';
 import { normalizeUrlInput } from '@/lib/growthValidation';
@@ -57,7 +57,8 @@ export default function StoreSiteSettingsScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const bottomInset = useScreenBottomInset();
+  // Clear of the floating tab bar.
+  const bottomInset = useTabBarClearance(2);
   const { page, failed, reload } = useStoreSite();
   const [editing, setEditing] = useState<Editing | null>(null);
   const [toast, flash] = useToast();
@@ -79,7 +80,7 @@ export default function StoreSiteSettingsScreen() {
   return (
     <View style={[s.root, { backgroundColor: theme.background }]} testID="store-site-settings">
       {header}
-      <ScrollView contentContainerStyle={{ paddingBottom: bottomInset + 24 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomInset + 24 }} showsVerticalScrollIndicator={false}>
         <Text style={[s.section, { color: theme.text }]}>Links</Text>
         {links.map((l, i) => (
           <ListRow
@@ -232,7 +233,7 @@ function EditSheet({ editing, socials, onClose, onSaved, onError, ensurePage }: 
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  section: { fontSize: 17, fontWeight: '600', paddingHorizontal: 16, marginTop: 24, marginBottom: 4 },
+  section: { fontSize: 17, fontWeight: '600', marginTop: 24, marginBottom: 4 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: FILL_ELEVATED, borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet },
   grabberWrap: { alignItems: 'center', paddingTop: 6, paddingBottom: 2 },

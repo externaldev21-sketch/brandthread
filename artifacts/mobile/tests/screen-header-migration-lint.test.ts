@@ -93,6 +93,8 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/conversation-details.tsx',
   'app/conversation-search.tsx',
   'app/design-canvas.tsx',
+  // Editor chrome copied from Linktree's design editor: back, undo/redo, Cancel + Save.
+  'app/store-design.tsx',
   'app/design-project.tsx',
   'app/design-prompt-edit.tsx',
   'app/design-upload-sketch.tsx',

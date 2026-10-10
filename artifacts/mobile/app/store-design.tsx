@@ -37,6 +37,7 @@ import {
 } from '@/lib/storeSiteDesign';
 import { saveBio } from '@/services/growthService';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { RADII } from '@/constants/radii';
 import { draftHistoryReducer, type DesignDraft } from '@/lib/storeDesignHistory';
 
@@ -61,6 +62,8 @@ export default function StoreDesignScreen() {
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{ panel?: string }>();
+  // Full-screen editor with its own toolbar and sheets (Linktree): no tab bar.
+  useHideTabBar();
   const insets = useSafeAreaInsets();
   const topInset = useHeaderTopInset();
   const { page, site, failed, reload } = useStoreSite();
