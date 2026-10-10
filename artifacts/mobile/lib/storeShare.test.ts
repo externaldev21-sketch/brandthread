@@ -4,7 +4,7 @@ import { displayStoreLink, sellerStoreLink } from './storeShare';
 
 describe('sellerStoreLink', () => {
   it('builds the one storefront link from a valid username', () => {
-    expect(sellerStoreLink('@Northline')).toBe('https://brandthread.app/u/northline');
+    expect(sellerStoreLink('@Northline')).toBe('https://brandthread.app/@northline');
   });
 
   it('gives no link without a valid username (never an invented slug)', () => {
@@ -14,6 +14,6 @@ describe('sellerStoreLink', () => {
   });
 
   it('displays without the scheme', () => {
-    expect(displayStoreLink('https://brandthread.app/u/northline')).toBe('brandthread.app/u/northline');
+    expect(displayStoreLink('https://brandthread.app/@northline')).toBe('brandthread.app/@northline');
   });
 });

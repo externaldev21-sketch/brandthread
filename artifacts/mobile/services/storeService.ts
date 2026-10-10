@@ -415,7 +415,8 @@ export async function getStorefront(options: {
       local.sharePreviewRevokedAt = remote?.sharePreviewRevokedAt ?? null;
       // Sync server title/slug if we don't have one locally
       if (!local.settings.storeUrl && remote?.slug) {
-        local.settings.storeUrl = `${remote.slug}.brandthread.app`;
+        // Bare slug only — callers add the domain (BT-316 doubled domain).
+        local.settings.storeUrl = remote.slug;
       }
     } catch { /* no-op — API may not be reachable */ }
 

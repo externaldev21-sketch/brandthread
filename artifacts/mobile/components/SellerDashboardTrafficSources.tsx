@@ -80,7 +80,6 @@ export function SellerDashboardTrafficSources({
   theme,
   onSeeAll,
   onOpenSource,
-  onShareStore,
 }: {
   /** Real store-visit count for the selected period (same figure the hero/tiles use). Never fabricated. */
   totalVisits: number;
@@ -93,7 +92,8 @@ export function SellerDashboardTrafficSources({
   theme: AppThemePreset;
   onSeeAll: () => void;
   onOpenSource: (source: TrafficSource) => void;
-  onShareStore: () => void;
+  /** @deprecated The Dashboard header's Share store button replaced the in-panel one. */
+  onShareStore?: () => void;
 }) {
   // Defensive: an older/partial analytics payload missing this field must
   // never crash the whole dashboard into the error boundary — fall back to
@@ -134,15 +134,6 @@ export function SellerDashboardTrafficSources({
           <Text style={[styles.emptyText, { color: theme.muted }]}>
             No visits yet
           </Text>
-          <PressableScale
-            onPress={onShareStore}
-            style={[styles.shareBtn, { borderColor: theme.text }]}
-            accessibilityRole="button"
-            accessibilityLabel="Share your store"
-          >
-            <Icon name="share" size={14} color={theme.text} />
-            <Text style={[styles.shareBtnText, { color: theme.text }]}>Share store</Text>
-          </PressableScale>
         </View>
       ) : (
         <>
@@ -315,18 +306,5 @@ const styles = StyleSheet.create({
     fontSize: FS.sm,
     textAlign: 'center',
     maxWidth: 280,
-  },
-  shareBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 44,
-    paddingHorizontal: SP.lg,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  shareBtnText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
   },
 });

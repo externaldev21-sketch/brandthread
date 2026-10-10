@@ -32,7 +32,7 @@ import {
   type SetupState, type SetupTask,
 } from '@/lib/setupStore';
 import { withOrigin } from '@/lib/navigation/flowOrigin';
-import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
+import { useStoreLink } from '@/hooks/useStoreLink';
 import { middleTruncate } from '@/lib/middleTruncate';
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
 import SetupContinueBanner from '@/components/SetupContinueBanner';
@@ -239,16 +239,10 @@ export default function SellerHomeCommerceDashboard({
   // published (Dev: "it's where the store will eventually live"). Uses the
   // one existing public-store-URL builder (lib/shareProfile.ts), not a new
   // one — same as app/meta-ads-setup.tsx's own storeUrl fetch.
-  const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  // One store link everywhere: brandthread.app/@username (lib/storeShare).
+  const storeLink = useStoreLink();
+  const storeUrl = storeLink.url;
   const [storeUrlCopied, setStoreUrlCopied] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    api.seller.getProfile().then((profile) => {
-      if (cancelled) return;
-      setStoreUrl(buildCanonicalProfileUrl(profile.username));
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [api]);
 
   const handleCopyStoreUrl = useCallback(() => {
     if (!storeUrl) return;
@@ -762,6 +756,17 @@ export default function SellerHomeCommerceDashboard({
                 </TouchableOpacity>
               )}
             </View>
+            {/* Share store — opens the one Share store sheet (app/share-store.tsx). */}
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); nav('/share-store'); }}
+              style={styles.topBarShare}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel="Share store"
+              testID="seller-dashboard-share-store"
+            >
+              <Icon name="share" size={22} color={theme.text ?? FG} />
+            </TouchableOpacity>
             {(!sellerPreview || isSignedIn) && <ActivityBellButton
               testID="seller-dashboard-activity"
               color={theme.text ?? FG}
@@ -942,7 +947,6 @@ export default function SellerHomeCommerceDashboard({
                     theme={theme}
                     onSeeAll={() => nav('/analytics-store')}
                     onOpenSource={() => nav('/analytics-store')}
-                    onShareStore={() => nav('/share-store')}
                   />
                 </View>
               )}
@@ -1016,6 +1020,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   topBarAction: { width: 44, height: 44, marginRight: -SP.sm },
+  topBarShare: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   // flex: 1 so the store-url row below has room to shrink/truncate instead
   // of pushing the fixed-size activity bell off the right edge; the
   // ActivityBellButton itself keeps its own fixed width, unaffected.
