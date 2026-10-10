@@ -36,6 +36,7 @@ import {
   validateScheduleInput,
 } from "../lib/money/payoutSchedule";
 import { assertBreakdownReconciles, buildPayoutBreakdown } from "../lib/money/payoutBreakdown";
+import { heldOrderTimingRows, payoutHoldRule } from "../lib/delivery/payoutTiming";
 
 const router = Router();
 router.use(requireAuth);
@@ -285,10 +286,26 @@ router.get("/balance", requirePayoutsRead(), async (req, res) => {
   }
 });
 
+/** The seller's held orders, soonest payout first, with when each is paid. */
+async function loadHeldOrderTimings(sellerId: string, limit = 20) {
+  const result = await db.execute(sql`
+    SELECT o.id, o.order_number, o.is_preorder, o.seller_net_cents, o.charge_model,
+           o.deliver_by, o.delivered_at, o.payout_release_at, o.dispute_paused_at,
+           EXISTS (SELECT 1 FROM returns r WHERE r.order_id = o.id AND r.status IN ('pending', 'approved')) AS has_open_return
+    FROM orders o
+    WHERE o.owner_id = ${sellerId} AND o.funds_state = 'held'
+    ORDER BY o.payout_release_at ASC NULLS LAST, o.deliver_by ASC NULLS LAST
+    LIMIT ${limit}
+  `);
+  return heldOrderTimingRows((result as { rows?: any[] }).rows ?? []);
+}
+
 // ─── GET /api/finance/summary ─────────────────────────────────────────────────
 // Where every dollar of the seller's sales is right now, from the money
 // ledger (lib/money/ledger.ts) plus Stripe's live balance:
-//   held       preorder money Brandthread is holding until each order ships
+//   held       money Brandthread holds until each order is delivered + the
+//              payout buffer (pre-order drops without a deadline: until it
+//              ships); held.orders = per-order timing, held.rule = the policy
 //   releasing  shipped preorders whose transfer to the seller is in flight
 //   available  in the seller's Stripe balance, ready to cash out
 //   pending    in the seller's Stripe balance, still settling
@@ -376,6 +393,13 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
         .limit(25),
     ]);
 
+    // Per-order payout timing for the money still held (hold-until-delivered
+    // and pre-order drops). Additive; a failure only omits the list.
+    const heldOrders = await loadHeldOrderTimings(sellerId).catch((err) => {
+      req.log.warn({ err }, "Held order timing unavailable for finance summary");
+      return null;
+    });
+
     // Live Stripe balance. The ledger part of the summary still renders if
     // Stripe is unreachable; the app shows those two figures as unavailable.
     let stripeBalance: { available: number; pending: number } | null = null;
@@ -427,6 +451,8 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
             ordersRefunded: row.ordersRefunded,
           };
         }),
+        rule: payoutHoldRule(),
+        orders: heldOrders,
       },
       releasing: { ...money(Number(releasing[0]?.total ?? 0)), count: releasing[0]?.count ?? 0 },
       available: stripeBalance ? money(stripeBalance.available) : null,

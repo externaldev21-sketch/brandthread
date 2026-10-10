@@ -21,6 +21,7 @@ import type { FinanceTransactionRow } from '@/lib/previewFinance';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { HeldForDeliveryRow } from '@/components/payouts/HeldForDeliveryRow';
 
 function fmtDate(iso: string | number) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -230,6 +231,7 @@ export default function FinanceScreen() {
       {!isReadOnly && (!isSignedOutSellerPreview || isDemoPreview) && (
         <FinanceMoneyFlow summary={summary} loading={loading} error={summaryError} onRetry={load} />
       )}
+      {!loading && (summary || isDemoPreview) && <HeldForDeliveryRow summary={summary} />}
 
       {/* Overview (Stripe balance) — shown when the ledger summary is unavailable */}
       {!isDemoPreview && (isReadOnly || isSignedOutSellerPreview || (!summary && summaryError)) && (
