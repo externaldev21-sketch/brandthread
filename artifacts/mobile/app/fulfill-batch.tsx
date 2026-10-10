@@ -8,15 +8,14 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
-import { FONT, FS, SP, ICON } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, SectionHeader } from '@/components/BrandthreadUI';
-import { Button } from '@/components/ui';
+import { SectionHeader } from '@/components/BrandthreadUI';
+import { Button, Icon, ICON_SIZE } from '@/components/ui';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FulfillSheet } from '@/components/orders/FulfillSheet';
 import { useApi } from '@/lib/api';
@@ -184,13 +183,13 @@ export default function FulfillBatchScreen() {
             {orders.map(o => {
               const open = linesToFulfill(o).reduce((n, li) => n + li.quantity, 0);
               return (
-                <BrandthreadCard key={o.id} style={s.orderRow}>
+                <View key={o.id} style={s.orderRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={s.orderNumber}>{orderTitle(o.orderNumber)}</Text>
                     <Text style={s.mutedText}>{o.customer.name}</Text>
                   </View>
                   <Text style={s.mutedText}>{open > 0 ? `Unfulfilled (${open})` : 'Fulfilled'}</Text>
-                </BrandthreadCard>
+                </View>
               );
             })}
 
@@ -209,10 +208,10 @@ export default function FulfillBatchScreen() {
                   ? `Results — ${successCount} fulfilled, ${failCount} skipped`
                   : `Results — ${successCount} succeeded, ${failCount} failed`} />
                 {results.map(r => (
-                  <BrandthreadCard key={r.orderId} style={s.resultRow}>
-                    <Feather
+                  <View key={r.orderId} style={s.resultRow}>
+                    <Icon
                       name={r.ok ? 'check-circle' : lastRun === 'ship' ? 'skip-forward' : 'alert-circle'}
-                      size={ICON.md}
+                      size={ICON_SIZE.md}
                       color={r.ok ? SUCCESS : lastRun === 'ship' ? MUTED : ERROR}
                     />
                     <View style={{ flex: 1 }}>
@@ -221,10 +220,10 @@ export default function FulfillBatchScreen() {
                     </View>
                     {r.labelUrl && (
                       <TouchableOpacity onPress={() => Linking.openURL(r.labelUrl!)} accessibilityRole="button" accessibilityLabel={`Open label for order ${r.orderNumber}`}>
-                        <Feather name="external-link" size={ICON.md} color={ACCENT} />
+                        <Icon name="external-link" size={ICON_SIZE.md} color={ACCENT} />
                       </TouchableOpacity>
                     )}
-                  </BrandthreadCard>
+                  </View>
                 ))}
               </>
             )}
@@ -245,16 +244,16 @@ export default function FulfillBatchScreen() {
   );
 }
 
-const createStyles = (theme: { text: string; muted: string }) => {
-  const { text: FG, muted: MUTED } = theme;
+const createStyles = (theme: { text: string; muted: string; border: string }) => {
+  const { text: FG, muted: MUTED, border: BORDER } = theme;
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: 'transparent' },
     centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: SP.xxl },
     mutedText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-    orderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SP.sm },
+    orderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SP.sm, minHeight: 56, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
     orderNumber: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
     actionRow: { flexDirection: 'row', gap: SP.sm },
     half: { flex: 1 },
-    resultRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+    resultRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 56, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
   });
 };

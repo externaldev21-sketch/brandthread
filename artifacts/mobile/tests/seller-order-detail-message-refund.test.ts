@@ -66,7 +66,7 @@ describe('order detail: Refund action', () => {
   });
 
   it('shows what was refunded in the Paid block', () => {
-    expect(source).toContain('label={`Refunded · ${refundReasonLabel(r.reason)}`}');
+    expect(source).toContain('label={`Refunded (${refundReasonLabel(r.reason).toLowerCase()})`}');
     expect(source).toContain('<InfoRow label="Refunded" value={`-${usd(order.payment.amountRefundedCents)}`} />');
   });
 });

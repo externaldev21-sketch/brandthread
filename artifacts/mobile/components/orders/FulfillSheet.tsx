@@ -10,16 +10,15 @@
  * server rules.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Button, OptionSheet, QuantityStepper } from '@/components/ui';
+import { Button, Icon, ICON_SIZE, Input, OptionSheet, QuantityStepper } from '@/components/ui';
 import { HapticSwitch } from '@/components/BrandthreadUI';
-import { FullSheet, SheetSection, SHEET_FIELD_BG } from '@/components/orders/FullSheet';
+import { FullSheet, SheetSection, SheetPickerField } from '@/components/orders/FullSheet';
 import { TYPE_SCALE } from '@/constants/typography';
-import { FONT, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, SP, RADIUS, FILL_ELEVATED } from '@/lib/theme';
 import { hapticSuccessAction } from '@/lib/haptics';
 import { sharePackingSlip } from '@/lib/packingSlip';
 import {
@@ -160,8 +159,8 @@ export function FulfillSheet({ visible, order, onCancel, onSubmit, batch }: Fulf
           return (
             <View key={li.id} style={s.itemRow}>
               <View style={s.thumbWrap}>
-                <View style={[s.thumb, { borderColor: theme.border }]}>
-                  {li.imageUri ? <Image source={{ uri: li.imageUri }} style={s.thumbImg} /> : <Feather name="package" size={ICON.sm} color={theme.muted} />}
+                <View style={s.thumb}>
+                  {li.imageUri ? <Image source={{ uri: li.imageUri }} style={s.thumbImg} /> : <Icon name="package" size={ICON_SIZE.sm} color={theme.muted} />}
                 </View>
                 <View style={[s.badge, { backgroundColor: theme.text, borderColor: theme.background }]}>
                   <Text style={[s.badgeText, { color: theme.background }]}>{li.quantity}</Text>
@@ -185,39 +184,28 @@ export function FulfillSheet({ visible, order, onCancel, onSubmit, batch }: Fulf
       </SheetSection>
 
       <SheetSection title="Tracking information" last>
-        <View style={[s.field, { backgroundColor: SHEET_FIELD_BG, borderColor: theme.border }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.fieldLabel, { color: theme.muted }]}>Tracking number</Text>
-            <TextInput
-              value={trackingNumber}
-              onChangeText={setTrackingNumber}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={[s.fieldInput, { color: theme.text }]}
-              accessibilityLabel="Tracking number"
-              testID="fulfill-tracking-number"
-            />
-          </View>
-          {Platform.OS !== 'web' ? (
+        <Input
+          label="Tracking number"
+          value={trackingNumber}
+          onChangeText={setTrackingNumber}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          testID="fulfill-tracking-number"
+          style={s.fieldGap}
+          right={Platform.OS !== 'web' ? (
             <Pressable onPress={openScanner} hitSlop={8} accessibilityRole="button" accessibilityLabel="Scan tracking barcode" style={s.fieldIcon}>
-              <Feather name="maximize" size={ICON.md} color={theme.text} />
+              <Icon name="maximize" size={ICON_SIZE.md} color={theme.text} />
             </Pressable>
-          ) : null}
-        </View>
+          ) : undefined}
+        />
 
-        <Pressable
+        <SheetPickerField
+          label="Shipping carrier"
+          value={carrier}
+          placeholder="Select a carrier"
           onPress={() => setCarrierOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={`Shipping carrier, ${carrier || 'not selected'}`}
-          style={[s.field, { backgroundColor: SHEET_FIELD_BG, borderColor: theme.border }]}
           testID="fulfill-carrier"
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={[s.fieldLabel, { color: theme.muted }]}>Shipping carrier</Text>
-            <Text style={[s.fieldInput, { color: carrier ? theme.text : theme.subtle }]}>{carrier || 'Select a carrier'}</Text>
-          </View>
-          <Feather name="chevron-right" size={ICON.md} color={theme.muted} />
-        </Pressable>
+        />
 
         <View style={s.notifyRow}>
           <Text style={[TYPE_SCALE.body, { color: theme.text, flex: 1 }]}>Send notification to customer</Text>
@@ -241,14 +229,12 @@ export function FulfillSheet({ visible, order, onCancel, onSubmit, batch }: Fulf
 const styles = StyleSheet.create({
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
   thumbWrap: { width: 48, height: 48 },
-  thumb: { width: 44, height: 44, marginTop: 4, borderRadius: RADIUS.sm, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: SHEET_FIELD_BG },
+  thumb: { width: 44, height: 44, marginTop: 4, borderRadius: RADIUS.sm, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: FILL_ELEVATED },
   thumbImg: { width: '100%', height: '100%' },
   badge: { position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold },
   itemBody: { flex: 1, minWidth: 0 },
-  field: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, marginBottom: SP.sm, minHeight: 60 },
-  fieldLabel: { fontSize: 12, lineHeight: 16, fontFamily: FONT.regular },
-  fieldInput: { fontSize: 17, lineHeight: 22, fontFamily: FONT.regular, paddingVertical: 2 },
+  fieldGap: { marginBottom: SP.sm },
   fieldIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -SP.sm },
   notifyRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingTop: SP.sm, minHeight: 48 },
   scannerTop: { position: 'absolute', left: SP.md },

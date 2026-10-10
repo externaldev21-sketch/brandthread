@@ -9,16 +9,15 @@
 
 import { shareInvoice, invoiceFromSellerOrder } from '@/lib/invoice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, Image } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { View, Text, ScrollView, StyleSheet, Alert, ActivityIndicator, Modal, Image } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { FONT, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, SP, RADIUS, FILL_ELEVATED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
-import { BottomSheet, Button, Chip, ListRow } from '@/components/ui';
+import { BottomSheet, Button, Chip, Icon, ICON_SIZE, Input, ListRow, type IconName } from '@/components/ui';
 import { showActionSheet, type ActionSheetButton } from '@/components/ui/ActionSheet';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RADII } from '@/constants/radii';
@@ -42,7 +41,6 @@ import { formatLocalDate, sellerOrderConflictMessage } from '@/lib/deliveryGuara
 import { SellerDeliveryBanner } from '@/components/orders/SellerDelivery';
 import { FulfillSheet } from '@/components/orders/FulfillSheet';
 import { RefundSheet } from '@/components/orders/RefundSheet';
-import { SHEET_FIELD_BG } from '@/components/orders/FullSheet';
 import { sharePackingSlip } from '@/lib/packingSlip';
 import {
   applyFulfillLocally, applyRefundLocally, linesToFulfill, orderTitle, refundableCentsOf, shipmentGroups,
@@ -421,12 +419,12 @@ function Block({ children, testID }: { children: React.ReactNode; testID?: strin
   return <View style={s.block} testID={testID}>{children}</View>;
 }
 
-function Pill({ icon, label }: { icon: keyof typeof Feather.glyphMap; label: string }) {
+function Pill({ icon, label }: { icon: IconName; label: string }) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={s.pill}>
-      <Feather name={icon} size={14} color={theme.text} />
+      <Icon name={icon} size={ICON_SIZE.sm} color={theme.text} />
       <Text style={s.pillText}>{label}</Text>
     </View>
   );
@@ -436,7 +434,7 @@ function MoreButton({ onPress, label }: { onPress: () => void; label: string }) 
   const { theme } = useAppTheme();
   return (
     <PressableScale onPress={onPress} hitSlop={10} accessibilityRole="button" accessibilityLabel={label} style={{ width: 36, height: 32, alignItems: 'flex-end', justifyContent: 'center' }}>
-      <Feather name="more-horizontal" size={ICON.md} color={theme.text} />
+      <Icon name="more-horizontal" size={ICON_SIZE.md} color={theme.text} />
     </PressableScale>
   );
 }
@@ -458,7 +456,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       accessibilityLabel={copied ? 'Copied' : label}
       style={{ width: 32, height: 32, alignItems: 'flex-end', justifyContent: 'center' }}
     >
-      <Feather name={copied ? 'check' : 'copy'} size={ICON.sm} color={theme.muted} />
+      <Icon name={copied ? 'check' : 'copy'} size={ICON_SIZE.sm} color={theme.muted} />
     </PressableScale>
   );
 }
@@ -471,7 +469,7 @@ function ItemRow({ item, onPress }: { item: OrderLineItem; onPress?: () => void 
       <View style={s.itemThumb}>
         {item.imageUri
           ? <Image source={{ uri: item.imageUri }} style={s.itemThumbImg} />
-          : <Feather name="package" size={ICON.md} color={theme.muted} />}
+          : <Icon name="package" size={ICON_SIZE.md} color={theme.muted} />}
       </View>
       <View style={s.itemBody}>
         <Text style={s.itemName} numberOfLines={2}>{item.productName}</Text>
@@ -518,24 +516,19 @@ function DeliveryStatusSheet({ visible, order, onClose, onSave }: {
             key={option.key}
             title={option.label}
             onPress={() => setStatus(option.key)}
-            right={status === option.key ? <Feather name="check" size={18} color={theme.text} /> : undefined}
+            right={status === option.key ? <Icon name="check" size={ICON_SIZE.sm} color={theme.text} /> : undefined}
             testID={`tracking-status-${option.key}`}
           />
         ))}
-        <View style={s.sheetField}>
-          <Text style={s.sheetFieldLabel}>Estimated delivery</Text>
-          <TextInput
-            style={s.sheetFieldInput}
-            value={estimated}
-            onChangeText={setEstimated}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={theme.subtle}
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel="Estimated delivery date"
-            testID="estimated-delivery-input"
-          />
-        </View>
+        <Input
+          label="Estimated delivery (YYYY-MM-DD)"
+          value={estimated}
+          onChangeText={setEstimated}
+          autoCapitalize="none"
+          autoCorrect={false}
+          accessibilityLabel="Estimated delivery date"
+          testID="estimated-delivery-input"
+        />
         <Button
           label="Save"
           fullWidth
@@ -873,7 +866,7 @@ export default function OrderDetailScreen() {
             accessibilityLabel="Live updates paused. Tap to retry."
             testID="order-detail-live-updates-retry"
           >
-            <Feather name="wifi-off" size={ICON.sm} color={theme.text} />
+            <Icon name="wifi-off" size={ICON_SIZE.sm} color={theme.text} />
             <Text style={s.pausedBannerText}>Live updates paused</Text>
             <Text style={s.pausedBannerAction}>Tap to retry</Text>
           </PressableScale>
@@ -972,7 +965,7 @@ export default function OrderDetailScreen() {
   const timeline = [
     ...order.timeline,
     ...refundRows.map(r => ({
-      id: `tl-refund-${r.id}`, type: 'refund_issued', message: `Refunded ${usd(r.amountCents)} · ${refundReasonLabel(r.reason)}`,
+      id: `tl-refund-${r.id}`, type: 'refund_issued', message: `Refunded ${usd(r.amountCents)} (${refundReasonLabel(r.reason).toLowerCase()})`,
       isCustomerVisible: true, isSystemEvent: true, isSellerNote: false, createdAt: r.succeededAt ?? r.createdAt,
     })),
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -998,7 +991,7 @@ export default function OrderDetailScreen() {
           accessibilityLabel="Live updates paused. Tap to retry."
           testID="order-detail-live-updates-retry"
         >
-          <Feather name="wifi-off" size={ICON.sm} color={theme.text} />
+          <Icon name="wifi-off" size={ICON_SIZE.sm} color={theme.text} />
           <Text style={s.pausedBannerText}>Live updates paused</Text>
           <Text style={s.pausedBannerAction}>Tap to retry</Text>
         </PressableScale>
@@ -1015,7 +1008,7 @@ export default function OrderDetailScreen() {
         {fulfilledAt ? (
           <View style={s.band} testID="order-fulfilled-banner">
             <View style={s.doneBanner}>
-              <View style={s.doneIcon}><Feather name="check" size={16} color={theme.background} /></View>
+              <View style={s.doneIcon}><Icon name="check" size={ICON_SIZE.sm} color={theme.background} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={s.doneTitle}>Fulfilled</Text>
                 <Text style={s.doneText}>Items fulfilled {fmtStamp(fulfilledAt)}.</Text>
@@ -1027,7 +1020,7 @@ export default function OrderDetailScreen() {
         {cancelConfirmed && (
           <View style={s.band}>
             <View style={s.doneBanner}>
-              <View style={s.doneIcon}><Feather name="check" size={16} color={theme.background} /></View>
+              <View style={s.doneIcon}><Icon name="check" size={ICON_SIZE.sm} color={theme.background} /></View>
               <Text style={[s.doneText, { flex: 1 }]}>Order cancelled.</Text>
             </View>
           </View>
@@ -1039,7 +1032,7 @@ export default function OrderDetailScreen() {
 
         {pinnedNotes.map(note => (
           <View key={note.id} style={s.noticeRow}>
-            <Feather name="alert-triangle" size={ICON.sm} color={theme.text} />
+            <Icon name="alert-triangle" size={ICON_SIZE.sm} color={theme.text} />
             <Text style={s.noticeText}>{note.content.replace(/^⚠️\s*/, '')}</Text>
           </View>
         ))}
@@ -1069,7 +1062,7 @@ export default function OrderDetailScreen() {
                 <Text style={s.trackingLabel}>Tracking number</Text>
                 <Text style={s.trackingValue} selectable>{[group.carrier, group.trackingNumber].filter(Boolean).join(' • ')}</Text>
                 {trackingStatusLabel(order.trackingStatus) ? (
-                  <Text style={s.trackingLabel}>{[trackingStatusLabel(order.trackingStatus), order.estimatedDelivery ? `Est. ${fmt(`${order.estimatedDelivery}T12:00:00`)}` : null].filter(Boolean).join(' · ')}</Text>
+                  <Text style={s.trackingLabel}>{[trackingStatusLabel(order.trackingStatus), order.estimatedDelivery ? `Est. ${fmt(`${order.estimatedDelivery}T12:00:00`)}` : null].filter(Boolean).join(', ')}</Text>
                 ) : null}
               </View>
             ) : null}
@@ -1142,7 +1135,7 @@ export default function OrderDetailScreen() {
           {order.payment.amountHeldCents > 0 ? <InfoRow label="Held" value={usd(order.payment.amountHeldCents)} /> : null}
           {refundRows.length > 0
             ? refundRows.map(r => (
-              <InfoRow key={r.id} label={`Refunded · ${refundReasonLabel(r.reason)}`} value={`-${usd(r.amountCents)}`} />
+              <InfoRow key={r.id} label={`Refunded (${refundReasonLabel(r.reason).toLowerCase()})`} value={`-${usd(r.amountCents)}`} />
             ))
             : order.payment.amountRefundedCents > 0
               ? <InfoRow label="Refunded" value={`-${usd(order.payment.amountRefundedCents)}`} />
@@ -1176,8 +1169,9 @@ export default function OrderDetailScreen() {
             {orderReturns.map(ret => (
               <ListRow
                 key={ret.id}
-                title={`${returnRequestStatusLabel(ret.status)} · ${returnRequestReasonLabel(ret.reason)}`}
-                subtitle={`${ret.status === 'pending' ? 'Needs your review' : `Updated ${fmt(ret.updatedAt)}`} · Items ${formatCents(itemsTotalCents(ret.items))}`}
+                title={returnRequestReasonLabel(ret.reason)}
+                subtitle={ret.status === 'pending' ? 'Needs your review' : `${returnRequestStatusLabel(ret.status)}, updated ${fmt(ret.updatedAt)}`}
+                value={formatCents(itemsTotalCents(ret.items))}
                 chevron
                 onPress={() => router.push(`/return-detail?returnId=${encodeURIComponent(ret.id)}` as never)}
                 testID={`seller-return-${ret.id}`}
@@ -1265,12 +1259,10 @@ export default function OrderDetailScreen() {
                 />
               ))}
             </View>
-            <TextInput
-              style={s.cancelNoteInput}
+            <Input
+              label="Additional notes (optional)"
               value={cancelNote}
               onChangeText={setCancelNote}
-              placeholder="Additional notes (optional)"
-              placeholderTextColor={theme.subtle}
               multiline
             />
             <Text style={s.warningText}>
@@ -1333,7 +1325,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   centered:         { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   content:          { flex: 1 },
 
-  block:            { paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: 8, borderBottomColor: SHEET_FIELD_BG },
+  block:            { paddingHorizontal: SP.md, paddingVertical: SP.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
   blockHead:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
   blockHeadMeta:    { ...TYPE_SCALE.footnote, color: MUTED },
   blockTitle:       { ...TYPE_SCALE.headline, color: FG, marginBottom: SP.xs },
@@ -1341,13 +1333,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   blockFoot:        { ...TYPE_SCALE.footnote, color: MUTED, marginTop: SP.sm },
   blockActions:     { gap: SP.sm, marginTop: SP.md },
   pillLine:         { flexDirection: 'row', alignItems: 'center', gap: SP.sm, flexShrink: 1 },
-  pill:             { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.sm, backgroundColor: SHEET_FIELD_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER },
+  pill:             { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.sm, backgroundColor: FILL_ELEVATED },
   pillText:         { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold, color: FG },
   bannerWrap:       { paddingHorizontal: SP.md, paddingTop: SP.sm },
   flagRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md },
 
   itemRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm, marginTop: SP.xs },
-  itemThumb:        { width: 60, height: 60, borderRadius: RADIUS.sm, backgroundColor: SHEET_FIELD_BG, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  itemThumb:        { width: 60, height: 60, borderRadius: RADIUS.sm, backgroundColor: FILL_ELEVATED, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   itemThumbImg:     { width: '100%', height: '100%' },
   itemBody:         { flex: 1, minWidth: 0, gap: 2 },
   itemName:         { ...TYPE_SCALE.body, fontFamily: FONT.semibold, color: FG },
@@ -1356,7 +1348,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   rowDivider:       { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER },
   itemCount:        { ...TYPE_SCALE.footnote, color: MUTED, marginTop: SP.md },
 
-  trackingBox:      { marginTop: SP.sm, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: 2 },
+  trackingBox:      { marginTop: SP.md, gap: 2 },
   trackingLabel:    { ...TYPE_SCALE.footnote, color: MUTED },
   trackingValue:    { ...TYPE_SCALE.body, fontFamily: FONT.medium, color: FG },
 
@@ -1372,12 +1364,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mutedText:        { color: MUTED },
   copyRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs },
 
-  band:             { borderBottomWidth: 8, borderBottomColor: SHEET_FIELD_BG },
+  band:             { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
   doneBanner:       { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.md, borderLeftWidth: 3, borderLeftColor: FG },
   doneIcon:         { width: 24, height: 24, borderRadius: 6, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   doneTitle:        { ...TYPE_SCALE.headline, color: FG },
   doneText:         { ...TYPE_SCALE.body, color: FG },
-  noticeRow:        { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: 8, borderBottomColor: SHEET_FIELD_BG },
+  noticeRow:        { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
   noticeText:       { ...TYPE_SCALE.footnote, color: FG, flex: 1 },
 
   timelineWrap:     { paddingHorizontal: SP.md, paddingVertical: SP.md },
@@ -1389,20 +1381,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   timelineMessage:  { ...TYPE_SCALE.body, color: FG },
   timelineTime:     { ...TYPE_SCALE.footnote, color: MUTED, marginTop: 2 },
 
-  sheetField:       { backgroundColor: SHEET_FIELD_BG, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  sheetFieldLabel:  { fontSize: 12, lineHeight: 16, fontFamily: FONT.regular, color: MUTED },
-  sheetFieldInput:  { fontSize: 17, lineHeight: 22, fontFamily: FONT.regular, color: FG, paddingVertical: 2 },
 
   // Cancel modal
   chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   modalOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
-  modalCard:        { backgroundColor: SHEET_FIELD_BG, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, gap: SP.md, maxHeight: '90%' },
+  modalCard:        { backgroundColor: FILL_ELEVATED, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, gap: SP.md, maxHeight: '90%' },
   modalTitle:       { ...TYPE_SCALE.title2, color: FG },
   modalSubtitle:    { ...TYPE_SCALE.footnote, color: MUTED },
   modalActions:     { flexDirection: 'row', gap: SP.sm },
-  cancelNoteInput:  { backgroundColor: BG, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: 15, padding: SP.md, minHeight: 80, textAlignVertical: 'top' },
   warningText:      { ...TYPE_SCALE.footnote, color: MUTED },
-  pausedBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: SHEET_FIELD_BG, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  pausedBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: FILL_ELEVATED, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   pausedBannerText: { flex: 1, ...TYPE_SCALE.footnote, color: FG },
   pausedBannerAction: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: FG },
   });

@@ -64,7 +64,7 @@ vi.mock('@/lib/theme', () => ({
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
-      accent: '#F7F7FA', success: '#10B981', error: '#F87171', muted: '#999', text: '#FAFAFA',
+      accent: '#F7F7FA', success: '#10B981', error: '#F87171', muted: '#999', text: '#FAFAFA', border: '#333',
     },
   }),
 }));
@@ -96,6 +96,8 @@ vi.mock('@/lib/api', () => ({
 }));
 
 vi.mock('@/components/ui', () => ({
+  Icon: nativeComponent('Icon'),
+  ICON_SIZE: { sm: 17, md: 20, lg: 24 },
   Button: ({ label, onPress, disabled, loading }: any) =>
     React.createElement('Button', { label, onPress, disabled, loading, accessibilityLabel: label }),
 }));

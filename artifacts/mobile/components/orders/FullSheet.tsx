@@ -5,19 +5,17 @@
  * order detail's fulfil and refund sheets (and batch ship).
  */
 import React from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Button } from '@/components/ui';
+import { Button, Icon, ICON_SIZE } from '@/components/ui';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { a11yModalProps } from '@/lib/a11y/modal';
 import { TYPE_SCALE } from '@/constants/typography';
-import { FONT, SP } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, SP, TEXT } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
-
-/** Inputs and sheets are solid #1C1C1E (Dev's palette rule). */
-export const SHEET_FIELD_BG = '#1C1C1E';
 
 export function FullSheet({
   visible, title, subtitle, onCancel, right, children, footer, testID, overlay,
@@ -66,11 +64,11 @@ export function FullSheet({
   );
 }
 
-/** A titled block of the sheet, separated from the next by a thick band (Shopify grouping). */
+/** A titled block of the sheet, separated from the next by a full-width hairline (BRANDTHREAD_DESIGN.md: lists, not cards). */
 export function SheetSection({ title, children, last }: { title?: string; children: React.ReactNode; last?: boolean }) {
   const { theme } = useAppTheme();
   return (
-    <View style={[styles.section, !last && { borderBottomWidth: 8, borderBottomColor: SHEET_FIELD_BG }]}>
+    <View style={[styles.section, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border }]}>
       {title ? <Text style={[TYPE_SCALE.headline, { color: theme.text, marginBottom: SP.sm }]}>{title}</Text> : null}
       {children}
     </View>
@@ -84,6 +82,36 @@ const styles = StyleSheet.create({
   sideBtn: { alignSelf: 'flex-start', paddingHorizontal: SP.sm },
   titleBlock: { flex: 1, alignItems: 'center' },
   title: { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold },
-  section: { paddingHorizontal: SP.md, paddingVertical: SP.md },
+  section: { paddingHorizontal: SP.md, paddingVertical: SP.lg },
   footer: { paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.sm },
+  picker: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52, paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: radius.md, backgroundColor: FILL_ELEVATED, marginBottom: SP.sm },
 });
+
+/**
+ * A picker that looks like the shared `Input` (same fill, label inside the
+ * field, no resting border) with a chevron: "Shipping carrier", "Reason".
+ */
+export function SheetPickerField({ label, value, placeholder, onPress, testID }: {
+  label: string;
+  value: string | null | undefined;
+  placeholder: string;
+  onPress: () => void;
+  testID?: string;
+}) {
+  const { theme } = useAppTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}, ${value || 'not selected'}`}
+      style={styles.picker}
+      testID={testID}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={[TEXT.caption, { fontFamily: FONT.medium, color: theme.muted }]}>{label}</Text>
+        <Text style={[TEXT.body, { color: value ? theme.text : theme.muted }]}>{value || placeholder}</Text>
+      </View>
+      <Icon name="chevron-right" size={ICON_SIZE.md} color={theme.muted} />
+    </Pressable>
+  );
+}
