@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const alert = vi.fn();
-vi.mock('react-native', () => ({ Alert: { alert: (...args: unknown[]) => alert(...args) } }));
+const platform = vi.hoisted(() => ({ OS: 'ios' }));
+vi.mock('react-native', () => ({ Alert: { alert: (...args: unknown[]) => alert(...args) }, Platform: platform }));
 
 import { ApiError } from './networkNotice';
 import { promptUpgradeOnPlanGate } from './planUpgradePrompt';
@@ -29,6 +30,22 @@ describe('promptUpgradeOnPlanGate', () => {
   it('names Pro for Pro-only actions', () => {
     promptUpgradeOnPlanGate(gate({ code: 'PLAN_REQUIRED', requiredPlan: 'pro', message: 'Analytics export is on the Pro plan. Upgrade to use it.' }), { push: vi.fn() });
     expect(alert.mock.calls[0][0]).toBe('Upgrade to Pro');
+  });
+
+  it("asks with the browser's confirm on web, where Alert.alert is a no-op", () => {
+    platform.OS = 'web';
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal('window', { confirm });
+    const router = { push: vi.fn() };
+    try {
+      expect(promptUpgradeOnPlanGate(gate({ code: 'PLAN_REQUIRED', requiredPlan: 'growth', message: 'Live selling is on the Growth plan. Upgrade to use it.' }), router)).toBe(true);
+      expect(confirm).toHaveBeenCalledWith('Upgrade to Growth\n\nLive selling is on the Growth plan. Upgrade to use it.');
+      expect(router.push).toHaveBeenCalledWith('/subscription');
+      expect(alert).not.toHaveBeenCalled();
+    } finally {
+      platform.OS = 'ios';
+      vi.unstubAllGlobals();
+    }
   });
 
   it('leaves every other error to the screen', () => {
