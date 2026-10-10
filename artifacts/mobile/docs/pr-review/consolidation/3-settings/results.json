@@ -1,0 +1,37 @@
+[
+  {
+    "name": "buyer-settings-mid",
+    "target": "/buyer-settings",
+    "landed": "/buyer-settings?bt_preview=buyer&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "buyer-settings-bottom",
+    "target": "/buyer-settings",
+    "landed": "/buyer-settings?bt_preview=buyer&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "seller-settings-mid",
+    "target": "/seller-settings",
+    "landed": "/seller-settings?bt_preview=seller&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "seller-settings-bottom",
+    "target": "/seller-settings",
+    "landed": "/seller-settings?bt_preview=seller&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "buyer-settings-search",
+    "target": "/buyer-settings",
+    "landed": "/buyer-settings?bt_preview=buyer&demo=1",
+    "ok": true,
+    "notFound": false
+  }
+]

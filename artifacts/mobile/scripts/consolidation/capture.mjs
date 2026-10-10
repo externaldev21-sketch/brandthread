@@ -7,6 +7,8 @@
  * shots.json: [{ "name", "role": "seller"|"buyer", "target": "/path?x=1",
  *               "demo": true (&demo=1) | false (fresh account), "expect": "/landing/path" (optional),
  *               "tap": "testID to press after load" (optional),
+ *               "tapLabel": "accessibility label to press instead" (optional),
+ *               "scroll": px | "bottom" (optional),
  *               "expectNotFound": true (optional) }]
  * Writes <name>.png per shot and results.json ({ name, target, landed, ok }).
  */
@@ -39,10 +41,22 @@ try {
         await page.waitForTimeout(1500);
         if (new URL(page.url()).pathname !== '/') break;
       }
-      if (shot.tap) {
-        await page.getByTestId(shot.tap).first().click();
+      if (shot.tap || shot.tapLabel) {
+        const target = shot.tap ? page.getByTestId(shot.tap) : page.getByLabel(shot.tapLabel, { exact: true });
+        await target.first().click();
         await waitForQuietNetwork(activity, 800, 15_000);
         await page.waitForTimeout(900);
+      }
+      if (shot.scroll) {
+        // Scroll every scrollable element by `shot.scroll` px ('bottom' = to the end).
+        await page.evaluate((amount) => {
+          for (const el of document.querySelectorAll('*')) {
+            const style = getComputedStyle(el);
+            if (!/(auto|scroll)/.test(style.overflowY) || el.scrollHeight <= el.clientHeight) continue;
+            el.scrollTop = amount === 'bottom' ? el.scrollHeight : el.scrollTop + amount;
+          }
+        }, shot.scroll);
+        await page.waitForTimeout(700);
       }
       const landed = new URL(page.url());
       const landedPath = decodeURIComponent(landed.pathname);
