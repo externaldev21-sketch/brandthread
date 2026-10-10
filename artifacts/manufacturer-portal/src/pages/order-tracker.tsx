@@ -148,7 +148,7 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
             <section className="rounded-lg border border-border bg-card p-5" data-testid="panel-payment">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Payment</h2>
               {cancelRequested && (
-                <div className="mt-3 space-y-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200" data-testid="banner-cancel-request">
+                <div className="mt-3 space-y-3 rounded-md border border-border bg-secondary/40 p-3 text-sm text-foreground" data-testid="banner-cancel-request">
                   <p>{sellerName} asked to cancel this order{order.cancelRequestReason ? `: "${order.cancelRequestReason}"` : "."} Approving refunds them in full.</p>
                   <div className="flex gap-2">
                     <Button size="sm" className="flex-1" disabled={answerCancel.isPending} data-testid="button-approve-cancel"
