@@ -54,6 +54,7 @@ import { recordLostChargeback, reinstateLostChargeback } from "../lib/money/sell
 import { recordDisputeReinstatement } from "../lib/money/disputes";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
+import { releaseCartRewards } from "../lib/money/cartRewards";
 import {
   isOrderConfirmationEligibleStatus,
   sendOrderConfirmationEmail,
@@ -767,7 +768,12 @@ export async function handleCartPaymentEnded(pi: any, failed: boolean): Promise<
       logger.warn({ err, paymentIntentId: pi.id }, "Could not cancel a failed cart PaymentIntent");
     }
   }
-  const groups = await db.select({ id: checkoutSessions.id }).from(checkoutSessions)
+  const groups = await db.select({
+    id: checkoutSessions.id,
+    buyerId: checkoutSessions.buyerId,
+    loyaltyToken: checkoutSessions.loyaltyToken,
+    threadCashToken: checkoutSessions.threadCashToken,
+  }).from(checkoutSessions)
     .where(eq(checkoutSessions.stripePaymentIntentId, pi.id));
   for (const group of groups) {
     await db.transaction(async (tx) => {
@@ -812,6 +818,8 @@ async function notifyLowStockAfterOrder(
       lowStockThreshold: row.lowStockThreshold ?? 0,
     });
   }
+  // Loyalty / Thread Cash this payment held go back to the buyer (BT-258).
+  if (pi.status !== "succeeded") await releaseCartRewards(groups);
 }
 
 export async function handleCheckoutPaid(
@@ -1122,9 +1130,12 @@ export async function handleCheckoutPaid(
       grossCents: totalCents,
       // Rate fixed when the checkout was created; null (older sessions) = standard 5%.
       platformFeeBps: csRecord.platformFeeBps,
-      processingFeeCents: chargeModel === "held"
+      // A preorder group of an in-app cart (BT-258) shares the cart's one
+      // charge too, so it takes its pro-rata share of the fee like a
+      // transfer group; a hosted held session is one order.
+      processingFeeCents: chargeModel === "held" && session.cart_amount_total == null
         ? chargeDetails.processingFeeCents
-        : chargeModel === "transfer"
+        : chargeModel === "transfer" || chargeModel === "held"
           // A cart-wide charge carries this order's pro-rata share; a hosted
           // Checkout Session charged on the platform balance is one order.
           ? (session.cart_amount_total == null

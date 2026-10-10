@@ -61,7 +61,13 @@ export async function settleTransferOrder(
     disputePausedAt: orders.disputePausedAt,
   }).from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!order || order.chargeModel !== "transfer") return "not_transfer_order";
-  if (order.stripeTransferId || order.fundsState === "released") return "already";
+  if (order.stripeTransferId || order.fundsState === "released") {
+    // A retry after the payout: finish a Thread Cash top-up that failed then.
+    await applyThreadCashSellerTopup(stripeClient ?? null, orderId).catch((error) => {
+      logger.error({ err: error, orderId }, "Thread Cash seller top-up failed; the money sweep retries it");
+    });
+    return "already";
+  }
   // Refunded / cancelled before the transfer: nothing is owed to the seller.
   if (order.fundsState !== "held" || order.status === "refund_pending" || order.status === "cancelled") return "not_ready";
   if (!stripeClient) return "not_ready";

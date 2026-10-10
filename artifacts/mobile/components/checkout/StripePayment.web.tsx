@@ -26,6 +26,8 @@ import type { Stripe, StripeElements, StripeElementsOptions } from '@stripe/stri
 import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { MIN_CARD_CHARGE_CENTS_CLIENT, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
 import { useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
+import { reportError } from '@/lib/monitoring';
+import { reportStripeUnavailableOnce, shouldReportStripeUnavailable } from '@/lib/stripeLaunchCheck';
 import {
   stripePublishableKey,
   type BillingDetails, type ConfirmOutcome, type ExpressPayProps, type GetClientSecret, type PaymentControllerApi,
@@ -46,7 +48,13 @@ function stripeLoader(): Promise<Stripe | null> | null {
 }
 
 export function stripePaymentAvailable(): boolean {
-  return !!stripePublishableKey() && !stripeLoadFailed;
+  const hasKey = !!stripePublishableKey();
+  // BT-271: a production web build without the key is reported once (a
+  // Stripe.js load failure is the buyer's network, not a launch bug).
+  if (!hasKey && shouldReportStripeUnavailable({ isDev: __DEV__, isExpoGo: false })) {
+    reportStripeUnavailableOnce('missing_publishable_key', 'web', reportError);
+  }
+  return hasKey && !stripeLoadFailed;
 }
 
 /** Follows the app theme: fields with a hairline border (the page's own field style). */

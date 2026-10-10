@@ -20,6 +20,9 @@ import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } 
 import { NativeModules, Platform, StyleSheet, TurboModuleRegistry, View } from 'react-native';
 import { centsToAmountString, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
 import { FONT } from '@/lib/theme';
+import { reportError } from '@/lib/monitoring';
+import { isExpoGo } from '@/lib/expoGoRuntime';
+import { reportStripeUnavailableOnce, shouldReportStripeUnavailable, stripeUnavailableReason } from '@/lib/stripeLaunchCheck';
 import { useCheckoutColors } from './CheckoutPrimitives';
 import {
   APPLE_MERCHANT_ID, stripePublishableKey,
@@ -43,8 +46,13 @@ function nativeModulePresent(): boolean {
 
 function sdk(): StripeSdk | null {
   if (cachedSdk !== undefined) return cachedSdk;
-  if (!stripePublishableKey() || !nativeModulePresent()) {
+  const unavailable = stripeUnavailableReason({ hasPublishableKey: !!stripePublishableKey(), nativeModulePresent: nativeModulePresent() });
+  if (unavailable) {
     cachedSdk = null;
+    // BT-271: a production build without in-app payments is a launch bug, not a quiet fallback.
+    if (shouldReportStripeUnavailable({ isDev: __DEV__, isExpoGo: isExpoGo() })) {
+      reportStripeUnavailableOnce(unavailable, Platform.OS, reportError);
+    }
     return null;
   }
   try {

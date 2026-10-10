@@ -32,6 +32,7 @@ import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode, type Ch
 import { payoutHoldApplies, payoutReleasableSql, payoutTimeReached, hasOpenReturn } from "../delivery/payoutGate";
 import { announceRecovered, netRecoveriesFromRelease, type SellerRecovery } from "./sellerRecovery";
 import type Stripe from "stripe";
+import { applyThreadCashSellerTopup } from "../threadCash/checkoutTopup";
 
 type StripeLike = Pick<Stripe, "transfers">;
 
@@ -629,6 +630,12 @@ export async function executeOrderRelease(
       }
       await maybeCompleteDrop(tx, release.drop_id);
     }
+  });
+
+  // Thread Cash on a preorder is Brandthread's to fund: top the seller up
+  // now that the order's own funds went out (idempotent; checkoutTopup.ts).
+  await applyThreadCashSellerTopup(stripeClient ?? null, release.order_id).catch((error) => {
+    logger.error({ err: error, orderId: release.order_id }, "Thread Cash seller top-up failed after a release");
   });
 
   return { releaseId, state: "paid", amountCents: release.amount_cents, stripeTransferId: transferId, recoveryNettedCents: netted };

@@ -23,10 +23,15 @@ import { requestPrimitives, validateRequest } from "../middlewares/validateReque
 import { recordCheckoutAttribution } from "../lib/growth/attribution";
 import { BundlePricingError } from "../lib/money/bundlePricing";
 import { priceGroupBundles } from "../lib/money/bundleLoader";
+import { DiscountValidationError, validateDiscountCode } from "../lib/discounts";
+import {
+  buildGuestCheckoutSessionParams, guestCustomerParams, guestDiscountCents,
+} from "../lib/money/guestCheckoutSession";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const tokenHash = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
+/** SHA-256 of a guest access token: the only form the database keeps. */
+export const tokenHash = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
 const guestTokenSecret = process.env.SESSION_SECRET;
 const shippingAddressSchema = z.object({
   name: requestPrimitives.shortText.optional(),
@@ -61,13 +66,22 @@ const guestCheckoutSchema = z.object({
   shippingAddress: shippingAddressSchema,
   clientIdempotencyKey: z.string().trim().min(8).max(160),
   dropId: requestPrimitives.uuid.nullable().optional(),
+  /** This seller's discount code (BT-255), validated fresh here like the signed-in flow. */
+  discountCode: z.string().trim().min(1).max(64).optional(),
+  /** Live the guest is shopping from (live-only codes). */
+  liveStreamId: z.string().uuid().nullable().optional(),
 }).passthrough();
 const guestVerifyParamsSchema = z.object({ sessionId: requestPrimitives.id });
 const guestVerifyBodySchema = z.object({
   guestAccessToken: z.string().min(32).max(512),
 });
 
-function guestAccessToken(checkoutId: string): string {
+/**
+ * The guest's capability for one checkout: HMAC(SESSION_SECRET, id). Also
+ * used by the in-app guest payment (routes/checkout-intent.ts), keyed on
+ * that cart's first checkout row.
+ */
+export function guestAccessToken(checkoutId: string): string {
   if (!guestTokenSecret) {
     throw Object.assign(new Error("Guest checkout is temporarily unavailable"), { status: 503 });
   }
@@ -109,7 +123,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
   let stripeStarted = false;
   try {
     const stripe = requireStripe();
-    const { items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress, clientIdempotencyKey, dropId } = req.body ?? {};
+    const {
+      items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress, clientIdempotencyKey, dropId,
+      discountCode, liveStreamId,
+    } = req.body ?? {};
     const email = typeof contactEmail === "string" ? contactEmail.trim().toLowerCase() : "";
     if (!emailPattern.test(email)) return res.status(400).json({ error: "A valid contactEmail is required" });
     const phone = typeof contactPhone === "string" ? contactPhone.trim() : "";
@@ -122,6 +139,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     const seen = new Set<string>();
     const cartItems: any[] = [];
     const lineItems: any[] = [];
+    const discountLines: Array<{ productId: string; priceCents: number; quantity: number }> = [];
     let sellerId = "";
     // Tracked separately (not persisted on the checkout-session row) so it
     // can feed weight-tiered shipping zones without changing the shape of
@@ -164,6 +182,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       variant.priceCents = (await effectiveUnitPrice({ productId: variant.productId, sellerId: variant.sellerId, priceCents: variant.priceCents })).priceCents;
       const variantLabel = [variant.size, variant.color].filter(Boolean).join(" / ");
       cartItems.push({ variantId: variant.variantId, productName: variant.productName, variantLabel, quantity, priceCents: variant.priceCents });
+      discountLines.push({ productId: variant.productId, priceCents: variant.priceCents, quantity });
       cartWeightGrams += (variant.weightGrams ?? 0) * quantity;
       lineItems.push({ price_data: { currency: "usd", unit_amount: variant.priceCents, tax_behavior: "exclusive", product_data: {
         name: variant.productName, ...(variantLabel ? { description: variantLabel } : {}),
@@ -287,13 +306,43 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       tax_behavior: "exclusive",
       product_data: { name: shippingLineName },
     }, quantity: 1 });
+    // ── Discount code (BT-255): validated fresh, with the same rules and the
+    // same per-customer key ("guest:<email>") the order webhook records.
+    let discountApplication: Awaited<ReturnType<typeof validateDiscountCode>> | null = null;
+    if (typeof discountCode === "string" && discountCode.trim()) {
+      try {
+        discountApplication = await validateDiscountCode({
+          sellerId,
+          code: discountCode,
+          customerKey: `guest:${email}`,
+          cartSubtotalCents: subtotalCents,
+          lines: discountLines,
+          liveStreamId: typeof liveStreamId === "string" ? liveStreamId : null,
+        });
+      } catch (err) {
+        if (err instanceof DiscountValidationError) {
+          return void res.status(400).json({ error: err.message, code: err.code, ...err.details });
+        }
+        throw err;
+      }
+    }
+    const discountCodeAmountCents = discountApplication
+      ? guestDiscountCents({
+        appliedAmountCents: discountApplication.appliedAmountCents,
+        freeShipping: discountApplication.freeShipping,
+        subtotalCents,
+        shippingCents,
+      })
+      : 0;
+
     const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
+    // A seller's discount code lowers the fee basis, as on the signed-in flow.
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
-      merchandiseCents: afterBundlesCents,
+      merchandiseCents: Math.max(0, afterBundlesCents - discountCodeAmountCents),
       shippingCents,
-      preTaxTotalCents: afterBundlesCents + shippingCents,
+      preTaxTotalCents: Math.max(0, afterBundlesCents + shippingCents - discountCodeAmountCents),
       platformFeeBps,
     });
     const checkoutIdValue = crypto.randomUUID();
@@ -310,6 +359,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         platformFeeBps,
         processingFeeEstimateCents: money.processingFeeEstimateCents,
         ...(bundleDiscountCents > 0 ? { bundleDiscountCents, bundleLines: bundlePricing.applied } : {}),
+        ...(discountApplication ? {
+          discountCodeId: discountApplication.discount.id,
+          discountCodeAmountCents,
+        } : {}),
       }).returning({ id: checkoutSessions.id });
     } catch (error: any) {
       // A concurrent duplicate request lost the DB uniqueness race. Reuse only
@@ -334,41 +387,38 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       throw error;
     }
     checkoutId = checkout.id;
-    const validDropId = chargePlan.dropId ?? undefined;
-    let bundleCouponId: string | undefined;
-    if (bundleDiscountCents > 0) {
+    // BT-256: the address was collected in the app and validated above, so
+    // the Stripe page doesn't ask for it again. It rides on a Customer (tax
+    // and prefill) and on the PaymentIntent (lib/money/guestCheckoutSession.ts).
+    const customer = await stripe.customers.create(
+      guestCustomerParams({ email, phone, shipping: shippingAddressValue, checkoutId: checkout.id }),
+      { idempotencyKey: `guest_cust_${checkout.id}` },
+    );
+    let couponId: string | null = null;
+    if (discountCodeAmountCents + bundleDiscountCents > 0) {
       const coupon = await stripe.coupons.create({
-        amount_off: bundleDiscountCents,
+        amount_off: discountCodeAmountCents + bundleDiscountCents,
         currency: "usd",
         duration: "once",
         max_redemptions: 1,
-        name: bundlePricing.applied.map((bundle) => `Bundle: ${bundle.name}`).join(" + ").slice(0, 40),
-      });
-      bundleCouponId = coupon.id;
+        name: discountApplication?.discount.code ?? "Bundle savings",
+      }, { idempotencyKey: `guest_coupon_${checkout.id}` });
+      couponId = coupon.id;
     }
     stripeStarted = true;
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: lineItems,
-      ...(bundleCouponId ? { discounts: [{ coupon: bundleCouponId }] } : {}),
-      automatic_tax: {
-        enabled: true,
-        liability: { type: "account", account: seller.stripeAccountId },
-      },
-      shipping_address_collection: { allowed_countries: [shippingAddressValue.country] },
-      success_url: successUrl, cancel_url: cancelUrl,
-      customer_email: email,
-      // The store language (seller Languages screen) for Stripe's page.
-      ...(checkoutSettings ? { locale: stripeCheckoutLocale(checkoutSettings.storeLanguage) } : {}),
-      metadata: { csRef: checkout.id, guest: "true", ...(validDropId ? { dropId: validDropId } : {}) },
-      payment_intent_data: {
-        ...money.paymentIntentData,
-        metadata: {
-          ...(money.paymentIntentData.metadata as Record<string, string>),
-          ...(validDropId ? { dropId: validDropId } : {}),
-        },
-      },
-    }, key ? { idempotencyKey: `guest_cs_${key}` } : {});
+    const session = await stripe.checkout.sessions.create(buildGuestCheckoutSessionParams({
+      lineItems,
+      sellerStripeAccountId: seller.stripeAccountId,
+      shipping: shippingAddressValue,
+      successUrl,
+      cancelUrl,
+      email,
+      customerId: customer.id,
+      checkoutId: checkout.id,
+      dropId: chargePlan.dropId ?? null,
+      couponId,
+      paymentIntentData: money.paymentIntentData,
+    }), key ? { idempotencyKey: `guest_cs_${key}` } : {});
     await db.update(checkoutSessions).set({ stripeSessionId: session.id }).where(eq(checkoutSessions.id, checkout.id));
     // Additive growth attribution (tracked link / UTM); best effort, never blocks checkout.
     await recordCheckoutAttribution({
