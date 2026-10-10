@@ -112,18 +112,17 @@ async function buildPreview(ownerId: string, source: ImportSource, mapped: MapRe
 
   const capacity = await readCapacity(ownerId, planLimit);
   const creates = plan.filter((p) => p.action === "create" && p.product.sourceStatus !== "archived").length;
-  const wouldExceed = capacity.remaining !== null && creates > capacity.remaining;
-  if (wouldExceed) {
-    issues.push({
-      severity: "warning", line: 0, product: "", field: null,
-      message: `Your plan allows ${capacity.limit} products and ${capacity.used} are in use, so only the first ${capacity.remaining} new product${capacity.remaining === 1 ? "" : "s"} will be imported.`,
-    });
-  }
+  // Imports land as drafts, which the plan cap doesn't count, so nothing is
+  // held back here; the cap applies when the seller publishes.
+  const wouldExceed = false;
 
   const notes: string[] = [];
   if (mapped.products.some((p) => p.variants.some((v) => v.compareAtCents))) notes.push("Compare-at prices aren't imported.");
   if (mapped.products.some((p) => p.seoTitle || p.seoDescription || p.vendor)) notes.push("Vendor and SEO fields aren't imported.");
   notes.push("Products are imported as drafts. Publish when ready.");
+  if (capacity.remaining !== null && creates > capacity.remaining) {
+    notes.push(`Your plan lists up to ${capacity.limit} live products and ${capacity.used} are live, so you can publish ${capacity.remaining} more. Upgrade to publish the rest.`);
+  }
 
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
@@ -214,7 +213,7 @@ async function runCommit(req: express.Request, res: express.Response, source: Im
   const summary = await commitProducts({ ownerId, source, items: mapped.products, planLimit: access.limits.products, runId, log: req.log ?? logger });
   const c = summary.runCounts;
   if (summary.planLimitReached && c.created === 0 && c.updated === 0 && c.unchanged === 0) {
-    sendPlanLimitReached(res, { resource: "products", currentPlan: access.planId, requiredPlan: "growth", limit: access.limits.products! });
+    sendPlanLimitReached(res, { resource: "products", currentPlan: access.planId, paid: access.paid, requiredPlan: "growth", limit: access.limits.products! });
     return;
   }
   const rowErrors = mapped.issues.filter((i) => i.severity === "error");

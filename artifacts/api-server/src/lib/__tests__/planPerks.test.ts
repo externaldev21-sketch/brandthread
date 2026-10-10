@@ -103,13 +103,13 @@ describe("buildPlanPerks", () => {
       expect(perk.platformFeeBps).toBe(platformFeeBpsForPlan(perk.planId));
     }
     expect(perks.find((p) => p.planId === "pro")).toMatchObject({
-      amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true,
+      amountCents: 12900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true,
     });
   });
 
-  it("only Pro has advanced analytics", () => {
+  it("gives Growth and Pro advanced analytics (planCatalogue.ts tiers)", () => {
     expect(hasAdvancedAnalytics("pro")).toBe(true);
-    expect(hasAdvancedAnalytics("growth")).toBe(false);
+    expect(hasAdvancedAnalytics("growth")).toBe(true);
     expect(hasAdvancedAnalytics("starter")).toBe(false);
     expect(hasAdvancedAnalytics(null)).toBe(false);
   });

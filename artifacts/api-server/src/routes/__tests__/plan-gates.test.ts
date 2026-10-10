@@ -15,25 +15,28 @@ const manufacturersSource = fs.readFileSync(
   "utf8",
 );
 
+const analyticsSource = fs.readFileSync(path.resolve(__dirname, "..", "analytics.ts"), "utf8");
+const insightsSource = fs.readFileSync(path.resolve(__dirname, "..", "analytics-insights.ts"), "utf8");
+
 describe("paid route mounts", () => {
   it("keeps every paid route behind an explicit minimum plan", () => {
     expect(routesSource).toContain(
-      'router.use("/logo",            tc, requirePlan("growth"), logoRouter);',
+      'router.use("/logo",            tc, requirePlan("growth"), aiSafetyGuard("logo"), logoRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/mockup",          tc, requirePlan("growth"), mockupRouter);',
+      'router.use("/mockup",          tc, requirePlan("growth"), aiSafetyGuard("mockup"), mockupRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/photography",     tc, requirePlan("growth"), photographyRouter);',
+      'router.use("/photography",     tc, requirePlan("growth"), aiSafetyGuard("photography"), photographyRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/bg-removal",      tc, requirePlan("growth"), bgRemovalRouter);',
+      'router.use("/bg-removal",      tc, requirePlan("growth"), aiSafetyGuard("bg-removal"), bgRemovalRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/lifestyle",       tc, requirePlan("growth"), lifestyleRouter);',
+      'router.use("/lifestyle",       tc, requirePlan("growth"), aiSafetyGuard("lifestyle"), lifestyleRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);',
+      'router.use("/techpack",        tc, requirePlan("growth"), aiSafetyGuard("techpack", { mode: "chat", scan: "all" }), techpackRouter);',
     );
     expect(routesSource).toContain(
       'router.use("/manufacturers",   tc, manufacturersRouter);',
@@ -44,13 +47,26 @@ describe("paid route mounts", () => {
     expect(routesSource).toContain(
       'router.use("/live",                      tc, liveRouter);',
     );
+    // Buying a boost or a Featured slot: Growth+ (planCatalogue.ts → boosts).
     expect(routesSource).toContain(
-      'router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);',
+      'router.use("/boosts",                    tc, featureGate("boosts", { only: [{ method: "POST", path: "/" }] }), boostsRouter);',
     );
+    expect(routesSource).toContain('featureGate("boosts", { only: [{ method: "POST", path: "/" }] }), featuredSlotsRouter);');
   });
 
-  it("gates hosting a live behind Pro without blocking buyers from watching", () => {
-    expect(liveSource).toContain('const hostPlan = requirePlan("pro");');
+  it("gates starting growth tools (not managing them) on the server", () => {
+    expect(routesSource).toContain('featureGate("drops", { only: [{ method: "POST", path: "/" }] }), dropsRouter');
+    // Giveaways and Shopify sync aren't tier differences in Dev's plan tiers.
+    expect(routesSource).toContain('router.use("/seller/giveaways",          tc, sellerGiveawaysRouter);');
+    expect(routesSource).toContain('router.use("/shopify",         tc, shopifyRouter);');
+    expect(routesSource).toContain('featureGate("custom_domain", { only: [{ method: "POST", path: "/domains" }] }), storeRouter');
+    expect(routesSource).toContain('featureGate("manufacturer_hub", { only: [{ method: "POST", path: "/", when: (req) => req.body?.orderType === "bulk" }] }), sampleOrdersRouter');
+    expect(routesSource).toContain('{ method: "POST", path: "/quote-requests", when: (req) => req.body?.type !== "sample" }, { method: "POST", path: "/rfqs" }] }), sellerHubRouter');
+    expect(routesSource).toContain('tc, pushBroadcastAllowance, sellerPushBroadcastsRouter');
+  });
+
+  it("gates hosting a live behind the live_hosting plan without blocking buyers from watching", () => {
+    expect(liveSource).toContain('const hostPlan = featureGate("live_hosting", { extra: checkLiveAllowance });');
     expect(liveSource).toContain('router.post("/start", requireAuth, hostPlan,');
     expect(liveSource).toContain('router.post("/:id/end", requireAuth, hostPlan,');
     expect(liveSource).toContain('router.patch("/:id/products", requireAuth, hostPlan,');
@@ -63,7 +79,7 @@ describe("paid route mounts", () => {
 
   it("gates seller manufacturer actions without blocking manufacturer onboarding", () => {
     expect(manufacturersSource).toContain(
-      'const requireGrowthSeller = [requireAuth, teamContext(), requirePlan("growth")] as const;',
+      'const requireGrowthSeller = [requireAuth, teamContext(), featureGate("manufacturer_hub")] as const;',
     );
     expect(manufacturersSource).toContain(
       'router.post("/invite-tokens", ...requireGrowthSeller',
@@ -77,5 +93,13 @@ describe("paid route mounts", () => {
     expect(manufacturersSource).toContain(
       'router.post("/register-via-invite/:token", async',
     );
+  });
+
+  it("reads the analytics level from the plan config", () => {
+    expect(analyticsSource).toContain('router.get("/advanced", featureGate("advanced_analytics"),');
+    expect(analyticsSource).toContain('router.get("/customers", featureGate("advanced_analytics"),');
+    expect(insightsSource).toContain('router.get("/advanced", featureGate("advanced_analytics"),');
+    expect(insightsSource).toContain('router.post("/export", featureGate("analytics_export"),');
+    expect(analyticsSource + insightsSource).not.toContain('requirePlan("pro")');
   });
 });

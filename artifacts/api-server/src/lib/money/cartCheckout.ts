@@ -30,6 +30,7 @@ import {
 } from "@workspace/db";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../shippingZones";
 import { getSellerVacationStatus } from "../sellerAvailability";
+import { productsBeyondSellerPlan, SELLER_PLAN_LIMIT_CODE, SELLER_PLAN_LIMIT_MESSAGE } from "../planGate";
 import { validateDiscountCode, DiscountValidationError } from "../discounts";
 import { effectiveUnitPrice } from "../pricing/salesRuntime";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
@@ -200,6 +201,9 @@ export async function priceCartGroup(input: {
 
   const vacation = await getSellerVacationStatus(sellerId);
   if (vacation.active) throw new CartCheckoutError(409, "SELLER_ON_VACATION", vacation.message);
+  if ((await productsBeyondSellerPlan(sellerId, items.map((i) => i.productId))).length > 0) {
+    throw new CartCheckoutError(409, SELLER_PLAN_LIMIT_CODE, SELLER_PLAN_LIMIT_MESSAGE);
+  }
 
   const [seller] = await db.select({
     stripeAccountId: users.stripeAccountId,

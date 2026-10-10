@@ -60,6 +60,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { radius } from '@/constants/radii';
+import { getEntitlementRejection } from '@/lib/entitlementError';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -740,6 +741,15 @@ export default function BoostScreen() {
         boostRecord = created as Boost;
         setPendingBoost(boostRecord);
       } catch (e: any) {
+        // A plan gate answers with the upgrade path, not a generic error.
+        const rejection = getEntitlementRejection(e);
+        if (rejection) {
+          Alert.alert(`Upgrade to ${rejection.requiredPlan === 'pro' ? 'Pro' : 'Growth'}`, rejection.message, [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'View plans', onPress: () => router.push('/subscription' as never) },
+          ]);
+          return;
+        }
         const msg = e?.message ?? '';
         const body = (() => { try { return JSON.parse(msg); } catch { return null; } })();
         Alert.alert('Error', body?.error ?? 'Could not create boost. Please try again.');

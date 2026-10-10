@@ -33,6 +33,7 @@ import {
   SHARE_BASE_URL,
   validateGiveawayInput,
 } from "../lib/giveaways";
+import { stripRequiredFooter, withRequiredFooter } from "../lib/giveaways";
 
 type GiveawayRow = typeof giveaways.$inferSelect;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,7 +50,7 @@ function serialize(g: GiveawayRow, now = new Date()) {
     postId: g.postId,
     startsAt: g.startsAt.toISOString(),
     endsAt: g.endsAt.toISOString(),
-    rulesText: g.rulesText,
+    rulesText: withRequiredFooter(g.rulesText), // fixed Apple / Google / Brandthread disclaimer (5.3.3)
     eligibility: g.eligibility,
     region: g.region,
     winnerCount: g.winnerCount,
@@ -171,7 +172,7 @@ sellerGiveawaysRouter.post("/", rateLimit("mutation"), async (req, res) => {
       const [row] = await tx.insert(giveaways).values({
         sellerId, shareCode: generateShareCode(), title: v.title, prizeText: v.prizeText,
         productId: v.productId, postId: v.postId, startsAt: v.startsAt, endsAt: v.endsAt,
-        rulesText: v.rulesText, eligibility: v.eligibility, region: v.region, winnerCount: v.winnerCount,
+        rulesText: stripRequiredFooter(v.rulesText), eligibility: v.eligibility, region: v.region, winnerCount: v.winnerCount,
       }).returning();
       return row!;
     });
@@ -246,7 +247,7 @@ sellerGiveawaysRouter.patch("/:id", rateLimit("mutation"), async (req, res) => {
     if (refError) { res.status(400).json({ error: refError, code: "INVALID_REFERENCE" }); return; }
     const [row] = await db.update(giveaways).set({
       title: v.title, prizeText: v.prizeText, productId: v.productId, postId: v.postId,
-      startsAt: v.startsAt, endsAt: v.endsAt, rulesText: v.rulesText, eligibility: v.eligibility,
+      startsAt: v.startsAt, endsAt: v.endsAt, rulesText: stripRequiredFooter(v.rulesText), eligibility: v.eligibility,
       region: v.region, winnerCount: v.winnerCount, updatedAt: new Date(),
     }).where(and(eq(giveaways.id, g.id), eq(giveaways.status, "open"))).returning();
     if (!row) { res.status(409).json({ error: "This giveaway can no longer be edited.", code: "NOT_EDITABLE" }); return; }

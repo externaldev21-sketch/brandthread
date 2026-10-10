@@ -20,6 +20,12 @@ export const ANALYTICS_EVENTS = {
   live_joined: ['surface'],
   seller_onboarding_completed: [],
   product_published: [],
+  // Seller paywall (BT-450). Trial start, purchase, cancel and end are sent
+  // by the server from the Stripe / RevenueCat webhooks, not from here.
+  paywall_viewed: ['source', 'from_onboarding'],
+  plan_selected: ['plan'],
+  paywall_purchase_cancelled: ['plan'],
+  paywall_dismissed: ['from_onboarding'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type AnalyticsEventName = keyof typeof ANALYTICS_EVENTS;

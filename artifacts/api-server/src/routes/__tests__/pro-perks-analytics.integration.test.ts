@@ -1,6 +1,6 @@
 /**
  * Brandthread Pro: GET /api/seller/subscription/perks and the Pro-only
- * GET /api/analytics/advanced (requirePlan("pro") on the real middleware).
+ * GET /api/analytics/advanced (the real advanced_analytics gate: Growth+).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
@@ -90,11 +90,11 @@ describe("GET /api/seller/subscription/perks", () => {
     expect(res.status).toBe(200);
     const body: any = await res.json();
     expect(body.currentPlan).toBe("growth");
-    expect(body.hasAdvancedAnalytics).toBe(false);
+    expect(body.hasAdvancedAnalytics).toBe(true);
     expect(body.plans).toEqual([
-      expect.objectContaining({ planId: "starter", amountCents: 2900, platformFeeBps: 500, monthlyAiCredits: 1000, advancedAnalytics: false }),
-      expect.objectContaining({ planId: "growth", amountCents: 7900, platformFeeBps: 400, monthlyAiCredits: 4000, advancedAnalytics: false }),
-      expect.objectContaining({ planId: "pro", amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true }),
+      expect.objectContaining({ planId: "starter", amountCents: 1999, platformFeeBps: 500, monthlyAiCredits: 1000, advancedAnalytics: false }),
+      expect.objectContaining({ planId: "growth", amountCents: 4900, platformFeeBps: 400, monthlyAiCredits: 4000, advancedAnalytics: true }),
+      expect.objectContaining({ planId: "pro", amountCents: 12900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true }),
     ]);
   });
 
@@ -117,13 +117,11 @@ describe("GET /api/seller/subscription/perks", () => {
 });
 
 describe("GET /api/analytics/advanced", () => {
-  it("is refused below Pro with an upgrade response", async () => {
-    for (const plan of ["starter", "growth"]) {
-      state.planId = plan;
-      const res = await fetch(`${base}/api/analytics/advanced`);
-      expect(res.status).toBe(403);
-      expect(await res.json()).toMatchObject({ code: "PLAN_REQUIRED", requiredPlan: "pro", currentPlan: plan });
-    }
+  it("is refused on Starter with an upgrade response pointing to Growth", async () => {
+    state.planId = "starter";
+    const res = await fetch(`${base}/api/analytics/advanced`);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "PLAN_REQUIRED", feature: "advanced_analytics", requiredPlan: "growth", currentPlan: "starter" });
   });
 
   it("denies access when the plan cannot be verified", async () => {
