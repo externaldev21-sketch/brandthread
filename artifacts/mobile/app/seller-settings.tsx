@@ -17,6 +17,7 @@ import { previewSellerBrandName } from '@/lib/previewIdentity';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { appVersion } from '@/lib/appVersion';
+import { Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
@@ -33,6 +34,7 @@ import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/setting
 import { ConfirmSheet } from '@/components/settings/SettingsKit';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -41,6 +43,7 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 export default function SellerSettingsScreen() {
   const colors = useColors();
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const titleCollapse = useLargeTitleCollapse();
   const router = useRouter();
   const api = useApi();
   const { signOut } = useAuth();
@@ -160,7 +163,9 @@ export default function SellerSettingsScreen() {
         onBack={() => { hapticLight(); goBackOr(router); }}
       />
 
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={titleCollapse.onScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: tabBarInset + SP.xl }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"

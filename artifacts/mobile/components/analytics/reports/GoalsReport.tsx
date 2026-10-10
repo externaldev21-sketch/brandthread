@@ -136,7 +136,7 @@ export default function GoalsReport() {
           <Text style={s.fieldLabel}>Target</Text>
           <View style={s.inputWrap}>
             {metric === 'revenue' && <Text style={s.inputPrefix}>$</Text>}
-            <TextInput
+            <TextInput returnKeyType="done"
               value={text}
               onChangeText={setText}
               keyboardType="decimal-pad"

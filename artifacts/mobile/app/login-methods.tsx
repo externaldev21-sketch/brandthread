@@ -54,6 +54,7 @@ export default function LoginMethods() {
   const [removingProvider, setRemovingProvider] = useState<OAuthProvider | null>(null);
   const [passwordSetupOpen, setPasswordSetupOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const confirmPasswordRef = useRef<TextInput>(null);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordSetupError, setPasswordSetupError] = useState('');
   const [passwordSetupSaving, setPasswordSetupSaving] = useState(false);
@@ -511,6 +512,10 @@ export default function LoginMethods() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="next"
+                onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                blurOnSubmit={false}
               />
               <IconButton
                 name={showPassword ? 'eye-off' : 'eye'}
@@ -526,6 +531,7 @@ export default function LoginMethods() {
 
             <Text style={s.passwordSetupLabel}>Confirm password</Text>
             <TextInput
+              ref={confirmPasswordRef}
               testID="confirm-password-input"
               style={s.passwordInputStandalone}
               value={confirmPassword}
@@ -539,6 +545,7 @@ export default function LoginMethods() {
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="new-password"
+              textContentType="newPassword"
               onSubmitEditing={savePassword}
               returnKeyType="done"
             />
@@ -592,13 +599,15 @@ export default function LoginMethods() {
 
             <Text style={s.modalStep}>3. Enter the 6-digit code shown in your app:</Text>
 
-            <TextInput
+            <TextInput returnKeyType="done"
               style={s.codeInput}
               value={verifyCode}
               onChangeText={setVerifyCode}
               placeholder="000000"
               placeholderTextColor={colors.subtle}
               keyboardType="number-pad"
+              autoComplete="one-time-code"
+              textContentType="oneTimeCode"
               maxLength={6}
               textAlign="center"
             />

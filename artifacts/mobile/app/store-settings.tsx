@@ -138,7 +138,7 @@ export default function StoreSettingsScreen() {
         <SectionHeader title="STORE IDENTITY" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <FieldRow ss={ss} label="Store name">
-            <TextInput
+            <TextInput returnKeyType="done"
               style={ss.input}
               value={form.storeName}
               onChangeText={v => patch({ storeName: v })}
@@ -149,7 +149,7 @@ export default function StoreSettingsScreen() {
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Store URL">
             <View style={ss.urlRow}>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={[ss.input, { flex: 1, minWidth: 0 }]}
                 value={form.storeUrl}
                 onChangeText={v => patch({ storeUrl: v })}
@@ -162,7 +162,7 @@ export default function StoreSettingsScreen() {
           </FieldRow>
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Contact email">
-            <TextInput
+            <TextInput returnKeyType="done"
               style={ss.input}
               value={form.contactEmail}
               onChangeText={v => patch({ contactEmail: v })}
@@ -174,7 +174,7 @@ export default function StoreSettingsScreen() {
           </FieldRow>
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Customer support email">
-            <TextInput
+            <TextInput returnKeyType="done"
               style={ss.input}
               value={form.supportEmail}
               onChangeText={v => patch({ supportEmail: v })}
@@ -211,7 +211,7 @@ export default function StoreSettingsScreen() {
           </FieldRow>
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Time zone">
-            <TextInput
+            <TextInput returnKeyType="done"
               style={ss.input}
               value={form.timezone}
               onChangeText={v => patch({ timezone: v })}
@@ -258,7 +258,7 @@ export default function StoreSettingsScreen() {
             <>
               <View style={ss.divider} />
               <FieldRow ss={ss} label="Store password">
-                <TextInput
+                <TextInput returnKeyType="done"
                   style={ss.input}
                   value={form.storePassword ?? ''}
                   onChangeText={v => patch({ storePassword: v })}

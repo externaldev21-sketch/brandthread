@@ -42,6 +42,8 @@ import { PrimaryButton, HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { DayPickerSheet } from '@/components/DayPickerSheet';
 import { formatDayKey, isoToDayKey, resolveDiscountDates, toDayKey } from '@/lib/discountDates';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products' | 'collections';
@@ -704,28 +706,28 @@ export default function DiscountsScreen() {
             {/* Active dates */}
             <View>
               <Text style={s.label}>Active dates</Text>
-              <Text style={s.subLabel}>Start date <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional — blank starts immediately)</Text></Text>
-              <View style={[s.pickerRow, { marginTop: 0 }]}>
-                <TouchableOpacity style={{ flex: 1 }} onPress={() => setDatePickerFor('start')} accessibilityRole="button" accessibilityLabel="Start date">
-                  <Text style={[s.pickerRowText, !startDate && { color: MUTED }]}>{startDate ? formatDayKey(startDate) : 'Starts immediately'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => (startDate ? setStartDate('') : setDatePickerFor('start'))}
-                  hitSlop={8}
-                  accessibilityLabel={startDate ? 'Clear start date' : 'Choose start date'}
-                >
-                  <AppIcon name={startDate ? 'x' : 'calendar'} size={16} color={MUTED} />
-                </TouchableOpacity>
-              </View>
+              <NativeDateTimeField
+                mode="date"
+                label="Start date"
+                placeholder="Immediately"
+                value={ymdToDate(startDate)}
+                onChange={(d) => setStartDate(dateToYmd(d))}
+                onClear={() => setStartDate('')}
+                testID="discount-start-date"
+              />
               <View style={[s.switchRow, { marginTop: SP.sm }]}>
                 <Text style={s.switchLabel}>Set an end date</Text>
                 <HapticSwitch value={hasEnd} onValueChange={setHasEnd} />
               </View>
               {hasEnd && (
-                <TouchableOpacity style={[s.pickerRow, { marginTop: 0 }]} onPress={() => setDatePickerFor('end')} accessibilityRole="button" accessibilityLabel="End date">
-                  <Text style={[s.pickerRowText, !endDate && { color: MUTED }]}>{endDate ? `Through ${formatDayKey(endDate)}` : 'Choose end date'}</Text>
-                  <AppIcon name="calendar" size={16} color={MUTED} />
-                </TouchableOpacity>
+                <NativeDateTimeField
+                  mode="date"
+                  label="End date"
+                  value={ymdToDate(endDate)}
+                  onChange={(d) => setEndDate(dateToYmd(d))}
+                  minimumDate={ymdToDate(startDate) ?? startOfToday()}
+                  testID="discount-end-date"
+                />
               )}
             </View>
 

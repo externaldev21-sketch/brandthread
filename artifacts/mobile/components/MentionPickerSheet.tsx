@@ -85,7 +85,7 @@ export function MentionPickerSheet({
           <Text style={styles.title}>Mention</Text>
           <View style={styles.searchWrap}>
             <Icon name="search" size={16} color={MUTED} />
-            <TextInput
+            <TextInput returnKeyType="search"
               style={[styles.searchInput, WEB_INPUT_RESET]}
               placeholder="Search"
               placeholderTextColor={MUTED}

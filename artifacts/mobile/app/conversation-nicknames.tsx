@@ -85,7 +85,7 @@ export default function ConversationNicknamesScreen() {
         <Text style={[s.label, { color: theme.muted }]}>
           Set a nickname for {participant.name}. Only you will see it.
         </Text>
-        <TextInput
+        <TextInput returnKeyType="done"
           style={[s.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.cardElevated }]}
           value={nickname}
           onChangeText={setNickname}

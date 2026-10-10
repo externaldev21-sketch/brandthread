@@ -393,7 +393,7 @@ export default function StoreNavScreen() {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {/* Label */}
               <Text style={styles.fieldLabel}>Label *</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={itemForm.label}
                 onChangeText={(v) => setItemForm((p) => ({ ...p, label: v }))}
@@ -418,7 +418,7 @@ export default function StoreNavScreen() {
               {itemForm.target === 'collection' && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>Collection name or ID</Text>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={styles.textInput}
                     value={itemForm.targetId}
                     onChangeText={(v) => setItemForm((p) => ({ ...p, targetId: v }))}
@@ -430,7 +430,7 @@ export default function StoreNavScreen() {
               {itemForm.target === 'product' && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>Product name or ID</Text>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={styles.textInput}
                     value={itemForm.targetId}
                     onChangeText={(v) => setItemForm((p) => ({ ...p, targetId: v }))}
@@ -442,7 +442,7 @@ export default function StoreNavScreen() {
               {itemForm.target === 'page' && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>Page title or slug</Text>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={styles.textInput}
                     value={itemForm.targetId}
                     onChangeText={(v) => setItemForm((p) => ({ ...p, targetId: v }))}
@@ -454,7 +454,7 @@ export default function StoreNavScreen() {
               {itemForm.target === 'external' && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>URL</Text>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={styles.textInput}
                     value={itemForm.url}
                     onChangeText={(v) => setItemForm((p) => ({ ...p, url: v }))}

@@ -309,7 +309,7 @@ export default function StoreFromSocialScreen() {
           <>
             <BrandthreadCard style={ss.card}>
               <Text style={ss.fieldLabel}>Social profile or website URL</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={ss.input}
                 value={profileUrl}
                 onChangeText={setProfileUrl}

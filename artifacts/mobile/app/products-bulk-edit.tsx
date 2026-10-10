@@ -661,7 +661,7 @@ function PriceEditor({ productIds, local, onDone }: {
 
         <View style={s.valueBox}>
           {unit === '$' && <Text style={s.unit}>$</Text>}
-          <TextInput
+          <TextInput returnKeyType="done"
             value={input}
             onChangeText={setInput}
             placeholder={unit === '%' ? '10' : '0.00'}

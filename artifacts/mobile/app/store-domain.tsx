@@ -238,7 +238,7 @@ export default function StoreDomainScreen() {
         ) : (
           <BrandthreadCard style={dm.card}>
             <View style={dm.urlInputRow}>
-              <TextInput
+              <TextInput returnKeyType="done"
                 // minWidth 0: on web a TextInput keeps its intrinsic width under
                 // flex: 1 and pushes the .brandthread.app suffix off the card.
                 style={[dm.input, { flex: 1, minWidth: 0 }]}
@@ -344,7 +344,7 @@ export default function StoreDomainScreen() {
         ) : (
           <BrandthreadCard style={dm.card}>
             <Text style={dm.fieldLabel}>Custom Domain</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={dm.input}
               value={newDomain}
               onChangeText={(v) => { setNewDomain(v); setDomainError(null); }}

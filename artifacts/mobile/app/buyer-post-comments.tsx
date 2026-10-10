@@ -28,6 +28,7 @@ import {
 } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import Composer from '@/components/ui/Composer';
+import { KeyboardAccessoryBar, keyboardAccessoryID } from '@/components/ui/KeyboardAccessoryBar';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -70,6 +71,8 @@ const MAX_COMMENT_LENGTH = 1000;
 // Links the comment list's KeyboardGestureArea to the composer's TextInput
 // (react-native-keyboard-controller, iOS) for interactive drag-to-dismiss.
 const COMMENT_INPUT_NATIVE_ID = 'buyer-post-comments-input';
+// iOS keyboard accessory bar (Done) for the comment composer.
+const COMMENT_ACCESSORY_ID = 'buyer-post-comments-keyboard-accessory';
 /** TikTok's own quick-reaction set, in TikTok's own order. */
 const QUICK_EMOJI = QUICK_REACTION_EMOJI;
 
@@ -1374,6 +1377,7 @@ export default function BuyerPostCommentsScreen() {
               <Composer
                 inputRef={inputRef}
                 nativeID={COMMENT_INPUT_NATIVE_ID}
+                inputAccessoryViewID={keyboardAccessoryID(COMMENT_ACCESSORY_ID)}
                 value={inputText}
                 onChangeText={setInputText}
                 onSend={handleSend}
@@ -1411,6 +1415,7 @@ export default function BuyerPostCommentsScreen() {
               />
             </>
           )}
+          <KeyboardAccessoryBar nativeID={COMMENT_ACCESSORY_ID} />
         </View>
         </KeyboardAvoidingView>
       </Animated.View>

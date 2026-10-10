@@ -1442,7 +1442,7 @@ export default function StoryComposer() {
             </View>
             <View style={styles.alsoShareSearchWrap}>
               <Icon name="search" size={16} color={MUTED} />
-              <TextInput
+              <TextInput returnKeyType="search"
                 style={[styles.alsoShareSearchInput, WEB_INPUT_RESET]}
                 placeholder="Search"
                 placeholderTextColor={MUTED}
@@ -1785,7 +1785,7 @@ export default function StoryComposer() {
         </View>
       ) : (
       <View style={[styles.editBottom, { paddingBottom: insets.bottom + SP.md }]}>
-        <TextInput
+        <TextInput returnKeyType="done"
           style={styles.captionInput}
           value={captionDraft}
           onChangeText={setCaptionDraft}
@@ -2179,7 +2179,7 @@ export default function StoryComposer() {
           <View style={styles.overlayModalBackdrop}>
             <View style={styles.overlayModalCard}>
               <Text style={styles.sheetTitle}>Add a shop link</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.shopInput}
                 value={shopUrlDraft}
                 onChangeText={setShopUrlDraft}

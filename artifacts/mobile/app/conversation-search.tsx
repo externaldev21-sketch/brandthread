@@ -85,7 +85,7 @@ export default function ConversationSearchScreen() {
         </PressableScale>
         <View style={[s.searchPill, { backgroundColor: theme.cardElevated }]}>
           <Icon name="search" size={ICON.sm} color={theme.muted} />
-          <TextInput
+          <TextInput returnKeyType="search"
             style={[s.searchInput, { color: theme.text }, WEB_INPUT_RESET]}
             value={query}
             onChangeText={runSearch}

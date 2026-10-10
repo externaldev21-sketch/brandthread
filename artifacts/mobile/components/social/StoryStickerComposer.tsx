@@ -47,7 +47,7 @@ function Field({ value, onChangeText, placeholder, max, autoFocus, label }: {
 }) {
   const { theme } = useAppTheme();
   return (
-    <TextInput
+    <TextInput returnKeyType="done"
       style={[s.input, WEB_INPUT_RESET, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
       value={value}
       onChangeText={onChangeText}

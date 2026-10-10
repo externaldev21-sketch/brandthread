@@ -118,7 +118,7 @@ export default function QuickRepliesScreen() {
           <Text style={[styles.label, { color: colors.mutedForeground }]}>Shortcut</Text>
           <View style={[styles.shortcutRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.slash, { color: colors.mutedForeground }]}>/</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={[styles.shortcutInput, { color: colors.foreground }]}
               value={draft.shortcut}
               onChangeText={(v) => setDraft({ ...draft, shortcut: v.replace(/[^A-Za-z0-9_-]/g, '').slice(0, SHORTCUT_MAX) })}
@@ -131,7 +131,7 @@ export default function QuickRepliesScreen() {
           </View>
 
           <Text style={[styles.label, { color: colors.mutedForeground }]}>Title</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={inputStyle}
             value={draft.title}
             onChangeText={(v) => setDraft({ ...draft, title: v.slice(0, TITLE_MAX) })}

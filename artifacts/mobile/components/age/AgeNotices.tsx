@@ -12,6 +12,8 @@ import {
   AGE_RESTRICTED_COPY, DOB_PLACEHOLDER, checkDobInput, formatDobInput, type AgeBand,
 } from '@/lib/ageGate';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToMdy, mdyToDate } from '@/lib/dateTimeField';
 
 /** The single date-of-birth field. Pass the host form's own styles so it matches its siblings. */
 export function AgeDobField({
@@ -27,10 +29,10 @@ export function AgeDobField({
   testID?: string;
 }) {
   const colors = useColors();
-  return (
+  const legacyField = (
     <View style={wrapStyle}>
       <Text style={[{ color: colors.mutedForeground, fontFamily: FONT.semibold, fontSize: 12, marginBottom: 5 }, labelStyle]}>Date of birth</Text>
-      <TextInput
+      <TextInput returnKeyType="done"
         testID={testID}
         style={[
           {
@@ -53,6 +55,20 @@ export function AgeDobField({
       />
       {error ? <Text testID="age-dob-error" style={[{ color: colors.destructive, fontFamily: FONT.regular, fontSize: 12, marginTop: 4 }, hintStyle]}>{error}</Text> : null}
     </View>
+  );
+  return (
+    <NativeDateTimeField
+      mode="date"
+      label="Date of birth"
+      value={mdyToDate(value)}
+      onChange={(d) => onChange(dateToMdy(d))}
+      maximumDate={new Date()}
+      iosEmptyDisplay="spinner"
+      error={error}
+      style={wrapStyle}
+      testID={testID}
+      fallback={legacyField}
+    />
   );
 }
 

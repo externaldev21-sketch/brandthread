@@ -9,6 +9,8 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { CollapsingTitleBar } from '@/components/ui/CollapsingTitleBar';
+import type { LargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 
 export interface ScreenHeaderAction {
   icon: IconName;
@@ -56,6 +58,14 @@ interface ScreenHeaderProps {
   variant?: 'push' | 'modal';
   /** Compatibility alias for divider={false}; hides the hairline under the header. */
   hideDivider?: boolean;
+  /**
+   * Collapse the title into the bar on scroll (iOS large-title behaviour),
+   * from `useLargeTitleCollapse()` — the screen passes the same object's
+   * `onScroll` to its list. At rest the header is unchanged; as the list
+   * scrolls the title slides up out of its row 1:1 with the scroll and a
+   * small centered title fades into the same row (CollapsingTitleBar).
+   */
+  collapse?: LargeTitleCollapse;
 }
 
 /** Design-system rule: at most 2 action icons on the right, primary rightmost. */
@@ -73,7 +83,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, rightElement, actions, scrollY, collapseDistance = 48, onBack, divider = false, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, hideDivider = false,
+  title, rightElement, actions, scrollY, collapseDistance = 48, onBack, divider = false, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, hideDivider = false, collapse,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -113,8 +123,20 @@ export function ScreenHeader({
           ) : <View style={{ width: COMP.iconBtn }} />
         )}
 
-        <View style={styles.titleBlock}>
-          {scrollY ? (
+        <View style={[styles.titleBlock, collapse ? styles.titleBlockClip : null]}>
+          {collapse ? (
+            <Animated.Text
+              testID="screen-header-title"
+              {...({ dataSet: { variant } } as object)}
+              accessibilityRole="header"
+              maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
+              onLayout={collapse.onLargeTitleLayout}
+              style={[styles.title, { color: colors.foreground }, collapse.largeTitleStyle]}
+              numberOfLines={1}
+            >
+              {title}
+            </Animated.Text>
+          ) : scrollY ? (
             <Animated.Text
               testID="screen-header-title"
               {...({ dataSet: { variant } } as object)}
@@ -162,6 +184,7 @@ export function ScreenHeader({
             </>
           )}
         </View>
+        {collapse && <CollapsingTitleBar title={title} collapse={collapse} bottomInset={SP.md} />}
       </View>
 
       {scrollY && (
@@ -222,6 +245,10 @@ const styles = StyleSheet.create({
   },
   titleBlock: {
     flex: 1,
+  },
+  // Collapsing title: it slides up out of this box, so the box clips it.
+  titleBlockClip: {
+    overflow: 'hidden',
   },
   title: {
     fontSize: TITLE_SIZE,

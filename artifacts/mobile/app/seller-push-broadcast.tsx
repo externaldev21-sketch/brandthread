@@ -145,7 +145,7 @@ export default function SellerPushBroadcastScreen() {
               {!limited && !review ? (
                 <>
                   <Text style={[styles.label, { color: c.mutedForeground }]}>Title</Text>
-                  <TextInput value={title} onChangeText={(t) => setTitle(t.slice(0, TITLE_MAX))} placeholder="New drop Friday" placeholderTextColor={c.mutedForeground}
+                  <TextInput returnKeyType="done" value={title} onChangeText={(t) => setTitle(t.slice(0, TITLE_MAX))} placeholder="New drop Friday" placeholderTextColor={c.mutedForeground}
                     style={[styles.input, { color: c.foreground, borderColor: c.border }]} accessibilityLabel="Push title" />
                   <Text style={[styles.count, { color: c.mutedForeground }]}>{title.length}/{TITLE_MAX}</Text>
                   <Text style={[styles.label, { color: c.mutedForeground }]}>Message</Text>

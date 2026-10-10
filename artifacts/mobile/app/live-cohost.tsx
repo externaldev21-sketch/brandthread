@@ -100,7 +100,7 @@ export default function LiveCohostScreen() {
     <View>
       <View style={s.searchWrap}>
         <Icon name="search" size={16} color={theme.muted} />
-        <TextInput
+        <TextInput returnKeyType="search"
           value={query}
           onChangeText={setQuery}
           placeholder="Search sellers"

@@ -26,6 +26,8 @@ import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useAuth } from '@clerk/expo';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
 export default function VacationModeScreen() {
   const { theme } = useAppTheme();
@@ -165,17 +167,15 @@ export default function VacationModeScreen() {
               textAlignVertical="top"
             />
 
-            <Text style={[s.label, { marginTop: SP.md }]}>Return date <Text style={s.optional}>(optional)</Text></Text>
-            <TextInput
-              style={s.input}
-              value={returnDate}
-              onChangeText={(v) => { setReturnDate(v); setReturnDateError(null); }}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={MUTED}
-              keyboardType="numbers-and-punctuation"
-              autoCorrect={false}
-              maxLength={10}
-              accessibilityLabel="Return date, YYYY-MM-DD"
+            <NativeDateTimeField
+              mode="date"
+              label="Return date (optional)"
+              value={ymdToDate(returnDate)}
+              onChange={(d) => { setReturnDate(dateToYmd(d)); setReturnDateError(null); }}
+              onClear={() => setReturnDate('')}
+              minimumDate={startOfToday()}
+              style={{ marginTop: SP.sm }}
+              testID="vacation-return-date"
             />
             {returnDateError
               ? <Text style={[s.fieldHint, { color: RED }]} accessibilityLiveRegion="polite">{returnDateError}</Text>

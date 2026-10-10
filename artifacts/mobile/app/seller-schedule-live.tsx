@@ -101,7 +101,7 @@ export default function SellerScheduleLiveScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xl, gap: SP.sm }}
       >
-        <TextInput
+        <TextInput returnKeyType="done"
           value={title}
           onChangeText={setTitle}
           placeholder="Title"
