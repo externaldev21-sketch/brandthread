@@ -9,7 +9,8 @@
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.
 - [Buyer/Seller navigation](buyer-seller-nav.md) — buyer bar is Home·Discover·Inbox·Activity plus a Profile/Close circle; Search remains accessible elsewhere; screens clear the bar.
 - [User-scoped onboarding state](user-scoped-onboarding-state.md) — auth-gated local completion and identity writes must be owned by a Clerk user, never a shared device-global key.
-- [Onboarding architecture](onboarding-architecture.md) — Clerk account creation is the literal first step for buyer and seller; user-scoped draft migration preserves equivalent screens across reorderings.
+- [Onboarding architecture](onboarding-architecture.md) — approved onboarding is one question per screen; preserve canonical entry, identity ownership and final server-authoritative completion.
+- [Onboarding billing target](onboarding-billing-target.md) — owner expects a post-preview plan step and seven-day payment-method-required trial; verify actual provider terms.
 - [Manufacturer payout and call integrity](manufacturer-payout-call-integrity.md) — payout truth, reversal accounting, exact callbacks, and participant-scoped call events must stay idempotent across provider races.
 - [Manufacturer quote and review integrity](manufacturer-quote-review-integrity.md) — quotes use role-specific locked transitions; reviews require a completed shared order and aggregate from immutable review rows.
 - [Manufacturer favorites boundary](manufacturer-favorites-boundary.md) — seller favorites are server-authoritative and separate from My Manufacturers relationship/workflow records.
