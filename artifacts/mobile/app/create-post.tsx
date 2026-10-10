@@ -33,6 +33,7 @@ import { PostPicker } from '@/components/create-post/PostPicker';
 import { CarouselEditor } from '@/components/create-post/CarouselEditor';
 import { VideoEditor } from '@/components/create-post/VideoEditor';
 import { PostScreen, type PublishState } from '@/components/create-post/PostScreen';
+import { remixClipToVideoDraft, remixErrorMessage } from '@/lib/remix';
 
 type Step = 'capture' | 'gallery' | 'edit' | 'post';
 
@@ -68,11 +69,13 @@ export default function CreatePostScreen() {
   const router = useRouter();
   const api = useApi();
   const { role, isLoaded: roleLoaded } = useRole();
-  const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; capture?: string }>();
+  const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; capture?: string; remixOf?: string }>();
   const isSeller = role === 'seller' && params.accountType !== 'buyer';
   const roleKey = isSeller ? 'seller' : 'buyer';
   const modes = CREATE_MODES_BY_ROLE[roleKey];
   const editId = typeof params.editId === 'string' ? params.editId : undefined;
+  // `?remixOf=<postId>` (share sheet "Remix"): the source video is preloaded as the clip.
+  const remixOf = !editId && typeof params.remixOf === 'string' && params.remixOf ? params.remixOf : undefined;
   const isWeb = Platform.OS === 'web';
   // Camera-first on native and web; a browser without a camera still has
   // the roll shortcut and permission placeholder. Keep a direct-gallery opt-out.
@@ -94,7 +97,7 @@ export default function CreatePostScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleLoaded, roleKey]);
 
-  const [step, setStep] = useState<Step>(editId ? 'post' : noCameraStep ? 'gallery' : 'capture');
+  const [step, setStep] = useState<Step>(editId ? 'post' : remixOf ? 'edit' : noCameraStep ? 'gallery' : 'capture');
   const [media, setMedia] = useState<MediaDraft | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [details, setDetails] = useState<PostDetails>(DEFAULT_DETAILS);
@@ -132,6 +135,29 @@ export default function CreatePostScreen() {
     }).catch(() => { if (live) leave(); });
     return () => { live = false; };
   }, [editId, isSeller, leave]);
+
+  // Remix: the server checks the author's "Allow remixes of videos" setting
+  // and copies the source video into a clip this account owns; it opens in
+  // the THREAD video editor (video posting is a seller capability).
+  useEffect(() => {
+    if (!remixOf) return;
+    let live = true;
+    api.remix.clip(remixOf)
+      .then((clip) => {
+        if (!live) return;
+        modeTouched.current = true;
+        setMode('thread');
+        setMedia({ kind: 'video', video: remixClipToVideoDraft(clip) });
+        setStep('edit');
+      })
+      .catch((error) => {
+        if (!live) return;
+        Alert.alert('Remix unavailable', remixErrorMessage(error) ?? "Couldn't load this video. Try again.");
+        leave();
+      });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remixOf]);
 
   // ── Back handling ──────────────────────────────────────────────────────────
   const hasWork = media !== null && step !== 'gallery' && step !== 'capture';
@@ -222,7 +248,7 @@ export default function CreatePostScreen() {
       } else if (media) {
         const run = () => publishCreatePost({
           api,
-          input: { mode: postMode, media, details, isDraft: asDraft },
+          input: { mode: postMode, media, details, isDraft: asDraft, remixOfPostId: remixOf },
           onProgress: (fraction, phaseStep) => setPublishState({ phase: 'running', fraction, step: phaseStep, draft: asDraft }),
           signal: abort.current,
         });
@@ -237,7 +263,7 @@ export default function CreatePostScreen() {
       if (abort.current.aborted) { setPublishState({ phase: 'idle' }); return; }
       setPublishState({ phase: 'error', message: friendlyError(error), draft: asDraft });
     }
-  }, [api, details, editId, editing, leave, media, postMode, publishState.phase]);
+  }, [api, details, editId, editing, leave, media, postMode, publishState.phase, remixOf]);
 
   const lastDraft = publishState.phase === 'error' || publishState.phase === 'running' ? publishState.draft : false;
 

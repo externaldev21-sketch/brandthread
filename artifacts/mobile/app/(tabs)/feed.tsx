@@ -101,6 +101,7 @@ import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { remixCreditLabel } from '@/lib/interactionSettings';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -319,6 +320,8 @@ const hdStyles = StyleSheet.create({
 
 interface SpotlightItem {
   id: string;
+  /** "Remix of @handle" when this video remixes another post. */
+  remixCredit?: string | null;
   creator: string;
   handle: string;
   avatarColor: string;
@@ -1816,6 +1819,7 @@ function SpotlightPageImpl({
         style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
         creator={item.creator}
         verified={!!item.verified}
+        remixCredit={item.remixCredit}
         sponsored={item.sponsored}
         caption={item.caption}
         sound={item.sound}
@@ -1907,6 +1911,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
   const tag = post.productTags?.[0];
   return {
     id: post.id,
+    remixCredit: remixCreditLabel(post.remixOf),
     creator: post.authorName,
     handle: post.authorHandle,
     avatarColor: post.authorColor,

@@ -41,6 +41,7 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { Hairline } from './CheckoutPrimitives';
 import { groupDeliveryWindow } from './OrderSummarySection';
 import { OrderConfetti } from './OrderConfetti';
+import { useCheckoutT } from './CheckoutLanguage';
 
 export interface VerifiedOrderRef {
   id: string;
@@ -102,6 +103,7 @@ function SellerProductsCarousel({ sellerId, sellerName }: { sellerId: string; se
   const router = useRouter();
   const api = useApi();
   const [products, setProducts] = useState<any[] | null>(null);
+  const t = useCheckoutT();
 
   useEffect(() => {
     let alive = true;
@@ -115,7 +117,7 @@ function SellerProductsCarousel({ sellerId, sellerName }: { sellerId: string; se
 
   return (
     <View style={styles.moreSection} testID="order-confirmation-more-from-brand">
-      <Text style={[styles.sectionHeading, { color: theme.muted }]}>More from {sellerName}</Text>
+      <Text style={[styles.sectionHeading, { color: theme.muted }]}>{t('More from {name}', { name: sellerName })}</Text>
       <View style={styles.moreScroll} testID="order-confirmation-more-scroll">
         {products.map((product) => {
           const priceCents = product.variants?.length
@@ -151,17 +153,22 @@ function SellerProductsCarousel({ sellerId, sellerName }: { sellerId: string; se
 }
 
 export function OrderConfirmation({
-  session, verifiedOrders, finalizing, totalPaidCents,
+  session, verifiedOrders, finalizing, totalPaidCents, offer, hideAccountPrompt,
 }: {
   session: CheckoutSession;
   verifiedOrders: VerifiedOrderRef[];
   finalizing: boolean;
   totalPaidCents: number;
+  /** The seller's post-purchase offer (PostPurchaseOffer), shown right under the order number. */
+  offer?: React.ReactNode;
+  /** "Guest checkout only" stores (seller Checkout settings) don't ask buyers to create an account. */
+  hideAccountPrompt?: boolean;
 }) {
   const { theme } = useAppTheme();
   const router = useRouter();
   const api = useApi();
   const { userId, isSignedIn } = useAuth();
+  const t = useCheckoutT();
 
   const items = session.deliveryGroups.flatMap(group => group.items);
   const deliveryEstimates = session.deliveryGroups
@@ -250,39 +257,41 @@ export function OrderConfirmation({
       </View>
 
       <View style={styles.titleBlock}>
-        <Text style={[styles.eyebrow, { color: theme.muted }]}>{finalizing ? 'Payment received' : 'Order confirmed'}</Text>
+        <Text style={[styles.eyebrow, { color: theme.muted }]}>{t(finalizing ? 'Payment received' : 'Order confirmed')}</Text>
         {!finalizing ? (
           <View style={styles.orderNumbers}>
             {verifiedOrders.length > 0 ? verifiedOrders.map(order => (
               <Text key={order.id} style={[styles.orderNumber, { color: theme.text }]} testID="checkout-order-number">
-                {verifiedOrders.length > 1 ? `Order ${order.number}` : order.number}
+                {verifiedOrders.length > 1 ? t('Order {number}', { number: order.number }) : order.number}
               </Text>
             )) : (
-              <Text style={[styles.orderNumberPending, { color: theme.muted }]}>Assigned once payment is confirmed</Text>
+              <Text style={[styles.orderNumberPending, { color: theme.muted }]}>{t('Assigned once payment is confirmed')}</Text>
             )}
           </View>
         ) : (
           <Text style={[styles.body, { color: theme.muted }]}>
-            We’re finalizing your order with the seller. This can take a moment after payment.
+            {t('We’re finalizing your order with the seller. This can take a moment after payment.')}
           </Text>
         )}
       </View>
 
+      {!finalizing && offer ? offer : null}
+
       <View style={styles.section}>
-        <Row label="Estimated delivery" testID="order-confirmation-delivery-row">
+        <Row label={t('Estimated delivery')} testID="order-confirmation-delivery-row">
           {estimates.length > 0 ? estimates.map(estimate => (
-            <Text key={estimate} style={[styles.rowText, { color: theme.text }]}>{estimate}</Text>
+            <Text key={estimate} style={[styles.rowText, { color: theme.text }]}>{t(estimate)}</Text>
           )) : (
-            <Text style={[styles.rowText, { color: theme.text }]}>Seller will confirm delivery date</Text>
+            <Text style={[styles.rowText, { color: theme.text }]}>{t('Seller will confirm delivery date')}</Text>
           )}
           {estimates.length > 1 ? (
-            <Text style={[styles.rowSub, { color: theme.muted }]}>Arrives in {estimates.length} shipments</Text>
+            <Text style={[styles.rowSub, { color: theme.muted }]}>{t('Arrives in {n} shipments', { n: estimates.length })}</Text>
           ) : null}
         </Row>
         {address?.line1 ? (
           <>
             <Hairline />
-            <Row label="Ships to">
+            <Row label={t('Ships to')}>
               <Text style={[styles.rowText, { color: theme.text }]}>{[address.firstName, address.lastName].filter(Boolean).join(' ')}</Text>
               <Text style={[styles.rowSub, { color: theme.muted }]}>
                 {[address.line1, address.line2].filter(Boolean).join(', ')}{'\n'}{address.city}, {address.state} {address.postalCode}
@@ -293,7 +302,7 @@ export function OrderConfirmation({
         <Hairline />
         {(session.threadCashRedemption?.discountCents ?? 0) > 0 ? (
           <>
-            <Row label="Thread Cash">
+            <Row label={t('Thread Cash')}>
               <Text style={[styles.rowText, { color: theme.text }, TABULAR_NUMS]} testID="checkout-confirmation-thread-cash">
                 −{formatCents(session.threadCashRedemption!.discountCents)}
               </Text>
@@ -301,7 +310,7 @@ export function OrderConfirmation({
             <Hairline />
           </>
         ) : null}
-        <Row label={(session.threadCashRedemption?.discountCents ?? 0) > 0 ? 'Charged to card' : 'Total'}>
+        <Row label={t((session.threadCashRedemption?.discountCents ?? 0) > 0 ? 'Charged to card' : 'Total')}>
           <Text style={[styles.rowStrong, { color: theme.text }, TABULAR_NUMS]}>{formatCents(totalPaidCents)}</Text>
           {payment?.last4 ? (
             <Text style={[styles.rowSub, { color: theme.muted }]}>
@@ -350,13 +359,13 @@ export function OrderConfirmation({
             onPress={messageSeller}
             style={styles.helpRow}
             accessibilityRole="button"
-            accessibilityLabel={`Message ${firstGroup.sellerName}`}
+            accessibilityLabel={t('Message {name}', { name: firstGroup.sellerName })}
             rippleEnabled={false}
           >
             <Feather name="message-circle" size={18} color={theme.text} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.itemName, { color: theme.text }]}>Message {firstGroup.sellerName}</Text>
-              <Text style={[styles.rowSub, { color: theme.muted }]}>Questions about sizing, shipping or your order</Text>
+              <Text style={[styles.itemName, { color: theme.text }]}>{t('Message {name}', { name: firstGroup.sellerName })}</Text>
+              <Text style={[styles.rowSub, { color: theme.muted }]}>{t('Questions about sizing, shipping or your order')}</Text>
             </View>
             <Feather name="chevron-right" size={18} color={theme.muted} />
           </PressableScale>
@@ -371,7 +380,7 @@ export function OrderConfirmation({
             <Hairline style={styles.linkHairline} />
             <LinkRow
               icon="file-text"
-              label="View receipt"
+              label={t('View receipt')}
               hint="Opens this order's details and receipt"
               onPress={openOrder}
               testID="checkout-view-receipt"
@@ -381,16 +390,16 @@ export function OrderConfirmation({
         <Hairline style={styles.linkHairline} />
         <LinkRow
           icon="compass"
-          label="Continue shopping"
+          label={t('Continue shopping')}
           onPress={() => router.replace('/(buyer)/discover' as never)}
           testID="checkout-continue-shopping"
         />
-        {!isSignedIn ? (
+        {!isSignedIn && !hideAccountPrompt ? (
           <>
             <Hairline style={styles.linkHairline} />
             <LinkRow
               icon="user-plus"
-              label="Create an account to track orders faster"
+              label={t('Create an account to track orders faster')}
               onPress={() => router.replace('/sign-in' as never)}
               subtle
               testID="checkout-create-account"
@@ -426,6 +435,7 @@ export function OrderConfirmationActions({
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const firstVerified = verifiedOrders[0] ?? null;
+  const t = useCheckoutT();
 
   function trackOrder() {
     // ONLY navigate with a verified server order ID — never the display number.
@@ -438,10 +448,10 @@ export function OrderConfirmationActions({
   return (
     <View style={[styles.actions, { borderTopColor: theme.border, paddingBottom: bottomPad }]}>
       {finalizing ? (
-        <Button label="Check order status" variant="primary" loading={refreshing} onPress={onRefresh} fullWidth />
+        <Button label={t('Check order status')} variant="primary" loading={refreshing} onPress={onRefresh} fullWidth />
       ) : (
         <Button
-          label="Track order"
+          label={t('Track order')}
           icon="package"
           variant="primary"
           disabled={!firstVerified?.id}

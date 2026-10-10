@@ -67,56 +67,37 @@ export async function clearBrandMemory(): Promise<BrandMemory> {
 export async function rebuildBrandMemory(authToken?: string | null): Promise<BrandMemory> {
   const memory = await getBrandMemory();
 
-  // Try real API first — derives brand voice from seller's actual products/posts/store
+  // Derives brand voice from the seller's actual products/posts/store. On any
+  // failure this throws (the caller shows "Could not rebuild") — it never
+  // fills the seller's brand memory with made-up demo values.
   const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-  if (!isSellerDevPreview() && API_BASE && authToken) {
-    try {
-      const res = await fetch(`${API_BASE}/ai/brand-memory/rebuild`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({}),
-      });
-      if (res.ok) {
-        const { fields } = await res.json() as { fields: Record<string, string> };
-        const keyMap: Partial<Record<string, keyof BrandMemory>> = {
-          brandDescription:  'brandDescription',
-          brandVoice:        'brandVoice',
-          targetAudience:    'targetAudience',
-          pricePosition:     'pricePosition',
-          visualStyle:       'visualStyle',
-          marketingTone:     'marketingTone',
-          preferredWords:    'preferredWords',
-          productCategories: 'productCategories',
-        };
-        for (const [apiKey, value] of Object.entries(fields)) {
-          const memKey = keyMap[apiKey];
-          if (memKey && value?.trim()) {
-            memory[memKey] = { ...memory[memKey], value: value.trim(), enabled: true };
-          }
-        }
-        await saveBrandMemory(memory);
-        return memory;
-      }
-    } catch { /* fall through to demo defaults */ }
-  }
-
-  // Fallback: pre-fill with sensible demo defaults if fields are empty
-  const demoValues: Partial<Record<keyof BrandMemory, string>> = {
-    brandDescription:  'Premium streetwear brand focused on elevated basics and limited drops.',
-    brandVoice:        'Confident, concise, luxury-adjacent. Never corporate.',
-    targetAudience:    'Style-conscious 18–34 year olds who value quality over hype.',
-    pricePosition:     'Mid-to-high. $50–$250 range. Compete on quality and brand story.',
-    visualStyle:       'Dark, minimal, high-contrast. Studio photography. No lifestyle clutter.',
-    marketingTone:     'Direct and premium. No exclamation marks. No emojis in copy.',
-    productCategories: 'Hoodies, tees, joggers, outerwear, accessories.',
+  // The signed-out seller dev preview never calls the API (no account to
+  // derive from), and never gets demo values either.
+  if (isSellerDevPreview() || !API_BASE || !authToken) throw new Error('Sign in to rebuild brand memory.');
+  const res = await fetch(`${API_BASE}/api/ai/brand-memory/rebuild`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error(`Brand memory rebuild failed (${res.status})`);
+  const { fields } = await res.json() as { fields: Record<string, string> };
+  const keyMap: Partial<Record<string, keyof BrandMemory>> = {
+    brandDescription:  'brandDescription',
+    brandVoice:        'brandVoice',
+    targetAudience:    'targetAudience',
+    pricePosition:     'pricePosition',
+    visualStyle:       'visualStyle',
+    marketingTone:     'marketingTone',
+    preferredWords:    'preferredWords',
+    productCategories: 'productCategories',
   };
-  for (const [k, v] of Object.entries(demoValues)) {
-    const key = k as keyof BrandMemory;
-    if (!memory[key].value && v) {
-      memory[key] = { ...memory[key], value: v, enabled: true };
+  for (const [apiKey, value] of Object.entries(fields ?? {})) {
+    const memKey = keyMap[apiKey];
+    if (memKey && value?.trim()) {
+      memory[memKey] = { ...memory[memKey], value: value.trim(), enabled: true };
     }
   }
   await saveBrandMemory(memory);

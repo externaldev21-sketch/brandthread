@@ -26,6 +26,12 @@ export * from './productBulkSeo';
 export * from './promotions';
 export * from './sellerPushGiveaways';
 export * from './admin';
+export * from './aiSettings';
+export * from './interactionSettings';
+export * from './displayPreferences';
+export * from './dmCalls';
+export * from './callPushTokens';
+export * from './checkoutExtras';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { places } from './places';
 import { relations, sql } from 'drizzle-orm';
@@ -517,6 +523,8 @@ export const orders = pgTable('orders', {
   // portion — see lib/threadCash/wallet.ts). Refunded/cancelled orders return
   // this amount to the buyer's Thread Cash balance exactly once.
   threadCashAppliedCents: integer('thread_cash_applied_cents').notNull().default(0),
+  // The original order when this one is an accepted post-purchase offer (migration 121).
+  upsellOfOrderId: uuid('upsell_of_order_id'),
   // The platform-funded supplemental transfer that topped the seller up to
   // the full item price (destination charges only). A full refund reverses
   // exactly this transfer in addition to the buyer's card refund.
@@ -668,6 +676,8 @@ export const posts = pgTable('posts', {
   moderatedAt: timestamp('moderated_at', { withTimezone: true }),
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
   publishedAt: timestamp('published_at', { withTimezone: true }),
+  /** The video post this one remixes (migration 119; FK ON DELETE SET NULL in SQL). */
+  remixOfPostId: uuid('remix_of_post_id'),
   // Quote repost (migration 118): the direct original this post quotes. Set
   // to NULL (not cascaded) if the original is ever hard-deleted; `repostKind`
   // stays 'quote' so readers can tell "original gone" from "not a quote".
@@ -773,6 +783,11 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   taxCents: integer('tax_cents'),
   stripeTaxCalculationId: text('stripe_tax_calculation_id'),
   stripePaymentIntentId: text('stripe_payment_intent_id'),
+  // The buyer's tip for this seller group (migration 117); included in
+  // amountTotalCents and paid out to the seller with the order.
+  tipCents: integer('tip_cents').notNull().default(0),
+  // Post-purchase offer checkout: the order it adds to (migration 121).
+  upsellOfOrderId: uuid('upsell_of_order_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   paymentIntentIdx: index('checkout_sessions_payment_intent_idx').on(t.stripePaymentIntentId),
@@ -1431,6 +1446,8 @@ export const postUserTags = pgTable('post_user_tags', {
   id:           uuid('id').primaryKey().defaultRandom(),
   postId:       uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
   taggedUserId: text('tagged_user_id').notNull(), // Clerk user ID of the tagged account
+  /** 'approved' | 'pending' (tagged account has "Manually approve tags" on; migration 119). */
+  status:       text('status').notNull().default('approved'),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   taggedIdx: index('post_user_tags_tagged_idx').on(table.taggedUserId, table.createdAt),
@@ -1515,6 +1532,8 @@ export const storyMentions = pgTable('story_mentions', {
   sticker:         jsonb('sticker').$type<Record<string, unknown>>().notNull().default({}),
   handledAt:       timestamp('handled_at'),
   handledAction:   text('handled_action'), // 'reshared' | 'dismissed'
+  /** 'approved' | 'pending' (tagged account has "Manually approve tags" on; migration 119). */
+  status:          text('status').notNull().default('approved'),
   createdAt:       timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   pk:           primaryKey({ columns: [t.storyId, t.mentionedUserId] }),

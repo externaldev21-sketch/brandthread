@@ -37,11 +37,13 @@ import { sanitizeStoryOverlays, withStickerState, StickerValidationError } from 
 import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
 import { storyListedFor } from "../lib/storyVisibility";
+import { authorsHidingStoriesFrom, storyHiddenFrom } from "../lib/interactionSettings";
 import { sanitizeStoryMentions, recordStoryMentions, withOriginalInfo } from "../lib/storyMentions";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { followingSortDirection } from "../lib/followingSort";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
+import { emitUserBlocked } from "../lib/blockEvents";
 import { viewerCanSeeContent } from "../lib/privateAccount";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
@@ -695,6 +697,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     .innerJoin(users, eq(users.clerkId, posts.userId))
     .where(and(
       eq(postUserTags.taggedUserId, other),
+      eq(postUserTags.status, "approved"), // pending tags stay off the Tagged tab until approved
       publicPostCondition(new Date(), myId),
       notBlockedWith(myId, posts.userId),
     ))
@@ -711,6 +714,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     .innerJoin(stories, eq(stories.id, storyMentions.storyId))
     .where(and(
       eq(storyMentions.mentionedUserId, other),
+      eq(storyMentions.status, "approved"), // pending tags stay off the Tagged tab until approved
       gt(stories.expiresAt, new Date()),
       storyListedFor(myId),
       notInArray(stories.privacyVisibility, ["friends", "close_friends"]),
@@ -1252,8 +1256,8 @@ router.post("/stories", async (req, res) => {
     });
   }
 
-  await recordStoryMentions(row.id, myId, taggable);
-  for (const mention of storyHeld ? [] : taggable) {
+  const pendingMentions = await recordStoryMentions(row.id, myId, taggable);
+  for (const mention of storyHeld ? [] : taggable.filter((m) => !pendingMentions?.has(m.userId))) {
     void notifyStoryMention({
       storyId: row.id, taggerId: myId, mentionedUserId: mention.userId, media, slide: mention.sticker.slide,
     });
@@ -1304,6 +1308,8 @@ router.get("/stories/user/:userId", async (req, res) => {
   if (authorId !== myId) {
     if ((await blockRelation(myId, authorId)) !== "none") { res.json([]); return; }
     if (!(await isFollowing(myId, authorId))) { res.json([]); return; }
+    // "Hide story from" (lib/interactionSettings.ts).
+    if (await storyHiddenFrom(authorId, myId)) { res.json([]); return; }
   }
 
   const rows = await db.select().from(stories)
@@ -1351,10 +1357,14 @@ router.get("/stories/following", async (req, res) => {
       .flatMap((b) => [b.blockerId === myId ? b.blockedId : b.blockerId]),
   );
 
+  // Authors who hide their stories from me ("Hide story from").
+  const hidingAuthors = await authorsHidingStoriesFrom(myId, Array.from(new Set(rows.map((r) => r.authorId))));
   const rel = await viewerRelations(myId, rows.map((r) => r.authorId));
+
   const visibleRows = rows.filter((r) => {
     if (r.authorId === myId) return true;
     if (blockedIds.has(r.authorId)) return false;
+    if (hidingAuthors.has(r.authorId)) return false;
     return audienceAllows(r.privacyVisibility, r.authorId, myId, rel);
   });
   if (!visibleRows.length) { res.json([]); return; }
@@ -1465,6 +1475,9 @@ router.post("/stories/:id/like", async (req, res) => {
   if (story.authorId !== myId && (await blockRelation(myId, story.authorId)) !== "none") {
     res.status(404).json({ error: "Story not found" }); return;
   }
+  if (await storyHiddenFrom(story.authorId, myId)) {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
   if (!(await viewerMayOpenAudience(story.privacyVisibility, story.authorId, myId))) {
     res.status(404).json({ error: "Story not found" }); return;
   }
@@ -1509,6 +1522,9 @@ router.post("/stories/:id/view", async (req, res) => {
   const story = await loadActiveStory(storyId);
   if (!story) { res.status(404).json({ error: "Story not found" }); return; }
   if (story.authorId !== myId && (await blockRelation(myId, story.authorId)) !== "none") {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
+  if (await storyHiddenFrom(story.authorId, myId)) {
     res.status(404).json({ error: "Story not found" }); return;
   }
   if (!(await viewerMayOpenAudience(story.privacyVisibility, story.authorId, myId))) {
@@ -1677,6 +1693,8 @@ router.post("/block", async (req, res) => {
       and(eq(followRequests.requesterId, userId), eq(followRequests.targetId, myId)),
     ));
   });
+  // Ends any DM call ringing / live between the two (routes/call.ts).
+  await emitUserBlocked(myId, userId);
 
   res.json({ ok: true });
 });

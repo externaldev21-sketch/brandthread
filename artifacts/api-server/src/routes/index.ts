@@ -46,6 +46,9 @@ import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
 import checkoutIntentRouter from "./checkout-intent";
 import guestCheckoutRouter from "./guest-checkout";
+import {
+  buyerPostPurchaseRouter, checkoutProfileRouter, sellerConversionTrackingRouter, sellerPostPurchaseOfferRouter,
+} from "./checkout-extras";
 import connectRouter, { connectRedirectRouter } from "./connect";
 import subscriptionRouter from "./subscription";
 import webhooksRouter from "./webhooks";
@@ -69,6 +72,10 @@ import reportsRouter from "./reports";
 import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
+import interactionSettingsRouter from "./interaction-settings";
+import remixRouter from "./remix";
+import displayPreferencesRouter from "./display-preferences";
+import translateRouter from "./translate";
 import socialRouter from "./social";
 import storyMentionsRouter from "./story-mentions";
 import closeFriendsRouter from "./close-friends";
@@ -195,6 +202,7 @@ router.use("/public",          profileMediaRouter); // /users/:id/videos, /produ
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
 router.use("/profile",         avatarVideoRouter);  // avatar video (moving profile picture), all account types
 router.use("/guest/checkout",  guestCheckoutRouter);
+router.use("/checkout-profile", checkoutProfileRouter); // public: store language + checkout mode for the buyer checkout
 router.use("/webhooks/resend-marketing", emailMarketingWebhookRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
@@ -281,6 +289,8 @@ router.use("/product-seo",               productSeoRouter);
 router.use("/buyer/cart",                cartDbRouter);
 // One-page checkout (one PaymentIntent per cart). Before /buyer so its card-data guard runs first.
 router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);
+// Post-purchase offer on the order confirmation (seller Checkout settings). Before /buyer.
+router.use("/buyer/post-purchase",       buyerPostPurchaseRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/notifications",             notificationEventsRouter);
 router.use("/buyer",                     buyerRouter);
@@ -295,6 +305,9 @@ router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliat
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
+// Checkout settings: post-purchase offer + conversion tracking ("Additional scripts").
+router.use("/seller/post-purchase-offer", tc, sellerPostPurchaseOfferRouter);
+router.use("/seller/conversion-tracking", tc, sellerConversionTrackingRouter);
 router.use("/seller/push-broadcasts",    tc, sellerPushBroadcastsRouter);
 router.use("/seller/giveaways",          tc, sellerGiveawaysRouter);
 router.use("/seller/launch-checklist",   tc, sellerLaunchChecklistRouter);
@@ -312,6 +325,10 @@ router.use("/moderation",                auditModerationActions, moderationRoute
 router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
 router.use("/safety",                    safetyRouter);
 router.use("/social/contacts",           socialContactsRouter);
+router.use("/interaction-settings",      interactionSettingsRouter); // comment/repost/download + hidden-story settings; download check is public
+router.use("/remix",                     remixRouter); // video remixes: permission check + source clip copy (lib/remix.ts)
+router.use("/display-preferences",       displayPreferencesRouter); // translation language, auto-translate, text size, high-contrast icons
+router.use("/translate",                 translateRouter); // caption/comment translation (expensive rate limit, cached)
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
 router.use("/social",                    closeFriendsRouter);

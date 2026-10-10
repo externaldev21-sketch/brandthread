@@ -11,6 +11,7 @@ import { Button } from '@/components/ui';
 import type { CheckoutDiscount } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
 import { CheckoutField, CheckoutSection, TextAction, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
+import { useCheckoutT } from './CheckoutLanguage';
 
 export function PromoCodeSection({
   discounts, onApply, onRemove, unavailableReason, title = 'Promo code', idSuffix = '',
@@ -27,6 +28,7 @@ export function PromoCodeSection({
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
+  const t = useCheckoutT();
   const [code, setCode] = useState('');
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,48 +42,48 @@ export function PromoCodeSection({
     try {
       const result = await onApply(trimmed);
       if (result.isValid) setCode('');
-      else setError(result.errorMessage || 'That code isn’t valid for this order.');
+      else setError(result.errorMessage ? t(result.errorMessage) : t('That code isn’t valid for this order.'));
     } catch {
-      setError('We couldn’t check that code. Check your connection and try again.');
+      setError(t('We couldn’t check that code. Check your connection and try again.'));
     } finally {
       setApplying(false);
     }
   }
 
   return (
-    <CheckoutSection title={title} testID={`checkout-promo${idSuffix}`}>
+    <CheckoutSection title={title === 'Promo code' ? t('Promo code') : title} testID={`checkout-promo${idSuffix}`}>
       {applied.map(discount => (
         <View key={discount.code} style={styles.applied} testID="checkout-promo-applied">
           <Feather name="check-circle" size={18} color={ck.text} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.appliedCode}>{discount.code} applied</Text>
+            <Text style={styles.appliedCode}>{t('{code} applied', { code: discount.code })}</Text>
             {discount.description ? <Text style={styles.appliedDesc} numberOfLines={2}>{discount.description}</Text> : null}
           </View>
-          <TextAction label="Remove" accessibilityLabel={`Remove promo code ${discount.code}`} onPress={() => onRemove(discount.code)} />
+          <TextAction label={t('Remove')} accessibilityLabel={`Remove promo code ${discount.code}`} onPress={() => onRemove(discount.code)} />
         </View>
       ))}
 
       {unavailableReason ? (
-        <Text style={styles.unavailable}>{unavailableReason}</Text>
+        <Text style={styles.unavailable}>{t(unavailableReason)}</Text>
       ) : applied.length === 0 ? (
         <View style={styles.row}>
           <CheckoutField
-            label="Code"
+            label={t('Code')}
             value={code}
             onChangeText={next => { setCode(next.toUpperCase()); if (error) setError(null); }}
             error={error ?? undefined}
             showError
-            placeholder="Enter promo code"
+            placeholder={t('Enter promo code')}
             autoCapitalize="characters"
             autoCorrect={false}
             returnKeyType="done"
             onSubmitEditing={() => void apply()}
             style={{ flex: 1, marginBottom: 0 }}
-            accessibilityLabel="Promo code"
+            accessibilityLabel={t('Promo code')}
             testID="checkout-promo-input"
           />
           <Button
-            label="Apply"
+            label={t('Apply')}
             variant="secondary"
             size="small"
             loading={applying}

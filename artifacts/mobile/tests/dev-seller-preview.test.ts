@@ -48,7 +48,7 @@ describe('temporary seller preview flag', () => {
     const orders = readFileSync(resolve(root, 'lib/previewSellerOrders.ts'), 'utf8');
     const products = readFileSync(resolve(root, 'lib/previewSellerProducts.ts'), 'utf8');
     expect(aiService).toContain('if (isSellerDevPreview())');
-    expect(memory).toContain('!isSellerDevPreview() && API_BASE && authToken');
+    expect(memory).toContain('isSellerDevPreview() || !API_BASE || !authToken');
     expect(removal).toContain('const demo = isSellerDevPreview() && isPreviewDemoMode()');
     expect(orders).toContain('allPreviewSellerOrders');
     expect(products).toContain('getPreviewSellerProducts');

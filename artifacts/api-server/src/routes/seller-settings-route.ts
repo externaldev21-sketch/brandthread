@@ -1,7 +1,8 @@
 /**
  * Seller Settings — language, store preferences, and integration status.
  * GET   /api/seller/settings              — current settings
- * PATCH /api/seller/settings              — update settings (language, etc.)
+ * PATCH /api/seller/settings              — update settings (language, checkoutMode,
+ *                                            tippingEnabled — lib/sellerCheckoutSettings.ts)
  * GET   /api/seller/settings/policies     — load store policies from storefronts table
  * PUT   /api/seller/settings/policies     — save store policies to storefronts table
  * GET   /api/seller/settings/integrations — list connected integrations
@@ -12,6 +13,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { checkoutSettingsPatchError } from "../lib/sellerCheckoutSettings";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,6 +36,9 @@ router.get("/", async (req, res) => {
 router.patch("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const updates = req.body; // e.g. { language: 'fr', ...}
+  // Checkout keys are enforced at checkout, so only valid values may be stored.
+  const invalid = checkoutSettingsPatchError(updates);
+  if (invalid) return res.status(400).json({ error: invalid, code: "VALIDATION_ERROR" });
 
   try {
     await db.execute(sql`

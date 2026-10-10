@@ -62,6 +62,9 @@ import {
 } from '@/lib/profileNavigation';
 import { getPreviewBuyerProduct, getPreviewRelatedProducts, isPreviewProductId } from '@/lib/previewProducts';
 import { isPreviewSellerId } from '@/lib/previewCheckout';
+import { isOwnerPreviewRow, sellerProductToBuyerProduct } from '@/lib/sellerProductPreview';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { getProduct as getLocalSellerProduct } from '@/services/productService';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
@@ -504,8 +507,10 @@ export default function BuyerProductDetailScreen() {
   const { theme, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, BORDER_ACTIVE, BORDER_FOCUS, GRAD_PRIMARY, SHADOW_PURPLE } = useChrome();
   const s = makeStyles(theme);
   const wl = makeWaitlistStyles(theme);
-  const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId, src } = useLocalSearchParams<{
+  const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId, src, localPreview } = useLocalSearchParams<{
     productId?: string;
+    /** "1": the seller's "Preview as buyer" for a product stored only on this device. */
+    localPreview?: string;
     sourcePostId?: string;
     sourceTagId?: string;
     editVariantId?: string;
@@ -541,6 +546,12 @@ export default function BuyerProductDetailScreen() {
   const [sellerPaymentReady, setSellerPaymentReady] = useState<boolean | null>(null);
   const [sellerPaymentReason, setSellerPaymentReason] = useState<string | null>(null);
   const [sellerVacationMessage, setSellerVacationMessage] = useState<string | null>(null);
+  // The seller's own not-yet-buyable product ("Preview as buyer"): a draft /
+  // archived product the API serves only to its owner (`previewOnly`), or one
+  // stored only on this device. Shown, never sold.
+  const [sellerPreview, setSellerPreview] = useState<null | 'server' | 'local'>(null);
+  // The seller's own tab bar would sit over the purchase bar on their preview.
+  useHideTabBar(!!sellerPreview);
   const [refreshing, setRefreshing] = useState(false);
   // Track whether options were touched at least once (for required-option feedback)
   const [optionsTouched, setOptionsTouched] = useState(false);
@@ -592,13 +603,25 @@ export default function BuyerProductDetailScreen() {
     setLoadFailed(false);
     setSellerPaymentReady(null);
     setSellerPaymentReason(null);
+    setSellerPreview(null);
 
     (async () => {
       try {
         let prod: BuyerProduct | null = null;
         let paymentStatus: { ready: boolean; reason?: string } | null = null;
+        let previewKind: null | 'server' | 'local' = null;
 
-        if (productId) {
+        // "Preview as buyer" for a product that exists only in this device's
+        // product store (signed-out web preview save, or a seeded demo product).
+        if (productId && localPreview === '1') {
+          const local = await getLocalSellerProduct(productId).catch(() => undefined);
+          if (local) {
+            prod = sellerProductToBuyerProduct(local);
+            previewKind = 'local';
+          }
+        }
+
+        if (productId && !prod) {
           // Load the live product from the public API.
           // DB product UUIDs from the discover feed carry real variant IDs
           // so the checkout server can look them up correctly.
@@ -623,9 +646,10 @@ export default function BuyerProductDetailScreen() {
               // Adapt the product and check payment readiness together as soon
               // as the product supplies the seller ID. A payment-status failure
               // is non-fatal: Buy Now performs its own safety check on tap.
+              if (isOwnerPreviewRow(row)) previewKind = 'server';
               [prod, paymentStatus] = await Promise.all([
                 Promise.resolve(adaptApiProductToBuyerProduct(row)),
-                row.ownerId && isSignedIn
+                row.ownerId && isSignedIn && !isOwnerPreviewRow(row)
                   ? api.buyer.sellerPaymentStatus(row.ownerId).catch(() => null)
                   : Promise.resolve(null),
               ]);
@@ -646,44 +670,45 @@ export default function BuyerProductDetailScreen() {
 
         if (!cancelled) {
           setProduct(prod);
+          setSellerPreview(prod ? previewKind : null);
           if (paymentStatus) {
             setSellerPaymentReady(paymentStatus.ready);
             setSellerPaymentReason(paymentStatus.reason ?? null);
           }
           // Best-effort — a failed view record should never affect the
           // product page itself, so no error handling beyond swallowing it.
-          if (prod?.id && isSignedIn) api.buyer.recentlyViewed.record(prod.id).catch(() => {});
-          if (prod?.id) track('product_viewed', { surface: 'detail' });
+          if (prod?.id && isSignedIn && !previewKind) api.buyer.recentlyViewed.record(prod.id).catch(() => {});
+          if (prod?.id && !previewKind) track('product_viewed', { surface: 'detail' });
         }
       } catch {}
       if (!cancelled) setLoading(false);
     })();
 
     return () => { cancelled = true; };
-  }, [productId, reloadTick]);
+  }, [productId, localPreview, reloadTick]);
 
   // Real per-source traffic tracking for the seller's own Dashboard — a
   // signed-out shopper's visit still counts, so this never gates on
   // isSignedIn. Fire-and-forget, never blocks this screen's own render.
   useEffect(() => {
-    if (!product?.id || !product.sellerId) return;
+    if (!product?.id || !product.sellerId || sellerPreview) return;
     api.publicSellers
       .recordStoreVisit(product.sellerId, { source: resolveStoreVisitSource(src), productId: product.id })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.id, product?.sellerId]);
+  }, [product?.id, product?.sellerId, sellerPreview]);
 
   // Meta Pixel + Conversions API — ViewContent, once per loaded product. This
   // is the real buyer-facing product page (product-detail.tsx is the seller's
   // own management view), so it's the correct place to fire ViewContent.
   useEffect(() => {
-    if (!product?.id) return;
+    if (!product?.id || sellerPreview) return;
     void trackAndRelayConversionEvent(
       'ViewContent',
       { content_ids: [product.id], content_type: 'product', value: product.priceCents / 100, currency: 'usd' },
       { productId: product.id, valueCents: product.priceCents, currency: 'usd' },
     );
-  }, [product?.id]);
+  }, [product?.id, sellerPreview]);
 
   useEffect(() => {
     if (!product || !editVariantId) return;
@@ -826,7 +851,7 @@ export default function BuyerProductDetailScreen() {
   }
 
   async function handleReserve() {
-    if (!product) return;
+    if (!product || sellerPreview) return;
     if (!isSignedIn) {
       goToSignIn();
       return;
@@ -842,6 +867,7 @@ export default function BuyerProductDetailScreen() {
   }
 
   async function handleAddToCart() {
+    if (sellerPreview) return;
     if (!allSelected) {
       // Mark options as touched so unselected options show a required indicator
       setOptionsTouched(true);
@@ -916,6 +942,7 @@ export default function BuyerProductDetailScreen() {
   }
 
   async function handleBuyNow() {
+    if (sellerPreview) return;
     if (sellerVacationMessage) {
       Alert.alert('Seller is away', sellerVacationMessage);
       return;
@@ -995,6 +1022,18 @@ export default function BuyerProductDetailScreen() {
               style={s.mediaChromeBtn}
             />
           </View>
+          {sellerPreview && (
+            <View
+              style={[s.previewMarkerWrap, { top: headerTopInset + SP.sm + 8 }]}
+              pointerEvents="none"
+              testID="product-seller-preview-marker"
+            >
+              <View style={s.previewMarker}>
+                <Feather name="eye" size={12} color="#FFFFFF" />
+                <Text style={s.previewMarkerText}>Preview</Text>
+              </View>
+            </View>
+          )}
           {/* Save heart — sits left of the cart button on the same chrome row
               (tap saves, long-press files into a collection). */}
           <SaveHeart
@@ -1059,6 +1098,14 @@ export default function BuyerProductDetailScreen() {
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
+
+          {sellerPreview && (
+            <Text style={s.previewNote} testID="product-seller-preview-note">
+              {sellerPreview === 'local'
+                ? 'Saved on this device only. Buyers can’t see or buy it.'
+                : 'Only you can see this. Buyers can buy it once it’s active.'}
+            </Text>
+          )}
 
           <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />
 
@@ -1445,14 +1492,23 @@ export default function BuyerProductDetailScreen() {
             variant="secondary"
             onPress={handleAddToCart}
             loading={addingToCart}
-            disabled={addingToCart || launching || (allSelected && !inStock)}
-            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
+            disabled={!!sellerPreview || addingToCart || launching || (allSelected && !inStock)}
+            accessibilityLabel={sellerPreview ? 'Add to cart unavailable in preview' : !allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
             style={s.buyNowBtn}
             testID="product-add-to-cart"
           />
         )}
 
-        {product.isPreOrder ? (
+        {sellerPreview ? (
+          <Button
+            label="Not for sale yet"
+            onPress={() => {}}
+            variant="primary"
+            disabled
+            style={s.buyNowBtn}
+            testID="product-seller-preview-buy"
+          />
+        ) : product.isPreOrder ? (
           <Button
             label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
             onPress={handleReserve}
@@ -1868,6 +1924,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // from `mediaChromeBtn` below on a `variant="plain"` IconButton (no blur
   // over the swipeable gallery — see the comment where these render).
   backBtnWrap: { position: 'absolute', left: SP.md },
+  previewMarkerWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  previewMarker: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: SP.sm + 2, paddingVertical: 5,
+    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.5)',
+  },
+  previewMarkerText: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.4 },
+  previewNote: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.meta, marginBottom: SP.md },
   cartBtnWrap: { position: 'absolute', right: SP.md },
   // `right: 0` (was `-4`, pushing the badge outward past the button's
   // own bounds) — same class of fix as the buyer feed top bar's cart

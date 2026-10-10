@@ -22,11 +22,16 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   AIMessage, AISession, AIScreenContext, AIChatRequest,
   AIChatResponse, AIActionCard, AISettings, AISuggestion,
-  NextBestAction, DEFAULT_AI_SETTINGS, contextLabel,
+  NextBestAction, contextLabel,
 } from './aiTypes';
 import { getEnabledMemorySummary } from './aiBrandMemory';
 import { addAuditEntry } from './aiAuditLog';
 import { getPreviewAiReply } from '../lib/previewAiBrain';
+import {
+  aiDisabledError,
+  normalizeAISettings,
+  suggestionCategoryAllowed,
+} from './aiSettingsPolicy';
 
 // ─── ID helper ────────────────────────────────────────────────────────────────
 
@@ -37,6 +42,8 @@ function nanoid(): string {
 // ─── AsyncStorage key scoping ─────────────────────────────────────────────────
 
 const SETTINGS_KEY = 'bt:ai:settings:v1';
+/** Set while a settings change has not yet been accepted by the server. */
+const SETTINGS_PENDING_KEY = 'bt:ai:settings:pending:v1';
 const MAX_STORED   = 50; // max messages kept in AsyncStorage
 
 /**
@@ -63,18 +70,124 @@ let _currentSession: AISession | null = null;
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
+/**
+ * Device cache of the seller's AI Settings. The account copy lives on the
+ * server (GET/PUT /api/v1/ai/settings) — see syncAISettingsFromServer() and
+ * pushAISettings(). The cache is what the app reads offline and in the
+ * signed-out web preview, which never calls the server.
+ */
 export async function getAISettings(): Promise<AISettings> {
   try {
     const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { ...DEFAULT_AI_SETTINGS };
-    return { ...DEFAULT_AI_SETTINGS, ...JSON.parse(raw) };
+    if (!raw) return normalizeAISettings(undefined);
+    return normalizeAISettings(JSON.parse(raw));
   } catch {
-    return { ...DEFAULT_AI_SETTINGS };
+    return normalizeAISettings(undefined);
   }
 }
 
+/** Writes the device cache only. Use pushAISettings() to sync to the account. */
 export async function saveAISettings(settings: AISettings): Promise<void> {
-  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(normalizeAISettings(settings)));
+}
+
+/**
+ * Loads the account's AI Settings from the server and refreshes the device
+ * cache. Returns null (cache untouched) when there is no API base / token or
+ * the request fails, so callers keep showing the cached copy.
+ * Callers must not call this in dev/web preview (see lib/devPreview.ts).
+ */
+export async function syncAISettingsFromServer(authToken: string | null | undefined): Promise<AISettings | null> {
+  const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+  if (!apiBase || !authToken) return null;
+  try {
+    const res = await fetch(`${apiBase}/api/v1/ai/settings`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    if (!res.ok) return null;
+    const body = await res.json() as { settings?: unknown; updatedAt?: string | null };
+    const pending = await AsyncStorage.getItem(SETTINGS_PENDING_KEY).catch(() => null);
+    if (!body.updatedAt || pending) {
+      // Either a change made on this device (e.g. offline) has not reached
+      // the server yet, or the account has no row (first sync after this
+      // shipped) — the device's choices win instead of being reset.
+      const local = await getAISettings();
+      await pushAISettings(local, authToken);
+      return local;
+    }
+    const settings = normalizeAISettings(body.settings);
+    await saveAISettings(settings);
+    return settings;
+  } catch {
+    return null;
+  }
+}
+
+// Serialize writes so rapid toggles reach the server in order.
+let _settingsPush: Promise<boolean> = Promise.resolve(true);
+
+/**
+ * Saves the settings to the device cache and to the account. Resolves true
+ * when the server accepted them. Callers must not call this in dev/web
+ * preview — use saveAISettings() there.
+ */
+export function pushAISettings(
+  settings: AISettings,
+  auth: string | null | undefined | (() => Promise<string | null>),
+): Promise<boolean> {
+  const normalized = normalizeAISettings(settings);
+  const serialized = JSON.stringify(normalized);
+  // The cache (and the pending marker) are written right away so a reader
+  // sees the new value even while the network write is still queued.
+  const cached = Promise.all([
+    saveAISettings(normalized),
+    AsyncStorage.setItem(SETTINGS_PENDING_KEY, serialized),
+  ]).catch(() => { /* cache is best-effort */ });
+  const run = async (): Promise<boolean> => {
+    await cached;
+    const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+    if (!apiBase || !auth) return false;
+    try {
+      const authToken = typeof auth === 'function' ? await auth().catch(() => null) : auth;
+      if (!authToken) return false;
+      const res = await fetch(`${apiBase}/api/v1/ai/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ settings: normalized }),
+      });
+      if (res.ok) {
+        // Clear the marker only if no newer change was queued after this one.
+        const stillPending = await AsyncStorage.getItem(SETTINGS_PENDING_KEY).catch(() => null);
+        if (stillPending === serialized) {
+          await AsyncStorage.removeItem(SETTINGS_PENDING_KEY).catch(() => { /* best-effort */ });
+        }
+      }
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
+  _settingsPush = _settingsPush.then(run, run);
+  return _settingsPush;
+}
+
+/** The server said the assistant is off for this account — mirror that in the cache. */
+async function markAssistantDisabledLocally(): Promise<void> {
+  try {
+    const current = await getAISettings();
+    if (current.enabled) await saveAISettings({ ...current, enabled: false });
+  } catch { /* best-effort */ }
+}
+
+function isAIDisabledBody(text: string): boolean {
+  try {
+    return (JSON.parse(text) as { code?: string })?.code === 'AI_DISABLED';
+  } catch {
+    return false;
+  }
 }
 
 // ─── Session repair ───────────────────────────────────────────────────────────
@@ -225,6 +338,13 @@ async function callAI(
   });
 
   if (!res.ok) {
+    if (res.status === 403) {
+      const text = await res.text().catch(() => '');
+      if (isAIDisabledBody(text)) {
+        await markAssistantDisabledLocally();
+        throw aiDisabledError();
+      }
+    }
     if (res.status === 401 || res.status === 403) {
       throw new Error('Authentication error. Please sign in again.');
     }
@@ -315,7 +435,9 @@ function callAIStream(
       if (xhr.readyState === 4 && !settled) {
         settled = true;
         cleanup();
-        if (xhr.status === 401 || xhr.status === 403) {
+        if (xhr.status === 403 && isAIDisabledBody(xhr.responseText ?? '')) {
+          markAssistantDisabledLocally().finally(() => reject(aiDisabledError()));
+        } else if (xhr.status === 401 || xhr.status === 403) {
           reject(new Error('Authentication error. Please sign in again.'));
         } else if (xhr.status === 429) {
           reject(new Error('Rate limit reached — please wait a moment and try again.'));
@@ -380,14 +502,23 @@ async function buildChatRequest(session: AISession, userText: string): Promise<A
     .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
   history.push({ role: 'user', content: userText });
 
-  const brandMemory = await getEnabledMemorySummary();
+  const settings = await getAISettings();
+  // "Brand Memory" off → the summary is never sent (the server also drops it).
+  const brandMemory = settings.brandMemoryEnabled ? await getEnabledMemorySummary() : {};
 
   return {
     messages: history,
     context: session.context,
     brandMemory: Object.keys(brandMemory).length > 0 ? brandMemory : undefined,
     maxTokens: 700,
+    aiSettings: settings,
   };
+}
+
+/** Throws AIDisabledError when "Enable AI assistant" is off on this device. */
+async function assertAssistantEnabled(): Promise<void> {
+  const settings = await getAISettings();
+  if (!settings.enabled) throw aiDisabledError();
 }
 
 async function finalizeTurn(
@@ -444,6 +575,8 @@ async function finalizeTurn(
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
   const { userText, session, authToken, userId, storeContext } = params;
 
+  await assertAssistantEnabled();
+
   // Cancel any in-flight request from a previous turn.
   _activeController?.abort();
   _activeController = new AbortController();
@@ -478,6 +611,8 @@ export async function sendMessageStream(
 ): Promise<SendMessageResult> {
   const { userText, session, authToken, userId, storeContext } = params;
 
+  await assertAssistantEnabled();
+
   _activeController?.abort();
   _activeController = new AbortController();
   const { signal } = _activeController;
@@ -510,6 +645,8 @@ export async function sendPreviewMessageStream(
   onDelta: (textSoFar: string) => void,
 ): Promise<SendMessageResult> {
   const { userText, session, userId, storeContext } = params;
+
+  await assertAssistantEnabled();
 
   const fullReply = getPreviewAiReply(userText);
 
@@ -615,6 +752,13 @@ export async function getAISuggestions(
 ): Promise<AISuggestion[]> {
   const storageKey = suggestionsKey(userId);
 
+  // "Enable AI assistant" / "Dashboard suggestions" off → nothing is fetched
+  // or shown; a disabled data source hides its category (the server applies
+  // the same rules to what it computes).
+  const settings = await getAISettings();
+  if (!settings.enabled || !settings.suggestionsEnabled) return [];
+  const allowed = (s: AISuggestion) => suggestionCategoryAllowed(s.category, settings);
+
   const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
   // Try real API suggestions first
   if (!isSellerDevPreview() && apiBase && authToken) {
@@ -629,13 +773,13 @@ export async function getAISuggestions(
             const raw = await AsyncStorage.getItem(storageKey);
             const stored: AISuggestion[] = raw ? JSON.parse(raw) : [];
             const dismissedIds = new Set(stored.filter(s => s.dismissedAt).map(s => s.id));
-            const filtered = suggestions.filter(s => !dismissedIds.has(s.id));
+            const filtered = suggestions.filter(s => !dismissedIds.has(s.id) && allowed(s));
             await AsyncStorage.setItem(storageKey, JSON.stringify([
               ...stored.filter(s => s.dismissedAt),
               ...filtered,
             ]));
             return filtered;
-          } catch { return suggestions; }
+          } catch { return suggestions.filter(allowed); }
         }
       }
     } catch { /* fall through — no fake fallback here */ }
@@ -646,7 +790,7 @@ export async function getAISuggestions(
     const raw = await AsyncStorage.getItem(storageKey);
     if (!raw) return [];
     const stored = JSON.parse(raw) as AISuggestion[];
-    return stored.filter(s => !s.dismissedAt && !s.completedAt);
+    return stored.filter(s => !s.dismissedAt && !s.completedAt && allowed(s));
   } catch {
     return [];
   }

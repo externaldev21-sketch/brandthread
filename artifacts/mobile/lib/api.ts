@@ -34,10 +34,19 @@ import type {
 import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { InteractionSettings, InteractionSettingsPatch, PendingTag } from '@/lib/interactionSettings';
+import type {
+  AcceptOfferResult, BuyerOffer, ConversionTrackingView, PostPurchaseOfferResponse, PostPurchaseOfferSettings,
+} from '@/lib/checkoutExtras';
+import type { DisplayPrefs } from '@/lib/displayPrefs';
+import type { TranslationResult } from '@/lib/translation';
+import type { RemixCheck, RemixClip } from '@/lib/remix';
+import type { DmCallDto, DmCallRtcDto } from '@/lib/calls/dmCallClient';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
 import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
+import type { BulkPriceRequest, BulkPriceResult, BulkProductList, ProductSeoDetail, ProductSeoInput } from '@/lib/productBulk';
 
 /** Server story highlight (GET /api/social/highlights/*). */
 export interface ServerHighlight {
@@ -52,7 +61,6 @@ export interface HighlightPickerStory {
   storyId: string; thumbnailUrl: string | null; slides: number;
   visibility: 'public' | 'friends' | 'close_friends'; createdAt: number; live: boolean;
 }
-import type { BulkPriceRequest, BulkPriceResult, BulkProductList, ProductSeoDetail, ProductSeoInput } from '@/lib/productBulk';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -1583,6 +1591,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           { method: 'DELETE', body: JSON.stringify({ token }) },
           getToken,
         ),
+      /** Native call-ringing token (iOS PushKit VoIP / Android FCM) — lib/calls/native/. */
+      registerVoipToken: (body: {
+        token: string;
+        platform: 'ios' | 'android';
+        kind: 'voip' | 'fcm';
+        environment?: 'sandbox' | 'production';
+      }) => post<{ ok: boolean }>('/api/push/voip-token', body),
+      deregisterVoipToken: (token: string) =>
+        request<{ ok: boolean }>(
+          '/api/push/voip-token',
+          { method: 'DELETE', body: JSON.stringify({ token }) },
+          getToken,
+        ),
     },
     notifications: {
       trackEvent: (body: {
@@ -1814,6 +1835,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           cancel: (paymentIntentId: string) =>
             post<{ ok: boolean }>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}/cancel`, {}),
         },
+        /** Post-purchase offer on the order confirmation (seller Checkout settings; routes/checkout-extras.ts). */
+        postPurchase: {
+          get: (orderId: string) => get<BuyerOffer>(`/api/buyer/post-purchase/${encodeURIComponent(orderId)}`),
+          /** Charges the card from the original payment; the server prices it. Poll paymentIntent.get for the order. */
+          accept: (orderId: string, body: { variantId: string; clientIdempotencyKey: string }) =>
+            post<AcceptOfferResult>(`/api/buyer/post-purchase/${encodeURIComponent(orderId)}/accept`, body),
+        },
+        /** Public: each seller's store language and checkout mode (the checkout's language and guest-only rule). */
+        profiles: (sellerIds: string[]) =>
+          get<{ profiles: Record<string, { language: string; checkoutMode: string }> }>(
+            `/api/checkout-profile?sellerIds=${sellerIds.map(encodeURIComponent).join(',')}`),
       },
       orders: {
         list:   () => get<any[]>('/api/buyer/orders'),
@@ -2072,6 +2104,26 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         clientEventId: string;
       }) =>
         post<{ recorded: true }>('/api/call/events', body),
+      /** Real 1:1 DM calls (see lib/calls/agoraCallProvider.ts) — server-tracked call state shared by both sides. */
+      dm: {
+        create: (body: { conversationId: string; mode: 'voice' | 'video' }) =>
+          post<{ call: DmCallDto; rtc: DmCallRtcDto }>('/api/call/dm/calls', body),
+        accept: (id: string) =>
+          post<{ call: DmCallDto; rtc: DmCallRtcDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}/accept`, {}),
+        decline: (id: string) =>
+          post<{ call: DmCallDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}/decline`, {}),
+        end: (id: string) =>
+          post<{ call: DmCallDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}/end`, {}),
+        token: (id: string) =>
+          post<{ rtc: DmCallRtcDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}/token`, {}),
+        get: (id: string) =>
+          freshGet<{ call: DmCallDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}`),
+        incoming: () => freshGet<{ call: DmCallDto | null }>('/api/call/dm/incoming'),
+        rate: (id: string, rating: 'good' | 'not_good') =>
+          post<{ ok: boolean }>(`/api/call/dm/calls/${encodeURIComponent(id)}/rating`, { rating }),
+        log: (conversationId: string) =>
+          freshGet<{ calls: DmCallDto[] }>(`/api/call/dm/conversations/${encodeURIComponent(conversationId)}/calls?limit=50`),
+      },
     },
     /** Unauthenticated public endpoints — no Authorization header needed. */
     /**
@@ -2494,6 +2546,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       // ─ Settings (language, preferences) ──────────────────────────────────
       getSettings:          () => get<{ settings: Record<string, any> }>('/api/seller/settings'),
       updateSettings:       (body: Record<string, any>) => patch<any>('/api/seller/settings', body),
+      // ─ Checkout settings: post-purchase offer + conversion tracking ──────
+      getPostPurchaseOffer:  () => get<PostPurchaseOfferResponse>('/api/seller/post-purchase-offer'),
+      savePostPurchaseOffer: (body: PostPurchaseOfferSettings) => put<PostPurchaseOfferResponse>('/api/seller/post-purchase-offer', body),
+      getConversionTracking: () => get<{ tracking: ConversionTrackingView }>('/api/seller/conversion-tracking'),
+      saveConversionTracking: (body: Record<string, string | null>) =>
+        put<{ tracking: ConversionTrackingView }>('/api/seller/conversion-tracking', body),
       // ─ Policies ───────────────────────────────────────────────────────────
       getPolicies:          () => get<{ policies: any[] }>('/api/seller/settings/policies'),
       savePolicies:         (policies: any[]) => put<any>('/api/seller/settings/policies', { policies }),
@@ -3063,6 +3121,46 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         ),
       replace: (friendIds: string[]) =>
         put<{ ok: boolean; friendIds: string[]; skipped: string[] }>('/api/social/close-friends', { friendIds }),
+    },
+    /**
+     * Account interaction settings, enforced server-side: who can comment on
+     * my posts, whether others can repost or download my content, and the
+     * people I hide my stories from.
+     */
+    interactionSettings: {
+      get: () => freshGet<{ settings: InteractionSettings; storyHiddenCount: number; pendingTagCount?: number }>('/api/interaction-settings'),
+      update: (body: InteractionSettingsPatch) =>
+        patch<{ settings: InteractionSettings }>('/api/interaction-settings', body),
+      /** Tags waiting for my approval ("Manually approve tags"). */
+      pendingTags: () => freshGet<{ items: PendingTag[] }>('/api/interaction-settings/pending-tags'),
+      approveTag: (kind: PendingTag['kind'], id: string) =>
+        post<{ ok: boolean; pendingTagCount: number }>(`/api/interaction-settings/pending-tags/${kind}/${encodeURIComponent(id)}/approve`, {}),
+      /** Remove me from a post/story tag (untag). */
+      removeTag: (kind: PendingTag['kind'], id: string) =>
+        del<{ ok: boolean; pendingTagCount: number }>(`/api/interaction-settings/tags/${kind}/${encodeURIComponent(id)}`),
+      storyHidden: () => freshGet<{ userIds: string[] }>('/api/interaction-settings/story-hidden'),
+      setStoryHidden: (userIds: string[]) =>
+        put<{ userIds: string[] }>('/api/interaction-settings/story-hidden', { userIds }),
+      /** May the viewer save this post's media? (signed-out allowed) */
+      downloadAllowed: (postId: string) =>
+        quietGet<{ allowed: boolean }>(`/api/interaction-settings/posts/${encodeURIComponent(postId)}/download`),
+    },
+    /** Translation language, auto-translate captions, text size, high-contrast icons (signed-in). */
+    displayPreferences: {
+      get: () => freshGet<{ preferences: DisplayPrefs }>('/api/display-preferences'),
+      update: (body: Partial<DisplayPrefs>) =>
+        patch<{ preferences: DisplayPrefs }>('/api/display-preferences', body),
+    },
+    /** Translate captions/comments (signed-in). 503 { code: 'TRANSLATION_NOT_CONFIGURED' } without the server's AI integration. */
+    translate: (texts: string[], targetLanguage: string) =>
+      post<{ targetLanguage: string; translations: TranslationResult[] }>('/api/translate', { texts, targetLanguage }),
+    /** Video remixes (api-server routes/remix.ts) — the source author's setting decides. */
+    remix: {
+      check: (postId: string) =>
+        quietGet<RemixCheck>(`/api/remix/posts/${encodeURIComponent(postId)}`),
+      /** Copies the source video into a private clip I own for the create flow. */
+      clip: (postId: string) =>
+        post<RemixClip>(`/api/remix/posts/${encodeURIComponent(postId)}/clip`, {}),
     },
     /**
      * Server-side "seen" state for the buyer "Watching Threads" gesture coach

@@ -31,6 +31,15 @@
  *    hostedCheckoutFallback flag is on.
  *  - preview: the dev-web preview's fake pay path (no Stripe), with the same
  *    confirmation screen.
+ *
+ * Seller Checkout settings applied here (GET /api/checkout-profile):
+ *  - language: a single-seller checkout renders in the store's language; a
+ *    multi-seller cart in the device language, else English
+ *    (lib/checkoutI18n.ts);
+ *  - "Guest checkout only": no address or card saved, no account prompt
+ *    (the server also never saves the card);
+ *  - post-purchase offer: the confirmation shows the seller's offer
+ *    (components/checkout/PostPurchaseOffer.tsx).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -70,9 +79,10 @@ import {
 } from '@/lib/checkoutReadiness';
 import {
   buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath, paymentErrorMessage,
-  isCartQuote, quoteKey, quoteOffersBnpl, quoteTotals, recipientName, walletContactToCheckout,
+  isCartQuote, quoteKey, quoteOffersBnpl, quoteTipCents, quoteTotals, recipientName, walletContactToCheckout,
   type CartQuote, type PaymentIntentStart, type WalletContact,
 } from '@/lib/checkoutPayment';
+import { tipsForRequest, type TipChoice } from '@/lib/checkoutTips';
 import { ApiError } from '@/lib/networkNotice';
 import { CheckoutSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { StickyFooter } from '@/components/layout';
@@ -89,8 +99,13 @@ import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
 import { GiftCardSection } from '@/components/checkout/GiftCardSection';
 import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
 import { OrderSummarySection } from '@/components/checkout/OrderSummarySection';
+import { TipSection } from '@/components/checkout/TipSection';
 import { CheckoutTermsLine } from '@/components/checkout/CheckoutTermsLine';
 import { OrderConfirmation, OrderConfirmationActions } from '@/components/checkout/OrderConfirmation';
+import { PostPurchaseOffer } from '@/components/checkout/PostPurchaseOffer';
+import { CheckoutLanguageProvider } from '@/components/checkout/CheckoutLanguage';
+import { deviceLocale, resolveCheckoutLanguage, translateCheckout } from '@/lib/checkoutI18n';
+import { offerOrderId } from '@/lib/checkoutExtras';
 import {
   ExpressPay, PaymentController, StripePaymentProvider, stripePaymentAvailable,
 } from '@/components/checkout/StripePayment';
@@ -147,6 +162,8 @@ export default function BuyerCheckoutScreen() {
   const [cardComplete, setCardComplete] = useState(false);
   const [walletAvailable, setWalletAvailable] = useState(false);
   const [quote, setQuote] = useState<{ key: string; value: CartQuote } | null>(null);
+  /** sellerId → the buyer's tip choice (sellers whose Checkout settings accept tips). */
+  const [tipChoices, setTipChoices] = useState<Record<string, TipChoice>>({});
   const [serverSaidHosted, setServerSaidHosted] = useState(false);
   const [stripeLoadFailed, setStripeLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -157,6 +174,10 @@ export default function BuyerCheckoutScreen() {
   const [footerHeight, setFooterHeight] = useState(150);
   const scrollRef = useRef<ScrollView>(null);
   const controllerRef = useRef<PaymentControllerApi>(null);
+  /** Finishes a bank check (3DS) on a post-purchase offer, on the confirmation. */
+  const offerControllerRef = useRef<PaymentControllerApi>(null);
+  /** sellerId → store language + checkout mode (seller Checkout settings). */
+  const [storeProfiles, setStoreProfiles] = useState<Record<string, { language: string; checkoutMode: string }>>({});
   const startedRef = useRef<PaymentIntentStart | null>(null);
   /**
    * Fully verified orders — each entry has a real server `id` (used for navigation/API)
@@ -283,6 +304,24 @@ export default function BuyerCheckoutScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // The sellers' Checkout settings that change this page: language and "Guest checkout only".
+  const sellerKey = session ? session.deliveryGroups.map(group => group.sellerId).join(',') : '';
+  useEffect(() => {
+    if (!sellerKey) return;
+    let alive = true;
+    api.buyer.checkout.profiles(sellerKey.split(','))
+      .then(data => { if (alive && data?.profiles) setStoreProfiles(data.profiles); })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [api, sellerKey]);
+  const language = resolveCheckoutLanguage({
+    sellerLanguages: session ? session.deliveryGroups.map(group => storeProfiles[group.sellerId]?.language) : [],
+    deviceLocale: deviceLocale(),
+  });
+  const t = (text: string, vars?: Record<string, string | number>) => translateCheckout(language, text, vars);
+  const guestCheckoutOnly = !!session?.deliveryGroups.some(group => storeProfiles[group.sellerId]?.checkoutMode === 'guest_only');
+  const withLanguage = (node: React.ReactNode) => <CheckoutLanguageProvider language={language}>{node}</CheckoutLanguageProvider>;
+
   const handleSelectAddress = (addr: SavedAddress) => {
     const parts = addr.recipientName ? addr.recipientName.split(' ') : [];
     setAddress({
@@ -376,8 +415,14 @@ export default function BuyerCheckoutScreen() {
   }), [previewOnly, isSignedIn, hostedFallbackFlag, session, serverSaidHosted, stripeLoadFailed]);
   const inApp = payment.path === 'in_app';
 
+  // ── Tips: offered where the last server quote says the seller accepts them ─
+  // (the last quote received, not only the current one, so a pending re-quote
+  // never drops the tip it was asked to price).
+  const tipGroups = quote?.value.groups ?? [];
+  const tips = inApp ? tipsForRequest(tipChoices, tipGroups) : {};
+
   // ── Server quote: real shipping + tax for the address (in-app only) ─────
-  const quoteBody = session && inApp && canQuote(address) ? buildQuoteBody(session, address) : null;
+  const quoteBody = session && inApp && canQuote(address) ? buildQuoteBody(session, address, tips) : null;
   const currentQuoteKey = quoteBody ? quoteKey(quoteBody) : null;
   useEffect(() => {
     if (!quoteBody || !currentQuoteKey || quote?.key === currentQuoteKey) return;
@@ -453,7 +498,9 @@ export default function BuyerCheckoutScreen() {
         contact: who.contact,
         address: who.address,
         idempotencyKey: base.idempotencyKey,
-        saveCard: true,
+        // A "Guest checkout only" store saves nothing to the buyer's account.
+        saveCard: !guestCheckoutOnly,
+        tips,
       }));
       startedRef.current = started;
       // Remember the intent so a restart can find the orders it produced.
@@ -589,7 +636,7 @@ export default function BuyerCheckoutScreen() {
       const value = await api.buyer.checkout.paymentIntent.quote(buildQuoteBody(session, {
         city: walletAddress.city ?? '', state: walletAddress.state ?? '',
         postalCode: walletAddress.postalCode ?? '', country: walletAddress.country ?? 'US',
-      }));
+      }, tips));
       return isCartQuote(value) ? value : null;
     } catch {
       return null;
@@ -614,7 +661,7 @@ export default function BuyerCheckoutScreen() {
   };
 
   const saveAddressIfAsked = async (who: { address: CheckoutAddressDraft; contact: Partial<CheckoutContact> }) => {
-    if (!isSignedIn || who.address.saveAddress === false || who.address.id) return;
+    if (!isSignedIn || guestCheckoutOnly || who.address.saveAddress === false || who.address.id) return;
     try {
       await api.buyer.addresses.create({
         label: who.address.label || 'Saved Address',
@@ -831,8 +878,14 @@ export default function BuyerCheckoutScreen() {
       await saveAddressIfAsked({ address, contact });
       await persist({ ...current, paidGroups, step: 'confirmation' });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      showError({ title: 'Couldn’t start secure checkout', message: 'Something went wrong reaching Stripe. Check your connection and try again — you haven’t been charged.' });
+    } catch (err) {
+      const apiError = err instanceof ApiError ? err : null;
+      if (apiError?.code === 'ACCOUNT_REQUIRED') {
+        // The seller's Checkout settings require an account (no guest checkout).
+        showError({ title: 'Sign in to check out', message: apiError.message });
+      } else {
+        showError({ title: 'Couldn’t start secure checkout', message: 'Something went wrong reaching Stripe. Check your connection and try again — you haven’t been charged.' });
+      }
     }
     setPlacing(false);
   };
@@ -922,20 +975,20 @@ export default function BuyerCheckoutScreen() {
 
   const header = (title: string, onClose: () => void, closeLabel: string) => (
     <View style={[styles.header, { paddingTop: headerTop }]} testID="checkout-header">
-      <IconButton name="x" variant="plain" onPress={onClose} accessibilityLabel={closeLabel} testID="checkout-close" />
-      <Text style={styles.headerTitle} accessibilityRole="header">{title}</Text>
+      <IconButton name="x" variant="plain" onPress={onClose} accessibilityLabel={t(closeLabel)} testID="checkout-close" />
+      <Text style={styles.headerTitle} accessibilityRole="header">{t(title)}</Text>
       <View style={styles.headerSpacer} />
     </View>
   );
 
   if (loadFailed) {
-    return (
+    return withLanguage(
       <View style={styles.root}>
         {header('Checkout', leaveCheckout, 'Close checkout')}
         <ErrorState
-          message="We couldn't load checkout. Check your connection and try again."
+          message={t("We couldn't load checkout. Check your connection and try again.")}
           onRetry={() => void load()}
-          retryLabel="Try again"
+          retryLabel={t('Try again')}
           style={{ flex: 1 }}
         />
       </View>
@@ -957,6 +1010,7 @@ export default function BuyerCheckoutScreen() {
         threadCashCents: 0,
         orderTotalCents: quoted.totalCents,
         totalCents: quoted.totalCents,
+        tipCents: activeQuote ? quoteTipCents(activeQuote) : 0,
       }
     : sessionTotals;
   const taxNote = quoted || previewOnly
@@ -968,15 +1022,27 @@ export default function BuyerCheckoutScreen() {
   const ready = formReady && cardReady;
   const nextStep = getCheckoutNextStepHint(contact, address, current)
     ?? (!cardReady ? 'Enter your card details to continue' : null);
+  const nextStepText = nextStep ? t(nextStep) : null;
   const multiSeller = current.deliveryGroups.length > 1;
   const preorderAcks = current.acknowledgments;
-  const ctaLabel = canRetryPayment ? `Try again · ${formatCents(totals.totalCents)}` : `Pay ${formatCents(totals.totalCents)}`;
+  const ctaLabel = canRetryPayment
+    ? t('Try again · {amount}', { amount: formatCents(totals.totalCents) })
+    : t('Pay {amount}', { amount: formatCents(totals.totalCents) });
   const onCta = () => void (canRetryPayment ? retryPayment() : handlePlaceOrder());
 
   if (isConfirmation) {
     const paidCents = Object.values(current.paidGroups ?? {}).reduce((sum, group) => sum + (group.amountTotalCents ?? 0), 0);
-    return (
+    // The seller's post-purchase offer: signed-in, single-seller, real
+    // (non-preview) orders whose store isn't "Guest checkout only".
+    const offerForOrder = isSignedIn && !previewOnly && !guestCheckoutOnly
+      ? offerOrderId(verifiedOrders, current.deliveryGroups.length)
+      : null;
+    const offer = offerForOrder ? (
+      <PostPurchaseOffer orderId={offerForOrder} orderNumber={verifiedOrders[0]?.number ?? ''} controller={offerControllerRef} />
+    ) : null;
+    const confirmation = (
       <View style={styles.root}>
+        {offer && stripePaymentAvailable() ? <PaymentController ref={offerControllerRef} /> : null}
         {header('Order confirmation', () => router.replace('/(buyer)/discover' as never), 'Close')}
         <ScrollView
           contentContainerStyle={{ padding: GUTTER }}
@@ -989,6 +1055,8 @@ export default function BuyerCheckoutScreen() {
             verifiedOrders={verifiedOrders}
             finalizing={pendingSessionIds.length > 0}
             totalPaidCents={paidCents > 0 ? paidCents : totals.totalCents}
+            offer={offer}
+            hideAccountPrompt={guestCheckoutOnly}
           />
         </ScrollView>
         {/* A sibling of the ScrollView above, never inside its scrollable
@@ -1002,6 +1070,9 @@ export default function BuyerCheckoutScreen() {
         />
       </View>
     );
+    return withLanguage(offer && stripePaymentAvailable()
+      ? <StripePaymentProvider amountCents={0}>{confirmation}</StripePaymentProvider>
+      : confirmation);
   }
 
   const expressVisible = inApp ? walletAvailable : true;
@@ -1025,10 +1096,10 @@ export default function BuyerCheckoutScreen() {
             <View style={styles.errorBanner} accessibilityRole="alert" accessibilityLiveRegion="assertive" testID="checkout-error">
               <Feather name="alert-circle" size={18} color={ck.text} style={{ marginTop: 1 }} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.errorTitle}>{error.title}</Text>
-                <Text style={styles.errorText}>{error.message}</Text>
+                <Text style={styles.errorTitle}>{t(error.title)}</Text>
+                <Text style={styles.errorText}>{t(error.message)}</Text>
               </View>
-              <IconButton name="x" variant="plain" size={16} onPress={() => setError(null)} accessibilityLabel="Dismiss" />
+              <IconButton name="x" variant="plain" size={16} onPress={() => setError(null)} accessibilityLabel={t('Dismiss')} />
             </View>
           ) : null}
 
@@ -1056,7 +1127,7 @@ export default function BuyerCheckoutScreen() {
             onChange={setAddress}
             savedAddresses={isSignedIn ? savedAddresses : []}
             onSelectSaved={handleSelectAddress}
-            canSaveAddresses={!!isSignedIn}
+            canSaveAddresses={!!isSignedIn && !guestCheckoutOnly}
             showErrors={false}
           />
 
@@ -1137,7 +1208,7 @@ export default function BuyerCheckoutScreen() {
 
           {/* Pre-order disclosures stay explicit, required checkboxes. */}
           {preorderAcks.length > 0 && (
-            <CheckoutSection title="Pre-order terms" testID="checkout-preorder-terms">
+            <CheckoutSection title={t('Pre-order terms')} testID="checkout-preorder-terms">
               {preorderAcks.map(ack => (
                 <PressableScale
                   key={ack.key}
@@ -1165,6 +1236,17 @@ export default function BuyerCheckoutScreen() {
             </CheckoutSection>
           )}
 
+          {inApp ? (
+            <TipSection
+              groups={current.deliveryGroups.flatMap(group => {
+                const quotedGroup = tipGroups.find(q => q.sellerId === group.sellerId && q.tippingEnabled === true);
+                return quotedGroup ? [{ sellerId: group.sellerId, sellerName: group.sellerName, subtotalCents: quotedGroup.subtotalCents }] : [];
+              })}
+              choices={tipChoices}
+              onChange={(sellerId, choice) => setTipChoices(prev => ({ ...prev, [sellerId]: choice }))}
+            />
+          ) : null}
+
           <OrderSummarySection
             session={current}
             totals={totals}
@@ -1186,10 +1268,10 @@ export default function BuyerCheckoutScreen() {
             still missing (while disabled), and the terms line. */}
         <StickyFooter style={{ paddingBottom: footerBottomPad, paddingTop: SP.sm + 4, backgroundColor: ck.bg, borderTopColor: ck.divider }}>
           <View onLayout={event => setFooterHeight(event.nativeEvent.layout.height + footerBottomPad + SP.sm + 4)} testID="checkout-footer">
-            {!ready && nextStep ? (
+            {!ready && nextStepText ? (
               <View style={styles.hintRow} testID="checkout-next-step">
                 <Feather name="info" size={13} color={ck.muted} />
-                <Text style={styles.hint}>{nextStep}</Text>
+                <Text style={styles.hint}>{nextStepText}</Text>
               </View>
             ) : null}
             <Button
@@ -1199,7 +1281,7 @@ export default function BuyerCheckoutScreen() {
               disabled={!ready}
               fullWidth
               onPress={onCta}
-              accessibilityHint={ready ? (inApp ? 'Pays now with the card you chose' : 'Opens Stripe secure checkout') : nextStep ?? undefined}
+              accessibilityHint={ready ? (inApp ? 'Pays now with the card you chose' : 'Opens Stripe secure checkout') : nextStepText ?? undefined}
               testID="checkout-place-order"
             />
             <View style={{ marginTop: SP.sm + 2 }}>
@@ -1216,9 +1298,9 @@ export default function BuyerCheckoutScreen() {
       </KeyboardAvoidingView>
   );
   // Stripe (and Stripe.js on web) is only loaded when this order pays in the app.
-  return inApp
+  return withLanguage(inApp
     ? <StripePaymentProvider amountCents={totals.totalCents} paymentMethodTypes={quote?.value.paymentMethodTypes} onUnavailable={() => setStripeLoadFailed(true)}>{page}</StripePaymentProvider>
-    : page;
+    : page);
 }
 
 /** The wallet sheet supplies contact and address itself; only pre-order terms must be accepted first. */

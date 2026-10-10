@@ -23,6 +23,10 @@ export interface PushPayload {
   sound?: string | null;
   /** Android notification channel, which must be configured in the app. */
   channelId?: string;
+  /** Expo delivery priority; 'high' wakes the device (incoming calls). Omitted = Expo default. */
+  priority?: "default" | "normal" | "high";
+  /** iOS interruption level; 'time-sensitive' breaks through Focus (incoming calls). */
+  interruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
   /**
    * Promotional vs transactional. Normally inferred from `data.type` via
    * lib/pushPolicy.ts; set explicitly for any new marketing sender.
@@ -116,6 +120,8 @@ export interface ExpoPushMessage {
   sound: string | null;
   badge?: number;
   channelId?: string;
+  priority?: "default" | "normal" | "high";
+  interruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
 }
 
 export function preferenceKey(accountType: string | null, category: PushEventCategory): string | null {
@@ -160,6 +166,8 @@ export function buildExpoPushMessages(
     sound: payload.sound ?? "default",
     badge: payload.badge,
     channelId: payload.channelId,
+    ...(payload.priority ? { priority: payload.priority } : {}),
+    ...(payload.interruptionLevel ? { interruptionLevel: payload.interruptionLevel } : {}),
   }));
 }
 

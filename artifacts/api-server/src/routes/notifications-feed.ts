@@ -343,14 +343,31 @@ type PublishInput = {
   pushCategory?: PushEventCategory;
   pushSound?: string | null;
   pushChannelId?: string;
+  /** Expo push priority ('high' for incoming calls). */
+  pushPriority?: "default" | "normal" | "high";
+  /** iOS interruption level ('time-sensitive' for incoming calls). */
+  pushInterruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
+  /** Extra keys merged into the push `data` payload; they override core keys except notificationId. */
+  extraData?: Record<string, unknown>;
+  /**
+   * Incoming calls only: a muted chat (conversation_participants.muted_until)
+   * and Activity "see less" mutes still let the push through, so a call
+   * always rings. The feed row keeps its muted flag. Message notifications
+   * never set this and stay muted.
+   */
+  ringThroughMutes?: boolean;
   /** Promotional vs transactional override (see lib/pushPolicy.ts). */
   pushKind?: "transactional" | "promotional";
   /** The recipient asked for this exact alert (e.g. per-drop "notify me"). */
   pushExplicitRequest?: boolean;
 };
 
-/** conversation_participants.muted_until in the future (Chat details > Mute). */
+/**
+ * conversation_participants.muted_until in the future (Chat details > Mute).
+ * Incoming calls (ringThroughMutes) ring through a muted chat.
+ */
 async function isConversationMutedFor(n: PublishInput): Promise<boolean> {
+  if (n.ringThroughMutes) return false;
   if (n.targetType !== "conversation" || !n.targetId) return false;
   const [participant] = await db.select({ mutedUntil: conversationParticipants.mutedUntil })
     .from(conversationParticipants)
@@ -374,9 +391,12 @@ async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory
       targetType: n.targetType,
       cta: n.cta,
       commentId: n.commentId,
+      ...(n.extraData ?? {}),
     },
     sound: n.pushSound,
     channelId: n.pushChannelId,
+    ...(n.pushPriority ? { priority: n.pushPriority } : {}),
+    ...(n.pushInterruptionLevel ? { interruptionLevel: n.pushInterruptionLevel } : {}),
     kind: n.pushKind,
     explicitRequest: n.pushExplicitRequest,
   }, pushCategory, n.analyticsOwnerId);
@@ -391,7 +411,9 @@ export async function publishNotification(n: PublishInput): Promise<void> {
   const muteKeys = [`type:${n.type}`, ...(n.actorId ? [`actor:${n.actorId}`] : [])];
   const muted = await db.select({ muteKey: activityMutes.muteKey }).from(activityMutes)
     .where(and(eq(activityMutes.userId, n.userId), inArray(activityMutes.muteKey, muteKeys)));
-  const isMuted = muted.length > 0;
+  // The feed row always records the mute; incoming calls still push through it.
+  const rowMuted = muted.length > 0;
+  const isMuted = rowMuted && !n.ringThroughMutes;
 
   // Settings → Notifications → In-app: a type switched off never reaches the
   // feed. Push is a separate channel, so it still goes out (without a feed id
@@ -410,7 +432,7 @@ export async function publishNotification(n: PublishInput): Promise<void> {
       type:         n.type,
       title:        n.title,
       body:         n.body   ?? "",
-      isMuted,
+      isMuted:      rowMuted,
       actorName:    n.actorName    ?? null,
       actorHandle:  n.actorHandle  ?? null,
       actorInitials: n.actorInitials ?? null,
@@ -442,16 +464,22 @@ export async function publishNotification(n: PublishInput): Promise<void> {
       title: n.title,
       body: n.body ?? "",
       data: {
-        notificationId: notification.id,
         type: n.type,
         category: n.category,
         targetId: n.targetId,
         targetType: n.targetType,
         cta: n.cta,
         commentId: n.commentId,
+        actorName: n.actorName,
+        // Extra push-only keys; they may override the feed row's targetType/
+        // targetId (e.g. an incoming call pushes the call, the feed row opens the chat).
+        ...(n.extraData ?? {}),
+        notificationId: notification.id,
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,
+      ...(n.pushPriority ? { priority: n.pushPriority } : {}),
+      ...(n.pushInterruptionLevel ? { interruptionLevel: n.pushInterruptionLevel } : {}),
       kind: n.pushKind,
       explicitRequest: n.pushExplicitRequest,
     }, pushCategory, n.analyticsOwnerId);

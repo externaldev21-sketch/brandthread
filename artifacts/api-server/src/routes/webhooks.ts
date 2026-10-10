@@ -87,6 +87,7 @@ import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
 import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
+import { sendPurchaseConversions } from "../lib/conversionTracking";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
@@ -665,7 +666,9 @@ export async function handleCartPaymentSucceeded(pi: any, providerEventId: strin
       total_details: {
         amount_tax: tax,
         amount_shipping: shippingCents,
-        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal - (giftByGroup.get(group.id) ?? 0)),
+        // The group's tip (seller Checkout settings) is part of amountTotal,
+        // not a negative discount; gift-card cents paid it down off-card.
+        amount_discount: Math.max(0, subtotal + shippingCents + tax + (group.tipCents ?? 0) - amountTotal - (giftByGroup.get(group.id) ?? 0)),
       },
       shipping_details: shipping,
       metadata: { csRef: group.id },
@@ -769,6 +772,8 @@ export async function handleCheckoutPaid(
     } catch (err) {
       logger.error({ err, orderId: existing.id }, "Order confirmation email delivery failed");
     }
+    // The seller's conversion tracking; idempotent per order and provider.
+    void sendPurchaseConversions(existing.id);
     try {
       await applyThreadCashSellerTopup(stripe, existing.id);
     } catch (err) {
@@ -978,6 +983,8 @@ export async function handleCheckoutPaid(
         stripeCheckoutSessionId: sessionId,
         ...(shippingAddress && { shippingAddress }),
         ...(dropId ? { dropId } : {}),
+        // An accepted post-purchase offer (lib/postPurchaseOffer.ts) links to the order it adds to.
+        ...(csRecord.upsellOfOrderId ? { upsellOfOrderId: csRecord.upsellOfOrderId } : {}),
       })
       .returning();
     createdOrderId = order.id;
@@ -1327,6 +1334,11 @@ export async function handleCheckoutPaid(
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Order confirmation email delivery failed");
       }
+
+      // The seller's conversion tracking (Checkout settings → Additional
+      // scripts): a server-to-server Purchase event per configured provider.
+      // Best effort, never blocks the order (lib/conversionTracking.ts).
+      void sendPurchaseConversions(createdOrderId);
 
       // This buyer now has a real paid order with this seller — if a
       // pending message request from this buyer is sitting in the seller's

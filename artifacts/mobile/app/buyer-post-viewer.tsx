@@ -41,6 +41,7 @@ import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { TranslatableCaption } from '@/components/translation/CaptionTranslation';
 import { CaptionSpans } from '@/components/social/CaptionText';
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -363,7 +364,12 @@ export default function BuyerPostViewer() {
 
         {/* Caption */}
         {caption ? (
-          <Text style={s.caption}><CaptionSpans text={caption} /></Text>
+          <TranslatableCaption
+            text={caption}
+            style={s.caption}
+            linkStyle={s.translationLink}
+            renderText={(text) => <CaptionSpans text={text} />}
+          />
         ) : null}
 
         {/* Quoted original (only present on quote reposts — no layout change otherwise) */}
@@ -575,6 +581,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM },
   editBtnText: { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE },
   caption: { paddingHorizontal: SP.md, paddingTop: SP.sm, fontFamily: FONT.regular, fontSize: FS.base, color: FG, lineHeight: 22 },
+  translationLink: { paddingHorizontal: SP.md, color: MUTED },
   timestamp: { paddingHorizontal: SP.md, paddingTop: SP.xs, fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
   engagementBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.sm },
   engageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: SP.xs },

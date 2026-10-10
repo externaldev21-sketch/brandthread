@@ -32,6 +32,9 @@ import {
 } from "../lib/pagination";
 import { setPublicCacheHeaders, setViewerScopedCacheHeaders } from "../lib/httpCache";
 import { applySalesToVariants } from "../lib/pricing/salesRuntime";
+import { suggestedPostsSnoozed } from "../lib/interactionSettings";
+import { remixCredits } from "../lib/remix";
+import { productReadAccess } from "../lib/productPreviewAccess";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -435,20 +438,28 @@ router.get("/products/:id/related", async (req, res) => {
 });
 
 // GET /api/public/products/:id
+// Active products are public. The owning seller may also open their own
+// draft / archived product here ("Preview as buyer"); that response is
+// flagged `previewOnly: true` and is never cached publicly.
 router.get("/products/:id", async (req, res) => {
   try {
     const viewerId = optionalViewerId(req);
-    setViewerScopedCacheHeaders(res, viewerId);
-    const [product] = await db
+    const [row] = await db
       .select()
       .from(products)
-      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId)))
+      .where(and(eq(products.id, req.params.id), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId)))
       .limit(1);
 
-    if (!product) {
+    const access = productReadAccess(row, row && row.status !== "active" ? viewerId : null);
+    if (access === "hidden") {
+      res.setHeader("Cache-Control", "no-store");
       res.status(404).json({ error: "Product not found" });
       return;
     }
+    const product = row!;
+    const previewOnly = access === "owner_preview";
+    if (previewOnly) res.setHeader("Cache-Control", "private, no-store");
+    else setViewerScopedCacheHeaders(res, viewerId);
 
     const variants = await applySalesToVariants([product], await db
       .select()
@@ -488,6 +499,7 @@ router.get("/products/:id", async (req, res) => {
       sellerVacationUntil: vacation.until?.toISOString() ?? null,
       claimedUnits: Math.max(0, Number(claimedRow?.claimedUnits ?? 0)),
       variants: variants.map(toPublicVariant),
+      ...(previewOnly ? { previewOnly: true } : {}),
     });
   } catch (err) {
     req.log.error({ err, productId: req.params.id }, "Failed to fetch public product");
@@ -1691,6 +1703,14 @@ router.get("/posts", async (req, res) => {
     }
     const { limit: lim, offset: off } = page.data;
     const viewerId = optionalViewerId(req);
+    // "Snooze suggested posts": the general (non-profile) feed shows only
+    // accounts the viewer follows, plus their own posts, until the snooze ends.
+    const followedOnly = !ownerId && viewerId && await suggestedPostsSnoozed(viewerId)
+      ? or(
+          eq(posts.userId, viewerId),
+          inArray(posts.userId, db.select({ id: follows.followingId }).from(follows).where(eq(follows.followerId, viewerId))),
+        )
+      : undefined;
 
     // Fetch posts newest-first, joined with seller display info
     const pageRows = await db
@@ -1708,6 +1728,7 @@ router.get("/posts", async (req, res) => {
         styleTags:   posts.styleTags,
         sound:       posts.sound,
         visibility:  posts.visibility,
+        remixOfPostId: posts.remixOfPostId,
         createdAt:   posts.createdAt,
         displayName: users.displayName,
         brandName:   users.brandName,
@@ -1720,6 +1741,7 @@ router.get("/posts", async (req, res) => {
       .leftJoin(users, eq(users.clerkId, posts.userId))
       .where(and(
         ownerId ? eq(posts.userId, ownerId) : undefined,
+        followedOnly,
         eq(users.accountType, "seller"),
         ownerId ? undefined : eq(posts.surface, "thread"),
         publicPostCondition(),
@@ -1798,12 +1820,14 @@ router.get("/posts", async (req, res) => {
     const savesByPost: Record<string, number> = {};
     for (const r of saveRows) if (r.postId) savesByPost[r.postId] = Number(r.cnt);
     const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
+    const remixOfByPost = await remixCredits(rows);
 
     const locationById = await locationsByPlaceId(rows.map((p) => p.placeId));
     const baseResult = rows.map((p) => ({
       location:       p.placeId ? locationById.get(p.placeId) ?? null : null,
       id:             p.id,
       userId:         p.userId,
+      remixOf:        remixOfByPost.get(p.id) ?? null,
       mediaUrl:       p.mediaUrl,
       thumbnailUrl:   p.thumbnailUrl,
       mediaUrls:      p.mediaUrls,

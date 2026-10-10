@@ -39,6 +39,7 @@ import { flushPendingBuyerSurvey } from '@/lib/onboardingSurvey';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider, useAppTheme, peekPersistedTheme } from '@/contexts/AppThemeContext';
+import { DisplayPrefsProvider } from '@/contexts/DisplayPrefsContext';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { AppIconProvider } from '@/contexts/AppIconContext';
 import BootScreen from '@/components/BootScreen';
@@ -525,6 +526,16 @@ if (Platform.OS !== 'web') {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#F7F7FA',
     });
+    // Incoming 1:1 calls (POST /api/call/dm/calls pushes to this channel).
+    Notifications.setNotificationChannelAsync('calls', {
+      name:       'Calls',
+      description: 'Incoming voice and video calls.',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 600, 400, 600, 400, 600],
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: false,
+      lightColor: '#F7F7FA',
+    });
     Notifications.setNotificationChannelAsync('drops', {
       name:       'Drops',
       description: 'Drops going live from brands you follow.',
@@ -656,6 +667,12 @@ const DEV_FORCE_ONBOARDING_START = false;
 
 // Screens that don't require authentication
 const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
+// Buyer-group routes a seller also uses as themselves (sellers can shop:
+// cart and checkout accept any signed-in account). The seller (tabs) group
+// has no equivalent, so the role-mismatch correction must leave these alone
+// — redirecting "/(buyer)/cart" to "/(tabs)/cart" opened "Not found" (QA-0527).
+const SELLER_SHARED_BUYER_ROUTES = new Set(['cart']);
+
 const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
@@ -932,7 +949,7 @@ function AuthGate() {
           ? window.location.search : '';
         if (devRole === 'buyer' && inTabsGroup) {
           router.replace(`/(buyer)/${rest}${previewQuery}` as never);
-        } else if (devRole === 'seller' && inBuyerGroup) {
+        } else if (devRole === 'seller' && inBuyerGroup && !SELLER_SHARED_BUYER_ROUTES.has((segments as string[])[1])) {
           router.replace(`/(tabs)/${rest}${previewQuery}` as never);
         }
       }
@@ -1022,7 +1039,7 @@ function AuthGate() {
     if (onboardingDone && storedRole === 'buyer' && inTabsGroup) {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(buyer)/${rest}` : '/(buyer)/') as never);
-    } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup) {
+    } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup && !SELLER_SHARED_BUYER_ROUTES.has((segments as string[])[1])) {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
@@ -1576,6 +1593,8 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-download-data"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-story-hidden"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-pending-tags"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-recently-watched" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1743,6 +1762,7 @@ function RootLayout() {
           <KeyboardProvider>
             <CookieConsentProvider>
             <AppThemeProvider>
+              <DisplayPrefsProvider>
               <AppIconProvider>
                 <RoleProvider>
                   <SellerShellProvider>
@@ -1770,6 +1790,7 @@ function RootLayout() {
                   </SellerShellProvider>
                 </RoleProvider>
               </AppIconProvider>
+              </DisplayPrefsProvider>
             </AppThemeProvider>
             </CookieConsentProvider>
           </KeyboardProvider>

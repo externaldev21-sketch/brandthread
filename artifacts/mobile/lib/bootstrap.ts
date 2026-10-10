@@ -8,6 +8,8 @@ import { startBackgroundUpdateChecks } from '@/lib/otaUpdates';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { logNativeRuntimeDiagnostics } from '@/lib/startupDiagnostics';
 import { injectWebFocusOutlineStyles, injectWebRootClipStyles, injectWebScrollbarHideStyles, injectWebTextRenderingStyles } from '@/lib/webTextRendering';
+// Android: headless FCM task that rings DM calls when the app is killed (no-op elsewhere).
+import '@/lib/calls/native/registerBackgroundCallTask';
 
 // React's own dev-only console.error warnings (e.g. "Encountered two
 // children with the same key") are logged at the *error* level, so React

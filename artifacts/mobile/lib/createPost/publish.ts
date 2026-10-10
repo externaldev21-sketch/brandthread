@@ -110,10 +110,13 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
     thumbnailPath = composed.thumbnailPath;
   } else {
     const { video } = media;
-    const uploadedClip = await api.posts.uploadVideoChunked(
-      { uri: video.uri, mimeType: video.mimeType },
-      { signal, onProgress: (f) => onProgress(f * UPLOAD_SHARE, 'uploading') },
-    );
+    // A remix's source clip was already copied into this account's storage.
+    const uploadedClip = video.objectPath
+      ? { objectPath: video.objectPath }
+      : await api.posts.uploadVideoChunked(
+        { uri: video.uri, mimeType: video.mimeType },
+        { signal, onProgress: (f) => onProgress(f * UPLOAD_SHARE, 'uploading') },
+      );
     onProgress(UPLOAD_SHARE, 'processing');
     const composed = await api.posts.composeVideo({
       clips: [{ objectPath: uploadedClip.objectPath, duration: video.duration, speed: video.speed, filter: 'none' }],
@@ -152,6 +155,7 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
     visibility: details.visibility,
     isDraft,
     scheduledAt: isDraft ? null : details.scheduledAt,
+    ...(!editId && contentType === 'video' && input.remixOfPostId ? { remixOfPostId: input.remixOfPostId } : {}),
   };
   const post = editId
     ? await updateSellerPost(editId, {

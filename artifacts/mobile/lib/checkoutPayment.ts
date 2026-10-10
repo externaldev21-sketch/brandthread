@@ -58,11 +58,16 @@ export function choosePaymentPath(input: {
 export type PaymentIntentGroup = {
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string;
+  /** The buyer's tip for this seller (sent only when > 0; the server checks the seller accepts tips). */
+  tipCents?: number;
   /** Live the buyer is shopping from — lets a live-only code validate server-side. */
   liveStreamId?: string;
   /** A store gift card from the buyer's wallet, spent on this seller's group only. */
   giftCard?: { cardId: string };
 };
+
+/** sellerId → tip in cents (lib/checkoutTips.ts tipsForRequest). */
+export type CheckoutTips = Record<string, number>;
 
 export type PaymentIntentAddress = {
   recipientName: string;
@@ -93,15 +98,18 @@ type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'> &
 /**
  * One group per seller. A single-seller order takes the one valid code; a
  * multi-store order takes each seller's own code (a discount tagged with that
- * seller's id), so a code never crosses stores.
+ * seller's id), so a code never crosses stores. Each group carries the buyer's
+ * tip for that seller (sent only when > 0; the server checks the seller
+ * accepts tips).
  */
-export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] {
+export function paymentGroups(session: SessionForPayment, tips: CheckoutTips = {}): PaymentIntentGroup[] {
   const single = session.deliveryGroups.length === 1;
   return session.deliveryGroups.map(group => {
     const code = single
       ? session.discounts.find(d => d.isValid)?.code
       : session.discounts.find(d => d.isValid && d.sellerId === group.sellerId)?.code;
     const liveStreamId = code ? getLiveCheckoutContext(group.sellerId ?? null)?.streamId : undefined;
+    const tip = Math.round(Number(tips[group.sellerId] ?? 0));
     return {
       items: group.items.map(item => ({
         variantId: String(item.variantId),
@@ -111,6 +119,7 @@ export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] 
       ...(code ? { discountCode: String(code) } : {}),
       ...(liveStreamId ? { liveStreamId } : {}),
       ...(session.giftCards?.[group.sellerId] ? { giftCard: { cardId: session.giftCards[group.sellerId].cardId } } : {}),
+      ...(Number.isFinite(tip) && tip > 0 ? { tipCents: tip } : {}),
     };
   });
 }
@@ -125,10 +134,11 @@ export function buildCreatePaymentIntentBody(input: {
   address: Partial<CheckoutAddress>;
   idempotencyKey: string;
   saveCard: boolean;
+  tips?: CheckoutTips;
 }): CreatePaymentIntentBody {
   const { address, contact } = input;
   return {
-    groups: paymentGroups(input.session),
+    groups: paymentGroups(input.session, input.tips),
     contactEmail: String(contact.email ?? '').trim(),
     contactPhone: String(contact.phone ?? '').trim(),
     shippingAddress: {
@@ -151,9 +161,9 @@ export function canQuote(address: Partial<CheckoutAddress>): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9 -]{1,15}$/.test(zip) && !!(address.country ?? 'US');
 }
 
-export function buildQuoteBody(session: SessionForPayment, address: Partial<CheckoutAddress>): QuoteBody {
+export function buildQuoteBody(session: SessionForPayment, address: Partial<CheckoutAddress>, tips: CheckoutTips = {}): QuoteBody {
   return {
-    groups: paymentGroups(session),
+    groups: paymentGroups(session, tips),
     shippingAddress: {
       ...(address.line1?.trim() ? { street: address.line1.trim() } : {}),
       ...(address.city?.trim() ? { city: address.city.trim() } : {}),
@@ -182,6 +192,10 @@ export type QuoteGroup = {
   giftCardCents?: number;
   totalCents: number;
   processingDays: number | null;
+  /** The tip included in totalCents (servers before tipping omit it). */
+  tipCents?: number;
+  /** The seller accepts tips (seller Checkout settings). */
+  tippingEnabled?: boolean;
 };
 
 /** paymentMethodTypes: what the server will offer for this cart (card, plus klarna / afterpay_clearpay when every seller opted in). */
@@ -232,6 +246,11 @@ export function quoteTotals(quote: CartQuote): QuoteTotals {
   const giftCardCents = quote.groups.reduce((sum, group) => sum + (group.giftCardCents ?? 0), 0);
   // Only present when a store gift card is applied, so other orders keep their exact shape.
   return giftCardCents > 0 ? { ...base, giftCardCents } : base;
+}
+
+/** The tips included in a quote's total. */
+export function quoteTipCents(quote: CartQuote): number {
+  return quote.groups.reduce((sum, group) => sum + (Number.isFinite(group.tipCents) ? Number(group.tipCents) : 0), 0);
 }
 
 // ─── Delivery window ─────────────────────────────────────────────────────────

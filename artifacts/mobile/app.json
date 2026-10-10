@@ -245,7 +245,9 @@
         "android.permission.READ_PHONE_STATE",
         "android.permission.READ_MEDIA_AUDIO",
         "android.permission.BLUETOOTH_SCAN",
-        "android.permission.BLUETOOTH_ADVERTISE"
+        "android.permission.BLUETOOTH_ADVERTISE",
+        "android.permission.CALL_PHONE",
+        "android.permission.READ_PHONE_NUMBERS"
       ],
       "intentFilters": [
         {
@@ -436,6 +438,8 @@
       ],
       "./plugins/with-sentry-upload-guard",
       "./plugins/with-upload-live-activity",
+      "./plugins/with-voip-callkit",
+      "expo-dev-client",
       [
         "@stripe/stripe-react-native",
         {

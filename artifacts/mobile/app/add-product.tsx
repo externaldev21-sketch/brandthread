@@ -34,7 +34,11 @@ import { SuccessSheet } from '@/components/ui/SuccessSheet';
 import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
 
-import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
+import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections, createProduct, updateProduct } from '@/services/productService';
+import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
+import { buildServerVariants, sanitizeMoneyInput } from '@/lib/productSave';
 import { useApi } from '@/hooks/useApi';
 
 import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType, ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection } from '@/services/productTypes';
@@ -185,6 +189,16 @@ export default function AddProductScreen() {
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const insets = useSafeAreaInsets();
   const api = useApi();
+  // Signed-out seller preview (?bt_preview=seller with no account): there is
+  // no server to save to, so Save keeps the product in the local product
+  // store the Products tab and product detail read (services/productService.ts)
+  // and never calls a protected API — same rule as app/subscription.tsx.
+  const { isLoaded: authLoaded, isSignedIn, userId: authUserId } = useAuth();
+  const localOnlyPreview = isSellerDevPreview() && (!authLoaded || !isSignedIn || !authUserId);
+  const publishingRef = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const variantsSectionY = useRef<number | null>(null);
+  const pendingSectionScroll = useRef(params.section === 'variants');
 
   const [draftData, setDraftData] = useState<Partial<Product>>({
     name: '',
@@ -407,6 +421,22 @@ export default function AddProductScreen() {
       }
     }
     loadForEdit();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Deep link to a section (QA-0652): product detail's "Edit variants"
+  // opens /add-product?editId=<id>&section=variants — land on Variants.
+  function scrollToVariantsSection() {
+    const y = variantsSectionY.current;
+    if (y === null) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - SP.sm), animated: true });
+  }
+  useEffect(() => {
+    if (!pendingSectionScroll.current) return;
+    // Re-aim once the edit data has filled the sections above, then stop
+    // following layout changes so later edits never yank the scroll.
+    const aim = setTimeout(scrollToVariantsSection, 450);
+    const stop = setTimeout(() => { pendingSectionScroll.current = false; }, 1200);
+    return () => { clearTimeout(aim); clearTimeout(stop); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load collections ──
@@ -661,23 +691,28 @@ export default function AddProductScreen() {
       return;
     }
 
-    if (publishing) return;
+    // A ref, not just the `publishing` state: a second tap can land before
+    // the re-render that disables Save, which used to create the product twice.
+    if (publishing || publishingRef.current) return;
     if (shipDateError) {
-      Alert.alert('Add a ship date', PREORDER_SHIP_DATE_REQUIRED_MESSAGE);
+      showPublishError('Add a ship date', PREORDER_SHIP_DATE_REQUIRED_MESSAGE);
       return;
     }
+    publishingRef.current = true;
     setPublishing(true);
 
     const retailPriceCents = parseDecimalToCents(priceStr);
     if (retailPriceCents === null || retailPriceCents <= 0) {
       showPublishError('Invalid price', 'Enter a valid price with up to two decimal places.');
       setPublishing(false);
+      publishingRef.current = false;
       return;
     }
     const compareAtCents = compareAtStr ? parseDecimalToCents(compareAtStr) : undefined;
     if (compareAtStr && (compareAtCents === null || compareAtCents === undefined || compareAtCents <= retailPriceCents)) {
       showPublishError('Compare-at price', 'Compare-at price should be higher than the retail price.');
       setPublishing(false);
+      publishingRef.current = false;
       return;
     }
 
@@ -686,6 +721,7 @@ export default function AddProductScreen() {
     if ((salesModel === 'pre-order' || salesModel === 'both') && ps && ps.openDate && ps.closeDate && ps.closeDate <= ps.openDate) {
       showPublishError('Invalid dates', 'Pre-order close date must be after the open date.');
       setPublishing(false);
+      publishingRef.current = false;
       return;
     }
 
@@ -694,10 +730,15 @@ export default function AddProductScreen() {
     if (skus.length !== uniqueSkus.size) {
       showPublishError('Duplicate SKU', 'Each variant must have a unique SKU.');
       setPublishing(false);
+      publishingRef.current = false;
       return;
     }
 
-    const totalStock = productVariants.reduce((sum, v) => sum + v.inventoryQuantity, 0);
+    // No variants: the product-level "In stock" count is the stock (it used
+    // to be dropped, saving every option-less product with 0 in stock).
+    const totalStock = productVariants.length > 0
+      ? productVariants.reduce((sum, v) => sum + v.inventoryQuantity, 0)
+      : (trackInventory ? Math.max(0, parseInt(stockStr, 10) || 0) : 0);
 
     // The header status pill (Active/Draft) decides what gets saved — Save
     // always runs this same flow, just with a different final status.
@@ -733,14 +774,14 @@ export default function AddProductScreen() {
       },
     };
 
-    const productVariantsForServer = (productPayload.variants ?? []).map((v: any) => ({
-      size:              v.size,
-      color:             v.color,
-      sku:               v.sku || ((productPayload.name ?? 'SKU').replace(/\s+/g, '-').toUpperCase() + '-' + (v.id ?? 'DEFAULT')),
-       priceCents:        (v.priceCents ?? productPayload.pricing?.priceCents ?? 0) as number,
-      stock:             typeof v.inventoryQuantity === 'number' ? v.inventoryQuantity : 0,
-      lowStockThreshold: (productPayload.inventory as any)?.lowStockThreshold ?? 10,
-    })).filter((v: any) => v.priceCents > 0).map((v: any) => {
+    const productVariantsForServer = buildServerVariants({
+      name: productPayload.name ?? '',
+      options: productOptions,
+      variants: productVariants,
+      priceCents: productPayload.pricing?.priceCents ?? 0,
+      stock: totalStock,
+      lowStockThreshold: parseInt(lowStockStr, 10) || 5,
+    }).map((v) => {
       // Persist the strike-through price (server requires it to exceed the variant price).
       const compareAt = productPayload.pricing?.compareAtPriceCents;
       return compareAt && compareAt > v.priceCents ? { ...v, compareAtPriceCents: compareAt } : v;
@@ -779,14 +820,28 @@ export default function AddProductScreen() {
     try {
       const name = draftData.name ?? 'Product';
       if (isEditMode && editProductId) {
-        await api.products.update(editProductId, serverUpdatePayload);
+        // A seeded demo product (?demo=1) has no server row to update.
+        if (!localOnlyPreview && !isPreviewSellerProductId(editProductId)) await api.products.update(editProductId, serverUpdatePayload);
+        // Product detail and the Products tab read the local product store.
+        await updateProduct(editProductId, productPayload);
         await deleteDraft(draftId.current);
         setPublishSuccess({ name, kind: 'updated', productId: editProductId });
+      } else if (localOnlyPreview) {
+        const saved = await createProduct(productPayload);
+        await deleteDraft(draftId.current);
+        setPublishSuccess({ name, kind: 'created', productId: saved.id });
       } else {
         const newProduct = await completeSetupTaskAfter(
           'first_product',
           () => api.products.create(serverCreatePayload),
         ) as any;
+        // Mirror it under the server's id into the local product store that
+        // the Products tab and product detail read — otherwise "View product"
+        // opened "Couldn't load this product" and the list never showed it.
+        await createProduct(
+          { ...productPayload, publishedAt: finalStatus === 'active' ? new Date().toISOString() : undefined },
+          { id: String(newProduct.id) },
+        ).catch(() => undefined);
         await deleteDraft(draftId.current);
         setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
@@ -798,6 +853,7 @@ export default function AddProductScreen() {
       );
     } finally {
       setPublishing(false);
+      publishingRef.current = false;
     }
   }
 
@@ -808,6 +864,11 @@ export default function AddProductScreen() {
   // Uploads a locally-picked photo, tracking per-item status so the thumbnail
   // can show a progress overlay and Publish can be blocked until it's done.
   async function uploadMediaAsset(item: ProductMedia) {
+    if (localOnlyPreview) {
+      // Nothing to upload to — the picked photo stays local (see localOnlyPreview).
+      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'done', remoteUri: item.uri } }));
+      return;
+    }
     setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'uploading' } }));
     try {
       const uploaded = await api.products.uploadImage({ uri: item.uri });
@@ -825,6 +886,7 @@ export default function AddProductScreen() {
   async function uploadSizeChartPhoto(localUri: string) {
     setSizeChartUploadStatus('uploading');
     patchDraft({ sizeChartImageUrl: localUri });
+    if (localOnlyPreview) { setSizeChartUploadStatus('idle'); return; }
     try {
       const uploaded = await api.products.uploadImage({ uri: localUri });
       const remoteUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || localUri;
@@ -1286,7 +1348,7 @@ export default function AddProductScreen() {
         <FormInput
           label="Price *"
           value={priceStr}
-          onChange={v => updateUnsavedState(setPriceStr, v)}
+          onChange={v => updateUnsavedState(setPriceStr, sanitizeMoneyInput(v))}
           placeholder="0.00"
           keyboardType="decimal-pad"
           style={{ flex: 1 }}
@@ -1294,7 +1356,7 @@ export default function AddProductScreen() {
         <FormInput
           label="Compare-at price"
           value={compareAtStr}
-          onChange={v => updateUnsavedState(setCompareAtStr, v)}
+          onChange={v => updateUnsavedState(setCompareAtStr, sanitizeMoneyInput(v))}
           placeholder="0.00"
           keyboardType="decimal-pad"
           style={{ flex: 1 }}
@@ -1315,21 +1377,21 @@ export default function AddProductScreen() {
         <FormInput
           label="Product cost"
           value={costStr}
-          onChange={v => updateUnsavedState(setCostStr, v)}
+          onChange={v => updateUnsavedState(setCostStr, sanitizeMoneyInput(v))}
           placeholder="What it costs to make"
           keyboardType="decimal-pad"
         />
         <FormInput
           label="Est. shipping cost"
           value={shippingStr}
-          onChange={v => updateUnsavedState(setShippingStr, v)}
+          onChange={v => updateUnsavedState(setShippingStr, sanitizeMoneyInput(v))}
           placeholder="per unit"
           keyboardType="decimal-pad"
         />
         <FormInput
           label="Est. fees"
           value={feesStr}
-          onChange={v => updateUnsavedState(setFeesStr, v)}
+          onChange={v => updateUnsavedState(setFeesStr, sanitizeMoneyInput(v))}
           placeholder="Platform + payment fees"
           keyboardType="decimal-pad"
         />
@@ -1605,7 +1667,7 @@ export default function AddProductScreen() {
                   <TextInput
                     style={s.variantInput}
                     value={bulkPrice}
-                    onChangeText={setBulkPrice}
+                    onChangeText={txt => setBulkPrice(sanitizeMoneyInput(txt))}
                     placeholder="Set price for selected"
                     placeholderTextColor={SUBTLE}
                     keyboardType="decimal-pad"
@@ -1673,7 +1735,7 @@ export default function AddProductScreen() {
                   <TextInput
                     style={[s.variantInput, { flex: 0.9 }]}
                     value={v.price}
-                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, price: txt } : x))}
+                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, price: sanitizeMoneyInput(txt) } : x))}
                     placeholder="Price"
                     placeholderTextColor={SUBTLE}
                     keyboardType="decimal-pad"
@@ -1844,7 +1906,7 @@ export default function AddProductScreen() {
         )}
         {mfgMode === 'quote' && (
           <>
-            <FormInput label="Target cost per unit" value={targetCost} onChange={v => updateUnsavedState(setTargetCost, v)} placeholder="0.00" keyboardType="decimal-pad" />
+            <FormInput label="Target cost per unit" value={targetCost} onChange={v => updateUnsavedState(setTargetCost, sanitizeMoneyInput(v))} placeholder="0.00" keyboardType="decimal-pad" />
             <FormInput label="Required quantity" value={reqQty} onChange={v => updateUnsavedState(setReqQty, v)} placeholder="50" keyboardType="numeric" />
             <FormInput label="Production deadline" value={prodDeadline} onChange={v => updateUnsavedState(setProdDeadline, v)} placeholder="YYYY-MM-DD" />
             <SecondaryButton label="Upload tech pack" onPress={() => Alert.alert('Tech Pack', 'Tech pack upload will be available in the next release.')} icon="upload" disabled />
@@ -2089,6 +2151,7 @@ export default function AddProductScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={scrollRef}
           style={s.scrollView}
           contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + SP.xl }]}
           keyboardShouldPersistTaps="handled"
@@ -2101,7 +2164,13 @@ export default function AddProductScreen() {
           </View>
 
           <View style={s.divider} />
-          <View style={s.essentialSection}>
+          <View
+            style={s.essentialSection}
+            onLayout={e => {
+              variantsSectionY.current = e.nativeEvent.layout.y;
+              if (pendingSectionScroll.current) scrollToVariantsSection();
+            }}
+          >
             {renderVariants()}
           </View>
 

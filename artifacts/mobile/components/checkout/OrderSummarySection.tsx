@@ -13,6 +13,7 @@ import type { CheckoutSession } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { CheckoutSection, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
+import { useCheckoutT } from './CheckoutLanguage';
 
 type Group = CheckoutSession['deliveryGroups'][number];
 type LineItem = Group['items'][number];
@@ -29,7 +30,8 @@ function Thumb({ uri, ck, styles }: { uri?: string; ck: CheckoutColors; styles: 
 }
 
 function ItemRow({ item, ck, styles }: { item: LineItem; ck: CheckoutColors; styles: ReturnType<typeof makeStyles> }) {
-  const meta = [item.variantTitle, `Qty ${item.quantity}`].filter(Boolean).join(' · ');
+  const t = useCheckoutT();
+  const meta = [item.variantTitle, t('Qty {n}', { n: item.quantity })].filter(Boolean).join(' · ');
   return (
     <View style={styles.itemRow} accessible accessibilityLabel={`${item.productName}, ${meta}, ${formatCents(item.priceCents * item.quantity)}`}>
       <Thumb uri={item.imageUri} ck={ck} styles={styles} />
@@ -38,7 +40,7 @@ function ItemRow({ item, ck, styles }: { item: LineItem; ck: CheckoutColors; sty
         <Text style={styles.itemMeta} numberOfLines={1}>{meta}</Text>
         {item.isPreOrder ? (
           <Text style={styles.itemMeta} numberOfLines={1}>
-            Pre-order{item.preOrderEstShipDate ? ` · ships ${item.preOrderEstShipDate}` : ''}
+            {t('Pre-order')}{item.preOrderEstShipDate ? ` · ${t('ships {date}', { date: item.preOrderEstShipDate })}` : ''}
           </Text>
         ) : null}
       </View>
@@ -60,11 +62,12 @@ function SellerGroup({ group, shippingCents, processingDays, first, ck, styles }
   group: Group; shippingCents: number | null; processingDays: number | null; first: boolean;
   ck: CheckoutColors; styles: ReturnType<typeof makeStyles>;
 }) {
+  const t = useCheckoutT();
   const method = group.availableMethods.find(m => m.id === group.selectedMethodId);
   const shipping = shippingCents ?? method?.priceCents ?? null;
   return (
     <View style={first ? undefined : styles.groupDivider} testID={`checkout-seller-group-${group.sellerId}`}>
-      <Text style={styles.seller} numberOfLines={1}>From {group.sellerName}</Text>
+      <Text style={styles.seller} numberOfLines={1}>{t('From {name}', { name: group.sellerName })}</Text>
       <View style={styles.items}>
         {group.items.map(item => <ItemRow key={item.id} item={item} ck={ck} styles={styles} />)}
       </View>
@@ -72,11 +75,11 @@ function SellerGroup({ group, shippingCents, processingDays, first, ck, styles }
         <Feather name="truck" size={14} color={ck.muted} style={{ marginTop: 2 }} />
         <View style={{ flex: 1 }}>
           <Text style={styles.deliveryTitle}>
-            {method ? method.service : 'No delivery option available'}
-            {shipping !== null ? ` · ${shipping === 0 ? 'Free' : formatCents(shipping)}` : ''}
+            {method ? method.service : t('No delivery option available')}
+            {shipping !== null ? ` · ${shipping === 0 ? t('Free') : formatCents(shipping)}` : ''}
           </Text>
           <Text style={styles.deliverySub}>
-            {method ? groupDeliveryWindow(group, processingDays) : `We couldn’t get a shipping rate from ${group.sellerName}. Try again in a moment.`}
+            {method ? t(groupDeliveryWindow(group, processingDays)) : t('We couldn’t get a shipping rate from {name}. Try again in a moment.', { name: group.sellerName })}
           </Text>
         </View>
       </View>
@@ -108,8 +111,9 @@ export function OrderSummarySection({
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
+  const t = useCheckoutT();
   return (
-    <CheckoutSection title="Order summary" testID="checkout-order-summary">
+    <CheckoutSection title={t('Order summary')} testID="checkout-order-summary">
       {session.deliveryGroups.map((group, index) => {
         const quoted = quotedGroups?.find(q => q.sellerId === group.sellerId);
         return (
@@ -125,22 +129,25 @@ export function OrderSummarySection({
         );
       })}
       <View style={styles.totals} testID="checkout-price-breakdown">
-        <Line styles={styles} label={`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`} value={formatCents(totals.subtotalCents)} />
-        <Line styles={styles} label="Shipping" value={totals.shippingCents === 0 ? 'Free' : formatCents(totals.shippingCents)} />
+        <Line styles={styles} label={t(itemCount === 1 ? 'Subtotal ({n} item)' : 'Subtotal ({n} items)', { n: itemCount })} value={formatCents(totals.subtotalCents)} />
+        <Line styles={styles} label={t('Shipping')} value={totals.shippingCents === 0 ? t('Free') : formatCents(totals.shippingCents)} />
         <Line
           styles={styles}
-          label="Tax"
-          value={taxNote ?? formatCents(totals.taxCents)}
+          label={t('Tax')}
+          value={taxNote ? t(taxNote) : formatCents(totals.taxCents)}
           testID="checkout-tax-line"
         />
         {totals.promoCents > 0 ? (
-          <Line styles={styles} label="Discount" value={`−${formatCents(totals.promoCents)}`} testID="checkout-discount-line" />
+          <Line styles={styles} label={t('Discount')} value={`−${formatCents(totals.promoCents)}`} testID="checkout-discount-line" />
         ) : null}
-        {totals.rewardsCents > 0 ? <Line styles={styles} label="Rewards" value={`−${formatCents(totals.rewardsCents)}`} /> : null}
+        {(totals.tipCents ?? 0) > 0 ? (
+          <Line styles={styles} label={t('Tip')} value={formatCents(totals.tipCents ?? 0)} testID="checkout-tip-line" />
+        ) : null}
+        {totals.rewardsCents > 0 ? <Line styles={styles} label={t('Rewards')} value={`−${formatCents(totals.rewardsCents)}`} /> : null}
         {totals.threadCashCents > 0 ? (
           <>
-            <Line styles={styles} label="Order total" value={formatCents(totals.orderTotalCents)} testID="checkout-order-total-line" />
-            <Line styles={styles} label="Thread Cash" value={`−${formatCents(totals.threadCashCents)}`} testID="checkout-thread-cash-line" />
+            <Line styles={styles} label={t('Order total')} value={formatCents(totals.orderTotalCents)} testID="checkout-order-total-line" />
+            <Line styles={styles} label={t('Thread Cash')} value={`−${formatCents(totals.threadCashCents)}`} testID="checkout-thread-cash-line" />
           </>
         ) : null}
         {giftCardCents > 0 ? (
@@ -152,7 +159,7 @@ export function OrderSummarySection({
         <View style={styles.totalDivider} />
         <Line
           styles={styles}
-          label={totals.threadCashCents > 0 || giftCardCents > 0 ? 'Charged to card' : 'Total'}
+          label={t(totals.threadCashCents > 0 || giftCardCents > 0 ? 'Charged to card' : 'Total')}
           value={formatCents(totals.totalCents)}
           strong
           testID="checkout-total-line"

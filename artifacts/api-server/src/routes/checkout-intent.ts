@@ -5,7 +5,8 @@
  * Mounted at /api/buyer/checkout/payment-intent.
  *
  * POST /quote      prices the cart for an address (shipping, promo, Stripe
- *                  Tax) without reserving anything, so the page and the
+ *                  Tax, the buyer's tip where the seller accepts tips —
+ *                  lib/sellerCheckoutSettings.ts) without reserving anything, so the page and the
  *                  Apple Pay / Google Pay sheet show the real total.
  * POST /           prices every seller group (lib/money/cartCheckout.ts),
  *                  reserves stock atomically, persists one checkout row per
@@ -41,6 +42,7 @@ import {
 import { paymentIntentMethodParams, paymentMethodTypesFor } from "../lib/payments/bnpl";
 import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
+import { MAX_TIP_CENTS, checkTip, loadSellerCheckoutSettings } from "../lib/sellerCheckoutSettings";
 import { applyGiftCardToGroup, trimGiftCardsForMinimumCharge } from "../lib/giftCards/checkout";
 import { GiftCardError, claimCard, giftCentsForCheckouts, reserveForCheckout } from "../lib/giftCards/service";
 
@@ -81,6 +83,8 @@ const addressSchema = z.object({
 const groupsSchema = z.array(z.object({
   items: z.array(itemSchema).min(1).max(100),
   discountCode: z.string().trim().min(1).max(64).optional(),
+  /** The buyer's tip for this seller (only when the seller turned tipping on). */
+  tipCents: z.coerce.number().int().min(0).max(MAX_TIP_CENTS).optional(),
   liveStreamId: z.string().uuid().nullable().optional(),
   /** A store gift card for this seller's group: a code, or the id of a card in the buyer's wallet. */
   giftCard: z.object({
@@ -117,10 +121,14 @@ type GroupBreakdown = {
   shippingCents: number;
   discountCents: number;
   taxCents: number;
+  /** Included in totalCents. */
+  tipCents: number;
   /** Covered by a store gift card; totalCents is what is left for the card payment. */
   giftCardCents: number;
   totalCents: number;
   processingDays: number | null;
+  /** The seller accepts tips (quote/create only; unknown on a retried intent). */
+  tippingEnabled?: boolean;
 };
 
 function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gift: Map<string, number> = new Map()): GroupBreakdown[] {
@@ -133,6 +141,7 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
       shippingCents: row.shippingCents ?? 0,
       discountCents: row.discountCodeAmountCents ?? 0,
       taxCents: row.taxCents ?? 0,
+      tipCents: row.tipCents ?? 0,
       giftCardCents: gift.get(row.id) ?? 0,
       totalCents: row.amountTotalCents ?? 0,
       processingDays: null,
@@ -141,11 +150,18 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
 }
 
 type PricedCartGroup = PricedGroup & {
-  taxCents: number; calculationId: string | null; totalCents: number;
-  giftCardId: string | null; giftCardCents: number;
+  taxCents: number;
+  calculationId: string | null;
+  tipCents: number;
+  tippingEnabled: boolean;
+  /** The seller's checkout mode is "Guest checkout only": nothing is saved to the buyer's account. */
+  guestCheckoutOnly: boolean;
+  totalCents: number;
+  giftCardId: string | null;
+  giftCardCents: number;
 };
 
-/** Prices every seller group, then its Stripe Tax. Throws CartCheckoutError. */
+/** Prices every seller group, then its Stripe Tax, then the buyer's tip (seller Checkout settings). Throws CartCheckoutError. */
 async function priceCart(
   stripe: ReturnType<typeof requireStripe>,
   buyerId: string,
@@ -173,11 +189,28 @@ async function priceCart(
       ...pricedGroup,
       taxCents: tax.taxCents,
       calculationId: tax.calculationId,
+      tipCents: 0,
+      tippingEnabled: false,
+      guestCheckoutOnly: false,
       giftCardId: gift?.cardId ?? null,
       giftCardCents: gift?.cents ?? 0,
       totalCents: fullTotalCents - (gift?.cents ?? 0),
     });
   }
+  // Tips: only for sellers who turned tipping on; paid out with the order
+  // (the platform fee stays on the merchandise only). A gift card covers the
+  // merchandise total above; the tip is always added on top of what is left.
+  const settings = await loadSellerCheckoutSettings(priced.map((group) => group.sellerId));
+  priced.forEach((group, index) => {
+    const tippingEnabled = settings.get(group.sellerId)?.tippingEnabled === true;
+    const tipCents = groups[index]?.tipCents ?? 0;
+    const check = checkTip({ tipCents, subtotalCents: group.subtotalCents, tippingEnabled });
+    if (!check.ok) throw new CartCheckoutError(400, check.code, check.message, { sellerId: group.sellerId });
+    group.tippingEnabled = tippingEnabled;
+    group.guestCheckoutOnly = settings.get(group.sellerId)?.checkoutMode === "guest_only";
+    group.tipCents = tipCents;
+    group.totalCents += tipCents;
+  });
   trimGiftCardsForMinimumCharge(priced, MIN_CARD_CHARGE_CENTS);
   return priced;
 }
@@ -190,9 +223,11 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     shippingCents: group.shippingCents,
     discountCents: group.discountCents,
     taxCents: group.taxCents,
+    tipCents: group.tipCents,
     giftCardCents: group.giftCardCents,
     totalCents: group.totalCents,
     processingDays: group.processingDays,
+    tippingEnabled: group.tippingEnabled,
   }));
 }
 
@@ -334,6 +369,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
           amountTotalCents: group.totalCents,
           shippingCents: group.shippingCents,
           taxCents: group.taxCents,
+          tipCents: group.tipCents,
           stripeTaxCalculationId: group.calculationId,
         }).returning();
         await reserveStock(tx, row.id, group.items.map((item) => ({
@@ -381,7 +417,8 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
       customer,
       // Card covers Apple Pay and Google Pay (both are card wallets). BNPL
       // can't be combined with a top-level setup_future_usage, see lib/payments/bnpl.ts.
-      ...paymentIntentMethodParams(bnpl, body.saveCard !== false),
+      // A "Guest checkout only" store (seller Checkout settings) never saves the card.
+      ...paymentIntentMethodParams(bnpl, body.saveCard !== false && !priced.some((group) => group.guestCheckoutOnly)),
       receipt_email: body.contactEmail,
       shipping: {
         name: shipping.name,

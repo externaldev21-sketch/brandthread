@@ -44,6 +44,8 @@ export interface VideoDraft {
   trimEnd: number;
   /** Cover frame offset in seconds (post-trim timeline); 0 = first frame. */
   coverOffset: number;
+  /** Already uploaded (a remix's copied source clip): publish skips the upload. */
+  objectPath?: string;
 }
 
 export type MediaDraft =
@@ -62,4 +64,6 @@ export interface PublishInput {
   media: MediaDraft;
   details: PostDetails;
   isDraft: boolean;
+  /** `?remixOf=` — the video post this one remixes (server re-checks permission). */
+  remixOfPostId?: string;
 }

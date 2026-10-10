@@ -29,9 +29,11 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useApi } from '@/lib/api';
 import { isUUID } from '@/lib/engagementUtils';
+import { useRouter } from 'expo-router';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import { remixActionVisible, remixRoute } from '@/lib/remix';
 import { buildPostUrl } from '@/lib/shareLinks';
 import { quotePostHref } from '@/lib/quotePost';
-import { useRouter } from 'expo-router';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 
 interface ThreadShareSheetProps {
@@ -71,6 +73,13 @@ export function ThreadShareSheet({
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [savingProgress, setSavingProgress] = useState<number | null>(null);
+  // The author's "Allow downloads" setting (GET /api/interaction-settings/
+  // posts/:id/download). Preview/demo posts (non-UUID ids) have no author
+  // account to ask, so they keep the plain save action.
+  const [downloadAllowed, setDownloadAllowed] = useState<boolean | null>(null);
+  // "Remix" — offered only when the server says the author allows this viewer
+  // to remix (GET /api/remix/posts/:id) and the viewer can publish video.
+  const [remixAllowed, setRemixAllowed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const actionInFlightRef = useRef(false);
 
@@ -94,6 +103,27 @@ export function ThreadShareSheet({
   const shareText = productName
     ? `${productName} by ${creator} on Brandthread\n${postUrl}`
     : `Watch ${creator}'s post on Brandthread\n${postUrl}`;
+
+  useEffect(() => {
+    if (!visible || !isVideo || !mediaUri) return;
+    if (!isUUID(postId)) { setDownloadAllowed(true); return; }
+    let cancelled = false;
+    setDownloadAllowed(null);
+    api.interactionSettings.downloadAllowed(postId)
+      .then(result => { if (!cancelled) setDownloadAllowed(result.allowed === true); })
+      .catch(() => { if (!cancelled) setDownloadAllowed(false); });
+    return () => { cancelled = true; };
+  }, [api, visible, isVideo, mediaUri, postId]);
+
+  useEffect(() => {
+    // Signed-out web preview never calls protected APIs.
+    if (!visible || !isVideo || !isUUID(postId) || isBuyerDevPreview()) { setRemixAllowed(false); return; }
+    let cancelled = false;
+    api.remix.check(postId)
+      .then(result => { if (!cancelled) setRemixAllowed(remixActionVisible(result)); })
+      .catch(() => { if (!cancelled) setRemixAllowed(false); });
+    return () => { cancelled = true; };
+  }, [api, visible, isVideo, postId]);
 
   useEffect(() => {
     if (!visible) return;
@@ -182,7 +212,7 @@ export function ThreadShareSheet({
   }
 
   async function saveVideo() {
-    if (!mediaUri || !isVideo || savingProgress != null) return;
+    if (!mediaUri || !isVideo || downloadAllowed !== true || savingProgress != null) return;
     setSavingProgress(0);
     onClose();
     const controller = new AbortController();
@@ -312,8 +342,11 @@ export function ThreadShareSheet({
             <View style={styles.actionRow}>
               <ShareAction label="Report" icon="flag" onPress={() => { onClose(); onReport(); }} muted />
               <ShareAction label="Not interested" icon="slash" onPress={() => { onClose(); onNotInterested(); }} muted />
-              {isVideo && mediaUri ? (
+              {isVideo && mediaUri && downloadAllowed === true ? (
                 <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} muted />
+              ) : null}
+              {remixAllowed ? (
+                <ShareAction label="Remix" icon="layers" onPress={() => { onClose(); router.push(remixRoute(postId) as never); }} muted />
               ) : null}
               {isUUID(postId) ? (
                 <ShareAction
