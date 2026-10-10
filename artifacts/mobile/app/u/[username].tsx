@@ -9,8 +9,9 @@
  * 2. Fetch GET /api/v1/public/profiles/:username — returns safe public DTO.
  * 3a. If visitor is signed in (auth ready + isSignedIn): navigate internally to
  *     buyer-other-profile or seller-profile using the opaque users.id alias.
- * 3b. If visitor is signed out (auth ready + !isSignedIn): stay on /u/{username}
- *     and render a polished public profile landing page from safe DTO fields only.
+ * 3b. If visitor is signed out (auth ready + !isSignedIn): sellers go to the
+ *     guest-browsable seller-profile (BT-305); buyers stay on /u/{username}
+ *     and see a polished public profile landing page from safe DTO fields only.
  *     No posts, no social graph, no private IDs, no seller commerce data.
  *
  * Never exposes Clerk IDs in the browser URL.
@@ -330,10 +331,12 @@ export default function PublicProfileRoute() {
     if (state.kind !== 'ready') return;
     // Don't act until Clerk has resolved the auth state.
     if (!authLoaded) return;
-    // Signed-out visitors stay on this route and see the landing page.
-    if (!isSignedIn) return;
-
     const { profile } = state;
+    // Signed-out visitors stay on this route and see the landing page —
+    // except for sellers (BT-305/324): the seller profile is guest-browsable,
+    // so a shared store / creator link shows real products, not a wall.
+    if (!isSignedIn && profile.accountType !== 'seller') return;
+
     if (profile.accountType === 'seller') {
       // sellerId param is the opaque DB id — not a Clerk ID, never in the URL.
       router.replace(
@@ -356,7 +359,7 @@ export default function PublicProfileRoute() {
   // Show spinner while either the fetch or Clerk initialisation is in-flight.
   const isWaiting =
     state.kind === 'loading' ||
-    (state.kind === 'ready' && (!authLoaded || isSignedIn));
+    (state.kind === 'ready' && (!authLoaded || isSignedIn || state.profile.accountType === 'seller'));
 
   if (isWaiting) {
     // Skeleton in the profile shell's shape (hero, avatar, name) — the fetch

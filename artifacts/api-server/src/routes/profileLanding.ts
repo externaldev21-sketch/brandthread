@@ -7,6 +7,17 @@ const escapeHtml = (value: string) =>
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[char] ?? char);
 
+/** aff / utm_* params to carry from a shared link to the page it forwards to. */
+export function forwardedQuery(query: Request["query"]): string {
+  const out = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (typeof value !== "string" || value.length > 200) continue;
+    if (key === "aff" || /^utm_(source|medium|campaign|term|content)$/.test(key)) out.set(key, value);
+  }
+  const qs = out.toString();
+  return qs ? `&${qs}` : "";
+}
+
 /** A signed-out landing page for shared profile links on the API-only domain. */
 export async function profileLanding(req: Request, res: Response): Promise<void> {
   const rawUsername = req.params.username;
@@ -18,6 +29,7 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
 
   try {
     const [profile] = await db.select({
+      id: users.id,
       username: users.username,
       accountType: users.accountType,
       displayName: users.displayName,
@@ -43,6 +55,13 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
     const image = avatar ? `<img src="${escapeHtml(avatar)}" alt="" class="avatar">` :
       `<div class="avatar placeholder" aria-hidden="true">${escapeHtml(profile.username.slice(0, 1).toUpperCase())}</div>`;
     const url = `https://brandthread.app/u/${encodeURIComponent(profile.username)}`;
+    // Sellers (BT-305/324): people on a shared store or creator (?aff=) link
+    // land on the guest-browsable seller profile with real products and
+    // checkout. The query string (aff, utm_*) is carried over so the creator
+    // click is still captured. Crawlers read this page's Open Graph tags.
+    const shopHref = profile.accountType === "seller"
+      ? `/seller-profile?sellerId=${encodeURIComponent(profile.id)}&isOwner=false${forwardedQuery(req.query)}`
+      : null;
 
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src https:; base-uri 'none'; form-action 'none'");
@@ -54,6 +73,7 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
 <meta property="og:description" content="${bio || `View @${handle}'s public profile` }">
 <meta property="og:url" content="${escapeHtml(url)}">
 ${avatar ? `<meta property="og:image" content="${escapeHtml(avatar)}">` : ""}
+${shopHref ? `<meta http-equiv="refresh" content="0;url=${escapeHtml(shopHref)}">` : ""}
 <style>
 *{box-sizing:border-box}body{margin:0;background:#0a0a0b;color:#f8f8f8;font-family:Inter,system-ui,-apple-system,sans-serif;min-height:100vh;display:grid;place-items:center;padding:24px}
 main{width:min(100%,440px);text-align:center}.brand{font-weight:700;letter-spacing:.08em;font-size:14px;margin-bottom:56px}
@@ -67,7 +87,9 @@ h1{font-size:26px;line-height:1.2;margin:22px 0 6px}.handle{color:#a6a6a6;margin
 <div class="brand">BRANDTHREAD</div>${image}
 <h1>${name}</h1><p class="handle">@${handle}</p>
 ${bio ? `<p class="bio">${bio}</p>` : `<p class="bio">On Brandthread</p>`}
-<a class="button" href="brandthread://u/${encodeURIComponent(profile.username)}">Open in Brandthread</a>
+${shopHref
+  ? `<a class="button" href="${escapeHtml(shopHref)}">Shop ${name}</a>`
+  : `<a class="button" href="brandthread://u/${encodeURIComponent(profile.username)}">Open in Brandthread</a>`}
 <p class="link">${escapeHtml(url)}</p>
 </main></body></html>`);
   } catch (err) {
