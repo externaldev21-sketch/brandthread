@@ -35,7 +35,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { sendManufacturerSignupEmail } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
-import { findCountry, isValidTimeZone, validateTransition } from "@workspace/manufacturer-flow";
+import { findCountry, isValidTimeZone, manufacturerNetCents, validateTransition } from "@workspace/manufacturer-flow";
 import { afterStageChange, attachOrderSnapshots, postThreadSystemMessage } from "../lib/manufacturerOrders";
 
 const router = Router();
@@ -143,6 +143,8 @@ async function resolveManufacturerEmail(clerkId: string, suppliedEmail?: string 
 function serializeSampleOrder(order: typeof sampleOrders.$inferSelect) {
   return {
     ...order,
+    // What the manufacturer receives after Brandthread's fee and processing.
+    manufacturerNetCents: manufacturerNetCents(order),
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     shippedAt: order.shippedAt?.toISOString() ?? null,

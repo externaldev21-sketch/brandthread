@@ -278,7 +278,23 @@ export const sampleOrders = pgTable('sample_orders', {
   createdAt:               timestamp('created_at').defaultNow().notNull(),
   updatedAt:               timestamp('updated_at').defaultNow().notNull(),
   revision:                integer('revision').notNull().default(1),
+  // B2B money (migration 451). Fees are fixed when Checkout opens / the wallet
+  // pays: manufacturerNetCents is what the manufacturer actually receives.
+  processingFeeEstimateCents: integer('processing_fee_estimate_cents').notNull().default(0),
+  manufacturerNetCents:    integer('manufacturer_net_cents'),
+  // 'card' | 'us_bank_account' | 'drop_wallet'; set once payment starts.
+  paymentMethodType:       text('payment_method_type'),
+  paymentFailedAt:         timestamp('payment_failed_at'),
+  refundedCents:           integer('refunded_cents').notNull().default(0),
+  platformFeeRefundedCents: integer('platform_fee_refunded_cents').notNull().default(0),
+  // Seller cancel request on a paid card: 'none' | 'requested' | 'declined' | 'approved'
+  cancelRequestState:      text('cancel_request_state').notNull().default('none'),
+  cancelRequestReason:     text('cancel_request_reason'),
+  cancelRequestedAt:       timestamp('cancel_requested_at'),
+  // The accepted seller quote this card was created from (one card per quote).
+  quoteRequestId:          uuid('quote_request_id'),
 }, (t) => ({
+  quoteRequestUnique: uniqueIndex('sample_orders_quote_request_unique').on(t.quoteRequestId),
   sellerIdx: index('sample_orders_seller_idx').on(t.sellerId),
   mfgIdx:    index('sample_orders_mfg_idx').on(t.manufacturerId),
   threadIdx: index('sample_orders_thread_idx').on(t.threadId),
@@ -311,6 +327,33 @@ export const manufacturerOrderEvents = pgTable('manufacturer_order_events', {
 }, (t) => ({
   orderCreatedIdx: index('manufacturer_order_events_order_created_idx').on(t.sampleOrderId, t.createdAt),
   manufacturerIdx: index('manufacturer_order_events_manufacturer_idx').on(t.manufacturerId),
+}));
+
+// ─── Sample / bulk order refunds (migration 452) ──────────────────────────────
+// One row per refund of a paid B2B card. idempotencyKey makes a retried or
+// double-clicked refund a no-op; the Stripe ids are filled as each call lands.
+export const sampleOrderRefunds = pgTable('sample_order_refunds', {
+  id:                       uuid('id').primaryKey().defaultRandom(),
+  sampleOrderId:            uuid('sample_order_id').notNull().references(() => sampleOrders.id, { onDelete: 'cascade' }),
+  idempotencyKey:           text('idempotency_key').notNull().unique(),
+  amountCents:              integer('amount_cents').notNull(),
+  platformFeeRefundedCents: integer('platform_fee_refunded_cents').notNull().default(0),
+  // 'card_refund' (Stripe refund + transfer reversal) | 'wallet_reversal'
+  method:                   text('method').notNull(),
+  // 'pending' | 'succeeded' | 'failed'
+  state:                    text('state').notNull().default('pending'),
+  stripeRefundId:           text('stripe_refund_id'),
+  stripeTransferReversalId: text('stripe_transfer_reversal_id'),
+  stripeFeeRefundId:        text('stripe_fee_refund_id'),
+  reason:                   text('reason'),
+  // 'manufacturer' | 'admin' | 'cancel_request'
+  initiatedByRole:          text('initiated_by_role').notNull(),
+  initiatedBy:              text('initiated_by'),
+  error:                    text('error'),
+  createdAt:                timestamp('created_at').defaultNow().notNull(),
+  updatedAt:                timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  orderIdx: index('sample_order_refunds_order_idx').on(t.sampleOrderId),
 }));
 
 // ─── Manufacturer Product Catalog (browsable listings, Alibaba-style) ─────────

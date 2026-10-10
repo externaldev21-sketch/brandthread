@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Clock, ExternalLink, Loader2, MessageSquare, Package, Shirt, Truck, XCircle } from "lucide-react";
 import { getGetManufacturerSampleOrderQueryKey, useGetManufacturerSampleOrder } from "@workspace/api-client-react";
-import { deriveCardState, formatMoney, formatTimestamp, orderStatusLabel, orderTypeLabel } from "@workspace/manufacturer-flow";
+import { deriveCardState, formatMoney, formatTimestamp, manufacturerNetCents, orderStatusLabel, orderTypeLabel } from "@workspace/manufacturer-flow";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -11,6 +11,7 @@ import {
 import { EmptyState, QueryError } from "@/components/query-state";
 import { OrderTimeline } from "@/components/orders/order-timeline";
 import { TrackingDialog } from "@/components/orders/tracking-dialog";
+import { RefundDialog } from "@/components/orders/refund-dialog";
 import { useOrderActions, useOrderTimeline } from "@/hooks/use-order-actions";
 import { errorMessage } from "@/lib/api";
 
@@ -23,9 +24,11 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
   });
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const order = timeline.data?.order;
-  const { advance, withdraw } = useOrderActions(detail.data?.threadId ?? null);
+  const { advance, withdraw, refund, answerCancel } = useOrderActions(detail.data?.threadId ?? null);
 
   if (timeline.isLoading) {
     return (
@@ -50,6 +53,15 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
   const Icon = order.orderType === "bulk" ? Package : Shirt;
   const images = (detail.data?.imageUrls ?? []).filter((url): url is string => typeof url === "string");
   const reviewHold = order.paymentReviewState && order.paymentReviewState !== "none";
+  // Paid cards: what the manufacturer receives, refunds, and seller cancel requests (BT-452/460).
+  const money = detail.data as (typeof detail.data & {
+    manufacturerNetCents?: number; refundedCents?: number; platformFeeRefundedCents?: number;
+  }) | undefined;
+  const paid = !!data.paidAt && order.status !== "pending_payment" && order.status !== "cancelled";
+  const refundedCents = order.refundedCents ?? money?.refundedCents ?? 0;
+  const refundableCents = Math.max(0, order.priceCents - refundedCents);
+  const netCents = money?.manufacturerNetCents ?? manufacturerNetCents({ priceCents: order.priceCents });
+  const cancelRequested = order.cancelRequestState === "requested" && order.status !== "refunded";
 
   const runAdvance = (tracking?: { carrier: string; trackingNumber: string }) => {
     if (!nextAction || nextAction.kind !== "advance") return;
@@ -132,6 +144,39 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
             {error && <p className="mt-3 text-sm text-destructive" role="alert">{error}</p>}
           </section>
 
+          {paid && (
+            <section className="rounded-lg border border-border bg-card p-5" data-testid="panel-payment">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Payment</h2>
+              {cancelRequested && (
+                <div className="mt-3 space-y-3 rounded-md border border-border bg-secondary/40 p-3 text-sm text-foreground" data-testid="banner-cancel-request">
+                  <p>{sellerName} asked to cancel this order{order.cancelRequestReason ? `: "${order.cancelRequestReason}"` : "."} Approving refunds them in full.</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1" disabled={answerCancel.isPending} data-testid="button-approve-cancel"
+                      onClick={() => { setError(null); answerCancel.mutate({ orderId, decision: "approve" }, { onError: (err) => setError(errorMessage(err)) }); }}>
+                      Approve and refund
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1" disabled={answerCancel.isPending} data-testid="button-decline-cancel"
+                      onClick={() => { setError(null); answerCancel.mutate({ orderId, decision: "decline" }, { onError: (err) => setError(errorMessage(err)) }); }}>
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex justify-between"><dt className="text-muted-foreground">Seller paid</dt><dd className="font-mono">{formatMoney(order.priceCents, order.currency)}</dd></div>
+                {refundedCents > 0 && (
+                  <div className="flex justify-between"><dt className="text-muted-foreground">Refunded</dt><dd className="font-mono" data-testid="text-refunded">-{formatMoney(refundedCents, order.currency)}</dd></div>
+                )}
+                <div className="flex justify-between border-t border-border pt-2"><dt>You receive</dt><dd className="font-mono font-semibold" data-testid="text-net">{formatMoney(netCents, order.currency)}</dd></div>
+              </dl>
+              {refundableCents > 0 && !reviewHold && (
+                <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => { setRefundError(null); setRefundOpen(true); }} data-testid="button-refund-order">
+                  Refund
+                </Button>
+              )}
+            </section>
+          )}
+
           {(data.tracking.trackingNumber || order.status === "shipped") && (
             <section className="rounded-lg border border-border bg-card p-5" data-testid="panel-shipment">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Shipment</h2>
@@ -176,6 +221,19 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
           </div>
         </section>
       )}
+
+      <RefundDialog
+        open={refundOpen}
+        onOpenChange={setRefundOpen}
+        availableCents={refundableCents}
+        sellerName={sellerName}
+        pending={refund.isPending}
+        error={refundError}
+        onSubmit={(input) => {
+          setRefundError(null);
+          refund.mutate({ orderId, ...input }, { onSuccess: () => setRefundOpen(false), onError: (err) => setRefundError(errorMessage(err)) });
+        }}
+      />
 
       <TrackingDialog open={trackingOpen} onOpenChange={setTrackingOpen} pending={advance.isPending} error={error} onSubmit={(tracking) => runAdvance(tracking)} />
 

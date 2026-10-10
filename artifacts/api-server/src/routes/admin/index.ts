@@ -16,6 +16,7 @@ import commerceRouter from "./commerce";
 import insightsRouter from "./insights";
 import growthRouter from "./growth";
 import accessRouter from "./access";
+import b2bRouter from "./b2b";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,5 +35,6 @@ router.use(commerceRouter);
 router.use(insightsRouter);
 router.use(growthRouter);
 router.use("/access", accessRouter); // invite-only launch waitlist
+router.use(b2bRouter); // sample/bulk card refunds + B2B chargebacks
 
 export default router;

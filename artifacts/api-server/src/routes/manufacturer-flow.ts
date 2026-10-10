@@ -16,7 +16,6 @@ import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import {
   manufacturerMessages,
-  manufacturerRelationships,
   manufacturerThreads,
   manufacturers,
   sampleOrders,
@@ -26,11 +25,10 @@ import { SendManufacturerOrderCardBody, CancelManufacturerOrderCardBody } from "
 import { orderTypeLabel, validateCardInput, validateTransition } from "@workspace/manufacturer-flow";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext } from "../middlewares/requireRole";
-import { computeApplicationFeeCents, requireStripe } from "../lib/stripe";
+import { requireStripe } from "../lib/stripe";
+import { insertOrderCard } from "../lib/b2b/orderCards";
 import {
   afterStageChange,
-  cardMessageType,
-  cardSummary,
   loadOrderTimeline,
   postThreadSystemMessage,
   recordOrderEvent,
@@ -160,7 +158,6 @@ router.post("/me/threads/:threadId/order-cards", requireAuth, async (req, res) =
   const requestKey = `mfr-card:${input.clientRequestId}`;
   const title = input.title.trim();
   const description = input.description?.trim() || null;
-  const messageType = cardMessageType(input.orderType);
 
   const replay = async () => {
     const [existing] = await db.select().from(sampleOrders).where(and(
@@ -194,54 +191,13 @@ router.post("/me/threads/:threadId/order-cards", requireAuth, async (req, res) =
 
   let created: { order: typeof sampleOrders.$inferSelect; message: typeof manufacturerMessages.$inferSelect } | null;
   try {
-    created = await db.transaction(async (tx) => {
-      const [order] = await tx.insert(sampleOrders).values({
-        manufacturerId: mfr.id,
-        sellerId: thread.buyerClerkId,
-        clientRequestId: requestKey,
-        threadId: thread.id,
-        orderType: input.orderType,
-        issuedBy: "manufacturer",
-        title,
-        description,
-        quantity: input.quantity,
-        priceCents: input.priceCents,
-        platformFeeCents: computeApplicationFeeCents(input.priceCents),
-        status: "pending_payment",
-      }).onConflictDoNothing().returning();
-      if (!order) return null;
-      await recordOrderEvent(tx, {
-        order, actorRole: "manufacturer", actorClerkId: userId, fromStatus: null, toStatus: "pending_payment",
-      });
-      const [message] = await tx.insert(manufacturerMessages).values({
-        threadId: thread.id,
-        senderRole: "manufacturer",
-        senderClerkId: userId,
-        clientRequestId: requestKey,
-        content: cardSummary(order),
-        messageType,
-        mediaUrls: [],
-        cardData: {
-          orderId: order.id,
-          orderType: order.orderType,
-          title: order.title,
-          description: order.description,
-          quantity: order.quantity,
-          priceCents: order.priceCents,
-          currency: "USD",
-        },
-      }).returning();
-      await tx.update(manufacturerThreads).set({
-        lastMessage: message.content,
-        lastMessageAt: new Date(),
-        orderStatus: "pending_payment",
-        sellerUnreadCount: sql`${manufacturerThreads.sellerUnreadCount} + 1`,
-      }).where(eq(manufacturerThreads.id, thread.id));
-      await tx.insert(manufacturerRelationships)
-        .values({ sellerId: thread.buyerClerkId, manufacturerId: mfr.id })
-        .onConflictDoNothing();
-      return { order, message };
-    });
+    created = await db.transaction((tx) => insertOrderCard(tx, {
+      manufacturerId: mfr.id,
+      thread,
+      actorClerkId: userId,
+      requestKey,
+      card: { orderType: input.orderType, title, description, quantity: input.quantity, priceCents: input.priceCents },
+    }));
   } catch (err) {
     req.log.error({ err, threadId }, "Failed to create manufacturer order card");
     res.status(500).json({ error: "The card couldn't be sent. Try again." });
