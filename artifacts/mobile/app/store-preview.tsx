@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -161,8 +161,8 @@ export default function StorePreview() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const screenWidth = Dimensions.get('window').width;
-  const screenHeight = Dimensions.get('window').height - insets.top - insets.bottom - 52;
+  const { width: screenWidth, height: windowHeight } = useWindowDimensions();
+  const screenHeight = windowHeight - insets.top - insets.bottom - 52;
   const containerWidth = device === 'desktop' ? DESKTOP_WIDTH : screenWidth;
   const scale = device === 'desktop' ? screenWidth / DESKTOP_WIDTH : 1;
   const desktopInjectedJS = "var m=document.querySelector('meta[name=viewport]'); if(m){m.setAttribute('content','width=" + DESKTOP_WIDTH + "');} true;";

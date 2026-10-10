@@ -13,7 +13,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, ActivityIndicator, Platform,
+  ActivityIndicator, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -31,8 +31,6 @@ import { loadAgoraModule } from '@/lib/agoraAvailability';
 
 // ─── Agora SDK — native only, gracefully absent on web / Expo Go ──────────────
 const AgoraModule = loadAgoraModule();
-
-const { width: W, height: H } = Dimensions.get('window');
 
 const CALL_DARK  = '#0A0A14';
 const MUTE_RED   = '#FF3B30';

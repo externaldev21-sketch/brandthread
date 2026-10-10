@@ -6,7 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   Animated,
   ActivityIndicator, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,7 +21,6 @@ import { FS, FONT } from '@/lib/theme';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type DateRange = '7d' | '14d' | '30d' | 'All';
 const DATE_RANGES: DateRange[] = ['7d', '14d', '30d', 'All'];
@@ -473,8 +472,9 @@ interface HeroCardProps {
 function HeroCard({ icon, iconColor, label, value }: HeroCardProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
   return (
-    <View style={styles.heroCard}>
+    <View style={[styles.heroCard, { width: (SCREEN_WIDTH - 32 - 10) / 2 }]}>
       <Feather name={icon} size={16} color={iconColor} />
       <Text style={styles.heroValue}>{value}</Text>
       <Text style={styles.heroLabel}>{label}</Text>
@@ -505,6 +505,7 @@ interface RetentionChartProps {
 function RetentionChart({ data }: RetentionChartProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
   const chartWidth = SCREEN_WIDTH - 32 - 28 - 16; // account for padding + card padding
   const barWidth = 2;
   const gap = 1;
@@ -674,7 +675,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     marginTop: 16,
   },
   heroCard: {
-    width: (SCREEN_WIDTH - 32 - 10) / 2,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,

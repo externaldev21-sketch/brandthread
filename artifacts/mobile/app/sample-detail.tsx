@@ -6,10 +6,11 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, Alert, Image,
+  View, Text, ScrollView, Alert,
   StyleSheet, TouchableOpacity, Platform,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -241,9 +242,10 @@ function SampleTimeline({
               )}
               {showImage && (
                 <Image
+                  cachePolicy="memory-disk"
                   source={{ uri: imageUris[0] }}
                   style={tl.activeImage}
-                  resizeMode="cover"
+                  contentFit="cover"
                 />
               )}
             </View>
@@ -791,7 +793,7 @@ export default function SampleDetailScreen() {
           {sample.imageUris.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.imageScroll} contentContainerStyle={s.imageScrollContent}>
               {sample.imageUris.map((uri, i) => (
-                <Image key={i} source={{ uri }} style={s.sampleImage} />
+                <Image cachePolicy="memory-disk" key={i} source={{ uri }} style={s.sampleImage} />
               ))}
             </ScrollView>
           ) : (

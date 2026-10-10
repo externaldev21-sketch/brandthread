@@ -7,8 +7,9 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, ScrollView, Image, StyleSheet, ActivityIndicator, Pressable,
+  View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, Pressable,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -501,7 +502,7 @@ function ProductRow({ item, checked, onPress, theme, s }: {
     >
       <Checkbox checked={checked} theme={theme} />
       {item.image ? (
-        <Image source={{ uri: item.image }} style={s.thumb} />
+        <Image cachePolicy="memory-disk" source={{ uri: item.image }} style={s.thumb} />
       ) : (
         <View style={[s.thumb, s.thumbEmpty]}><Feather name="image" size={ICON.sm} color={theme.subtle} /></View>
       )}

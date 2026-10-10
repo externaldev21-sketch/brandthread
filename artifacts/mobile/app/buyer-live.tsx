@@ -8,7 +8,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TextInput,
   ScrollView, Platform, ActivityIndicator,
-  Alert, Dimensions, Share,
+  Alert, Share, useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import * as ExpoLinking from 'expo-linking';
@@ -40,8 +40,6 @@ import { useLiveModeration } from '@/lib/live/useLiveModeration';
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
 import { radius } from '@/constants/radii';
 
-const { width: W, height: H } = Dimensions.get('window');
-
 // ─── Agora SDK (native-only) ──────────────────────────────────────────────────
 const AgoraModule = loadAgoraModule();
 
@@ -66,6 +64,8 @@ function BuyerLiveNativeScreen() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary;
   const s = makeStyles(theme);
+  // Live window height so the purchase sheet cap tracks iPad rotation / split view.
+  const { height: H } = useWindowDimensions();
   const params = useLocalSearchParams<{ streamId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -597,7 +597,7 @@ function BuyerLiveNativeScreen() {
       {purchaseTag && (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={[s.purchaseSheet, { paddingBottom: insets.bottom + SP.sm }]}
+          style={[s.purchaseSheet, { maxHeight: H * 0.78, paddingBottom: insets.bottom + SP.sm }]}
         >
           <View style={s.purchaseHandle} />
           <View style={s.purchaseHeader}>
@@ -724,7 +724,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   commentMsg:       { color: 'rgba(255,255,255,0.88)', fontFamily: FONT.regular, fontSize: 12 },
   purchaseSheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 30,
-    maxHeight: H * 0.78, backgroundColor: BG, borderTopLeftRadius: RADIUS.xl,
+    backgroundColor: BG, borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: SP.md, paddingTop: SP.xs,
   },

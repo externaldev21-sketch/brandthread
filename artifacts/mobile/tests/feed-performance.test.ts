@@ -12,6 +12,7 @@ const feed = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');
 // both the Threads feed and the LIVE pager spread onto their FlatList.
 const pager = readFileSync(resolve(__dirname, '../lib/feedPager.ts'), 'utf8');
 const live = readFileSync(resolve(__dirname, '../app/live.tsx'), 'utf8');
+const pageMemo = readFileSync(resolve(__dirname, '../lib/feedPageMemo.ts'), 'utf8');
 
 describe('Feed video list virtualization bounds', () => {
   it('caps how many pages (and video players) are ever mounted at once on native', () => {
@@ -79,12 +80,14 @@ describe('Feed video list virtualization bounds', () => {
   });
 
   it('memoizes SpotlightPage so liking/saving one post does not re-render every mounted row', () => {
-    expect(feed).toContain('const SpotlightPage = React.memo(SpotlightPageImpl,');
+    expect(feed).toContain('const SpotlightPage = React.memo(SpotlightPageImpl, spotlightPagePropsEqual);');
     // The engagement lookup at the call site (`engagements[id] ?? initialEngagement(item)`)
     // hands every not-yet-engaged row a brand new object each render, so the
     // comparator must compare its fields rather than trust reference equality.
-    expect(feed).toContain('function engagementEqual(');
-    expect(feed).toContain('engagementEqual(prev.engagement, next.engagement)');
+    // The comparator lives in lib/feedPageMemo.ts (behaviour covered by
+    // tests/list-render-counts.test.tsx).
+    expect(pageMemo).toContain('export function engagementEqual(');
+    expect(pageMemo).toContain('engagementEqual(prev.engagement, next.engagement)');
   });
 
   it('keeps the engagement/UI callbacks passed into SpotlightPage stable across renders', () => {
@@ -92,5 +95,15 @@ describe('Feed video list virtualization bounds', () => {
     // SpotlightPage memoization above regardless of the comparator.
     expect(feed).toContain('const handleOpenComments = useCallback((id: string) => {');
     expect(feed).toContain('const handleShopTag = useCallback((item: SpotlightItem, tag: SpotlightProductTag) => {');
+    // The like/save/repost/follow handlers read engagements through a ref, so
+    // their identity doesn't change on every like (which would make the memo
+    // comparator re-render every mounted page).
+    expect(feed).toContain('engagementsRef.current = engagements;');
+    for (const handler of ['handleLike', 'handleSave', 'handleRepost', 'handleFollow']) {
+      const start = feed.indexOf(`const ${handler} = useCallback(`);
+      expect(start).toBeGreaterThan(-1);
+      const deps = feed.slice(start, feed.indexOf(']);', start) + 2);
+      expect(deps.slice(deps.lastIndexOf('}, ['))).not.toMatch(/\bengagements\b/);
+    }
   });
 });

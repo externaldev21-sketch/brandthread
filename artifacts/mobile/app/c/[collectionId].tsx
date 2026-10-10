@@ -8,7 +8,8 @@
  * Server returns 404 for anything not explicitly marked public.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
@@ -23,9 +24,7 @@ import { formatCents } from '@/lib/money';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { radius } from '@/constants/radii';
 
-const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
-const TILE_SIZE = (Math.min(W, CONTENT_MAX_WIDTH) - SP.md * 2 - GAP) / 2;
 
 const PROD_ORIGIN = 'https://brandthread.app';
 
@@ -65,6 +64,11 @@ export default function PublicCollectionScreen() {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
+  // Live window width so the 2-up grid re-fits on iPad rotation / split view.
+  const { width: W } = useWindowDimensions();
+  const TILE_SIZE = (Math.min(W, CONTENT_MAX_WIDTH) - SP.md * 2 - GAP) / 2;
+  const tileSize = { width: TILE_SIZE };
+  const tileImageSize = { width: TILE_SIZE, height: TILE_SIZE };
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
   const pull = usePullToRefresh(async () => {
     if (!collectionId) return;
@@ -129,7 +133,7 @@ export default function PublicCollectionScreen() {
         </View>
 
         {collection.coverImageUrl ? (
-          <Image source={{ uri: collection.coverImageUrl }} style={styles.cover} />
+          <Image cachePolicy="memory-disk" source={{ uri: collection.coverImageUrl }} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]}>
             <Feather name="folder" size={36} color={MUTED} />
@@ -150,11 +154,11 @@ export default function PublicCollectionScreen() {
             columnWrapperStyle={{ gap: GAP }}
             contentContainerStyle={{ gap: GAP, marginTop: SP.lg }}
             renderItem={({ item }) => (
-              <View style={styles.tile}>
+              <View style={[styles.tile, tileSize]}>
                 {item.image ? (
-                  <Image source={{ uri: item.image }} style={styles.tileImage} />
+                  <Image cachePolicy="memory-disk" source={{ uri: item.image }} style={[styles.tileImage, tileImageSize]} />
                 ) : (
-                  <View style={[styles.tileImage, styles.coverPlaceholder]}>
+                  <View style={[styles.tileImage, tileImageSize, styles.coverPlaceholder]}>
                     <Feather name="shopping-bag" size={20} color={MUTED} />
                   </View>
                 )}
@@ -182,8 +186,8 @@ const styles = StyleSheet.create({
   coverPlaceholder: { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl, marginTop: SP.md, textAlign: 'center' },
   subtitle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 2 },
-  tile: { width: TILE_SIZE, gap: 4 },
-  tileImage: { width: TILE_SIZE, height: TILE_SIZE, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
+  tile: { gap: 4 },
+  tileImage: { borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
   tileTitle: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm, marginTop: 4 },
   tilePrice: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
   messageTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginTop: SP.sm, textAlign: 'center' },

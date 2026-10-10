@@ -19,7 +19,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, Animated, Dimensions, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View,
+  Alert, Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { StatusBar } from 'expo-status-bar';
@@ -57,8 +57,6 @@ import {
 } from '@/lib/storyMentionsRail';
 import { advance, retreat, nextUser, prevUser, classifyGesture, type NavResult } from '@/lib/storyViewerNav';
 import type { MessageAttachment, StoryMedia, StoryMentionItem, StoryOverlay } from '@/services/socialTypes';
-
-const { height: H } = Dimensions.get('window');
 
 /** Every slide runs this long; an unavailable story only flashes its notice. */
 const SLIDE_MS = 5000;
@@ -259,6 +257,11 @@ export default function StoryMentionViewerScreen() {
   }, [progress, slideKey, paused, currentUnavailable, !!current, !!slide]);
 
   // ── Swipe down to close, swipe sideways for the next / previous person ─────
+  // Live window height (iPad rotation / split view); the pan responder below is
+  // created once, so it reads the latest value through a ref.
+  const { height: H } = useWindowDimensions();
+  const heightRef = useRef(H);
+  heightRef.current = H;
   const dragY = useRef(new Animated.Value(0)).current;
   const draggingDown = useRef(false);
   const scale = dragY.interpolate({ inputRange: [0, H], outputRange: [1, 0.82], extrapolate: 'clamp' });
@@ -277,7 +280,7 @@ export default function StoryMentionViewerScreen() {
       draggingDown.current = false;
       if (wasDown) {
         if (gesture === 'close') {
-          Animated.timing(dragY, { toValue: H, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true })
+          Animated.timing(dragY, { toValue: heightRef.current, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true })
             .start(() => gestureRef.current.close());
         } else {
           Animated.timing(dragY, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -430,7 +433,7 @@ export default function StoryMentionViewerScreen() {
         {/* Tap zones: left = previous, right = next, hold = pause. Plain
             Pressables with no feedback so hold-to-pause timing is untouched. */}
         <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="box-none">
-          <View style={styles.tapRow}>
+          <View style={[styles.tapRow, { height: H * 0.7 }]}>
             <Pressable
               style={styles.tapLeft}
               onPress={prev}
@@ -564,7 +567,7 @@ const styles = StyleSheet.create({
   closeWrap: { position: 'absolute', right: SP.sm, zIndex: 10 },
   textSlide: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   textSlideText: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center', paddingHorizontal: SP.xl },
-  tapRow: { position: 'absolute', top: 0, left: 0, right: 0, height: H * 0.7, flexDirection: 'row' },
+  tapRow: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row' },
   tapLeft: { width: '30%', height: '100%' },
   tapRight: { width: '70%', height: '100%' },
   topScrim: { position: 'absolute', left: 0, right: 0, top: 0, height: 140, zIndex: 1 },

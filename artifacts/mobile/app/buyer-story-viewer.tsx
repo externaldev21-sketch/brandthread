@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, Pressable, Animated, Easing,
-  Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
-  Linking, Platform, Share,
+  PanResponder, StyleSheet, Alert, Modal, FlatList,
+  Linking, Platform, Share, useWindowDimensions,
 } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { prefetchImage } from '@/lib/prefetch';
@@ -55,8 +55,6 @@ import {
 import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/storyMentionSticker';
 import { reshareGradientFromBackground } from '@/lib/storyReshare';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
-
-const { width: W, height: H } = Dimensions.get('window');
 
 // Mirrors Instagram's own quick-reaction row (Mobbin: Instagram iOS story
 // viewer reply screen) — same 8 emoji, in the same order: laughing-crying,
@@ -429,6 +427,11 @@ export default function BuyerStoryViewer() {
   // a slight shrink), then either snaps back (timing, never a spring — no
   // bounce) or finishes the dismiss with the same shrink continuing off
   // screen before actually closing.
+  // Live window height (iPad rotation / split view); the pan responder below is
+  // created once, so it reads the latest value through a ref.
+  const { height: H } = useWindowDimensions();
+  const heightRef = useRef(H);
+  heightRef.current = H;
   const dragY = useRef(new Animated.Value(0)).current;
   const isDraggingDown = useRef(false);
   const dragScale = dragY.interpolate({ inputRange: [0, H], outputRange: [1, 0.82], extrapolate: 'clamp' });
@@ -449,7 +452,7 @@ export default function BuyerStoryViewer() {
         isDraggingDown.current = false;
         if (wasDraggingDown) {
           if (gesture === 'close') {
-            Animated.timing(dragY, { toValue: H, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true })
+            Animated.timing(dragY, { toValue: heightRef.current, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true })
               .start(() => goBackOr(router));
           } else {
             Animated.timing(dragY, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -680,7 +683,7 @@ export default function BuyerStoryViewer() {
             advance/retreat/pause zones with intentionally no visual feedback
             (matching the old activeOpacity=1), so the hold-to-pause timing is
             never touched. */}
-        <View style={styles.tapZoneRow}>
+        <View style={[styles.tapZoneRow, { height: H * 0.75 }]}>
           <Pressable
             style={styles.tapLeft}
             onPress={retreatSlide}
@@ -1258,7 +1261,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     top: 0,
     left: 0,
     right: 0,
-    height: H * 0.75,
     flexDirection: 'row',
   },
   tapLeft: {

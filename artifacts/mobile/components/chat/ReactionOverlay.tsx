@@ -14,7 +14,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, Modal, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle,
+  Animated, Easing, Modal, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle, useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,9 +88,11 @@ export function ReactionOverlay({
     }
   }, [visible, ready, anim]);
 
+  // Read before the early return (hook order); live on iPad rotation / split view.
+  const { width: screenW, height: screenH } = useWindowDimensions();
+
   if (!visible || !anchor) return null;
 
-  const { width: screenW, height: screenH } = Dimensions.get('window');
   const topInset = headerTopInset + 8;
   const bottomInset = insets.bottom + 8;
   const hintBlockH = 26;

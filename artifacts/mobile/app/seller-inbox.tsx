@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, RefreshControl, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, RefreshControl, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -624,7 +625,7 @@ export default function SellerInboxScreen() {
         >
           <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
             {other.avatarUri ? (
-              <Image source={{ uri: other.avatarUri }} style={s.avatarImage} />
+              <Image cachePolicy="memory-disk" recyclingKey={other.avatarUri} source={{ uri: other.avatarUri }} style={s.avatarImage} />
             ) : (
               <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
             )}

@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -23,6 +22,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReanimatedAnimated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1383,7 +1383,7 @@ export function ShopProductSheet({
           ]}
         >
           {product?.imageUris?.[0] ? (
-            <Image source={{ uri: product.imageUris[0] }} style={ss.cartFlyImage} />
+            <Image cachePolicy="memory-disk" source={{ uri: product.imageUris[0] }} style={ss.cartFlyImage} />
           ) : (
             <View style={[ss.cartFlyFallback, { backgroundColor: theme.accent }]}>
               <Feather name="shopping-bag" size={21} color={theme.onAccent} />

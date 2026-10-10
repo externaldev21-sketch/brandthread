@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList,
-  Alert, StyleSheet, Dimensions, Share,
+  Alert, StyleSheet, Share,
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -37,8 +37,6 @@ type ApiFollowing = {
   userId: string; name: string; username: string | null;
   handle: string; initials: string; color: string; followedAt: string;
 };
-
-const { width: SCREEN_W } = Dimensions.get('window');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -309,7 +309,7 @@ export default function DiscoverScreen() {
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       {filter === 'forYou' && (
         <DiscoverGrid
-          ref={listRef}
+          ref={listRef as never}
           posts={forYouPosts}
           loading={forYouLoading}
           loadingMore={forYouLoadingMore}
@@ -338,7 +338,7 @@ export default function DiscoverScreen() {
 
       {filter === 'fits' && (
         <DiscoverGrid
-          ref={listRef}
+          ref={listRef as never}
           posts={fitsPosts}
           loading={fitsLoading}
           loadingMore={fitsLoadingMore}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
+  View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, useWindowDimensions,
   ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard, Linking,
 } from 'react-native';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
@@ -206,10 +206,6 @@ function attachmentIcon(type: MessageAttachment['type']): keyof typeof Feather.g
   }
 }
 
-// ─── Screen width ─────────────────────────────────────────────────────────────
-
-const SCREEN_W = Dimensions.get('window').width;
-const BUBBLE_MAX = SCREEN_W * 0.75;
 const DOUBLE_TAP_MS = 300;
 // Links the message list's KeyboardGestureArea to the composer's TextInput
 // (react-native-keyboard-controller, iOS) so a drag on the list can swipe
@@ -237,6 +233,9 @@ const COMPOSER_ICON = 20;
 export default function BuyerConversationScreen() {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
+  // Bubbles cap at 75% of the live window width (re-fits on iPad rotation / split view).
+  const { width: SCREEN_W } = useWindowDimensions();
+  const BUBBLE_MAX = SCREEN_W * 0.75;
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -1709,7 +1708,7 @@ export default function BuyerConversationScreen() {
         <View style={{ marginTop: isFirstInGroup ? 12 : 2, paddingLeft: BUBBLE_COLUMN_LEFT, paddingRight: SP.md }}>
           <PressableScale rippleEnabled={false}
             bounce={false}
-            style={[s.agentCardOuter, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
+            style={[s.agentCardOuter, { maxWidth: BUBBLE_MAX, backgroundColor: theme.cardElevated, borderColor: theme.border }]}
             activeOpacity={deepLink ? 0.7 : 1}
             onPress={() => { if (deepLink) router.push(deepLink as never); }}
           >
@@ -3360,7 +3359,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   agentCardOuter: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
-    padding: SP.sm, width: '100%', maxWidth: BUBBLE_MAX, alignSelf: 'flex-start',
+    padding: SP.sm, width: '100%', alignSelf: 'flex-start',
   },
   agentCardIconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   // Quick replies: standalone chips below the last bubble, on the same

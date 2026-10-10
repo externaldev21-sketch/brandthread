@@ -29,8 +29,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Image,
+  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -315,7 +316,7 @@ export default function BuyerReturnRequestScreen() {
             <View key={idx} style={[s.itemRow, idx > 0 && s.itemBorder]}>
               <View style={s.itemThumb}>
                 {item.imageUri ? (
-                  <Image source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  <Image cachePolicy="memory-disk" source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
                 ) : (
                   <Feather name="package" size={16} color={theme.subtle} />
                 )}
@@ -363,7 +364,7 @@ export default function BuyerReturnRequestScreen() {
           <View style={s.photoGrid}>
             {evidencePhotos.map((uri, idx) => (
               <View key={`${uri}-${idx}`} style={s.photoCell}>
-                <Image source={{ uri }} style={s.evidenceThumb} accessibilityLabel={`Photo ${idx + 1}`} />
+                <Image cachePolicy="memory-disk" source={{ uri }} style={s.evidenceThumb} accessibilityLabel={`Photo ${idx + 1}`} />
                 <TouchableOpacity
                   onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
                   style={s.evidenceRemove}

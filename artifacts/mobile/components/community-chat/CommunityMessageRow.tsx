@@ -5,7 +5,7 @@
  * bubble of a run, and tappable reaction-count chips underneath.
  */
 import React, { memo, useCallback, useRef } from 'react';
-import { Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
@@ -24,9 +24,6 @@ import { radius } from '@/constants/radii';
 
 const AVATAR_SIZE = 28;
 const AVATAR_GAP = SP.sm;
-const BUBBLE_MAX = Dimensions.get('window').width * 0.75;
-/** Photo area inside a bubble: bubble max minus its 12pt side padding. */
-const MEDIA_MAX = Math.min(BUBBLE_MAX, 280) - 24;
 const GRID_GAP = 3;
 
 export interface CommunityMessageRowProps {
@@ -66,6 +63,9 @@ function CommunityMessageRowImpl({
 }: CommunityMessageRowProps) {
   const { theme } = useAppTheme();
   const s = getStyles(theme);
+  // Bubbles cap at 75% of the live window width (re-fits on iPad rotation / split view).
+  const { width: windowW } = useWindowDimensions();
+  const BUBBLE_MAX = windowW * 0.75;
   const bubbleRef = useRef<View>(null);
   const pending = msg.pendingStatus;
   const chips = reactionChips(msg.reactions, myId, COMMUNITY_REACTIONS);
@@ -97,9 +97,9 @@ function CommunityMessageRowImpl({
         ) : <View style={s.avatarSpacer} />
       )}
 
-      <View style={[s.column, { alignItems: isOwn ? 'flex-end' : 'flex-start' }]}>
+      <View style={[s.column, { maxWidth: BUBBLE_MAX, alignItems: isOwn ? 'flex-end' : 'flex-start' }]}>
         {!isOwn && isFirstInGroup && (
-          <View style={s.nameRow}>
+          <View style={[s.nameRow, { maxWidth: BUBBLE_MAX }]}>
             <Text style={s.name} numberOfLines={1}>{msg.fromName}</Text>
             {roleLabel && (
               <View style={[s.pill, s.pillRole]}><Text style={[s.pillText, { color: theme.text }]}>{roleLabel}</Text></View>
@@ -136,7 +136,7 @@ function CommunityMessageRowImpl({
               ]}
             >
               {msg.replyToId ? (
-                <View style={[s.quote, { borderLeftColor: isOwn ? theme.onAccent : theme.muted }]} {...({ dataSet: { fit: 'preview' } } as object)}>
+                <View style={[s.quote, { maxWidth: BUBBLE_MAX - 24, borderLeftColor: isOwn ? theme.onAccent : theme.muted }]} {...({ dataSet: { fit: 'preview' } } as object)}>
                   {msg.replyToAuthorName ? (
                     <Text style={[s.quoteName, { color: isOwn ? theme.onAccent : theme.text }]} numberOfLines={1}>{msg.replyToAuthorName}</Text>
                   ) : null}
@@ -236,6 +236,9 @@ function PhotoGrid({
   hasText: boolean;
   bg: string;
 }) {
+  const { width: windowW } = useWindowDimensions();
+  /** Photo area inside a bubble: bubble max minus its 12pt side padding. */
+  const MEDIA_MAX = Math.min(windowW * 0.75, 280) - 24;
   const single = urls.length === 1;
   const cell = (MEDIA_MAX - GRID_GAP) / 2;
   // A single photo keeps its own aspect ratio (clamped so it never gets tall or sliver-thin).
@@ -286,8 +289,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarSpacer: { width: AVATAR_SIZE, marginRight: AVATAR_GAP },
   avatarInitials: { fontSize: 11, fontFamily: FONT.bold, color: theme.text },
-  column: { maxWidth: BUBBLE_MAX, flexShrink: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3, marginLeft: 4, maxWidth: BUBBLE_MAX },
+  column: { flexShrink: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3, marginLeft: 4 },
   name: { flexShrink: 1, fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.muted },
   pill: {
     paddingHorizontal: 12, paddingVertical: 1, borderRadius: RADIUS.pill,
@@ -295,7 +298,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   pillRole: { backgroundColor: theme.accentDim },
   pillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted },
-  quote: { borderLeftWidth: 2, paddingLeft: 8, marginBottom: 6, maxWidth: BUBBLE_MAX - 24, overflow: 'hidden' },
+  quote: { borderLeftWidth: 2, paddingLeft: 8, marginBottom: 6, overflow: 'hidden' },
   quoteName: { fontSize: FS.xs, fontFamily: FONT.semibold },
   quoteText: { fontSize: FS.xs, fontFamily: FONT.regular },
   text: {

@@ -3,7 +3,8 @@
  * Route: /size-chart-template-apply?id=<templateId>
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Header } from '@/components/layout';
@@ -96,7 +97,7 @@ export default function SizeChartTemplateApplyScreen() {
               return (
                 <TouchableOpacity style={s.row} onPress={() => toggle(item.id)} accessibilityRole="checkbox" accessibilityState={{ checked: on }}>
                   {item.images?.[0]
-                    ? <Image source={{ uri: item.images[0] }} style={s.thumb} />
+                    ? <Image cachePolicy="memory-disk" source={{ uri: item.images[0] }} style={s.thumb} />
                     : <View style={[s.thumb, s.thumbEmpty]}><Feather name="image" size={ICON.sm} color={colors.mutedForeground} /></View>}
                   <Text style={s.name} numberOfLines={1}>{item.name}</Text>
                   <View style={[s.check, on && s.checkOn]}>

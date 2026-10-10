@@ -23,9 +23,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, FlatList, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
+  View, Text, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
 } from 'react-native';
-import { LONG_LIST_TUNING } from '@/lib/listTuning';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import Composer from '@/components/ui/Composer';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import { Feather, FontAwesome } from '@expo/vector-icons';
@@ -136,6 +136,17 @@ interface ViewRepliesRow {
   expanded: boolean;
 }
 
+const MVCP_OFF = { disabled: true } as const;
+
+function commentRowKey(row: Row | ViewRepliesRow): string {
+  return isViewRepliesRow(row) ? `view-replies-${row.rootId}` : row.id;
+}
+
+function commentRowType(row: Row | ViewRepliesRow): string {
+  if (isViewRepliesRow(row)) return 'view-replies';
+  return row.isReply ? 'reply' : 'comment';
+}
+
 function isViewRepliesRow(row: Row | ViewRepliesRow): row is ViewRepliesRow {
   return '_viewReplies' in row;
 }
@@ -174,10 +185,10 @@ const csk = StyleSheet.create({
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-function Avatar({ uri, initials, size = 38, ring = true, backgroundColor }: { uri?: string | null; initials: string; size?: number; ring?: boolean; backgroundColor?: string }) {
+function Avatar({ uri, initials, size = 38, ring = true, backgroundColor, recyclingKey }: { uri?: string | null; initials: string; size?: number; ring?: boolean; backgroundColor?: string; recyclingKey?: string }) {
   const { theme } = useAppTheme();
   if (uri) {
-    return <CachedImage source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" />;
+    return <CachedImage source={{ uri }} recyclingKey={recyclingKey} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" />;
   }
   return (
     <View style={{
@@ -202,26 +213,34 @@ function LikeHeart({
   count,
   onPress,
   accessibilityLabel,
+  itemKey,
 }: {
   liked: boolean;
   count: number;
   onPress: () => void;
   accessibilityLabel: string;
+  /** The comment this heart belongs to. FlashList recycles rows, so a heart
+   *  can be handed a different comment; the pop only plays for a real tap
+   *  on the same comment, never because a recycled row became a liked one. */
+  itemKey: string;
 }) {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
   const pop = useRef(new Animated.Value(1)).current;
   const wasLiked = useRef(liked);
+  const lastKey = useRef(itemKey);
 
   useEffect(() => {
-    if (liked && !wasLiked.current) {
+    const sameItem = lastKey.current === itemKey;
+    lastKey.current = itemKey;
+    if (sameItem && liked && !wasLiked.current) {
       Animated.sequence([
         Animated.spring(pop, { toValue: 1.35, speed: 40, bounciness: 10, useNativeDriver: true }),
         Animated.spring(pop, { toValue: 1, speed: 24, bounciness: 6, useNativeDriver: true }),
       ]).start();
     }
     wasLiked.current = liked;
-  }, [liked, pop]);
+  }, [liked, pop, itemKey]);
 
   return (
     <PressableScale
@@ -255,7 +274,7 @@ function LikeHeart({
 // overlapping interactive elements — spurious hover/press flicker on the
 // outer row whenever the cursor crossed into an inner button).
 
-function CommentRow({
+const CommentRow = React.memo(function CommentRow({
   comment,
   highlighted = false,
   postAuthorId,
@@ -281,7 +300,7 @@ function CommentRow({
 
   return (
     <View style={[s.commentRow, comment.isReply && s.commentRowIndented, isPending && s.commentRowPending, highlighted && s.commentRowHighlighted]} testID={highlighted ? 'comment-deep-link-highlight' : undefined}>
-      <Avatar uri={comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 26 : 32} />
+      <Avatar uri={comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 26 : 32} recyclingKey={comment.id} />
 
       <View style={s.commentBody}>
         <PressableScale
@@ -364,11 +383,12 @@ function CommentRow({
           count={comment.likesCount}
           onPress={() => onLike(comment)}
           accessibilityLabel={`${comment.likedByMe ? 'Unlike' : 'Like'} comment`}
+          itemKey={comment.id}
         />
       )}
     </View>
   );
-}
+});
 
 // ─── View/hide replies toggle ──────────────────────────────────────────────────
 // Reply threads start collapsed under their root comment (TikTok/Reels
@@ -697,7 +717,7 @@ export default function BuyerPostCommentsScreen() {
   const [actionsFor, setActionsFor] = useState<Row | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const listRef = useRef<FlatList>(null);
+  const listRef = useRef<FlashListRef<Row | ViewRepliesRow>>(null);
   const inputRef = useRef<TextInput>(null);
   const hasLoadedOnce = useRef(false);
 
@@ -797,7 +817,9 @@ export default function BuyerPostCommentsScreen() {
     [api, postId],
   );
 
-  const handleLike = async (comment: Row) => {
+  // Row callbacks are stable (useCallback) so a like re-renders only the
+  // liked row: CommentRow is memoized and the other rows' props are unchanged.
+  const handleLike = useCallback(async (comment: Row) => {
     const liked = !comment.likedByMe;
     hapticSelection();
     // Optimistic update
@@ -811,12 +833,12 @@ export default function BuyerPostCommentsScreen() {
     } catch {
       setCommentsSynced(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: comment.likedByMe, likesCount: comment.likesCount } : c));
     }
-  };
+  }, [api, isPreviewPost, postId, setCommentsSynced]);
 
-  const handleReply = (comment: Row) => {
+  const handleReply = useCallback((comment: Row) => {
     setReplyingTo(comment);
     inputRef.current?.focus();
-  };
+  }, []);
 
   const handleCancelReply = () => {
     setReplyingTo(null);
@@ -891,13 +913,13 @@ export default function BuyerPostCommentsScreen() {
     }
   };
 
-  const handlePressMention = (mention: CommentMentionRef) => {
+  const handlePressMention = useCallback((mention: CommentMentionRef) => {
     hapticLight();
     router.push({
       pathname: '/buyer-other-profile' as never,
       params: { userId: mention.userId, handle: `@${mention.handle}` },
     } as never);
-  };
+  }, [router]);
 
   const mentionQuery = activeMentionQuery(inputText);
 
@@ -1072,13 +1094,21 @@ export default function BuyerPostCommentsScreen() {
     return () => clearTimeout(fade);
   }, [highlightId]);
 
-  const handleScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
-    // Rows below the fold aren't measured yet: jump near it, then settle.
-    listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
-    setTimeout(() => {
-      listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.3, animated: true });
-    }, 80);
-  }, []);
+  const renderCommentItem = useCallback(({ item }: { item: Row | ViewRepliesRow }) => (
+    isViewRepliesRow(item) ? (
+      <ViewRepliesButton count={item.count} expanded={item.expanded} onToggle={() => toggleReplies(item.rootId)} />
+    ) : (
+      <CommentRow
+        comment={item}
+        highlighted={item.id === highlightId}
+        postAuthorId={postAuthorId}
+        onLike={handleLike}
+        onReply={handleReply}
+        onMore={setActionsFor}
+        onPressMention={handlePressMention}
+      />
+    )
+  ), [highlightId, postAuthorId, handleLike, handleReply, handlePressMention, toggleReplies]);
 
   const composerLocked = meta.commentsDisabled || !meta.canComment;
 
@@ -1156,14 +1186,15 @@ export default function BuyerPostCommentsScreen() {
           </View>
 
           <KeyboardGestureArea style={{ flex: 1 }} textInputNativeID={COMMENT_INPUT_NATIVE_ID}>
-          <FlatList
-            {...LONG_LIST_TUNING}
+          <FlashList
             ref={listRef}
             data={loading ? [] : visibleRows}
             refreshControl={pull.refreshControl}
-            keyExtractor={row => (isViewRepliesRow(row) ? `view-replies-${row.rootId}` : row.id)}
+            keyExtractor={commentRowKey}
+            getItemType={commentRowType}
+            // FlatList semantics: no auto scroll-anchoring when rows are prepended.
+            maintainVisibleContentPosition={MVCP_OFF}
             extraData={highlightId}
-            onScrollToIndexFailed={handleScrollToIndexFailed}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
@@ -1174,21 +1205,7 @@ export default function BuyerPostCommentsScreen() {
               {!loading && fetchError ? <InlineError message={fetchError} onRetry={load} /> : null}
             </>
           )}
-          renderItem={({ item }) => (
-            isViewRepliesRow(item) ? (
-              <ViewRepliesButton count={item.count} expanded={item.expanded} onToggle={() => toggleReplies(item.rootId)} />
-            ) : (
-              <CommentRow
-                comment={item}
-                highlighted={item.id === highlightId}
-                postAuthorId={postAuthorId}
-                onLike={handleLike}
-                onReply={handleReply}
-                onMore={setActionsFor}
-                onPressMention={handlePressMention}
-              />
-            )
-          )}
+          renderItem={renderCommentItem}
           ListEmptyComponent={
             !loading && !fetchError
               ? (

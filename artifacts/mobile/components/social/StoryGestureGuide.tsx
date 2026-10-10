@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
@@ -14,8 +14,6 @@ import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
 import { markStoryGestureGuideShown } from '@/lib/storyGestureGuideStorage';
 
 export { shouldShowStoryGestureGuide } from '@/lib/storyGestureGuideStorage';
-
-const { width: W } = Dimensions.get('window');
 
 function PulseIcon({ name }: { name: keyof typeof MaterialCommunityIcons.glyphMap }) {
   const scale = useSharedValue(1);
@@ -81,6 +79,7 @@ type Props = {
  * rows with looping line-art icon animations, dismissed by any tap.
  */
 export default function StoryGestureGuide({ userId, onDismiss }: Props) {
+  const { width: W } = useWindowDimensions();
   const dismiss = () => {
     void markStoryGestureGuideShown(userId);
     onDismiss();
@@ -98,7 +97,7 @@ export default function StoryGestureGuide({ userId, onDismiss }: Props) {
       <View style={[StyleSheet.absoluteFill, styles.dim]} />
       <View style={styles.content}>
         <Text style={styles.title}>Watching stories</Text>
-        <Text style={styles.subtitle}>You can use these gestures to control playback.</Text>
+        <Text style={[styles.subtitle, { maxWidth: W * 0.8 }]}>You can use these gestures to control playback.</Text>
 
         <View style={styles.rows}>
           {ROWS.map((row) => (
@@ -138,7 +137,6 @@ const styles = StyleSheet.create({
     fontSize: FS.sm,
     textAlign: 'center',
     marginTop: SP.xs,
-    maxWidth: W * 0.8,
   },
   rows: {
     marginTop: SP.xl,
