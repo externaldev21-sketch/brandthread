@@ -37,6 +37,7 @@ export * from './dmCalls';
 export * from './callPushTokens';
 export * from './checkoutExtras';
 export * from './adminMoney';
+export * from './moderationQueue';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { places } from './places';
 import { relations, sql } from 'drizzle-orm';

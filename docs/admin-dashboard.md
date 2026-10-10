@@ -92,6 +92,24 @@ changes those shapes, update `admin/pages/moderation.tsx`. Because that router i
 `auditModerationActions` (`lib/admin/moderationAudit.ts`) is mounted in front of it in
 `routes/index.ts` and records successful `resolve` / `reinstate` calls in the admin audit log.
 
+**Queue extensions (Revenue P1 5/7).** Additive to the same router (the mobile `admin-reports`
+screen keeps working): items carry `overdue` (past the 24h `dueBy`); `resolve` also takes
+`warn` (in-app + push warning, content stays), `ban` (permanent) and `suspend_user` with optional
+`durationDays: 1|3|7|30` (recorded in `user_moderation_actions`; the moderation-alerts job lifts it
+when it ends); `POST /api/moderation/reports/bulk-dismiss { ids ≤100, note? }`; and
+`GET /api/moderation/reports/:id/context` — for a DM report, the reported message plus 3 messages
+either side from **that conversation only**. `GET /admin/problem-sellers?days=` ranks sellers by
+open/total reports, content-filter hits, disputes, refund rate and late shipments.
+
+**Moderator alerts (BT-369).** Every report insert (member reports, the content filter and media
+screening) calls `notifyModerators` (`lib/moderation/alerts.ts`): email to
+`MODERATOR_ALERT_EMAILS` (comma list; falls back to every active admin's email; skipped when
+Resend isn't configured), push + in-app to every admin, and Slack when
+`MODERATION_SLACK_WEBHOOK_URL` is set. The first report in a quiet period alerts at once; more
+within 5 minutes collapse into one "N new reports" digest. Hourly, reports open longer than 12
+hours re-alert once each (`report_escalations`). `ADMIN_DASHBOARD_URL` (optional) sets the
+"Open the queue" link. Nothing in this path can fail a report.
+
 ## AI spend
 
 `ai_usage_events` is filled by a hook in `lib/integrations-openai-ai-server/src/client.ts`:

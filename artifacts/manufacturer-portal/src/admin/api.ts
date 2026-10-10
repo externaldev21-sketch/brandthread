@@ -35,12 +35,13 @@ export function useAdminMutation<TBody = unknown, TResult = unknown>(
 }
 
 /** The moderation queue lives in the trust & safety API, not under /api/admin. */
-export function useModerationQuery<T>(path: string) {
+export function useModerationQuery<T>(path: string, enabled = true) {
   const request = useApiRequest();
   return useQuery({
     queryKey: ["admin", `moderation${path}`],
     queryFn: () => request<T>(`/api/moderation${path}`),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
@@ -50,6 +51,17 @@ export function useModerationResolve() {
   return useMutation({
     mutationFn: ({ id, action, note }: { id: string; action: string; note?: string }) =>
       request(`/api/moderation/reports/${id}/resolve`, { method: "POST", body: JSON.stringify({ action, note }) }),
+    onSuccess: () => qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "admin" }),
+  });
+}
+
+/** POST to the trust & safety API (/api/moderation) — bulk dismiss, timed suspensions, warn, ban. */
+export function useModerationPost<TBody = unknown>() {
+  const request = useApiRequest();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path, body }: { path: string; body: TBody }) =>
+      request(`/api/moderation${path}`, { method: "POST", body: JSON.stringify(body ?? {}) }),
     onSuccess: () => qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "admin" }),
   });
 }

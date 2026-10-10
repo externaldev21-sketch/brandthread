@@ -14,6 +14,7 @@ import {
   type MediaVerdict,
 } from "./mediaModeration";
 import type { ReportTargetType } from "./safety";
+import { notifyModerators } from "./moderation/alerts";
 
 export interface MediaRefs {
   images?: string[];
@@ -90,7 +91,9 @@ export async function recordHeldMedia(input: {
       targetType: input.targetType === "video" ? "post" : input.targetType,
       targetId: input.targetId, ownerId: input.ownerId, verdict: input.verdict, refs: input.refs,
     });
+    const reportId = randomUUID();
     await db.insert(reports).values({
+      id: reportId,
       reporterId: "system:auto-filter",
       source: "auto_filter",
       targetType: input.targetType,
@@ -101,6 +104,7 @@ export async function recordHeldMedia(input: {
       reason: MEDIA_CATEGORY_TO_REPORT_REASON(input.verdict.categories),
       description: reportDescription(input.verdict),
     });
+    notifyModerators({ id: reportId, targetType: input.targetType, reason: MEDIA_CATEGORY_TO_REPORT_REASON(input.verdict.categories), contentExcerpt: input.label, source: "auto_filter" });
   } catch (err) {
     logger.error({ err, targetId: input.targetId }, "Could not queue held media for review");
   }
@@ -118,7 +122,9 @@ export async function recordRejectedUpload(input: {
       targetType: "upload", targetId: randomUUID(), ownerId: input.ownerId,
       verdict: input.verdict, refs: input.refs ?? [], surface: input.surface,
     });
+    const reportId = randomUUID();
     await db.insert(reports).values({
+      id: reportId,
       reporterId: "system:auto-filter",
       source: "auto_filter",
       targetType: "profile",
@@ -129,6 +135,7 @@ export async function recordRejectedUpload(input: {
       reason: MEDIA_CATEGORY_TO_REPORT_REASON(input.verdict.categories),
       description: reportDescription(input.verdict),
     });
+    notifyModerators({ id: reportId, targetType: "profile", reason: MEDIA_CATEGORY_TO_REPORT_REASON(input.verdict.categories), contentExcerpt: `Blocked ${input.surface} upload`, source: "auto_filter" });
   } catch (err) {
     logger.error({ err, ownerId: input.ownerId }, "Could not record rejected upload");
   }

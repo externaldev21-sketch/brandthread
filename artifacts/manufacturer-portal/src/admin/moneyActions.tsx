@@ -263,7 +263,7 @@ export type PayoutTarget = { partyType: "seller" | "manufacturer"; partyId: stri
 
 export function PayoutHoldDialog({ target, onClose }: { target: PayoutTarget | null; onClose: () => void }) {
   const path = useMemo(() => (target ? `/payouts/${target.partyType}/${encodeURIComponent(target.partyId)}/${target.action}` : "/payouts/none"), [target]);
-  const mutation = useAdminMutation<{ reason: string }>("POST", path, ["/payouts", "/risk", "/moderation-sellers"]);
+  const mutation = useAdminMutation<{ reason: string }>("POST", path, ["/payouts", "/risk", "/problem-sellers"]);
   const hold = target?.action === "hold";
   return (
     <ConfirmAction open={!!target} destructive={hold}
@@ -280,7 +280,7 @@ export function PayoutHoldDialog({ target, onClose }: { target: PayoutTarget | n
 
 /** Suspend from a list row (reuses the existing POST /users/:id/suspend). */
 export function SuspendDialog({ user, onClose }: { user: { clerkId: string; name: string } | null; onClose: () => void }) {
-  const suspend = useAdminMutation<{ reason: string }>("POST", `/users/${user?.clerkId}/suspend`, ["/users", "/risk", "/moderation-sellers"]);
+  const suspend = useAdminMutation<{ reason: string }>("POST", `/users/${user?.clerkId}/suspend`, ["/users", "/risk", "/problem-sellers"]);
   return (
     <ConfirmAction open={!!user} destructive title={`Suspend ${user?.name ?? "this account"}?`} confirmLabel="Suspend"
       description="They're signed out everywhere and their content is hidden. Nothing is deleted, and you can reinstate them from Users."

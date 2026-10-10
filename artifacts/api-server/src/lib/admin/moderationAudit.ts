@@ -16,15 +16,24 @@ export function auditModerationActions(req: Request, res: Response, next: NextFu
     const path = req.path;
     const resolve = /^\/reports\/([^/]+)\/resolve$/.exec(path);
     const reinstate = /^\/users\/([^/]+)\/reinstate$/.exec(path);
-    if (!resolve && !reinstate) return;
-    const action = (req.body as { action?: unknown } | undefined)?.action;
+    const bulk = path === "/reports/bulk-dismiss";
+    if (!resolve && !reinstate && !bulk) return;
+    const body = (req.body ?? {}) as { action?: unknown; durationDays?: unknown; note?: unknown; ids?: unknown };
+    const action = body.action;
+    const note = typeof body.note === "string" ? body.note.slice(0, 300) : null;
     void recordAdminAction(actorOf(req), resolve
       ? {
           action: "moderation.resolve", targetType: "report", targetId: resolve[1],
-          summary: `Resolved a report: ${typeof action === "string" ? action : "unknown action"}`,
-          metadata: { action: typeof action === "string" ? action : null },
+          summary: `Resolved a report: ${typeof action === "string" ? action : "unknown action"}${note ? ` (${note})` : ""}`,
+          metadata: { action: typeof action === "string" ? action : null, durationDays: body.durationDays ?? null, note },
         }
-      : { action: "user.reinstate", targetType: "user", targetId: reinstate![1], summary: "Lifted the suspension (moderation queue)" },
+      : bulk
+        ? {
+            action: "moderation.bulk_dismiss", targetType: "report", targetId: "bulk",
+            summary: `Dismissed ${Array.isArray(body.ids) ? body.ids.length : 0} reports`,
+            metadata: { ids: Array.isArray(body.ids) ? body.ids.slice(0, 100) : [], note },
+          }
+        : { action: "user.reinstate", targetType: "user", targetId: reinstate![1], summary: "Lifted the suspension (moderation queue)" },
     ).catch((err) => logger.error({ err, path }, "Failed to audit moderation action"));
   });
   next();

@@ -17,6 +17,7 @@ import insightsRouter from "./insights";
 import growthRouter from "./growth";
 import accessRouter from "./access";
 import moneyRouter from "./money";
+import trustRouter from "./trust";
 import manufacturerTrustRouter from "./manufacturerTrust";
 import b2bRouter from "./b2b";
 import platformBalanceRouter from "./platformBalance";
@@ -38,6 +39,7 @@ router.use(commerceRouter);
 router.use(insightsRouter);
 router.use(growthRouter);
 router.use(moneyRouter); // refunds, dispute evidence, payout holds, Thread Cash, risk
+router.use(trustRouter); // problem sellers
 router.use("/access", accessRouter); // invite-only launch waitlist
 router.use("/manufacturer-trust", manufacturerTrustRouter); // manufacturer vetting + chat contact signals
 router.use(b2bRouter); // sample/bulk card refunds + B2B chargebacks
