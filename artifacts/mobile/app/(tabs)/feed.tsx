@@ -110,6 +110,7 @@ import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { remixCreditLabel } from '@/lib/interactionSettings';
+import { prefetchSellerOnPressIn } from '@/lib/detailPrefetch';
 
 /** Looped feed copies carry `<postId>__loopN` keys; every API call uses the real post id. */
 const feedPostId = (id: string) => id.replace(/__loop\d+$/, '');
@@ -863,6 +864,13 @@ type EngagementState = {
   following: boolean;
   comments: { id: string; user: string; text: string }[];
 };
+
+/** Avatar / name press-in: warm the seller profile the tap opens (a buyer
+ *  creator's profile loads through a different screen, left as-is). */
+function prefetchCreatorProfile(item: SpotlightItem): void {
+  if (!item.sellerId || item.authorAccountType === 'buyer') return;
+  prefetchSellerOnPressIn(item.sellerId);
+}
 
 function initialEngagement(item: SpotlightItem): EngagementState {
   return {
@@ -1801,6 +1809,7 @@ function SpotlightPageImpl({
         shares={item.shares}
         saves={item.saves}
         onOpenCreator={() => { onOpenCreator(item); }}
+        onPressInCreator={() => prefetchCreatorProfile(item)}
         onFollow={() => onFollow(item.id)}
         onLike={async () => { bumpHeart(); await onLike(item.id); }}
         onOpenComments={() => onOpenComments(item.id)}
@@ -1877,6 +1886,7 @@ function SpotlightPageImpl({
         captionExpanded={captionExpanded}
         onToggleCaptionExpanded={() => setCaptionExpanded(v => !v)}
         onOpenCreator={() => onOpenCreator(item)}
+        onPressInCreator={() => prefetchCreatorProfile(item)}
         onHeightChange={setCaptionBlockHeight}
         topSlot={!!item.productTags?.length && (
           <ShopTagPill

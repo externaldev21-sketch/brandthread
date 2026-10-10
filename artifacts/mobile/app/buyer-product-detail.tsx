@@ -14,6 +14,8 @@ import {
   Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, AppState, Pressable,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { DETAIL_STALE_TIME_MS, queryKeys } from '@/lib/queryClient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,7 +28,7 @@ import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   addToCart, createBuyNowSession, replaceCartItemVariant,
-  getCart,
+  getCart, warmCart,
 } from '@/services/cartService';
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
@@ -605,10 +607,22 @@ export default function BuyerProductDetailScreen() {
     pathname === '/thread-product-detail' && productId ? productTransitionKey(productId) : undefined,
     { x: 0, y: 0, width: GALLERY_WIDTH, height: GALLERY_HEIGHT },
   );
+  const queryClient = useQueryClient();
 
-  const [product, setProduct] = useState<BuyerProduct | null>(null);
+  // Cache-first: a row warmed by the tile's press-in prefetch (or a recent
+  // visit) paints the page on the first frame; the effect below still
+  // refreshes it. See hooks/useProductPrefetch.ts.
+  const cachedProductRow = (): any => {
+    if (!productId) return undefined;
+    const row = queryClient.getQueryData<any>(queryKeys.publicProduct(productId));
+    return row && !row.error ? row : undefined;
+  };
+  const [product, setProduct] = useState<BuyerProduct | null>(() => {
+    const row = cachedProductRow();
+    return row ? adaptApiProductToBuyerProduct(row) : null;
+  });
   const sizeBadgeModel = useSizeBadgeModel(product);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !cachedProductRow());
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [selections, setSelections] = useState<Record<string, string>>({});
@@ -655,6 +669,9 @@ export default function BuyerProductDetailScreen() {
   const cartFlyProgress = useRef(new Animated.Value(0)).current;
   const [flying, setFlying] = useState(false);
   const [flight, setFlight] = useState<{ source: CartFlightSource | null; target: CartFlightPoint } | null>(null);
+  // Confirm the bag against the server while the buyer browses, so "Add to
+  // bag" completes locally on the tap instead of waiting on a round trip.
+  useEffect(() => { warmCart(); }, []);
   useEffect(() => {
     let active = true;
     void AccessibilityInfo.isReduceMotionEnabled?.()
@@ -677,7 +694,15 @@ export default function BuyerProductDetailScreen() {
   useEffect(() => {
     let cancelled = false;
 
-    setLoading(true);
+    // A cached row (press-in prefetch / recent visit) shows immediately; the
+    // fetch below then refreshes it in place. A manual retry always reloads.
+    const seededRow = reloadTick === 0 ? cachedProductRow() : undefined;
+    if (seededRow) {
+      setProduct(adaptApiProductToBuyerProduct(seededRow));
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     setLoadFailed(false);
     setSellerPaymentReady(null);
     setSellerPaymentReason(null);
@@ -688,6 +713,7 @@ export default function BuyerProductDetailScreen() {
         let prod: BuyerProduct | null = null;
         let paymentStatus: { ready: boolean; reason?: string } | null = null;
         let previewKind: null | 'server' | 'local' = null;
+        let keepSeeded = false;
 
         // "Preview as buyer" for a product that exists only in this device's
         // product store (signed-out web preview save, or a seeded demo product).
@@ -710,7 +736,11 @@ export default function BuyerProductDetailScreen() {
           // DB product UUIDs from the discover feed carry real variant IDs
           // so the checkout server can look them up correctly.
           try {
-            const row = await api.publicProducts.get(productId);
+            const row = await queryClient.fetchQuery({
+              queryKey: queryKeys.publicProduct(productId),
+              queryFn: () => api.publicProducts.get(productId),
+              staleTime: reloadTick === 0 ? DETAIL_STALE_TIME_MS : 0,
+            });
             if (row && !row.error) {
               if (!cancelled) {
                 setSellerVacationMessage(
@@ -740,8 +770,11 @@ export default function BuyerProductDetailScreen() {
             }
           } catch (loadError) {
             // A missing product (404) reads as not found; any other failure is a
-            // load problem and gets a retry instead of a misleading dead end.
-            if (!(loadError instanceof ApiError && loadError.status === 404) && !cancelled) setLoadFailed(true);
+            // load problem and gets a retry instead of a misleading dead end —
+            // unless a cached copy is already on screen, which then simply stays.
+            const notFound = loadError instanceof ApiError && loadError.status === 404;
+            if (!notFound && seededRow) keepSeeded = true;
+            else if (!notFound && !cancelled) setLoadFailed(true);
           }
         }
         // Dev-web preview only: a seeded `preview-product-*` has no catalog
@@ -753,7 +786,7 @@ export default function BuyerProductDetailScreen() {
         // must supply a productId so real variant data is loaded.
 
         if (!cancelled) {
-          setProduct(prod);
+          if (!keepSeeded) setProduct(prod);
           setSellerPreview(prod ? previewKind : null);
           if (paymentStatus) {
             setSellerPaymentReady(paymentStatus.ready);

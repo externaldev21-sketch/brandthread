@@ -47,6 +47,7 @@ export function CaptionBlock({
   friendReposts, hasRepostIdentity, repostLabel, onOpenRepostIdentity,
   captionExpanded, onToggleCaptionExpanded,
   onOpenCreator,
+  onPressInCreator,
   style,
   onHeightChange,
   topSlot,
@@ -68,6 +69,8 @@ export function CaptionBlock({
   onToggleCaptionExpanded: () => void;
   onOpenCreator: () => void;
   style?: StyleProp<ViewStyle>;
+  /** Press-in on the creator name: warm the profile it opens. */
+  onPressInCreator?: () => void;
   /** Reports this block's real rendered height — bigger than the
    *  `CAPTION_BLOCK_HEIGHT`/`_WITH_REPOST` *minimums* whenever a 2-line
    *  caption, a repost row, or just different font metrics push it taller.
@@ -148,6 +151,7 @@ export function CaptionBlock({
         onLayout={creatorHit.onLayout}
         activeOpacity={0.8}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
+        onPressIn={onPressInCreator}
         accessibilityRole="button"
         accessibilityLabel={`View ${creator}'s profile`}
       >

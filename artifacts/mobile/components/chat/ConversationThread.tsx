@@ -51,8 +51,11 @@ import {
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
   markConversationRead, subscribeSocial,
   setConversationTheme, setConversationDisappearing,
+  sendQueuedMessage, getCachedConversation, getCachedMessages,
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
+import { clientIdFromOutboxMessageId, discardOutboxMessage, enqueueOutboxMessage, isOutboxMessageId, mergeOutboxIntoThread, outboxEntryToMessage, retryOutboxMessage, subscribeOutboxEvents, type OutboxEntry } from '@/lib/messageOutbox';
+import { useMessageOutbox } from '@/hooks/useMessageOutbox';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
@@ -357,6 +360,24 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const [isSending, setIsSending] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const sendQueued = useCallback((entry: OutboxEntry) => sendQueuedMessage(userId ?? '', entry), [userId]);
+  const { entries: outboxEntries, flush: flushOutboxNow } = useMessageOutbox(userId, conv?.id, sendQueued, !!userId && !!conv?.id && !isPreviewId(conv.id));
+  useEffect(() => {
+    if (!userId || !conv?.id) return;
+    const convId = conv.id;
+    return subscribeOutboxEvents(event => {
+      if (event.userId !== userId || event.entry.conversationId !== convId) return;
+      if (event.type === 'sent') {
+        const stored = event.result as Message | null;
+        if (stored?.id) setMessages(prev => prev.some(m => m.id === stored.id) ? prev : [...prev, stored]);
+        void requestContextualPushPermission(userId, api, 'message');
+      } else {
+        Alert.alert('Message not sent', apiErrorMessage(event.error, 'Please check your connection and try again.'));
+        setText(current => current.trim() ? current : event.entry.text);
+        setSelectedAttachment(current => current ?? ((event.entry.attachment as MessageAttachment | undefined) ?? null));
+      }
+    });
+  }, [userId, conv?.id, api]);
   const [copiedToast, setCopiedToast] = useState(false);
   const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
@@ -507,6 +528,10 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       }
 
       if (params.id) {
+        const [cachedConv, cachedMsgs] = await Promise.all([getCachedConversation(params.id).catch(() => null), getCachedMessages(params.id).catch(() => [] as Message[])]);
+        if (!active) return;
+        if (cachedConv) setConv(prev => prev ?? cachedConv);
+        if (cachedMsgs.length) setMessages(prev => prev.length ? prev : cachedMsgs);
         loadedConv = await getConversation(params.id);
         if (loadedConv) {
           unreadBeforeRead = loadedConv.unreadCount ?? 0;
@@ -1219,6 +1244,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // background — rolled back to the pre-tap message list if it fails, so a
   // reaction never silently "sticks" client-side when the server rejected it.
   async function handleReact(msg: Message, type: ReactionType) {
+    if (isOutboxMessageId(msg.id)) return;
     // Defense in depth alongside the request-mode guards on the long-press
     // overlay and double-tap-to-like above: reacting is engagement gated
     // behind Accept, so this single choke-point for every reaction mutation
@@ -1607,6 +1633,12 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       return;
     }
 
+    if (userId) {
+      await enqueueOutboxMessage(userId, conv.id, { text: t, attachment: att ?? undefined, replyToId: replyingTo && !isOutboxMessageId(replyingTo.id) ? replyingTo.id : undefined, replyPreview: replyingTo?.text, replyToAuthorName: replyingTo?.fromName });
+      listScroll.requestScrollToEnd();
+      void flushOutboxNow();
+      return;
+    }
     setIsSending(true);
     try {
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
@@ -2153,7 +2185,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             {/* Failed / retry */}
             {isOwn && msg.status === 'failed' && (
               <PressableScale rippleEnabled={false}
-                onPress={() => { if (conv) void retryMessage(conv.id, msg.id).catch(() => {}); }}
+                onPress={() => { if (!conv) return; const queuedId = clientIdFromOutboxMessageId(msg.id); if (queuedId && userId) { void retryOutboxMessage(userId, conv.id, queuedId).then(() => flushOutboxNow()); return; } void retryMessage(conv.id, msg.id).catch(() => {}); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={s.retryRow}
               >
@@ -2205,7 +2237,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
 
   // ── Main render ─────────────────────────────────────────────────────────────
 
-  const visibleMessages = messages.filter(m => !m.deletedForMe);
+  const visibleMessages = mergeOutboxIntoThread(messages.filter(m => !m.deletedForMe), outboxEntries.map(entry => outboxEntryToMessage(entry, { fromId: myId, fromName: myCallName, fromInitials: MY_INITIALS, fromColor: MY_COLOR })));
   const listData = mergeCallLogRows(buildListRows(visibleMessages, unreadDividerId), callLog);
 
   useEffect(() => {

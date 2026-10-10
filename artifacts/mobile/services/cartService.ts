@@ -292,13 +292,27 @@ export async function flushDirtyCart(): Promise<void> {
 
 // ─── Cart storage ─────────────────────────────────────────────────────────────
 
-async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; remoteConfirmed: boolean }> {
-  // Signed-in: let any queued write-through sync finish first, so the GET
-  // below can never read the server's copy from before the buyer's latest
-  // change (see the DB sync note above).
-  if (k.userId !== 'anon') await _syncChain;
+/**
+ * When each account's local cart was last confirmed against the server.
+ * A cart mutation (add to bag, quantity change, remove, …) only needs a fresh
+ * server read if we haven't confirmed recently — otherwise the local copy is
+ * already the server's, and reading it alone makes the tap instant instead of
+ * waiting on a network round trip (the server still gets the result via
+ * syncToDb right after, exactly as before).
+ */
+const CART_CONFIRMED_FRESH_MS = 2 * 60_000;
+const cartConfirmedAt = new Map<string, number>();
 
-  const cart: Cart = (await readLocalCart(k)) ?? { id: uid(), items: [], savedItems: [], updatedAt: now() };
+/** Whether a mutation for `userId` may read the local cart without re-confirming it. */
+export function isCartConfirmationFresh(userId: string, nowMs: number = Date.now()): boolean {
+  if (userId === 'anon') return true; // a guest cart is local-only
+  const at = cartConfirmedAt.get(userId);
+  return at !== undefined && nowMs - at < CART_CONFIRMED_FRESH_MS;
+}
+
+async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; remoteConfirmed: boolean }> {
+  if (k.userId !== 'anon') await _syncChain;
+  const cart = (await readLocalCart(k)) ?? { id: uid(), items: [], savedItems: [], updatedAt: now() };
 
   // A guest (never signed in — k.userId === 'anon') has no server-side cart
   // to confirm against: /api/buyer/cart requires auth and would always fail
@@ -324,6 +338,7 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
   try {
     const remote = await serviceRequest<{ items: CartItem[]; savedItems: SavedCartItem[] }>('/api/buyer/cart', {});
     remoteConfirmed = true;
+    cartConfirmedAt.set(k.userId, Date.now());
     const resolved = resolveRemoteCart(cart, remote);
     // Guard: skip cache write if account switched while the request was in-flight.
     if (resolved.adoptedRemote && _cartUserId === k.userId) {
@@ -340,6 +355,21 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
 
 async function loadCart(k: CartKeys = keys()): Promise<Cart> {
   return (await loadCartWithStatus(k)).cart;
+}
+
+/** The cart a mutation starts from: the local copy when it was confirmed
+ *  against the server recently, otherwise a fresh confirm (old behavior). */
+async function loadCartForMutation(k: CartKeys): Promise<Cart> {
+  if (isCartConfirmationFresh(k.userId)) return (await readLocalCart(k)) ?? { id: uid(), items: [], savedItems: [], updatedAt: now() };
+  return loadCart(k);
+}
+
+/** Confirm the cart against the server in the background (e.g. when a product
+ *  page opens), so the next "Add to bag" doesn't wait on the network. */
+export function warmCart(): void {
+  const k = keys();
+  if (isCartConfirmationFresh(k.userId)) return;
+  void loadCartWithStatus(k).catch(() => {});
 }
 
 /**
@@ -396,7 +426,7 @@ export interface AddToCartParams {
 export async function addToCart(params: AddToCartParams): Promise<{ success: boolean; message?: string; cart: Cart }> {
   const k = keys();
   const { product, variant, quantity, attribution } = params;
-  const cart = await loadCart(k);
+  const cart = await loadCartForMutation(k);
 
   // Validate
   if (!product.isActive) return { success: false, message: 'This product is no longer available.', cart };
@@ -527,7 +557,7 @@ export async function addBundleToCart(
 
 export async function updateCartItemQuantity(itemId: string, quantity: number): Promise<Cart> {
   const k = keys();
-  const cart = await loadCart(k);
+  const cart = await loadCartForMutation(k);
   const idx = cart.items.findIndex(i => i.id === itemId);
   if (idx >= 0) {
     if (quantity <= 0) {
@@ -550,7 +580,7 @@ export async function replaceCartItemVariant(
   quantity: number,
 ): Promise<{ success: boolean; message?: string; cart: Cart }> {
   const k = keys();
-  const cart = await loadCart(k);
+  const cart = await loadCartForMutation(k);
   const index = cart.items.findIndex(item => item.id === itemId);
   if (index < 0) return { success: false, message: 'That cart item is no longer available.', cart };
   if (!product.isActive || !variant.isAvailable) {
@@ -592,7 +622,7 @@ export async function replaceCartItemVariant(
 
 export async function removeCartItem(itemId: string): Promise<Cart> {
   const k = keys();
-  const cart = await loadCart(k);
+  const cart = await loadCartForMutation(k);
   cart.items = cart.items.filter(i => i.id !== itemId);
   await saveCart(cart, k);
   return cart;
@@ -610,7 +640,7 @@ export async function removeCartItem(itemId: string): Promise<Cart> {
 export async function removeCartItems(itemIds: string[]): Promise<Cart> {
   if (itemIds.length === 0) return getCart();
   const k = keys();
-  const cart = await loadCart(k);
+  const cart = await loadCartForMutation(k);
   const idSet = new Set(itemIds);
   cart.items = cart.items.filter(i => !idSet.has(i.id));
   await saveCart(cart, k);
@@ -633,7 +663,7 @@ export async function restoreCartSnapshot(snapshot: Cart): Promise<Cart> {
 
 export async function saveForLater(itemId: string): Promise<Cart> {
   const k = keys();
-  const cart = await loadCart(k);
+  const cart = await loadCartForMutation(k);
   const idx = cart.items.findIndex(i => i.id === itemId);
   if (idx >= 0) {
     const item = cart.items[idx];
@@ -647,7 +677,7 @@ export async function saveForLater(itemId: string): Promise<Cart> {
 
 export async function moveToCart(savedItemId: string): Promise<Cart> {
   const k = keys();
-  const cart = await loadCart(k);
+  const cart = await loadCartForMutation(k);
   const idx = cart.savedItems.findIndex(i => i.id === savedItemId);
   if (idx >= 0) {
     const saved = cart.savedItems[idx];
@@ -669,7 +699,7 @@ export async function moveToCart(savedItemId: string): Promise<Cart> {
 
 export async function removeSavedItem(savedItemId: string): Promise<Cart> {
   const k = keys();
-  const cart = await loadCart(k);
+  const cart = await loadCartForMutation(k);
   cart.savedItems = cart.savedItems.filter(i => i.id !== savedItemId);
   await saveCart(cart, k);
   return cart;
@@ -684,6 +714,7 @@ export async function clearCart(): Promise<void> {
 // Merge guest cart into authenticated cart (no duplicates)
 export async function mergeGuestCart(guestCart: Cart): Promise<Cart> {
   const k = keys();
+  // Always confirm against the server: this runs right at sign-in.
   const cart = await loadCart(k);
   for (const guestItem of guestCart.items) {
     const existing = cart.items.findIndex(i => i.variantId === guestItem.variantId);
@@ -1344,6 +1375,8 @@ async function loadProblems(k: CartKeys = keys()): Promise<BuyerProblemReport[]>
  */
 export async function clearCartCache(userId?: string): Promise<void> {
   const u = userId ?? _cartUserId;
+  // The local copy is going away, so it no longer reflects the server.
+  cartConfirmedAt.delete(u);
   try {
     const allKeys = await AsyncStorage.getAllKeys();
     const toRemove = (allKeys as string[]).filter(k =>

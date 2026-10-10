@@ -63,4 +63,21 @@ export const queryKeys = {
   order: (id: string) => ['order', _queryScopeUserId, id] as const,
   orderList: (scope: string) => ['orders', _queryScopeUserId, scope] as const,
   tabData: (tab: string) => ['tab-data', _queryScopeUserId, tab] as const,
+  /** The buyer product page's public product row (api.publicProducts.get) —
+   *  a different shape from `product` (the seller's own Product). */
+  publicProduct: (id: string) => ['public-product', _queryScopeUserId, id] as const,
+  /** The buyer order page's order row (loadBuyerOrder). */
+  buyerOrder: (id: string) => ['buyer-order', _queryScopeUserId, id] as const,
+  /** A seller's public profile row (api.publicSellers.get). */
+  publicSeller: (id: string) => ['public-seller', _queryScopeUserId, id] as const,
 };
+
+/** How long a press-in prefetch (or a previous visit) counts as fresh enough
+ *  to paint a detail page without refetching first. The page still renders
+ *  from it instantly when older, and refreshes in the background. */
+export const DETAIL_STALE_TIME_MS = 30_000;
+
+/** For detail data the user can change (orders): reuse a press-in prefetch
+ *  only if it finished moments ago, otherwise refetch (still painting the
+ *  cached copy first). */
+export const PRESS_IN_REUSE_MS = 5_000;

@@ -19,6 +19,8 @@ import {
   isRetryableFailure,
   processEngagementRetryQueue,
   setEngagementRetryExecutor,
+  setEngagementRetryFallback,
+  setEngagementRetryOwnerResolver,
 } from './engagementRetryQueue';
 
 describe('engagement retry queue', () => {
@@ -76,5 +78,35 @@ describe('engagement retry queue', () => {
     const pending = getQueuedEngagementActions();
     expect(pending).toHaveLength(1);
     expect(pending[0].payload).toEqual({ value: 'remove' });
+  });
+  it('replays through a per-kind fallback when no screen executor is registered', async () => {
+    const replayed: string[] = [];
+    setEngagementRetryFallback('follow', async (action) => { replayed.push(action.targetId); });
+    await enqueueEngagementRetry({ kind: 'follow', targetId: 'seller-1' });
+    await enqueueEngagementRetry({ kind: 'like', targetId: 'post-9' });
+    await new Promise((r) => setTimeout(r, 0));
+    await processEngagementRetryQueue();
+    expect(replayed).toEqual(['seller-1']);
+    // No handler for likes outside the feed: kept, untouched, for later.
+    expect(getQueuedEngagementActions().map((a) => [a.kind, a.attempts])).toEqual([['like', 0]]);
+  });
+
+  it('only replays an action while the account that queued it is signed in', async () => {
+    let signedIn = 'user-a';
+    setEngagementRetryOwnerResolver(() => signedIn);
+    const replayed: string[] = [];
+    await enqueueEngagementRetry({ kind: 'follow', targetId: 'seller-2' });
+    expect(getQueuedEngagementActions()[0].ownerId).toBe('user-a');
+
+    signedIn = 'user-b';
+    setEngagementRetryExecutor(async (action) => { replayed.push(`${signedIn}:${action.targetId}`); });
+    await processEngagementRetryQueue();
+    expect(replayed).toEqual([]);
+    expect(getQueuedEngagementActions()).toHaveLength(1);
+
+    signedIn = 'user-a';
+    await processEngagementRetryQueue();
+    expect(replayed).toEqual(['user-a:seller-2']);
+    expect(getQueuedEngagementActions()).toHaveLength(0);
   });
 });

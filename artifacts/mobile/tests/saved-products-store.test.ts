@@ -93,6 +93,32 @@ describe('saved products store', () => {
     expect(store.has('p1')).toBe(true);
   });
 
+  it('keeps the tap when the failure was queued for a background retry', async () => {
+    const queueRetry = vi.fn(() => true);
+    const { store } = makeStore({
+      save: vi.fn(async () => { throw new Error('Network request failed'); }),
+      queueRetry,
+    });
+    store.setSignedIn(true, 'user_a');
+    await store.load();
+    const result = await store.toggle({ ...DRAFT, productId: 'p3' });
+    expect(result).toEqual({ ok: true, saved: true });
+    expect(store.has('p3')).toBe(true);
+    expect(queueRetry).toHaveBeenCalledWith(expect.objectContaining({ productId: 'p3' }), true, expect.any(Error));
+  });
+
+  it('still rolls back when the failure was not queued (a real refusal)', async () => {
+    const { store } = makeStore({
+      remove: vi.fn(async () => { throw new Error('API 403'); }),
+      queueRetry: () => false,
+    });
+    store.setSignedIn(true, 'user_a');
+    await store.load();
+    const result = await store.toggle(DRAFT);
+    expect(result).toEqual({ ok: false, saved: true, reason: 'error' });
+    expect(store.has('p1')).toBe(true);
+  });
+
   it('ignores a second tap while the first toggle for that product is in flight', async () => {
     const gate = deferred();
     const { store, deps } = makeStore({ save: vi.fn(() => gate.promise) });

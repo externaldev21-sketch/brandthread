@@ -11,6 +11,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { productTransitionKey, setPendingTileTransition } from '@/lib/tileTransition';
+import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 
 // Fixed 4:5 aspect ratio for every card so the grid never has uneven row
 // heights — no per-image aspect-ratio measurement.
@@ -59,7 +60,10 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
     <View style={{ width }}>
     <Pressable
       onPress={handlePress}
-      onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+      onPressIn={() => {
+        pressScaleAnim(scale, PRESS_SCALE).start();
+        prefetchProductOnPressIn(item.productId ?? item.id, item.imageUri);
+      }}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"
       accessibilityLabel={`Open ${item.name}, ${item.brand}`}
