@@ -5,7 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { serviceRequest } from '@/lib/serviceConfig';
+import { hasServiceToken, serviceRequest } from '@/lib/serviceConfig';
 import { fetchSponsoredSlots } from '@/services/sponsoredService';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
@@ -963,6 +963,10 @@ export interface ThreadFeedCursor {
   seenPostIds: string[];
   /** Organic posts served so far in this For You session — drives the Sponsored frequency cap. */
   organicServed?: number;
+  /** For You, signed in: offset into the ranked feed (GET /api/feed/for-you). */
+  rankedOffset?: number;
+  /** For You: ranked source exhausted, failed, or not available (guest). */
+  rankedDone?: boolean;
 }
 export type ThreadFeedMode = 'following' | 'for-you' | 'mixed';
 
@@ -1868,6 +1872,8 @@ export async function getThreadPostsPage(
     generalDone: Boolean(cursor.generalDone),
     seenPostIds: Array.isArray(cursor.seenPostIds) ? [...cursor.seenPostIds] : [],
   };
+  next.rankedOffset = Math.max(0, Math.floor(cursor.rankedOffset || 0));
+  next.rankedDone = Boolean(cursor.rankedDone);
   const seen = new Set(next.seenPostIds);
   const rows: any[] = [];
 
@@ -1875,6 +1881,12 @@ export async function getThreadPostsPage(
     next.generalDone = true;
   } else if (mode === 'for-you') {
     next.followedDone = true;
+  }
+  // The ranking engine (style interests, not-interested, purchases) serves
+  // For You first for signed-in viewers; guests and every other mode keep
+  // the public newest-first source.
+  if (mode !== 'for-you' || (!next.rankedDone && !(await canUseRankedForYou()))) {
+    next.rankedDone = true;
   }
 
   const addUnique = (sourceRows: any[]) => {
@@ -1885,6 +1897,20 @@ export async function getThreadPostsPage(
       rows.push(row);
     }
   };
+
+  for (let attempts = 0; rows.length < pageLimit && !next.rankedDone && attempts < 4; attempts += 1) {
+    let ranked: { rows: any[]; nextOffset: number | null };
+    try {
+      ranked = await requestRankedForYou(next.rankedOffset ?? 0, pageLimit);
+    } catch {
+      // Falls back to the public source below.
+      next.rankedDone = true;
+      break;
+    }
+    addUnique(ranked.rows);
+    if (ranked.nextOffset === null || ranked.nextOffset <= (next.rankedOffset ?? 0)) next.rankedDone = true;
+    else next.rankedOffset = ranked.nextOffset;
+  }
 
   while (rows.length < pageLimit && !next.followedDone) {
     let followed: any[];
@@ -1970,7 +1996,27 @@ export async function getThreadPostsPage(
   return {
     posts: pageRows.map((post, index) => mapApiPostToSellerThreadPost(post, index)),
     cursor: next,
-    hasMore: !next.followedDone || !next.generalDone,
+    hasMore: !next.followedDone || !next.generalDone || !next.rankedDone,
+  };
+}
+
+async function canUseRankedForYou(): Promise<boolean> {
+  try {
+    return await hasServiceToken();
+  } catch {
+    return false;
+  }
+}
+
+/** One raw page of the ranked For You feed; live entries are left to the live rails. */
+async function requestRankedForYou(offset: number, limit: number): Promise<{ rows: any[]; nextOffset: number | null }> {
+  const response = await serviceRequest<{ items?: unknown; nextOffset?: unknown }>(
+    `/api/feed/for-you?limit=${limit}&offset=${offset}`,
+  );
+  if (!response || !Array.isArray(response.items)) throw new Error('Invalid For You response');
+  return {
+    rows: response.items.filter((item: any) => item?.type !== 'live' && item?.sponsored !== true),
+    nextOffset: typeof response.nextOffset === 'number' ? response.nextOffset : null,
   };
 }
 

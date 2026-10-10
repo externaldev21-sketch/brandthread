@@ -27,6 +27,10 @@ import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { serveSponsoredSlots } from "../lib/promotions/sponsoredService";
 import { injectSponsored } from "../lib/promotions/sponsored";
+import { engagementFields, postEngagementCounts } from "../lib/postEngagement";
+import { locationsByPlaceId } from "../lib/places";
+import { mutedPhrasesFor } from "../lib/safety";
+import { matchesMutedWords } from "../lib/contentModerator";
 
 const router = Router();
 
@@ -178,6 +182,13 @@ router.get("/for-you", requireAuth, async (req, res) => {
 
     const postById = new Map(postRows.map((p) => [p.id, p]));
     const liveById = new Map(liveRows.map((l) => [l.id, l]));
+    // Same counts, location and muted-word filtering as GET /api/public/posts,
+    // so the Home For You tab looks the same whichever source serves it.
+    const [engagementById, locationById, muted] = await Promise.all([
+      postEngagementCounts(postIds),
+      locationsByPlaceId(postRows.map((p) => p.placeId)),
+      mutedPhrasesFor(userId),
+    ]);
 
     // Blocked-seller filtering already happened during candidate generation
     // in computeForYouRankingForUser (via the `blocks` table), so this page
@@ -203,6 +214,7 @@ router.get("/for-you", requireAuth, async (req, res) => {
       }
       const post = postById.get(item.postId);
       if (!post) return null;
+      if (muted.length > 0 && matchesMutedWords([post.caption ?? "", ...(post.hashtags ?? [])].join(" "), muted)) return null;
       const seller = sellerById.get(post.userId);
       return {
         type: "post" as const,
@@ -217,7 +229,10 @@ router.get("/for-you", requireAuth, async (req, res) => {
         hashtags: post.hashtags,
         styleTags: post.styleTags,
         sound: post.sound,
+        visibility: post.visibility,
+        location: post.placeId ? locationById.get(post.placeId) ?? null : null,
         createdAt: post.createdAt,
+        ...engagementFields(post.visibility as { showLikeCount?: boolean } | null, engagementById.get(post.id)),
         seller: seller ? {
           displayName: seller.displayName, brandName: seller.brandName,
           verified: deriveSellerVerified(seller),
