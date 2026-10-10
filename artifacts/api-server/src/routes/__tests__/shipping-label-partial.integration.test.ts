@@ -44,6 +44,7 @@ let base = "";
 beforeAll(async () => {
   const [order] = await db.insert(orders).values({
     ownerId: sellerId, orderNumber: `PL-${suffix}`, status: "processing", totalCents: 9000, subtotalCents: 9000,
+    stripePaymentIntentId: `pi_pl_${suffix}`, chargeModel: "destination",
   }).returning({ id: orders.id });
   orderId = order.id;
   [{ id: itemA }, { id: itemB }] = await db.insert(orderItems).values([

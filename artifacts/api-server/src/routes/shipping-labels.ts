@@ -14,6 +14,7 @@ import {
   executeOrderRelease, lockDrop, recordLabelPurchased, recordLabelVoided, recoverLabelCost, requestOrderRelease,
 } from "../lib/money/escrow";
 import { orderHeldCents } from "../lib/money/ledger";
+import { labelEligibility, labelEligibilityFromRow } from "../lib/money/labelEligibility";
 import { logger } from "../lib/logger";
 import { parseItemIds, partialLabelItemError } from "../lib/partialLabel";
 import { shipItems } from "../lib/delivery/deliveryState";
@@ -89,6 +90,8 @@ router.post("/:orderId/rates", requireRole("staff"), validateInput({ params: ord
     eq(orders.id, req.params.orderId), eq(orders.ownerId, ownerId),
   )).limit(1);
   if (!order) return void res.status(404).json({ error: "Order not found" });
+  const eligibility = labelEligibility(order);
+  if (!eligibility.ok) return void res.status(eligibility.status).json({ error: eligibility.message, code: eligibility.code });
   const ratesItemIds = parseItemIds(req.body?.itemIds);
   if (ratesItemIds === "invalid") return void res.status(400).json({ error: "itemIds must be a non-empty list of order item ids" });
   if (!(ratesItemIds ? PARTIAL_ELIGIBLE_STATUSES : ELIGIBLE_STATUSES).includes(order.status)) {
@@ -171,6 +174,10 @@ router.post("/:orderId/purchase", requireRole("staff"), validateInput({ params: 
       `);
       const order = (lock as any).rows?.[0];
       if (!order) throw Object.assign(new Error("Order not found"), { status: 404 });
+      // Only Stripe-paid orders can fund a label (BT-055): manual/off-platform
+      // orders would have Brandthread pay the carrier with nothing to recover.
+      const eligibility = labelEligibilityFromRow(order);
+      if (!eligibility.ok) throw Object.assign(new Error(eligibility.message), { status: eligibility.status, code: eligibility.code });
       const openResult = await tx.execute(sql`
         SELECT * FROM shipping_labels
         WHERE order_id = ${order.id}::uuid

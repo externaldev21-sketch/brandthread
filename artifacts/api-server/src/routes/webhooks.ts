@@ -73,6 +73,8 @@ import { nextOrderNumber } from "../lib/orderNumber";
 import { notifyStockLevelChanged } from "../lib/stockNotifications";
 import { connectReadiness } from "./manufacturer-connect";
 import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
+import { loyaltyAppliedCents as loyaltyShareCents, sellerFundedDiscountCents } from "../lib/money/loyaltyFunding";
+import { applyLoyaltySellerTopup } from "../lib/money/loyaltyTopup";
 import {
   claimStripeWebhookEvent,
   completeStripeWebhookEvent,
@@ -878,6 +880,11 @@ export async function handleCheckoutPaid(
       logger.error({ err, orderId: existing.id }, "Thread Cash seller top-up failed");
     }
     try {
+      await applyLoyaltySellerTopup(stripe, existing.id);
+    } catch (err) {
+      logger.error({ err, orderId: existing.id }, "Loyalty seller top-up failed");
+    }
+    try {
       await settleTransferOrder(existing.id);
     } catch (err) {
       logger.error({ err, orderId: existing.id }, "Cart order transfer failed");
@@ -981,6 +988,13 @@ export async function handleCheckoutPaid(
   const stripeDiscountCents = Number.isInteger(totalDetails.amount_discount)
     ? Math.max(0, totalDetails.amount_discount)
     : loyaltyDiscountCents;
+  // Loyalty points are platform-funded (BT-066): carved out of the fee /
+  // seller-payout basis like Thread Cash, and topped up for the seller by
+  // applyLoyaltySellerTopup. Only the seller's discount code reduces the basis.
+  const loyaltyAppliedCents = loyaltyShareCents({ stripeDiscountCents, threadCashAppliedCents, loyaltyDiscountCents });
+  const sellerDiscountCents = sellerFundedDiscountCents({
+    stripeDiscountCents, threadCashAppliedCents, loyaltyAppliedCents, subtotalCents,
+  });
   // Derive shipping from the pre-discount total. A loyalty discount otherwise
   // makes shipping look like zero (or negative) in the persisted order.
   const shippingCents = Number.isInteger(totalDetails.amount_shipping)
@@ -1083,6 +1097,7 @@ export async function handleCheckoutPaid(
         bundleDiscountCents: Math.min(Math.max(0, csRecord.bundleDiscountCents ?? 0), stripeDiscountCents),
         bundleLines: csRecord.bundleLines ?? [],
         threadCashAppliedCents: oversoldItems.length === 0 ? threadCashAppliedCents : 0,
+        loyaltyAppliedCents: oversoldItems.length === 0 ? loyaltyAppliedCents : 0,
         stripePaymentIntentId:   piId,
         stripeCheckoutSessionId: sessionId,
         ...(shippingAddress && { shippingAddress }),
@@ -1098,10 +1113,10 @@ export async function handleCheckoutPaid(
     // transaction as the order row (lib/money/escrow.ts).
     const split = splitOrder({
       subtotalCents,
-      // Thread Cash must never reduce the platform-fee / seller-payout
-      // basis — only loyalty and the discount code do that (see comment
-      // above threadCashAppliedCents).
-      discountCents: Math.min(Math.max(0, stripeDiscountCents - threadCashAppliedCents), subtotalCents),
+      // Thread Cash and loyalty points (both platform-funded) must never
+      // reduce the platform-fee / seller-payout basis — only the seller's
+      // discount code does (see sellerDiscountCents above).
+      discountCents: sellerDiscountCents,
       shippingCents,
       taxCents,
       grossCents: totalCents,
@@ -1217,7 +1232,7 @@ export async function handleCheckoutPaid(
           buyerId: buyerId ?? null,
           guestEmail: guestEmail ?? null,
           subtotalCents,
-          sellerDiscountCents: Math.min(Math.max(0, stripeDiscountCents - threadCashAppliedCents), subtotalCents),
+          sellerDiscountCents,
           discountCodeId: csRecord.discountCodeId ?? null,
           paidAt: successfulPaymentAt,
         }));
@@ -1433,6 +1448,11 @@ export async function handleCheckoutPaid(
         await applyThreadCashSellerTopup(stripe, createdOrderId);
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Thread Cash seller top-up failed");
+      }
+      try {
+        await applyLoyaltySellerTopup(stripe, createdOrderId);
+      } catch (err) {
+        logger.error({ err, orderId: createdOrderId }, "Loyalty seller top-up failed");
       }
 
       await qualifyReferralForOrderSafe(createdOrderId); // referral: inviter's $10 on first paid order (idempotent)

@@ -19,6 +19,7 @@ import accessRouter from "./access";
 import moneyRouter from "./money";
 import manufacturerTrustRouter from "./manufacturerTrust";
 import b2bRouter from "./b2b";
+import platformBalanceRouter from "./platformBalance";
 
 const router = Router();
 router.use(requireAuth);
@@ -40,5 +41,6 @@ router.use(moneyRouter); // refunds, dispute evidence, payout holds, Thread Cash
 router.use("/access", accessRouter); // invite-only launch waitlist
 router.use("/manufacturer-trust", manufacturerTrustRouter); // manufacturer vetting + chat contact signals
 router.use(b2bRouter); // sample/bulk card refunds + B2B chargebacks
+router.use(platformBalanceRouter); // BT-062: payout schedule + balance vs seller_held
 
 export default router;

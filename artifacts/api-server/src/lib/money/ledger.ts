@@ -69,6 +69,12 @@ export const LEDGER_ACCOUNTS = {
    */
   thread_cash_rewards_expense: "thread_cash_rewards_expense",
   /**
+   * Brandthread's cost of its loyalty / referral points program (BT-066):
+   * the top-up that pays the seller the full price for points a buyer
+   * redeemed on their order (party = none) — see lib/money/loyaltyTopup.ts.
+   */
+  loyalty_seller_topup: "loyalty_seller_topup",
+  /**
    * Brandthread's cost of a seller cashing out their earned Thread Cash
    * (from Live gifts / message payments) into their real payout balance
    * (party = seller). Funded from the platform's own balance, same shape as
