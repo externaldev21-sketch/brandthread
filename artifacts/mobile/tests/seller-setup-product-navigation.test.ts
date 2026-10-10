@@ -68,7 +68,8 @@ describe('seller setup destination navigation', () => {
     // "Product published!" moved from a native Alert to the shared
     // SuccessSheet (components/ui/SuccessSheet.tsx) — its secondary action
     // still returns to the seller-setup origin via leaveProductFlow.
-    expect(addProduct).toContain("secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}");
+    // Done is the second button, or a text button under "Share store" after a first publish.
+    expect(addProduct).toContain("{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }");
     expect(createPost).toContain('leaveSetupFlow(router, params.from);');
     expect(createPost).toContain('onDiscard={leave}');
   });
