@@ -2978,6 +2978,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       blocks: () => freshGet<BlockedAccount[]>('/api/social/blocks'),
     },
     /** Referral / invite-code system */
+    /** Brand → brand referrals: a free month for both brands (BT-313). */
+    sellerReferrals: {
+      overview: () => get<SellerReferralOverview>('/api/seller-referrals'),
+      apply: (code: string) => post<{ ok: true }>('/api/seller-referrals/apply', { code }),
+    },
     referrals: {
       /** Get (or lazily generate) my invite code + shareable link */
       code: () =>
@@ -4255,6 +4260,17 @@ export type AdminPromotionItem = {
   window: { startsAt: string; endsAt: string } | null;
 };
 export type AdminPromotionQueue = { items: AdminPromotionItem[]; summary: { pendingBoosts: number; pendingFeatured: number } };
+
+export type SellerReferralOverview =
+  | { enabled: false }
+  | {
+      enabled: true;
+      freeMonths: number;
+      code: string | null;
+      link: string | null;
+      referred: Array<{ id: string; name: string; status: 'pending' | 'rewarded' | 'capped'; createdAt: string }>;
+      canApplyCode: boolean;
+    };
 
 export function useApi(): BrandthreadApi {
   const { getToken, userId } = useAuth();
