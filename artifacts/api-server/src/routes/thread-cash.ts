@@ -70,6 +70,7 @@ import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checko
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
 import { stripe } from "../lib/stripe";
 import { liveTipsGate } from "../lib/liveTips";
+import { personProfileIds } from "../lib/accountProfiles";
 
 const router = Router();
 router.use(requireAuth);
@@ -94,6 +95,29 @@ async function loadStreakState(buyerId: string): Promise<{ state: StreakState; t
     timezone: row.timezone,
   };
 }
+
+/**
+ * One daily reward per PERSON: a login's buyer and seller profiles share it.
+ * True when another profile of the same login already claimed today.
+ */
+async function linkedProfileClaimedToday(
+  buyerId: string,
+  config: Awaited<ReturnType<typeof getThreadCashConfig>>,
+  now: Date,
+  timezone: string,
+): Promise<boolean> {
+  const ids = (await personProfileIds(buyerId, { includeDeleted: true })).filter((id) => id !== buyerId);
+  for (const id of ids) {
+    const { state } = await loadStreakState(id);
+    if (computeCheckIn(state, config, now, timezone).alreadyCheckedInToday) return true;
+  }
+  return false;
+}
+
+const LINKED_CLAIM_BODY = {
+  error: "Today's Thread Cash was already claimed on your other profile.",
+  code: "THREAD_CASH_CLAIMED_ON_LINKED_PROFILE",
+} as const;
 
 // ─── GET /api/thread-cash ───────────────────────────────────────────────────
 router.get("/", async (req, res) => {
@@ -159,6 +183,11 @@ router.post("/check-in", async (req, res) => {
       code: "THREAD_CASH_ALREADY_CHECKED_IN",
       streak: { ...result.state, timezone, dayInCycle: result.dayInCycle },
     });
+    return;
+  }
+
+  if (await linkedProfileClaimedToday(buyerId, config, now, timezone)) {
+    res.status(409).json(LINKED_CLAIM_BODY);
     return;
   }
 
@@ -262,6 +291,11 @@ router.post("/daily/claim", async (req, res) => {
       code: "THREAD_CASH_ALREADY_CHECKED_IN",
       streak: { ...result.state, timezone, dayInCycle: result.dayInCycle },
     });
+    return;
+  }
+
+  if (await linkedProfileClaimedToday(buyerId, config, now, timezone)) {
+    res.status(409).json(LINKED_CLAIM_BODY);
     return;
   }
 

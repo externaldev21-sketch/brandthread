@@ -55,6 +55,14 @@ vi.mock("../../lib/accountDeletion", () => ({
   },
 }));
 
+// No linked profiles in these cases: every account is its own login.
+vi.mock("../../lib/accountProfiles", () => ({
+  markProfileDeleted: async () => undefined,
+  isLoginWithLiveSiblings: async () => false,
+  loginFor: async (id: string) => id,
+  activeSiblingIds: async () => [],
+}));
+
 import { runAccountPurge } from "../accountPurge";
 
 const now = new Date("2026-03-01T00:00:00.000Z");

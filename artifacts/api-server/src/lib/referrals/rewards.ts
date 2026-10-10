@@ -5,11 +5,12 @@
  * (unique partial index on thread_cash_entries), so a retried request, a
  * redelivered Stripe webhook or a concurrent apply can never pay twice.
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, orders, referrals, threadCashEntries, users } from "@workspace/db";
 import { awardLoyaltyPointsOnce } from "../../routes/loyalty";
 import { assertThreadCashNotFrozen, ThreadCashError } from "../threadCash/wallet";
 import { logger } from "../logger";
+import { personProfileIds } from "../accountProfiles";
 import { notifyReferralReward } from "../activityEvents";
 import {
   REFERRAL_INVITEE_REWARD_CENTS,
@@ -60,10 +61,13 @@ export async function applyReferralCode(input: {
 }): Promise<ApplyReferralResult> {
   const { inviteeId, code } = input;
 
+  // One referral credit per PERSON: a login's buyer and seller profiles
+  // (and deleted ones) share it.
+  const personIds = await personProfileIds(inviteeId, { includeDeleted: true });
   const [existing] = await db
     .select({ inviteeId: referrals.inviteeId })
     .from(referrals)
-    .where(eq(referrals.inviteeId, inviteeId))
+    .where(inArray(referrals.inviteeId, personIds))
     .limit(1);
   if (existing) return { ok: false, status: 409, error: "Referral already recorded.", code: "ALREADY_APPLIED" };
 
@@ -73,7 +77,7 @@ export async function applyReferralCode(input: {
     .where(eq(users.inviteCode, code))
     .limit(1);
   if (!inviter) return { ok: false, status: 404, error: "Invite code not found.", code: "INVALID_CODE" };
-  if (inviter.clerkId === inviteeId) {
+  if (inviter.clerkId === inviteeId || personIds.includes(inviter.clerkId)) {
     return { ok: false, status: 400, error: "You cannot use your own invite code.", code: "SELF_REFERRAL" };
   }
 
@@ -82,7 +86,7 @@ export async function applyReferralCode(input: {
   const [priorOrder] = await db
     .select({ id: orders.id })
     .from(orders)
-    .where(eq(orders.buyerId, inviteeId))
+    .where(inArray(orders.buyerId, personIds))
     .limit(1);
   if (priorOrder) {
     return { ok: false, status: 409, error: "Invite codes are for new customers.", code: "NOT_NEW_CUSTOMER" };

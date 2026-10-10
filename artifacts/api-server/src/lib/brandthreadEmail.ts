@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./logger";
+import { deliveryAddressFor } from "./profileDelivery";
 
 const DEFAULT_FROM = "Brandthread <no-reply@brandthread.app>";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -175,7 +176,7 @@ export async function sendBrandthreadEmail({
   html,
   idempotencyKey,
 }: BrandthreadEmailOptions): Promise<boolean> {
-  const recipient = to.trim();
+  const recipient = await deliveryAddressFor(to.trim());
   if (!recipient) {
     logger.warn({ subject }, "Brandthread email skipped because recipient is missing");
     return false;

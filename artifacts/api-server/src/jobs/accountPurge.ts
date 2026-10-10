@@ -8,6 +8,7 @@ import {
   getDeletionBlockers,
   purgeAccount,
 } from "../lib/accountDeletion";
+import { isLoginWithLiveSiblings, loginFor, markProfileDeleted, activeSiblingIds } from "../lib/accountProfiles";
 
 const INTERVAL_MS = 60 * 60 * 1000;
 const BATCH_SIZE = 25;
@@ -55,10 +56,16 @@ export async function runAccountPurge(now = new Date()): Promise<AccountPurgeRes
         }
         await purgeAccount(row.clerkId);
       }
-      try {
-        await clerkClient.users.deleteUser(row.clerkId);
-      } catch (err) {
-        if (!isNotFound(err)) throw err;
+      await markProfileDeleted(row.clerkId, now);
+      // Deleting one profile keeps the other: a login whose other profile is
+      // still in use keeps its Clerk user (its password / Apple / Google).
+      if (!(await isLoginWithLiveSiblings(row.clerkId))) {
+        try {
+          await clerkClient.users.deleteUser(row.clerkId);
+        } catch (err) {
+          if (!isNotFound(err)) throw err;
+        }
+        await releaseOrphanedLogin(row.clerkId);
       }
       await db.update(users)
         .set({ deletionScheduledFor: null, updatedAt: now })
@@ -75,6 +82,24 @@ export async function runAccountPurge(now = new Date()): Promise<AccountPurgeRes
   }
   if (due.length > 0) logger.info({ job: "accountPurge", ...result }, "Account purge run finished");
   return result;
+}
+
+/**
+ * After a linked profile is purged: if its login's own profile was already
+ * purged and nothing else uses that login, the login itself goes too.
+ */
+async function releaseOrphanedLogin(profileClerkId: string): Promise<void> {
+  const login = await loginFor(profileClerkId);
+  if (login === profileClerkId) return;
+  const [loginRow] = await db.select({ deletedAt: users.deletedAt }).from(users).where(eq(users.clerkId, login)).limit(1);
+  if (!loginRow?.deletedAt) return;
+  if ((await activeSiblingIds(login)).length > 0) return;
+  try {
+    await clerkClient.users.getUser(login); // already removed with its own profile?
+    await clerkClient.users.deleteUser(login);
+  } catch (err) {
+    if (!isNotFound(err)) throw err;
+  }
 }
 
 export function startAccountPurgeJob(): void {
