@@ -135,7 +135,7 @@ describe("POST /api/shipping-labels/:orderId/purchase on a manual order (BT-055)
       headers: { "content-type": "application/json", "x-test-user": sellerId },
       body: JSON.stringify({ rateId: manualRate, idempotencyKey: `manual-${manualOrderId}` }),
     });
-    const body = await response.json();
+    const body = await response.json() as { code?: string; error?: string };
     expect(response.status).toBe(409);
     expect(body.code).toBe("LABEL_REQUIRES_PAID_ORDER");
     expect(body.error).toMatch(/paid through Brandthread checkout/);

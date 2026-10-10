@@ -174,16 +174,19 @@ export async function seedManufacturer() {
     status: "active",
     stripeAccountId: `acct_${uid("mfr").replace(/-/g, "_")}`,
     paymentSetup: true,
+    verifiedAt: new Date(),
   }).returning();
   return manufacturer;
 }
 
-export async function seedBulkOrder(sellerId: string, manufacturerId: string, priceCents: number) {
+/** A bulk order card; quoted by the manufacturer unless `issuedBy` says otherwise (BT-065). */
+export async function seedBulkOrder(sellerId: string, manufacturerId: string, priceCents: number, issuedBy: "manufacturer" | "seller" = "manufacturer") {
   const [order] = await db.insert(sampleOrders).values({
     manufacturerId,
     sellerId,
     clientRequestId: uid("bulk"),
     orderType: "bulk",
+    issuedBy,
     title: "Bulk run",
     quantity: 100,
     priceCents,

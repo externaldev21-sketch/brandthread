@@ -37,7 +37,7 @@ vi.mock("../../../middlewares/requireRole", async (importOriginal) => {
   };
 });
 
-import { db, drops, orderRefunds, orderReleases, orders, productVariants, sampleOrders } from "@workspace/db";
+import { db, drops, manufacturers, orderRefunds, orderReleases, orders, productVariants, sampleOrders, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { fake } from "./fakeStripe";
 import {
@@ -60,6 +60,9 @@ import financeRouter from "../../../routes/finance";
 let app: { base: string; close: () => Promise<void> };
 
 beforeAll(async () => {
+  // These flows pay most of a drop's held money to the manufacturer; the
+  // BT-065 cap itself is covered in "bulk orders from held funds" below.
+  process.env.PREORDER_BULK_MAX_PCT = "100";
   app = await startApp((server) => {
     server.use("/api/sample-orders", sampleOrdersRouter);
     server.use("/api/orders", ordersRouter);
@@ -71,6 +74,7 @@ beforeAll(async () => {
   });
 });
 afterAll(async () => {
+  delete process.env.PREORDER_BULK_MAX_PCT;
   await expectLedgerBalanced();
   await app?.close();
 });
@@ -709,3 +713,61 @@ describe("finance summary", () => {
 });
 
 void sampleOrders;
+
+describe("bulk orders from held funds (BT-065)", () => {
+  async function heldDrop(tag: string) {
+    const seller = await seedSeller(tag);
+    const drop = await seedDrop(seller);
+    const product = await seedProduct(seller, { priceCents: 5_000, dropId: drop.id });
+    await pay({ sellerId: seller, buyerId: await seedBuyer(`${tag}-b`), chargeModel: "held", dropId: drop.id, items: [{ ...product, quantity: 2 }], stripeFeeCents: 320 });
+    return { seller, drop, wallet: await walletFor(drop.id) };
+  }
+  const payFromWallet = (seller: string, orderId: string, walletId: string) =>
+    call(app.base, "POST", `/api/sample-orders/${orderId}/pay-from-wallet`, seller, { walletId });
+
+  it("refuses a seller-priced bulk order", async () => {
+    const { seller, wallet } = await heldDrop("bt065-quote");
+    const bulk = await seedBulkOrder(seller, (await seedManufacturer()).id, 1_000, "seller");
+    expect(await payFromWallet(seller, bulk.id, wallet.id)).toMatchObject({ status: 409, body: { code: "BULK_QUOTE_REQUIRED" } });
+    expect(fake.state.transfers).toHaveLength(0);
+  });
+
+  it("refuses an unverified manufacturer", async () => {
+    const { seller, wallet } = await heldDrop("bt065-unverified");
+    const manufacturer = await seedManufacturer();
+    await db.update(manufacturers).set({ verifiedAt: null }).where(eq(manufacturers.id, manufacturer.id));
+    const bulk = await seedBulkOrder(seller, manufacturer.id, 1_000);
+    expect(await payFromWallet(seller, bulk.id, wallet.id)).toMatchObject({ status: 409, body: { code: "MANUFACTURER_NOT_VERIFIED" } });
+  });
+
+  it("refuses a manufacturer on the seller's own Stripe account", async () => {
+    const { seller, wallet } = await heldDrop("bt065-self");
+    const manufacturer = await seedManufacturer();
+    const [sellerRow] = await db.select({ stripeAccountId: users.stripeAccountId }).from(users).where(eq(users.clerkId, seller));
+    await db.update(manufacturers).set({ stripeAccountId: sellerRow.stripeAccountId }).where(eq(manufacturers.id, manufacturer.id));
+    const bulk = await seedBulkOrder(seller, manufacturer.id, 1_000);
+    expect(await payFromWallet(seller, bulk.id, wallet.id)).toMatchObject({ status: 403, body: { code: "MANUFACTURER_SAME_AS_SELLER" } });
+    expect(fake.state.transfers).toHaveLength(0);
+  });
+
+  it("caps wallet-funded bulk at PREORDER_BULK_MAX_PCT of the drop's held money", async () => {
+    process.env.PREORDER_BULK_MAX_PCT = "60";
+    try {
+      const { seller, wallet } = await heldDrop("bt065-cap");
+      const capCents = Math.floor(wallet.balanceCents * 0.6);
+      const manufacturer = await seedManufacturer();
+      const tooMuch = await seedBulkOrder(seller, manufacturer.id, capCents + 1);
+      expect(await payFromWallet(seller, tooMuch.id, wallet.id)).toMatchObject({
+        status: 409, body: { code: "BULK_EXCEEDS_PREORDER_CAP", capCents, maxPct: 60 },
+      });
+      const options = await call(app.base, "GET", `/api/sample-orders/${tooMuch.id}/payment-options`, seller);
+      expect(options.body.wallets.find((w: any) => w.id === wallet.id)).toMatchObject({ bulkRemainingCents: capCents, eligible: false });
+      const fits = await seedBulkOrder(seller, manufacturer.id, capCents);
+      expect((await payFromWallet(seller, fits.id, wallet.id)).status).toBe(200);
+      const more = await seedBulkOrder(seller, manufacturer.id, 1);
+      expect(await payFromWallet(seller, more.id, wallet.id)).toMatchObject({ status: 409, body: { code: "BULK_EXCEEDS_PREORDER_CAP" } });
+    } finally {
+      process.env.PREORDER_BULK_MAX_PCT = "100";
+    }
+  });
+});

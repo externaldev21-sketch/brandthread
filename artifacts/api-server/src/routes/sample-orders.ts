@@ -18,12 +18,13 @@
 import express, { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
-import { sampleOrders, manufacturers, manufacturerThreads, manufacturerActivityEvents, manufacturerRelationships, dropWallets, dropWalletTransactions, drops } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { sampleOrders, manufacturers, manufacturerThreads, manufacturerActivityEvents, manufacturerRelationships, dropWallets, dropWalletTransactions, drops, users } from "@workspace/db";
+import { eq, and, desc, sql, inArray, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, PLATFORM_COMMISSION_RATE, computeApplicationFeeCents } from "../lib/stripe";
 import { lockDrop, recordBulkPaidFromHeld } from "../lib/money/escrow";
 import { DROP_OPEN_STATES } from "../lib/money/stateMachines";
+import { bulkWalletRefusal, bulkWalletRemainingCents } from "../lib/money/bulkWalletPolicy";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { publishNotification } from "./notifications-feed";
@@ -734,14 +735,17 @@ router.get("/:id/payment-options", async (req, res) => {
       res.status(409).json({ error: "Order is not eligible for wallet payment" }); return;
     }
     const wallets = await db.select().from(dropWallets).where(eq(dropWallets.sellerId, sellerId));
+    const bulkPaid = await walletBulkPaidCents(wallets.map((wallet) => wallet.id), order.id);
     res.json({
       orderId: order.id,
       requiredCents: order.priceCents,
       wallets: wallets.map((wallet) => {
         const availableCents = wallet.balanceCents - wallet.releasedCents - wallet.reservedCents;
+        // BT-065: bulk orders may use only part of a drop's pre-order money.
+        const bulkRemainingCents = bulkWalletRemainingCents(wallet.balanceCents, bulkPaid.get(wallet.id) ?? 0);
         return {
-          id: wallet.id, dropId: wallet.dropId, availableCents,
-          eligible: availableCents >= order.priceCents,
+          id: wallet.id, dropId: wallet.dropId, availableCents, bulkRemainingCents,
+          eligible: availableCents >= order.priceCents && bulkRemainingCents >= order.priceCents,
         };
       }),
     });
@@ -750,6 +754,20 @@ router.get("/:id/payment-options", async (req, res) => {
     res.status(500).json({ error: "Failed to list payment options" });
   }
 });
+
+/** Bulk payments made or in flight from each wallet, excluding one order. */
+async function walletBulkPaidCents(walletIds: string[], excludeOrderId: string): Promise<Map<string, number>> {
+  if (walletIds.length === 0) return new Map();
+  const rows = await db.select({
+    walletId: sampleOrders.walletId,
+    total: sql<string>`COALESCE(SUM(${sampleOrders.priceCents}), 0)`,
+  }).from(sampleOrders).where(and(
+    inArray(sampleOrders.walletId, walletIds),
+    inArray(sampleOrders.walletPaymentState, ["processing", "paid"]),
+    ne(sampleOrders.id, excludeOrderId),
+  )).groupBy(sampleOrders.walletId);
+  return new Map(rows.map((row) => [row.walletId as string, Number(row.total)]));
+}
 
 // ── POST /api/sample-orders/:id/pay-from-wallet ───────────────────────────────
 // Seller pays a bulk order from their drop wallet (no new card charge).
@@ -797,6 +815,34 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
       return;
     }
     if (!row.mfrStripeId) { res.status(409).json({ error: "Manufacturer cannot receive wallet payment" }); return; }
+    // BT-065: a new wallet payment needs a manufacturer quote, a verified and
+    // independent manufacturer, and stays under the drop's bulk cap. An
+    // in-flight ("processing") payment is only reconciled below.
+    if (order.walletPaymentState === "pending") {
+      const [mfr] = await db.select({
+        status: manufacturers.status, verifiedAt: manufacturers.verifiedAt, contactEmail: manufacturers.contactEmail,
+      }).from(manufacturers).where(eq(manufacturers.id, order.manufacturerId)).limit(1);
+      const [mfrUser] = row.mfrClerkId
+        ? await db.select({ email: users.email }).from(users).where(eq(users.clerkId, row.mfrClerkId)).limit(1)
+        : [];
+      const [seller] = await db.select({ email: users.email, stripeAccountId: users.stripeAccountId })
+        .from(users).where(eq(users.clerkId, sellerId)).limit(1);
+      const bulkPaid = await walletBulkPaidCents([wallet.id], order.id);
+      const refusal = bulkWalletRefusal({
+        order: { issuedBy: order.issuedBy, priceCents: order.priceCents },
+        manufacturer: {
+          status: mfr?.status, verifiedAt: mfr?.verifiedAt, clerkId: row.mfrClerkId, stripeAccountId: row.mfrStripeId,
+          emails: [mfr?.contactEmail, mfrUser?.email],
+        },
+        seller: { clerkId: sellerId, stripeAccountId: seller?.stripeAccountId, email: seller?.email },
+        wallet: { balanceCents: wallet.balanceCents, bulkPaidCents: bulkPaid.get(wallet.id) ?? 0 },
+      });
+      if (refusal) {
+        req.log.warn({ orderId: order.id, code: refusal.code }, "Wallet bulk payment refused");
+        res.status(refusal.status).json({ error: refusal.message, code: refusal.code, ...(refusal.details ?? {}) });
+        return;
+      }
+    }
     const connectedAccount = await stripe.accounts.retrieve(row.mfrStripeId);
     if (connectedAccount.deleted || !connectedAccount.charges_enabled
       || !connectedAccount.payouts_enabled || !connectedAccount.details_submitted) {
