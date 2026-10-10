@@ -33,6 +33,7 @@ export const MAIN_SCREENS = [
   { id: 'seller-add-product', role: 'seller', path: '/add-product' },
   { id: 'seller-analytics', role: 'seller', path: '/(tabs)/analytics' },
   { id: 'seller-settings', role: 'seller', path: '/seller-settings' },
+  { id: 'seller-profile', role: 'seller', path: '/(tabs)/profile' },
 ];
 
 const VARIANTS = [
