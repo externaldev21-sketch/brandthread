@@ -20,7 +20,7 @@ export default function ShareStoreScreen() {
   const [toast, flash] = useToast();
 
   return (
-    <View style={[s.root, { backgroundColor: theme.background }]}>
+    <View style={[s.root, { backgroundColor: theme.background }]} testID="share-store-screen">
       <ScreenHeader title="Share store" />
       <ScrollView contentContainerStyle={[s.body, { paddingBottom: bottomInset + 24 }]} showsVerticalScrollIndicator={false}>
         <ShareStoreContent onToast={flash} previewWidth={220} previewHeight={290} />
