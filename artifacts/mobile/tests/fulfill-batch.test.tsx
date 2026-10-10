@@ -97,10 +97,18 @@ vi.mock('@/app/order-detail', () => ({
 
 const getShippingRatesMock = vi.fn();
 const purchaseShippingLabelMock = vi.fn();
+const getPackagePresetsMock = vi.fn();
+const getParcelSuggestionMock = vi.fn();
 vi.mock('@/services/orderService', () => ({
   getShippingRates: (...args: unknown[]) => getShippingRatesMock(...args),
   purchaseShippingLabel: (...args: unknown[]) => purchaseShippingLabelMock(...args),
+  getPackagePresets: (...args: unknown[]) => getPackagePresetsMock(...args),
+  getParcelSuggestion: (...args: unknown[]) => getParcelSuggestionMock(...args),
+  isShipFromError: (err: any) => err?.code === 'SHIP_FROM_REQUIRED' || err?.code === 'SHIP_FROM_IS_BUYER',
 }));
+vi.mock('@/lib/money', () => ({ formatCents: (c: number) => `$${(c / 100).toFixed(2)}` }));
+
+const box = { id: 'box-1', name: 'Mailer', weightOz: 24, lengthIn: '12', widthIn: '9', heightIn: '3' };
 
 import FulfillBatchScreen from '@/app/fulfill-batch';
 
@@ -150,13 +158,16 @@ describe('fulfill-batch per-row summary', () => {
     expect(messages).toContain('Order changed while cancelling');
   });
 
-  it('purchases labels for unlabeled orders and skips already-labeled ones', async () => {
+  it('quotes with the saved box and item weights, shows the total, and buys only after confirming', async () => {
     orderGetMock.mockImplementation((id: string) => Promise.resolve(
       id === 'order-1'
         ? order(id, '1001', { labels: [{ id: 'lbl-existing', status: 'active', labelUrl: 'https://example.com/existing.pdf' }] })
         : order(id, '1002'),
     ));
+    getPackagePresetsMock.mockResolvedValue([box]);
+    getParcelSuggestionMock.mockResolvedValue({ weightLb: 2.2, weightKnown: true });
     getShippingRatesMock.mockResolvedValue([
+      { id: 'rate-2', carrier: 'UPS', service: 'Ground', priceCents: 900, estimatedDays: 4, estimatedDelivery: 'Jan 2', trackingIncluded: true, insuranceIncluded: false, isRecommended: false },
       { id: 'rate-1', carrier: 'USPS', service: 'Priority', priceCents: 500, estimatedDays: 3, estimatedDelivery: 'Jan 1', trackingIncluded: true, insuranceIncluded: false, isRecommended: false },
     ]);
     purchaseShippingLabelMock.mockResolvedValue({
@@ -168,15 +179,52 @@ describe('fulfill-batch per-row summary', () => {
     await act(async () => { renderer = create(<FulfillBatchScreen />); });
     await flush();
 
-    const printBtn = findByLabel(renderer, 'PrimaryButton', 'Print labels');
-    await act(async () => { await printBtn.props.onPress(); });
+    await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Print labels').props.onPress(); });
+    await flush();
+
+    // No buyer address as sender, the real box, and the items' weight.
+    expect(getShippingRatesMock).toHaveBeenCalledTimes(1);
+    const [, parcel] = getShippingRatesMock.mock.calls[0];
+    expect(parcel).toEqual({ weight: '2.2', length: '12', width: '9', height: '3' });
+    expect(purchaseShippingLabelMock).not.toHaveBeenCalled();
+
+    const texts = () => renderer.root.findAllByType('Text' as any).map(n => (Array.isArray(n.props.children) ? n.props.children.join('') : n.props.children));
+    expect(texts()).toContain('$5.00');
+    expect(texts()).toContain('Total');
+
+    await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Buy 1 label').props.onPress(); });
     await flush();
 
     expect(purchaseShippingLabelMock).toHaveBeenCalledTimes(1);
     expect(purchaseShippingLabelMock).toHaveBeenCalledWith('order-2', expect.objectContaining({ id: 'rate-1' }), 'fulfill-batch-order-2');
+    expect(texts()).toContain('Already labeled');
+    expect(texts()).toContain('USPS Priority purchased');
+  });
 
-    const messages = renderer.root.findAllByType('Text' as any).map(n => (Array.isArray(n.props.children) ? n.props.children.join('') : n.props.children));
-    expect(messages).toContain('Already labeled');
-    expect(messages).toContain('USPS Priority purchased');
+  it('asks for a box size before quoting when none is saved', async () => {
+    orderGetMock.mockImplementation((id: string) => Promise.resolve(order(id, id)));
+    getPackagePresetsMock.mockResolvedValue([]);
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<FulfillBatchScreen />); });
+    await flush();
+    await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Print labels').props.onPress(); });
+    await flush();
+    expect(getShippingRatesMock).not.toHaveBeenCalled();
+    expect(findByLabel(renderer, 'SecondaryButton', 'Add a box size')).toBeTruthy();
+  });
+
+  it('asks for a ship-from address instead of using the buyer\'s', async () => {
+    orderGetMock.mockImplementation((id: string) => Promise.resolve(order(id, id)));
+    getPackagePresetsMock.mockResolvedValue([box]);
+    getParcelSuggestionMock.mockResolvedValue(null);
+    getShippingRatesMock.mockRejectedValue(Object.assign(new Error('API 400'), { code: 'SHIP_FROM_REQUIRED' }));
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<FulfillBatchScreen />); });
+    await flush();
+    await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Print labels').props.onPress(); });
+    await flush();
+    expect(getShippingRatesMock.mock.calls[0][1]).not.toHaveProperty('fromAddress');
+    expect(findByLabel(renderer, 'SecondaryButton', 'Add ship-from address')).toBeTruthy();
+    expect(purchaseShippingLabelMock).not.toHaveBeenCalled();
   });
 });

@@ -16,10 +16,15 @@ import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader } from '
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { adaptApiOrder } from '@/app/order-detail';
-import { getShippingRates, purchaseShippingLabel } from '@/services/orderService';
-import { Order } from '@/services/orderTypes';
+import {
+  getPackagePresets, getParcelSuggestion, getShippingRates, isShipFromError, purchaseShippingLabel, type PackagePreset,
+} from '@/services/orderService';
+import { Order, ShippingRate } from '@/services/orderTypes';
+import { formatCents } from '@/lib/money';
+import { batchParcelWeightLb } from '@/lib/batchLabels';
 
 type RowResult = { orderId: string; orderNumber: string; ok: boolean; message: string; labelUrl?: string };
+type QuotedOrder = { order: Order; rate: ShippingRate; weight: string };
 
 export default function FulfillBatchScreen() {
   const { theme } = useAppTheme();
@@ -36,6 +41,12 @@ export default function FulfillBatchScreen() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<'labels' | 'ship' | null>(null);
   const [results, setResults] = useState<RowResult[]>([]);
+  const [presets, setPresets] = useState<PackagePreset[]>([]);
+  const [presetsLoaded, setPresetsLoaded] = useState(false);
+  const [boxId, setBoxId] = useState<string | null>(null);
+  const [quotes, setQuotes] = useState<QuotedOrder[]>([]);
+  const [notice, setNotice] = useState<'no_box' | 'no_ship_from' | null>(null);
+  const quoteTotal = quotes.reduce((sum, q) => sum + q.rate.priceCents, 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,32 +69,78 @@ export default function FulfillBatchScreen() {
     return () => { cancelled = true; };
   }, [api, ids]);
 
-  async function handlePrintLabels() {
+  // Step 1 of "Print labels": quote every unlabeled order with a real box (a
+  // saved package preset) and the items' stored weights, from the seller's
+  // ship-from address. Nothing is bought until the seller confirms the total.
+  async function handlePrintLabels(pickedBoxId?: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setRunning('labels');
-    const rows: RowResult[] = [];
-    for (const order of orders) {
-      if (order.labels.some(l => l.status === 'active')) {
-        const existing = order.labels.find(l => l.status === 'active')!;
-        rows.push({ orderId: order.id, orderNumber: order.orderNumber, ok: true, message: 'Already labeled', labelUrl: existing.labelUrl });
-        continue;
+    setNotice(null);
+    setQuotes([]);
+    try {
+      let boxes = presets;
+      if (!presetsLoaded) {
+        boxes = await getPackagePresets().catch(() => []);
+        setPresets(boxes);
+        setPresetsLoaded(true);
       }
-      try {
-        const fromAddress = order.fulfillment.fromAddress ?? order.customer.shippingAddress;
-        const rates = await getShippingRates(order.id, {
-          fromAddress, weight: '1', length: '10', width: '8', height: '4',
-        });
-        const cheapest = [...rates].sort((a, b) => a.priceCents - b.priceCents)[0];
-        if (!cheapest) {
-          rows.push({ orderId: order.id, orderNumber: order.orderNumber, ok: false, message: 'No rates available' });
+      const box = boxes.find(p => p.id === (pickedBoxId ?? boxId)) ?? boxes[0];
+      if (!box) {
+        setNotice('no_box');
+        return;
+      }
+      setBoxId(box.id);
+      const next: QuotedOrder[] = [];
+      const rows: RowResult[] = [];
+      for (const order of orders) {
+        const existing = order.labels.find(l => l.status === 'active');
+        if (existing) {
+          rows.push({ orderId: order.id, orderNumber: order.orderNumber, ok: true, message: 'Already labeled', labelUrl: existing.labelUrl });
           continue;
         }
-        const label = await purchaseShippingLabel(order.id, cheapest, `fulfill-batch-${order.id}`);
+        try {
+          const suggestion = await getParcelSuggestion(order.id).catch(() => null);
+          const weight = batchParcelWeightLb(suggestion, box.weightOz);
+          const fromAddress = order.fulfillment.fromAddress;
+          const rates = await getShippingRates(order.id, {
+            ...(fromAddress ? { fromAddress } : {}),
+            weight, length: String(box.lengthIn), width: String(box.widthIn), height: String(box.heightIn),
+          });
+          const cheapest = [...rates].sort((a, b) => a.priceCents - b.priceCents)[0];
+          if (!cheapest) {
+            rows.push({ orderId: order.id, orderNumber: order.orderNumber, ok: false, message: 'No rates available' });
+            continue;
+          }
+          next.push({ order, rate: cheapest, weight });
+        } catch (err: any) {
+          if (isShipFromError(err)) {
+            setNotice('no_ship_from');
+            return;
+          }
+          rows.push({ orderId: order.id, orderNumber: order.orderNumber, ok: false, message: err?.message ?? 'Could not get rates' });
+        }
+      }
+      setQuotes(next);
+      setResults(rows);
+    } finally {
+      setRunning(null);
+    }
+  }
+
+  // Step 2: buy exactly the quoted labels after the seller saw the total.
+  async function handleBuyQuoted() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setRunning('labels');
+    const rows: RowResult[] = [...results];
+    for (const { order, rate } of quotes) {
+      try {
+        const label = await purchaseShippingLabel(order.id, rate, `fulfill-batch-${order.id}`);
         rows.push({ orderId: order.id, orderNumber: order.orderNumber, ok: true, message: `${label.carrier} ${label.service} purchased`, labelUrl: label.labelUrl });
       } catch (err: any) {
         rows.push({ orderId: order.id, orderNumber: order.orderNumber, ok: false, message: err?.message ?? 'Label purchase failed' });
       }
     }
+    setQuotes([]);
     setResults(rows);
     setRunning(null);
 
@@ -132,11 +189,64 @@ export default function FulfillBatchScreen() {
             ))}
 
             <View style={s.actionRow}>
-              <PrimaryButton label="Print labels" icon="tag" onPress={handlePrintLabels} loading={running === 'labels'} disabled={running !== null || orders.length === 0} style={{ flex: 1 }} />
+              <PrimaryButton label="Print labels" icon="tag" onPress={() => handlePrintLabels()} loading={running === 'labels'} disabled={running !== null || orders.length === 0} style={{ flex: 1 }} />
               <SecondaryButton label="Mark shipped" icon="send" onPress={handleMarkShipped} disabled={running !== null || orders.length === 0} style={{ flex: 1 }} />
             </View>
 
-            {results.length > 0 && (
+            {notice === 'no_ship_from' && (
+              <BrandthreadCard style={{ gap: SP.sm }}>
+                <Text style={s.mutedText}>Add the address you ship from to buy labels.</Text>
+                <SecondaryButton label="Add ship-from address" onPress={() => router.push('/locations' as any)} />
+              </BrandthreadCard>
+            )}
+            {notice === 'no_box' && (
+              <BrandthreadCard style={{ gap: SP.sm }}>
+                <Text style={s.mutedText}>Save a box size first. Labels are priced by the box's size and weight.</Text>
+                <SecondaryButton label="Add a box size" onPress={() => router.push({ pathname: '/fulfill-order', params: { orderId: orders[0]?.id } } as any)} />
+              </BrandthreadCard>
+            )}
+
+            {quotes.length > 0 && (
+              <>
+                {presets.length > 0 && (
+                  <View style={s.boxRow}>
+                    {presets.map(p => (
+                      <TouchableOpacity
+                        key={p.id}
+                        onPress={() => { if (p.id !== boxId) handlePrintLabels(p.id); }}
+                        disabled={running !== null}
+                        style={[s.boxChip, p.id === boxId && s.boxChipActive]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Use box ${p.name}`}
+                      >
+                        <Text style={s.orderNumber}>{p.name}</Text>
+                        <Text style={s.mutedText}>{Number(p.lengthIn)}×{Number(p.widthIn)}×{Number(p.heightIn)} in</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                <SectionHeader title={`Review ${quotes.length} label${quotes.length === 1 ? '' : 's'}`} />
+                {quotes.map(q => (
+                  <BrandthreadCard key={q.order.id} style={s.resultRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.orderNumber}>#{q.order.orderNumber}</Text>
+                      <Text style={s.mutedText}>{q.rate.carrier} {q.rate.service}, {q.weight} lb</Text>
+                    </View>
+                    <Text style={s.orderNumber}>{formatCents(q.rate.priceCents)}</Text>
+                  </BrandthreadCard>
+                ))}
+                <View style={s.totalRow}>
+                  <Text style={s.orderNumber}>Total</Text>
+                  <Text style={s.orderNumber}>{formatCents(quoteTotal)}</Text>
+                </View>
+                <View style={s.actionRow}>
+                  <PrimaryButton label={`Buy ${quotes.length} label${quotes.length === 1 ? '' : 's'}`} onPress={handleBuyQuoted} loading={running === 'labels'} disabled={running !== null} style={{ flex: 1 }} />
+                  <SecondaryButton label="Cancel" onPress={() => setQuotes([])} disabled={running !== null} style={{ flex: 1 }} />
+                </View>
+              </>
+            )}
+
+            {results.length > 0 && quotes.length === 0 && (
               <>
                 <SectionHeader title={`Results — ${successCount} succeeded, ${failCount} failed`} />
                 {results.map(r => (
@@ -174,5 +284,9 @@ const createStyles = (theme: { text: string; muted: string }) => {
     orderNumber: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
     actionRow: { flexDirection: 'row', gap: SP.sm },
     resultRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+    totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SP.md },
+    boxRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+    boxChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', gap: 2 },
+    boxChipActive: { borderColor: FG },
   });
 };

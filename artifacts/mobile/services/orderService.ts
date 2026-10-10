@@ -338,9 +338,16 @@ export async function getParcelSuggestion(orderId: string): Promise<ParcelSugges
   return await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/parcel-suggestion`) as ParcelSuggestion;
 }
 
+/** The server refused to quote because the seller has no usable ship-from address. */
+export function isShipFromError(err: unknown): err is { code: 'SHIP_FROM_REQUIRED' | 'SHIP_FROM_IS_BUYER' } {
+  const code = (err as { code?: unknown } | null)?.code;
+  return code === 'SHIP_FROM_REQUIRED' || code === 'SHIP_FROM_IS_BUYER';
+}
+
 export async function getShippingRates(orderId: string, parcel: {
   itemIds?: string[];
-  fromAddress: OrderAddress;
+  /** Omit to ship from the seller's primary location (Settings → Locations). */
+  fromAddress?: OrderAddress;
   weight: string;
   length: string;
   width: string;

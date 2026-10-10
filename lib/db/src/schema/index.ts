@@ -10,6 +10,7 @@ export * from './money';
 export * from './productLaunches';
 export * from './threadCash';
 export * from './threadCashExpiry';
+export * from './sellerShipping';
 export * from './shopifyFulfillment';
 export * from './productFit';
 export * from './metaAds';
