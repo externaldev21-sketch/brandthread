@@ -163,7 +163,7 @@ export default function KlaviyoIntegrationScreen() {
         ) : (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>Klaviyo Private API Key</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={[styles.input, { backgroundColor: colors.secondary, color: colors.foreground, borderColor: colors.border }]}
               placeholder="pk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
               placeholderTextColor={colors.mutedForeground}

@@ -144,7 +144,7 @@ export default function BuyerCloseFriends() {
       {/* Search */}
       <View style={s.searchWrap}>
         <Feather name="search" size={16} color={colors.mutedForeground} />
-        <TextInput
+        <TextInput returnKeyType="search"
           style={[s.searchInput, WEB_INPUT_RESET]}
           value={query}
           onChangeText={setQuery}

@@ -44,6 +44,7 @@ import {
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
+import { KeyboardAccessoryBar, keyboardAccessoryID } from '@/components/ui/KeyboardAccessoryBar';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
@@ -215,6 +216,8 @@ const DOUBLE_TAP_MS = 300;
 // (react-native-keyboard-controller, iOS) so a drag on the list can swipe
 // the keyboard down interactively.
 const CHAT_INPUT_NATIVE_ID = 'buyer-conversation-composer-input';
+// iOS keyboard accessory bar (Done) for the composer.
+const CHAT_ACCESSORY_ID = 'buyer-conversation-keyboard-accessory';
 
 // ─── Bubble column (Instagram/Threads DM layout) ───────────────────────────────
 // A 28pt avatar + 8pt gap sits to the left of every incoming bubble, but only
@@ -2441,6 +2444,7 @@ export default function BuyerConversationScreen() {
             placeholder="Message…"
             inputRef={textInputRef}
             nativeID={CHAT_INPUT_NATIVE_ID}
+            inputAccessoryViewID={keyboardAccessoryID(CHAT_ACCESSORY_ID)}
             topSlot={<>{replyBanner}{attachmentChip}</>}
             leftAccessory={
               <PressableScale rippleEnabled={false}
@@ -2869,6 +2873,7 @@ export default function BuyerConversationScreen() {
         }}
         onDismiss={() => setThreadCashNotice(null)}
       />
+      <KeyboardAccessoryBar nativeID={CHAT_ACCESSORY_ID} />
     </KeyboardAvoidingView>
   );
 }

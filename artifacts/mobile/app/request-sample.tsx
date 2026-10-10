@@ -125,9 +125,9 @@ export default function RequestSampleScreen() {
             {QUANTITIES.map((item) => <Chip key={item} label={`${item}`} active={item === quantity} onPress={() => setQuantity(item)} color={colors.primary} />)}
           </View>
         </Field>
-        <Field label="Colorway"><TextInput accessibilityLabel="Colorway" accessibilityHint="Enter the requested sample color" value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
-        <Field label="Size"><TextInput accessibilityLabel="Size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
-        <Field label="Reply contact"><TextInput accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={colors.mutedForeground} style={styles.input} autoCapitalize="none" /></Field>
+        <Field label="Colorway"><TextInput returnKeyType="done" accessibilityLabel="Colorway" accessibilityHint="Enter the requested sample color" value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
+        <Field label="Size"><TextInput returnKeyType="done" accessibilityLabel="Size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
+        <Field label="Reply contact"><TextInput returnKeyType="done" accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={colors.mutedForeground} style={styles.input} autoCapitalize="none" /></Field>
         <Field label="Notes"><TextInput accessibilityLabel="Sample notes" accessibilityHint="Enter optional materials, construction, or deadline details" value={notes} onChangeText={setNotes} placeholder="Materials, construction, or deadlines" placeholderTextColor={colors.mutedForeground} style={[styles.input, styles.notes]} multiline /></Field>
       </ScrollView>
       <View style={[styles.bottom, { paddingBottom: insets.bottom + 12 }]}>

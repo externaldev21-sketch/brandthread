@@ -122,6 +122,7 @@ export function ShippingSection({
         showError={showErrors}
         autoCapitalize="words"
         textContentType="addressCity"
+        autoComplete="postal-address-locality"
         testID="checkout-city"
       />
       <View style={styles.twoCol}>
@@ -146,6 +147,7 @@ export function ShippingSection({
             showError={showErrors}
             autoCapitalize="words"
             textContentType="addressState"
+            autoComplete="postal-address-region"
             style={styles.col}
             testID="checkout-state"
           />

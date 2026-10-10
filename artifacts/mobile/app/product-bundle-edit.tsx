@@ -199,7 +199,7 @@ export default function ProductBundleEditScreen() {
         <Text style={s.sectionTitle}>Bundle details</Text>
 
         <Text style={s.fieldLabel}>Name</Text>
-        <TextInput
+        <TextInput returnKeyType="done"
           style={s.input}
           value={name}
           onChangeText={setName}
@@ -221,7 +221,7 @@ export default function ProductBundleEditScreen() {
         <Text style={s.fieldLabel}>Bundle price</Text>
         <View style={s.priceRow}>
           <Text style={s.dollarSign}>$</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={[s.input, { flex: 1 }]}
             value={priceStr}
             onChangeText={setPriceStr}

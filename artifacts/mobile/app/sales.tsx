@@ -24,6 +24,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { BrandthreadCard, PrimaryButton, StatusBadge, SectionHeader, HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 import { EmptyState } from '@/components/layout';
 
 type DiscountType = 'percent' | 'fixed';
@@ -322,13 +324,29 @@ export default function SalesScreen() {
 
             <View>
               <Text style={s.label}>Active dates</Text>
-              <TextInput style={s.input} value={startDate} onChangeText={setStartDate} placeholder="Start date (YYYY-MM-DD)" placeholderTextColor={MUTED} autoCorrect={false} />
+              <NativeDateTimeField
+                mode="date"
+                label="Start date"
+                placeholder="Immediately"
+                value={ymdToDate(startDate)}
+                onChange={(d) => setStartDate(dateToYmd(d))}
+                onClear={() => setStartDate('')}
+                testID="sale-start-date"
+              />
               <View style={s.switchRow}>
                 <Text style={s.switchLabel}>Set end date</Text>
                 <HapticSwitch value={hasEnd} onValueChange={setHasEnd} />
               </View>
               {hasEnd && (
-                <TextInput style={[s.input, { marginTop: SP.sm }]} value={endDate} onChangeText={setEndDate} placeholder="End date (YYYY-MM-DD)" placeholderTextColor={MUTED} autoCorrect={false} />
+                <NativeDateTimeField
+                  mode="date"
+                  label="End date"
+                  value={ymdToDate(endDate)}
+                  onChange={(d) => setEndDate(dateToYmd(d))}
+                  minimumDate={ymdToDate(startDate) ?? startOfToday()}
+                  style={{ marginTop: SP.sm }}
+                  testID="sale-end-date"
+                />
               )}
             </View>
 

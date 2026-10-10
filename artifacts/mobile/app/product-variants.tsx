@@ -332,12 +332,12 @@ export default function ProductVariantsScreen() {
             <View style={st.addRow}>
               <View style={{ flex: 1 }}>
                 <Text style={st.fieldLabel}>{variants.length === 0 ? 'Price' : 'Price for new'}</Text>
-                <TextInput style={st.input} value={genPrice} onChangeText={setGenPrice} keyboardType="decimal-pad"
+                <TextInput returnKeyType="done" style={st.input} value={genPrice} onChangeText={setGenPrice} keyboardType="decimal-pad"
                   placeholder={variants.length ? centsToInput(Math.min(...variants.map((v) => v.priceCents))) : '0.00'} placeholderTextColor={colors.subtle} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={st.fieldLabel}>Starting stock</Text>
-                <TextInput style={st.input} value={genStock} onChangeText={setGenStock} keyboardType="number-pad" placeholderTextColor={colors.subtle} />
+                <TextInput returnKeyType="done" style={st.input} value={genStock} onChangeText={setGenStock} keyboardType="number-pad" placeholderTextColor={colors.subtle} />
               </View>
             </View>
             <PrimaryButton label={variants.length ? 'Generate missing variants' : 'Generate variants'} onPress={generate} loading={busy === 'generate'} disabled={overCap} />
@@ -378,7 +378,7 @@ export default function ProductVariantsScreen() {
                               {formatCents(v.priceCents)}{out ? ' · Sold out' : low ? ' · Low stock' : ''}
                             </Text>
                           </Pressable>
-                          <TextInput style={st.stockPill} value={stockText} keyboardType="number-pad" selectTextOnFocus
+                          <TextInput returnKeyType="done" style={st.stockPill} value={stockText} keyboardType="number-pad" selectTextOnFocus
                             onChangeText={(t) => setEdit(v.id, { stock: t.replace(/[^0-9]/g, '') })} accessibilityLabel={`Stock for ${label}`} />
                           <Pressable hitSlop={8} onPress={() => setExpanded(open ? null : v.id)}>
                             <Feather name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={colors.mutedForeground} />
@@ -388,17 +388,17 @@ export default function ProductVariantsScreen() {
                           <View style={st.editGrid}>
                             <View style={{ flex: 1 }}>
                               <Text style={st.fieldLabel}>Price</Text>
-                              <TextInput style={st.input} value={e.price ?? centsToInput(v.priceCents)} keyboardType="decimal-pad"
+                              <TextInput returnKeyType="done" style={st.input} value={e.price ?? centsToInput(v.priceCents)} keyboardType="decimal-pad"
                                 onChangeText={(t) => setEdit(v.id, { price: t })} />
                             </View>
                             <View style={{ flex: 1 }}>
                               <Text style={st.fieldLabel}>Low-stock level</Text>
-                              <TextInput style={st.input} value={e.low ?? String(v.lowStockThreshold)} keyboardType="number-pad"
+                              <TextInput returnKeyType="done" style={st.input} value={e.low ?? String(v.lowStockThreshold)} keyboardType="number-pad"
                                 onChangeText={(t) => setEdit(v.id, { low: t.replace(/[^0-9]/g, '') })} />
                             </View>
                             <View style={{ flexBasis: '100%' }}>
                               <Text style={st.fieldLabel}>SKU</Text>
-                              <TextInput style={st.input} value={e.sku ?? v.sku} autoCapitalize="characters" autoCorrect={false}
+                              <TextInput returnKeyType="done" style={st.input} value={e.sku ?? v.sku} autoCapitalize="characters" autoCorrect={false}
                                 onChangeText={(t) => setEdit(v.id, { sku: t })} />
                             </View>
                           </View>
@@ -438,7 +438,7 @@ export default function ProductVariantsScreen() {
             <BrandthreadCard style={st.card}>
               <Text style={st.axisName}>Low-stock alert</Text>
               <Text style={st.fieldLabel}>Default level for new variants</Text>
-              <TextInput style={st.input} value={lowDefaultText} keyboardType="number-pad" placeholder="10" placeholderTextColor={colors.subtle}
+              <TextInput returnKeyType="done" style={st.input} value={lowDefaultText} keyboardType="number-pad" placeholder="10" placeholderTextColor={colors.subtle}
                 onChangeText={(t) => setLowDefaultText(t.replace(/[^0-9]/g, ''))} />
               <View style={st.switchRow}>
                 <Text style={[st.variantName, { flex: 1 }]}>Apply to existing variants</Text>
@@ -457,7 +457,7 @@ export default function ProductVariantsScreen() {
               {rules.limitedQuantityEnabled && (
                 <>
                   <Text style={st.fieldLabel}>Edition size</Text>
-                  <TextInput style={st.input} value={editionText} keyboardType="number-pad" placeholder="50" placeholderTextColor={colors.subtle}
+                  <TextInput returnKeyType="done" style={st.input} value={editionText} keyboardType="number-pad" placeholder="50" placeholderTextColor={colors.subtle}
                     onChangeText={(t) => setEditionText(t.replace(/[^0-9]/g, ''))} />
                 </>
               )}
@@ -471,7 +471,7 @@ export default function ProductVariantsScreen() {
               {rules.showRemainingCounter && (
                 <>
                   <Text style={st.fieldLabel}>Show when this many or fewer are left</Text>
-                  <TextInput style={st.input} value={counterText} keyboardType="number-pad" placeholder="5" placeholderTextColor={colors.subtle}
+                  <TextInput returnKeyType="done" style={st.input} value={counterText} keyboardType="number-pad" placeholder="5" placeholderTextColor={colors.subtle}
                     onChangeText={(t) => setCounterText(t.replace(/[^0-9]/g, ''))} />
                 </>
               )}

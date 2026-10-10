@@ -546,7 +546,7 @@ export default function ShippingScreen() {
           </View>
           {shipFromEditing ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <TextInput
+              <TextInput returnKeyType="done"
                 value={shipFromDraft}
                 onChangeText={t => setShipFromDraft(t.toUpperCase())}
                 autoCapitalize="characters"
@@ -767,7 +767,7 @@ export default function ShippingScreen() {
           </View>
 
           <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Name</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             value={zoneForm.name}
             onChangeText={t => setZoneForm(f => ({ ...f, name: t }))}
             placeholder="e.g. Canada, EU, Domestic"
@@ -778,7 +778,7 @@ export default function ShippingScreen() {
           {zoneForm.zoneType === 'country' && (
             <>
               <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Countries (comma-separated ISO codes)</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 value={zoneForm.countriesText}
                 onChangeText={t => setZoneForm(f => ({ ...f, countriesText: t }))}
                 placeholder="CA, MX"
@@ -807,7 +807,7 @@ export default function ShippingScreen() {
           {zoneForm.pricingModel === 'flat' ? (
             <>
               <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Flat rate</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 value={zoneForm.flatRate}
                 onChangeText={t => setZoneForm(f => ({ ...f, flatRate: t }))}
                 placeholder="$5.99"
@@ -822,7 +822,7 @@ export default function ShippingScreen() {
                 <View key={i} style={[styles.tierRow, { borderColor: colors.border }]}>
                   <View style={styles.tierField}>
                     <Text style={[styles.tierLabel, { color: colors.mutedForeground }]}>Min (g)</Text>
-                    <TextInput
+                    <TextInput returnKeyType="done"
                       value={String(tier.minWeightGrams)}
                       onChangeText={t => updateTier(i, { minWeightGrams: parseInt(t, 10) || 0 })}
                       keyboardType="number-pad"
@@ -831,7 +831,7 @@ export default function ShippingScreen() {
                   </View>
                   <View style={styles.tierField}>
                     <Text style={[styles.tierLabel, { color: colors.mutedForeground }]}>Max (g)</Text>
-                    <TextInput
+                    <TextInput returnKeyType="done"
                       value={tier.maxWeightGrams != null ? String(tier.maxWeightGrams) : ''}
                       onChangeText={t => updateTier(i, { maxWeightGrams: t.trim() ? (parseInt(t, 10) || 0) : null })}
                       placeholder="∞"
@@ -842,7 +842,7 @@ export default function ShippingScreen() {
                   </View>
                   <View style={styles.tierField}>
                     <Text style={[styles.tierLabel, { color: colors.mutedForeground }]}>Rate</Text>
-                    <TextInput
+                    <TextInput returnKeyType="done"
                       value={tier.rateCents ? (tier.rateCents / 100).toFixed(2) : ''}
                       onChangeText={t => updateTier(i, { rateCents: parseDecimalToCents(t || '0') ?? 0 })}
                       placeholder="$0.00"
@@ -864,7 +864,7 @@ export default function ShippingScreen() {
           )}
 
           <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Free shipping above (optional)</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             value={zoneForm.freeAbove}
             onChangeText={t => setZoneForm(f => ({ ...f, freeAbove: t }))}
             placeholder="$75.00"
@@ -874,7 +874,7 @@ export default function ShippingScreen() {
           />
 
           <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Processing time (business days)</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             value={zoneForm.processingDays}
             onChangeText={t => setZoneForm(f => ({ ...f, processingDays: t.replace(/[^0-9]/g, '') }))}
             placeholder="2"
@@ -884,7 +884,7 @@ export default function ShippingScreen() {
           />
 
           <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Carrier / service (label only)</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             value={zoneForm.carrierLabel}
             onChangeText={t => setZoneForm(f => ({ ...f, carrierLabel: t }))}
             placeholder="e.g. USPS Priority"
@@ -963,7 +963,7 @@ export default function ShippingScreen() {
         <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: insets.bottom + 20 }]}>
           <Text style={[styles.sheetTitle, { color: colors.foreground }]}>{presetForm.id ? 'Edit package' : 'Add package preset'}</Text>
           <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Name</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             value={presetForm.name}
             onChangeText={t => setPresetForm(f => ({ ...f, name: t }))}
             placeholder="Small Box"
@@ -974,7 +974,7 @@ export default function ShippingScreen() {
             {(['lengthIn', 'widthIn', 'heightIn'] as const).map((key, i) => (
               <View key={key} style={{ flex: 1 }}>
                 <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>{['L', 'W', 'H'][i]} (in)</Text>
-                <TextInput
+                <TextInput returnKeyType="done"
                   value={presetForm[key]}
                   onChangeText={t => setPresetForm(f => ({ ...f, [key]: t }))}
                   placeholder="0"
@@ -986,7 +986,7 @@ export default function ShippingScreen() {
             ))}
           </View>
           <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Weight (oz)</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             value={presetForm.weightOz}
             onChangeText={t => setPresetForm(f => ({ ...f, weightOz: t }))}
             placeholder="8"

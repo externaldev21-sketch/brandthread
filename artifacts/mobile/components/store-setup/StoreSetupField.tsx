@@ -31,6 +31,7 @@ export function StoreSetupField({ label, prefix, status, ...inputProps }: Props)
       <View style={[styles.box, { borderColor: focused ? theme.text : theme.border, backgroundColor: theme.background }]}>
         {prefix ? <Text style={[styles.prefix, { color: theme.muted }]}>{prefix}</Text> : null}
         <TextInput
+          returnKeyType={inputProps.multiline ? undefined : 'done'}
           {...inputProps}
           onFocus={(e) => { setFocused(true); inputProps.onFocus?.(e); }}
           onBlur={(e) => { setFocused(false); inputProps.onBlur?.(e); }}

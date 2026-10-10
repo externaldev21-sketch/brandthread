@@ -162,6 +162,7 @@ export function AddressAutocompleteInput({
           autoCapitalize="words"
           autoComplete="street-address"
           textContentType="fullStreetAddress"
+          returnKeyType="done"
           accessibilityLabel="Shipping address search"
           style={[styles.input, WEB_INPUT_RESET]}
         />

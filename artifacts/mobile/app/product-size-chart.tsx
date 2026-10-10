@@ -234,7 +234,7 @@ export default function ProductSizeChartScreen() {
           ))}
         </View>
         <View style={s.addRow}>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={s.addInput}
             value={newColName}
             onChangeText={setNewColName}
@@ -268,7 +268,7 @@ export default function ProductSizeChartScreen() {
               {rows.map((row, ri) => (
                 <View key={ri} style={t.dataRow}>
                   <View style={[t.cell, t.sizeCell]}>
-                    <TextInput
+                    <TextInput returnKeyType="done"
                       style={t.sizeInput}
                       value={row.size}
                       onChangeText={v => updateSizeLabel(ri, v)}
@@ -278,7 +278,7 @@ export default function ProductSizeChartScreen() {
                   </View>
                   {columns.map((_, ci) => (
                     <View key={ci} style={t.cell}>
-                      <TextInput
+                      <TextInput returnKeyType="done"
                         style={t.cellInput}
                         value={row.values[ci] ?? ''}
                         onChangeText={v => updateCell(ri, ci, v)}
@@ -301,7 +301,7 @@ export default function ProductSizeChartScreen() {
 
         {/* Add row */}
         <View style={[s.addRow, { marginTop: SP.sm }]}>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={s.addInput}
             value={newSizeName}
             onChangeText={setNewSizeName}

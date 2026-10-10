@@ -28,6 +28,7 @@ import Animated, {
   Easing, useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
 import type { FeatherNames } from '@/lib/featherNames';
+import { AnimatedSymbol, canAnimateSymbol, type AnimatedSymbolName } from '@/components/ui/AnimatedSymbol';
 
 const FILL_MS = 200;
 const FILL_EASING = Easing.out(Easing.cubic);
@@ -73,6 +74,21 @@ export function IconFillTransition({
 
   const outlineStyle = useAnimatedStyle(() => ({ opacity: 1 - fill.value }));
   const solidStyle = useAnimatedStyle(() => ({ opacity: fill.value }));
+
+  // iOS: the native SF Symbol with a bounce on turning on (heart, bookmark).
+  if (canAnimateSymbol(outlineName)) {
+    return (
+      <Animated.View style={styles.stack} testID={testID}>
+        <AnimatedSymbol
+          name={outlineName as AnimatedSymbolName}
+          active={active}
+          size={size}
+          activeColor={activeColor}
+          inactiveColor={inactiveColor}
+        />
+      </Animated.View>
+    );
+  }
 
   // Each glyph is wrapped in its own plain Reanimated.View (a real host
   // component on every platform, including web) that carries the animated

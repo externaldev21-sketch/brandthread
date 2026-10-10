@@ -376,7 +376,7 @@ export default function TechPackGeneratorScreen() {
                   <View style={[styles.tableCell, styles.tableFirstCol]} />
                   {sizes.map((size) => (
                     <View key={size} style={styles.tableCell}>
-                      <TextInput
+                      <TextInput returnKeyType="done"
                         value={size}
                         onChangeText={(v) => renameSize(size, v)}
                         style={[styles.sizeInput, { color: colors.foreground, borderColor: colors.border }]}
@@ -394,7 +394,7 @@ export default function TechPackGeneratorScreen() {
                 {rows.map((row, i) => (
                   <View key={i} style={styles.tableRow}>
                     <View style={[styles.tableCell, styles.tableFirstCol]}>
-                      <TextInput
+                      <TextInput returnKeyType="done"
                         value={row.point}
                         onChangeText={(v) => updateRowPoint(i, v)}
                         placeholder="Chest"
@@ -404,7 +404,7 @@ export default function TechPackGeneratorScreen() {
                     </View>
                     {sizes.map((size) => (
                       <View key={size} style={styles.tableCell}>
-                        <TextInput
+                        <TextInput returnKeyType="done"
                           value={row.values[size] ?? ''}
                           onChangeText={(v) => updateCell(i, size, v)}
                           placeholder="—"

@@ -22,6 +22,8 @@ import { haptics } from '@/lib/haptics';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { apiErrorMessage } from '@/lib/safety';
 import { formatMinute, parseMinute } from '@/lib/awayHours';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToHm, hmToDate } from '@/lib/dateTimeField';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const MESSAGE_MAX = 1000;
@@ -170,26 +172,46 @@ export default function AwayMessageScreen() {
               <View style={styles.hoursRow} testID="away-message-hours">
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>Opens</Text>
-                  <TextInput
-                    style={[styles.input, fieldStyle]}
-                    value={openText}
-                    onChangeText={(v) => { setSaved(false); setOpenText(v); }}
-                    placeholder="09:00"
-                    placeholderTextColor={colors.mutedForeground}
-                    keyboardType="numbers-and-punctuation"
+                  <NativeDateTimeField
+                    variant="pill"
+                    mode="time"
+                    label="Opens"
+                    value={hmToDate(openText)}
+                    onChange={(d) => { setSaved(false); setOpenText(dateToHm(d)); }}
                     testID="away-message-open"
+                    fallback={(
+                      <TextInput returnKeyType="done"
+                        style={[styles.input, fieldStyle]}
+                        value={openText}
+                        onChangeText={(v) => { setSaved(false); setOpenText(v); }}
+                        placeholder="09:00"
+                        placeholderTextColor={colors.mutedForeground}
+                        keyboardType="numbers-and-punctuation"
+                        testID="away-message-open"
+                      />
+                    )}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>Closes</Text>
-                  <TextInput
-                    style={[styles.input, fieldStyle]}
-                    value={closeText}
-                    onChangeText={(v) => { setSaved(false); setCloseText(v); }}
-                    placeholder="17:00"
-                    placeholderTextColor={colors.mutedForeground}
-                    keyboardType="numbers-and-punctuation"
+                  <NativeDateTimeField
+                    variant="pill"
+                    mode="time"
+                    label="Closes"
+                    value={hmToDate(closeText)}
+                    onChange={(d) => { setSaved(false); setCloseText(dateToHm(d)); }}
                     testID="away-message-close"
+                    fallback={(
+                      <TextInput returnKeyType="done"
+                        style={[styles.input, fieldStyle]}
+                        value={closeText}
+                        onChangeText={(v) => { setSaved(false); setCloseText(v); }}
+                        placeholder="17:00"
+                        placeholderTextColor={colors.mutedForeground}
+                        keyboardType="numbers-and-punctuation"
+                        testID="away-message-close"
+                      />
+                    )}
                   />
                 </View>
               </View>

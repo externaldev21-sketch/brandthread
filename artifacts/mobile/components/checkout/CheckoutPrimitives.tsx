@@ -199,6 +199,7 @@ export function CheckoutField({
     <View style={[styles.field, style]}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
+        returnKeyType={inputProps.multiline ? undefined : 'done'}
         {...inputProps}
         value={value}
         onChangeText={onChangeText}

@@ -37,6 +37,8 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 import { radius } from '@/constants/radii';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToHm, dateToYmd, hmToDate, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
 interface SellerProductRow {
   id: string;
@@ -145,20 +147,41 @@ function DateTimeChipPicker({
         <Text style={[styles.customToggleText, { color: theme.muted }]}>Enter an exact date & time</Text>
       </TouchableOpacity>
       {showCustom && (
-        <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: 8 }}>
-          <TextInput
-            style={[styles.input, { flex: 1.4, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
-            value={dateValue}
-            onChangeText={onDateChange}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={theme.muted}
+        <View style={{ marginTop: 8 }}>
+          <NativeDateTimeField
+            mode="date"
+            label="Date"
+            value={ymdToDate(dateValue)}
+            onChange={(d) => onDateChange(dateToYmd(d))}
+            minimumDate={startOfToday()}
+            divider
+            testID="drop-exact-date"
+            fallback={(
+              <View style={{ flexDirection: 'row', gap: SP.sm }}>
+                <TextInput
+                  style={[styles.input, { flex: 1.4, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
+                  value={dateValue}
+                  onChangeText={onDateChange}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={theme.muted}
+                />
+                <TextInput
+                  style={[styles.input, { flex: 1, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
+                  value={timeValue}
+                  onChangeText={onTimeChange}
+                  placeholder="HH:MM"
+                  placeholderTextColor={theme.muted}
+                />
+              </View>
+            )}
           />
-          <TextInput
-            style={[styles.input, { flex: 1, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
-            value={timeValue}
-            onChangeText={onTimeChange}
-            placeholder="HH:MM"
-            placeholderTextColor={theme.muted}
+          <NativeDateTimeField
+            mode="time"
+            label="Time"
+            value={hmToDate(timeValue)}
+            onChange={(d) => onTimeChange(dateToHm(d))}
+            testID="drop-exact-time"
+            fallback={null}
           />
         </View>
       )}

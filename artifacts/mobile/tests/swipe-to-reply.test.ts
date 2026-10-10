@@ -83,3 +83,12 @@ describe('SwipeToReplyBubble: nextCrossedState (haptic fires once, on threshold-
     expect(reCrossed).toEqual({ crossed: true, fireHaptic: true });
   });
 });
+
+describe('back-swipe guard', () => {
+  it('never claims a drag that starts at the left screen edge', async () => {
+    const { shouldClaimSwipe, BACK_SWIPE_EDGE } = await import('@/lib/swipeToReply');
+    expect(shouldClaimSwipe(40, 2, false, BACK_SWIPE_EDGE - 1)).toBe(false);
+    expect(shouldClaimSwipe(40, 2, false, BACK_SWIPE_EDGE + 30)).toBe(true);
+    expect(shouldClaimSwipe(40, 2, false)).toBe(true);
+  });
+});

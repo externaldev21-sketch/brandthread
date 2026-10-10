@@ -10,7 +10,7 @@ import {
   View, Text, TouchableOpacity, TextInput, ScrollView,
   StyleSheet, ActivityIndicator, Animated, Platform,
   ViewStyle, TextStyle, StyleProp, Pressable,
-  SwitchProps, PressableProps, LayoutChangeEvent,
+  SwitchProps, PressableProps, LayoutChangeEvent, TextInputProps,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line as SvgLine } from 'react-native-svg';
@@ -1075,8 +1075,13 @@ interface FormInputProps {
   multiline?: boolean;
   secureTextEntry?: boolean;
   keyboardType?: 'default' | 'email-address' | 'numeric' | 'decimal-pad' | 'url';
-  returnKeyType?: 'done' | 'next' | 'search' | 'go';
+  /** Defaults to 'done' on single-line fields (multiline keeps return = newline). */
+  returnKeyType?: 'done' | 'next' | 'search' | 'go' | 'send';
   onSubmitEditing?: () => void;
+  /** Autofill hints; an email keyboard implies `email` / `emailAddress` unless overridden. */
+  autoComplete?: TextInputProps['autoComplete'];
+  textContentType?: TextInputProps['textContentType'];
+  autoCapitalize?: TextInputProps['autoCapitalize'];
   style?: StyleProp<ViewStyle>;
   rightElement?: React.ReactNode;
   /** Inline validation message: error border + text under the field. */
@@ -1088,8 +1093,10 @@ interface FormInputProps {
 export function FormInput({
   label, value, onChange, placeholder, multiline, secureTextEntry, keyboardType,
   returnKeyType, onSubmitEditing, style, rightElement, error, helper,
+  autoComplete, textContentType, autoCapitalize,
 }: FormInputProps) {
   const [focused, setFocused] = useState(false);
+  const isEmail = keyboardType === 'email-address';
   const { theme } = useAppTheme();
   return (
     <View style={[fiS.wrap, style]}>
@@ -1104,8 +1111,11 @@ export function FormInput({
           multiline={multiline}
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
-          returnKeyType={returnKeyType}
+          returnKeyType={returnKeyType ?? (multiline ? undefined : 'done')}
           onSubmitEditing={onSubmitEditing}
+          autoComplete={autoComplete ?? (isEmail ? 'email' : undefined)}
+          textContentType={textContentType ?? (isEmail ? 'emailAddress' : undefined)}
+          autoCapitalize={autoCapitalize ?? (isEmail || keyboardType === 'url' ? 'none' : undefined)}
           accessibilityLabel={label ?? placeholder}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

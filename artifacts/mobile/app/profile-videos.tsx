@@ -10,7 +10,9 @@
  * Params: source=creator|product, id, startPostId?, title?
  */
 import React from 'react';
+import { View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import { useLocalSearchParams } from 'expo-router';
 import FeedScreen from './(tabs)/feed';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -19,13 +21,20 @@ export default function ProfileVideosScreen() {
   const params = useLocalSearchParams<{ source?: string; id?: string; startPostId?: string; title?: string; exactPost?: string }>();
   const source = params.source === 'product' ? 'product' : 'creator';
   const id = typeof params.id === 'string' ? params.id : '';
+  const { width, height } = useWindowDimensions();
+  // Zoom from the tapped grid tile into the full-screen player (the tile's
+  // rect is handed over by ProfileVideoTile); no-op on deep links / back.
+  const { overlay } = useExpandFromTileOverlay(
+    typeof params.startPostId === 'string' ? params.startPostId : undefined,
+    { x: 0, y: 0, width, height },
+  );
 
   if (!id) {
     return <EmptyState icon="film" title="Video not found" description="This link is missing the creator or product it belongs to." />;
   }
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <StatusBar style="light" />
       <FeedScreen
         key={`${source}:${id}:${params.startPostId ?? ''}`}
@@ -37,6 +46,7 @@ export default function ProfileVideosScreen() {
           exactPost: params.exactPost === '1',
         }}
       />
-    </>
+      {overlay}
+    </View>
   );
 }

@@ -14,6 +14,7 @@ export function Field({ label, error, style, ...rest }: TextInputProps & { label
       <TextInput
         placeholderTextColor={colors.subtle}
         accessibilityLabel={label}
+        returnKeyType={rest.multiline ? undefined : 'done'}
         {...rest}
         style={[st.input, { backgroundColor: colors.secondary, borderColor: error ? colors.destructive : colors.border, color: colors.foreground }, style]}
       />

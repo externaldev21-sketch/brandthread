@@ -144,7 +144,7 @@ export default function ShopifyImportScreen() {
             </Text>
           </BrandthreadCard>
           <Text style={[styles.label, { color: colors.mutedForeground }]}>Shopify store domain</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={[styles.input, { backgroundColor: colors.secondary, color: colors.foreground, borderColor: colors.border }]}
             placeholder="my-brand.myshopify.com"
             placeholderTextColor={colors.mutedForeground}

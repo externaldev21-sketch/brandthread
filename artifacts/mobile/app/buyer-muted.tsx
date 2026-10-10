@@ -68,7 +68,7 @@ export default function MutedAccountsScreen() {
       {muted.length > 0 && (
         <View style={styles.search}>
           <Feather name="search" size={16} color={theme.muted} />
-          <TextInput
+          <TextInput returnKeyType="search"
             style={[styles.searchInput, WEB_INPUT_RESET]}
             value={query}
             onChangeText={setQuery}

@@ -193,11 +193,11 @@ export default function AdminInvitesScreen() {
         <View style={s.fieldRow}>
           <View style={s.field}>
             <Text style={s.meta}>Codes</Text>
-            <TextInput style={s.input} value={count} onChangeText={setCount} keyboardType="number-pad" maxLength={2} accessibilityLabel="Number of codes" />
+            <TextInput returnKeyType="done" style={s.input} value={count} onChangeText={setCount} keyboardType="number-pad" maxLength={2} accessibilityLabel="Number of codes" />
           </View>
           <View style={s.field}>
             <Text style={s.meta}>Uses each</Text>
-            <TextInput style={s.input} value={uses} onChangeText={setUses} keyboardType="number-pad" maxLength={5} accessibilityLabel="Uses per code" />
+            <TextInput returnKeyType="done" style={s.input} value={uses} onChangeText={setUses} keyboardType="number-pad" maxLength={5} accessibilityLabel="Uses per code" />
           </View>
         </View>
         <PrimaryButton label="Generate" onPress={generate} loading={busy === 'generate'} />

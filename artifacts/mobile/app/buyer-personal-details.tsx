@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, type TextInputProps } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -27,17 +27,21 @@ type FieldDef = {
   icon: keyof typeof Feather.glyphMap;
   editable?: boolean;
   keyboardType?: 'default' | 'email-address' | 'phone-pad';
+  autoComplete?: TextInputProps['autoComplete'];
+  textContentType?: TextInputProps['textContentType'];
+  autoCapitalize?: TextInputProps['autoCapitalize'];
 };
 
 // email and birthday are managed in Login methods and locked in the UI.
 const FIELDS: FieldDef[] = [
-  { key: 'name',     label: 'Name',      placeholder: 'Your name',         icon: 'user' },
-  { key: 'username', label: 'Username',  placeholder: '@username',          icon: 'at-sign' },
-  { key: 'email',    label: 'Email',     placeholder: 'your@email.com',     icon: 'mail',    keyboardType: 'email-address', editable: false },
-  { key: 'phone',    label: 'Phone',     placeholder: 'Add phone number',   icon: 'phone',   keyboardType: 'phone-pad' },
+  { key: 'name',     label: 'Name',      placeholder: 'Your name',         icon: 'user', autoComplete: 'name', textContentType: 'name', autoCapitalize: 'words' },
+  { key: 'username', label: 'Username',  placeholder: '@username',          icon: 'at-sign', autoComplete: 'username', textContentType: 'username', autoCapitalize: 'none' },
+  { key: 'email',    label: 'Email',     placeholder: 'your@email.com',     icon: 'mail',    keyboardType: 'email-address', editable: false, autoComplete: 'email', textContentType: 'emailAddress', autoCapitalize: 'none' },
+  { key: 'phone',    label: 'Phone',     placeholder: 'Add phone number',   icon: 'phone',   keyboardType: 'phone-pad', autoComplete: 'tel', textContentType: 'telephoneNumber' },
   { key: 'birthday', label: 'Birthday',  placeholder: 'Set in Login methods', icon: 'calendar', editable: false },
   { key: 'pronouns', label: 'Pronouns',  placeholder: 'e.g. they/them',     icon: 'smile' },
 ];
+const EDITABLE_KEYS: string[] = FIELDS.filter((f) => f.editable !== false).map((f) => f.key);
 
 /** Masks a real email address, e.g. "jordan@example.com" -> "••••@example.com". */
 function maskEmail(email: string | null | undefined): string {
@@ -51,6 +55,7 @@ export default function BuyerPersonalDetails() {
   const palette = useColors();
   const s = makeStyles(palette, theme);
   const insets = useSafeAreaInsets();
+  const inputRefs = useRef<Record<string, TextInput | null>>({});
   const router = useRouter();
   const { user } = useUser();
   const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
@@ -112,12 +117,14 @@ export default function BuyerPersonalDetails() {
         <Card style={s.card}>
           {FIELDS.map((field, i) => {
             const isEditable = field.editable !== false;
+            const nextKey = EDITABLE_KEYS[EDITABLE_KEYS.indexOf(field.key) + 1];
             return (
               <React.Fragment key={field.key}>
                 <View style={s.row}>
                   <Feather name={field.icon} size={17} color={theme.accent} style={{ width: 24 }} />
                   <Text style={s.rowLabel}>{field.label}</Text>
                   <TextInput
+                    ref={(r) => { inputRefs.current[field.key] = r; }}
                     style={[s.input, !isEditable && s.inputDisabled]}
                     value={getValue(field.key)}
                     onChangeText={v => isEditable && set(field.key, v)}
@@ -125,8 +132,13 @@ export default function BuyerPersonalDetails() {
                     placeholderTextColor={palette.mutedForeground}
                     editable={isEditable}
                     keyboardType={field.keyboardType ?? 'default'}
+                    autoComplete={field.autoComplete}
+                    textContentType={field.textContentType}
+                    autoCapitalize={field.autoCapitalize}
                     autoCorrect={false}
-                    returnKeyType="done"
+                    returnKeyType={isEditable && nextKey ? 'next' : 'done'}
+                    blurOnSubmit={!(isEditable && nextKey)}
+                    onSubmitEditing={isEditable && nextKey ? () => inputRefs.current[nextKey]?.focus() : undefined}
                   />
                   {!isEditable && <Feather name="lock" size={14} color={palette.mutedForeground} />}
                 </View>

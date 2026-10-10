@@ -103,6 +103,34 @@ async function tapAt(page, x, y, wait = 2200) {
   await page.waitForTimeout(wait);
 }
 
+// A9 large titles: scroll the screen's list by `dy` CSS px with the wheel
+// (RN-web lists are plain overflow:auto views), then let the frame settle.
+async function scrollList(page, dy, x = 195, y = 560) {
+  await page.mouse.move(x, y);
+  await page.mouse.wheel(0, dy);
+  await page.waitForTimeout(600);
+}
+async function openBuyerMenu(page) {
+  await openBuyerTab(page, 'profile');
+  await page.getByLabel('More options', { exact: true }).first().click();
+  await page.waitForTimeout(2200);
+}
+async function openBuyerSettings(page) {
+  await openBuyerMenu(page);
+  await page.getByLabel('Settings', { exact: true }).first().click();
+  await page.waitForTimeout(2200);
+}
+async function openBuyerPrivacy(page) {
+  await openBuyerSettings(page);
+  await page.getByLabel(/^Privacy & activity/).first().click();
+  await page.waitForTimeout(2500);
+}
+async function openSellerSettings(page) {
+  await openSellerTab(page, /profile/);
+  await page.getByLabel('Seller settings', { exact: true }).first().click();
+  await page.waitForTimeout(2200);
+}
+
 export const FLOWS = [
   // ⋯ pull-down menus (Apple HIG pull-down button / UIMenu)
   { name: 'orders-pulldown', role: 'seller', act: async (p) => { await openSellerTab(p, /orders/i); await clickLabel(p, 'More order actions'); }, wait: 'pulldown-menu' },
@@ -120,6 +148,33 @@ export const FLOWS = [
   { name: 'orders-fullswipe', role: 'seller', act: async (p) => { await openSellerTab(p, /orders/i); await swipeAt(p, 340, 340, -270, { hold: true }); }, wait: null },
   { name: 'cart-swipe', role: 'buyer', act: async (p) => { await tapAt(p, 66, 80, 3000); await swipeAt(p, 340, 265, -170); }, wait: null },
   { name: 'notifications-swipe', role: 'buyer', act: async (p) => { await openBuyerTab(p, 'profile'); await tapAt(p, 282, 87, 3000); await swipeAt(p, 330, 260, -120); }, wait: null },
+  // A9 large titles collapsing into the bar on scroll (iOS Settings / Mail):
+  // -rest must look identical to before; -scrolled shows the compact title.
+  { name: 'a9-menu-rest', role: 'buyer', act: async (p) => { await openBuyerMenu(p); }, wait: null },
+  { name: 'a9-menu-mid', role: 'buyer', act: async (p) => { await openBuyerMenu(p); await scrollList(p, 12); }, wait: null },
+  { name: 'a9-menu-scrolled', role: 'buyer', act: async (p) => { await openBuyerMenu(p); await scrollList(p, 160); }, wait: null },
+  { name: 'a9-buyer-settings-rest', role: 'buyer', act: async (p) => { await openBuyerSettings(p); }, wait: null },
+  { name: 'a9-buyer-settings-scrolled', role: 'buyer', act: async (p) => { await openBuyerSettings(p); await scrollList(p, 160); }, wait: null },
+  { name: 'a9-privacy-rest', role: 'buyer', act: async (p) => { await openBuyerPrivacy(p); }, wait: null },
+  { name: 'a9-privacy-scrolled', role: 'buyer', act: async (p) => { await openBuyerPrivacy(p); await scrollList(p, 160); }, wait: null },
+  { name: 'a9-seller-settings-rest', role: 'seller', act: async (p) => { await openSellerSettings(p); }, wait: null },
+  { name: 'a9-seller-settings-scrolled', role: 'seller', act: async (p) => { await openSellerSettings(p); await scrollList(p, 160); }, wait: null },
+  // A11 native date/time pickers. The web preview shows the web fallback
+  // (a native <input type="date">), not the iOS compact button.
+  { name: 'a11-discount-dates', role: 'seller', act: async (p) => {
+    await openSellerSettings(p);
+    await p.getByLabel('Discounts', { exact: true }).first().click(); await p.waitForTimeout(2500);
+    await p.getByLabel('New discount', { exact: true }).first().click(); await p.waitForTimeout(1500);
+    await p.getByText('Active dates', { exact: true }).last().scrollIntoViewIfNeeded();
+    await p.getByRole('switch').last().click(); await p.waitForTimeout(500);
+    await p.getByText('Active dates', { exact: true }).last().scrollIntoViewIfNeeded(); await p.waitForTimeout(400);
+  }, wait: null },
+  { name: 'a11-vacation', role: 'seller', act: async (p) => {
+    await openSellerSettings(p);
+    await p.getByLabel('Vacation mode', { exact: true }).first().click(); await p.waitForTimeout(2500);
+    await p.getByRole('switch').first().click(); await p.waitForTimeout(600);
+    await scrollList(p, 220);
+  }, wait: null },
 ];
 
 async function run(browser, images, origin, flow) {

@@ -2,8 +2,8 @@
  * Change password — current + new + confirm, via Clerk's user.updatePassword.
  * Reached from Password and security (buyer), Security (seller) and Login methods.
  */
-import React, { useState } from 'react';
-import { View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { TextInput, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useRouter } from 'expo-router';
 import { useUser, useReverification } from '@clerk/expo';
@@ -22,6 +22,8 @@ export default function ChangePassword() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
+  const nextRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
   const [signOutOthers, setSignOutOthers] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -79,9 +81,13 @@ export default function ChangePassword() {
           secure
           autoComplete="current-password"
           textContentType="password"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => nextRef.current?.focus()}
         />
       ) : null}
       <SecurityField
+        ref={nextRef}
         testID="new-password-input"
         label="New password"
         value={next}
@@ -90,8 +96,12 @@ export default function ChangePassword() {
         secure
         autoComplete="new-password"
         textContentType="newPassword"
+        returnKeyType="next"
+        blurOnSubmit={false}
+        onSubmitEditing={() => confirmRef.current?.focus()}
       />
       <SecurityField
+        ref={confirmRef}
         testID="confirm-password-input"
         label="Confirm new password"
         value={confirm}

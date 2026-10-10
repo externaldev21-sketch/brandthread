@@ -139,7 +139,7 @@ export default function BrandScreen() {
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>
         </View>
-        <TextInput
+        <TextInput returnKeyType="done"
           style={[styles.input, { backgroundColor: colors.secondary, color: colors.foreground, borderColor: colors.border }]}
           placeholder="Describe your brand..."
           placeholderTextColor={colors.mutedForeground}

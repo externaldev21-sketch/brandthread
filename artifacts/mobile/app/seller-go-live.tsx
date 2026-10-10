@@ -252,7 +252,7 @@ function SellerGoLiveNativeScreen() {
         pointerEvents="box-none"
       >
         <View style={s.fields} pointerEvents="box-none">
-          <TextInput
+          <TextInput returnKeyType="done"
             value={title}
             onChangeText={setTitle}
             placeholder="Add a title…"

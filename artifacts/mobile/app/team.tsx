@@ -443,7 +443,7 @@ export default function TeamScreen() {
               <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
                 They'll get access to your store based on the role you choose.
               </Text>
-              <TextInput
+              <TextInput returnKeyType="done" autoComplete="email" textContentType="emailAddress"
                 value={inviteEmail}
                 onChangeText={setInviteEmail}
                 placeholder="Email address or @username"

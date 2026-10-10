@@ -126,6 +126,9 @@ export default function ForgotPasswordScreen() {
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoComplete="email"
+                  textContentType="emailAddress"
+                  returnKeyType="go"
+                  onSubmitEditing={() => { if (email.trim() && !isFetching) handleSendCode(); }}
                   autoFocus
                 />
               </View>
@@ -175,13 +178,15 @@ export default function ForgotPasswordScreen() {
 
               <View style={s.fieldWrap}>
                 <Text style={s.label}>Reset code</Text>
-                <TextInput accessibilityLabel="Reset code"
+                <TextInput returnKeyType="done" accessibilityLabel="Reset code"
                   style={[s.input, s.codeInput]}
                   placeholder="000000"
                    placeholderTextColor={theme.subtle}
                   value={code}
                   onChangeText={t => { setCode(t); setError(''); }}
                   keyboardType="number-pad"
+                  autoComplete="one-time-code"
+                  textContentType="oneTimeCode"
                   maxLength={6}
                   autoFocus
                 />
@@ -198,6 +203,9 @@ export default function ForgotPasswordScreen() {
                     onChangeText={t => { setPassword(t); setError(''); }}
                     secureTextEntry={!showPw}
                     autoComplete="new-password"
+                    textContentType="newPassword"
+                    autoCapitalize="none"
+                    returnKeyType="done"
                   />
                   <TouchableOpacity accessibilityLabel={showPw ? 'Hide password' : 'Show password'} accessibilityRole="button" style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
                      <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={theme.muted} />

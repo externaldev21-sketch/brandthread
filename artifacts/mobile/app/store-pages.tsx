@@ -305,7 +305,7 @@ export default function StorePagesScreen() {
         {/* 2. Title */}
         <View style={styles.formSection}>
           <Text style={styles.fieldLabel}>Title</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={styles.textInput}
             value={form.title}
             onChangeText={(v) => setFormField('title', v)}
@@ -350,7 +350,7 @@ export default function StorePagesScreen() {
           {form.seoExpanded && (
             <>
               <Text style={styles.subLabel}>SEO Title</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={form.seoTitle}
                 onChangeText={(v) => setFormField('seoTitle', v)}
@@ -375,7 +375,7 @@ export default function StorePagesScreen() {
         {/* 5. URL Slug */}
         <View style={styles.formSection}>
           <Text style={styles.fieldLabel}>URL</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={styles.textInput}
             value={form.slug}
             onChangeText={(v) => setFormField('slug', v)}
@@ -401,7 +401,7 @@ export default function StorePagesScreen() {
           {form.status === 'scheduled' && (
             <>
               <Text style={[styles.subLabel, { marginTop: SP.sm }]}>Schedule Date</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={form.scheduledAt}
                 onChangeText={(v) => setFormField('scheduledAt', v)}

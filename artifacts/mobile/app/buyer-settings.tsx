@@ -3,7 +3,7 @@
  * Profile card + search + compact grouped iOS-Settings-style sections.
  */
 import React, { useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
@@ -13,6 +13,7 @@ import { haptics } from '@/lib/haptics';
 import { BUYER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
 import { SettingsProfileCard, SettingsSearchBar, ConfirmSheet } from '@/components/settings/SettingsKit';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 import { SectionHeader } from '@/components/BrandthreadUI';
 import { Card, ListRow } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -20,6 +21,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 export default function BuyerSettingsScreen() {
   const colors = useColors();
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const titleCollapse = useLargeTitleCollapse();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useAuth();
@@ -71,9 +73,11 @@ export default function BuyerSettingsScreen() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Settings" variant="push" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Settings" variant="push" onBack={() => goBackOr(router)} collapse={titleCollapse} />
 
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={titleCollapse.onScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: insets.bottom + 48 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -112,7 +116,7 @@ export default function BuyerSettingsScreen() {
         ))}
 
         <Text style={s.version}>Brandthread v1.0.0</Text>
-      </ScrollView>
+      </Animated.ScrollView>
 
       <ConfirmSheet
         visible={signOutVisible}

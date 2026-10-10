@@ -29,6 +29,9 @@ export interface InputProps extends Omit<TextInputProps, 'style' | 'placeholder'
 
 export function Input({ label, value, onChangeText, error, right, style, onFocus, onBlur, multiline, testID, ...rest }: InputProps) {
   const palette = useColors();
+  // Keyboard defaults: 'done' on single-line fields, and an email keyboard
+  // implies the email autofill hints. Explicit props always win.
+  const isEmail = rest.keyboardType === 'email-address';
   const [focused, setFocused] = React.useState(false);
   const raised = focused || value.length > 0;
   const borderColor = error ? palette.destructive : focused ? palette.foreground : 'transparent';
@@ -43,6 +46,10 @@ export function Input({ label, value, onChangeText, error, right, style, onFocus
             </Text>
           )}
           <TextInput
+            returnKeyType={multiline ? undefined : 'done'}
+            autoComplete={isEmail ? 'email' : undefined}
+            textContentType={isEmail ? 'emailAddress' : undefined}
+            autoCapitalize={isEmail ? 'none' : undefined}
             {...rest}
             testID={testID}
             value={value}

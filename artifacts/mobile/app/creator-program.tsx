@@ -185,7 +185,7 @@ export default function CreatorProgramScreen() {
 
             <SectionTitle>Join a brand</SectionTitle>
             <View style={[s.input, { borderColor: theme.border, backgroundColor: theme.card }]}>
-              <TextInput
+              <TextInput returnKeyType="done"
                 value={brandRef}
                 onChangeText={setBrandRef}
                 placeholder="Brand username"

@@ -350,7 +350,7 @@ export default function StoreCollectionsScreen() {
         {/* 2. Name */}
         <View style={styles.formSection}>
           <Text style={styles.fieldLabel}>Name *</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={styles.textInput}
             value={form.name}
             onChangeText={(v) => setFormField('name', v)}
@@ -474,7 +474,7 @@ export default function StoreCollectionsScreen() {
                       ))}
                     </View>
                   </ScrollView>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={styles.textInput}
                     value={cond.value}
                     onChangeText={(v) => updateCondition(idx, { value: v })}
@@ -514,7 +514,7 @@ export default function StoreCollectionsScreen() {
           {form.seoExpanded && (
             <>
               <Text style={styles.subLabel}>SEO Title</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={form.seoTitle}
                 onChangeText={(v) => setFormField('seoTitle', v)}
@@ -533,7 +533,7 @@ export default function StoreCollectionsScreen() {
                 textAlignVertical="top"
               />
               <Text style={[styles.subLabel, { marginTop: SP.sm }]}>URL Handle</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={form.handle}
                 onChangeText={(v) => setFormField('handle', v)}
@@ -561,7 +561,7 @@ export default function StoreCollectionsScreen() {
           {form.status === 'scheduled' && (
             <>
               <Text style={[styles.subLabel, { marginTop: SP.sm }]}>Schedule Date</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={form.scheduledAt}
                 onChangeText={(v) => setFormField('scheduledAt', v)}

@@ -30,6 +30,8 @@ import {
   StatusBadge, SectionHeader, HapticSwitch,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 import { EmptyState } from '@/components/layout';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
@@ -642,27 +644,27 @@ export default function DiscountsScreen() {
             {/* Active dates */}
             <View>
               <Text style={s.label}>Active dates</Text>
-              <Text style={s.subLabel}>Start date <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional — blank starts immediately)</Text></Text>
-              <TextInput
-                style={s.input}
-                value={startDate}
-                onChangeText={setStartDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={MUTED}
-                autoCorrect={false}
+              <NativeDateTimeField
+                mode="date"
+                label="Start date"
+                placeholder="Immediately"
+                value={ymdToDate(startDate)}
+                onChange={(d) => setStartDate(dateToYmd(d))}
+                onClear={() => setStartDate('')}
+                testID="discount-start-date"
               />
               <View style={[s.switchRow, { marginTop: SP.sm }]}>
                 <Text style={s.switchLabel}>Set an end date</Text>
                 <HapticSwitch value={hasEnd} onValueChange={setHasEnd} />
               </View>
               {hasEnd && (
-                <TextInput
-                  style={s.input}
-                  value={endDate}
-                  onChangeText={setEndDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={MUTED}
-                  autoCorrect={false}
+                <NativeDateTimeField
+                  mode="date"
+                  label="End date"
+                  value={ymdToDate(endDate)}
+                  onChange={(d) => setEndDate(dateToYmd(d))}
+                  minimumDate={ymdToDate(startDate) ?? startOfToday()}
+                  testID="discount-end-date"
                 />
               )}
             </View>
@@ -823,7 +825,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   summaryLine: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
   label:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  subLabel:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
   linkText:    { fontSize: FS.xs, fontFamily: FONT.semibold },
   input:       { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
   typeGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

@@ -104,7 +104,7 @@ export function CashOutSheet({
 
         <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
           <Text style={[styles.dollarSign, { color: theme.text }]}>$</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             value={amountText}
             onChangeText={setAmountText}
             placeholder="0.00"

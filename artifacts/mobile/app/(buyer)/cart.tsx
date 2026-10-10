@@ -1174,7 +1174,7 @@ export default function CartScreen() {
                 ) : (
                   <>
                     <View style={s.pointsRow}>
-                      <TextInput
+                      <TextInput returnKeyType="done"
                         value={pointsInput}
                         onChangeText={setPointsInput}
                         keyboardType="number-pad"

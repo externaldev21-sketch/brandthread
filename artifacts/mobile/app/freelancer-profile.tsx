@@ -376,7 +376,7 @@ export default function FreelancerProfileScreen() {
               Payment is held by Brandthread and released when the job is done.
             </Text>
 
-            <TextInput
+            <TextInput returnKeyType="done"
               style={styles.input}
               value={title}
               onChangeText={setTitle}
@@ -395,7 +395,7 @@ export default function FreelancerProfileScreen() {
             />
             <View style={styles.priceRow}>
               <Text style={styles.pricePrefix}>$</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={[styles.input, { flex: 1, marginBottom: 0 }]}
                 value={priceText}
                 onChangeText={(v) => setPriceText(v.replace(/[^0-9.]/g, ''))}

@@ -708,7 +708,7 @@ export default function BuyerEditProfileScreen() {
             <Divider theme={theme} />
             <View style={styles.row}>
               <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Emoji</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={[styles.rowInput, { color: theme.text }]}
                 value={badge.emoji}
                 onChangeText={v => setBadge(b => ({ ...b, emoji: v }))}

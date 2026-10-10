@@ -16,12 +16,13 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  Alert, Animated, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { haptics } from '@/lib/haptics';
@@ -45,6 +46,7 @@ type MenuSection = {
 
 export default function BuyerSettingsMenuScreen() {
   const { theme } = useAppTheme();
+  const titleCollapse = useLargeTitleCollapse();
   const router = useRouter();
   const { signOut } = useAuth();
   const [query, setQuery] = useState('');
@@ -129,7 +131,7 @@ export default function BuyerSettingsMenuScreen() {
 
   return (
     <View style={[s.page, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Menu" />
+      <ScreenHeader title="Menu" collapse={titleCollapse} />
 
       <View style={s.searchWrap}>
         <View style={[s.searchField, { backgroundColor: theme.cardElevated }]}>
@@ -151,7 +153,7 @@ export default function BuyerSettingsMenuScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <Animated.ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" onScroll={titleCollapse.onScroll} scrollEventThrottle={16}>
         {filteredSections.map((section) => (
           <View key={section.title} style={s.section}>
             <Text style={[s.sectionHeader, { color: theme.subtle }]}>{section.title.toUpperCase()}</Text>
@@ -174,7 +176,7 @@ export default function BuyerSettingsMenuScreen() {
             ))}
           </View>
         ))}
-      </ScrollView>
+      </Animated.ScrollView>
 
       <ShareProfileSheet visible={shareSheetOpen} onClose={() => setShareSheetOpen(false)} />
     </View>

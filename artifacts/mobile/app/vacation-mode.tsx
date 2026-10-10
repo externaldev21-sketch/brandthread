@@ -21,6 +21,8 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
 export default function VacationModeScreen() {
   const { theme } = useAppTheme();
@@ -132,15 +134,15 @@ export default function VacationModeScreen() {
               textAlignVertical="top"
             />
 
-            <Text style={[s.label, { marginTop: SP.md }]}>Return Date <Text style={s.optional}>(optional)</Text></Text>
-            <TextInput
-              style={s.input}
-              value={returnDate}
-              onChangeText={setReturnDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={MUTED}
-              keyboardType="default"
-              autoCorrect={false}
+            <NativeDateTimeField
+              mode="date"
+              label="Return date (optional)"
+              value={ymdToDate(returnDate)}
+              onChange={(d) => setReturnDate(dateToYmd(d))}
+              onClear={() => setReturnDate('')}
+              minimumDate={startOfToday()}
+              style={{ marginTop: SP.sm }}
+              testID="vacation-return-date"
             />
             <Text style={s.fieldHint}>Vacation mode auto-clears when this date passes.</Text>
           </View>

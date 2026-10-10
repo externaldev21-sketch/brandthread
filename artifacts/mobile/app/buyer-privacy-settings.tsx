@@ -1,13 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, ScrollView, StyleSheet,
+  Animated, View, ScrollView, StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SP } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 import { SectionHeader } from '@/components/BrandthreadUI';
 import { ListSkeleton } from '@/components/layout/Skeleton';
 import { Card, ListRow, Button, OptionSheet, OptionSheetOption } from '@/components/ui';
@@ -43,6 +44,7 @@ type PickerKey = keyof Pick<
 export default function BuyerPrivacySettings() {
   const colors = useColors();
   const styles = React.useMemo(() => makeStyles(colors), [colors]);
+  const titleCollapse = useLargeTitleCollapse();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
@@ -136,9 +138,10 @@ export default function BuyerPrivacySettings() {
         variant="push"
         onBack={handleBack}
         rightElement={hasChanges ? <Button label="Save" size="small" onPress={() => saveSettings(true)} /> : undefined}
+        collapse={titleCollapse}
       />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xxl }} showsVerticalScrollIndicator={false}>
+      <Animated.ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xxl }} showsVerticalScrollIndicator={false} onScroll={titleCollapse.onScroll} scrollEventThrottle={16}>
         {saveError ? <Card style={[styles.card, styles.errorCard]}><ListRow icon="alert-circle" iconColor={colors.destructive} title={saveError} disabled /></Card> : null}
 
         {/* PROFILE VISIBILITY */}
@@ -295,7 +298,7 @@ export default function BuyerPrivacySettings() {
             onPress={() => router.push('/buyer-restricted' as never)}
           />
         </Card>
-      </ScrollView>
+      </Animated.ScrollView>
 
       <OptionSheet
         visible={picker === 'whoCanSendFriendRequests'}

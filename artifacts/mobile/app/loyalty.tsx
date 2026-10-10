@@ -178,7 +178,7 @@ export default function LoyaltyScreen() {
         <View style={s.redeemCard}>
           <Text style={s.redeemLabel}>Points to redeem (min 100)</Text>
           <View style={s.redeemRow}>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={s.redeemInput}
               value={redeemPts}
               onChangeText={setRedeemPts}

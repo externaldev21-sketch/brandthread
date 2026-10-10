@@ -44,7 +44,7 @@ export default function FeesScreen() {
                   <Text style={styles.inputLabel}>Sale price</Text>
                   <View style={styles.inputWrap}>
                     <Text style={styles.currency}>$</Text>
-                    <TextInput
+                    <TextInput returnKeyType="done"
                       testID="fees-price-input"
                       style={styles.input}
                       value={priceText}

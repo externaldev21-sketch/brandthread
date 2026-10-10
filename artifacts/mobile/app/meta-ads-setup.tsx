@@ -32,6 +32,8 @@ import {
   PrimaryButton, EmptyState, FormInput, HapticSwitch,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 import {
   BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS, formatBudgetCents,
   META_OBJECTIVE_OPTIONS, META_CTA_OPTIONS, formatReachRange,
@@ -509,8 +511,8 @@ export default function MetaAdsSetupScreen() {
         {/* Schedule */}
         <Section title="Schedule" colors={colors}>
           <ToggleRow label="Start now" value={startNow} onChange={setStartNow} colors={colors} />
-          {!startNow && <FormInput label="Start date (YYYY-MM-DD)" value={startDate} onChange={setStartDate} placeholder="2026-10-01" />}
-          <FormInput label="End date (optional)" value={endDate} onChange={setEndDate} placeholder="YYYY-MM-DD" />
+          {!startNow && <NativeDateTimeField mode="date" label="Start date" value={ymdToDate(startDate)} onChange={(d) => setStartDate(dateToYmd(d))} minimumDate={startOfToday()} divider testID="meta-ads-start-date" />}
+          <NativeDateTimeField mode="date" label="End date (optional)" value={ymdToDate(endDate)} onChange={(d) => setEndDate(dateToYmd(d))} onClear={() => setEndDate('')} minimumDate={ymdToDate(startDate) ?? startOfToday()} testID="meta-ads-end-date" />
         </Section>
 
         {/* Placements */}

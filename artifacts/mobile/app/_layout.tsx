@@ -1495,7 +1495,10 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="analytics-cohorts"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
+        {/* A pushed product page (from Search, Saved, related products): a
+            standard push with the interactive edge back-swipe, like every
+            other pushed screen. */}
+        <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'ios_from_right', gestureEnabled: true }} />
         <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/*
@@ -1535,11 +1538,11 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="seller-activity"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="activity-people"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
-        <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
-        <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
-        <Stack.Screen name="seller-agreement"        options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
-        <Stack.Screen name="refund-policy"           options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-agreement"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="refund-policy"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-collection"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'ios_from_right' }} />

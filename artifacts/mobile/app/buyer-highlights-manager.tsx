@@ -107,7 +107,7 @@ function HLFormModal({
               )}
 
               {/* Label input */}
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={[s.labelInput, { borderColor: colors.primary, color: colors.foreground }]}
                 value={label}
                 onChangeText={setLabel}

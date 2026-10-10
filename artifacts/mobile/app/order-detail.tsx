@@ -15,6 +15,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, ymdToDate } from '@/lib/dateTimeField';
 import { RADII, radius } from '@/constants/radii';
 import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
@@ -1170,8 +1172,8 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" />
             {addingTracking && (
               <BrandthreadCard style={s.inlineForm}>
-                <TextInput style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
-                <TextInput style={s.inlineInput} value={trackingNum} onChangeText={setTrackingNum} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.inlineInput} value={trackingNum} onChangeText={setTrackingNum} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
                 <PrimaryButton label="Save & Mark Shipped" onPress={handleAddTrackingAndShip} small />
               </BrandthreadCard>
             )}
@@ -1547,19 +1549,18 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
               </View>
             ))}
           </View>
-          <Text style={s.estimatedDeliveryLabel}>Estimated delivery (optional)</Text>
-          <TextInput
-            style={s.inlineInput}
-            value={estimatedDelivery}
-            onChangeText={value => {
-              setEstimatedDelivery(value);
+          <NativeDateTimeField
+            mode="date"
+            label="Estimated delivery (optional)"
+            value={ymdToDate(estimatedDelivery)}
+            onChange={(d) => {
+              setEstimatedDelivery(dateToYmd(d));
               setTrackingFormDirty(true);
             }}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={SUBTLE}
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel="Estimated delivery date"
+            onClear={() => {
+              setEstimatedDelivery('');
+              setTrackingFormDirty(true);
+            }}
             testID="estimated-delivery-input"
           />
           <PrimaryButton
@@ -1633,8 +1634,8 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
             {form.visible && (
               <BrandthreadCard style={s.inlineForm}>
                 <Text style={s.inlineFormTitle}>Add Tracking</Text>
-                <TextInput style={s.inlineInput} value={form.carrier} onChangeText={v => updateForm(group.id, 'carrier', v)} placeholder="Carrier (USPS, UPS, FedEx...)" placeholderTextColor={SUBTLE} />
-                <TextInput style={s.inlineInput} value={form.tracking} onChangeText={v => updateForm(group.id, 'tracking', v)} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.inlineInput} value={form.carrier} onChangeText={v => updateForm(group.id, 'carrier', v)} placeholder="Carrier (USPS, UPS, FedEx...)" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.inlineInput} value={form.tracking} onChangeText={v => updateForm(group.id, 'tracking', v)} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
                 <View style={s.actionCol}>
                   <SecondaryButton label="Cancel" onPress={() => toggleForm(group.id)} small />
                   <PrimaryButton label="Save" onPress={() => onAddTracking(group.id)} small />
@@ -2091,7 +2092,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   trackingStatusOptionSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   trackingStatusOptionText: { textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   trackingStatusOptionTextSelected: { color: FG },
-  estimatedDeliveryLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.xs },
   groupHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
   groupTitle:       { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   manufacturerCard: { gap: SP.sm },

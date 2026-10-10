@@ -22,6 +22,8 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormInput, PrimaryButton, EmptyState, StatusBadge } from '@/components/BrandthreadUI';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { createRfq, getRfqTargetManufacturers, type RfqTargetManufacturer } from '@/services/manufacturerRfq';
 import { radius } from '@/constants/radii';
@@ -141,7 +143,7 @@ export default function RfqPostScreen() {
           <FormInput label="Quantity" value={quantity} onChange={setQuantity} placeholder="500" keyboardType="numeric" style={[s.field, s.half]} />
           <FormInput label="Target price / unit" value={targetPrice} onChange={setTargetPrice} placeholder="$6.50" keyboardType="decimal-pad" style={[s.field, s.half]} />
         </View>
-        <FormInput label="Deadline (optional)" value={deadline} onChange={setDeadline} placeholder="YYYY-MM-DD" style={s.field} />
+        <NativeDateTimeField mode="date" label="Deadline (optional)" value={ymdToDate(deadline)} onChange={(d) => setDeadline(dateToYmd(d))} onClear={() => setDeadline('')} minimumDate={startOfToday()} style={s.field} testID="rfq-deadline" />
 
         <View style={s.sectionHeaderRow}>
           <Text style={s.sectionLabel}>Send to manufacturers</Text>
@@ -150,7 +152,7 @@ export default function RfqPostScreen() {
 
         <View style={s.searchRow}>
           <Feather name="search" size={ICON.sm} color={theme.subtle} />
-          <TextInput
+          <TextInput returnKeyType="search"
             style={[s.searchInput, WEB_INPUT_RESET]}
             value={query}
             onChangeText={setQuery}

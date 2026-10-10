@@ -97,6 +97,8 @@ function BuyerLiveNativeScreen() {
   const [city, setCity]                   = useState('');
   const [region, setRegion]               = useState('');
   const [postalCode, setPostalCode]       = useState('');
+  const deliveryRefs = useRef<Record<string, TextInput | null>>({});
+  const focusDelivery = (key: string) => () => deliveryRefs.current[key]?.focus();
   const lastHighlightedRef = useRef<string | null>(null);
   // Moderation + co-host: pinned comment above chat, co-host tiles, removal.
   const mod = useLiveModeration(params.streamId);
@@ -655,14 +657,14 @@ function BuyerLiveNativeScreen() {
                 })}
               </View>
               <Text style={s.fieldLabel}>Delivery</Text>
-              <TextInput value={buyerEmail} onChangeText={setBuyerEmail} placeholder="Email" placeholderTextColor={SUBTLE} keyboardType="email-address" autoCapitalize="none" style={s.purchaseInput} />
-              <TextInput value={buyerName} onChangeText={setBuyerName} placeholder="Full name" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
-              <TextInput value={buyerPhone} onChangeText={setBuyerPhone} placeholder="Phone number" placeholderTextColor={SUBTLE} keyboardType="phone-pad" style={s.purchaseInput} />
-              <TextInput value={street} onChangeText={setStreet} placeholder="Street address" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
+              <TextInput ref={(r) => { deliveryRefs.current.buyerEmail = r; }} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusDelivery('buyerName')} autoComplete="email" textContentType="emailAddress" value={buyerEmail} onChangeText={setBuyerEmail} placeholder="Email" placeholderTextColor={SUBTLE} keyboardType="email-address" autoCapitalize="none" style={s.purchaseInput} />
+              <TextInput ref={(r) => { deliveryRefs.current.buyerName = r; }} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusDelivery('buyerPhone')} autoComplete="name" textContentType="name" autoCapitalize="words" value={buyerName} onChangeText={setBuyerName} placeholder="Full name" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
+              <TextInput ref={(r) => { deliveryRefs.current.buyerPhone = r; }} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusDelivery('street')} autoComplete="tel" textContentType="telephoneNumber" value={buyerPhone} onChangeText={setBuyerPhone} placeholder="Phone number" placeholderTextColor={SUBTLE} keyboardType="phone-pad" style={s.purchaseInput} />
+              <TextInput ref={(r) => { deliveryRefs.current.street = r; }} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusDelivery('city')} autoComplete="street-address" textContentType="fullStreetAddress" value={street} onChangeText={setStreet} placeholder="Street address" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
               <View style={s.addressRow}>
-                <TextInput value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={SUBTLE} style={[s.purchaseInput, { flex: 1 }]} />
-                <TextInput value={region} onChangeText={setRegion} placeholder="State" placeholderTextColor={SUBTLE} autoCapitalize="characters" style={[s.purchaseInput, s.regionInput]} />
-                <TextInput value={postalCode} onChangeText={setPostalCode} placeholder="ZIP" placeholderTextColor={SUBTLE} keyboardType="numbers-and-punctuation" style={[s.purchaseInput, s.postalInput]} />
+                <TextInput ref={(r) => { deliveryRefs.current.city = r; }} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusDelivery('region')} autoComplete="postal-address-locality" textContentType="addressCity" value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={SUBTLE} style={[s.purchaseInput, { flex: 1 }]} />
+                <TextInput ref={(r) => { deliveryRefs.current.region = r; }} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusDelivery('postalCode')} autoComplete="postal-address-region" textContentType="addressState" value={region} onChangeText={setRegion} placeholder="State" placeholderTextColor={SUBTLE} autoCapitalize="characters" style={[s.purchaseInput, s.regionInput]} />
+                <TextInput ref={(r) => { deliveryRefs.current.postalCode = r; }} returnKeyType="done" autoComplete="postal-code" textContentType="postalCode" value={postalCode} onChangeText={setPostalCode} placeholder="ZIP" placeholderTextColor={SUBTLE} keyboardType="numbers-and-punctuation" style={[s.purchaseInput, s.postalInput]} />
               </View>
               {checkoutError ? <Text style={s.checkoutError}>{checkoutError}</Text> : null}
               <PressableScale

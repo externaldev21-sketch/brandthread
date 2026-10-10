@@ -20,6 +20,7 @@ export function Field({
         onChangeText={onChangeText}
         maxLength={max}
         multiline={multiline}
+        returnKeyType={multiline ? undefined : 'done'}
         placeholderTextColor={c.mutedForeground}
         accessibilityLabel={label}
         style={[

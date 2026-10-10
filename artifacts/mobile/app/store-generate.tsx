@@ -612,7 +612,7 @@ export default function StoreGenerateScreen() {
       <View style={st.ageRow}>
         <View style={st.ageInputWrap}>
           <Text style={st.ageInputLabel}>Min age</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={st.ageInput}
             value={String(answers.ageRange?.min ?? 16)}
             onChangeText={v => updateAnswers({ ageRange: { min: parseInt(v) || 16, max: answers.ageRange?.max ?? 45 } })}
@@ -623,7 +623,7 @@ export default function StoreGenerateScreen() {
         <Text style={st.ageSep}>—</Text>
         <View style={st.ageInputWrap}>
           <Text style={st.ageInputLabel}>Max age</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={st.ageInput}
             value={String(answers.ageRange?.max ?? 45)}
             onChangeText={v => updateAnswers({ ageRange: { min: answers.ageRange?.min ?? 16, max: parseInt(v) || 45 } })}

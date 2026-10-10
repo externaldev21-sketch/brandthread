@@ -11,7 +11,7 @@
  *    session is signed out, and signing back in within 30 days cancels it.
  *    The hard delete runs server-side after the grace period.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, Platform,
@@ -60,6 +60,7 @@ export default function DeleteAccountScreen() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
+  const passwordRef = useRef<TextInput>(null);
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
@@ -287,13 +288,17 @@ export default function DeleteAccountScreen() {
               placeholderTextColor={theme.subtle}
               autoCapitalize="characters"
               autoCorrect={false}
+              autoComplete="off"
+              returnKeyType={usesCode ? 'done' : 'next'}
+              blurOnSubmit={usesCode}
+              onSubmitEditing={usesCode ? undefined : () => passwordRef.current?.focus()}
               accessibilityLabel="Type DELETE to confirm"
             />
 
             {usesCode ? (
               <>
                 <Text style={s.fieldLabel}>Enter the 6-digit code we email you</Text>
-                <TextInput
+                <TextInput returnKeyType="done"
                   style={s.input}
                   value={code}
                   onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
@@ -315,6 +320,7 @@ export default function DeleteAccountScreen() {
               <>
                 <Text style={s.fieldLabel}>Enter your password to confirm it’s you</Text>
                 <TextInput
+                  ref={passwordRef}
                   style={[s.input, s.passwordInput]}
                   value={password}
                   onChangeText={setPassword}
@@ -325,6 +331,7 @@ export default function DeleteAccountScreen() {
                   autoCorrect={false}
                   autoComplete="current-password"
                   textContentType="password"
+                  returnKeyType="done"
                   accessibilityLabel="Password"
                 />
               </>

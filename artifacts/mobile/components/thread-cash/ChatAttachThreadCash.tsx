@@ -411,7 +411,7 @@ export function ThreadCashAttachButton({
                 </Text>
               </Text>
 
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={[styles.noteInput, { color: theme.text, backgroundColor: theme.cardElevated, borderColor: theme.border }]}
                 placeholder="Add a note"
                 placeholderTextColor={theme.subtle}

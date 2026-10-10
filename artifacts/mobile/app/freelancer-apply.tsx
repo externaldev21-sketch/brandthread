@@ -190,7 +190,7 @@ export default function FreelancerApplyScreen() {
 
               <Text style={[styles.label, { marginTop: SP.lg }]}>Skill tags (optional)</Text>
               <Text style={styles.hint}>Comma-separated, e.g. logos, packaging, lookbooks</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.input}
                 value={tagsText}
                 onChangeText={setTagsText}
@@ -205,7 +205,7 @@ export default function FreelancerApplyScreen() {
               <Text style={styles.label}>Hourly rate (USD)</Text>
               <View style={styles.rateRow}>
                 <Text style={styles.ratePrefix}>$</Text>
-                <TextInput
+                <TextInput returnKeyType="done"
                   style={[styles.input, { flex: 1, marginBottom: 0 }]}
                   value={rateText}
                   onChangeText={(v) => setRateText(v.replace(/[^0-9.]/g, ''))}
@@ -238,7 +238,7 @@ export default function FreelancerApplyScreen() {
               <Text style={styles.label}>Portfolio links (up to 4, optional)</Text>
               <Text style={styles.hint}>Behance, Dribbble, Instagram, your site…</Text>
               {urls.map((u, i) => (
-                <TextInput
+                <TextInput returnKeyType="done"
                   key={i}
                   style={styles.input}
                   value={u}

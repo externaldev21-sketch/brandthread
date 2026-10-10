@@ -46,7 +46,7 @@ export function SwipeToReplyBubble({
     // Only claims the gesture past a clear rightward, horizontal-dominant
     // drag — a plain tap (double-tap-to-like) or a long-press (reactions/
     // actions sheet) on the bubble underneath is never intercepted.
-    onMoveShouldSetPanResponder: (_, gesture) => shouldClaimSwipe(gesture.dx, gesture.dy, disabled),
+    onMoveShouldSetPanResponder: (_, gesture) => shouldClaimSwipe(gesture.dx, gesture.dy, disabled, gesture.x0),
     onPanResponderGrant: () => { crossedRef.current = false; },
     onPanResponderMove: (_, gesture) => {
       const dx = Math.max(0, gesture.dx);

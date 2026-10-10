@@ -506,7 +506,7 @@ export default function StoreBuilderScreen() {
             {!importJob ? (
               <>
                 <Text style={s.inputLabel}>Shopify store URL</Text>
-                <TextInput
+                <TextInput returnKeyType="done"
                   value={shopifyUrl}
                   onChangeText={setShopifyUrl}
                   placeholder="https://your-store.com"

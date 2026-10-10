@@ -16,6 +16,8 @@ import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { LegalContinueNotice } from '@/components/legal/LegalConsent';
 import { rememberPendingConsent } from '@/lib/legalConsent';
 import { AgeDobField } from '@/components/age/AgeNotices';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToMdy, mdyToDate } from '@/lib/dateTimeField';
 import { checkDobInput, formatDobInput, setPendingDob, submitPendingAge } from '@/lib/ageGate';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -666,6 +668,9 @@ function BuyerAuthStep({
   const [oauthLoading, setOAuth]        = useState('');
   const [error, setError]               = useState('');
   const [clearingSession, setClearSession] = useState(false);
+  const buyerReferralRef = useRef<TextInput>(null);
+  const buyerEmailRef = useRef<TextInput>(null);
+  const buyerPasswordRef = useRef<TextInput>(null);
   const [usernameError, setUsernameError] = useState('');
   // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
   // is required before any account is created (email, Google or Apple).
@@ -875,13 +880,15 @@ function BuyerAuthStep({
           <Text style={sba.sub}>We sent a 6-digit code to {email}</Text>
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Verification code</Text>
-            <TextInput accessibilityLabel="Verification code"
+            <TextInput returnKeyType="done" accessibilityLabel="Verification code"
               style={[sba.input, sba.codeInput]}
               placeholder="000000"
               placeholderTextColor={MUTED2}
               value={code}
               onChangeText={setCode}
               keyboardType="number-pad"
+              autoComplete="one-time-code"
+              textContentType="oneTimeCode"
               maxLength={6}
               autoFocus
             />
@@ -928,6 +935,11 @@ function BuyerAuthStep({
               }}
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="username-new"
+              textContentType="username"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => buyerReferralRef.current?.focus()}
               maxLength={30}
             />
             {usernameError
@@ -946,6 +958,7 @@ function BuyerAuthStep({
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Referral code (optional)</Text>
             <TextInput accessibilityLabel="Referral code"
+              ref={buyerReferralRef}
               testID="onboarding-referral-input"
               style={sba.input}
               placeholder="e.g. FASHION"
@@ -955,6 +968,10 @@ function BuyerAuthStep({
               onChangeText={v => onReferralCodeChange(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12))}
               autoCapitalize="characters"
               autoCorrect={false}
+              autoComplete="off"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => buyerEmailRef.current?.focus()}
               maxLength={12}
             />
             <Text style={sba.hint}>Enter the code from the friend who invited you.</Text>
@@ -963,6 +980,7 @@ function BuyerAuthStep({
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Email address</Text>
             <TextInput accessibilityLabel="Email"
+              ref={buyerEmailRef}
               style={sba.input}
               placeholder="mila@nightshiftstudio.co"
               placeholderTextColor={MUTED2}
@@ -971,6 +989,10 @@ function BuyerAuthStep({
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => buyerPasswordRef.current?.focus()}
             />
           </View>
 
@@ -978,13 +1000,17 @@ function BuyerAuthStep({
             <Text style={sba.label}>Password</Text>
             <View style={sba.pwRow}>
               <TextInput accessibilityLabel="Password"
+                ref={buyerPasswordRef}
                 style={[sba.input, sba.pwInput]}
                 placeholder="Minimum 8 characters"
                 placeholderTextColor={MUTED2}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPw}
+                autoCapitalize="none"
                 autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="done"
               />
               <TouchableOpacity accessibilityLabel={showPw ? 'Hide password' : 'Show password'} accessibilityRole="button" style={sba.eyeBtn} onPress={() => setShowPw(v => !v)}>
                 <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
@@ -1199,6 +1225,13 @@ function SharedAuthStep({
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
   const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
   const passwordsMatch = password === confirmPassword;
+  const signUpFirstNameRef = useRef<TextInput>(null);
+  const signUpLastNameRef = useRef<TextInput>(null);
+  const signUpPasswordRef = useRef<TextInput>(null);
+  const signUpConfirmRef = useRef<TextInput>(null);
+  const signUpUsernameRef = useRef<TextInput>(null);
+  const signUpReferralRef = useRef<TextInput>(null);
+  const signUpDobRef = useRef<TextInput>(null);
   const canSubmit = email.includes('@') && password.length >= 8 && passwordsMatch && isUsernameValid
     && !usernameLiveCheck.error && !usernameLiveCheck.checking && formFirstName.trim().length >= 1;
   const missingFields: string[] = [];
@@ -1436,6 +1469,10 @@ function SharedAuthStep({
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpFirstNameRef.current?.focus()}
             valid={email.includes('@')}
           />
         </Reveal>
@@ -1443,11 +1480,17 @@ function SharedAuthStep({
         {/* First name */}
         <Reveal index={3}>
           <FloatingInput
+            ref={signUpFirstNameRef}
             label="First name"
             placeholder="Alex"
             value={formFirstName}
             onChangeText={setFormFirstName}
             autoCapitalize="words"
+            autoComplete="given-name"
+            textContentType="givenName"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpLastNameRef.current?.focus()}
             maxLength={40}
             valid={formFirstName.trim().length >= 1}
           />
@@ -1456,11 +1499,17 @@ function SharedAuthStep({
         {/* Last name */}
         <Reveal index={4}>
           <FloatingInput
+            ref={signUpLastNameRef}
             label="Last name"
             placeholder="Rivera"
             value={formLastName}
             onChangeText={setFormLastName}
             autoCapitalize="words"
+            autoComplete="family-name"
+            textContentType="familyName"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpPasswordRef.current?.focus()}
             maxLength={40}
           />
         </Reveal>
@@ -1468,12 +1517,18 @@ function SharedAuthStep({
         {/* Password */}
         <Reveal index={5}>
           <FloatingInput
+            ref={signUpPasswordRef}
             label="Password"
             placeholder="Minimum 8 characters"
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPw}
+            autoCapitalize="none"
             autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpConfirmRef.current?.focus()}
             hint={password.length > 0 && password.length < 8 ? 'Use at least 8 characters' : null}
             right={<RevealToggle shown={showPw} onToggle={() => setShowPw(v => !v)} />}
           />
@@ -1482,12 +1537,18 @@ function SharedAuthStep({
         {/* Confirm password */}
         <Reveal index={6}>
           <FloatingInput
+            ref={signUpConfirmRef}
             label="Confirm password"
             placeholder="Re-enter password"
             value={confirmPassword}
             onChangeText={setConfirm}
             secureTextEntry={!showConfirm}
+            autoCapitalize="none"
             autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpUsernameRef.current?.focus()}
             error={!passwordsMatch && confirmPassword.length > 0 ? 'Passwords do not match' : null}
             right={<RevealToggle shown={showConfirm} onToggle={() => setShowConfirm(v => !v)} />}
           />
@@ -1502,6 +1563,7 @@ function SharedAuthStep({
         {/* Username */}
         <Reveal index={7}>
           <FloatingInput
+            ref={signUpUsernameRef}
             testID="onboarding-username-input"
             value={username}
             editable
@@ -1518,6 +1580,11 @@ function SharedAuthStep({
             placeholder="e.g. noire_collective"
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete="username-new"
+            textContentType="username"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpReferralRef.current?.focus()}
             maxLength={30}
             error={usernameError || usernameLiveCheck.error || null}
             valid={isUsernameValid && !usernameLiveCheck.error && !usernameLiveCheck.checking}
@@ -1534,6 +1601,7 @@ function SharedAuthStep({
         {/* Referral code */}
         <Reveal index={8}>
           <FloatingInput
+            ref={signUpReferralRef}
             testID="onboarding-referral-input"
             value={referralCode}
             editable
@@ -1542,21 +1610,39 @@ function SharedAuthStep({
             placeholder="e.g. FASHION"
             autoCapitalize="characters"
             autoCorrect={false}
+            autoComplete="off"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => signUpDobRef.current?.focus()}
             maxLength={12}
             hint="Enter the code from the friend who invited you."
           />
         </Reveal>
 
         <Reveal index={9}>
-          <FloatingInput
-            testID="onboarding-dob-input"
-            value={dobText}
-            onChangeText={(t) => { setDobText(formatDobInput(t)); setDobError(null); }}
+          <NativeDateTimeField
+            mode="date"
             label="Date of birth"
-            placeholder="MM/DD/YYYY"
-            keyboardType="number-pad"
-            maxLength={10}
+            value={mdyToDate(dobText)}
+            onChange={(d) => { setDobText(dateToMdy(d)); setDobError(null); }}
+            maximumDate={new Date()}
+            iosEmptyDisplay="spinner"
             error={dobError}
+            testID="onboarding-dob-input"
+            fallback={(
+              <FloatingInput
+                ref={signUpDobRef}
+                testID="onboarding-dob-input"
+                value={dobText}
+                onChangeText={(t) => { setDobText(formatDobInput(t)); setDobError(null); }}
+                label="Date of birth"
+                placeholder="MM/DD/YYYY"
+                keyboardType="number-pad"
+                returnKeyType="done"
+                maxLength={10}
+                error={dobError}
+              />
+            )}
           />
         </Reveal>
 
@@ -2584,6 +2670,9 @@ export default function OnboardingScreen() {
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
+                autoComplete="given-name"
+                textContentType="givenName"
+                returnKeyType="done"
                 maxLength={40}
                 valid={firstName.trim().length >= 2}
               />
@@ -2687,6 +2776,9 @@ export default function OnboardingScreen() {
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
+                autoComplete="given-name"
+                textContentType="givenName"
+                returnKeyType="done"
                 maxLength={40}
                 valid={firstName.trim().length >= 2}
               />
@@ -2711,6 +2803,9 @@ export default function OnboardingScreen() {
                 value={brandName}
                 onChangeText={setBrandName}
                 autoCapitalize="words"
+                autoComplete="organization"
+                textContentType="organizationName"
+                returnKeyType="done"
                 maxLength={60}
                 valid={brandName.trim().length >= 1}
                 hint="Brandthread AI will use this to shape your workspace."

@@ -246,7 +246,7 @@ export default function LocationsScreen() {
             ].map(({ label, key, placeholder }) => (
               <View key={key} style={s.formField}>
                 <Text style={[s.formLabel, { color: colors.mutedForeground }]}>{label}</Text>
-                <TextInput
+                <TextInput returnKeyType="done"
                   value={(form as any)[key]}
                   onChangeText={v => setForm(prev => ({ ...prev, [key]: v }))}
                   placeholder={placeholder}

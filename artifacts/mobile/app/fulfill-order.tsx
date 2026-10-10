@@ -550,7 +550,7 @@ export default function FulfillOrderScreen() {
             {packageChoice?.kind === 'custom' && (
               <BrandthreadCard style={{ gap: SP.sm }}>
                 <Text style={s.fieldLabel}>Weight (lb)</Text>
-                <TextInput
+                <TextInput returnKeyType="done"
                   style={s.input}
                   value={packageChoice.weight}
                   onChangeText={v => setPackageChoice({ ...packageChoice, weight: v })}
@@ -560,9 +560,9 @@ export default function FulfillOrderScreen() {
                 />
                 <Text style={s.fieldLabel}>Dimensions (in)</Text>
                 <View style={s.dimRow}>
-                  <TextInput style={[s.input, { flex: 1 }]} value={packageChoice.length} onChangeText={v => setPackageChoice({ ...packageChoice, length: v })} keyboardType="decimal-pad" placeholder="L" placeholderTextColor={SUBTLE} />
-                  <TextInput style={[s.input, { flex: 1 }]} value={packageChoice.width} onChangeText={v => setPackageChoice({ ...packageChoice, width: v })} keyboardType="decimal-pad" placeholder="W" placeholderTextColor={SUBTLE} />
-                  <TextInput style={[s.input, { flex: 1 }]} value={packageChoice.height} onChangeText={v => setPackageChoice({ ...packageChoice, height: v })} keyboardType="decimal-pad" placeholder="H" placeholderTextColor={SUBTLE} />
+                  <TextInput returnKeyType="done" style={[s.input, { flex: 1 }]} value={packageChoice.length} onChangeText={v => setPackageChoice({ ...packageChoice, length: v })} keyboardType="decimal-pad" placeholder="L" placeholderTextColor={SUBTLE} />
+                  <TextInput returnKeyType="done" style={[s.input, { flex: 1 }]} value={packageChoice.width} onChangeText={v => setPackageChoice({ ...packageChoice, width: v })} keyboardType="decimal-pad" placeholder="W" placeholderTextColor={SUBTLE} />
+                  <TextInput returnKeyType="done" style={[s.input, { flex: 1 }]} value={packageChoice.height} onChangeText={v => setPackageChoice({ ...packageChoice, height: v })} keyboardType="decimal-pad" placeholder="H" placeholderTextColor={SUBTLE} />
                 </View>
               </BrandthreadCard>
             )}
@@ -571,12 +571,12 @@ export default function FulfillOrderScreen() {
               <SecondaryButton label="Save current as a preset" icon="plus" small onPress={() => setAddingPreset(true)} />
             ) : (
               <BrandthreadCard style={{ gap: SP.sm }}>
-                <TextInput style={s.input} value={newPreset.name} onChangeText={v => setNewPreset({ ...newPreset, name: v })} placeholder="Preset name" placeholderTextColor={SUBTLE} />
-                <TextInput style={s.input} value={newPreset.weightOz} onChangeText={v => setNewPreset({ ...newPreset, weightOz: v })} keyboardType="decimal-pad" placeholder="Weight (oz)" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.input} value={newPreset.name} onChangeText={v => setNewPreset({ ...newPreset, name: v })} placeholder="Preset name" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.input} value={newPreset.weightOz} onChangeText={v => setNewPreset({ ...newPreset, weightOz: v })} keyboardType="decimal-pad" placeholder="Weight (oz)" placeholderTextColor={SUBTLE} />
                 <View style={s.dimRow}>
-                  <TextInput style={[s.input, { flex: 1 }]} value={newPreset.lengthIn} onChangeText={v => setNewPreset({ ...newPreset, lengthIn: v })} keyboardType="decimal-pad" placeholder="L (in)" placeholderTextColor={SUBTLE} />
-                  <TextInput style={[s.input, { flex: 1 }]} value={newPreset.widthIn} onChangeText={v => setNewPreset({ ...newPreset, widthIn: v })} keyboardType="decimal-pad" placeholder="W (in)" placeholderTextColor={SUBTLE} />
-                  <TextInput style={[s.input, { flex: 1 }]} value={newPreset.heightIn} onChangeText={v => setNewPreset({ ...newPreset, heightIn: v })} keyboardType="decimal-pad" placeholder="H (in)" placeholderTextColor={SUBTLE} />
+                  <TextInput returnKeyType="done" style={[s.input, { flex: 1 }]} value={newPreset.lengthIn} onChangeText={v => setNewPreset({ ...newPreset, lengthIn: v })} keyboardType="decimal-pad" placeholder="L (in)" placeholderTextColor={SUBTLE} />
+                  <TextInput returnKeyType="done" style={[s.input, { flex: 1 }]} value={newPreset.widthIn} onChangeText={v => setNewPreset({ ...newPreset, widthIn: v })} keyboardType="decimal-pad" placeholder="W (in)" placeholderTextColor={SUBTLE} />
+                  <TextInput returnKeyType="done" style={[s.input, { flex: 1 }]} value={newPreset.heightIn} onChangeText={v => setNewPreset({ ...newPreset, heightIn: v })} keyboardType="decimal-pad" placeholder="H (in)" placeholderTextColor={SUBTLE} />
                 </View>
                 <View style={s.dimRow}>
                   <SecondaryButton label="Cancel" small onPress={() => setAddingPreset(false)} style={{ flex: 1 }} />
@@ -677,7 +677,7 @@ export default function FulfillOrderScreen() {
                 </View>
                 <Text style={s.fieldLabel}>Tracking number</Text>
                 <View style={s.dimRow}>
-                  <TextInput
+                  <TextInput returnKeyType="done"
                     style={[s.input, { flex: 1 }]}
                     value={manualTracking}
                     onChangeText={setManualTracking}

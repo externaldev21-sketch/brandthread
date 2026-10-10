@@ -77,7 +77,7 @@ export default function SellerCreatorDetailScreen() {
 
             <SectionTitle>Commission</SectionTitle>
             <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.md, paddingHorizontal: SP.md, minHeight: 48, marginBottom: SP.sm }}>
-              <TextInput
+              <TextInput returnKeyType="done"
                 value={override}
                 onChangeText={setOverride}
                 placeholder={`${c.commissionPercent} (program default)`}

@@ -35,6 +35,8 @@ import {
   TYPOGRAPHY_STYLES,
 } from '@/services/storeTypes';
 import { radius } from '@/constants/radii';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { isoToDate } from '@/lib/dateTimeField';
 
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
@@ -533,7 +535,7 @@ export default function StoreEditor() {
             <>
               <FieldRow>
                 <FieldLabel>Drop Date</FieldLabel>
-                <StyledInput value={field('dropDate')} onChange={v => handleLocalChange('dropDate', v)} placeholder="2025-01-01T00:00:00Z" />
+                <NativeDateTimeField variant="pill" mode="datetime" label="Drop Date" value={isoToDate(field('dropDate'))} onChange={d => handleLocalChange('dropDate', d.toISOString())} testID="store-editor-drop-date" fallback={<StyledInput value={field('dropDate')} onChange={v => handleLocalChange('dropDate', v)} placeholder="2025-01-01T00:00:00Z" />} />
               </FieldRow>
               <FieldRow>
                 <FieldLabel>Style</FieldLabel>
@@ -841,10 +843,20 @@ export default function StoreEditor() {
             {ab.hasCountdown && (
               <FieldRow>
                 <FieldLabel>Countdown Date</FieldLabel>
-                <StyledInput
-                  value={ab.countdownDate ?? ''}
-                  onChange={v => handleThemeUpdate({ announcementBar: { ...ab, countdownDate: v } })}
-                  placeholder="2025-12-31T00:00:00Z"
+                <NativeDateTimeField
+                  variant="pill"
+                  mode="datetime"
+                  label="Countdown Date"
+                  value={isoToDate(ab.countdownDate)}
+                  onChange={d => handleThemeUpdate({ announcementBar: { ...ab, countdownDate: d.toISOString() } })}
+                  testID="store-editor-countdown-date"
+                  fallback={(
+                    <StyledInput
+                      value={ab.countdownDate ?? ''}
+                      onChange={v => handleThemeUpdate({ announcementBar: { ...ab, countdownDate: v } })}
+                      placeholder="2025-12-31T00:00:00Z"
+                    />
+                  )}
                 />
               </FieldRow>
             )}
@@ -1010,7 +1022,7 @@ export default function StoreEditor() {
             <View style={[sectionStyles.enabledDot, { backgroundColor: section.enabled ? SUCCESS : MUTED }]} />
             <View style={{ flex: 1 }}>
               {isInlineEditing ? (
-                <TextInput
+                <TextInput returnKeyType="done"
                   autoFocus
                   value={inlineHeadingDraft}
                   onChangeText={setInlineHeadingDraft}

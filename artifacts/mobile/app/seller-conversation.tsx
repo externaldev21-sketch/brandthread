@@ -38,6 +38,7 @@ import {
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
+import { KeyboardAccessoryBar, keyboardAccessoryID } from '@/components/ui/KeyboardAccessoryBar';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
@@ -82,6 +83,9 @@ import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost
 import { Snackbar } from '@/components/ui/Snackbar';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 import { radius } from '@/constants/radii';
+
+// iOS keyboard accessory bar (Done) for the composer.
+const CHAT_ACCESSORY_ID = 'seller-conversation-keyboard-accessory';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1844,6 +1848,7 @@ export default function SellerConversationScreen() {
           canSend={canSend}
           placeholder="Message…"
           inputRef={textInputRef}
+          inputAccessoryViewID={keyboardAccessoryID(CHAT_ACCESSORY_ID)}
           topSlot={<>{replyBanner}{pendingAttachmentChip}</>}
           leftAccessory={
             <PressableScale
@@ -2356,6 +2361,7 @@ export default function SellerConversationScreen() {
       />
       <MediaViewer visible={viewerUri != null} uri={viewerUri} onClose={() => setViewerUri(null)} />
       <VideoMessageViewer uri={viewerVideoUri} onClose={() => setViewerVideoUri(null)} />
+      <KeyboardAccessoryBar nativeID={CHAT_ACCESSORY_ID} />
     </KeyboardAvoidingView>
   );
 }

@@ -19,7 +19,7 @@ function Field({ label, value, onChange, suffix, help }: { label: string; value:
     <View style={{ marginBottom: SP.md }}>
       <Text style={{ fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, marginBottom: 6 }}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.md, paddingHorizontal: SP.md, minHeight: 48 }}>
-        <TextInput
+        <TextInput returnKeyType="done"
           value={value}
           onChangeText={onChange}
           keyboardType="decimal-pad"

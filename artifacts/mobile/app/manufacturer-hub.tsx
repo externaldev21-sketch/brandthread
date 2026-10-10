@@ -633,7 +633,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           <Feather name="search" size={ICON.sm} color={theme.muted} />
         </TouchableOpacity>
         {searchActive && (
-          <TextInput
+          <TextInput returnKeyType="search"
             style={[s.searchInput, WEB_INPUT_RESET]}
             value={searchQuery}
             onChangeText={onSearch}

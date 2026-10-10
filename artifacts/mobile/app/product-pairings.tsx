@@ -145,7 +145,7 @@ export default function ProductPairingsScreen() {
         />
         <View style={s.searchWrap}>
           <Feather name="search" size={16} color={colors.mutedForeground} />
-          <TextInput
+          <TextInput returnKeyType="search"
             value={query}
             onChangeText={setQuery}
             placeholder="Search products"

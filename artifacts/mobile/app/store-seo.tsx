@@ -82,7 +82,7 @@ export default function StoreSEOScreen() {
                 {seo.homepageTitle.length}/60
               </Text>
             </View>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={se.input}
               value={seo.homepageTitle}
               onChangeText={v => patch({ homepageTitle: v.slice(0, 60) })}
@@ -191,7 +191,7 @@ export default function StoreSEOScreen() {
         <BrandthreadCard style={se.card}>
           <View style={se.fieldRow}>
             <Text style={se.fieldLabel}>Title Template</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={se.input}
               value={seo.productSeoDefaults.titleTemplate}
               onChangeText={v => patch({ productSeoDefaults: { ...seo.productSeoDefaults, titleTemplate: v } })}
@@ -222,7 +222,7 @@ export default function StoreSEOScreen() {
         <BrandthreadCard style={se.card}>
           <View style={se.fieldRow}>
             <Text style={se.fieldLabel}>Title Template</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={se.input}
               value={seo.collectionSeoDefaults.titleTemplate}
               onChangeText={v => patch({ collectionSeoDefaults: { ...seo.collectionSeoDefaults, titleTemplate: v } })}

@@ -157,7 +157,7 @@ export default function CustomersScreen() {
       {/* Search */}
       <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Feather name="search" size={16} color={colors.mutedForeground} />
-        <TextInput
+        <TextInput returnKeyType="search"
           style={[styles.searchInput, { color: colors.foreground }, WEB_INPUT_RESET]}
           placeholder="Search customers..."
           placeholderTextColor={colors.mutedForeground}

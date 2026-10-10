@@ -157,7 +157,7 @@ export default function AiHelperScreen() {
   const field = (label: string, value: string, set: (v: string) => void) => (
     <View style={s.numCell}>
       <Text style={s.label}>{label}</Text>
-      <TextInput style={s.numInput} value={value} onChangeText={set} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.mutedForeground} maxLength={6} />
+      <TextInput returnKeyType="done" style={s.numInput} value={value} onChangeText={set} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.mutedForeground} maxLength={6} />
     </View>
   );
 
