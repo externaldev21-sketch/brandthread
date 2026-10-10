@@ -119,7 +119,7 @@ export default function MyStoreScreen() {
     <View style={[s.root, { backgroundColor: theme.background }]} testID="my-store-screen">
       {header}
       <ScrollView
-        contentContainerStyle={[s.body, { paddingBottom: (showChecklist ? 360 : 24) + bottomInset }]}
+        contentContainerStyle={[s.body, { paddingBottom: (showChecklist ? 420 : 24) + bottomInset }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={[s.name, { color: theme.text }]} numberOfLines={2} accessibilityRole="header">{name}</Text>
@@ -196,7 +196,7 @@ export default function MyStoreScreen() {
           <View style={[s.track, { backgroundColor: theme.background }]}>
             <View style={[s.fill, { backgroundColor: theme.text, width: `${(progress.done / progress.total) * 100}%` }]} />
           </View>
-          <ScrollView style={{ maxHeight: 300 }} bounces={false}>
+          <ScrollView style={{ maxHeight: 360 }} bounces={false}>
             {steps.map((step, i) => {
               const open = current?.id === step.id;
               return (

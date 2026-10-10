@@ -64,17 +64,15 @@ async function capture(browser, origin, mode, shots) {
     const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images: {} });
     page.on('pageerror', (e) => console.log(`  [pageerror ${mode}/${shot.name}]`, e.message.slice(0, 160)));
     await openScreen(page, activity, origin, 'seller', '/', { extraQuery: extra });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(4000);
     const url = `${shot.route}${shot.route.includes('?') ? '&' : '?'}bt_preview=seller${extra}`;
-    // A startup redirect can race the first push; push again until the
-    // screen's own testID is on the page.
+    // A full load keeps `demo=1` in the URL while the screen first reads its
+    // data (a client-side push briefly replaces the URL with "/"). Retry
+    // until the screen's own testID is on the page.
     const marker = SCREEN_MARKER[shot.route.split('?')[0]];
-    for (let attempt = 0; attempt < 4; attempt++) {
-      await page.evaluate((target) => {
-        history.pushState(history.state, '', target);
-        window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
-      }, url);
-      await page.waitForTimeout(2500);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (shot.route !== '/') await page.goto(`${origin}${url}`);
+      await page.waitForTimeout(4500);
       if (!marker || await page.locator(`[data-testid="${marker}"]`).count()) break;
     }
     try {
