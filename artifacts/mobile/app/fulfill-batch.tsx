@@ -208,7 +208,7 @@ export default function FulfillBatchScreen() {
 
             {quotes.length > 0 && (
               <>
-                {presets.length > 1 && (
+                {presets.length > 0 && (
                   <View style={s.boxRow}>
                     {presets.map(p => (
                       <TouchableOpacity
