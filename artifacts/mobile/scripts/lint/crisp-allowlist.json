@@ -1,0 +1,33 @@
+{
+  "about": "Intended exceptions to scripts/lint/crisp.mjs. Each one is listed in the crispness PRs so Dev can keep or remove it. Everything else that blurs, fades or smears is a bug.",
+  "files": {
+    "components/tab-bar/TabBarParts.tsx": {
+      "blur": { "count": 1, "reason": "Seller (and shared buyer) tab bar glass: Dev's reference mechanism, never touched by this pass." },
+      "glass": { "count": 1, "reason": "Seller tab bar capsule glass (noBlur): part of the swipe + glow mechanism." }
+    },
+    "components/ui/Glass.tsx": {
+      "blur": { "count": 3, "reason": "The glass primitive itself (iOS/Android blur + web backdrop-filter). Only reached by the allow-listed floating controls below; everything else passes `solid`." }
+    },
+    "components/ui/GlassIconButton.tsx": {
+      "glass": { "count": 1, "reason": "BRANDTHREAD_DESIGN.md 'Glass': circular back/share/close floating over photos and video." }
+    },
+    "components/ui/IconButton.tsx": {
+      "glass": { "count": 1, "reason": "IconButton variant='glass': documented for circular controls floating over full-bleed photo/video only." }
+    },
+    "components/ai-tools/AiResultViewer.tsx": {
+      "glass": { "count": 2, "reason": "Circular close/share buttons floating over the full-screen AI result photo." }
+    },
+    "components/live/LiveOverlays.tsx": {
+      "glass": { "count": 4, "reason": "Live video overlays: host pill, Follow chip, join/purchase event pills (noBlur) and the right-rail circles. Over live video. Dev decides: keep glass, or solid #1C1C1E." }
+    },
+    "components/buyer-feed/FeedTopBar.tsx": {
+      "glass": { "count": 1, "reason": "LIVE pill over the playing feed video (noBlur: tint only, no blur). Dev decides." }
+    },
+    "components/buyer-feed/ShopSideTab.tsx": {
+      "glass": { "count": 1, "reason": "Shop tag pill over the playing feed video (noBlur: tint only, no blur). Dev decides." }
+    },
+    "app/design-bg-removal.tsx": {
+      "blur": { "count": 1, "reason": "'Blur' is a background the user picks for their own cut-out photo (content, not UI chrome). Owned by the Remove Background session." }
+    }
+  }
+}

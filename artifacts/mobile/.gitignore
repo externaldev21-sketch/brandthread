@@ -9,6 +9,9 @@ dist/
 web-build/
 static-build/
 
+# crisp crawl output (scripts/crisp/crawl.mjs): screenshots + report
+.crisp-crawl/
+
 # audit script's generated demo-image cache (scripts/audit/half-done-audit.mjs)
 .audit/
 expo-env.d.ts
