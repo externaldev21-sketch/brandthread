@@ -738,6 +738,19 @@ describe('onboarding entry points and resume', () => {
     renderer = undefined;
   });
 
+  it('?flow=seller after Start selling skips the buyer/seller question even without a stored pending flow', async () => {
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_second_profile';
+    searchParams.postAuth = '1';
+    searchParams.flow = 'seller';
+    renderer = await renderScreen();
+    await settle();
+    expect(has(renderer, 'onboarding-first-name-input')).toBe(true);
+    await type(renderer, 'onboarding-first-name-input', 'Sasha Rivera');
+    await tap(renderer, 'onboarding-name-next');
+    expect(has(renderer, 'onboarding-brand-name-input')).toBe(true);
+  });
+
   it('reopening mid-sign-up returns to the same step with the email kept', async () => {
     memoryStorage.set('onboarding_pending_draft', JSON.stringify({
       version: 9, flow: 'buyer', stepId: 'CODE', authMethod: 'email', accountCreated: false, email: 'resume@x.test',
@@ -856,7 +869,7 @@ describe('Dev P0: a brand-new email never shows "this email already has an accou
     await toEmailStep(renderer);
     await submitNewEmail(renderer, 'taken@x.test');
     expect(has(renderer, 'onboarding-code-step')).toBe(false);
-    expect(findByTestId(renderer, 'onboarding-step-error').props.children).toBe('This email already has a buyer account.');
+    expect(findByTestId(renderer, 'onboarding-step-error').props.children).toBe('This email already has an account.'); // role unknown off-device: never guessed
     await tap(renderer, 'onboarding-email-use-different');
     expect(findByTestId(renderer, 'onboarding-email-input').props.value).toBe('');
     expect(has(renderer, 'onboarding-email-switch')).toBe(false);

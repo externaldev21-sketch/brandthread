@@ -234,6 +234,7 @@ export default function OnboardingScreen() {
     deviceStep,
     deviceProbe,
     previewUser,
+    flow: flowParam,
   } = useLocalSearchParams<{
     postAuth?: string;
     addAccount?: string;
@@ -243,6 +244,8 @@ export default function OnboardingScreen() {
     deviceStep?: string;
     deviceProbe?: string;
     previewUser?: string;
+    /** Set by "Start selling" / "Shop as a buyer" (Accounts session). */
+    flow?: string;
   }>();
   const isAddAccount = addAccount === '1';
   const isDevWebPreviewUser = __DEV__ && Platform.OS === 'web' && previewUser === '1';
@@ -399,7 +402,8 @@ export default function OnboardingScreen() {
 
     void (async () => {
       try {
-        const landingFlow = await AsyncStorage.getItem(PENDING_FLOW_KEY).catch(() => null);
+        const storedFlow = await AsyncStorage.getItem(PENDING_FLOW_KEY).catch(() => null);
+        const landingFlow = flowParam === 'buyer' || flowParam === 'seller' ? flowParam : storedFlow;
         await AsyncStorage.multiRemove(LEGACY_PENDING_KEYS).catch(() => {});
         // "Create new account" always starts clean at the buyer/seller question.
         if (isAddAccount && postAuth !== '1') {
@@ -1013,8 +1017,10 @@ export default function OnboardingScreen() {
             loading={busy}
             error={stepError}
             onLogin={goLogin}
-            existing={existingEmail && existingEmail === email.trim().toLowerCase() && flow ? {
-              role: flow,
+            existing={existingEmail && existingEmail === email.trim().toLowerCase() ? {
+              // Which role the email has is only known for an account signed in
+              // on this device (Accounts session's lookup, #806); never guess.
+              role: null,
               onSwitch: goLogin,
               onUseDifferent: () => { setEmail(''); setExistingEmail(null); },
             } : null}
