@@ -92,14 +92,27 @@ describe('seller fresh preview: no seeded/demo data by default', () => {
   it('discounts.tsx routes fresh-preview create/update/delete through the in-session store, never the network, when there is no signed-in account', () => {
     const src = read('app/discounts.tsx');
     expect(src).toContain("import { addPreviewDiscount, deletePreviewDiscount, getPreviewDiscounts, updatePreviewDiscount");
-    expect(src).toContain('const previewOnly = isPreviewMode && (!authLoaded || !isSignedIn || !userId);');
+    // The seller web preview can't call the API at all (lib/api.ts rejects it,
+    // signed in or not), so preview is preview whether or not a stub user exists.
+    expect(src).toContain('const [previewOnly] = useState(() => isSellerDevPreview());');
     expect(src).toContain('if (previewOnly) {');
+    // Demo codes only with demo=1.
+    expect(src).toContain('const previewDemo = usePreviewDemoMode();');
+    expect(src).toContain('buildPreviewDemoDiscounts(previewDemo)');
   });
 
   it('customers, finance and payouts resolve to the honest empty/zero state (not a fake seeded list) when previewing with no account', () => {
-    for (const file of ['app/customers.tsx', 'app/finance.tsx', 'app/payouts.tsx']) {
+    for (const file of ['app/finance.tsx', 'app/payouts.tsx']) {
       const src = read(file);
       expect(src).toMatch(/isPreviewMode && !userId|isPreviewMode && \(!(authLoaded|isAuthLoaded) \|\| !isSignedIn\)/);
     }
+  });
+
+  it('customers: preview never calls the API; fresh is empty, demo=1 reads lib/previewCustomers.ts', () => {
+    const src = read('app/customers.tsx');
+    expect(src).toContain('const [isPreviewMode] = useState(() => isSellerDevPreview());');
+    expect(src).toContain('buildPreviewCustomers(previewDemo)');
+    const detail = read('app/customer-orders.tsx');
+    expect(detail).toContain('getPreviewCustomerDetail(String(customerId), previewDemo)');
   });
 });

@@ -1,68 +1,53 @@
+/**
+ * Seller Customers — Shopify iOS "Customers" list, reskinned dark: a search
+ * field with a sort button beside it, then flat rows (name, location,
+ * "<amount spent> • <n> orders", note) separated by hairlines. Rows open the
+ * customer's detail (app/customer-orders.tsx).
+ */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
-import { Badge } from '@/components/Badge';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { FS } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
-import { EmptyState } from '@/components/layout';
+import { usePreviewDemoMode } from '@/hooks/usePreviewDemoMode';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState, OptionSheet, SkeletonLine } from '@/components/ui';
+import { FILL_ELEVATED, TABULAR, TEXT } from '@/lib/theme';
 import { radius } from '@/constants/radii';
-
-type ApiCustomer = {
-  id: string;
-  ownerId: string;
-  name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  tags?: string[];
-  notes?: string;
-  orderCount?: number;
-  totalSpentCents?: number;
-  createdAt: string;
-};
-
-
-type SortOption = 'recent' | 'spend' | 'name';
-
-const SORT_OPTIONS: { key: SortOption; label: string }[] = [
-  { key: 'recent', label: 'Recent' },
-  { key: 'spend', label: 'Top spender' },
-  { key: 'name', label: 'Name A-Z' },
-];
-
-function getInitials(name: string): string {
-  return name.split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase();
-}
+import { hapticLight } from '@/lib/haptics';
+import {
+  CUSTOMER_SORT_OPTIONS, customerLocation, customerSpendLine, matchesCustomerSearch, sortCustomers,
+  type CustomerSort, type SellerCustomer,
+} from '@/lib/sellerCustomers';
+import { buildPreviewCustomers } from '@/lib/previewCustomers';
 
 export default function CustomersScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { userId } = useAuth();
-  // ?bt_preview=seller with no real signed-in account (app/_layout.tsx's
-  // PREVIEW_ROLE bypass): there is no token to fetch real customers with, so
-  // this resolves straight to the honest "no customers yet" empty state
-  // instead of the "couldn't load" retry banner a real fetch failure shows.
+  // The seller web preview (?bt_preview=seller) can't call the API — lib/api.ts
+  // rejects every request there, signed in or not. Fresh preview resolves to
+  // the honest "no customers yet" state; &demo=1 shows the local demo
+  // customers behind the demo Orders tab (lib/previewCustomers.ts).
   const [isPreviewMode] = useState(() => isSellerDevPreview());
+  const previewDemo = usePreviewDemoMode();
   const [search, setSearch] = useState('');
-  const [customers, setCustomers] = useState<ApiCustomer[]>([]);
+  const [customers, setCustomers] = useState<SellerCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [sortBy, setSortBy] = useState<CustomerSort>('recent');
+  const [sortOpen, setSortOpen] = useState(false);
   const hasDataRef = useRef(false);
 
   const fetchCustomers = useCallback(async (searchText: string) => {
-    if (isPreviewMode && !userId) {
-      setCustomers([]);
-      hasDataRef.current = false;
+    if (isPreviewMode) {
+      const list = buildPreviewCustomers(previewDemo).filter((c) => matchesCustomerSearch(c, searchText));
+      setCustomers(list);
+      hasDataRef.current = list.length > 0;
       setError(false);
       setLoading(false);
       return;
@@ -71,7 +56,7 @@ export default function CustomersScreen() {
       const url = searchText.trim()
         ? `/api/customers?search=${encodeURIComponent(searchText.trim())}`
         : '/api/customers';
-      const res = await serviceRequest<ApiCustomer[]>(url);
+      const res = await serviceRequest<SellerCustomer[]>(url);
       if (Array.isArray(res)) {
         setCustomers(res);
         hasDataRef.current = res.length > 0;
@@ -85,185 +70,129 @@ export default function CustomersScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isPreviewMode, previewDemo]);
 
   useEffect(() => {
-    fetchCustomers('');
-  }, [fetchCustomers]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (search.trim()) fetchCustomers(search);
-      else fetchCustomers('');
-    }, 400);
+    const timer = setTimeout(() => { void fetchCustomers(search); }, search.trim() ? 400 : 0);
     return () => clearTimeout(timer);
   }, [search, fetchCustomers]);
 
-  const totalCustomers = customers.length;
-  const avgSpendCents = totalCustomers > 0
-    ? Math.round(customers.reduce((sum, c) => sum + (c.totalSpentCents ?? 0), 0) / totalCustomers)
-    : 0;
-
-  const sortedCustomers = useMemo(() => {
-    const list = [...customers];
-    switch (sortBy) {
-      case 'spend':
-        return list.sort((a, b) => (b.totalSpentCents ?? 0) - (a.totalSpentCents ?? 0));
-      case 'name':
-        return list.sort((a, b) => a.name.localeCompare(b.name));
-      case 'recent':
-      default:
-        return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    }
-  }, [customers, sortBy]);
+  const sortedCustomers = useMemo(() => sortCustomers(customers, sortBy), [customers, sortBy]);
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customers"
-        rightElement={
-          <TouchableOpacity
-            onPress={() => router.navigate('/(tabs)/analytics' as never)}
-            hitSlop={10}
-            activeOpacity={0.7}
-            style={[styles.analyticsBtnHdr, { borderColor: colors.border, backgroundColor: colors.card }]}
-            accessibilityRole="button"
-            accessibilityLabel="View customer analytics"
-          >
-            <Feather name="bar-chart-2" size={18} color={colors.foreground} />
-          </TouchableOpacity>
-        }
+        actions={[{ icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View customer analytics' }]}
       />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 140, paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        {[
-          { label: 'Total', value: totalCustomers.toLocaleString(), icon: 'users' as const },
-          { label: 'Avg. spend', value: formatCents(avgSpendCents), icon: 'heart' as const },
-        ].map((s) => (
-          <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name={s.icon} size={14} color={colors.primary} />
-            <Text style={[styles.statVal, { color: colors.foreground }]}>{s.value}</Text>
-            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+        {/* Search + sort (Shopify: search field, sort button on its right) */}
+        <View style={styles.searchRow}>
+          <View style={[styles.searchWrap, { backgroundColor: FILL_ELEVATED }]}>
+            <Icon name="search" size={17} color={colors.mutedForeground} />
+            <TextInput
+              style={[styles.searchInput, TEXT.body, { color: colors.foreground }, WEB_INPUT_RESET]}
+              placeholder="Search"
+              placeholderTextColor={colors.mutedForeground}
+              value={search}
+              onChangeText={setSearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+              accessibilityLabel="Search customers"
+            />
+            {search ? (
+              <TouchableOpacity onPress={() => setSearch('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
+                <Icon name="x-circle" size={17} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            ) : null}
           </View>
-        ))}
-      </View>
+          <TouchableOpacity
+            onPress={() => { hapticLight(); setSortOpen(true); }}
+            activeOpacity={0.7}
+            style={[styles.sortBtn, { backgroundColor: FILL_ELEVATED }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort customers, ${CUSTOMER_SORT_OPTIONS.find((o) => o.id === sortBy)?.label}`}
+            testID="customers-sort"
+          >
+            <Icon name="sliders" size={17} color={colors.foreground} />
+          </TouchableOpacity>
+        </View>
 
-      {/* Search */}
-      <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Feather name="search" size={16} color={colors.mutedForeground} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.foreground }, WEB_INPUT_RESET]}
-          placeholder="Search customers..."
-          placeholderTextColor={colors.mutedForeground}
-          value={search}
-          onChangeText={setSearch}
-        />
-      </View>
-
-      {/* Sort */}
-      <View style={styles.sortRow}>
-        {SORT_OPTIONS.map((opt) => {
-          const active = sortBy === opt.key;
-          return (
-            <TouchableOpacity
-              key={opt.key}
-              activeOpacity={0.7}
-              onPress={() => setSortBy(opt.key)}
-              style={[
-                styles.segChip,
-                {
-                  backgroundColor: active ? colors.primary : colors.card,
-                  borderColor: active ? colors.primary : colors.border,
-                },
-              ]}
-            >
-              <Text style={[styles.segText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Customer List — the bordered/shaded card wrapper is for populated
-          rows and the loading/error states only. The empty state renders
-          flat, directly on the screen background, with no grey box behind
-          it (Dev's explicit "no grey boxes" call). */}
-      {!loading && !error && sortedCustomers.length === 0 ? (
-        <EmptyState
-          icon="users"
-          title={search.trim() ? 'No matching customers' : 'No customers yet'}
-          message={
-            search.trim()
-              ? 'Try a different name, email or tag.'
-              : 'Once someone buys from your store, they will show up here.'
-          }
-          // Dev's explicit call: Customers gets no action button, ever —
-          // there's nothing a seller can "do" from an empty customer list
-          // (see the fresh-preview empty-state action audit in this PR's
-          // description).
-          compact
-        />
-      ) : (
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* Flat on black — no card behind the empty state or the rows. */}
         {loading ? (
-          <View style={styles.custRow}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.custEmail, { color: colors.mutedForeground, marginLeft: 10 }]}>Loading customers...</Text>
+          <View style={{ gap: 22, marginTop: 14 }}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={{ gap: 7 }}>
+                <SkeletonLine width="45%" height={16} />
+                <SkeletonLine width="30%" />
+                <SkeletonLine width="38%" />
+              </View>
+            ))}
           </View>
         ) : error ? (
           <ErrorState
             message="Couldn't load your customers."
-            onRetry={() => { setLoading(true); fetchCustomers(search); }}
+            onRetry={() => { setLoading(true); void fetchCustomers(search); }}
+          />
+        ) : sortedCustomers.length === 0 ? (
+          // One line, and no action: Dev's call — there's nothing a seller
+          // can "do" from an empty customer list.
+          <EmptyState
+            title={search.trim() ? 'No customers match your search.' : 'No customers yet.'}
+            style={{ marginTop: 48 }}
+            testID="customers-empty"
           />
         ) : (
           sortedCustomers.map((c, i) => {
-            // Monochrome avatar tint (theme foreground) — no saturated per-user hues,
-            // so it reads correctly across all 12 app themes.
-            const color = colors.foreground;
-            const initials = getInitials(c.name);
+            const location = customerLocation(c.address);
+            const tag = c.tags?.[0];
             return (
               <TouchableOpacity
                 key={c.id}
-                activeOpacity={0.8}
-                style={[styles.custRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
-                onPress={() => router.push(`/customer-orders?customerId=${c.id}` as never)}
+                activeOpacity={0.7}
+                style={[styles.custRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
+                accessibilityRole="button"
+                testID="customer-row"
               >
-                <View style={[styles.avatar, { backgroundColor: color + '33' }]}>
-                  <Text style={[styles.avatarText, { color }]}>{initials}</Text>
-                </View>
-                <View style={styles.custInfo}>
-                  <Text style={[styles.custName, { color: colors.foreground }]}>{c.name}</Text>
-                  <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>{c.email}</Text>
-                  {c.phone ? (
-                    <Text style={[styles.custOrders, { color: colors.mutedForeground }]}>{c.phone}</Text>
-                  ) : null}
-                  {c.tags && c.tags.length > 0 && (
-                    <View style={styles.tagsRow}>
-                      {c.tags.slice(0, 3).map((tag) => (
-                        <View key={tag} style={[styles.tagChip, { backgroundColor: colors.primary + '22', borderColor: colors.primary + '44' }]}>
-                          <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
-                        </View>
-                      ))}
+                <View style={styles.nameLine}>
+                  <Text style={[TEXT.headline, styles.custName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
+                  {tag ? (
+                    <View style={styles.tagChip}>
+                      <Text style={[TEXT.caption, { color: colors.mutedForeground }]} numberOfLines={1}>{tag}</Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
-                <View style={styles.custRight}>
-                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-                </View>
+                {location ? (
+                  <Text style={[TEXT.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>{location}</Text>
+                ) : null}
+                <Text style={[TEXT.footnote, TABULAR, { color: colors.foreground }]} numberOfLines={1}>{customerSpendLine(c)}</Text>
+                {c.notes ? (
+                  <View style={styles.noteLine}>
+                    <Icon name="file-text" size={17} color={colors.mutedForeground} />
+                    <Text style={[TEXT.footnote, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>{c.notes}</Text>
+                  </View>
+                ) : null}
               </TouchableOpacity>
             );
           })
         )}
-      </View>
-      )}
-    </ScrollView>
+      </ScrollView>
+      <OptionSheet
+        visible={sortOpen}
+        onClose={() => setSortOpen(false)}
+        title="Sort by"
+        options={CUSTOMER_SORT_OPTIONS}
+        selectedId={sortBy}
+        onSelect={(id) => { setSortBy(id as CustomerSort); setSortOpen(false); }}
+        testID="customers-sort-sheet"
+      />
       <AIBrainFAB context={{ screen: 'customers' as const }} bottomOffset={0} />
     </View>
   );
@@ -271,45 +200,13 @@ export default function CustomersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
-  statsRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
-  stat: { flex: 1, borderRadius: 12, padding: 10, borderWidth: 1, alignItems: 'center', gap: 3 },
-  statVal: { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
-  // 44x44: matches ScreenHeader's own actionBtn convention and the minimum
-  // comfortable touch target (was 36x36 with only hitSlop making up the
-  // difference, which the audit can't verify from the DOM).
-  analyticsBtnHdr: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  loyaltyCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 16 },
-  loyaltyLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  loyaltyTitle: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
-  loyaltySub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  loyaltyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
-  loyaltyBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, marginBottom: 12 },
-  searchInput: { flex: 1, fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
-  segments: { marginBottom: 16 },
-  sortRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  segChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
-  segText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
-  custRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
-  custInfo: { flex: 1, gap: 2 },
-  custName: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
-  custEmail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  custOrders: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  custRight: { alignItems: 'flex-end', justifyContent: 'center' },
-  tagsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  tagChip:   { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
-  tagText:   { fontSize: FS.xs, fontFamily: 'Inter_600SemiBold' },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
-  rewardRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  rewardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  rewardLabel: { flex: 1, fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
-  rewardVal: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  searchWrap: { flex: 1, height: 44, flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1 },
+  sortBtn: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  custRow: { paddingVertical: 14, gap: 3 },
+  nameLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  custName: { flexShrink: 1 },
+  tagChip: { marginLeft: 'auto', backgroundColor: FILL_ELEVATED, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 3, maxWidth: 120 },
+  noteLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
 });

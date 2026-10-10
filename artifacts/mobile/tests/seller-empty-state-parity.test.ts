@@ -24,9 +24,12 @@ const SCREENS: Record<string, string> = {
 
 describe('Every seller list screen uses the shared layout EmptyState', () => {
   for (const [name, path] of Object.entries(SCREENS)) {
-    it(`${name} imports EmptyState from @/components/layout`, () => {
+    it(`${name} imports a shared EmptyState (layout or ui)`, () => {
       const source = read(path);
-      expect(source).toMatch(/import\s*\{[^}]*\bEmptyState\b[^}]*\}\s*from\s*['"]@\/components\/layout['"]/);
+      // Either the layout EmptyState or the design foundation's one-line
+      // EmptyState (components/ui, BRANDTHREAD_DESIGN.md "Copy") — never the
+      // BrandthreadUI illustration variant.
+      expect(source).toMatch(/import\s*\{[^}]*\bEmptyState\b[^}]*\}\s*from\s*['"]@\/components\/(layout|ui)['"]/);
       expect(source).toContain('<EmptyState');
     });
   }

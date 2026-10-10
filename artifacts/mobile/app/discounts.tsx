@@ -4,33 +4,41 @@
  * One page: create a real, working discount code (auto-generated or typed),
  * a live summary card, and the list of existing codes with status/uses and
  * pause/edit.
+ *
+ * The list follows Shopify iOS "Discounts": a search field, All / Active /
+ * Scheduled / Expired chips, rows grouped under the day they were created,
+ * each row the code, a status chip, a " • "-joined summary line and a usage
+ * line. Tapping a row opens its actions (edit, copy, pause, delete).
  */
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, ActivityIndicator, Platform,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { InlineSlider } from '@/components/InlineSlider';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
-import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { usePreviewDemoMode } from '@/hooks/usePreviewDemoMode';
+import { buildPreviewDemoDiscounts, isPreviewDemoDiscountId } from '@/lib/previewDiscounts';
+import {
+  DISCOUNT_FILTERS, DISCOUNT_STATUS_LABEL, discountSummaryLine, discountUsageLine, groupDiscountsByDay,
+  matchesDiscountFilter, matchesDiscountSearch, type DiscountFilter,
+} from '@/lib/discountList';
+import { BottomSheet, Chip, EmptyState, ListRow } from '@/components/ui';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { addPreviewDiscount, deletePreviewDiscount, getPreviewDiscounts, updatePreviewDiscount, whenPreviewSellerFreshStoreReady, type PreviewDiscount } from '@/lib/previewSellerFreshStore';
 import {
-  FONT, FS, SP, RADIUS,
+  FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
-import {
-  BrandthreadCard, PrimaryButton, SecondaryButton, TertiaryButton,
-  StatusBadge, SectionHeader, HapticSwitch,
-} from '@/components/BrandthreadUI';
+import { PrimaryButton, HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { EmptyState } from '@/components/layout';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products' | 'collections';
@@ -87,17 +95,6 @@ function fmtValue(d: Pick<DiscountCode, 'type' | 'value'>) {
   return 'Free item';
 }
 
-const STATUS_VARIANT: Record<DiscountStatus, 'success' | 'warning' | 'neutral' | 'error'> = {
-  active: 'success',
-  scheduled: 'neutral',
-  paused: 'neutral',
-  expired: 'error',
-  exhausted: 'warning',
-};
-const STATUS_LABEL: Record<DiscountStatus, string> = {
-  active: 'Active', scheduled: 'Scheduled', paused: 'Paused', expired: 'Expired', exhausted: 'Used up',
-};
-
 function randomCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let out = '';
@@ -115,15 +112,17 @@ export default function DiscountsScreen() {
   const { muted: MUTED, border: BORDER } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
   const api = useApi();
-  // ?bt_preview=seller with no real signed-in account: no token to fetch or
-  // save real discounts with. Reads/writes go through
-  // lib/previewSellerFreshStore.ts's in-session store instead of the API, so
-  // "Create discount" still genuinely works for the rest of the preview
-  // session (same convention as app/(tabs)/orders.tsx's isPreviewMode guard).
-  const [isPreviewMode] = useState(() => isSellerDevPreview());
-  const previewOnly = isPreviewMode && (!authLoaded || !isSignedIn || !userId);
+  // The seller web preview (?bt_preview=seller) can't call the API — lib/api.ts
+  // rejects every request there, signed in or not. Reads/writes go through
+  // lib/previewSellerFreshStore.ts's local store instead, so "Create code"
+  // still genuinely works in the preview; &demo=1 adds the local demo codes
+  // from lib/previewDiscounts.ts. Fresh preview starts empty.
+  const [previewOnly] = useState(() => isSellerDevPreview());
+  const previewDemo = usePreviewDemoMode();
+  const [filter, setFilter] = useState<DiscountFilter>('all');
+  const [search, setSearch] = useState('');
+  const [actionFor, setActionFor] = useState<DiscountCode | null>(null);
 
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
   const [products, setProducts] = useState<Array<{ id: string; name: string; images?: string[] }>>([]);
@@ -155,11 +154,14 @@ export default function DiscountsScreen() {
 
   const loadDiscounts = useCallback(async () => {
     if (previewOnly) {
-      await whenPreviewSellerFreshStoreReady();
-      setDiscounts(getPreviewDiscounts().map(normalizeDiscount));
+      const read = () => setDiscounts([...getPreviewDiscounts(), ...buildPreviewDemoDiscounts(previewDemo)].map(normalizeDiscount));
+      // Render what's in memory now, then again once a saved session has loaded.
+      read();
       setProducts([]);
       setLoadError(false);
       setLoading(false);
+      await whenPreviewSellerFreshStoreReady();
+      read();
       return;
     }
     setLoading(true);
@@ -179,7 +181,7 @@ export default function DiscountsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api, previewOnly]);
+  }, [api, previewOnly, previewDemo]);
 
   useFocusEffect(useCallback(() => { loadDiscounts(); }, [loadDiscounts]));
 
@@ -252,10 +254,6 @@ export default function DiscountsScreen() {
     : `${startDate ? `Starts ${startDate}` : 'Starts immediately'}${hasEnd && endDate ? ` · Ends ${endDate}` : hasEnd ? '' : ' · No end date'}`;
 
   async function handleSave() {
-    if (previewOnly && userId) {
-      Alert.alert('Sign in required', 'Wait for your account to finish loading before saving.');
-      return;
-    }
     if (discType !== 'free_shipping' && discType !== 'free_item') {
       if (discType === 'percentage' && (percent < 1 || percent > 100)) {
         Alert.alert('Invalid percentage', 'Choose between 1% and 100%.');
@@ -311,8 +309,9 @@ export default function DiscountsScreen() {
       };
       if (previewOnly) {
         if (editingId) {
-          const updated = updatePreviewDiscount(editingId, payload);
-          if (updated) setDiscounts(prev => prev.map(d => d.id === editingId ? normalizeDiscount(updated) : d));
+          // Demo codes (&demo=1) live only in screen state, never the persisted store.
+          const updated = isPreviewDemoDiscountId(editingId) ? null : updatePreviewDiscount(editingId, payload);
+          setDiscounts(prev => prev.map(d => d.id === editingId ? (updated ? normalizeDiscount(updated) : normalizeDiscount({ ...d, ...payload, code: d.code })) : d));
         } else {
           const created: PreviewDiscount = {
             id: 'preview_discount_' + Math.random().toString(36).slice(2, 11),
@@ -358,7 +357,7 @@ export default function DiscountsScreen() {
     const nextActive = !d.active;
     setDiscounts(prev => prev.map(x => x.id === d.id ? { ...x, active: nextActive, status: nextActive ? 'active' : 'paused' } : x));
     if (previewOnly) {
-      updatePreviewDiscount(d.id, { active: nextActive, status: nextActive ? 'active' : 'paused' });
+      if (!isPreviewDemoDiscountId(d.id)) updatePreviewDiscount(d.id, { active: nextActive, status: nextActive ? 'active' : 'paused' });
       return;
     }
     try {
@@ -376,7 +375,7 @@ export default function DiscountsScreen() {
         onPress: async () => {
           setDiscounts(prev => prev.filter(x => x.id !== d.id));
           if (previewOnly) {
-            deletePreviewDiscount(d.id);
+            if (!isPreviewDemoDiscountId(d.id)) deletePreviewDiscount(d.id);
             return;
           }
           try { await api.discountCodes.delete(d.id); }
@@ -390,6 +389,11 @@ export default function DiscountsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Clipboard.setStringAsync(codeValue);
   }
+
+  const visibleGroups = useMemo(
+    () => groupDiscountsByDay(discounts.filter(d => matchesDiscountFilter(d.status, filter) && matchesDiscountSearch(d.code, search))),
+    [discounts, filter, search],
+  );
 
   return (
     <View style={s.root}>
@@ -405,38 +409,79 @@ export default function DiscountsScreen() {
 
           {loadError ? (
             <EmptyState
-              icon="alert-circle"
-              title="Couldn't load your codes"
-              message="Pull to refresh."
-              actionLabel="Try again"
-              onAction={() => { void loadDiscounts(); }}
-              variant="error"
+              title="Couldn't load your codes."
+              action={{ label: 'Try again', onPress: () => { void loadDiscounts(); } }}
+              style={{ marginTop: 96 }}
             />
-          ) : discounts.length === 0 && (
+          ) : discounts.length === 0 ? (
+            // Shopify's empty Discounts pattern, as one line + "Create discount".
             <EmptyState
-              icon="tag"
-              title="No discount codes yet"
-              message={previewOnly
-                ? 'Preview only · Create a code to explore discount options. Changes last until you reload.'
-                : 'Create a code to offer buyers a percentage off, a fixed amount, free shipping or a free item.'}
-              actionLabel="Create code"
-              onAction={openNewModal}
+              title="No discount codes yet."
+              action={{ label: 'Create discount', onPress: openNewModal }}
+              style={{ marginTop: 96 }}
+              testID="discounts-empty"
             />
+          ) : (
+            <>
+              <View style={[s.searchWrap, { backgroundColor: FILL_ELEVATED }]}>
+                <Icon name="search" size={16} color={MUTED} />
+                <TextInput
+                  style={[s.searchInput, TEXT.body, WEB_INPUT_RESET]}
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search"
+                  placeholderTextColor={MUTED}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  accessibilityLabel="Search discount codes"
+                />
+                {search ? (
+                  <TouchableOpacity onPress={() => setSearch('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
+                    <Icon name="x-circle" size={16} color={MUTED} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <View style={s.filterRow}>
+                {DISCOUNT_FILTERS.map(f => (
+                  <Chip key={f.id} label={f.label} selected={filter === f.id} onPress={() => setFilter(f.id)} testID={`discounts-filter-${f.id}`} />
+                ))}
+              </View>
+              {visibleGroups.length === 0 ? (
+                <EmptyState
+                  title={search.trim() ? 'No codes match your search.' : `No ${DISCOUNT_FILTERS.find(f => f.id === filter)?.label.toLowerCase()} codes.`}
+                />
+              ) : visibleGroups.map(group => (
+                <View key={group.label}>
+                  <Text style={s.groupLabel}>{group.label}</Text>
+                  {group.items.map((d, i) => (
+                    <DiscountRow key={d.id} d={d} first={i === 0} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActionFor(d); }} />
+                  ))}
+                </View>
+              ))}
+            </>
           )}
-
-          {discounts.length > 0 && <SectionHeader title="Your codes" />}
-          {discounts.map(d => (
-            <DiscountCard
-              key={d.id}
-              d={d}
-              onEdit={() => openEditModal(d)}
-              onTogglePause={() => togglePause(d)}
-              onDelete={() => handleDelete(d)}
-              onCopy={() => copyCode(d.code)}
-            />
-          ))}
         </ScrollView>
       )}
+
+      {/* Row actions — Shopify's discount "…" menu: edit, copy, deactivate, delete. */}
+      <BottomSheet visible={!!actionFor} onClose={() => setActionFor(null)} testID="discount-actions">
+        {actionFor && (
+          <View style={{ paddingBottom: SP.sm }}>
+            <View style={s.sheetHeader}>
+              <Text style={[TEXT.headline, { color: theme.text }]}>{actionFor.code}</Text>
+              <Text style={[TEXT.footnote, { color: MUTED, marginTop: 2 }]} numberOfLines={2}>{discountSummaryLine(actionFor)}</Text>
+            </View>
+            <ListRow icon="edit-2" title="Edit" onPress={() => { const d = actionFor; setActionFor(null); openEditModal(d); }} testID="discount-action-edit" />
+            <ListRow icon="copy" title="Copy code" onPress={() => { copyCode(actionFor.code); setActionFor(null); }} />
+            <ListRow
+              icon={actionFor.active ? 'pause-circle' : 'play-circle'}
+              title={actionFor.active ? 'Pause' : 'Resume'}
+              onPress={() => { const d = actionFor; setActionFor(null); void togglePause(d); }}
+            />
+            <ListRow icon="trash-2" title="Delete" destructive onPress={() => { const d = actionFor; setActionFor(null); void handleDelete(d); }} />
+          </View>
+        )}
+      </BottomSheet>
 
       {/* Create / Edit Modal — one page */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
@@ -453,14 +498,14 @@ export default function DiscountsScreen() {
             <View style={[s.summaryCard, { borderColor: theme.accent + '55' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={[s.summaryCode, { color: theme.accent }]}>{code.trim() || 'YOURCODE'}</Text>
-                <Feather name="tag" size={16} color={theme.accent} />
+                <Icon name="tag" size={16} color={theme.accent} />
               </View>
               <Text style={s.summaryValue}>{summaryValueLabel}</Text>
-              <View style={s.summaryRow}><Feather name="shopping-bag" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryScopeLabel}</Text></View>
-              {minQuantity.trim() ? <View style={s.summaryRow}><Feather name="layers" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. {minQuantity.trim()} item{minQuantity.trim() === '1' ? '' : 's'}</Text></View> : null}
-              {minOrderCents ? <View style={s.summaryRow}><Feather name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatCents(minOrderCents)}</Text></View> : null}
-              <View style={s.summaryRow}><Feather name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}{firstOrderOnly ? ' · First order only' : ''}</Text></View>
-              <View style={s.summaryRow}><Feather name="calendar" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryDatesLabel}</Text></View>
+              <View style={s.summaryRow}><Icon name="shopping-bag" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryScopeLabel}</Text></View>
+              {minQuantity.trim() ? <View style={s.summaryRow}><Icon name="layers" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. {minQuantity.trim()} item{minQuantity.trim() === '1' ? '' : 's'}</Text></View> : null}
+              {minOrderCents ? <View style={s.summaryRow}><Icon name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatCents(minOrderCents)}</Text></View> : null}
+              <View style={s.summaryRow}><Icon name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}{firstOrderOnly ? ' · First order only' : ''}</Text></View>
+              <View style={s.summaryRow}><Icon name="calendar" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryDatesLabel}</Text></View>
             </View>
 
             {/* Code */}
@@ -555,7 +600,7 @@ export default function DiscountsScreen() {
                   <Text style={s.pickerRowText}>
                     {selectedProductIds.length === 0 ? 'Choose products…' : `${selectedProductIds.length} product${selectedProductIds.length === 1 ? '' : 's'} selected`}
                   </Text>
-                  <Feather name="chevron-right" size={16} color={MUTED} />
+                  <Icon name="chevron-right" size={16} color={MUTED} />
                 </TouchableOpacity>
               )}
             </View>
@@ -574,7 +619,7 @@ export default function DiscountsScreen() {
                       }}
                     >
                       <Text style={s.productName} numberOfLines={1}>{c.title}</Text>
-                      <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
+                      <Icon name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
                     </TouchableOpacity>
                   );
                 })}
@@ -703,7 +748,7 @@ export default function DiscountsScreen() {
                   }}
                 >
                   <Text style={s.productName} numberOfLines={1}>{p.name}</Text>
-                  <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
+                  <Icon name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
                 </TouchableOpacity>
               );
             })}
@@ -714,88 +759,29 @@ export default function DiscountsScreen() {
   );
 }
 
-function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
-  d: DiscountCode;
-  onEdit: () => void;
-  onTogglePause: () => void;
-  onDelete: () => void;
-  onCopy: () => void;
-}) {
+function DiscountRow({ d, first, onPress }: { d: DiscountCode; first: boolean; onPress: () => void }) {
   const { theme } = useAppTheme();
-  const { muted: MUTED, border: BORDER, success: SUCCESS, warning: ORANGE, error: RED } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
-  const pctUsed = d.maxUses ? Math.round((d.usesCount / d.maxUses) * 100) : null;
-
+  // Status chip on the one #1C1C1E fill: Active reads white, every other status silver.
+  const live = d.status === 'active';
   return (
-    <BrandthreadCard style={s.card}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <TouchableOpacity style={{ flex: 1 }} onPress={onCopy} activeOpacity={0.7}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={s.codeText}>{d.code}</Text>
-            <Feather name="copy" size={12} color={MUTED} />
-          </View>
-          <Text style={[s.valueText, { color: theme.accentLight }]}>{fmtValue(d)}</Text>
-          <Text style={s.metaText}>{d.appliesTo === 'entire_store' ? 'Entire store' : d.appliesTo === 'collections' ? `${d.collectionIds.length} collection${d.collectionIds.length === 1 ? '' : 's'}` : `${d.productIds.length} product${d.productIds.length === 1 ? '' : 's'}`}</Text>
-          {d.minOrderCents > 0 && <Text style={s.metaText}>Min. order {formatCents(d.minOrderCents)}</Text>}
-          <Text style={s.metaText}>
-            {d.startsAt && new Date(d.startsAt).getTime() > Date.now() ? `Starts ${fmtDate(d.startsAt)}` : d.expiresAt ? `Ends ${fmtDate(d.expiresAt)}` : 'No end date'}
-          </Text>
-        </TouchableOpacity>
-        <View style={{ alignItems: 'flex-end', gap: 8 }}>
-          <StatusBadge label={STATUS_LABEL[d.status]} variant={STATUS_VARIANT[d.status]} small />
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity
-              onPress={onEdit}
-              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${d.code}`}
-            >
-              <Feather name="edit-2" size={15} color={MUTED} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onTogglePause}
-              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-              accessibilityRole="button"
-              accessibilityLabel={d.active ? `Pause ${d.code}` : `Resume ${d.code}`}
-            >
-              <Feather name={d.active ? 'pause-circle' : 'play-circle'} size={15} color={d.active ? ORANGE : SUCCESS} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onDelete}
-              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-              accessibilityRole="button"
-              accessibilityLabel={`Delete ${d.code}`}
-            >
-              <Feather name="trash-2" size={15} color={RED} />
-            </TouchableOpacity>
-          </View>
+    <TouchableOpacity
+      style={[s.row, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${d.code}, ${DISCOUNT_STATUS_LABEL[d.status]}`}
+      testID="discount-row"
+    >
+      <View style={s.rowTop}>
+        <Text style={s.codeText} numberOfLines={1}>{d.code}</Text>
+        <View style={s.statusChip}>
+          <Text style={[TEXT.caption, { color: live ? theme.text : theme.muted }]}>{DISCOUNT_STATUS_LABEL[d.status]}</Text>
         </View>
       </View>
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }}>
-        <View style={s.statPill}>
-          <Feather name="users" size={11} color={MUTED} />
-          <Text style={s.statText}>{d.usesCount} use{d.usesCount === 1 ? '' : 's'}</Text>
-        </View>
-        {d.maxUses != null && (
-          <View style={s.statPill}>
-            <Feather name="sliders" size={11} color={MUTED} />
-            <Text style={s.statText}>Limit {d.maxUses}</Text>
-          </View>
-        )}
-        {d.oneUsePerCustomer && (
-          <View style={s.statPill}>
-            <Feather name="user-check" size={11} color={MUTED} />
-            <Text style={s.statText}>1/customer</Text>
-          </View>
-        )}
-        {pctUsed !== null && (
-          <View style={{ flex: 1, height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' }}>
-            <View style={{ width: `${Math.min(pctUsed, 100)}%`, height: '100%', backgroundColor: pctUsed >= 90 ? RED : pctUsed >= 60 ? ORANGE : SUCCESS }} />
-          </View>
-        )}
-      </View>
-    </BrandthreadCard>
+      <Text style={s.metaText} numberOfLines={2}>{discountSummaryLine(d)}</Text>
+      <Text style={s.metaText} numberOfLines={1}>{discountUsageLine(d)}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -809,12 +795,16 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  card:     { marginBottom: SP.sm },
-  codeText: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: 1.5 },
-  valueText:{ fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: 2, marginBottom: 2 },
-  metaText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
-  statPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 3 },
-  statText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  searchWrap: { height: 44, flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1, color: FG },
+  filterRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: SP.sm, marginBottom: SP.xs },
+  groupLabel: { ...TEXT.footnote, color: MUTED, marginTop: SP.md, marginBottom: 2 },
+  row:      { paddingVertical: 14, gap: 3 },
+  rowTop:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
+  codeText: { ...TEXT.headline, color: FG, flexShrink: 1 },
+  metaText: { ...TEXT.footnote, color: MUTED },
+  statusChip: { backgroundColor: FILL_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 3 },
+  sheetHeader: { paddingHorizontal: SP.md, paddingTop: SP.xs, paddingBottom: SP.sm },
 
   modal:       { flex: 1, backgroundColor: BG },
 
