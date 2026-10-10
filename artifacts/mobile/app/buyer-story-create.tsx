@@ -40,7 +40,7 @@ import { getTaggableProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
-import { hapticLight, hapticToggle, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { hapticLight, hapticSelection, hapticToggle, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { TEXT_FONTS, storyFontFamily, loadStoryFontsAsync, type StoryFontKey } from '@/lib/storyFonts';
 import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/lib/uploadLiveActivity';
@@ -61,12 +61,13 @@ import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackgr
 import type { MentionPerson } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
 import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
+import { MODE_LABEL, stepCreateMode, storyCameraModes, type CreateMode } from '@/constants/postLimits';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
 
 type Step = 'camera' | 'create' | 'edit';
-type CaptureMode = 'story' | 'post' | 'live';
+type CaptureMode = CreateMode;
 type CapturedMedia = {
   kind: 'photo' | 'video'; uri: string;
   originalUri?: string; cropRect?: NormalizedCropRect;
@@ -532,6 +533,40 @@ export default function StoryComposer() {
       Animated.timing(modeIndicatorWidth, { toValue: layout.width, duration: 150, useNativeDriver: false }),
     ]).start();
   }, [mode, modeLayouts, modeIndicatorX, modeIndicatorWidth]);
+  // Every creation mode this role has (constants/postLimits.ts), so the
+  // switcher keeps cycling THREAD / POST / STORY / LIVE from this screen.
+  const cameraModes = storyCameraModes(isSeller ? 'seller' : 'buyer');
+  const selectMode = (m: CaptureMode) => {
+    // Forward the REAL role, not the route param this screen
+    // was reached with (see isSeller's own doc above) — a
+    // seller tapping POST must still land on create-post's
+    // seller-gated fields, not fall back to its buyer view.
+    if (m === 'thread' || m === 'post') { router.push({ pathname: '/create-post', params: { accountType: isSeller ? 'seller' : 'buyer', mode: m } } as any); return; }
+    if (m === 'live') { router.push('/seller-go-live' as never); return; }
+    setMode(m);
+  };
+  // Instagram camera: a horizontal swipe across the preview moves the
+  // switcher one mode (swipe left → next, swipe right → previous).
+  const selectModeRef = useRef(selectMode);
+  selectModeRef.current = selectMode;
+  const modeStepRef = useRef({ modes: cameraModes, mode });
+  modeStepRef.current = { modes: cameraModes, mode };
+  const modeSwipe = useRef(
+    PanResponder.create({
+      // The preview itself has no tap action, so the layer can own every
+      // touch that starts on it; only a mostly-horizontal drag steps a mode.
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderRelease: (_e, g) => {
+        if (Math.abs(g.dx) < 40 || Math.abs(g.dx) < Math.abs(g.dy) * 1.5) return;
+        const { modes, mode: current } = modeStepRef.current;
+        const next = stepCreateMode(modes, current, g.dx < 0 ? 1 : -1);
+        if (next === current) return;
+        hapticSelection();
+        selectModeRef.current(next);
+      },
+    }),
+  ).current;
   const [isRecording, setIsRecording] = useState(false);
   const [recordProgress, setRecordProgress] = useState(0);
   const [lastGalleryUri, setLastGalleryUri] = useState<string | null>(null);
@@ -1119,7 +1154,7 @@ export default function StoryComposer() {
         {hasPermission ? (
           <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} flash={flash} mode={isRecording ? 'video' : 'picture'} />
         ) : (
-          <View style={[styles.root, styles.webFallback]}>
+          <View style={[styles.root, styles.webFallback]} {...modeSwipe.panHandlers}>
             <Feather name="camera-off" size={40} color={ON_DARK} />
             <Text style={styles.webFallbackText}>
               {IS_WEB ? 'Allow camera access in your browser to capture a story here, or choose from your library.' : 'Allow camera access to post a story.'}
@@ -1141,18 +1176,13 @@ export default function StoryComposer() {
           </View>
         )}
 
+        {/* Swipe layer over the preview (beneath every control) for the mode switcher */}
+        {hasPermission && <View style={StyleSheet.absoluteFill} {...modeSwipe.panHandlers} />}
+
         {/* Top bar — never under the notch */}
         <View style={[styles.camTopBar, { paddingTop: topInset + SP.sm }]}>
           <TouchableOpacity style={styles.camIconBtn} onPress={closeAll} accessibilityLabel="Close" accessibilityRole="button">
             <Feather name="x" size={22} color={ON_DARK} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.camIconBtn}
-            onPress={() => setFlash((v) => (v === 'off' ? 'on' : 'off'))}
-            accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'}
-            accessibilityRole="button"
-          >
-            <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={22} color={flash === 'on' ? '#FBBF24' : ON_DARK} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.camIconBtn}
@@ -1164,8 +1194,21 @@ export default function StoryComposer() {
           </TouchableOpacity>
         </View>
 
-        {/* Left-side vertical tool rail — Create / Boomerang / Layout / Hands-free */}
+        {/* Left-side vertical tool rail — Flash / Create / Boomerang / Layout / Hands-free */}
         <View style={[styles.leftRail, { top: topInset + 90 }]}>
+          {hasPermission && (
+            <TouchableOpacity
+              style={styles.railBtn}
+              onPress={() => { hapticToggle(); setFlash((v) => (v === 'off' ? 'on' : 'off')); }}
+              accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'}
+              accessibilityRole="button"
+              accessibilityState={{ selected: flash === 'on' }}
+            >
+              <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={20} color={flash === 'on' ? '#FBBF24' : ON_DARK} />
+              {railExpanded && <Text style={styles.railLabel}>Flash</Text>}
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={styles.railBtn}
             onPress={() => { hapticLight(); setStep('create'); }}
@@ -1219,7 +1262,8 @@ export default function StoryComposer() {
           </TouchableOpacity>
 
           {gridPopoverOpen && (
-            <View style={styles.gridPopover}>
+            // Sits beside Layout, one row lower while the Flash item is shown.
+            <View style={[styles.gridPopover, hasPermission && { top: 152 }]}>
               {GRID_SPECS.map((spec) => (
                 <TouchableOpacity key={spec.id} style={styles.gridOption} onPress={() => selectGrid(spec)} accessibilityRole="button" accessibilityLabel={`Grid ${spec.cols} by ${spec.rows}`}>
                   <GridIcon spec={spec} active={gridSpec?.id === spec.id} />
@@ -1240,12 +1284,12 @@ export default function StoryComposer() {
 
         {/* Bottom controls */}
         <View style={[styles.camBottom, { paddingBottom: insets.bottom + SP.md }]}>
-          {/* Mode carousel: STORY / POST / LIVE. LIVE is a real, working
+          {/* Mode carousel: THREAD / POST / STORY / LIVE. LIVE is a real, working
               destination for sellers (routes to the Go Live flow) — never a
               disabled "coming soon" item. Buyers can't go live at all, so
               the item isn't rendered for them rather than shown dead. */}
           <View style={styles.modeRow}>
-            {(isSeller ? (['post', 'story', 'live'] as CaptureMode[]) : (['post', 'story'] as CaptureMode[])).map((m) => {
+            {cameraModes.map((m) => {
               const active = mode === m;
               return (
                 <TouchableOpacity
@@ -1257,20 +1301,14 @@ export default function StoryComposer() {
                   }}
                   onPress={() => {
                     hapticToggle();
-                    // Forward the REAL role, not the route param this screen
-                    // was reached with (see isSeller's own doc above) — a
-                    // seller tapping POST must still land on create-post's
-                    // seller-gated fields, not fall back to its buyer view.
-                    if (m === 'post') { router.push({ pathname: '/create-post', params: { accountType: isSeller ? 'seller' : 'buyer' } } as any); return; }
-                    if (m === 'live') { router.push('/seller-go-live' as never); return; }
-                    setMode(m);
+                    selectMode(m);
                   }}
                   accessibilityLabel={`${m} mode`}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                 >
                   <Text style={[styles.modeText, active && styles.modeTextActive]}>
-                    {m.toUpperCase()}
+                    {MODE_LABEL[m]}
                   </Text>
                 </TouchableOpacity>
               );
