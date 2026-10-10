@@ -749,7 +749,7 @@ function localDuplicate(entries: LocalBulkEntry[], ids: string[], update: (next:
 function Checkbox({ checked, theme }: { checked: boolean; theme: any }) {
   return (
     <View style={{
-      width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
+      width: 22, height: 22, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
       borderColor: checked ? theme.text : theme.subtle, backgroundColor: checked ? theme.text : 'transparent',
     }}>
       {checked && <Icon name="check" size={ICON_SIZE.sm} color={theme.background} />}

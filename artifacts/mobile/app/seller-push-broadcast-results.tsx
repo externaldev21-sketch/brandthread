@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   title: { fontSize: FS.lg, fontFamily: FONT.bold, marginBottom: 6 },
   note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
   meta: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 8, marginBottom: SP.lg },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', borderWidth: StyleSheet.hairlineWidth, borderRadius: 14 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', borderWidth: StyleSheet.hairlineWidth, borderRadius: 12 },
   cell: { width: '50%', paddingVertical: 20, alignItems: 'center', gap: 4 },
   value: { fontSize: FS.xl, fontFamily: FONT.bold },
   label: { fontSize: FS.xs, fontFamily: FONT.regular },

@@ -824,7 +824,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
-<<<<<<< HEAD
   searchWrap: { height: 44, flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: FG },
   filterRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: SP.sm, marginBottom: SP.xs },
@@ -835,14 +834,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   metaText: { ...TEXT.footnote, color: MUTED },
   statusChip: { backgroundColor: FILL_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 3 },
   sheetHeader: { paddingHorizontal: SP.md, paddingTop: SP.xs, paddingBottom: SP.sm },
-=======
-  card:     { marginBottom: SP.sm },
-  codeText: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  valueText:{ fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: 2, marginBottom: 2 },
-  metaText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
-  statPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 3 },
-  statText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
->>>>>>> origin/approved-pr-796
 
   modal:       { flex: 1, backgroundColor: BG },
 

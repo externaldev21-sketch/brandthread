@@ -106,7 +106,7 @@ const DOT = 18;
 
 const styles = StyleSheet.create({
   heading: { fontSize: FS.base, fontFamily: FONT.semibold, marginBottom: SP.sm },
-  card: { borderRadius: 14, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.md },
+  card: { borderRadius: 12, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.md },
   row: { flexDirection: 'row', gap: SP.md },
   rail: { alignItems: 'center', width: DOT },
   dot: {

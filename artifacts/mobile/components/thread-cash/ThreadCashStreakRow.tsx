@@ -116,7 +116,7 @@ export function ThreadCashStreakRow({
 const styles = StyleSheet.create({
   // Card: 16pt side gutters (matching the rest of the page), 14 radius, 10pt
   // padding, with the days row 8pt below the title row.
-  wrap: { marginHorizontal: SP.md, borderRadius: 14, padding: 9 },
+  wrap: { marginHorizontal: SP.md, borderRadius: 12, padding: 9 },
   wrapPressed: { opacity: 0.75 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

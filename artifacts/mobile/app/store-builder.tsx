@@ -791,11 +791,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   shopifyLogoText: { color: '#142000', fontSize: 22, fontFamily: FONT.bold },
   shopifyCopy: { flex: 1, gap: 3 },
-<<<<<<< HEAD
   shopifyEyebrow: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.bold },
-=======
-  shopifyEyebrow: { color: '#95BF47', fontSize: FS.xs, fontFamily: FONT.bold },
->>>>>>> origin/approved-pr-796
   shopifyTitle: { color: FG, fontSize: FS.base, lineHeight: 21, fontFamily: FONT.bold },
   shopifyDesc: { color: MUTED, fontSize: FS.xs, lineHeight: 17, fontFamily: FONT.regular },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },

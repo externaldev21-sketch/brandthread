@@ -320,17 +320,17 @@ const s = StyleSheet.create({
   // measured as blurry-small on live.
   verifiedText: { fontSize: FS.meta, fontFamily: FONT.semibold },
   reviewDate: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
-  fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
+  fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
   fitChipText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
   reviewBody: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 19, marginBottom: 8 },
   photoRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
-  photoThumb: { width: 56, height: 56, borderRadius: 6, backgroundColor: CARD_ELEVATED },
+  photoThumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: CARD_ELEVATED },
   helpfulRow: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start' },
   helpfulText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
 });
 
 const replyS = StyleSheet.create({
-  box: { borderRadius: 10, padding: 10, marginBottom: 8, gap: 4 },
+  box: { borderRadius: 8, padding: 10, marginBottom: 8, gap: 4 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   label: { fontSize: FS.meta, fontFamily: FONT.bold, flex: 1 },
   date: { fontSize: FS.meta, fontFamily: FONT.medium },

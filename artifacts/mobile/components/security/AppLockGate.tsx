@@ -167,7 +167,7 @@ export default function AppLockGate() {
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: SP.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  mark: { width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  mark: { width: 72, height: 72, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   markText: { fontFamily: FONT.bold, fontSize: 34 },
   lockBadge: {
     width: 30, height: 30, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center',

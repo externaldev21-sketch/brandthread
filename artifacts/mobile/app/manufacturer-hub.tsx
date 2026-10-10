@@ -1790,13 +1790,8 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   searchInput:  { flex: 1, height: 36, backgroundColor: theme.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, paddingHorizontal: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text },
   filterBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   filterBtnActive:{ borderColor: theme.border, backgroundColor: theme.accentDim },
-<<<<<<< HEAD
   filterCount:  { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: theme.accent, color: theme.onAccent, fontSize: 11, fontFamily: FONT.bold, textAlign: 'center', lineHeight: 16, overflow: 'hidden' },
   resultCount:  { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.sm },
-=======
-  filterCount:  { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: theme.accent, color: theme.onAccent, fontSize: 11, fontFamily: FONT.bold, textAlign: 'center', lineHeight: 16, overflow: 'hidden' },
-  resultCount:  { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, paddingHorizontal: SP.md, marginBottom: SP.sm },
->>>>>>> origin/approved-pr-796
   skeletonList: { padding: SP.md, gap: SP.md },
   skeletonRow:  { height: 132, borderRadius: RADIUS.lg, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md },

@@ -94,13 +94,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   glyphSlot: { width: 56, height: 40, alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1 },
-<<<<<<< HEAD
   rowTitle: { color: MEDIA.foreground, fontFamily: FONT.semibold, fontSize: FS.base },
   rowSubtitle: { color: MEDIA.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   dismissHint: { color: MEDIA.muted, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 48 },
-=======
-  rowTitle: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base },
-  rowSubtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  dismissHint: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 48 },
->>>>>>> origin/approved-pr-796
 });

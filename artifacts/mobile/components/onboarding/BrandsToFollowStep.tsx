@@ -153,16 +153,6 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
 }
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-<<<<<<< HEAD
-=======
-  scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
-  followAllBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
-    borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 40,
-    marginTop: SPACE.lg, marginBottom: SPACE.md,
-  },
-  followAllText: { fontSize: 15, fontFamily: FONT.semibold },
->>>>>>> origin/approved-pr-796
   loadingWrap: { paddingVertical: SPACE.xxl, alignItems: 'center' },
   emptyText: { ...TEXT.subhead, color: theme.muted, paddingVertical: SPACE.lg },
   followAll: { alignSelf: 'flex-end', paddingVertical: SPACE.xs },

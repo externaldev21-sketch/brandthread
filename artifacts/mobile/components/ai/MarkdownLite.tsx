@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_ELEVATED,
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 10,
+    borderRadius: 8,
     padding: 10,
     marginVertical: 6,
   },

@@ -37,7 +37,7 @@ export function DiscoverDropRow({ drop }: { drop: DiscoverDrop }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, borderRadius: RADII.card, borderWidth: 1, marginHorizontal: SP.md, marginBottom: SP.sm },
-  image: { width: 56, height: 56, borderRadius: 10 },
+  image: { width: 56, height: 56, borderRadius: 8 },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
   brand: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADII.pill },

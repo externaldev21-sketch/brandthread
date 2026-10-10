@@ -112,13 +112,7 @@ const styles = StyleSheet.create({
   ring: { position: 'absolute', borderRadius: RADIUS.lg, borderWidth: 2, borderColor: MEDIA.foreground },
   captionWrap: { position: 'absolute', left: SP.xl, right: SP.xl, alignItems: 'center' },
   arrow: { marginBottom: 6 },
-<<<<<<< HEAD
   title: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
   body: { color: mediaAlpha(MEDIA.foreground, 0.75), fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 4 },
   dismissHint: { color: mediaAlpha(MEDIA.foreground, 0.5), fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14 },
-=======
-  title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
-  body: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 4 },
-  dismissHint: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14 },
->>>>>>> origin/approved-pr-796
 });

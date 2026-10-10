@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   sheetHost: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
   sheet: {
-    width: '100%', maxWidth: 560, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1,
+    width: '100%', maxWidth: 560, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderWidth: 1,
     paddingHorizontal: SP.lg, paddingTop: SP.sm, gap: SP.sm,
   },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: SP.sm },

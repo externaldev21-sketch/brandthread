@@ -360,11 +360,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   currentBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-<<<<<<< HEAD
     color: FG,
-=======
-    color: SUCCESS,
->>>>>>> origin/approved-pr-796
   },
   previewingBadge: {
     position: 'absolute',

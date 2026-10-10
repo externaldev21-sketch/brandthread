@@ -623,7 +623,7 @@ const createStyles = (theme: AppThemePreset) => {
   currentPlanLabel:   { color: ON_ACCENT, fontSize: FS.xs, fontFamily: FONT.medium },
   currentPlanName:    { color: ON_ACCENT, fontSize: FS.xxl, fontFamily: FONT.semibold },
   currentPlanRenews:  { color: ON_ACCENT, fontSize: FS.xs, fontFamily: FONT.regular },
-  statusPill:         { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
+  statusPill:         { borderRadius: 16, paddingHorizontal: 8, paddingVertical: 2 },
   statusText:         { fontSize: FS.xs, fontFamily: FONT.medium },
   sectionTitle:       { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm },
   planCard:           { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
@@ -659,13 +659,8 @@ const createStyles = (theme: AppThemePreset) => {
    growthPerkText: { color: FG, fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
    growthPerkTextDim: { color: SUBTLE },
    growthPerkStatus: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.medium },
-<<<<<<< HEAD
-  popularBadge:       { alignSelf: 'flex-start', backgroundColor: `${FG}1F`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: SP.sm },
+  popularBadge:       { alignSelf: 'flex-start', backgroundColor: `${FG}1F`, borderRadius: 16, paddingHorizontal: 8, paddingVertical: 2, marginBottom: SP.sm },
   popularText:        { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
-=======
-  popularBadge:       { alignSelf: 'flex-start', backgroundColor: `${SUCCESS}22`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: SP.sm },
-  popularText:        { color: SUCCESS, fontSize: FS.xs, fontFamily: FONT.semibold },
->>>>>>> origin/approved-pr-796
   planHeader:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SP.md },
   planName:           { color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },
   planTagline:        { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },

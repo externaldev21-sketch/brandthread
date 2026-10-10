@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   iconBox: {
     width: 76,
     height: 76,
-    borderRadius: 24,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   button: {
-    borderRadius: 14,
+    borderRadius: 12,
     paddingHorizontal: 22,
     paddingVertical: 14,
   },

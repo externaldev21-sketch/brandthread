@@ -236,7 +236,7 @@ export function TextOverlayEditor({
               es.textPreviewBox,
               bgStyle !== 'none' && {
                 backgroundColor: previewBg,
-                borderRadius: 6,
+                borderRadius: 8,
                 paddingHorizontal: 12,
                 paddingVertical: 6,
               },
@@ -463,7 +463,7 @@ export function OverlayChip({
         delayLongPress={500}
         style={[
           oc.inner,
-          bgStyle !== 'none' && { backgroundColor: bgColor, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
+          bgStyle !== 'none' && { backgroundColor: bgColor, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
         ]}
       >
         <Text

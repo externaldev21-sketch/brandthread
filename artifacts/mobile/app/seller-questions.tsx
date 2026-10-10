@@ -153,7 +153,7 @@ const s = StyleSheet.create({
   q: { fontSize: FS.base, fontFamily: FONT.bold, lineHeight: 22 },
   a: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 20 },
   meta: { fontSize: FS.meta, fontFamily: FONT.medium },
-  answer: { borderRadius: 10, padding: 12, gap: 6 },
+  answer: { borderRadius: 8, padding: 12, gap: 6 },
   link: { fontSize: FS.meta, fontFamily: FONT.semibold },
   answerBtnWrap: { marginTop: 4 },
   half: { flex: 1 },

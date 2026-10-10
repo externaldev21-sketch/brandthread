@@ -146,7 +146,7 @@ const s = StyleSheet.create({
   itemIcon: {
     width: 40,
     height: 40,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },

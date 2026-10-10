@@ -677,7 +677,6 @@ export default function CartScreen() {
 }
 
 const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
-<<<<<<< HEAD
   savedSection: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, paddingTop: 14, marginTop: SP.md, marginBottom: SP.md },
   savedTitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.sm },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: SP.xs },
@@ -688,60 +687,4 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   pointsInput: { flex: 1, height: 44, borderRadius: RADIUS.md, backgroundColor: '#1C1C1E', color: theme.text, fontFamily: FONT.regular, paddingHorizontal: 14 },
   pointsPreview: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 17 },
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
-=======
-  emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.sm },
-  emptyIconCircle: {
-    width: 120, height: 120, borderRadius: 60, borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm,
-  },
-  emptyTitle: { fontSize: FS.lg, fontFamily: FONT.bold, textAlign: 'center' },
-  emptyDescription: { fontSize: FS.base, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 21, maxWidth: 280 },
-  emptyCta: { marginTop: SP.md },
-  editBtn: { paddingRight: SP.sm },
-  editText: { fontSize: FS.sm, fontFamily: FONT.semibold },
-  editBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.borderSubtle,
-  },
-  editBarText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-  selectAllRow: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingBottom: SP.xs,
-  },
-  selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  selectAllText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-  // Same label + hairline as a checkout section (CheckoutPrimitives).
-  savedSection: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingTop: 14, marginBottom: SP.md },
-  savedTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, marginBottom: SP.sm + 4 },
-  divider: { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
-  multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingVertical: 14 },
-  multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
-  loyaltyCard: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingVertical: 14 },
-  loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
-  loyaltySub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
-  pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
-  // The checkout's dark field with a hairline border.
-  pointsInput: { flex: 1, height: 48, borderRadius: 12, backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, paddingHorizontal: 14 },
-  pointsPreview: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
-  appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.success}26`, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
-  appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
-  appliedPointsSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
-  savedHint: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
-  // Sticky checkout bar: total on the left, a white pill on the right —
-  // Nike Bag / TikTok Shop checkout-bar reference, forced white/black
-  // regardless of theme so it reads as the one fixed "pay" affordance.
-  checkoutBarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  checkoutSummaryLabel: { ...TYPE_SCALE.footnote, color: theme.muted },
-  checkoutSummaryAmount: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
-  checkoutPill: {
-    minWidth: 132, minHeight: COMP.buttonH,
-    borderRadius: radius.md, backgroundColor: '#FFFFFF',
-    alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: SP.lg,
-  },
-  checkoutPillText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#000000' },
->>>>>>> origin/approved-pr-796
 });

@@ -278,21 +278,7 @@ const s = StyleSheet.create({
   tagText:      { fontSize: 11, fontFamily: FONT.semibold },
   notes:        { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
 
-<<<<<<< HEAD
   orderRow:     { paddingVertical: 14, gap: 4 },
   orderTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   statusChip:   { alignSelf: 'flex-start', backgroundColor: FILL_ELEVATED, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 3, marginTop: 4 },
-=======
-  sectionTitle: { fontSize: FS.sm, fontFamily: FONT.semibold },
-  emptyCard:    { borderRadius: 14, borderWidth: 1, padding: 32, alignItems: 'center', gap: 8 },
-  emptyText:    { fontSize: FS.sm, fontFamily: FONT.regular },
-  orderList:    { borderRadius: 14, borderWidth: 1 },
-  orderRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', padding: 14, gap: 12 },
-  orderLeft:    { flex: 1, gap: 3 },
-  orderNum:     { fontSize: 13, fontFamily: FONT.semibold },
-  orderDate:    { fontSize: 11, fontFamily: FONT.regular },
-  trackingText: { fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic' },
-  orderRight:   { alignItems: 'flex-end', gap: 6 },
-  orderTotal:   { fontSize: FS.sm, fontFamily: FONT.bold },
->>>>>>> origin/approved-pr-796
 });
