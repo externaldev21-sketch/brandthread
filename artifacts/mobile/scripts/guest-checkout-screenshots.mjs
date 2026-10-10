@@ -8,9 +8,11 @@
  *   pnpm exec expo start --web --port 8099      (in another shell)
  *   node scripts/guest-checkout-screenshots.mjs [outDir] [baseUrl]
  *
- * Only the dev server is reachable: every other request is aborted and any
- * /api/ call is listed, so the run proves a signed-out web checkout never
- * calls the paying API.
+ * Only the dev server is reachable. The connectivity probe (/api/healthz)
+ * and the public discount-code check are answered by stubs (a demo 10% code,
+ * THREAD10); every other request is aborted and every /api/ call is listed,
+ * so the run proves a signed-out web checkout never calls a checkout or
+ * payment endpoint.
  */
 import path from 'node:path';
 import { mkdirSync } from 'node:fs';
@@ -27,10 +29,27 @@ try {
   const page = await context.newPage();
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname.includes('/api/')) apiCalls.push(`${route.request().method()} ${url.pathname}`);
+    const p = url.pathname.replace(/^\/api\/v\d+\//, '/api/');
+    if (p.includes('/api/')) apiCalls.push(`${route.request().method()} ${p}`);
     if (url.origin === new URL(base).origin) return route.continue();
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    // The connectivity probe (lib/offlineState.ts): answer it so the page isn't shown offline.
+    if (p === '/api/healthz') return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: '{"status":"ok"}' });
+    // Demo stub for the public code check, so a code can be shown applied (no real server).
+    if (p === '/api/discount-codes/validate') {
+      const subtotal = Number(url.searchParams.get('subtotalCents') ?? 0);
+      return route.fulfill({
+        status: 200, headers: cors, contentType: 'application/json',
+        body: JSON.stringify({ code: 'THREAD10', type: 'percentage', value: 10, appliedAmountCents: Math.round(subtotal / 10), description: '10% off your order' }),
+      });
+    }
     return route.abort();
   });
+  const scrollTo = async (testId, block = 'start') => {
+    await page.getByTestId(testId).first().evaluate((el, b) => el.scrollIntoView({ block: b }), block);
+    await page.waitForTimeout(600);
+  };
   await page.goto(`${base}/thread-product-detail?productId=preview-product-01&bt_preview=buyer&demo=1`, { timeout: 240_000 });
   await page.getByText('Sculpted Wool Coat').first().waitFor({ timeout: 60_000 });
   await page.getByText('Necessary only', { exact: true }).first().click({ timeout: 2000 }).catch(() => {});
@@ -41,10 +60,20 @@ try {
   await page.getByText(/^Pay /).first().waitFor({ timeout: 30_000 }).catch(() => {});
   await page.waitForTimeout(2000);
   await page.screenshot({ path: path.join(out, 'guest-checkout-web-top.png') });
-  await page.mouse.wheel(0, 700);
-  await page.waitForTimeout(700);
+  // Apply a store code (the demo stub above answers the check).
+  await scrollTo('checkout-promo-input', 'center');
+  await page.getByTestId('checkout-promo-input').first().fill('THREAD10');
+  await page.getByTestId('checkout-promo-apply').first().click();
+  await page.getByTestId('checkout-promo-applied').first().waitFor({ timeout: 15_000 });
+  // Middle: the end of the shipping address, then the store's applied code.
+  await scrollTo('checkout-promo-applied', 'center');
   await page.screenshot({ path: path.join(out, 'guest-checkout-web-middle.png') });
-  await page.mouse.wheel(0, 3000);
+  // Bottom: scroll the page's scroller to the end (summary, discount line, Pay).
+  await page.evaluate(() => {
+    const scrollers = [...document.querySelectorAll('div')].filter((el) => el.scrollHeight > el.clientHeight + 4 && getComputedStyle(el).overflowY !== 'visible');
+    const main = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+    if (main) main.scrollTop = main.scrollHeight;
+  });
   await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(out, 'guest-checkout-web-summary.png') });
   console.log('url:', page.url());
