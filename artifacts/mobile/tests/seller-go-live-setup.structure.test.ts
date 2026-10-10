@@ -61,7 +61,10 @@ describe('Go Live setup screen (camera-first)', () => {
     // Previously only seller-live.tsx (mid-broadcast) could tag products;
     // /api/live/start already accepted productTags but setup never sent any.
     expect(source).toContain('setShowProductPicker(true)');
-    expect(source).toContain("(api as any).products?.list?.()");
+    // Reads the catalog listing that carries image + price (GET /api/products
+    // returns a bare array with neither, which left the picker empty).
+    expect(source).toContain("api.productBulk.list({ status: 'active' })");
+    expect(source).toContain('setAllProducts(toLiveProductOptions(r))');
     expect(source).toContain('toggleFeaturedProduct');
     expect(source).toContain('productTags: featuredProducts.map(p => ({');
   });

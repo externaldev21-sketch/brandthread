@@ -270,8 +270,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     color: theme.muted,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     marginBottom: SP.md,
   },
 
