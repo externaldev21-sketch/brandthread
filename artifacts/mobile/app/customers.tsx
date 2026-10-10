@@ -14,6 +14,7 @@ import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/layout';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { radius } from '@/constants/radii';
 
 type ApiCustomer = {
   id: string;
@@ -120,7 +121,6 @@ export default function CustomersScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customers"
-        subtitle="Your customer list"
         rightElement={
           <TouchableOpacity
             onPress={() => router.navigate('/(tabs)/analytics' as never)}
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
   segments: { marginBottom: 16 },
   sortRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  segChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  segChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
   segText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   custRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },

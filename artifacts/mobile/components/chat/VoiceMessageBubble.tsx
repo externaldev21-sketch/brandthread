@@ -1,9 +1,10 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, PanResponder, GestureResponderEvent, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { isBarPlayed, remainingTimeLabel } from '@/lib/voicePlayback';
+import { radius } from '@/constants/radii';
 
 export const TRANSCRIPTION_STUB =
   "Transcription isn't wired up to a real speech-to-text service yet — this is placeholder text standing in for it.";
@@ -124,7 +125,7 @@ const vs = StyleSheet.create({
   bar: { width: 2.5, borderRadius: 2 },
   duration: { fontSize: FS.xs, fontFamily: FONT.medium, minWidth: 32, textAlign: 'right' },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingLeft: 38 },
-  speedPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth },
+  speedPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth },
   speedText: { fontSize: 10, fontFamily: FONT.semibold },
   transcriptionLink: { fontSize: 11, fontFamily: FONT.medium, textDecorationLine: 'underline' },
 });

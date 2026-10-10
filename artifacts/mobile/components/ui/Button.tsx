@@ -25,8 +25,9 @@ import { hapticLight, hapticWarning } from '@/lib/haptics';
 import { COMP, FONT, RED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
 /**
@@ -141,7 +142,7 @@ export function Button({
       <Animated.View
         style={[
           styles.base,
-          { height, borderRadius: RADII.pill, transform: [{ scale }] },
+          { height, borderRadius: radius.md, transform: [{ scale }] },
           isFilled ? { backgroundColor: variantStyle.bg } : { backgroundColor: 'transparent' },
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
           isFilled && !isDisabled && styles.raisedShadow,
@@ -150,7 +151,7 @@ export function Button({
           style,
         ]}
       >
-        <View style={[StyleSheet.absoluteFill, { borderRadius: RADII.pill, overflow: 'hidden' }]} pointerEvents="none">
+        <View style={[StyleSheet.absoluteFill, { borderRadius: radius.md, overflow: 'hidden' }]} pointerEvents="none">
           {isFilled && !isDisabled && (
             <LinearGradient
               colors={['#FFFFFF3D', '#FFFFFF00']}
@@ -169,7 +170,7 @@ export function Button({
             {/* An icon-only button passes label="" (with an accessibilityLabel)
                 — no empty Text, so the icon sits dead centre. */}
             {label ? (
-              <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1}>
+              <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1} maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}>
                 {label}
               </Text>
             ) : null}

@@ -23,6 +23,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { FADE_MS } from '@/constants/motion';
+import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export interface SnackbarProps {
   visible: boolean;
@@ -31,9 +32,11 @@ export interface SnackbarProps {
   actionLabel?: string;
   onAction?: () => void;
   onDismiss?: () => void;
+  /** Distance from the bottom edge. Defaults to just above the safe area; pass a larger value to clear a tab bar or sticky footer. */
+  bottomOffset?: number;
 }
 
-export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss }: SnackbarProps) {
+export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss, bottomOffset }: SnackbarProps) {
   const insets = useSafeAreaInsets();
   const palette = useColors();
   const opacity = useSharedValue(0);
@@ -54,11 +57,11 @@ export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.root, { bottom: Math.max(insets.bottom, SPACING.md) + SPACING.xl }, style]}
+      style={[styles.root, { bottom: bottomOffset ?? Math.max(insets.bottom, SPACING.md) + SPACING.xl }, style]}
     >
       <View style={[styles.pill, { backgroundColor: palette.elevated }]} accessibilityLiveRegion="polite">
-        {thumbnailUri && <Image source={{ uri: thumbnailUri }} style={styles.thumb} />}
-        <Text style={[TYPE_SCALE.footnote, styles.message, { color: palette.foreground }]} numberOfLines={2}>{message}</Text>
+        {thumbnailUri && <Image source={{ uri: thumbnailUri }} style={styles.thumb} accessible={false} />}
+        <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, styles.message, { color: palette.foreground }]} numberOfLines={2}>{message}</Text>
         {actionLabel && onAction && (
           <PressableScale
             onPress={onAction}

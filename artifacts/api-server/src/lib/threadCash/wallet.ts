@@ -16,6 +16,8 @@ import {
   threadCashTransfers, users,
 } from "@workspace/db";
 import { DEFAULT_THREAD_CASH_CONFIG, type ThreadCashConfig } from "./streaks";
+import { activeExpiryDays, redemptionCapViolation } from "./rules";
+import { postDueExpiries } from "./expiry";
 
 /** A transfer sits unclaimed for this long before it expires back to the sender. */
 export const THREAD_CASH_TRANSFER_EXPIRY_DAYS = 14;
@@ -319,12 +321,9 @@ export async function redeemThreadCash(
     throw new ThreadCashError("A valid idempotency key is required.", 400, "THREAD_CASH_IDEMPOTENCY_KEY_REQUIRED");
   }
   const config = await getThreadCashConfig();
-  if (config.maxRedemptionPerOrderCents != null && amountCents > config.maxRedemptionPerOrderCents) {
-    throw new ThreadCashError(
-      `You can apply up to $${(config.maxRedemptionPerOrderCents / 100).toFixed(2)} of Thread Cash per order.`,
-      400,
-      "THREAD_CASH_REDEMPTION_CAP",
-    );
+  const capViolation = redemptionCapViolation(amountCents, config.maxRedemptionPerOrderCents);
+  if (capViolation) {
+    throw new ThreadCashError(capViolation.message, 400, "THREAD_CASH_REDEMPTION_CAP");
   }
   async function lookupByKey(executor: DbExecutor): Promise<ThreadCashRedemption | null> {
     const [row] = await executor
@@ -347,6 +346,9 @@ export async function redeemThreadCash(
       const existing = await lookupByKey(tx);
       if (existing) return existing;
 
+      // Lapsed credit is never spendable: post any expiry that is due (the
+      // scheduled job normally has) so the balance below excludes it.
+      await postDueExpiries(tx, buyerId, activeExpiryDays(config), new Date());
       const balance = await getBalanceCents(tx, buyerId);
       if (amountCents > balance) {
         throw new ThreadCashError(`Insufficient Thread Cash. You have $${(balance / 100).toFixed(2)}.`, 400, "INSUFFICIENT_THREAD_CASH");

@@ -34,6 +34,9 @@
           "UIInterfaceOrientationPortraitUpsideDown",
           "UIInterfaceOrientationLandscapeLeft",
           "UIInterfaceOrientationLandscapeRight"
+        ],
+        "LSApplicationQueriesSchemes": [
+          "instagram-stories"
         ]
       },
       "config": {
@@ -79,6 +82,14 @@
           },
           {
             "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeContacts",
             "NSPrivacyCollectedDataTypeLinked": true,
             "NSPrivacyCollectedDataTypeTracking": false,
             "NSPrivacyCollectedDataTypePurposes": [
@@ -226,6 +237,15 @@
       },
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.CALL_PHONE",
         "android.permission.READ_PHONE_NUMBERS"
       ],
@@ -245,12 +265,15 @@
       "favicon": "./assets/images/icon.png",
       "output": "single"
     },
-    "androidNavigationBar": {
-      "barStyle": "light-content",
-      "backgroundColor": "#0A0A0B"
-    },
     "plugins": [
       "./plugins/with-verify-app-identity",
+      [
+        "expo-navigation-bar",
+        {
+          "style": "dark",
+          "enforceContrast": false
+        }
+      ],
       [
         "expo-runtime-app-icon",
         {
@@ -331,12 +354,6 @@
       "expo-web-browser",
       "expo-apple-authentication",
       [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "Brandthread uses Face ID to confirm it's you when you turn on or use biometric unlock for your account."
-        }
-      ],
-      [
         "expo-media-library",
         {
           "photosPermission": "Brandthread uses your photo library so you can choose photos and videos to share in posts, stories, messages, products and designs.",
@@ -373,6 +390,7 @@
         }
       ],
       "expo-video",
+      "expo-sharing",
       [
         "expo-camera",
         {
@@ -403,6 +421,12 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Brandthread uses Face ID to unlock the app when App Lock is turned on."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Brandthread uses your contacts only when you choose Find friends, to check which people you know are already on Brandthread. Contacts are turned into scrambled codes on your phone and your contact list is never uploaded or stored."
         }
       ],
       "expo-updates",

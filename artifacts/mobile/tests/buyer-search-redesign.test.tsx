@@ -82,6 +82,9 @@ vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
 }));
 
+
+// The save heart has its own coverage (saved-products-store.test.ts); this suite only exercises search flow.
+vi.mock('@/components/SaveHeart', () => ({ SaveHeart: () => null }));
 vi.mock('expo-linear-gradient', () => ({
   LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
 }));
@@ -124,6 +127,9 @@ vi.mock('@/components/discover/DiscoverPostViewer', () => ({
 vi.mock('@/components/discover/DiscoverSafetyMenu', () => ({
   DiscoverSafetyMenu: () => React.createElement('DiscoverSafetyMenu'),
 }));
+vi.mock('@/components/safety/ReportSheet', () => ({
+  useReportSheet: () => ({ openReport: vi.fn() }),
+}));
 vi.mock('@/components/ShopProductSheet', () => ({
   ShopProductSheet: () => React.createElement('ShopProductSheet'),
 }));
@@ -149,6 +155,9 @@ vi.mock('@/components/BrandthreadUI', () => ({
     React.createElement('EmptyState', {}, React.createElement('Text', {}, `${title} ${description ?? ''}`)),
   AnimatedEntrance: ({ children }: { children: React.ReactNode }) => children,
 }));
+
+// The filter sheet is covered by its own logic tests; it needs the full RN + reanimated surface.
+vi.mock('@/components/search/FilterSheet', () => ({ FilterSheet: () => null }));
 
 vi.mock('@/contexts/ThreadPullTransitionContext', () => ({
   useThreadPull: () => ({ push: vi.fn() }),
@@ -364,7 +373,7 @@ describe('buyer full-screen search — Instagram-mimicking rebuild', () => {
       await flushPromises();
     });
 
-    expect(apiMock.public.search).toHaveBeenCalledWith({ q: 'vault', limit: 30 });
+    expect(apiMock.public.search).toHaveBeenCalledWith({ q: 'vault', limit: 30, facets: true });
     expect(apiMock.social.search).toHaveBeenCalledWith('vault', 20);
 
     await act(async () => {

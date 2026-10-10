@@ -108,6 +108,48 @@ export function maybeSnap(v: number, snap: boolean, grid = DEFAULT_SNAP_GRID): n
   return snap ? snapValue(v, grid) : v;
 }
 
+// ─── Rotation ─────────────────────────────────────────────────────────────────
+// The Transform tool's rotate handle: a single-finger drag from a fixed
+// point above the layer's top-center, where the angle swept from the
+// layer's CENTER (not the touch's own start point) determines the rotation
+// delta. All angle math here is in DISPLAY-space pixel coordinates (the
+// caller passes the layer center and pointer positions already converted
+// from page coordinates), matching how design-canvas.tsx already converts
+// coordinates for the other handles.
+
+/**
+ * computeRotationDelta — the change in rotation angle (degrees) between the
+ * drag's start pointer position and its current position, both measured as
+ * an angle from the layer's center (cx, cy). Pure trig, no snapping.
+ */
+export function computeRotationDelta(
+  cx: number, cy: number,
+  startX: number, startY: number,
+  curX: number, curY: number,
+): number {
+  const a0 = Math.atan2(startY - cy, startX - cx);
+  const a1 = Math.atan2(curY - cy, curX - cx);
+  let deltaDeg = (a1 - a0) * (180 / Math.PI);
+  // atan2 returns (-180, 180]; without normalizing, a drag that crosses that
+  // branch cut (e.g. sweeping from just past +180° back to just past -180°,
+  // a tiny real movement) would otherwise report a ~360° jump instead of the
+  // few degrees actually swept. Normalize to the shortest-path delta.
+  if (deltaDeg > 180) deltaDeg -= 360;
+  if (deltaDeg <= -180) deltaDeg += 360;
+  return deltaDeg;
+}
+
+/**
+ * applyRotateHandle — applies a rotation delta (degrees) on top of the
+ * drag-start transform's own rotation. `orig` is always the transform as it
+ * was at the START of the current gesture (see DesignCanvasScreen's
+ * `extHandleDragRef.origTransform`), so this is safe to call on every move
+ * event with the delta since that same start, not an incremental delta.
+ */
+export function applyRotateHandle(orig: DesignTransform, deltaDeg: number): DesignTransform {
+  return { ...orig, rotation: (orig.rotation ?? 0) + deltaDeg };
+}
+
 // ─── Freeform resize ──────────────────────────────────────────────────────────
 
 /**

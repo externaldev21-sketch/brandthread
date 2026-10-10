@@ -21,7 +21,12 @@ export type RateLimitPolicyName =
   | "follow"
   | "report"
   | "feed-event"
-  | "post-interact";
+  | "email-subscribe"
+  | "post-interact"
+  | "gift-card-lookup"
+  | "access-code"
+  | "access-waitlist"
+  | "contact-match";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -152,6 +157,22 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     windowMs: 60_000,
     message: "Too many follow requests. Please wait a moment and try again.",
   },
+  "access-code": {
+    id: "access-code",
+    // Guessing guard for invite-code validate/redeem. Deliberately low and
+    // NOT scaled for dev: a code is the only thing between a stranger and an
+    // invite-only launch.
+    limit: 10,
+    windowMs: 15 * 60_000,
+    ipLimit: 30,
+    message: "Too many attempts. Please wait a few minutes and try again.",
+  },
+  "access-waitlist": {
+    id: "access-waitlist",
+    limit: 5,
+    windowMs: 60 * 60_000,
+    message: "Too many requests. Please try again later.",
+  },
   report: {
     id: "report",
     limit: scaled(10),
@@ -166,6 +187,14 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     windowMs: 60_000,
     message: "Too many feed events submitted. Please wait a moment and try again.",
   },
+  "email-subscribe": {
+    id: "email-subscribe",
+    // Public, unauthenticated store signup form: per-IP cap. A tighter
+    // per-IP+email bucket is applied inside the route.
+    limit: 20,
+    windowMs: 10 * 60_000,
+    message: "Too many signups from this connection. Please try again later.",
+  },
   "post-interact": {
     id: "post-interact",
     // Likes/views/watch-time pings from a fast-scrolling feed; generous for
@@ -173,6 +202,22 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: scaled(240),
     windowMs: 60_000,
     message: "You're doing that too fast. Please wait a moment and try again.",
+  },
+  // Brute-force guard for gift card codes: every code lookup, claim and
+  // checkout redemption by code counts (lib/giftCards/checkout.ts).
+  "gift-card-lookup": {
+    id: "gift-card-lookup",
+    limit: 15,
+    windowMs: 15 * 60_000,
+    message: "Too many gift card code attempts. Please wait a few minutes and try again.",
+  },
+  "contact-match": {
+    id: "contact-match",
+    // Contact matching is an enumeration surface (up to 2000 hashes per call),
+    // so it is capped per account well below normal read traffic.
+    limit: 10,
+    windowMs: 60 * 60_000,
+    message: "You've checked contacts a lot. Please try again later.",
   },
 };
 

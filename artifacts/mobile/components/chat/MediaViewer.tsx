@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
+import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 /**
@@ -99,7 +100,7 @@ export default function MediaViewer({
       const result = await saveImageToMediaLibrary(uri);
       if (result === 'saved') Alert.alert('Saved', 'Photo saved to your library.');
       else if (result === 'denied') Alert.alert('Permission needed', 'Allow photo library access in Settings to save.');
-      else Alert.alert('Unavailable', 'Saving photos is not available here.');
+      else Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
     } catch {
       Alert.alert('Save failed', 'Could not save the photo.');
     } finally {
@@ -122,14 +123,14 @@ export default function MediaViewer({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <Animated.View style={[s.backdrop, { opacity: backdropOpacity }]}>
         <View style={[s.topBar, { paddingTop: headerTopInset + 12 }]}>
-          <TouchableOpacity style={s.iconBtn} onPress={handleClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" style={s.iconBtn} onPress={handleClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Feather name="x" size={22} color="#fff" />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity style={s.iconBtn} onPress={handleShare} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity accessibilityLabel="Share" accessibilityRole="button" style={s.iconBtn} onPress={handleShare} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Feather name="share" size={20} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={s.iconBtn} onPress={handleSave} disabled={isSaving} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity accessibilityLabel="Save to device" accessibilityRole="button" style={s.iconBtn} onPress={handleSave} disabled={isSaving} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Feather name="download" size={20} color="#fff" />
             </TouchableOpacity>
           </View>

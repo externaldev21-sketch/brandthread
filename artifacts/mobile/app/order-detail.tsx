@@ -3,6 +3,7 @@
  * Tabs: overview | customer | payment | fulfillment | timeline | returns | disputes | notes
  */
 
+import { shareInvoice, invoiceFromSellerOrder } from '@/lib/invoice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -14,10 +15,12 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { useFeeSchedule } from '@/hooks/useFeeSchedule';
+import { quoteFromSchedule } from '@/lib/feeSchedule';
 import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
@@ -25,11 +28,14 @@ import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
+import { getGeneratedSellerOrder, isGeneratedSellerOrderId } from '@/lib/previewSellerOrders';
 import { useQueryClient } from '@tanstack/react-query';
+import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
 import { queryKeys } from '@/lib/queryClient';
 import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
 import { SellerDeliveryBanner, ShipItemsSheet } from '@/components/orders/SellerDelivery';
 import { getPreviewSellerOrder } from '@/lib/previewOrders';
+import { ApiError } from '@/lib/networkNotice';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -277,7 +283,8 @@ export function adaptApiOrder(raw: any): Order {
        sellerAllocationCents:   subtotalCents,
        manufacturerAllocationCents: 0,
        shippingLabelAllocationCents: shippingCents,
-       platformFeeCents:        0,
+       platformFeeCents:        Math.max(0, raw.platformFeeCents ?? 0),
+       processingFeeCents:      Math.max(0, raw.processingFeeChargedCents || raw.processingFeeCents || 0),
       payoutStatus:            isRefundPending ? 'held' : uiStatus === 'refunded' ? 'paid' : 'pending',
     },
     threadCashPayout: sellerThreadCashPayout(raw),
@@ -315,6 +322,7 @@ export function adaptApiOrder(raw: any): Order {
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? raw.createdAt,
     shopifyFulfillment: raw.shopifyFulfillment ?? null,
+    sellerRisk: raw.risk ?? null,
   };
 }
 
@@ -406,6 +414,12 @@ const TRACKING_STATUS_OPTIONS: { key: TrackingStatus; label: string }[] = [
   { key: 'returned_to_sender', label: 'Returned to Sender' },
 ];
 
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
+
 function trackingStatusLabel(status: TrackingStatus): string {
   return TRACKING_STATUS_OPTIONS.find(option => option.key === status)?.label ?? status;
 }
@@ -459,6 +473,7 @@ export default function OrderDetailScreen() {
   const [order, setOrder] = useState<Order | null>(() => (cachedOrder ? adaptApiOrder(cachedOrder) : null));
   const [loading, setLoading] = useState(!cachedOrder);
   const [updatesPaused, setUpdatesPaused] = useState(false);
+  const [orderLoadFailed, setOrderLoadFailed] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>((tab as Tab) || 'overview');
   // Item 108: this order's real return requests (GET /api/returns, seller).
   // null = not loaded yet; the Returns tab shows a spinner until then.
@@ -507,6 +522,19 @@ export default function OrderDetailScreen() {
     // poll can overlap the next tick and an older success can clear the
     // paused state after a later failure has already stopped the timer.
     if (requestGenerationRef.current === generation) return;
+    // Preview demo orders (lib/previewSellerOrders.ts) live only on this
+    // device: never fetch them (or returns) from the API.
+    if (isGeneratedSellerOrderId(id)) {
+      const raw = getGeneratedSellerOrder(id);
+      if (raw) {
+        setOrder(adaptApiOrder(raw));
+        queryClient.setQueryData(queryKeys.order(id), raw);
+      } else if (!hasLoadedRef.current) setOrder(null);
+      setOrderReturns([]);
+      setLoading(false);
+      hasLoadedRef.current = true;
+      return;
+    }
     requestGenerationRef.current = generation;
     if (!hasLoadedRef.current) setLoading(true);
     api.returns.listSeller()
@@ -530,11 +558,14 @@ export default function OrderDetailScreen() {
       });
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrder(adaptApiOrder(raw));
+      setOrderLoadFailed(false);
       queryClient.setQueryData(queryKeys.order(id), raw);
       setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
-    } catch {
+    } catch (loadErr) {
       if (generationRef.current !== generation) return; // stale focus cycle
+      // A 404 is a real "not found"; anything else is a load failure to retry.
+      if (!hasLoadedRef.current) setOrderLoadFailed(!(loadErr instanceof ApiError && loadErr.status === 404));
       if (!hasLoadedRef.current) setOrder(null);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3) {
@@ -806,9 +837,11 @@ export default function OrderDetailScreen() {
         )}
         <EmptyState
           icon="alert-circle"
-          title="Order not found"
-          description="This order may have been deleted or the ID is invalid."
-          action={{ label: 'Go Back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
+          title={orderLoadFailed ? "Couldn't load this order" : 'Order not found'}
+          description={orderLoadFailed ? 'Check your connection and try again.' : 'This order may have been deleted or the ID is invalid.'}
+          action={orderLoadFailed
+            ? { label: 'Retry', onPress: retryUpdates, icon: 'refresh-cw' }
+            : { label: 'Go Back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
         />
       </View>
     );
@@ -821,7 +854,7 @@ export default function OrderDetailScreen() {
       {/* Header */}
       <ScreenHeader
         title={order.orderNumber}
-        subtitle={order.customer.name}
+        divider={false}
         variant="push"
         onBack={() => goBackOr(router, '/(tabs)/orders')}
         actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
@@ -937,7 +970,6 @@ export default function OrderDetailScreen() {
                 onPress={handleCancelOrder}
                 loading={cancelling}
                 colors={[RED, RED]}
-                style={{ flex: 1 }}
               />
             </View>
           </View>
@@ -950,6 +982,10 @@ export default function OrderDetailScreen() {
         items={unshippedItems(order.lineItems).map(li => ({ id: li.id, productName: li.productName, variant: li.variant, quantity: li.quantity }))}
         onClose={() => setShowShipItems(false)}
         onSubmit={handleShipItems}
+        onBuyLabel={(itemIds) => {
+          setShowShipItems(false);
+          router.push(`/fulfill-order?orderId=${id}&itemIds=${itemIds.join(',')}`);
+        }}
       />
 
       {/* Tracking Events Modal */}
@@ -1023,6 +1059,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             <StatusBadge label={order.paymentStatus.replace(/_/g, ' ').toUpperCase()} variant={paymentVariant(order.paymentStatus)} />
           </View>
         </View>
+        {order.customer.name ? <Text style={s.heroCustomer}>{order.customer.name}</Text> : null}
         <Text style={s.heroDate}>{fmt(order.createdAt)}</Text>
         <View style={s.heroMeta}>
           <Text style={s.heroMetaText}>Source: {order.source}</Text>
@@ -1037,6 +1074,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             <Text style={s.riskBadgeText}>⚠ High Risk</Text>
           </View>
         )}
+        <OrderRiskBadge risk={order.sellerRisk} />
         {order.isPreOrder && (
           <View style={s.preOrderBadge}>
             <Text style={s.preOrderBadgeText}>PRE-ORDER</Text>
@@ -1098,20 +1136,18 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       {/* Action Buttons */}
       <View style={s.actionSection}>
         <SectionHeader title="Actions" />
-        <View style={s.actionRow}>
+        <View style={s.actionCol}>
           <SecondaryButton
             label={messagingBuyer ? 'Opening…' : 'Message Buyer'}
             onPress={onMessageBuyer}
             icon="message-circle"
             disabled={messagingBuyer || !order.customer.buyerUserId}
-            style={{ flex: 1 }}
           />
           {order.payment.amountPaidCents > order.payment.amountRefundedCents && (
             <SecondaryButton
               label="Refund"
               onPress={() => router.push(`/refund-detail?orderId=${order.id}` as never)}
               icon="credit-card"
-              style={{ flex: 1 }}
             />
           )}
         </View>
@@ -1119,23 +1155,21 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
           <Text style={s.readOnlyNote}>Auto-refunded orders are read-only. Mark shipped and Add tracking are turned off.</Text>
         ) : null}
         {!order.autoRefundedAt && order.status === 'new' && (
-          <View style={s.actionRow}>
-            <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" style={{ flex: 1 }} />
-            <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" style={{ flex: 1 }} accent={RED} />
+          <View style={s.actionCol}>
+            <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" />
+            <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" accent={RED} />
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'processing' && (
-          <View style={s.actionRow}>
-            <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={{ flex: 1 }} />
-            <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
+          <View style={s.actionCol}>
+            <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" />
+            <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'ready_to_ship' && (
           <View style={s.actionCol}>
-            <View style={s.actionRow}>
-              <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
-              <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" style={{ flex: 1 }} />
-            </View>
+            <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
+            <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" />
             {addingTracking && (
               <BrandthreadCard style={s.inlineForm}>
                 <TextInput style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
@@ -1187,7 +1221,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         <View style={s.section}>
           <SectionHeader title="Pre-Order Details" />
           <BrandthreadCard>
-            <InfoRow label="Manufacturer" value={order.preOrder.manufacturerName ?? 'TBD'} />
+            <InfoRow label="Manufacturer" value={order.preOrder.manufacturerName ?? 'Not assigned yet'} />
             <InfoRow label="Production Status" value={order.preOrder.productionStatus.replace(/_/g, ' ')} />
             {order.preOrder.estimatedShipDate && (
               <InfoRow label="Est. Ship Date" value={fmtShort(order.preOrder.estimatedShipDate)} />
@@ -1278,13 +1312,12 @@ function CustomerTab({ order }: { order: Order }) {
       </View>
 
       {(!!c.id || !!c.buyerUserId) && (
-        <View style={[s.actionRow, { marginHorizontal: SP.md }]}>
+        <View style={[s.actionCol, { marginHorizontal: SP.md }]}>
           {!!c.id && (
             <SecondaryButton
               label="View customer"
               onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
               icon="user"
-              style={{ flex: 1 }}
             />
           )}
           {!!c.buyerUserId && (
@@ -1292,7 +1325,6 @@ function CustomerTab({ order }: { order: Order }) {
               label="View profile"
               onPress={() => router.push(profileHref({ userId: c.buyerUserId!, accountType: 'buyer', name: c.name, initials: c.initials }) as never)}
               icon="external-link"
-              style={{ flex: 1 }}
             />
           )}
         </View>
@@ -1304,6 +1336,19 @@ function CustomerTab({ order }: { order: Order }) {
 // ═══════════════════════════════════════════════════════
 // TAB: PAYMENT
 // ═══════════════════════════════════════════════════════
+
+/** "Fees" row: the recorded fees for this order, else the schedule's estimate; hidden with neither. */
+function FeesRow({ payment: p }: { payment: Order['payment'] }) {
+  const schedule = useFeeSchedule();
+  const recorded = p.platformFeeCents + (p.processingFeeCents ?? 0);
+  let fees = recorded;
+  if (!recorded && schedule && p.totalCents > 0) {
+    const q = quoteFromSchedule(schedule, Math.max(0, p.subtotalCents - p.discountTotalCents), { shippingCents: p.shippingTotalCents });
+    fees = q.platformFeeCents + q.processingFeeCents;
+  }
+  if (!fees) return null;
+  return <InfoRow label="Fees" value={`-${usd(fees)}`} />;
+}
 
 function PaymentTab({ order }: { order: Order }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
@@ -1321,10 +1366,16 @@ function PaymentTab({ order }: { order: Order }) {
         <InfoRow label="Tax" value={usd(p.taxTotalCents)} />
         <View style={s.divider} />
         <InfoRow label="Total" value={usd(p.totalCents)} bold />
+        <FeesRow payment={p} />
         <InfoRow label="Amount Paid" value={usd(p.amountPaidCents)} valueColor={SUCCESS} />
         {p.amountRefundedCents > 0 && <InfoRow label="Amount Refunded" value={`-${usd(p.amountRefundedCents)}`} valueColor={RED} />}
         <InfoRow label="Amount Held" value={usd(p.amountHeldCents)} valueColor={ORANGE} />
       </BrandthreadCard>
+      <SecondaryButton
+        label="Download invoice"
+        icon="file-text"
+        onPress={() => { shareInvoice(invoiceFromSellerOrder(order)).catch((err: any) => Alert.alert('Could not create invoice', err?.message ?? 'Please try again.')); }}
+      />
 
       {order.heldFunds && (
         <View style={s.section}>
@@ -1469,28 +1520,34 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
             Keep buyers up to date as this order moves through delivery.
           </Text>
           <View style={s.trackingStatusOptions}>
-            {TRACKING_STATUS_OPTIONS.map(option => {
-              const selected = trackingStatus === option.key;
-              return (
-                <PressableScale
-                  key={option.key}
-                  onPress={() => {
-                    hapticToggle();
-                    setTrackingStatus(option.key);
-                    setTrackingFormDirty(true);
-                  }}
-                  style={[s.trackingStatusOption, selected && s.trackingStatusOptionSelected]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`Set tracking status to ${option.label}`}
-                  testID={`tracking-status-${option.key}`}
-                >
-                  <Text style={[s.trackingStatusOptionText, selected && s.trackingStatusOptionTextSelected]}>
-                    {option.label}
-                  </Text>
-                </PressableScale>
-              );
-            })}
+            {chunkPairs(TRACKING_STATUS_OPTIONS).map((pair, rowIndex) => (
+              <View key={rowIndex} style={s.trackingStatusRow}>
+                {pair.map(option => {
+                  const selected = trackingStatus === option.key;
+                  return (
+                    <View key={option.key} style={s.trackingStatusCell}>
+                      <PressableScale
+                      onPress={() => {
+                        hapticToggle();
+                        setTrackingStatus(option.key);
+                        setTrackingFormDirty(true);
+                      }}
+                      style={[s.trackingStatusOption, selected && s.trackingStatusOptionSelected]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`Set tracking status to ${option.label}`}
+                      testID={`tracking-status-${option.key}`}
+                    >
+                      <Text style={[s.trackingStatusOptionText, selected && s.trackingStatusOptionTextSelected]}>
+                        {option.label}
+                      </Text>
+                    </PressableScale>
+                    </View>
+                  );
+                })}
+                {pair.length === 1 ? <View style={s.trackingStatusCell} /> : null}
+              </View>
+            ))}
           </View>
           <Text style={s.estimatedDeliveryLabel}>Estimated delivery (optional)</Text>
           <TextInput
@@ -1567,9 +1624,9 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                   </View>
                 )}
 
-                {!readOnly && <View style={s.actionRow}>
-                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small style={{ flex: 1 }} />
-                  <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ flex: 1 }} />
+                {!readOnly && <View style={s.actionCol}>
+                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small />
+                  <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small />
                 </View>}
               </BrandthreadCard>
             )}
@@ -1580,9 +1637,9 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                 <Text style={s.inlineFormTitle}>Add Tracking</Text>
                 <TextInput style={s.inlineInput} value={form.carrier} onChangeText={v => updateForm(group.id, 'carrier', v)} placeholder="Carrier (USPS, UPS, FedEx...)" placeholderTextColor={SUBTLE} />
                 <TextInput style={s.inlineInput} value={form.tracking} onChangeText={v => updateForm(group.id, 'tracking', v)} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
-                <View style={s.actionRow}>
-                  <SecondaryButton label="Cancel" onPress={() => toggleForm(group.id)} small style={{ flex: 1 }} />
-                  <PrimaryButton label="Save" onPress={() => onAddTracking(group.id)} small style={{ flex: 1 }} />
+                <View style={s.actionCol}>
+                  <SecondaryButton label="Cancel" onPress={() => toggleForm(group.id)} small />
+                  <PrimaryButton label="Save" onPress={() => onAddTracking(group.id)} small />
                 </View>
                 {form.tracking.trim().length > 0 && (
                   <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" small style={{ marginTop: SP.sm }} />
@@ -1936,7 +1993,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Tab bar
   tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
   tabBarContent:    { paddingHorizontal: SP.md, paddingVertical: SP.xs, gap: SP.xs, alignItems: 'center' },
-  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
+  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: radius.sm, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
   tabItemActive:    { borderColor: PURPLE_DIM, backgroundColor: PURPLE_DIM },
   tabLabel:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:   { color: FG, fontFamily: FONT.semibold },
@@ -1962,7 +2019,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Actions
   actionSection:    { gap: SP.sm },
-  actionRow:        { flexDirection: 'row', gap: SP.sm },
+  heroCustomer:     { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: SP.xs },
   actionCol:        { gap: SP.sm },
   readOnlyNote:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
   deliveredCard:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
@@ -2002,7 +2059,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Chips
   chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  chip:             { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  chip:             { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   chipActive:       { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   chipText:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   chipTextActive:   { color: FG },
@@ -2029,10 +2086,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Fulfillment
   trackingStatusCard: { gap: SP.sm, borderColor: BORDER_ACTIVE },
   trackingStatusHint: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
-  trackingStatusOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
-  trackingStatusOption: { paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: SURFACE },
+  trackingStatusOptions: { gap: SP.sm },
+  trackingStatusRow: { flexDirection: 'row', gap: SP.sm },
+  trackingStatusCell: { flex: 1, flexBasis: 0, minWidth: 0 },
+  trackingStatusOption: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: SURFACE },
   trackingStatusOptionSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
-  trackingStatusOptionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  trackingStatusOptionText: { textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   trackingStatusOptionTextSelected: { color: FG },
   estimatedDeliveryLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.xs },
   groupHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
@@ -2080,7 +2139,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   noteMeta:         { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   pinToggle:        { fontSize: FS.xs, fontFamily: FONT.medium },
   noteTypeRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  noteTypeChip:     { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+  noteTypeChip:     { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
   noteTypeText:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
 
   // Returns

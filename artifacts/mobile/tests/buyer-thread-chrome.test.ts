@@ -19,7 +19,7 @@ describe('buyer Thread chrome', () => {
   it('draws the Profile circle exactly as tall as the capsule', () => {
     expect(metrics).toContain('const circleSize = capsuleHeight;');
     expect(bar).toContain('size={metrics.circleSize}');
-    expect(parts).toContain('width: size, height: size, borderRadius: size / 2');
+    expect(parts).toContain('width: size, height: size, borderRadius: radius.bar');
   });
 
   it('fits every Thread page to the measured tab scene and never crops photos', () => {

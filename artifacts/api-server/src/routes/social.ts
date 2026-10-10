@@ -12,8 +12,10 @@
  * POST   /api/social/suggested/:userId/dismiss — hide a suggestion
  */
 import { Router } from "express";
+import { attachQuoteData } from "../lib/quotedPosts";
+import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, stories, storyMentions, storyLikes, storyViews, notes, blocks, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
+import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -30,6 +32,8 @@ import {
   publishingRestriction,
 } from "../lib/safety";
 import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
+import { viewerRelations, audienceAllows, viewerMayOpenAudience } from "../lib/storyAccess";
+import { sanitizeStoryOverlays, withStickerState, StickerValidationError } from "../lib/storyStickers";
 import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
 import { storyListedFor } from "../lib/storyVisibility";
@@ -40,6 +44,7 @@ import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { followingSortDirection } from "../lib/followingSort";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
 import { emitUserBlocked } from "../lib/blockEvents";
+import { viewerCanSeeContent } from "../lib/privateAccount";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -78,7 +83,7 @@ function initials(name: string): string {
 }
 
 type UserRow = typeof users.$inferSelect;
-function formatUser(u: UserRow) {
+export function formatUser(u: UserRow) {
   const nm = u.displayName || u.name || "Unknown";
   return {
     userId:      u.clerkId,
@@ -123,6 +128,12 @@ async function followerCount(userId: string): Promise<number> {
   return row?.n ?? 0;
 }
 
+async function followerCountIn(tx: any, userId: string): Promise<number> {
+  const [row] = await tx.select({ n: sql<number>`cast(count(*) as int)` })
+    .from(follows).where(eq(follows.followingId, userId));
+  return row?.n ?? 0;
+}
+
 function relationshipLockKey(firstUserId: string, secondUserId: string): string {
   return JSON.stringify([firstUserId, secondUserId].sort());
 }
@@ -139,8 +150,12 @@ async function buildBuyerPosts(
     id: posts.id,
     userId: posts.userId,
     mediaUrl: posts.mediaUrl,
+    mediaUrls: posts.mediaUrls,
+    slides: posts.slides,
+    aspectRatio: posts.aspectRatio,
     mediaType: posts.mediaType,
     caption: posts.caption,
+    placeId: posts.placeId,
     styleTags: posts.styleTags,
     postStatus: posts.postStatus,
     createdAt: posts.createdAt,
@@ -194,6 +209,7 @@ async function buildBuyerPosts(
   const likes = counts(likeRows);
   const reposts = counts(repostRows);
   const comments = commentRows;
+  const locations = await locationsByPlaceId(rows.map((row) => row.placeId));
   const mine = new Map<string, Set<string>>();
   for (const row of myRows) {
     if (!row.postId) continue;
@@ -201,7 +217,7 @@ async function buildBuyerPosts(
     mine.get(row.postId)!.add(row.type);
   }
 
-  return rows.map((row) => {
+  const mapped = rows.map((row) => {
     const name = row.displayName || row.name || "Buyer";
     return {
       id: row.id,
@@ -215,7 +231,11 @@ async function buildBuyerPosts(
       profileVisibility: "friends_only",
       type: row.mediaType,
       mediaUrl: row.mediaUrl,
+      mediaUrls: row.mediaUrls ?? [],
+      slides: row.slides ?? [],
+      aspectRatio: row.aspectRatio,
       caption: row.caption ?? "",
+      location: row.placeId ? locations.get(row.placeId) ?? null : null,
       hashtags: row.styleTags ?? [],
       mediaColors: [avatarColor(row.userId), "#07070f"],
       likesCount: likes.get(row.id) ?? 0,
@@ -230,6 +250,7 @@ async function buildBuyerPosts(
       updatedAt: row.createdAt,
     };
   });
+  return attachQuoteData(mapped, viewerId);
 }
 
 // ─── POST /api/social/follow ──────────────────────────────────────────────────
@@ -242,7 +263,7 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
   if (userId === myId) {
     res.status(400).json({ error: "Cannot follow yourself" }); return;
   }
-  const [target] = await db.select({ clerkId: users.clerkId })
+  const [target] = await db.select({ clerkId: users.clerkId, isPrivate: users.isPrivate })
     .from(users).where(eq(users.clerkId, userId)).limit(1);
   if (!target) { res.status(404).json({ error: "User not found" }); return; }
 
@@ -257,7 +278,21 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
         and(eq(blocks.blockerId, userId), eq(blocks.blockedId, myId)),
         and(eq(blocks.blockerId, myId), eq(blocks.blockedId, userId)),
       )).limit(1);
-    if (blockRow) return { blocked: true as const, inserted: [], followersCount: 0 };
+    if (blockRow) return { blocked: true as const, requested: false as const, inserted: [], followersCount: 0 };
+
+    // Private account: anyone not already following sends a request instead
+    // (deduped by the PK; already-following stays a no-op follow below).
+    if (target.isPrivate) {
+      const [already] = await tx.select({ f: follows.followerId }).from(follows)
+        .where(and(eq(follows.followerId, myId), eq(follows.followingId, userId))).limit(1);
+      if (!already) {
+        const requestRows = await tx.insert(followRequests)
+          .values({ requesterId: myId, targetId: userId })
+          .onConflictDoNothing()
+          .returning();
+        return { blocked: false as const, requested: true as const, inserted: requestRows, followersCount: await followerCountIn(tx, userId) };
+      }
+    }
 
     const inserted = await tx.insert(follows)
       .values({ followerId: myId, followingId: userId })
@@ -267,10 +302,30 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
       .select({ n: sql<number>`cast(count(*) as int)` })
       .from(follows)
       .where(eq(follows.followingId, userId));
-    return { blocked: false as const, inserted, followersCount: countRow?.n ?? 0 };
+    return { blocked: false as const, requested: false as const, inserted, followersCount: countRow?.n ?? 0 };
   });
   if (result.blocked) {
     res.status(403).json({ error: "Unable to follow this user.", code: "BLOCKED" }); return;
+  }
+  if (result.requested) {
+    // Only a genuinely new request notifies the target (retries are deduped).
+    if (result.inserted.length > 0) {
+      (async () => {
+        try {
+          const profile = (await profilesById([myId])).get(myId);
+          if (profile && !profile.deleted && !profile.suspended) {
+            const actor = actorFieldsFromProfile(profile);
+            await publishNotification({
+              userId, category: "social", type: "follow_request",
+              title: `${actor.actorName} requested to follow you`,
+              ...actor, targetId: myId, targetType: "user",
+            });
+          }
+        } catch { /* non-critical */ }
+      })();
+    }
+    res.status(202).json({ ok: true, isFollowing: false, status: "requested", followersCount: result.followersCount });
+    return;
   }
 
   // Only notify when this is a genuinely new follow (not a duplicate/retry)
@@ -322,6 +377,15 @@ router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
     `);
     await tx.delete(follows)
       .where(and(eq(follows.followerId, myId), eq(follows.followingId, target)));
+    // Also cancels a pending follow request to a private account.
+    await tx.delete(followRequests)
+      .where(and(eq(followRequests.requesterId, myId), eq(followRequests.targetId, target)));
+    await tx.delete(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, target),
+        eq(notificationsFeed.type, "follow_request"),
+        eq(notificationsFeed.actorId, myId),
+      ));
     // An unfollow right after a follow (or a follow/unfollow bounce) must not
     // leave a stale "started following you" notification in the target's
     // Activity tab for a relationship that no longer exists.
@@ -434,11 +498,16 @@ router.get("/status/:userId", async (req, res) => {
 
   const isFollowing  = (iFollowRow?.n   ?? 0) > 0;
   const isFollowedBy = (theyFollowRow?.n ?? 0) > 0;
+  const [reqRow] = isFollowing ? [] : await db.select({ r: followRequests.requesterId }).from(followRequests)
+    .where(and(eq(followRequests.requesterId, myId), eq(followRequests.targetId, other))).limit(1);
+  const [privRow] = await db.select({ p: users.isPrivate }).from(users).where(eq(users.clerkId, other)).limit(1);
   res.json({
     isFollowing,
     isFollowedBy,
     isMutual: isFollowing && isFollowedBy,
     followersCount: await followerCount(other),
+    isPrivate: privRow?.p === true,
+    status: isFollowing ? "following" : reqRow ? "requested" : "none",
   });
 });
 
@@ -498,6 +567,9 @@ router.get("/profile/:userId", async (req, res) => {
   const isFollowing  = (iFollowRow?.n   ?? 0) > 0;
   const isFollowedBy = (theyFollowRow?.n ?? 0) > 0;
 
+  const [reqRow] = isFollowing || other === myId ? [] : await db.select({ r: followRequests.requesterId }).from(followRequests)
+    .where(and(eq(followRequests.requesterId, myId), eq(followRequests.targetId, other))).limit(1);
+
   const [postsRow] = await db.select({ n: sql<number>`cast(count(*) as int)` })
     .from(posts)
     .innerJoin(users, and(eq(users.clerkId, posts.userId), eq(users.accountType, "buyer")))
@@ -514,6 +586,10 @@ router.get("/profile/:userId", async (req, res) => {
     isFollowedBy,
     isMutual: isFollowing && isFollowedBy,
     iBlockedThem,
+    // Private accounts: header data stays visible; content is follower-only.
+    isPrivate: user.isPrivate === true,
+    followRequested: !!reqRow,
+    contentHidden: user.isPrivate === true && other !== myId && !isFollowing,
   });
 });
 
@@ -603,6 +679,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
   if (other !== myId && (await blockRelation(myId, other)) !== "none") {
     res.status(404).json({ error: "User not found" }); return;
   }
+  if (other !== myId && !(await viewerCanSeeContent(myId, other))) { res.json([]); return; }
   const { limit, offset } = page.data;
   const window = limit + offset;
   const rows = await db.select({
@@ -621,7 +698,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     .where(and(
       eq(postUserTags.taggedUserId, other),
       eq(postUserTags.status, "approved"), // pending tags stay off the Tagged tab until approved
-      publicPostCondition(),
+      publicPostCondition(new Date(), myId),
       notBlockedWith(myId, posts.userId),
     ))
     .orderBy(desc(postUserTags.createdAt))
@@ -640,7 +717,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
       eq(storyMentions.status, "approved"), // pending tags stay off the Tagged tab until approved
       gt(stories.expiresAt, new Date()),
       storyListedFor(myId),
-      ne(stories.privacyVisibility, "friends"),
+      notInArray(stories.privacyVisibility, ["friends", "close_friends"]),
       notBlockedWith(myId, stories.authorId),
       authorInGoodStanding(stories.authorId),
     ))
@@ -717,6 +794,8 @@ async function resolveListOwner(req: any, res: any, myId: string): Promise<strin
   if (owner !== myId && (await blockRelation(myId, owner)) !== "none") {
     res.status(404).json({ error: "User not found" }); return null;
   }
+  // Private account: follower/following lists are for approved followers only.
+  if (owner !== myId && !(await viewerCanSeeContent(myId, owner))) { res.json([]); return null; }
   return owner;
 }
 
@@ -859,7 +938,7 @@ router.get("/search", async (req, res) => {
         eq(users.isSystemAccount, false),
         ne(users.clerkId, myId),
         isNull(users.suspendedAt),
-        isNull(users.deletedAt),
+        isNull(users.deletedAt), isNull(users.deletionRequestedAt),
         notBlockedWith(myId, users.clerkId),
         or(
           fuzzyMatch(users.name,        term, pattern),
@@ -945,7 +1024,7 @@ router.get("/suggested", async (req, res) => {
     .where(and(
       eq(users.accountType, "buyer"),
       isNull(users.suspendedAt),
-      isNull(users.deletedAt),
+      isNull(users.deletedAt), isNull(users.deletionRequestedAt),
       ne(users.clerkId, myId),
       excludeFromFresh.length > 0 ? notInArray(users.clerkId, excludeFromFresh) : undefined,
     ))
@@ -1006,10 +1085,12 @@ function buildStoryView(row: typeof stories.$inferSelect, likedByMe: boolean) {
     media:             (row.media as any[]) ?? [],
     repliesDisabled:   row.repliesDisabled,
     privacy: {
-      visibility:        row.privacyVisibility,
+      // 'close_friends' is reported as closeFriendsOnly on a public-typed story
+      // so clients that only know 'public' | 'friends' keep working.
+      visibility:        row.privacyVisibility === "close_friends" ? "public" : row.privacyVisibility,
       replyPermission:   row.privacyReplyPerm,
       hiddenFromUserIds: [],
-      closeFriendsOnly:  row.privacyVisibility === "friends",
+      closeFriendsOnly:  row.privacyVisibility === "friends" || row.privacyVisibility === "close_friends",
     },
     viewers:    [],          // viewer list omitted for listing; fetch separately if needed
     likesCount: row.likesCount,
@@ -1049,7 +1130,7 @@ router.post("/stories", async (req, res) => {
     media:              any[];
     originalStoryId?:   string;
     repliesDisabled?:   boolean;
-    privacy?: { visibility?: string; replyPermission?: string; };
+    privacy?: { visibility?: string; replyPermission?: string; closeFriendsOnly?: boolean; };
   };
 
   if (!Array.isArray(rawMedia) || rawMedia.length === 0) {
@@ -1103,7 +1184,17 @@ router.post("/stories", async (req, res) => {
 
   // Mention stickers (and "@name" typed into text) are verified server-side:
   // untaggable people (self, blocked either way, deleted/suspended) are dropped silently.
-  const { media, mentions } = await sanitizeStoryMentions(rawMedia, myId);
+  // Stickers are whitelisted first (unknown types / fields dropped, ids validated, counts capped).
+  let cleanMedia: any[];
+  try {
+    cleanMedia = await sanitizeStoryOverlays(rawMedia, { authorId: myId, accountType: me.accountType });
+  } catch (err) {
+    if (err instanceof StickerValidationError) {
+      res.status(err.status).json({ error: err.message, code: err.code }); return;
+    }
+    throw err;
+  }
+  const { media, mentions } = await sanitizeStoryMentions(cleanMedia, myId);
 
   // Automatic media screening (off when the AI integration env is missing).
   const storyUrls = (media as any[]).map((item) => ({
@@ -1124,7 +1215,11 @@ router.post("/stories", async (req, res) => {
   const storyHeld = !!storyVerdict && isFlagged(storyVerdict);
 
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const visibility = privacy?.visibility === "friends" ? "friends" : "public";
+  // Close Friends wins over the coarser visibility: the mobile client sends
+  // { visibility: 'public', closeFriendsOnly: true } for a Close Friends story.
+  const visibility = privacy?.closeFriendsOnly === true
+    ? "close_friends"
+    : privacy?.visibility === "friends" ? "friends" : "public";
 
   const [row] = await db.insert(stories).values({
     authorId:           myId,
@@ -1144,6 +1239,15 @@ router.post("/stories", async (req, res) => {
     expiresAt,
   }).returning();
 
+  // A Close Friends story is invisible to anyone outside the list, so only
+  // list members are recorded / notified as tagged (others would get a dead link).
+  let taggable = mentions;
+  if (visibility === "close_friends" && mentions.length) {
+    const members = await db.select({ id: closeFriends.friendId }).from(closeFriends)
+      .where(and(eq(closeFriends.userId, myId), inArray(closeFriends.friendId, mentions.map((m) => m.userId))));
+    const memberSet = new Set(members.map((m) => m.id));
+    taggable = mentions.filter((m) => memberSet.has(m.userId));
+  }
   if (storyHeld && storyVerdict) {
     await recordHeldMedia({
       targetType: "story", targetId: row.id, ownerId: myId, verdict: storyVerdict,
@@ -1152,8 +1256,8 @@ router.post("/stories", async (req, res) => {
     });
   }
 
-  const pendingMentions = await recordStoryMentions(row.id, myId, mentions);
-  for (const mention of storyHeld ? [] : mentions.filter((m) => !pendingMentions?.has(m.userId))) {
+  const pendingMentions = await recordStoryMentions(row.id, myId, taggable);
+  for (const mention of storyHeld ? [] : taggable.filter((m) => !pendingMentions?.has(m.userId))) {
     void notifyStoryMention({
       storyId: row.id, taggerId: myId, mentionedUserId: mention.userId, media, slide: mention.sticker.slide,
     });
@@ -1168,7 +1272,7 @@ router.post("/stories", async (req, res) => {
     });
   }
 
-  const [view] = await withOriginalInfo([buildStoryView(row, false)]);
+  const [view] = await withStickerState(await withOriginalInfo([buildStoryView(row, false)]), myId);
   res.status(201).json(storyHeld ? { ...view, moderation: { status: "held", message: MEDIA_HELD_MESSAGE } } : view);
 });
 
@@ -1189,7 +1293,7 @@ router.get("/stories/me", async (req, res) => {
       )
     : new Set<string>();
 
-  res.json(await withOriginalInfo(rows.map(r => buildStoryView(r, likedSet.has(r.id)))));
+  res.json(await withStickerState(await withOriginalInfo(rows.map(r => buildStoryView(r, likedSet.has(r.id)))), myId));
 });
 
 // ─── GET /api/social/stories/user/:userId — another user's active stories ────
@@ -1214,13 +1318,8 @@ router.get("/stories/user/:userId", async (req, res) => {
 
   if (!rows.length) { res.json([]); return; }
 
-  const visibleRows = authorId === myId
-    ? rows
-    : rows.filter((r) => r.privacyVisibility !== "friends");
-  const needsMutualCheck = authorId !== myId && rows.some((r) => r.privacyVisibility === "friends");
-  const finalRows = needsMutualCheck && await isFollowing(authorId, myId)
-    ? rows
-    : visibleRows;
+  const rel = await viewerRelations(myId, [authorId]);
+  const finalRows = rows.filter((r) => audienceAllows(r.privacyVisibility, authorId, myId, rel));
 
   if (!finalRows.length) { res.json([]); return; }
 
@@ -1231,7 +1330,7 @@ router.get("/stories/user/:userId", async (req, res) => {
     .map(r => r.storyId)
   );
 
-  res.json(await withOriginalInfo(finalRows.map(r => buildStoryView(r, likedSet.has(r.id)))));
+  res.json(await withStickerState(await withOriginalInfo(finalRows.map(r => buildStoryView(r, likedSet.has(r.id)))), myId));
 });
 
 // ─── GET /api/social/stories/following — stories tray ────────────────────────
@@ -1260,13 +1359,13 @@ router.get("/stories/following", async (req, res) => {
 
   // Authors who hide their stories from me ("Hide story from").
   const hidingAuthors = await authorsHidingStoriesFrom(myId, Array.from(new Set(rows.map((r) => r.authorId))));
+  const rel = await viewerRelations(myId, rows.map((r) => r.authorId));
 
   const visibleRows = rows.filter((r) => {
     if (r.authorId === myId) return true;
     if (blockedIds.has(r.authorId)) return false;
     if (hidingAuthors.has(r.authorId)) return false;
-    if (r.privacyVisibility === "friends") return false; // mutual-only check omitted from the tray for simplicity; per-user fetch still enforces it
-    return true;
+    return audienceAllows(r.privacyVisibility, r.authorId, myId, rel);
   });
   if (!visibleRows.length) { res.json([]); return; }
 
@@ -1309,7 +1408,7 @@ router.get("/stories/following", async (req, res) => {
       isMe:              authorId === myId,
       storyIds:          authorStories.map((s) => s.id),
       seen:              authorStories.every((s) => viewedSet.has(s.id)),
-      closeFriendsOnly:  authorStories.some((s) => s.privacyVisibility === "friends"),
+      closeFriendsOnly:  authorStories.some((s) => s.privacyVisibility === "friends" || s.privacyVisibility === "close_friends"),
       latestCreatedAt:   new Date(latest.createdAt).getTime(),
     };
   });
@@ -1361,6 +1460,8 @@ router.delete("/stories/:id", async (req, res) => {
     .where(and(eq(stories.id, storyId), eq(stories.authorId, myId)))
     .returning({ id: stories.id });
   if (!deleted) { res.status(404).json({ error: "Story not found" }); return; }
+  // Deleting a story early also takes it out of any highlight (expiry does not).
+  await db.delete(storyHighlightItems).where(eq(storyHighlightItems.storyId, storyId));
   res.json({ id: deleted.id, deleted: true });
 });
 
@@ -1375,6 +1476,9 @@ router.post("/stories/:id/like", async (req, res) => {
     res.status(404).json({ error: "Story not found" }); return;
   }
   if (await storyHiddenFrom(story.authorId, myId)) {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
+  if (!(await viewerMayOpenAudience(story.privacyVisibility, story.authorId, myId))) {
     res.status(404).json({ error: "Story not found" }); return;
   }
 
@@ -1421,6 +1525,9 @@ router.post("/stories/:id/view", async (req, res) => {
     res.status(404).json({ error: "Story not found" }); return;
   }
   if (await storyHiddenFrom(story.authorId, myId)) {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
+  if (!(await viewerMayOpenAudience(story.privacyVisibility, story.authorId, myId))) {
     res.status(404).json({ error: "Story not found" }); return;
   }
 
@@ -1571,11 +1678,36 @@ router.post("/block", async (req, res) => {
       and(eq(follows.followerId, myId), eq(follows.followingId, userId)),
       and(eq(follows.followerId, userId), eq(follows.followingId, myId)),
     ));
+    // Cancel any pending DM request between the two, in either direction.
+    // Accepted conversations are untouched - they simply become unreachable
+    // through the two-way block checks on the messaging routes.
+    await tx.execute(sql`
+      DELETE FROM conversations c
+      WHERE c.is_request = true
+        AND EXISTS (SELECT 1 FROM conversation_participants p1 WHERE p1.conversation_id = c.id AND p1.user_id = ${myId})
+        AND EXISTS (SELECT 1 FROM conversation_participants p2 WHERE p2.conversation_id = c.id AND p2.user_id = ${userId})
+    `);
+    // Blocks remove pending follow requests in both directions.
+    await tx.delete(followRequests).where(or(
+      and(eq(followRequests.requesterId, myId), eq(followRequests.targetId, userId)),
+      and(eq(followRequests.requesterId, userId), eq(followRequests.targetId, myId)),
+    ));
   });
   // Ends any DM call ringing / live between the two (routes/call.ts).
   await emitUserBlocked(myId, userId);
 
   res.json({ ok: true });
+});
+
+// GET /api/social/block-status/:userId - whether I blocked them / they blocked me
+router.get("/block-status/:userId", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const target = (await resolveToClerkId(req.params.userId)) ?? req.params.userId;
+  const relation = await blockRelation(myId, target);
+  res.json({
+    blockedByMe: relation === "blocked_by_me" || relation === "mutual",
+    blockedMe: relation === "blocked_me" || relation === "mutual",
+  });
 });
 
 // DELETE /api/social/block/:userId — unblock

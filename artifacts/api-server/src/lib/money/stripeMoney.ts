@@ -13,6 +13,12 @@ export type ChargeDetails = {
   transferId: string | null;
   /** Destination charges only: the application fee object. */
   applicationFeeId: string | null;
+  /** Radar signals read off the same charge (lib/risk). Absent when not retrievable. */
+  radar?: {
+    outcome: { risk_level?: string | null; risk_score?: number | null; seller_message?: string | null; type?: string | null } | null;
+    cardChecks: { cvc_check?: string | null; address_line1_check?: string | null; address_postal_code_check?: string | null } | null;
+    billingCountry: string | null;
+  } | null;
 };
 
 function idOf(value: unknown): string | null {
@@ -49,6 +55,11 @@ export async function fetchChargeDetails(
     processingFeeCents: fee,
     transferId: idOf(charge.transfer),
     applicationFeeId: idOf(charge.application_fee),
+    radar: {
+      outcome: charge.outcome ?? null,
+      cardChecks: charge.payment_method_details?.card?.checks ?? null,
+      billingCountry: charge.billing_details?.address?.country ?? null,
+    },
   };
 }
 

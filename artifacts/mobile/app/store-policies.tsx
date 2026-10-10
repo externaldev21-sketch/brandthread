@@ -255,7 +255,8 @@ export default function StorePoliciesScreen() {
 const s = StyleSheet.create({
   root:  { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1 },
+  // No divider under the header (app-wide header rule).
+  header: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FS.base, fontFamily: FONT.bold, flex: 1, flexShrink: 1, textAlign: 'center', marginHorizontal: SP.sm },
   aiBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: SP.md, paddingVertical: 10, borderBottomWidth: 1 },

@@ -3,25 +3,36 @@ import app from "./app";
 import { validateEnv } from "./lib/env";
 import { logger } from "./lib/logger";
 import { flushMonitoring } from "./lib/monitoring";
+import { flushAnalytics } from "./lib/analytics";
 import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
 import { startTrendingJob }       from "./jobs/computeTrending";
 import { startSellerRankingJob }  from "./jobs/computeSellerRanking";
 import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
 import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
+import { startProductLaunchJob } from "./jobs/productLaunches";
 import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
+import { startDisputeEvidenceReminderJob } from "./jobs/disputeEvidenceReminder";
 import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
 import { startMoneySweepJob } from "./jobs/moneySweep";
+import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
+import { startAnalyticsRetentionJob } from "./jobs/analyticsRetention";
+import { startAccountPurgeJob } from "./jobs/accountPurge";
+import { startDataExportJob } from "./jobs/dataExportJob";
 import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
 import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
 import { startLiveRecordingFinalizeJob } from "./jobs/liveRecordingFinalize";
 import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
+import { startThreadCashExpiryJob } from "./jobs/threadCashExpiry";
+import { startScheduledLiveReminderJob } from "./jobs/scheduledLiveReminders";
+import { startEmailCampaignJob } from "./jobs/emailCampaigns";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
 import { attachCallWebSocket } from "./ws/callHub";
 import { startCommunityPushJob } from "./lib/communityPush";
+import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
 
@@ -70,16 +81,26 @@ const server = app.listen(port, (err) => {
   startSellerRankingJob();
   startTeamInviteReminderJob();
   startScheduledDropBroadcastJob();
+  startProductLaunchJob();
   startSellerTrialReminderJob();
+  startDisputeEvidenceReminderJob();
   startDesignStudioObjectCleanupJob();
   startMoneySweepJob();
+  startAffiliatePayoutsJob();
   startDeliveryDeadlinesJob();
   startStoryCleanupJob();
+  startAnalyticsRetentionJob();
+  startAccountPurgeJob();
+  startDataExportJob();
   startPushReceiptCleanupJob();
   startNotificationBatchFlushJob();
   startLiveRecordingFinalizeJob();
   startLiveViewersPresenceJob();
+  startThreadCashExpiryJob();
+  startScheduledLiveReminderJob();
+  startEmailCampaignJob();
   startCommunityPushJob();
+  startScheduledPostPublisherJob();
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────
@@ -124,6 +145,7 @@ function shutdown(signal: NodeJS.Signals): void {
     }
 
     clearTimeout(forceExitTimer);
+    await flushAnalytics();
     await flushMonitoring();
     process.exit(closeErr ? 1 : 0);
   });

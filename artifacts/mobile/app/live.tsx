@@ -20,7 +20,7 @@ import {
   AccessibilityInfo, ActivityIndicator, Animated, FlatList, Platform,
   Pressable, Share, StyleSheet, Text, View, type GestureResponderEvent, type ViewToken,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -30,7 +30,7 @@ import * as ExpoLinking from 'expo-linking';
 import { CachedImage } from '@/components/CachedImage';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { FONT, FS, RADIUS } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { hapticLight } from '@/lib/haptics';
 import { profileHref } from '@/lib/profileNavigation';
@@ -40,12 +40,15 @@ import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPa
 import { getLiveStreamProvider } from '@/lib/live/liveProvider';
 import { useLivePager, LIVE_END_ANIMATION_MS, type LiveRuntime } from '@/lib/live/useLivePager';
 import { liveShopSelection } from '@/lib/live/liveShop';
+import { fetchLiveCodes, describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
+import { clearLiveCheckoutContext, getLiveCheckoutContext, setLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import type { LiveStream } from '@/lib/live/types';
 import {
   LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail,
-  LiveViewerCount, LiveViewerStack, type LiveHeartLayerHandle,
+  type LiveHeartLayerHandle,
 } from '@/components/live/LiveOverlays';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
 import { LiveStreamOptionsSheet } from '@/components/live/LiveStreamOptionsSheet';
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
@@ -54,6 +57,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { LIVE_VIEWER_GESTURE } from '@/lib/firstRunTips/content';
+import { radius } from '@/constants/radii';
 
 /** Same preference key as the Threads feed, so sound on/off carries over. */
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
@@ -81,7 +85,8 @@ function LivePage({
   onBuy: (productId: string) => void;
   onOpenBag: () => void;
   onShare: () => void;
-  onGift: () => void;
+  /** Undefined while the `live_tips` flag is OFF: the gift button is then not rendered. */
+  onGift?: () => void;
   /** Report this live stream / block its host. */
   onMore: () => void;
   onLike: (x: number, y: number, count?: number) => void;
@@ -184,7 +189,7 @@ function LivePage({
       <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} style={[styles.topScrim, { height: topInset + 110 }]} />
       <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.7)']} locations={[0, 0.4, 1]} style={[styles.bottomScrim, { height: bottomInset + 360 }]} />
 
-      {/* Top-left host pill · top-right viewer stack + count + close. Sits at
+      {/* One creator identity + follow action on the left, close on the right. Sits at
           topInset + 6, below the safe area (Dynamic Island on device, and
           TabPageHeader's 67pt web fallback when insets.top reads 0 in a
           plain browser preview) — never level with the notch. Mute lives in
@@ -197,15 +202,11 @@ function LivePage({
           onFollow={onFollow}
           onOpenHost={onOpenHost}
         />
-        <View style={styles.topRight}>
-          <LiveViewerStack viewers={stream.topViewers} />
-          <LiveViewerCount count={viewerCount} />
-          <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
-            <Feather name="x" size={22} color="#fff" />
-          </Pressable>
-        </View>
+        <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
+          <Feather name="x" size={22} color="#fff" />
+        </Pressable>
       </View>
-      <Text style={[styles.title, { top: topInset + 56 }]} numberOfLines={1}>{stream.title}</Text>
+      <Text style={[styles.title, { top: topInset + 68 }]} numberOfLines={1}>{stream.title}</Text>
 
       {/* Right rail */}
       <View style={[styles.railWrap, { bottom: bottomInset + 52 + (pinned ? 74 : 0) + 8 }]} pointerEvents="box-none">
@@ -258,9 +259,29 @@ export default function LiveScreen() {
   const [bagFor, setBagFor] = useState<LiveStream | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [giftFor, setGiftFor] = useState<LiveStream | null>(null);
+  // Server-side `live_tips` flag via the existing feature-flags context; a failed
+  // flag call keeps the OFF default, so the gift button just stays hidden.
+  const liveTipsEnabled = useFeatureFlag('live_tips');
   const [optionsFor, setOptionsFor] = useState<LiveStream | null>(null);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [notice, setNotice] = useState('');
+  const [liveCodes, setLiveCodes] = useState<LiveCode[]>([]);
+  const [appliedCode, setAppliedCode] = useState<string | null>(null);
+
+  // Live-only codes for the stream whose bag is open (real streams only —
+  // the preview provider has no backend).
+  const bagStreamId = bagFor?.id ?? null;
+  useEffect(() => {
+    setLiveCodes([]);
+    if (!bagStreamId || provider.id === 'preview') return undefined;
+    let alive = true;
+    setAppliedCode(getLiveCheckoutContext()?.streamId === bagStreamId ? getLiveCheckoutContext()?.code ?? null : null);
+    fetchLiveCodes(bagStreamId).then(codes => { if (alive) setLiveCodes(codes); }).catch(() => {});
+    return () => { alive = false; };
+  }, [bagStreamId, provider]);
+
+  // Leaving the live ends "shopping from this live" for discount purposes.
+  useEffect(() => () => clearLiveCheckoutContext(), []);
 
   useEffect(() => {
     AsyncStorage.getItem(SOUND_PREF_KEY).then(v => { if (v === 'on') setMuted(false); }).catch(() => {});
@@ -350,6 +371,7 @@ export default function LiveScreen() {
   const buy = useCallback((stream: LiveStream, productId: string) => {
     const sel = liveShopSelection(stream, productId, provider.id === 'preview');
     if (!sel) return;
+    if (provider.id !== 'preview') setLiveCheckoutContext({ streamId: stream.id, sellerId: stream.host.id });
     setBagFor(null);
     setShopSelection(sel);
   }, [provider.id]);
@@ -434,7 +456,7 @@ export default function LiveScreen() {
                 onBuy={pid => buy(item, pid)}
                 onOpenBag={() => setBagFor(item)}
                 onShare={() => { void share(item); }}
-                onGift={() => gift(item)}
+                onGift={liveTipsEnabled ? () => gift(item) : undefined}
                 onMore={() => openStreamOptions(item)}
                 onLike={(x, y, count) => { heartsRef.current?.burst(x, y, count); pager.like(item.id); }}
                 onSend={async text => {
@@ -463,6 +485,14 @@ export default function LiveScreen() {
           pinnedProductId={pager.runtime[bagFor.id]?.pinnedProductId ?? bagFor.pinnedProductId}
           onBuy={pid => buy(bagFor, pid)}
           onClose={() => setBagFor(null)}
+          codes={liveCodes}
+          appliedCode={appliedCode}
+          onApplyCode={code => {
+            setLiveCheckoutContext({ streamId: bagFor.id, sellerId: bagFor.host.id, code });
+            setAppliedCode(code);
+            const c = liveCodes.find(x => x.code === code);
+            setNotice(c ? `${code} applied: ${describeLiveCode(c)} at checkout` : `${code} applied at checkout`);
+          }}
         />
       )}
       {shopSelection && (
@@ -472,7 +502,7 @@ export default function LiveScreen() {
           reduceMotion={reduceMotion}
         />
       )}
-      {giftFor && (
+      {liveTipsEnabled && giftFor && (
         <LiveThreadCashSheet
           visible
           brandName={giftFor.host.name}
@@ -508,12 +538,11 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   loadingText: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.medium, fontSize: FS.sm },
   rtcWrap: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A0A0B' },
-  rtcBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: RADIUS.pill, paddingHorizontal: 18, height: 42 },
+  rtcBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: radius.md, paddingHorizontal: 18, height: 42 },
   rtcBtnText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  topRow: { position: 'absolute', left: 10, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  topRow: { position: 'absolute', left: 12, right: 12, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   topIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title: {
     position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,

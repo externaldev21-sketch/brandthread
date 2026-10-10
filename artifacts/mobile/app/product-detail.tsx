@@ -84,6 +84,17 @@ export default function ProductDetailScreen() {
   const tabScrollRef = useRef<ScrollView>(null);
 
   const loadProduct = useCallback(async () => {
+    const { isPreviewDemoMode } = await import('@/lib/devPreview');
+    if (isSellerDevPreview() && isPreviewDemoMode()) {
+      const { getPreviewSellerProducts } = await import('@/lib/previewSellerProducts');
+      setProduct(getPreviewSellerProducts().find((item) => item.id === id) ?? null);
+      setLoadError(false);
+      if (params.tab && TABS.some((tab) => tab.key === params.tab)) {
+        setActiveTab(params.tab as Tab);
+      }
+      setLoading(false);
+      return;
+    }
     // Signed-out seller preview has no userId but still has a (local)
     // product store — e.g. a product it just saved from Add product.
     if (!id || (!userId && !isSellerDevPreview())) {
@@ -296,7 +307,7 @@ export default function ProductDetailScreen() {
       </ScrollView>
 
       {/* ── Floating Action Button ── */}
-      <PressableScale
+      <PressableScale accessibilityLabel="Edit product"
         style={[s.fab, { bottom: insets.bottom + SP.lg }]}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/add-product?editId=' + id) as never); }}
       >
@@ -1395,8 +1406,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md,
-                  paddingVertical: SP.sm, minHeight: COMP.headerH, gap: SP.sm,
-                  borderBottomWidth: 1, borderBottomColor: border },
+                  paddingVertical: SP.sm, minHeight: COMP.headerH, gap: SP.sm },
+                  // ^ no divider under the header (app-wide header rule)
   backBtn:      { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: card,
                   borderWidth: 1, borderColor: border, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, fontSize: FS.base, fontFamily: FONT.bold, color: foreground, letterSpacing: -0.2 },

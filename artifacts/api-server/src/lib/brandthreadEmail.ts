@@ -404,6 +404,61 @@ export async function sendReturnStatusEmail(options: {
   });
 }
 
+export async function sendPayoutEmail(options: {
+  to: string;
+  amountCents: number;
+  currency?: string | null;
+  payoutId: string;
+  idempotencyKey?: string;
+}): Promise<boolean> {
+  const currency = (options.currency ?? "USD").toUpperCase();
+  const amount = currency === "USD"
+    ? formatCents(options.amountCents)
+    : `${(Math.max(0, options.amountCents) / 100).toFixed(2)} ${escapeHtml(currency)}`;
+  const html = renderBrandthreadEmail({
+    preheader: `${amount} was sent to your bank account.`,
+    eyebrow: "Payout sent",
+    title: "Your payout is on its way",
+    subtitle: `${amount} was sent to your bank account.`,
+    bodyHtml: `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr><td style="padding:12px 0;border-bottom:1px solid #eeeeee;color:#666666;">Amount</td><td align="right" style="padding:12px 0;border-bottom:1px solid #eeeeee;font-weight:700;">${amount}</td></tr><tr><td style="padding:12px 0;color:#666666;">Sent</td><td align="right" style="padding:12px 0;">${formatDate()}</td></tr></table><p style="margin-bottom:0;color:#666666;">Banks can take a few business days to show the deposit.</p>`,
+    cta: { label: "View payouts", url: "https://brandthread.app/payouts" },
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `Brandthread payout of ${amount} sent`,
+    html,
+    idempotencyKey: options.idempotencyKey ?? `payout-sent/${options.payoutId}`,
+  });
+}
+
+export async function sendAbandonedCartEmail(options: {
+  to: string;
+  items: EmailLineItem[];
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const shown = options.items.slice(0, 4);
+  const more = options.items.length - shown.length;
+  const itemsHtml = shown.map((item) => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #eeeeee;"><strong>${escapeHtml(item.productName)}</strong>${item.variantLabel ? `<br /><span style="color:#777777;font-size:13px;">${escapeHtml(item.variantLabel)}</span>` : ""}<br /><span style="color:#777777;font-size:13px;">Qty ${escapeHtml(item.quantity)}</span></td>
+      <td align="right" style="padding:10px 0;border-bottom:1px solid #eeeeee;vertical-align:top;">${formatCents(item.priceCents * item.quantity)}</td>
+    </tr>`).join("");
+  const html = renderBrandthreadEmail({
+    preheader: "The items in your cart are still waiting.",
+    eyebrow: "Your cart",
+    title: "You left something behind",
+    subtitle: "The items below are still in your cart.",
+    bodyHtml: `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">${itemsHtml}</table>${more > 0 ? `<p style="margin-bottom:0;color:#666666;">and ${more} more</p>` : ""}`,
+    cta: { label: "Return to your cart", url: "https://brandthread.app/cart" },
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: "You left something in your Brandthread cart",
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
 export async function sendManufacturerSignupEmail(options: {
   to: string;
   businessName: string;
@@ -446,6 +501,65 @@ export async function sendIpCaseInformationRequestEmail(options: {
   return sendBrandthreadEmail({
     to: options.to,
     subject: `Information requested for Brandthread case ${options.caseReference}`,
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
+/**
+ * Seller notice that a listing was taken down after an intellectual-property
+ * report. Includes the case reference and how to file a counter-notice.
+ */
+export async function sendIpTakedownSellerEmail(options: {
+  to: string;
+  caseReference: string;
+  listingName: string | null;
+  rightsType: string;
+  strikeCount: number;
+  flaggedRepeatInfringer: boolean;
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const listing = options.listingName ? `“${escapeHtml(options.listingName)}”` : "One of your listings";
+  const warning = options.flaggedRepeatInfringer
+    ? "<p><strong>Your account has been flagged under our repeat-infringer policy.</strong> Further reports may lead to suspension.</p>"
+    : `<p>This takedown counts as strike ${options.strikeCount} under our repeat-infringer policy. Repeated infringement leads to account suspension.</p>`;
+  const html = renderBrandthreadEmail({
+    preheader: `A listing was removed after an IP report (${options.caseReference}).`,
+    eyebrow: "Intellectual property",
+    title: "A listing was taken down",
+    subtitle: `Case ${options.caseReference}`,
+    bodyHtml: `<p>${listing} was removed from Brandthread after a ${escapeHtml(options.rightsType)} report from a rights holder.</p>
+      ${warning}
+      <p>If you believe this was a mistake, reply to this email within 10 business days with a counter-notice that includes your full name and contact details, a description of the removed listing, a statement under penalty of perjury that you have a good-faith belief it was removed by mistake or misidentification, and your consent to resolve any dispute in the courts of your location. Keep the case reference in the subject line.</p>
+      <p style="margin-bottom:0;color:#666666;">Questions: legal@brandthread.app</p>`,
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `Brandthread listing taken down - case ${options.caseReference}`,
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
+export async function sendIpCounterNoticeOutcomeEmail(options: {
+  to: string;
+  caseReference: string;
+  outcome: "reinstated" | "upheld";
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const reinstated = options.outcome === "reinstated";
+  const html = renderBrandthreadEmail({
+    preheader: `Counter-notice decision for case ${options.caseReference}.`,
+    eyebrow: "Intellectual property",
+    title: reinstated ? "Your listing was reinstated" : "The takedown stands",
+    subtitle: `Case ${options.caseReference}`,
+    bodyHtml: reinstated
+      ? "<p>We reviewed your counter-notice and restored the listing. The strike for this case was removed from your account.</p>"
+      : "<p>We reviewed your counter-notice and the takedown stands. The rights holder may pursue the matter further; the listing will stay removed.</p>",
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `Brandthread counter-notice decision - case ${options.caseReference}`,
     html,
     idempotencyKey: options.idempotencyKey,
   });

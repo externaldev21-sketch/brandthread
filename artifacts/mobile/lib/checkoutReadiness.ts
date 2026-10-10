@@ -154,10 +154,11 @@ export function getCheckoutDisplayTotals(
   session: Pick<CheckoutSession, 'summary' | 'discounts' | 'deliveryGroups'> & Partial<Pick<CheckoutSession, 'threadCashRedemption'>>,
 ): CheckoutDisplayTotals {
   const { summary } = session;
-  const promoApplies = session.deliveryGroups.length === 1;
-  const promoCents = promoApplies
-    ? session.discounts.filter(d => d.isValid).reduce((sum, d) => sum + Math.max(0, d.appliedAmountCents || 0), 0)
-    : 0;
+  const singleSeller = session.deliveryGroups.length === 1;
+  // Multi-store orders count only codes tagged with a seller (one per store group).
+  const promoCents = session.discounts
+    .filter(d => d.isValid && (singleSeller || !!d.sellerId))
+    .reduce((sum, d) => sum + Math.max(0, d.appliedAmountCents || 0), 0);
   // Only what the summary actually folded in (withThreadCashRedemption keeps
   // them in step), so the lines always add up to the total.
   const threadCashCents = Math.min(Math.max(0, session.threadCashRedemption?.discountCents ?? 0), Math.max(0, summary.discountTotalCents));

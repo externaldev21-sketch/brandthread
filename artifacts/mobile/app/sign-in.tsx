@@ -10,13 +10,14 @@
  * Forgot password is untouched — it's its own screen (app/forgot-password.tsx)
  * with its own custom email-code-based reset, not part of this flow.
  */
+import { track } from '@/lib/analytics';
 import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   Alert, View, Text, TextInput, StyleSheet, Platform, ActivityIndicator,
   ScrollView, StatusBar,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import GoogleGlyph from '@/components/branding/GoogleGlyph';
 import { useSignIn, useSSO, useAuth, useUser, useClerk } from '@clerk/expo';
@@ -32,6 +33,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { Button } from '@/components/ui/Button';
+import { safeReturnTo } from '@/lib/guestRoutes';
 import { IconButton } from '@/components/ui/IconButton';
 import { Avatar } from '@/components/ui/Avatar';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -42,6 +44,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import {
   APPLE_OAUTH_STRATEGY,
+  oauthProviderVisibility,
   isOAuthCancellationError,
   makeBrandthreadRedirectUri,
   mapOAuthError,
@@ -61,15 +64,19 @@ export default function SignInScreen() {
   const clerk = useClerk();
 
   const router = useRouter();
-  const { addAccount } = useLocalSearchParams<{ addAccount?: string }>();
+  const { addAccount, returnTo } = useLocalSearchParams<{ addAccount?: string; returnTo?: string }>();
+  // Guest tapped an account-only action: come back to it after signing in.
+  const afterSignIn = safeReturnTo(returnTo);
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
   const isAddAccount = addAccount === '1';
   const appleOAuthEnabled = useFeatureFlag('oauthAppleEnabled');
   const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
-  const showAppleOAuth = Platform.OS === 'ios' && appleOAuthEnabled;
-  const showAnyOAuth = showAppleOAuth || googleOAuthEnabled;
+  const { apple: showAppleOAuth, google: showGoogleOAuth } = oauthProviderVisibility(
+    Platform.OS, { apple: appleOAuthEnabled, google: googleOAuthEnabled },
+  );
+  const showAnyOAuth = showAppleOAuth || showGoogleOAuth;
 
   // Warm up the browser on Android for faster OAuth sheet presentation
   useEffect(() => {
@@ -106,13 +113,16 @@ export default function SignInScreen() {
   const [totpCode, setTotpCode]     = useState('');
   const [totpError, setTotpError]   = useState('');
   const [totpLoading, setTotpLoading] = useState(false);
+  // Lets someone without their authenticator app finish with a saved backup code.
+  const [useBackupCode, setUseBackupCode] = useState(false);
 
   const isFetching = fetchStatus === 'fetching' || loading;
   const identifierKind = detectIdentifierKind(identifier);
   const canSendCode = identifierKind !== 'invalid' && (identifierKind !== 'phone' || phoneSupported) && !sendingCode;
   const canSubmitPassword = identifierKind !== 'invalid' && password.length >= 1;
-  const canVerifyTotp = totpCode.length === 6;
+  const canVerifyTotp = useBackupCode ? totpCode.trim().length >= 6 : totpCode.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+  const showPreviewUser = __DEV__ && Platform.OS === 'web' && !isAddAccount;
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
@@ -140,7 +150,7 @@ export default function SignInScreen() {
         // on '/' after an add-account sign-in shows the newly-active
         // account's profile, where the switcher can be reopened at any time.
         checkMultiSessionDrop();
-        const destination = '/';
+        const destination = afterSignIn ?? '/';
         const url = decorateUrl(destination);
         if (url.startsWith('http') && typeof window !== 'undefined') {
           window.location.href = url;
@@ -241,7 +251,9 @@ export default function SignInScreen() {
     setTotpLoading(true);
     setTotpError('');
     try {
-      const { error: err } = await signIn.mfa.verifyTOTP({ code: totpCode });
+      const { error: err } = useBackupCode
+        ? await signIn.mfa.verifyBackupCode({ code: totpCode.trim() })
+        : await signIn.mfa.verifyTOTP({ code: totpCode });
       if (err) { setTotpError("That code isn't right. Try again."); return; }
       if (signIn.status === 'complete') {
         await finalizeSignIn();
@@ -282,6 +294,7 @@ export default function SignInScreen() {
         if (isAddAccount) { checkMultiSessionDrop(); router.replace('/' as never); }
       } else if (ssoSignUp) {
         // Brand-new user with no account yet — send them through onboarding
+        track('signup_completed', { method: provider });
         router.replace('/onboarding' as never);
       }
       // If user cancelled (result with no session) we fall through silently
@@ -393,7 +406,7 @@ export default function SignInScreen() {
               color={theme.muted}
               style={s.backBtn}
               accessibilityLabel="Go back"
-              onPress={() => { setNeedsTotp(false); setTotpCode(''); setTotpError(''); }}
+              onPress={() => { setNeedsTotp(false); setUseBackupCode(false); setTotpCode(''); setTotpError(''); }}
             />
 
             <View style={s.logoRow}>
@@ -402,19 +415,26 @@ export default function SignInScreen() {
             </View>
 
             <Text style={s.headline}>Two-factor authentication</Text>
-            <Text style={s.subtitle}>Enter the 6-digit code from your authenticator app.</Text>
+            <Text style={s.subtitle}>
+              {useBackupCode ? 'Enter one of your saved backup codes.' : 'Enter the 6-digit code from your authenticator app.'}
+            </Text>
 
             <View style={s.fieldWrap}>
               <Text style={s.label}>Code</Text>
-              <TextInput
+              <TextInput accessibilityLabel="Verification code"
                 style={s.input}
                 placeholder="000000"
                 placeholderTextColor={theme.subtle}
                 value={totpCode}
-                onChangeText={t => { setTotpCode(t.replace(/[^0-9]/g, '').slice(0, 6)); setTotpError(''); }}
-                keyboardType="number-pad"
+                onChangeText={t => {
+                  setTotpCode(useBackupCode ? t.replace(/\s/g, '').slice(0, 16) : t.replace(/[^0-9]/g, '').slice(0, 6));
+                  setTotpError('');
+                }}
+                keyboardType={useBackupCode ? 'default' : 'number-pad'}
+                autoCapitalize="none"
+                autoCorrect={false}
                 textContentType="oneTimeCode"
-                maxLength={6}
+                maxLength={useBackupCode ? 16 : 6}
                 autoFocus
                 returnKeyType="go"
                 onSubmitEditing={handleVerifyTotp}
@@ -435,6 +455,14 @@ export default function SignInScreen() {
               loading={totpLoading}
               fullWidth
               style={s.primaryWrap}
+            />
+            <Button
+              testID="toggle-backup-code"
+              label={useBackupCode ? 'Use authenticator app' : 'Use a backup code'}
+              variant="tertiary"
+              size="small"
+              onPress={() => { setUseBackupCode(v => !v); setTotpCode(''); setTotpError(''); }}
+              style={{ marginTop: 8 }}
             />
           </ScrollView>
         </KeyboardAvoidingView>
@@ -565,6 +593,8 @@ export default function SignInScreen() {
                 <TextInput
                   ref={passwordRef}
                   style={[s.input, s.pwInput]}
+                  testID="release-check-password"
+                  accessibilityLabel="Password"
                   placeholder="••••••••"
                   placeholderTextColor={theme.subtle}
                   value={password}
@@ -679,7 +709,7 @@ export default function SignInScreen() {
           )}
 
           {/* Google — dark surface with Google logo, per Google brand guidelines */}
-          {googleOAuthEnabled && (
+          {showGoogleOAuth && (
             <PressableScale
               style={s.oauthBtn}
               onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_google', 'Google'); }}
@@ -711,6 +741,8 @@ export default function SignInScreen() {
             <Text style={s.label}>{phoneSupported ? 'Email or phone number' : 'Email address'}</Text>
             <TextInput
               style={s.input}
+              testID="release-check-email"
+              accessibilityLabel={phoneSupported ? 'Email or phone number' : 'Email address'}
               placeholder={phoneSupported ? 'you@yourbrand.com or phone number' : 'you@yourbrand.com'}
               placeholderTextColor={theme.subtle}
               value={identifier}
@@ -722,7 +754,6 @@ export default function SignInScreen() {
               autoComplete="email"
               returnKeyType="go"
               onSubmitEditing={() => sendCode(false)}
-              testID="identifier-input"
             />
           </View>
 
@@ -755,6 +786,20 @@ export default function SignInScreen() {
             testID="use-password-button"
           />
 
+          {showPreviewUser && (
+            <Button
+              label="Continue as preview user"
+              variant="secondary"
+              testID="continue-as-preview-user"
+              onPress={() => {
+                hapticToggle();
+                router.replace('/onboarding?previewUser=1' as never);
+              }}
+              fullWidth
+              style={s.primaryWrap}
+            />
+          )}
+
           {/* ── Create account ─────────────────────────────────────────────────── */}
           <Button
             label="Create an account"
@@ -762,6 +807,18 @@ export default function SignInScreen() {
             onPress={() => router.replace('/onboarding' as never)}
             fullWidth
           />
+
+          {/* Guests can browse without an account (Guideline 5.1.1(v)). */}
+          {!isAddAccount && (
+            <Button
+              label="Browse as a guest"
+              variant="tertiary"
+              onPress={() => router.replace('/(buyer)/discover' as never)}
+              fullWidth
+              style={{ marginTop: 8 }}
+              testID="browse-as-guest-button"
+            />
+          )}
 
           <View nativeID="clerk-captcha" />
         </ScrollView>

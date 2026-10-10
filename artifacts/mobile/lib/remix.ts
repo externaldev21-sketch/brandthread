@@ -53,6 +53,23 @@ export function remixClipToVideoClip(clip: RemixClip): {
   };
 }
 
+/** The copied source as the create flow's video draft (already uploaded; untrimmed). */
+export function remixClipToVideoDraft(clip: RemixClip): {
+  uri: string; mimeType: string; duration: number; speed: 1; trimStart: number; trimEnd: number; coverOffset: number; objectPath: string;
+} {
+  const duration = Number.isFinite(clip.duration) && clip.duration > 0 ? clip.duration : 0;
+  return {
+    uri: clip.previewUrl,
+    mimeType: 'video/mp4',
+    duration,
+    speed: 1,
+    trimStart: 0,
+    trimEnd: duration,
+    coverOffset: 0,
+    objectPath: clip.objectPath,
+  };
+}
+
 /** Message for a refused publish (403 REMIX_NOT_ALLOWED etc.). */
 export function remixErrorMessage(error: unknown): string | null {
   const raw = (error as { body?: unknown; message?: unknown } | null)?.body ?? (error as { message?: unknown } | null)?.message;

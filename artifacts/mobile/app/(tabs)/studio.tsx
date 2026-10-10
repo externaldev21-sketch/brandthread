@@ -21,6 +21,8 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 import { Header } from '@/components/layout';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader, EmptyState, NewFeatureBadge, StatusBadge, LockBadge } from '@/components/BrandthreadUI';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS, type GrowthTool, type GrowthToolId } from '@/lib/growthTools';
+import { radius } from '@/constants/radii';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -106,6 +108,8 @@ const TEMPLATES = [
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function StudioScreen() {
+  // Content ends above the floating tab bar (shared app-wide rule).
+  const tabBarClearance = useTabBarClearance(2);
   const scrollResetRef = useScrollReset<ScrollView>();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
@@ -209,7 +213,7 @@ export default function StudioScreen() {
           </TouchableOpacity>
         )}
       />
-      <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+      <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} contentContainerStyle={[s.scroll, { paddingBottom: tabBarClearance }]}>
 
         {/* ── START CREATING GRID ── */}
         <View style={s.sectionHeader}>
@@ -399,7 +403,7 @@ const makeStyles = (theme: any) => {
     gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: accentDim,
     borderWidth: 1,
     borderColor: accent + '44',

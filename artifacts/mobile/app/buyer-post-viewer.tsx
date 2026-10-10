@@ -3,11 +3,14 @@
  * Receives lightweight params from the profile grid; loads real engagement
  * from socialService. Owner-only: edit caption (inline modal) and delete.
  */
+import { track } from '@/lib/analytics';
 import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { buildPostUrl } from '@/lib/shareLinks';
+import { QuotedPostCard } from '@/components/social/QuotedPostCard';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Modal, Share, Animated, useWindowDimensions,
+  TextInput, Modal, Share, Animated, useWindowDimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -29,7 +32,9 @@ import {
   getComments, likePost, repostPost, saveItem, getMyPosts, getPostById, updatePost, deletePost,
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
-import type { BuyerPost, Comment } from '@/services/socialTypes';
+import type { BuyerPost, Comment, PostSlide } from '@/services/socialTypes';
+import { mapSlides } from '@/services/socialService';
+import { PostCarousel } from '@/components/social/PostCarousel';
 import { getPreviewActivityPost } from '@/lib/previewActivity';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
@@ -37,9 +42,20 @@ import { requestContextualPushPermission } from '@/lib/contextualPushPermission'
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { TranslatableCaption } from '@/components/translation/CaptionTranslation';
+import { CaptionSpans } from '@/components/social/CaptionText';
+import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
+import { LocationTag } from '@/components/social/LocationTag';
 
-function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) {
-  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
+function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
+  const [currentTime, setCurrentTime] = useState(0);
+  useEffect(() => {
+    if (!captions) return;
+    const sub = player.addListener('timeUpdate', (e: { currentTime: number }) => setCurrentTime(e.currentTime));
+    return () => sub.remove();
+  }, [player, captions]);
   const isFocused = useIsFocused();
   useMeaningfulVideoWatch(player, isFocused, onWatched);
   useEffect(() => {
@@ -47,24 +63,28 @@ function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) 
     return () => { player.pause(); };
   }, [player]);
   return (
-    <VideoView
-      player={player}
-      style={StyleSheet.absoluteFill}
-      contentFit="contain"
-      nativeControls
-    />
+    <>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFill}
+        contentFit="contain"
+        nativeControls
+      />
+      {captions ? <CaptionsOverlay segments={captions} currentTime={currentTime} bottomOffset={56} /> : null}
+    </>
   );
 }
 
 function PostMedia({
-  mediaUrl, type, mediaColor1, mediaColor2, typeIcon, onWatched,
+  mediaUrl, type, mediaColor1, mediaColor2, typeIcon, onWatched, captions,
 }: {
   mediaUrl?: string; type: BuyerPost['type'];
   mediaColor1: string; mediaColor2: string; typeIcon: keyof typeof Feather.glyphMap;
   onWatched?: () => void;
+  captions?: CaptionSegment[];
 }) {
   if (mediaUrl && type === 'video') {
-    return <PostVideo uri={mediaUrl} onWatched={onWatched} />;
+    return <PostVideo uri={mediaUrl} onWatched={onWatched} captions={captions} />;
   }
   if (mediaUrl) {
     return (
@@ -105,6 +125,47 @@ function previewPost(postId: string | undefined): BuyerPost | null {
   };
 }
 
+/** Public /api/posts/:id payload to the viewer's BuyerPost shape (display only). */
+function publicPostToBuyerPost(raw: any): BuyerPost | null {
+  if (!raw?.id) return null;
+  const name = raw.seller?.brandName || raw.seller?.displayName || 'Brandthread member';
+  const parts = String(name).trim().split(/\s+/);
+  const isVideo = raw.mediaType === 'video';
+  return {
+    id: raw.id, authorId: raw.userId, authorName: name, authorHandle: '',
+    authorInitials: (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : String(name).slice(0, 2)).toUpperCase(),
+    authorColor: MY_COLOR, authorAccountType: 'buyer', feedEligibility: 'profile_only', profileVisibility: 'public',
+    type: isVideo ? 'video' : raw.mediaType === 'slideshow' ? 'slideshow' : 'photo',
+    caption: raw.caption ?? '', hashtags: raw.hashtags ?? [], mediaColors: [],
+    mediaUrl: isVideo ? raw.mediaUrl : (raw.mediaUrls?.[0] || raw.mediaUrl || undefined),
+    mediaUrls: Array.isArray(raw.mediaUrls) ? raw.mediaUrls : [],
+    slides: mapSlides(raw.slides),
+    aspectRatio: raw.aspectRatio,
+    likesCount: Number(raw.likeCount ?? 0), commentsCount: 0, repostsCount: Number(raw.repostCount ?? 0),
+    likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
+    createdAt: raw.createdAt, updatedAt: raw.updatedAt ?? raw.createdAt,
+  };
+}
+
+/** Seller POSTs (and any post the buyer-social route doesn't cover) via the public post route. */
+async function loadPublicPost(api: ReturnType<typeof useApi>, id: string): Promise<BuyerPost | null> {
+  try {
+    const p: any = await api.posts.get(id);
+    if (!p?.id) return null;
+    const name = p.seller?.brandName ?? p.seller?.displayName ?? 'Post';
+    const urls: string[] = Array.isArray(p.mediaUrls) ? p.mediaUrls : [];
+    return {
+      id: p.id, authorId: p.userId, authorName: name, authorHandle: '', authorInitials: String(name).slice(0, 2).toUpperCase(),
+      authorColor: '#1C1C1E', authorAccountType: 'buyer', feedEligibility: 'profile_only', profileVisibility: 'public' as any,
+      type: p.mediaType ?? 'photo', caption: p.caption ?? '', hashtags: p.hashtags ?? [], mediaColors: [],
+      mediaUrl: p.mediaUrl, mediaUrls: urls, slides: mapSlides(p.slides), aspectRatio: p.aspectRatio,
+      likesCount: p.likeCount ?? 0, commentsCount: 0, repostsCount: p.repostCount ?? 0,
+      likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
+      createdAt: p.createdAt, updatedAt: p.updatedAt ?? p.createdAt,
+    };
+  } catch { return null; }
+}
+
 export default function BuyerPostViewer() {
   const { userId } = useAuth();
   const api = useApi();
@@ -138,6 +199,9 @@ export default function BuyerPostViewer() {
   const [editOpen, setEditOpen] = useState(false);
   const [editCaption, setEditCaption] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const captionsFlag = useFeatureFlag('autoCaptions');
+  const [captionsOn, setCaptionsOn] = useCaptionsPreference();
+  const fetchCaptionTracks = useCallback((id: string) => api.posts.captions(id) as Promise<{ tracks: import('@/lib/captions').CaptionTrack[] }>, [api]);
   const handleVideoWatched = useCallback(() => {
     if (userId && post?.id) void api.posts.recordWatchedVideo(post.id).catch(() => {});
   }, [api, userId, post?.id]);
@@ -150,13 +214,19 @@ export default function BuyerPostViewer() {
     let found: BuyerPost | null = null;
     try {
       const all = await getMyPosts();
-      found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId);
+      found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId) ?? await loadPublicPost(api, params.postId);
     } catch {
       // A failed lookup leaves the placeholder, as before — or, in the
       // preview, falls through to the seeded post below.
     }
+    // Public posts opened from a hashtag page belong to people I may not be
+    // friends with, so the friends-only lookups above return nothing.
+    if (!found && params.postId && !params.postId.startsWith('preview-') && !getPreviewActivityPost(params.postId)) {
+      try { found = publicPostToBuyerPost(await api.posts.get(params.postId)); } catch { /* keep placeholder */ }
+    }
     found = found ?? previewPost(params.postId);
     if (found) {
+      track('post_viewed', { post_type: found.type });
       setPost(found);
       setLiked(found.likedByMe ?? false);
       setLikeCount(found.likesCount ?? 0);
@@ -164,7 +234,7 @@ export default function BuyerPostViewer() {
       setSaved(found.savedByMe ?? false);
       setEditCaption(found.caption);
     }
-  }, [params.postId]);
+  }, [params.postId, api]);
 
   useEffect(() => {
     loadPost();
@@ -185,7 +255,11 @@ export default function BuyerPostViewer() {
     const caption = post?.caption || params.postCaption || '';
     const handle = post?.authorHandle ? `@${post.authorHandle}` : MY_HANDLE;
     try {
-      await Share.share({ message: `${handle} on Brandthread: "${caption}"`, title: 'Share Post' });
+      const link = post?.id ? buildPostUrl(post.id) : null;
+      const message = `${handle} on Brandthread: "${caption}"`;
+      await Share.share(link
+        ? { message: Platform.OS === 'ios' ? message : `${message} ${link}`, url: link, title: 'Share Post' }
+        : { message, title: 'Share Post' });
     } catch {}
   };
 
@@ -213,8 +287,18 @@ export default function BuyerPostViewer() {
   const mediaColor2 = params.postMediaColor2 ?? BG;
   const postType = (post?.type ?? params.postType ?? 'photo') as BuyerPost['type'];
 
+  // POST carousels (and any multi-photo post) render as a 3:4 swipeable carousel.
+  const viewerSlides: PostSlide[] | null = post?.slides && post.slides.length > 0
+    ? post.slides
+    : post && post.mediaUrls && post.mediaUrls.length > 1 && post.type !== 'video'
+      ? post.mediaUrls.map((url) => ({ kind: 'photo' as const, url }))
+      : null;
+
   const typeIcon: keyof typeof Feather.glyphMap =
     postType === 'photo' ? 'image' : postType === 'slideshow' ? 'layers' : 'video';
+
+  const captionTrack = useReadyCaptionTrack(params.postId, postType === 'video', captionsFlag, fetchCaptionTracks);
+  const overlaySegments = captionTrack && captionsOn ? captionTrack.segments : undefined;
 
   // Media is a full-width square right under the header — a stable enough
   // target rect to grow the tapped grid tile into without needing to
@@ -241,6 +325,11 @@ export default function BuyerPostViewer() {
         style={contentOpacity ? { opacity: contentOpacity } : undefined}
       >
         {/* Media display */}
+        {viewerSlides ? (
+          <View style={{ backgroundColor: BG }} testID="viewer-carousel">
+            <PostCarousel slides={viewerSlides} width={windowWidth} dotColor={FG} dotDim={MUTED} />
+          </View>
+        ) : (
         <View style={s.media}>
           <PostMedia
             mediaUrl={post?.mediaUrl}
@@ -249,8 +338,10 @@ export default function BuyerPostViewer() {
             mediaColor2={mediaColor2}
             typeIcon={typeIcon}
             onWatched={post?.type === 'video' ? handleVideoWatched : undefined}
+            captions={overlaySegments}
           />
         </View>
+        )}
 
         {/* Author row */}
         <View style={s.authorRow}>
@@ -273,7 +364,26 @@ export default function BuyerPostViewer() {
 
         {/* Caption */}
         {caption ? (
-          <TranslatableCaption text={caption} style={s.caption} linkStyle={s.translationLink} />
+          <TranslatableCaption
+            text={caption}
+            style={s.caption}
+            linkStyle={s.translationLink}
+            renderText={(text) => <CaptionSpans text={text} />}
+          />
+        ) : null}
+
+        {/* Quoted original (only present on quote reposts — no layout change otherwise) */}
+        {post?.quotedPost ? (
+          <View style={{ paddingHorizontal: SP.md, paddingTop: SP.sm }}>
+            <QuotedPostCard
+              quotedPost={post.quotedPost}
+              onPress={(id) => router.push(`/buyer-post-viewer?postId=${encodeURIComponent(id)}` as never)}
+            />
+          </View>
+        ) : null}
+
+        {post?.location ? (
+          <LocationTag location={post.location} style={{ marginHorizontal: SP.md, marginTop: SP.sm }} />
         ) : null}
 
         {/* Timestamp */}
@@ -309,7 +419,7 @@ export default function BuyerPostViewer() {
             <Feather name="message-circle" size={22} color={FG} />
             <Text style={s.engageCount}>{comments.length}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityLabel="Repost" accessibilityRole="button"
             style={s.engageBtn}
             onPress={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -320,7 +430,7 @@ export default function BuyerPostViewer() {
           >
             <Feather name="repeat" size={22} color={reposted ? PURPLE : FG} />
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityLabel="Save post" accessibilityRole="button"
             style={s.engageBtn}
             onPress={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -335,9 +445,21 @@ export default function BuyerPostViewer() {
           >
             <Feather name="bookmark" size={22} color={saved ? PURPLE : FG} />
           </TouchableOpacity>
+          {captionTrack ? (
+            <TouchableOpacity
+              style={s.engageBtn}
+              onPress={() => { Haptics.selectionAsync(); setCaptionsOn(!captionsOn); }}
+              accessibilityRole="button"
+              accessibilityLabel={captionsOn ? 'Turn captions off' : 'Turn captions on'}
+              accessibilityState={{ selected: captionsOn }}
+              testID="captions-toggle"
+            >
+              <Text style={{ fontFamily: FONT.bold, fontSize: FS.base, color: captionsOn ? FG : MUTED }}>CC</Text>
+            </TouchableOpacity>
+          ) : null}
           <View style={{ flex: 1 }} />
           {!isOwner && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Report post" accessibilityRole="button"
               style={s.engageBtn}
               onPress={() => {
                 Haptics.selectionAsync();
@@ -347,7 +469,7 @@ export default function BuyerPostViewer() {
               <Feather name="flag" size={22} color={FG} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={s.engageBtn} onPress={handleShare}>
+          <TouchableOpacity accessibilityLabel="Share post" accessibilityRole="button" style={s.engageBtn} onPress={handleShare}>
             <Feather name="share-2" size={22} color={FG} />
           </TouchableOpacity>
         </View>
@@ -369,6 +491,21 @@ export default function BuyerPostViewer() {
             ))}
           </View>
         )}
+
+        {/* Owner-only captions (video posts, flag on) */}
+        {isOwner && postType === 'video' && captionsFlag ? (
+          <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
+            <TouchableOpacity
+              style={s.captionsBtn}
+              onPress={() => { Haptics.selectionAsync(); router.push(`/post-captions-edit?postId=${encodeURIComponent(params.postId ?? '')}` as never); }}
+              accessibilityRole="button"
+              testID="edit-captions"
+            >
+              <Feather name="type" size={16} color={FG} />
+              <Text style={s.captionsBtnText}>{captionTrack ? 'Edit captions' : 'Generate captions'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* Owner-only danger zone */}
         {isOwner && (
@@ -456,6 +593,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   commentAvatarText: { fontFamily: FONT.bold, fontSize: FS.xs, color: ON_DARK },
   commentName: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED },
   commentText: { fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
+  captionsBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, justifyContent: 'center' },
+  captionsBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: RED + '44', justifyContent: 'center' },
   deleteBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: RED },
   modalBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },

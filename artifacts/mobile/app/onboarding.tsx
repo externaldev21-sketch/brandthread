@@ -10,8 +10,13 @@
  * lib/onboardingFlow.ts (a plain, RN-free module) so they're independently
  * unit-testable and are not duplicated as hand-maintained index objects here.
  */
+import { track } from '@/lib/analytics';
 import { LegalConsent } from '@/components/legal/LegalConsent';
+import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
+import { LegalContinueNotice } from '@/components/legal/LegalConsent';
 import { rememberPendingConsent } from '@/lib/legalConsent';
+import { AgeDobField } from '@/components/age/AgeNotices';
+import { checkDobInput, formatDobInput, setPendingDob, submitPendingAge } from '@/lib/ageGate';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,7 +35,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -72,6 +77,7 @@ import {
 import { ApiError } from '@/lib/networkNotice';
 import {
   APPLE_OAUTH_STRATEGY,
+  oauthProviderVisibility,
   isOAuthCancellationError,
   isOAuthFlowComplete,
   makeBrandthreadRedirectUri,
@@ -88,6 +94,8 @@ import {
   type Flow,
 } from '@/lib/onboardingFlow';
 import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
+import { SizesStep } from '@/components/onboarding/SizesStep';
+import { EMPTY_SURVEY, hasSurveyAnswers, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
 import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
 import { Glow, ThreadDraw, ThreadLogoStitch, ThreadProgress, ThreadWeave } from '@/components/onboarding/ThreadLine';
 import {
@@ -102,6 +110,7 @@ import {
   StitchAccent,
 } from '@/components/onboarding/OnboardingUI';
 import { MOTION, RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
+import { radius } from '@/constants/radii';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -264,7 +273,7 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
   );
 }
 const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   emoji:    { fontSize: 16 },
   chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
@@ -285,7 +294,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
   );
 }
 const createSc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
   chipText:   { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
 
@@ -641,9 +650,10 @@ function BuyerAuthStep({
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
-  const appleOAuthFlagEnabled = useFeatureFlag('oauthAppleEnabled');
-  const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
-  const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
+  const { apple: appleOAuthEnabled, google: googleOAuthEnabled } = oauthProviderVisibility(Platform.OS, {
+    apple: useFeatureFlag('oauthAppleEnabled'),
+    google: useFeatureFlag('oauthGoogleEnabled'),
+  });
   const usernameLiveCheck = useUsernameLiveCheck(username);
 
   const [phase, setPhase]               = useState<BuyerAuthPhase>('choose');
@@ -659,14 +669,27 @@ function BuyerAuthStep({
   // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
   // is required before any account is created (email, Google or Apple).
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [dobText, setDobText] = useState('');
+  const [dobError, setDobError] = useState<string | null>(null);
+  // Date of birth is validated here and held in memory only; the server keeps just the age band.
+  function requireAge(): boolean {
+    const check = checkDobInput(dobText, { seller: false });
+    if (!check.ok) { setDobError(check.error); setPendingDob(null); return false; }
+    setDobError(null);
+    setPendingDob(check.dob);
+    return true;
+  }
   const [consentError, setConsentError] = useState(false);
+  function recordConsent() {
+    void rememberPendingConsent();
+  }
   function requireConsent(): boolean {
     if (!agreedToTerms) {
       setConsentError(true);
       setError('Please agree to the Terms of Service and Community Guidelines to continue.');
       return false;
     }
-    void rememberPendingConsent();
+    recordConsent();
     return true;
   }
   function updateConsent(value: boolean) {
@@ -697,6 +720,7 @@ function BuyerAuthStep({
   async function handleSignUp() {
     if (!canSubmit || loading) return;
     if (!requireConsent()) return;
+    if (!requireAge()) return;
     if (isSignedIn) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
       setError(`You are currently signed in ${who}. Tap "Sign out and create another account" below.`);
@@ -719,6 +743,7 @@ function BuyerAuthStep({
         }
         return;
       }
+      track('signup_started', { method: 'email' });
       await signUp.verifications.sendEmailCode();
       setPhase('verify');
     } catch (e: any) {
@@ -741,6 +766,7 @@ function BuyerAuthStep({
     try {
       await signUp.verifications.verifyEmailCode({ code });
       if (signUp.status === 'complete') {
+        track('signup_completed', { method: 'email' });
         await signUp.finalize({
           navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
             const referralQuery = referralCode
@@ -766,6 +792,7 @@ function BuyerAuthStep({
 
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
     if (!requireConsent()) return;
+    if (!requireAge()) return;
     setOAuth(provider);
     setError('');
     try {
@@ -847,7 +874,7 @@ function BuyerAuthStep({
           <Text style={sba.sub}>We sent a 6-digit code to {email}</Text>
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Verification code</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Verification code"
               style={[sba.input, sba.codeInput]}
               placeholder="000000"
               placeholderTextColor={MUTED2}
@@ -882,7 +909,7 @@ function BuyerAuthStep({
 
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Choose your @username</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Username"
               testID="onboarding-username-input"
               style={[sba.input, (usernameError || usernameLiveCheck.error) ? { borderColor: 'rgba(248,113,113,0.5)' } : undefined]}
               placeholder="e.g. alex_style"
@@ -917,7 +944,7 @@ function BuyerAuthStep({
 
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Referral code (optional)</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Referral code"
               testID="onboarding-referral-input"
               style={sba.input}
               placeholder="e.g. FASHION"
@@ -934,7 +961,7 @@ function BuyerAuthStep({
 
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Email address</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Email"
               style={sba.input}
               placeholder="mila@nightshiftstudio.co"
               placeholderTextColor={MUTED2}
@@ -949,7 +976,7 @@ function BuyerAuthStep({
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Password</Text>
             <View style={sba.pwRow}>
-              <TextInput
+              <TextInput accessibilityLabel="Password"
                 style={[sba.input, sba.pwInput]}
                 placeholder="Minimum 8 characters"
                 placeholderTextColor={MUTED2}
@@ -958,7 +985,7 @@ function BuyerAuthStep({
                 secureTextEntry={!showPw}
                 autoComplete="new-password"
               />
-              <TouchableOpacity style={sba.eyeBtn} onPress={() => setShowPw(v => !v)}>
+              <TouchableOpacity accessibilityLabel={showPw ? 'Hide password' : 'Show password'} accessibilityRole="button" style={sba.eyeBtn} onPress={() => setShowPw(v => !v)}>
                 <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
               </TouchableOpacity>
             </View>
@@ -969,9 +996,21 @@ function BuyerAuthStep({
 
           {error ? <Text style={sba.error}>{error}</Text> : null}
 
+          <AgeDobField
+            value={dobText}
+            onChange={(t) => { setDobText(t); setDobError(null); }}
+            error={dobError}
+            wrapStyle={sba.inputWrap}
+            labelStyle={sba.label}
+            inputStyle={sba.input}
+            hintStyle={sba.hint}
+          />
+
           <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 16 }} />
 
           <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
+
+          <LegalContinueNotice style={{ marginTop: 14 }} />
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -984,6 +1023,16 @@ function BuyerAuthStep({
       <ScrollView contentContainerStyle={sba.chooseScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={sba.chooseHeadline}>Sign up</Text>
         <Text style={sba.chooseSub}>Discover brands, buy products, and follow the drops that move you.</Text>
+
+        <AgeDobField
+          value={dobText}
+          onChange={(t) => { setDobText(t); setDobError(null); }}
+          error={dobError}
+          wrapStyle={sba.inputWrap}
+          labelStyle={sba.label}
+          inputStyle={sba.input}
+          hintStyle={sba.hint}
+        />
 
         <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 20 }} />
 
@@ -1049,6 +1098,8 @@ function BuyerAuthStep({
           <Feather name="chevron-right" size={16} color={MUTED2} />
         </TouchableOpacity>
 
+        <LegalContinueNotice style={{ marginTop: 12 }} />
+
         {error ? <Text style={[sba.error, { textAlign: 'center', marginTop: 8 }]}>{error}</Text> : null}
 
         <TouchableOpacity style={sba.signInLink} onPress={() => router.replace('/sign-in' as never)} activeOpacity={0.8}>
@@ -1091,9 +1142,10 @@ function SharedAuthStep({
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
-  const appleOAuthFlagEnabled = useFeatureFlag('oauthAppleEnabled');
-  const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
-  const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
+  const { apple: appleOAuthEnabled, google: googleOAuthEnabled } = oauthProviderVisibility(Platform.OS, {
+    apple: useFeatureFlag('oauthAppleEnabled'),
+    google: useFeatureFlag('oauthGoogleEnabled'),
+  });
   const showAnyOAuth = appleOAuthEnabled || googleOAuthEnabled;
   const usernameLiveCheck = useUsernameLiveCheck(username);
 
@@ -1114,14 +1166,27 @@ function SharedAuthStep({
   // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
   // is required before any account is created (email, Google or Apple).
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [dobText, setDobText] = useState('');
+  const [dobError, setDobError] = useState<string | null>(null);
+  // Date of birth is validated here and held in memory only; the server keeps just the age band.
+  function requireAge(): boolean {
+    const check = checkDobInput(dobText, { seller: true });
+    if (!check.ok) { setDobError(check.error); setPendingDob(null); return false; }
+    setDobError(null);
+    setPendingDob(check.dob);
+    return true;
+  }
   const [consentError, setConsentError] = useState(false);
+  function recordConsent() {
+    void rememberPendingConsent();
+  }
   function requireConsent(): boolean {
     if (!agreedToTerms) {
       setConsentError(true);
       setError('Please agree to the Terms of Service and Community Guidelines to continue.');
       return false;
     }
-    void rememberPendingConsent();
+    recordConsent();
     return true;
   }
   function updateConsent(value: boolean) {
@@ -1166,6 +1231,7 @@ function SharedAuthStep({
   async function handleSignUp() {
     if (!canSubmit || loading) return;
     if (!requireConsent()) return;
+    if (!requireAge()) return;
     if (!passwordsMatch) { setError('Passwords do not match.'); return; }
     if (isSignedIn && !allowSignedInAccountCreation) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
@@ -1247,6 +1313,7 @@ function SharedAuthStep({
 
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
     if (!requireConsent()) return;
+    if (!requireAge()) return;
     setOAuth(provider);
     setError('');
     try {
@@ -1480,6 +1547,19 @@ function SharedAuthStep({
         </Reveal>
 
         <Reveal index={9}>
+          <FloatingInput
+            testID="onboarding-dob-input"
+            value={dobText}
+            onChangeText={(t) => { setDobText(formatDobInput(t)); setDobError(null); }}
+            label="Date of birth"
+            placeholder="MM/DD/YYYY"
+            keyboardType="number-pad"
+            maxLength={10}
+            error={dobError}
+          />
+        </Reveal>
+
+        <Reveal index={9}>
           <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginTop: SPACE.xs, marginBottom: SPACE.md }} />
         </Reveal>
 
@@ -1488,6 +1568,7 @@ function SharedAuthStep({
         <Reveal index={10}>
           <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
           {!canSubmit && missingFieldsHint ? <Text style={[ssa.hint, ssa.hintCentered]}>{missingFieldsHint}</Text> : null}
+          <LegalContinueNotice style={{ marginTop: SPACE.sm }} />
         </Reveal>
 
         {/* OAuth options below the main CTA */}
@@ -1616,7 +1697,7 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   divider:   { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, marginVertical: SPACE.md },
   divLine:   { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: BORDER },
   divText:   { ...TYPE.label, color: MUTED },
-  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
+  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
   appleBtn:  { borderColor: BORDER },
   oauthText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: FG },
   existingEmailChip: {
@@ -1733,6 +1814,7 @@ function SellerPreviewStep({
         <Reveal>
           <View style={[spreview.resultCard, { borderColor: theme.border }]}>
             <Image source={{ uri: sampleUri }} style={spreview.resultImage} resizeMode="contain" accessibilityLabel={`${brandName} AI logo sample`} />
+            <AiGeneratedBadge position="topLeft" />
             <View style={spreview.resultCaption}>
               <Feather name="check" size={15} color={theme.text} />
               <Text style={spreview.resultText}>Your real AI sample is ready.</Text>
@@ -1826,6 +1908,7 @@ export default function OnboardingScreen() {
     deviceFlow,
     deviceStep,
     deviceProbe,
+    previewUser,
   } = useLocalSearchParams<{
     postAuth?: string;
     addAccount?: string;
@@ -1833,10 +1916,12 @@ export default function OnboardingScreen() {
     deviceFlow?: string;
     deviceStep?: string;
     deviceProbe?: string;
+    previewUser?: string;
   }>();
   const insets  = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const isAddAccount = addAccount === '1';
+  const isDevWebPreviewUser = __DEV__ && Platform.OS === 'web' && previewUser === '1';
   const deviceProbeEnabled = __DEV__ && deviceProbe === '1';
   const deviceProbeFlow: Flow | null = __DEV__ && (deviceFlow === 'buyer' || deviceFlow === 'seller')
     ? deviceFlow
@@ -1873,6 +1958,14 @@ export default function OnboardingScreen() {
       : '',
   );
   const [styleInterests, setStyleArr]     = useState<string[]>(DEFAULT_BUYER_INTERESTS);
+  // Optional survey answers (Sizes step + brands picked in the Brands step).
+  // Persisted in the per-Clerk-user draft; saved to buyer_preferences after auth.
+  const [survey, setSurvey]               = useState<OnboardingSurvey>(EMPTY_SURVEY);
+  const setSurveySizes = useCallback((sizes: OnboardingSurvey['sizes']) => setSurvey((prev) => ({ ...prev, sizes })), []);
+  const setSurveyBrands = useCallback((likedBrandIds: string[]) => setSurvey((prev) => (
+    prev.likedBrandIds.length === likedBrandIds.length && prev.likedBrandIds.every((id, i) => id === likedBrandIds[i])
+      ? prev : { ...prev, likedBrandIds }
+  )), []);
 
   // Seller data
   const [brandName, setBrandName]         = useState('');
@@ -1965,6 +2058,7 @@ export default function OnboardingScreen() {
               setLastName(draft.lastName ?? '');
               setUsername(draft.username ?? '');
               setStyleArr(draft.styleInterests ?? DEFAULT_BUYER_INTERESTS);
+              setSurvey(sanitizeDraftSurvey(draft.survey));
               setBrandName(draft.brandName ?? '');
               setBrandStage(draft.brandStage ?? 'idea');
               setGoals(draft.goals ?? DEFAULT_SELLER_GOALS);
@@ -2018,11 +2112,11 @@ export default function OnboardingScreen() {
     const data = {
       version: DRAFT_VERSION,
       ownerId: userId,
-      flow, step, firstName, lastName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId,
+      flow, step, firstName, lastName, username, styleInterests, survey, brandName, brandStage, goals, selectedPlanId, selectedThemeId,
       ...overrides,
     };
     await AsyncStorage.setItem(draftKey, JSON.stringify(data));
-  }, [flow, step, firstName, lastName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId, user?.id]);
+  }, [flow, step, firstName, lastName, username, styleInterests, survey, brandName, brandStage, goals, selectedPlanId, selectedThemeId, user?.id]);
 
   // Persist onboarding answers under the authenticated user's immutable ID.
   useEffect(() => {
@@ -2140,7 +2234,7 @@ export default function OnboardingScreen() {
     // back into the Auth/sign-up screen — only a deliberate "add another
     // account" flow (isAddAccount) still needs it, to create a second,
     // separate Clerk identity while the first stays signed in.
-    const skipAuth = isSignedIn && !isAddAccount;
+    const skipAuth = (isSignedIn && !isAddAccount) || isDevWebPreviewUser;
     // After AccountType (step 0), go to path-specific Auth (step 1), unless
     // already signed in, in which case go straight to the next step (Name).
     const next = skipAuth
@@ -2188,6 +2282,10 @@ export default function OnboardingScreen() {
   async function finishBuyer(retryAttempt = false) {
     if (finishing) return;
     setFinishing(true);
+    if (isDevWebPreviewUser && typeof window !== 'undefined') {
+      window.location.assign('/?bt_preview=buyer');
+      return;
+    }
     let profileId: string | null = null;
     let failureStage = 'required-profile';
     let pendingSyncQueued = false;
@@ -2196,6 +2294,7 @@ export default function OnboardingScreen() {
       const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
       const uname = username.trim().toLowerCase();
       const profile = await api.auth.sync({ name });
+      await submitPendingAge(api);
       profileId = profile.clerkId;
       const updated = await api.auth.updateProfile({
         name,
@@ -2225,6 +2324,9 @@ export default function OnboardingScreen() {
       pendingSyncQueued = true;
       failureStage = 'preferences-or-completion';
       await syncBuyerOnboarding(profile.clerkId, styleInterests, api);
+      // Optional survey (sizes + liked brands): best-effort, queued on failure,
+      // never blocks completion (which is already committed server-side above).
+      await saveBuyerSurvey(profile.clerkId, survey, styleInterests, api);
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],
@@ -2266,6 +2368,7 @@ export default function OnboardingScreen() {
         } catch (storageError) {
           logBuyerOnboardingFailure('local-fallback', storageError, true);
         }
+        void saveBuyerSurvey(profileId, survey, styleInterests, api);
         void syncBuyerOnboarding(profileId, styleInterests, api).catch((backgroundError) => {
           logBuyerOnboardingFailure('background-retry', backgroundError, true);
         });
@@ -2286,10 +2389,16 @@ export default function OnboardingScreen() {
   async function finishSeller() {
     if (finishing) return;
     setFinishing(true);
+    if (isDevWebPreviewUser && typeof window !== 'undefined') {
+      await selectTheme(selectedThemeId);
+      window.location.assign('/?bt_preview=seller');
+      return;
+    }
     try {
       const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
       const uname = username.trim().toLowerCase();
       const profile = await api.auth.sync({ name });
+      await submitPendingAge(api);
       await api.auth.onboarding({
         brandName: brandName.trim(),
         brandStage,
@@ -2371,6 +2480,7 @@ export default function OnboardingScreen() {
     if (flow === 'buyer') {
       if (step === BUYER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
       if (step === BUYER_STEP_INDEX.STYLE) return true;
+      if (step === BUYER_STEP_INDEX.SIZES) return true;
       if (step === BUYER_STEP_INDEX.BRANDS) return true;
     }
     if (flow === 'seller') {
@@ -2402,6 +2512,7 @@ export default function OnboardingScreen() {
       <WelcomeStep
         onGetStarted={() => transitionTo(BUYER_STEP_INDEX.ACCOUNT_TYPE, 1)}
         onSignIn={() => router.replace('/sign-in' as never)}
+        onBrowse={isSignedIn ? undefined : () => router.replace('/(buyer)/discover' as never)}
       />
     );
 
@@ -2502,9 +2613,14 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 5: Brands to follow — personalizes the Thread before the buyer ever sees it
+      // Step 5: Sizes (optional) — seeds My sizes and size recommendations
+      if (step === BUYER_STEP_INDEX.SIZES) return (
+        <SizesStep sizes={survey.sizes} onChange={setSurveySizes} />
+      );
+
+      // Step 6: Brands to follow — personalizes the Thread before the buyer ever sees it
       if (step === BUYER_STEP_INDEX.BRANDS) return (
-        <BrandsToFollowStep />
+        <BrandsToFollowStep onLikedChange={setSurveyBrands} />
       );
 
       // Step 6: Loading
@@ -2722,6 +2838,9 @@ export default function OnboardingScreen() {
     if (flow && isStepSkippable(flow, step)) {
       if (flow === 'buyer' && step === BUYER_STEP_INDEX.STYLE) {
         return styleInterests.length > 0 ? 'Continue' : 'Skip for now';
+      }
+      if (flow === 'buyer' && step === BUYER_STEP_INDEX.SIZES) {
+        return hasSurveyAnswers({ sizes: survey.sizes, likedBrandIds: [] }) ? 'Continue' : 'Skip for now';
       }
       if (flow === 'buyer' && step === BUYER_STEP_INDEX.BRANDS) {
         return 'Continue';

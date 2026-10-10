@@ -7,7 +7,7 @@
 
 export type DateRangeKey =
   | 'today' | 'yesterday' | '7d' | '30d' | '90d'
-  | 'this_month' | 'last_month' | 'this_year' | 'custom';
+  | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
 
 export type ComparisonKey =
   | 'previous_period' | 'previous_month' | 'previous_year' | 'none';
@@ -508,6 +508,7 @@ export const DATE_RANGE_OPTIONS: AnalyticsDateRange[] = [
   { key: 'this_month',  label: 'This month',   startDate: '', endDate: '' },
   { key: 'last_month',  label: 'Last month',   startDate: '', endDate: '' },
   { key: 'this_year',   label: 'This year',    startDate: '', endDate: '' },
+  { key: 'all',         label: 'All time',     startDate: '', endDate: '' },
 ];
 
 export const COMPARISON_OPTIONS: AnalyticsComparison[] = [

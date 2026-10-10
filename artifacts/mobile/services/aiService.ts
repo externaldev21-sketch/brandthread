@@ -18,6 +18,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   AIMessage, AISession, AIScreenContext, AIChatRequest,
   AIChatResponse, AIActionCard, AISettings, AISuggestion,
@@ -315,6 +316,9 @@ async function callAI(
   authToken: string | null,
   signal: AbortSignal,
 ): Promise<AIChatResponse> {
+  if (isSellerDevPreview()) {
+    throw new Error('Brandthread AI is unavailable in the signed-out seller preview.');
+  }
   const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
   if (!apiBase) {
     throw new Error('AI service is not configured. Check your API base URL.');
@@ -757,7 +761,7 @@ export async function getAISuggestions(
 
   const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
   // Try real API suggestions first
-  if (apiBase && authToken) {
+  if (!isSellerDevPreview() && apiBase && authToken) {
     try {
       const res = await fetch(`${apiBase}/api/v1/ai/suggestions`, {
         headers: { Authorization: `Bearer ${authToken}` },

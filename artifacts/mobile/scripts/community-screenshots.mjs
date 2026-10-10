@@ -6,8 +6,9 @@
  *
  *   node scripts/community-screenshots.mjs [--skip-build] [only-step-name]
  */
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { findTextFitIssues } from './lib/text-fit.mjs';
 import {
   DEFAULT_BUILD_DIR, MOBILE_ROOT, buildPreviewWeb, launchBrowser, openContext, openScreen, serveBuild,
 } from './store-screenshots/harness.mjs';
@@ -17,10 +18,22 @@ const VIEWPORT = { width: 393, height: 852 };
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const only = process.argv.slice(2).find((a) => !a.startsWith('--'));
 
+/** Zoomed crop (CSS px) of a card / button group, at 3x, for the PR's close-up review. */
+async function zoom(page, name, clip) {
+  const png = await page.screenshot({ clip: { x: clip[0], y: clip[1], width: clip[2], height: clip[3] } });
+  const sharp = (await import('sharp')).default;
+  await sharp(png).resize({ width: clip[2] * 3, kernel: 'lanczos3' }).toFile(path.join(OUT, `zoom-${name}.png`));
+  console.log(`  ⌕ zoom-${name}`);
+}
+const fitReport = {};
 async function shot(page, name) {
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });
-  console.log(`  ✓ ${name}`);
+  // TEXT-FIT & ALIGNMENT pass on every captured screen (see scripts/lib/text-fit.mjs).
+  const issues = await findTextFitIssues(page);
+  fitReport[name] = issues;
+  console.log(`  ${issues.length ? '✗' : '✓'} ${name}${issues.length ? `  (${issues.length} text-fit issue${issues.length === 1 ? '' : 's'})` : ''}`);
+  for (const i of issues) console.log(`      - ${i.kind}: ${i.el} — ${i.detail}`);
 }
 const go = (page, target) => page.evaluate((url) => {
   history.pushState(history.state, '', url);
@@ -47,9 +60,13 @@ async function run() {
     for (const [name, fn] of Object.entries(steps)) {
       if (only && name !== only) continue;
       console.log(name);
-      try { await fn({ browser, origin, session, shot, go }); } catch (e) { console.log('  ! failed:', e.message.split('\n')[0]); }
+      try { await fn({ browser, origin, session, shot, go, zoom }); } catch (e) { console.log('  ! failed:', e.message.split('\n')[0]); }
     }
   } finally {
+    writeFileSync(path.join(OUT, 'text-fit-report.json'), JSON.stringify(fitReport, null, 2));
+    const bad = Object.entries(fitReport).filter(([, v]) => v.length);
+    console.log(bad.length ? `\nTEXT-FIT: ${bad.length} screen(s) with issues` : '\nTEXT-FIT: clean on every screen');
+    if (bad.length) process.exitCode = 2;
     await browser.close();
     close();
   }

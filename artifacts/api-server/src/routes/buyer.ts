@@ -7,13 +7,14 @@ import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, buyerAddresses,
   drops, shippingZones, shippingZoneWeightTiers,
 } from "@workspace/db";
-import { eq, and, desc, sql, isNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, sql, isNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   requireStripe,
   ensureStripeCustomer,
   mapStripeError,
 } from "../lib/stripe";
+import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { buildBuyerDelivery, deliveryColumns, loadBuyerDelivery } from "../lib/delivery/buyerView";
 import { recordDelivery } from "../lib/delivery/deliveryState";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
@@ -21,6 +22,7 @@ import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneW
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import { notifyBuyerOrderCancelled, notifySellerOrderCancelledByBuyer } from "../lib/orderNotifications";
 import { withItemProductIds } from "../lib/orderItemProducts";
+import { resolveReorder } from "../lib/reorderResolver";
 import {
   bindLoyaltyRedemptionToCheckout,
   LoyaltyRedemptionError,
@@ -43,7 +45,12 @@ import { validateDiscountCode, DiscountValidationError } from "../lib/discounts"
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
-import { buyerCancellationEligibility } from "../lib/buyerCancellationPolicy";
+import {
+  BUYER_CANCELLABLE_ORDER_STATUSES,
+  buyerCancellationEligibility,
+} from "../lib/buyerCancellationPolicy";
+import { consumeBuyerAddressListFailure } from "./release-test-control";
+import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 
 const router = Router();
 router.use(requireAuth);
@@ -85,6 +92,7 @@ const checkoutBodySchema = z.object({
   loyaltyToken: z.string().trim().min(1).max(512).optional(),
   threadCashToken: z.string().trim().min(1).max(512).optional(),
   discountCode: z.string().trim().min(1).max(64).optional(),
+  liveStreamId: requestPrimitives.uuid.nullable().optional(),
 }).passthrough();
 const addressSuggestionQuerySchema = z.object({
   q: z.string().trim().min(3).max(160),
@@ -96,6 +104,7 @@ const addressSuggestionParamsSchema = z.object({
 const cartValidationBodySchema = z.object({
   items: z.array(checkoutItemSchema).min(1).max(100),
   discountCodes: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
+  liveStreamId: requestPrimitives.uuid.nullable().optional(),
 }).passthrough();
 
 type AddressInput = {
@@ -142,6 +151,10 @@ async function lockBuyerAddressBook(tx: any, buyerId: string) {
 // ─── Address book ────────────────────────────────────────────────────────────
 router.get("/addresses", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  if (await consumeBuyerAddressListFailure(buyerId)) {
+    res.status(503).json({ error: "Release-check one-shot address failure" });
+    return;
+  }
   const rows = await db.select().from(buyerAddresses)
     .where(eq(buyerAddresses.buyerId, buyerId))
     .orderBy(desc(buyerAddresses.isDefault), desc(buyerAddresses.updatedAt));
@@ -402,6 +415,8 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
       });
       continue;
     }
+    // Automatic sale price (lib/pricing/sales.ts) is what the buyer is charged.
+    row.priceCents = (await effectiveUnitPrice({ productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents })).priceCents;
     sellerIds.add(row.sellerId);
     const quantity = Number(item.quantity);
     if (!Number.isInteger(quantity) || quantity < 1 || row.stock < quantity) {
@@ -444,6 +459,7 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
       try {
         await validateDiscountCode({
           sellerId, code, customerKey: buyerId, cartSubtotalCents: subtotalCents, lines,
+          liveStreamId: typeof req.body?.liveStreamId === "string" ? req.body.liveStreamId : null,
         });
       } catch (err) {
         const message = err instanceof DiscountValidationError
@@ -485,7 +501,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     const buyerId = (req as any).clerkUserId as string;
     const {
       items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress,
-      clientIdempotencyKey, dropId, loyaltyToken, threadCashToken, discountCode,
+      clientIdempotencyKey, dropId, loyaltyToken, threadCashToken, discountCode, liveStreamId,
     } = req.body;
 
     // ── Thread Cash ─────────────────────────────────────────────────────
@@ -602,6 +618,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         return;
       }
 
+      row.priceCents = (await effectiveUnitPrice({ productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents })).priceCents;
       sellerIds.add(row.sellerId);
       if (sellerIds.size > 1) {
         res.status(400).json({
@@ -921,6 +938,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           customerKey: buyerId,
           cartSubtotalCents: subtotalCents,
           lines: discountLines,
+          liveStreamId: typeof liveStreamId === "string" ? liveStreamId : null,
         });
       } catch (err) {
         if (err instanceof DiscountValidationError) {
@@ -1015,11 +1033,13 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     // Persist the checkout before Stripe is contacted. Its ID is included in
     // the initial Stripe metadata, so a paid session is always reconstructable
     // by the webhook even if the later session-ID write is interrupted.
+    const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
       merchandiseCents: Math.max(0, subtotalCents - combinedDiscountCents),
       preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents),
+      platformFeeBps,
     });
     const insertValues = {
       buyerId,
@@ -1028,6 +1048,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       chargeModel: money.chargeModel,
       dropId: chargePlan.dropId,
       platformFeeCents: money.platformFeeCents,
+      platformFeeBps,
       processingFeeEstimateCents: money.processingFeeEstimateCents,
       ...(loyaltyRedemption ? {
         loyaltyToken: loyaltyRedemption.token,
@@ -1442,6 +1463,79 @@ router.get("/orders/:id", async (req, res) => {
   } catch (err) {
     req.log.error({ err, orderId: req.params.id }, "Failed to fetch buyer order");
     res.status(500).json({ error: "Failed to fetch order" });
+  }
+});
+
+// ─── Buyer Reorder ───────────────────────────────────────────────────────────
+/**
+ * POST /api/buyer/orders/:id/reorder
+ * Re-resolves every line of one of the buyer's own past orders against the
+ * CURRENT catalogue (price, stock, variant, product status). Read-only: the
+ * client adds the `addable` lines to the cart itself. See lib/reorderResolver.
+ */
+router.post("/orders/:id/reorder", validateRequest({ params: uuidParamsSchema }), async (req, res) => {
+  const id = req.params.id as string;
+  try {
+    const buyerId = (req as any).clerkUserId as string;
+    const [order] = await db
+      .select({ id: orders.id, ownerId: orders.ownerId })
+      .from(orders)
+      .where(and(eq(orders.id, id), eq(orders.buyerId, buyerId)))
+      .limit(1);
+    if (!order) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+
+    const items = await withItemProductIds(await db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, order.id)));
+
+    const productIds = new Set(items.map((i) => i.productId).filter((p): p is string => !!p));
+    // Lines whose variant was deleted have no product id: look the product up
+    // by title within the same seller so the line can still be re-matched.
+    const orphanNames = [...new Set(items.filter((i) => !i.productId).map((i) => i.productName))];
+    const filters = [];
+    if (productIds.size > 0) filters.push(inArray(products.id, [...productIds]));
+    if (orphanNames.length > 0) filters.push(and(eq(products.ownerId, order.ownerId), inArray(products.name, orphanNames)));
+    const productFilter = filters.length > 0 ? or(...filters) : sql`false`;
+    const productRows = await db
+      .select({
+        id: products.id, name: products.name, status: products.status,
+        deletedAt: products.deletedAt, isPreOrder: products.isPreOrder,
+      })
+      .from(products)
+      .where(productFilter);
+    const variantRows = productRows.length > 0
+      ? await db
+          .select({
+            id: productVariants.id, productId: productVariants.productId, size: productVariants.size,
+            color: productVariants.color, sku: productVariants.sku,
+            priceCents: productVariants.priceCents, stock: productVariants.stock,
+          })
+          .from(productVariants)
+          .where(inArray(productVariants.productId, productRows.map((p) => p.id)))
+      : [];
+
+    const catalog = productRows.map((p) => ({
+      ...p,
+      variants: variantRows.filter((v) => v.productId === p.id),
+    }));
+    const result = resolveReorder(
+      items.map((i) => ({
+        variantId: i.variantId,
+        productName: i.productName,
+        variantLabel: i.variantLabel,
+        quantity: i.quantity,
+        priceCents: i.priceCents,
+      })),
+      catalog,
+    );
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err, orderId: id }, "Failed to resolve reorder");
+    res.status(500).json({ error: "Failed to prepare reorder" });
   }
 });
 

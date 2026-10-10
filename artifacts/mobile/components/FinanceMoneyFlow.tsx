@@ -10,6 +10,7 @@ import {
 } from '@/lib/financeSummary';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticPrimaryAction } from '@/lib/haptics';
+import { radius } from '@/constants/radii';
 
 type Props = {
   summary: FinanceSummary | null;
@@ -205,7 +206,7 @@ const styles = StyleSheet.create({
   stateCard: { borderRadius: 14, borderWidth: 1, padding: 18, alignItems: 'center', gap: 8, marginBottom: 20 },
   stateTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   stateBody: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
-  retry: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },
+  retry: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },
   retryText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   notice: { flexDirection: 'row', gap: 10, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 16 },
   noticeTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 2 },

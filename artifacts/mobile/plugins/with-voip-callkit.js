@@ -42,7 +42,10 @@ const {
  *  5. Permissions for a self-managed ConnectionService call that rings from
  *     a high-priority FCM data message: MANAGE_OWN_CALLS,
  *     FOREGROUND_SERVICE_PHONE_CALL, FOREGROUND_SERVICE_MICROPHONE,
- *     USE_FULL_SCREEN_INTENT, POST_NOTIFICATIONS, READ_PHONE_STATE.
+ *     USE_FULL_SCREEN_INTENT, POST_NOTIFICATIONS. READ_PHONE_STATE is NOT
+ *     added: app.json blocks it (App Review hardening, enforced by
+ *     scripts/verify-ios-privacy-manifest.js) and a self-managed
+ *     ConnectionService does not need it.
  *  6. VoiceConnectionService label → the app name (callkeep's plugin ships
  *     "Wazo").
  *
@@ -58,7 +61,6 @@ const ANDROID_PERMISSIONS = [
   'android.permission.FOREGROUND_SERVICE_MICROPHONE',
   'android.permission.USE_FULL_SCREEN_INTENT',
   'android.permission.POST_NOTIFICATIONS',
-  'android.permission.READ_PHONE_STATE',
 ];
 
 const MARK = '// brandthread:voip-callkit';

@@ -30,6 +30,7 @@
  * as it does for the real API's buckets.
  */
 import { EMPTY_TRAFFIC_SOURCES, type SellerHomeAnalytics } from './sellerHomeAnalytics';
+import { ordersForDay, type PreviewSellerOrder } from './previewSellerOrders';
 
 export type PreviewSellerChartRange = 'today' | 'week' | 'month' | 'year' | 'all';
 export type PreviewSellerChartMode = 'fresh' | 'demo';
@@ -80,7 +81,67 @@ function makeBucket(iso: string, mode: PreviewSellerChartMode, baseCents: number
   return { bucket: iso, totalCents, netCents, orderCount, visitorCount };
 }
 
+/**
+ * Demo buckets are SUMS OF THE DEMO ORDER SET (lib/previewSellerOrders.ts), not
+ * an independent random curve, so every headline number on the dashboard is
+ * the count/total of real rows the Orders tab lists. Buckets after `now` are
+ * empty (the set never contains future orders).
+ */
+function bucketFromOrders(iso: string, orders: PreviewSellerOrder[]): Bucket {
+  const totalCents = orders.reduce((sum, o) => sum + o.totalCents, 0);
+  const visitorCount = orders.reduce((sum, o) => sum + o.visitors, 0);
+  // ~4% refunds so netCents is a real, distinct number from gross.
+  return { bucket: iso, totalCents, netCents: Math.round(totalCents * 0.96), orderCount: orders.length, visitorCount: Math.max(orders.length, visitorCount) };
+}
+
+function ordersInDays(y: number, m: number, firstDay: number, lastDay: number, now: Date): PreviewSellerOrder[] {
+  const out: PreviewSellerOrder[] = [];
+  for (let d = firstDay; d <= lastDay; d += 1) out.push(...ordersForDay(y, m, d, now));
+  return out;
+}
+
+function buildDemoBuckets(range: PreviewSellerChartRange, now: Date): Bucket[] {
+  switch (range) {
+    case 'today': {
+      const y = now.getFullYear(); const m = now.getMonth(); const d = now.getDate();
+      const orders = ordersForDay(y, m, d, now);
+      return Array.from({ length: 24 }, (_, h) => bucketFromOrders(
+        localBucketIso(y, m, d, h), orders.filter((o) => new Date(o.createdAt).getHours() === h),
+      ));
+    }
+    case 'week': {
+      const sunday = mostRecentSunday(now);
+      return Array.from({ length: 7 }, (_, i) => {
+        const day = new Date(sunday);
+        day.setDate(sunday.getDate() + i);
+        return bucketFromOrders(localBucketIso(day.getFullYear(), day.getMonth(), day.getDate()),
+          ordersForDay(day.getFullYear(), day.getMonth(), day.getDate(), now));
+      });
+    }
+    case 'month': {
+      const y = now.getFullYear(); const m = now.getMonth();
+      return Array.from({ length: daysInMonth(y, m) }, (_, i) => bucketFromOrders(localBucketIso(y, m, i + 1), ordersForDay(y, m, i + 1, now)));
+    }
+    case 'year': {
+      const y = now.getFullYear();
+      return Array.from({ length: now.getMonth() + 1 }, (_, m) => bucketFromOrders(localBucketIso(y, m, 1), ordersInDays(y, m, 1, daysInMonth(y, m), now)));
+    }
+    case 'all':
+    default: {
+      const years = 4;
+      const thisYear = now.getFullYear();
+      return Array.from({ length: years }, (_, i) => {
+        const year = thisYear - (years - 1 - i);
+        const orders: PreviewSellerOrder[] = [];
+        for (let m = 0; m < 12; m += 1) orders.push(...ordersInDays(year, m, 1, daysInMonth(year, m), now));
+        return bucketFromOrders(localBucketIso(year, 0, 1), orders);
+      });
+    }
+  }
+}
+
 function buildBuckets(range: PreviewSellerChartRange, mode: PreviewSellerChartMode, now: Date): Bucket[] {
+  if (mode === 'demo') return buildDemoBuckets(range, now);
   const rand = mulberry32(SEED_BY_RANGE[range]);
 
   switch (range) {

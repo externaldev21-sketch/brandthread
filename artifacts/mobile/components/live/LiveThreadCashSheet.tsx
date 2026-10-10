@@ -29,6 +29,7 @@ import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/pr
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { hapticLight } from '@/lib/haptics';
 import { apiErrorMessage } from '@/lib/safety';
+import { radius } from '@/constants/radii';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
 
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
   tipDisabled: { opacity: 0.35 },
   tipText: { fontFamily: FONT.bold, fontSize: FS.sm },
   sendError: { fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center', marginBottom: SP.sm },
-  sendBtn: { height: 46, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { height: 46, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { opacity: 0.4 },
   sendBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },
 });

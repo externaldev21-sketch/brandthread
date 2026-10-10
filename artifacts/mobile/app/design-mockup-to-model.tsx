@@ -110,7 +110,8 @@ export default function MockupToModelScreen() {
     } else if (result.reason === 'permission') {
       Alert.alert('Permission required', 'Allow photo library access to save this image.');
     } else {
-      Alert.alert('Download failed', 'Could not save this image. Please try again.');
+      Alert.alert(result.reason === 'unavailable' ? 'Unavailable' : 'Download failed',
+        result.reason === 'unavailable' ? 'Saving to Photos is unavailable in this app build.' : 'Could not save this image. Please try again.');
     }
   }
 
@@ -118,12 +119,13 @@ export default function MockupToModelScreen() {
     const done = slots.filter(sl => sl.status === 'done' && sl.imageUri).map(sl => sl.imageUri!);
     if (done.length === 0) return;
     setSavingAll(true);
-    const { succeeded, failed } = await saveAllToCameraRoll(done, 'mockup-to-model');
+    const { succeeded, failed, unavailable } = await saveAllToCameraRoll(done, 'mockup-to-model');
     setSavingAll(false);
     if (failed === 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
-      Alert.alert('Some downloads failed', `${succeeded} of ${done.length} photos saved.`);
+      Alert.alert(unavailable ? 'Photos unavailable' : 'Some downloads failed',
+        unavailable ? 'Saving to Photos is unavailable in this app build.' : `${succeeded} of ${done.length} photos saved.`);
     }
   }
 

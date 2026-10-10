@@ -27,12 +27,10 @@ import {
 import { useColors } from '@/hooks/useColors';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { loadAgoraModule } from '@/lib/agoraAvailability';
 
 // ─── Agora SDK — native only, gracefully absent on web / Expo Go ──────────────
-let AgoraModule: any = null;
-try {
-  AgoraModule = require('react-native-agora');
-} catch {}
+const AgoraModule = loadAgoraModule();
 
 const { width: W, height: H } = Dimensions.get('window');
 

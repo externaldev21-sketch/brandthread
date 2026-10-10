@@ -11,7 +11,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Alert, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -89,7 +89,8 @@ export default function ProductSizeChartScreen() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { loadProduct(); }, [productId, userId]);
+  // Re-read on focus so a template applied from the Size charts screen shows up on return.
+  useFocusEffect(React.useCallback(() => { loadProduct(); }, [productId, userId]));
 
   // ── Cell edit ───────────────────────────────────────────────────────────────
   function updateCell(rowIdx: number, colIdx: number, value: string) {
@@ -198,6 +199,16 @@ export default function ProductSizeChartScreen() {
         showsVerticalScrollIndicator={false}
         horizontal={false}
       >
+        {/* Reusable templates */}
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 52, marginBottom: SP.sm }}
+          onPress={() => router.push(`/size-chart-templates?productId=${productId}` as never)}
+          accessibilityRole="button"
+        >
+          <Text style={{ fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text }}>Use a saved size chart</Text>
+          <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+        </TouchableOpacity>
+
         {/* Unit toggle */}
         <View style={s.unitRow}>
           <Text style={s.label}>Measurement unit</Text>
@@ -319,6 +330,15 @@ export default function ProductSizeChartScreen() {
           multiline
           numberOfLines={3}
         />
+
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 52, marginTop: SP.md }}
+          onPress={() => router.push(`/size-chart-template-edit?fromProductId=${productId}` as never)}
+          accessibilityRole="button"
+        >
+          <Text style={{ fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text }}>Save as a reusable size chart</Text>
+          <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+        </TouchableOpacity>
 
         {/* Actions */}
         <PrimaryButton

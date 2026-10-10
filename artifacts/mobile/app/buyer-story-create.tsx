@@ -49,6 +49,8 @@ import { MediaCropper } from '@/components/media/MediaCropper';
 import { applyCropRect, type NormalizedCropRect } from '@/lib/mediaCrop';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { MentionPickerSheet, MentionSuggestionsBar } from '@/components/MentionPickerSheet';
+import { PollSticker, QuestionSticker, ProductSticker, CountdownSticker, STICKER } from '@/components/social/StoryStickers';
+import { PollComposer, QuestionComposer, CountdownPicker } from '@/components/social/StoryStickerComposer';
 import { MentionStickerView, ReshareCard, RESHARE_CARD_WIDTH, RESHARE_CARD_HEIGHT } from '@/components/StoryMentionSticker';
 import { InlineSlider } from '@/components/InlineSlider';
 import {
@@ -57,19 +59,11 @@ import {
 } from '@/lib/storyMentionSticker';
 import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackground, sampleImageColor } from '@/lib/storyReshare';
 import type { MentionPerson } from '@/services/socialTypes';
+import { radius } from '@/constants/radii';
+import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
-
-// expo-media-library has no web implementation — imported lazily (require)
-// only on native, same convention as components/create-post/MediaGrid.tsx.
-// The imperative getAssetsAsync/SortBy API used below lives under the
-// `/legacy` subpath in expo-media-library 57.
-let MediaLibrary: typeof import('expo-media-library/legacy') | null = null;
-if (!IS_WEB) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  MediaLibrary = require('expo-media-library/legacy');
-}
 
 type Step = 'camera' | 'create' | 'edit';
 type CaptureMode = 'story' | 'post' | 'live';
@@ -547,7 +541,8 @@ export default function StoryComposer() {
   // they've tapped anything. Falls back to the icon glyph until granted or
   // if the library is empty.
   useEffect(() => {
-    if (IS_WEB || !MediaLibrary) return;
+    const MediaLibrary = IS_WEB ? null : getMediaLibrary();
+    if (!MediaLibrary) return;
     void (async () => {
       try {
         const perm = await MediaLibrary.getPermissionsAsync();
@@ -642,6 +637,9 @@ export default function StoryComposer() {
   const [drawWidth, setDrawWidth] = useState(4);
   const [strokes, setStrokes] = useState<DrawStroke[]>([]);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [pollComposerOpen, setPollComposerOpen] = useState(false);
+  const [questionComposerOpen, setQuestionComposerOpen] = useState(false);
+  const [countdownPickerOpen, setCountdownPickerOpen] = useState(false);
   const [taggableProducts, setTaggableProducts] = useState<Product[]>([]);
   const [shopModalOpen, setShopModalOpen] = useState(false);
   const [shopUrlDraft, setShopUrlDraft] = useState('');
@@ -2054,11 +2052,14 @@ export default function StoryComposer() {
               <StickerTile icon="at-sign" label="Mention" onPress={() => { setStickerSheetOpen(false); setMentionPickerOpen(true); }} />
               <StickerTile icon="map-pin" label="Location" onPress={() => { addOverlay({ type: 'location', locationLabel: 'Add location' }); setStickerSheetOpen(false); }} />
               <StickerTile icon="clock" label="Time" onPress={() => { addOverlay({ type: 'time', text: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }); setStickerSheetOpen(false); }} />
-              <StickerTile icon="bar-chart-2" label="Poll" onPress={() => { addOverlay({ type: 'poll', pollQuestion: 'This or that?', pollOptions: [{ label: 'This', votes: 0 }, { label: 'That', votes: 0 }] }); setStickerSheetOpen(false); }} />
-              <StickerTile icon="help-circle" label="Question" onPress={() => { addOverlay({ type: 'question', questionPrompt: 'Ask me anything' }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="bar-chart-2" label="Poll" onPress={() => { setStickerSheetOpen(false); setPollComposerOpen(true); }} />
+              <StickerTile icon="help-circle" label="Question" onPress={() => { setStickerSheetOpen(false); setQuestionComposerOpen(true); }} />
               <StickerTile icon="link" label="Link" onPress={() => { addOverlay({ type: 'link', linkUrl: 'https://', linkText: 'Link' }); setStickerSheetOpen(false); }} />
               {isSeller ? (
                 <StickerTile icon="shopping-bag" label="Product" onPress={() => { setStickerSheetOpen(false); openProductPicker(); }} />
+              ) : null}
+              {isSeller ? (
+                <StickerTile icon="clock" label="Countdown" onPress={() => { setStickerSheetOpen(false); setCountdownPickerOpen(true); }} />
               ) : null}
               {isSeller ? (
                 <StickerTile icon="external-link" label="Shop link" onPress={() => { setStickerSheetOpen(false); setShopUrlDraft(''); setShopModalOpen(true); }} />
@@ -2072,6 +2073,32 @@ export default function StoryComposer() {
           </View>
         </ModalSafeArea>
       </Modal>
+
+      {/* ── Interactive sticker composers: poll, question, drop countdown ── */}
+      <PollComposer
+        visible={pollComposerOpen}
+        onClose={() => setPollComposerOpen(false)}
+        onAdd={({ question, options }) => {
+          addOverlay({ type: 'poll', x: W / 2 - STICKER.card / 2, y: H * 0.34, pollQuestion: question, pollOptions: options.map((label) => ({ label, votes: 0 })) });
+          setPollComposerOpen(false);
+        }}
+      />
+      <QuestionComposer
+        visible={questionComposerOpen}
+        onClose={() => setQuestionComposerOpen(false)}
+        onAdd={(prompt) => {
+          addOverlay({ type: 'question', x: W / 2 - STICKER.card / 2, y: H * 0.34, questionPrompt: prompt });
+          setQuestionComposerOpen(false);
+        }}
+      />
+      <CountdownPicker
+        visible={countdownPickerOpen}
+        onClose={() => setCountdownPickerOpen(false)}
+        onPick={(drop) => {
+          addOverlay({ type: 'countdown', x: W / 2 - STICKER.card / 2, y: H * 0.34, dropId: drop.id, dropName: drop.name, dropReleaseAt: drop.releaseAt });
+          setCountdownPickerOpen(false);
+        }}
+      />
 
       {/* ── Product tag picker (sellers) ── */}
       <Modal visible={productPickerOpen} transparent animationType="slide" onRequestClose={() => setProductPickerOpen(false)}>
@@ -2091,6 +2118,7 @@ export default function StoryComposer() {
                     hapticLight();
                     addOverlay({
                       type: 'product',
+                      x: W / 2 - STICKER.card / 2, y: H * 0.34,
                       productId: p.id,
                       productName: p.name,
                       productImageUri: p.media?.[0]?.uri,
@@ -2241,37 +2269,17 @@ function renderOverlayContent(ov: StoryOverlay, ctx?: { creditHandle?: string; o
     case 'time':
       return <View style={styles.pillChip}><Feather name="clock" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.text}</Text></View>;
     case 'question':
-      return (
-        <View style={styles.questionCard}>
-          <Text style={styles.questionCardTitle}>{ov.questionPrompt}</Text>
-          <View style={styles.questionInputMock}><Text style={styles.questionInputMockText}>Type your answer…</Text></View>
-        </View>
-      );
+      return <QuestionSticker prompt={ov.questionPrompt ?? ''} mode="editor" />;
     case 'poll':
-      return (
-        <View style={styles.pollCard}>
-          <Text style={styles.pollQuestion}>{ov.pollQuestion}</Text>
-          <View style={styles.pollOptionsRow}>
-            {(ov.pollOptions ?? []).map((o, i) => (
-              <View key={i} style={styles.pollOption}><Text style={styles.pollOptionText}>{o.label}</Text></View>
-            ))}
-          </View>
-        </View>
-      );
+      return <PollSticker question={ov.pollQuestion ?? ''} options={(ov.pollOptions ?? []).map((o) => o.label)} mode="editor" />;
+    case 'countdown':
+      return <CountdownSticker name={ov.dropName ?? 'Drop'} releaseAt={ov.dropReleaseAt ?? null} mode="editor" />;
     case 'link':
       return <View style={styles.pillChip}><Feather name="link-2" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.linkText || ov.linkUrl}</Text></View>;
     case 'shop':
       return <View style={styles.pillChip}><Feather name="external-link" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.shopLabel || ov.shopUrl}</Text></View>;
     case 'product':
-      return (
-        <View style={styles.productCard}>
-          {ov.productImageUri ? <Image source={{ uri: ov.productImageUri }} style={styles.productCardImg} /> : <View style={[styles.productCardImg, { backgroundColor: '#333' }]} />}
-          <View style={{ marginLeft: 8, maxWidth: 130 }}>
-            <Text style={styles.productCardName} numberOfLines={1}>{ov.productName}</Text>
-            {typeof ov.productPriceCents === 'number' ? <Text style={styles.productCardPrice}>${(ov.productPriceCents / 100).toFixed(2)}</Text> : null}
-          </View>
-        </View>
-      );
+      return <ProductSticker name={ov.productName ?? 'Product'} imageUrl={ov.productImageUri} priceCents={ov.productPriceCents} mode="editor" />;
     case 'threadcash':
       return <View style={styles.pillChip}><ThreadCashBillIcon size={16} /><Text style={styles.pillChipText}>{ov.text}</Text></View>;    default:
       return null;
@@ -2313,7 +2321,7 @@ const styles = StyleSheet.create({
   changeGridPill: {
     position: 'absolute', alignSelf: 'center', left: 0, right: 0, marginHorizontal: 'auto', width: 140,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6, zIndex: 15,
+    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6, zIndex: 15,
   },
   changeGridText: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold },
   gridDots: { flexDirection: 'row', gap: 4, marginTop: SP.xs, justifyContent: 'center' },
@@ -2382,7 +2390,7 @@ const styles = StyleSheet.create({
   mentionDock: { position: 'absolute', left: SP.md, right: SP.md, zIndex: 22, flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm },
   taggedChip: {
     minWidth: 44, height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    paddingHorizontal: SP.sm, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: SP.sm, borderRadius: radius.md, backgroundColor: 'rgba(0,0,0,0.6)',
     borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)',
   },
   taggedChipText: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
@@ -2391,10 +2399,10 @@ const styles = StyleSheet.create({
   mentionOpacityRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   mentionOpacityValue: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, width: 34, textAlign: 'right' },
 
-  reshareAction: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: SP.md },
+  reshareAction: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.md, paddingHorizontal: SP.md },
   reshareActionOutline: { borderWidth: 1, borderColor: 'rgba(192,192,192,0.5)' },
   reshareActionLabel: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
-  reshareNotNowWrap: { alignSelf: 'center', minHeight: 40, justifyContent: 'center', paddingHorizontal: SP.lg, marginTop: SP.xs, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.55)' },
+  reshareNotNowWrap: { alignSelf: 'center', minHeight: 40, justifyContent: 'center', paddingHorizontal: SP.lg, marginTop: SP.xs, borderRadius: radius.md, backgroundColor: 'rgba(0,0,0,0.55)' },
   reshareNotNow: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
   reshareUnavailable: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', padding: SP.md },
   reshareUnavailableTitle: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.semibold },
@@ -2421,7 +2429,7 @@ const styles = StyleSheet.create({
   myAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
   myAvatarText: { color: ON_DARK, fontSize: 10, fontFamily: FONT.bold },
   myStoryLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold },
-  closeFriendsChip: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6 },
+  closeFriendsChip: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
   closeFriendsLabel: { color: 'rgba(255,255,255,0.75)', fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: ON_DARK, alignItems: 'center', justifyContent: 'center' },
 
@@ -2440,7 +2448,7 @@ const styles = StyleSheet.create({
   textToolColorRow: { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   colorWheelDot: { width: 22, height: 22, borderRadius: 11 },
   fontChipRow: { maxHeight: 34 },
-  fontChip: { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: 'rgba(255,255,255,0.12)' },
+  fontChip: { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: 'rgba(255,255,255,0.12)' },
   fontChipText: { color: ON_DARK, fontSize: FS.sm },
   textAccessoryRow: { flexDirection: 'row', alignItems: 'center', paddingTop: SP.xs },
   textAccessoryItem: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', paddingVertical: SP.xs },
@@ -2465,7 +2473,7 @@ const styles = StyleSheet.create({
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: SP.sm },
   sheetTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginBottom: SP.md },
   stickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  stickerTile: { width: 78, height: 78, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  stickerTile: { width: Math.floor((W - SP.md * 2 - SP.sm * 3) / 4), height: 78, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', gap: 6 },
   stickerTileLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.medium },
   emptyText: { color: MUTED, fontSize: FS.sm, textAlign: 'center', padding: SP.lg },
   productRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
@@ -2486,7 +2494,7 @@ const styles = StyleSheet.create({
   alsoShareSearchWrap: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: RADIUS.md, paddingHorizontal: SP.sm, marginTop: SP.sm },
   alsoShareSearchInput: { flex: 1, color: ON_DARK, fontSize: FS.base, paddingVertical: SP.sm },
   alsoShareRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
-  alsoShareSendBtn: { paddingHorizontal: SP.md, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: ON_DARK, minWidth: 64, alignItems: 'center' },
+  alsoShareSendBtn: { paddingHorizontal: SP.md, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: ON_DARK, minWidth: 64, alignItems: 'center' },
   alsoShareSendBtnSent: { backgroundColor: 'rgba(255,255,255,0.15)' },
   alsoShareSendText: { color: '#000', fontFamily: FONT.semibold, fontSize: FS.sm },
   alsoShareHint: { color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: SP.xl },

@@ -103,7 +103,7 @@ export async function sanitizeStoryMentions(
         displayName: users.displayName, suspendedAt: users.suspendedAt, deletedAt: users.deletedAt,
       })
       .from(users)
-      .where(and(or(...conditions), isNull(users.deletedAt), isNull(users.suspendedAt)))
+      .where(and(or(...conditions), isNull(users.deletedAt), isNull(users.deletionRequestedAt), isNull(users.suspendedAt)))
     : [];
   const byId = new Map(found.map((u) => [u.clerkId, u]));
   const byHandle = new Map(found.filter((u) => u.username).map((u) => [u.username!.toLowerCase(), u]));

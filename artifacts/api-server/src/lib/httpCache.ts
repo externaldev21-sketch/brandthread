@@ -28,3 +28,13 @@ export function setPublicCacheHeaders(
     `public, max-age=${maxAgeSeconds}, stale-while-revalidate=${staleWhileRevalidateSeconds}`,
   );
 }
+
+/**
+ * Block-aware public reads: a signed-in viewer response omits content from
+ * people they have blocked (or who blocked them), so it must never enter a
+ * shared cache. Signed-out viewers keep the normal short public cache.
+ */
+export function setViewerScopedCacheHeaders(res: Response, viewerId: string | null | undefined): void {
+  if (viewerId) res.setHeader("Cache-Control", "private, no-store");
+  else setPublicCacheHeaders(res);
+}

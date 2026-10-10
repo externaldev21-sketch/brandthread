@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useIpCases, useIpCaseAudit, useUpdateIpCase } from '@/hooks/use-ip-cases';
+import { useIpCases, useIpCaseAudit, useUpdateIpCase, useResolveCounterNotice } from '@/hooks/use-ip-cases';
 import type { IpCase } from '@/hooks/use-ip-cases';
 import { Shield, AlertTriangle, XCircle, Clock, Info, FileText, ImageIcon, User, LinkIcon, AlertOctagon, HistoryIcon } from 'lucide-react';
 import { format } from 'date-fns';
@@ -23,6 +23,7 @@ function StatusBadge({ status }: { status: string }) {
 function CaseDetailView({ caseData }: { caseData: IpCase }) {
   const { toast } = useToast();
   const updateMutation = useUpdateIpCase();
+  const counterNoticeMutation = useResolveCounterNotice();
   const { data: auditLog } = useIpCaseAudit(caseData.id);
   const [activeTab, setActiveTab] = useState<'details' | 'audit'>('details');
 
@@ -277,6 +278,72 @@ function CaseDetailView({ caseData }: { caseData: IpCase }) {
                   )}
                 </div>
               </section>
+
+              {(caseData.sellerStanding || caseData.takedownAt || (caseData.counterNoticeStatus && caseData.counterNoticeStatus !== 'none')) && (
+                <section>
+                  <h3 className="text-xs font-mono uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+                    <AlertOctagon className="w-4 h-4" /> Seller standing
+                  </h3>
+                  <div className="bg-slate-900 rounded-lg border border-slate-800 p-4 space-y-3 text-sm" data-testid="section-seller-standing">
+                    {caseData.sellerStanding && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-400">IP strikes</span>
+                        <span className={cn('font-semibold', caseData.sellerStanding.ipRepeatInfringer && 'text-red-400')} data-testid="text-seller-strikes">
+                          {caseData.sellerStanding.ipStrikeCount} of {caseData.sellerStanding.threshold}
+                          {caseData.sellerStanding.ipRepeatInfringer ? ' - repeat infringer' : ''}
+                        </span>
+                      </div>
+                    )}
+                    {caseData.takedownAt && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-400">Taken down</span>
+                        <span>{format(new Date(caseData.takedownAt), 'MMM d, yyyy HH:mm')}</span>
+                      </div>
+                    )}
+                    {caseData.takedownAt && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-400">Seller notified</span>
+                        <span>{caseData.sellerNotifiedAt ? format(new Date(caseData.sellerNotifiedAt), 'MMM d, yyyy HH:mm') : 'Not sent'}</span>
+                      </div>
+                    )}
+                    {caseData.counterNoticeStatus && caseData.counterNoticeStatus !== 'none' && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-400">Counter-notice</span>
+                        <span className="capitalize" data-testid="text-counter-notice-status">{caseData.counterNoticeStatus}</span>
+                      </div>
+                    )}
+                    {caseData.counterNoticeStatus === 'received' && (
+                      <div className="pt-3 border-t border-slate-800 space-y-3">
+                        {caseData.counterNoticeStatement && (
+                          <div className="text-slate-300 whitespace-pre-wrap" data-testid="text-counter-notice-statement">{caseData.counterNoticeStatement}</div>
+                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            disabled={counterNoticeMutation.isPending}
+                            onClick={() => counterNoticeMutation.mutate({ id: caseData.id, outcome: 'reinstate' }, {
+                              onSuccess: () => toast({ title: 'Listing reinstated' }),
+                              onError: (err) => toast({ title: err.message, variant: 'destructive' }),
+                            })}
+                            className="h-10 px-3 rounded bg-slate-100 text-slate-900 font-semibold"
+                            data-testid="button-reinstate-listing"
+                          >Reinstate</button>
+                          <button
+                            type="button"
+                            disabled={counterNoticeMutation.isPending}
+                            onClick={() => counterNoticeMutation.mutate({ id: caseData.id, outcome: 'uphold' }, {
+                              onSuccess: () => toast({ title: 'Takedown upheld' }),
+                              onError: (err) => toast({ title: err.message, variant: 'destructive' }),
+                            })}
+                            className="h-10 px-3 rounded border border-slate-600 text-slate-200 font-semibold"
+                            data-testid="button-uphold-takedown"
+                          >Uphold</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
 
               {caseData.moderatorNotes && (
                 <section>

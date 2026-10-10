@@ -18,8 +18,8 @@ const read = (p: string) => readFileSync(resolve(__dirname, '..', p), 'utf8');
 const feed = read('app/(tabs)/feed.tsx');
 const segmentedControl = read('components/ui/SegmentedControl.tsx');
 
-describe('buyer feed top bar: LIVE and search/cart never yield to the center tabs', () => {
-  it('the LIVE cluster and the search/cart cluster are flexShrink: 0 — only the tabs may shrink', () => {
+describe('buyer feed top bar: LIVE/cart and search never yield to the center tabs', () => {
+  it('the LIVE/cart cluster and the search cluster are flexShrink: 0 — only the tabs may shrink', () => {
     expect(feed).toMatch(/buyerTopCluster: \{[^}]*flexShrink: 0[^}]*\}/);
   });
 
@@ -72,10 +72,10 @@ describe('numeric bound check: even at a real device\'s largest reported font sc
   const MAX_FONT_SIZE_MULTIPLIER = 1.2;
   const BASE_LABEL_FONT_SIZE = 15; // styles.underlineLabel.fontSize in SegmentedControl.tsx
 
-  // topRowSideGuard from feed.tsx: 24 (icon) * 2 clusters + topRowIconGap
-  // (6-8, width-dependent) + 6 — the fixed band width.tsx's tabs wrap is
+  // topRowSideGuard from feed.tsx: 24 (icon) * 2 in the wider cluster +
+  // topRowIconGap (8 on narrow screens) + 6 — the fixed band width the tabs wrap is
   // never allowed to draw outside of.
-  const TOP_ROW_SIDE_GUARD_NARROW = 24 * 2 + 6 + 6; // narrowest screens use topRowIconGap: 6
+  const TOP_ROW_SIDE_GUARD_NARROW = 24 * 2 + 8 + 6; // narrowest screens use topRowIconGap: 8
   const NARROWEST_SUPPORTED_SCREEN_WIDTH = 320; // iPhone SE (1st gen)
   const availableCenterBandWidth = NARROWEST_SUPPORTED_SCREEN_WIDTH - TOP_ROW_SIDE_GUARD_NARROW * 2;
 

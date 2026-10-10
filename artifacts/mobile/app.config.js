@@ -9,12 +9,27 @@
  * - android.googleServicesFile: set only when ./google-services.json is
  *   present (Firebase Android app config — FCM device tokens for native call
  *   ringing, lib/calls/native/). Without it the Android build is unchanged.
+ * - extra.router.asyncRoutes (web export only): while scripts/build-web.js is
+ *   exporting the static web build it creates `.web-async-routes` next to this
+ *   file and removes it afterwards. With that marker present every route
+ *   becomes its own web chunk, so the first load ships the shell and the
+ *   landing route instead of every screen. EAS and native builds never see the
+ *   marker, so the native config, fingerprint and OTA compatibility are
+ *   unchanged. The marker is a file rather than an environment variable on
+ *   purpose: it cannot differ between machines building the same binary.
  */
 const fs = require('fs');
 const path = require('path');
 
+const WEB_ASYNC_ROUTES_MARKER = path.join(__dirname, '.web-async-routes');
+
 module.exports = ({ config }) => {
-  let next = config;
+  let next = fs.existsSync(WEB_ASYNC_ROUTES_MARKER)
+    ? {
+        ...config,
+        extra: { ...config.extra, router: { ...config.extra?.router, asyncRoutes: { web: true, default: false } } },
+      }
+    : config;
   const googleServices = path.join(__dirname, 'google-services.json');
   if (!next.android?.googleServicesFile && fs.existsSync(googleServices)) {
     next = { ...next, android: { ...next.android, googleServicesFile: './google-services.json' } };

@@ -1,3 +1,5 @@
+import { isExpoGo } from '@/lib/expoGoRuntime';
+
 /**
  * skiaAvailability.ts — guarded, lazy loader for @shopify/react-native-skia.
  *
@@ -47,6 +49,10 @@ let cached: SkiaModuleShape | null | undefined; // undefined = not yet attempted
  */
 export function loadSkia(): SkiaModuleShape | null {
   if (cached !== undefined) return cached;
+  if (isExpoGo()) {
+    cached = null;
+    return cached;
+  }
   try {
     // Deliberately NOT a static top-level `import` — a static import would be
     // hoisted and evaluated at module-load time, which is exactly what we

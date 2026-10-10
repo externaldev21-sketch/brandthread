@@ -64,6 +64,7 @@ export function useImageSourceSheet() {
   const resolverRef = useRef<((asset: ImagePicker.ImagePickerAsset | null) => void) | null>(null);
   const onRemoveRef = useRef<(() => void) | undefined>(undefined);
   const aspectRef = useRef<[number, number]>([1, 1]);
+  const nativeEditRef = useRef(true);
   const [enableVideo, setEnableVideo] = useState(false);
 
   const settle = useCallback((asset: ImagePicker.ImagePickerAsset | null) => {
@@ -72,8 +73,9 @@ export function useImageSourceSheet() {
     resolverRef.current = null;
   }, []);
 
-  const open = useCallback((opts?: { aspect?: [number, number]; onRemove?: () => void; enableVideo?: boolean }) => {
+  const open = useCallback((opts?: { aspect?: [number, number]; onRemove?: () => void; enableVideo?: boolean; skipNativeEdit?: boolean }) => {
     aspectRef.current = opts?.aspect ?? [1, 1];
+    nativeEditRef.current = !opts?.skipNativeEdit;
     onRemoveRef.current = opts?.onRemove;
     setEnableVideo(!!opts?.enableVideo);
     setVisible(true);
@@ -84,13 +86,13 @@ export function useImageSourceSheet() {
 
   const takePhoto = useCallback(async () => {
     hapticSelection();
-    const asset = await pickFromCamera(aspectRef.current);
+    const asset = await pickFromCamera(aspectRef.current, nativeEditRef.current);
     settle(asset);
   }, [settle]);
 
   const chooseLibrary = useCallback(async () => {
     hapticSelection();
-    const asset = await pickFromLibrary(aspectRef.current);
+    const asset = await pickFromLibrary(aspectRef.current, nativeEditRef.current);
     settle(asset);
   }, [settle]);
 

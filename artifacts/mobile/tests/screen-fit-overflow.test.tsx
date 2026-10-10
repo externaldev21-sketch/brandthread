@@ -73,7 +73,12 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@expo/vector-icons', () => ({ Feather: nativeComponent('Feather') }));
 vi.mock('expo-linear-gradient', () => ({ LinearGradient: nativeComponent('LinearGradient') }));
-vi.mock('react-native-svg', () => ({ default: nativeComponent('Svg'), Line: nativeComponent('SvgLine') }));
+vi.mock('react-native-svg', () => ({
+  default: nativeComponent('Svg'),
+  Line: nativeComponent('SvgLine'),
+  // The shared empty-state badge (components/layout/EmptyStateBadge.tsx) draws with these.
+  ...Object.fromEntries(['G', 'Path', 'Rect', 'Circle', 'Polyline', 'Polygon', 'Ellipse'].map((n) => [n, nativeComponent(`Svg${n}`)])),
+}));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(), notificationAsync: vi.fn(), selectionAsync: vi.fn(),

@@ -10,10 +10,11 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, Platform, Image, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation, useFocusEffect } from 'expo-router';
+import { takePendingAiDescription, toUploadObjectPath } from '@/lib/aiHelperHandoff';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -24,7 +25,7 @@ import { File, Paths } from 'expo-file-system';
 
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { TYPE_SCALE } from '@/constants/typography';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
@@ -44,10 +45,10 @@ import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESET
 
 import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish, applyBulkEditToVariants } from '@/lib/productUtils';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 
@@ -281,8 +282,8 @@ export default function AddProductScreen() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
 
-  // ── Pre-order (Pricing & Stock step) ──
-  const [isPreOrder, setIsPreOrder] = useState(false);
+  // A drop starts in pre-order mode, matching its initial sales model.
+  const [isPreOrder, setIsPreOrder] = useState(params.intent === 'drop');
 
   // ── Variants: bulk-edit selection ──
   const [bulkEditMode, setBulkEditMode] = useState(false);
@@ -486,6 +487,13 @@ export default function AddProductScreen() {
     setDraftData(prev => ({ ...prev, ...patch }));
   }
 
+  // AI description chosen on /ai-helper ("Use in product") lands in this draft only.
+  useFocusEffect(useCallback(() => {
+    const text = takePendingAiDescription();
+    if (text) { setDescOpen(true); patchDraft({ description: text }); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []));
+
   function buildDraftSnapshot(): ProductDraft {
     const productOptions: ProductOption[] = localOptions.map((o, i) => ({
       id: o.id, type: o.type, name: o.name, values: o.values, sortOrder: i,
@@ -571,11 +579,11 @@ export default function AddProductScreen() {
 
   function leaveProductFlow() {
     isExitingRef.current = true;
-    if (launchedFromSellerSetup) {
-      router.replace(SELLER_HOME_ROUTE as never);
-      return;
-    }
-    goBackOr(router);
+    // Cancel / Discard / Done pop to the exact screen underneath (dashboard,
+    // products tab, setup checklist…); only a cold deep link with no history
+    // falls back to the explicit `from` origin. Never replace() to a tabs
+    // index here — that is what used to strand the seller on the wrong tab.
+    leaveSetupFlow(router, params.from);
   }
 
   function handleExit() {
@@ -773,6 +781,10 @@ export default function AddProductScreen() {
       priceCents: productPayload.pricing?.priceCents ?? 0,
       stock: totalStock,
       lowStockThreshold: parseInt(lowStockStr, 10) || 5,
+    }).map((v) => {
+      // Persist the strike-through price (server requires it to exceed the variant price).
+      const compareAt = productPayload.pricing?.compareAtPriceCents;
+      return compareAt && compareAt > v.priceCents ? { ...v, compareAtPriceCents: compareAt } : v;
     });
 
     const serverCreatePayload = {
@@ -799,6 +811,7 @@ export default function AddProductScreen() {
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
       sizeChartImageUrl: productPayload.sizeChartImageUrl ?? null,
+      compareAtPriceCents: productPayload.pricing?.compareAtPriceCents ?? null,
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
@@ -1228,6 +1241,10 @@ export default function AddProductScreen() {
   // Description and category are collapsed "+ Add…" rows until tapped/set,
   // same as the Shopify iOS Add Product screen this page is modeled on.
   function renderBasicInfo() {
+    const aiPaths = (draftData.media ?? []).map(m => toUploadObjectPath(m.uri)).filter((x): x is string => !!x).slice(0, 4);
+    const aiDescriptionHref = aiPaths.length > 0 || editProductId
+      ? `/ai-helper?mode=description${editProductId ? `&productId=${editProductId}` : `&paths=${encodeURIComponent(aiPaths.join(','))}`}${draftData.name ? `&name=${encodeURIComponent(draftData.name)}` : ''}`
+      : null;
     const showDescription = descOpen || !!draftData.description;
     return (
       <>
@@ -1252,6 +1269,13 @@ export default function AddProductScreen() {
             <Text style={s.plusRowText}>Add description</Text>
           </TouchableOpacity>
         )}
+
+        {aiDescriptionHref ? (
+          <TouchableOpacity style={s.plusRow} onPress={() => router.push(aiDescriptionHref as never)} accessibilityRole="button" testID="add-product-ai-description">
+            <Feather name="zap" size={15} color={theme.accentLight} />
+            <Text style={s.plusRowText}>Write with AI</Text>
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity style={s.plusRow} onPress={openCategoryPicker} accessibilityRole="button" testID="add-product-category-row">
           <Feather name={draftData.category ? 'tag' : 'plus'} size={15} color={theme.accentLight} />
@@ -1319,6 +1343,7 @@ export default function AddProductScreen() {
   // Pricing row layout).
   function renderPriceEssentials() {
     return (
+      <>
       <View style={s.priceRow}>
         <FormInput
           label="Price *"
@@ -1337,6 +1362,8 @@ export default function AddProductScreen() {
           style={{ flex: 1 }}
         />
       </View>
+      <FeeBreakdown collapsible priceCents={parseDecimalToCents(priceStr)} />
+      </>
     );
   }
 
@@ -1776,6 +1803,17 @@ export default function AddProductScreen() {
     );
   }
 
+  /** AI size chart entry — only for a saved product, since the chart is written to it directly. */
+  function renderSizeChartAi() {
+    if (!editProductId) return null;
+    return (
+      <TouchableOpacity style={s.plusRow} onPress={() => router.push(`/ai-helper?mode=size-chart&productId=${editProductId}` as never)} accessibilityRole="button" testID="add-product-ai-size-chart">
+        <Feather name="zap" size={15} color={theme.accentLight} />
+        <Text style={s.plusRowText}>Generate size chart with AI</Text>
+      </TouchableOpacity>
+    );
+  }
+
   function renderSalesModel() {
     const sm = draftData.salesModel ?? 'pre-made';
     const ps = draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false };
@@ -2186,6 +2224,7 @@ export default function AddProductScreen() {
             hint={draftData.sizeChartImageUrl ? 'Added' : 'Optional'}
           >
             {renderSizeChart()}
+            {renderSizeChartAi()}
           </CollapsibleSection>
 
           <CollapsibleSection
@@ -2296,7 +2335,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: 4,
     paddingHorizontal: SP.sm,
     paddingVertical: 6,
-    borderRadius: RADII.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: BORDER,
   },
@@ -2485,7 +2524,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   colorSwatch: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   valueChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.pill,
+    backgroundColor: CARD_ELEVATED, borderRadius: radius.sm,
     paddingHorizontal: 10, paddingVertical: 4,
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },

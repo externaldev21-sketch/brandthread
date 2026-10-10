@@ -97,7 +97,7 @@ function Line({ label, value, strong, testID, styles }: { label: string; value: 
 }
 
 export function OrderSummarySection({
-  session, totals, itemCount, taxNote, quotedGroups,
+  session, totals, itemCount, taxNote, quotedGroups, giftCardCents = 0,
 }: {
   session: CheckoutSession;
   totals: CheckoutDisplayTotals;
@@ -106,6 +106,8 @@ export function OrderSummarySection({
   taxNote?: string;
   /** Per-seller numbers from the server's quote, when available. */
   quotedGroups?: Array<{ sellerId: string; shippingCents: number; processingDays: number | null }>;
+  /** Store gift card cents already taken off; `totals.totalCents` is what the card is charged. */
+  giftCardCents?: number;
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
@@ -148,10 +150,16 @@ export function OrderSummarySection({
             <Line styles={styles} label={t('Thread Cash')} value={`−${formatCents(totals.threadCashCents)}`} testID="checkout-thread-cash-line" />
           </>
         ) : null}
+        {giftCardCents > 0 ? (
+          <>
+            <Line styles={styles} label="Order total" value={formatCents(totals.totalCents + giftCardCents)} testID="checkout-order-total-line" />
+            <Line styles={styles} label="Gift card" value={`−${formatCents(giftCardCents)}`} testID="checkout-gift-card-line" />
+          </>
+        ) : null}
         <View style={styles.totalDivider} />
         <Line
           styles={styles}
-          label={t(totals.threadCashCents > 0 ? 'Charged to card' : 'Total')}
+          label={t(totals.threadCashCents > 0 || giftCardCents > 0 ? 'Charged to card' : 'Total')}
           value={formatCents(totals.totalCents)}
           strong
           testID="checkout-total-line"

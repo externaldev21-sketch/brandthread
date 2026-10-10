@@ -108,7 +108,9 @@ describe('Studio card carousel: horizontal release LOCKS (does not navigate); ta
   });
 
   it('the sheet opens fresh with no card landed (landedPulse reset alongside cardIndex)', () => {
-    const resetBlock = studio.slice(studio.indexOf('if (open) {', studio.indexOf('useEffect(() => {\n    // Reset to the first card')), studio.indexOf('setCardIndexJS(0);'));
+    const start = studio.indexOf('if (open) {', studio.indexOf('// Fresh opens'));
+    const resetBlock = studio.slice(start, studio.indexOf('}, [open]);', start));
+    expect(resetBlock).toContain('cardIndex.value = 0;');
     expect(resetBlock).toContain('landedPulse.value = 0;');
   });
 });
@@ -151,7 +153,7 @@ describe('Studio card carousel: one rate-limited haptic tick per card-index chan
 
 describe('Studio card carousel: release/tap opens instantly — no closing animation, no push animation', () => {
   it('commitAndOpen cancels any in-flight page animation and sets open=false directly, with no withTiming close', () => {
-    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, traceProgress, zoomScale, enterFade, planLoading'));
+    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading'));
     expect(fnBody).toContain('cancelAnimation(translateY);');
     expect(fnBody).toContain('cancelAnimation(traceProgress);');
     expect(fnBody).toContain('setOpen(false);');
@@ -160,7 +162,7 @@ describe('Studio card carousel: release/tap opens instantly — no closing anima
 
   it('sets a one-shot "no animation" override immediately before pushing', () => {
     expect(studio).toContain("import { setNextPushAnimationNone } from '@/lib/navigationAnimationOverride';");
-    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, traceProgress, zoomScale, enterFade, planLoading'));
+    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading'));
     const setIdx = fnBody.indexOf('setNextPushAnimationNone();');
     const pushIdx = fnBody.indexOf('router.push(item.route as never);');
     expect(setIdx).toBeGreaterThan(-1);
@@ -168,7 +170,7 @@ describe('Studio card carousel: release/tap opens instantly — no closing anima
   });
 
   it('a Growth-gated, unpaid item shows the upsell modal instead of navigating, and never sets the animation override for that path', () => {
-    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, traceProgress, zoomScale, enterFade, planLoading'));
+    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading'));
     const gateIdx = fnBody.indexOf('!hasPlan(\'growth\')');
     const upsellIdx = fnBody.indexOf('setUpsellFeature(item.label);');
     const returnIdx = fnBody.indexOf('return;', upsellIdx);
@@ -203,8 +205,15 @@ describe('navigation animation override plumbing', () => {
       'design-ai-photoshoot', 'customer-accounts',
     ];
     destinations.forEach((name) => {
+      // A function options either way — add-product's also reads its route
+      // params (`?presentation=modal` from the seller profile's Products
+      // empty state) before falling back to the same override.
       const marker = `<Stack.Screen name="${name}" options={() => (`;
-      expect(rootLayout, `${name} should use a function options reading consumeAnimationOverride`).toContain(marker);
+      const paramMarker = `<Stack.Screen name="${name}" options={({ route }) => {`;
+      expect(
+        rootLayout.includes(marker) || rootLayout.includes(paramMarker),
+        `${name} should use a function options reading consumeAnimationOverride`,
+      ).toBe(true);
     });
     // Every one of those destinations' animation key must route through the
     // override, not just carry a plain static string.

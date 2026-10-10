@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, Platform, TextInput, Image, Animated, ActivityIndicator,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -23,6 +23,8 @@ import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
+import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { Avatar } from '@/components/ui/Avatar';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
@@ -57,7 +59,7 @@ type ImageSlotKey = 'avatar' | 'logo' | 'banner';
 // so this is never reachable outside a dev web preview.
 const PREVIEW_TAKEN_USERNAMES = new Set(['admin', 'test', 'brandthread', 'shop']);
 const PREVIEW_SELLER_FIELDS: Fields = {
-  name: 'Preview Studio', username: 'preview_studio', bio: 'Handmade goods, made to order.',
+  name: PREVIEW_SELLER_IDENTITY.brandName, username: PREVIEW_SELLER_IDENTITY.username, bio: PREVIEW_SELLER_IDENTITY.bio,
   website: 'https://example.com', category: 'Streetwear', tagsText: 'handmade, small batch',
   location: 'Los Angeles, CA', contactEmail: 'hello@example.com', instagram: '@previewstudio', tiktok: '@previewstudio',
 };
@@ -203,6 +205,10 @@ export default function EditProfileScreen() {
     try {
       const result = await api.auth.checkUsername(u);
       if (result.available) { setUsernameStatus('ok'); setUsernameError(''); return true; }
+      if (result.code === 'USERNAME_COOLDOWN' && result.nextChangeAt) {
+        setUsernameStatus('invalid'); setUsernameError(formatHandleCooldown(result.nextChangeAt));
+        return false;
+      }
       setUsernameStatus('taken'); setUsernameError(result.error ?? 'Username already taken');
       return false;
     } catch {
@@ -563,7 +569,7 @@ export default function EditProfileScreen() {
           <View>
             <View style={styles.row}>
               <Text style={styles.rowLabel}>Username</Text>
-              <TextInput
+              <TextInput accessibilityLabel="Username"
                 style={[
                   styles.rowInput,
                   usernameStatus === 'taken' && { color: theme.error },
@@ -596,7 +602,7 @@ export default function EditProfileScreen() {
             <Text style={[styles.rowValue, { flex: 1 }]} numberOfLines={1}>
               {username ? `brandthread.app/u/${username}` : 'Add a username to get your link'}
             </Text>
-            <TouchableOpacity onPress={handleCopyLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={!username}>
+            <TouchableOpacity accessibilityLabel="Copy profile link" accessibilityRole="button" onPress={handleCopyLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={!username}>
               <Feather name="copy" size={17} color={theme.muted} />
             </TouchableOpacity>
           </View>

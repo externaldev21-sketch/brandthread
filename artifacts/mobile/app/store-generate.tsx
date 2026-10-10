@@ -3,7 +3,7 @@ import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Platform, Alert, ActivityIndicator } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +28,7 @@ import { StoreGenerationAnswers, StoreColorPalette,
   COLOR_PRESETS, TypographyStyle, BrandStyle, BrandMood,
   HomepagePriority, TargetCustomer, StoreFeature, StoreContent } from '@/services/storeTypes';
 
+import { radius } from '@/constants/radii';
 const TOTAL_STEPS = 10;
 
 const DEFAULT_ANSWERS: Partial<StoreGenerationAnswers> = {
@@ -886,7 +887,6 @@ export default function StoreGenerateScreen() {
     <View style={[st.root, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Generate My Store"
-        subtitle={`Step ${step} of ${TOTAL_STEPS}`}
         onBack={handleBack}
         rightElement={
           <TouchableOpacity onPress={handleSaveAndExit} style={st.saveExitBtn} activeOpacity={0.7}>
@@ -1081,7 +1081,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chip: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs + 2,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: CARD,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1089,7 +1089,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chipGrad: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs + 2,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
   },
   chipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   chipTextActive: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
@@ -1197,7 +1197,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   aiToolChip: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: BORDER_ACTIVE,
     backgroundColor: PURPLE_DIM,
@@ -1260,7 +1260,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 4,
     backgroundColor: PURPLE_DIM,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     paddingHorizontal: SP.sm,
     paddingVertical: 2,
   },

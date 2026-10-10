@@ -110,3 +110,12 @@ describe("API routing trap — /api-shaped paths never get the SPA shell", () =>
     expect(response.headers["content-type"]).not.toContain("application/json");
   });
 });
+
+describe("Public account-deletion page", () => {
+  it("serves plain HTML at /account-deletion without the SPA shell or a session", () => {
+    const response = request("/account-deletion", { host: "brandthread.app", accept: "text/html" });
+    expect(response.status).toBe(200);
+    expect(response.body).toContain("Delete your Brandthread account");
+    expect(response.body).toContain("/api/public/account-deletion/");
+  });
+});

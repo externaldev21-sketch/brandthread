@@ -132,6 +132,8 @@ function toConversation(seed: PreviewConversationSeed): Conversation {
     // API's contract (requestedBy only set while isRequest is true).
     requestedBy: seed.requestedBy === 'me' ? 'me' : seed.requestedBy === 'them' ? seed.participantUserId : undefined,
     contextOrderNumber: seed.contextOrderNumber,
+    // Preview-only id so the buyer attach sheet's Order tab can render in demos.
+    contextOrderId: seed.contextOrderNumber ? `preview-order-${seed.contextOrderNumber}` : undefined,
     contextProductName: seed.contextProductName,
     updatedAt: new Date(ts).toISOString(),
     isPinned: seed.isPinned,

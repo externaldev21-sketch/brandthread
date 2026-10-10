@@ -6,9 +6,12 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
+import { fetchSponsoredSlots } from '@/services/sponsoredService';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { purgeAuthorFromFeedPostsCache } from '@/lib/feedPostsCache';
+import { queryClient } from '@/lib/queryClient';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
@@ -21,6 +24,7 @@ import type {
   SavedItem, SavedItemType, SavedCollection, PrivacySettings, ProfileSearchResult,
   Comment,
 } from './socialTypes';
+import type { PostSlide } from './socialTypes';
 import { DEFAULT_PRIVACY_SETTINGS, DEFAULT_NOTIFICATION_PREFS } from './socialTypes';
 
 // ─── Keys (scoped by user ID so two accounts never share storage) ─────────────
@@ -553,6 +557,9 @@ export interface SellerThreadPost {
   isDeleted:         boolean;
   sound?:            SellerPostSound;
   productTags:       SellerPostProductTag[];
+  /** Paid promotion served in For You; must be rendered with a "Sponsored" label. */
+  sponsored?:        boolean;
+  sponsoredBoostId?: string;
   visibility:        { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
   scheduledAt:       string | null;
   publishedAt?:      string;
@@ -579,6 +586,10 @@ export interface SellerThreadPost {
   remixOf?:          { postId: string; authorId: string; username: string | null } | null;
   /** Ordered object storage paths for composed slideshow slides (empty for video/photo posts) */
   mediaPaths?:       string[];
+  /** POST carousels: ordered photo/video slides with stable URLs. */
+  slides?:           PostSlide[];
+  /** Where it lives: Threads feed or the author's profile grid. */
+  surface?:          'thread' | 'profile';
   /** Per-slide overlay metadata — used to restore draft editors */
   slideOverlays?:    Array<{
     slideIndex: number;
@@ -657,6 +668,8 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     // Slideshow persistence fields
     mediaPaths:      Array.isArray(p.mediaPaths) && p.mediaPaths.length > 0 ? p.mediaPaths : undefined,
     slideOverlays:   Array.isArray(p.slideOverlays) && p.slideOverlays.length > 0 ? p.slideOverlays : undefined,
+    slides:          mapSlides(p.slides),
+    surface:         p.surface === 'profile' ? 'profile' : 'thread',
   };
 }
 
@@ -677,11 +690,15 @@ export async function createSellerPost(params: {
   /** @deprecated use productTags instead */
   productTagIds?: string[];
   sound?: SellerPostSound | null;
-  visibility?: { allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
+  visibility?: { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
+  /** Where the post lives: the Threads feed (sellers only) or the author's own profile grid. */
+  surface?: 'thread' | 'profile';
   isDraft?: boolean;
   scheduledAt?: string | null;
   /** Ordered object storage paths for slideshow slides */
   mediaPaths?: string[];
+  /** POST carousels: ordered photo/video slides (server derives stable URLs from the paths). */
+  slides?: Array<{ kind: 'photo' | 'video'; path: string; thumbnailPath: string; duration?: number }>;
   /** Per-slide overlay metadata */
   slideOverlays?: Array<{ slideIndex: number; overlays: any[] }>;
   /** The video this post remixes; the server refuses it (403 REMIX_NOT_ALLOWED) when the author doesn't allow it. */
@@ -698,9 +715,11 @@ export async function createSellerPost(params: {
       thumbnailPath: params.thumbnailPath,
       mediaUrls: params.mediaUris ?? [],
       mediaPaths: params.mediaPaths ?? [],
+      slides: params.slides,
       slideOverlays: params.slideOverlays ?? [],
       mediaType: params.contentType,
       aspectRatio: params.aspectRatio ?? '9:16',
+      surface: params.surface,
       caption: params.caption,
       hashtags: params.hashtags,
       styleTags: params.styleTags ?? [],
@@ -741,7 +760,7 @@ export async function updateSellerPost(
     'caption' | 'hashtags' | 'styleTags' | 'mediaUris' | 'thumbnailUri' | 'aspectRatio' |
     'contentType' | 'postStatus' | 'isDraft' | 'isArchived' | 'isDeleted' |
     'sound' | 'productTags' | 'visibility' | 'scheduledAt' | 'publishedAt'
-  >>,
+  >> & { surface?: 'thread' | 'profile' },
 ): Promise<SellerThreadPost> {
   const k = K();
   const updated = await serviceRequest<any>(`/api/posts/${encodeURIComponent(id)}`, {
@@ -751,6 +770,7 @@ export async function updateSellerPost(
       mediaUrls: patch.mediaUris,
       mediaType: patch.contentType,
       aspectRatio: patch.aspectRatio,
+      surface: patch.surface,
       caption: patch.caption,
       hashtags: patch.hashtags,
       styleTags: patch.styleTags,
@@ -781,6 +801,28 @@ export async function updateSellerPost(
   if (_socialUserId === k.userId) await save(k.sellerPosts, posts);
   notify();
   return merged;
+}
+
+/** Draft or scheduled -> published now. Server: POST /api/posts/:id/publish-now. */
+export async function publishSellerPostNow(id: string): Promise<SellerThreadPost> {
+  return applyOwnedPostAction(id, 'publish-now');
+}
+
+/** Scheduled -> draft. Server: POST /api/posts/:id/unschedule. */
+export async function unscheduleSellerPost(id: string): Promise<SellerThreadPost> {
+  return applyOwnedPostAction(id, 'unschedule');
+}
+
+async function applyOwnedPostAction(id: string, action: 'publish-now' | 'unschedule'): Promise<SellerThreadPost> {
+  const k = K();
+  const updated = await serviceRequest<any>(`/api/posts/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({}) });
+  const canonical = mapOwnedApiPost(updated, k.userId);
+  const posts = await load<SellerThreadPost[]>(k.sellerPosts, []);
+  const idx = posts.findIndex(p => p.id === id);
+  if (idx >= 0) posts[idx] = { ...posts[idx], ...canonical };
+  if (_socialUserId === k.userId && idx >= 0) await save(k.sellerPosts, posts);
+  notify();
+  return canonical;
 }
 
 export async function archiveSellerPost(id: string): Promise<void> {
@@ -832,6 +874,17 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
  * profile video endpoints) to a SellerThreadPost. Exported so the profile video
  * grid and the feed player read one shape.
  */
+/** API `slides` → client slides (drops malformed entries; undefined when there are none). */
+export function mapSlides(raw: unknown): PostSlide[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out = raw.flatMap((r: any) => (
+    r && (r.kind === 'photo' || r.kind === 'video') && typeof r.url === 'string'
+      ? [{ kind: r.kind, url: r.url, thumbnailUrl: typeof r.thumbnailUrl === 'string' ? r.thumbnailUrl : undefined, duration: typeof r.duration === 'number' ? r.duration : undefined } as PostSlide]
+      : []
+  ));
+  return out.length > 0 ? out : undefined;
+}
+
 export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
   const now = iso();
   const remixOf = p?.remixOf && typeof p.remixOf.postId === 'string'
@@ -861,12 +914,16 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     mediaUris:         Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0 ? p.mediaUrls : (p.mediaUrl ? [p.mediaUrl] : []),
     thumbnailUri:      p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:       (p.aspectRatio ?? '9:16') as SellerThreadPost['aspectRatio'],
+    slides:            mapSlides(p.slides),
+    surface:           p.surface === 'profile' ? 'profile' : 'thread',
     contentType:       (p.mediaType ?? 'video') as SellerThreadPost['contentType'],
     postStatus:        'published' as const,
     isDraft:           false,
     isArchived:        false,
     isDeleted:         false,
     sound:             p.sound ?? undefined,
+    sponsored:         p.sponsored === true ? true : undefined,
+    sponsoredBoostId:  p.sponsored === true && typeof p.boostId === 'string' ? p.boostId : undefined,
     productTags:       (p.taggedProducts ?? []).map((t: any) => ({
       productId:   t.productId,
       productName: t.name ?? '',
@@ -913,6 +970,8 @@ export interface ThreadFeedCursor {
   followedDone: boolean;
   generalDone: boolean;
   seenPostIds: string[];
+  /** Organic posts served so far in this For You session — drives the Sponsored frequency cap. */
+  organicServed?: number;
 }
 export type ThreadFeedMode = 'following' | 'for-you' | 'mixed';
 
@@ -1030,8 +1089,12 @@ export async function isCloseFriendOf(userId: string): Promise<boolean> {
   } catch { return false; }
 }
 
-/** Load close-friends IDs for the current user (buyer-close-friends screen). */
-export async function getCloseFriendIds(): Promise<string[]> {
+/** True when this session can talk to the server for social data (signed in, not the dev preview). */
+export function canSyncSocialServer(): boolean {
+  return _socialUserId !== 'anon' && !isBuyerDevPreview() && !isSellerDevPreview();
+}
+
+async function readLocalCloseFriends(): Promise<string[]> {
   try {
     const raw = await AsyncStorage.getItem(K().closeFriends);
     if (!raw) return [];
@@ -1040,9 +1103,53 @@ export async function getCloseFriendIds(): Promise<string[]> {
   } catch { return []; }
 }
 
-/** Persist close-friends IDs for the current user (buyer-close-friends screen). */
+/**
+ * Load close-friends IDs for the current user (buyer-close-friends screen).
+ * The server list is the source of truth (it decides who can open Close
+ * Friends stories) and is cached locally. The first time an account loads it
+ * with an empty server list but a non-empty local one (the list used to be
+ * local-only), the local list is uploaded once; after that the server wins.
+ */
+export async function getCloseFriendIds(): Promise<string[]> {
+  const local = await readLocalCloseFriends();
+  if (!canSyncSocialServer()) return local;
+  const keys = K();
+  const syncedKey = `${keys.closeFriends}:server`;
+  try {
+    const remote = await serviceRequest<{ userIds: string[] }>('/api/social/close-friends', {}, false);
+    let ids = Array.isArray(remote?.userIds) ? remote.userIds : [];
+    let alreadyMigrated = false;
+    try { alreadyMigrated = (await AsyncStorage.getItem(syncedKey)) === '1'; } catch { /* treat as not migrated */ }
+    if (!alreadyMigrated) {
+      if (ids.length === 0 && local.length > 0) {
+        const up = await serviceRequest<{ userIds: string[] }>('/api/social/close-friends', {
+          method: 'PUT', body: JSON.stringify({ userIds: local }),
+        }, false);
+        ids = Array.isArray(up?.userIds) ? up.userIds : [];
+      }
+      try { await AsyncStorage.setItem(syncedKey, '1'); } catch { /* best effort */ }
+    }
+    await AsyncStorage.setItem(keys.closeFriends, JSON.stringify(ids));
+    return ids;
+  } catch { return local; }
+}
+
+/**
+ * Persist close-friends IDs: local cache first, then the server, which drops
+ * anyone who is not in my follow graph or is blocked. Throws when the server
+ * rejects the save so callers can tell the user (the local copy is kept).
+ */
 export async function saveCloseFriendIds(ids: string[]): Promise<void> {
-  await AsyncStorage.setItem(K().closeFriends, JSON.stringify(ids));
+  const keys = K();
+  await AsyncStorage.setItem(keys.closeFriends, JSON.stringify(ids));
+  if (!canSyncSocialServer()) return;
+  const saved = await serviceRequest<{ userIds: string[] }>('/api/social/close-friends', {
+    method: 'PUT', body: JSON.stringify({ userIds: ids }),
+  }, false);
+  if (Array.isArray(saved?.userIds)) {
+    await AsyncStorage.setItem(keys.closeFriends, JSON.stringify(saved.userIds));
+  }
+  try { await AsyncStorage.setItem(`${keys.closeFriends}:server`, '1'); } catch { /* best effort */ }
 }
 export async function sendFriendRequest(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<{ success: boolean; message: string; request?: FriendRequest }> {
   const k = K();
@@ -1531,6 +1638,11 @@ export async function isBlocked(userId: string): Promise<boolean> {
  */
 export async function blockUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
   await serviceRequest('/api/social/block', { method: 'POST', body: JSON.stringify({ userId: params.userId }) });
+  // The server now hides this person everywhere; drop what this device already
+  // holds (warm-start feed pages, cached query results) so nothing of theirs
+  // paints again before the next refetch.
+  await purgeAuthorFromFeedPostsCache(params.userId).catch(() => {});
+  queryClient.invalidateQueries().catch(() => {});
   const k = K();
   const blocks = await getBlockedUsers(k);
   if (blocks.some(b => b.blockedUserId === params.userId)) { notify(); return; }
@@ -1844,9 +1956,28 @@ export async function getThreadPostsPage(
     } : row;
   });
 
+  // Sponsored placement (For You only): the server plans where labelled,
+  // admin-approved promotions go under a frequency cap. Optional — any failure
+  // leaves the organic page untouched.
+  let pageRows: any[] = rowsWithRepostContext;
+  const organicBefore = next.organicServed ?? 0;
+  if (mode === 'for-you' && rowsWithRepostContext.length > 0) {
+    const slots = await fetchSponsoredSlots(organicBefore, rowsWithRepostContext.length);
+    if (slots.length > 0) {
+      const byIndex = new Map<number, any[]>();
+      for (const slot of slots) {
+        if (seen.has(slot.post.id)) continue;
+        seen.add(slot.post.id);
+        byIndex.set(slot.afterIndex, [...(byIndex.get(slot.afterIndex) ?? []), slot.post]);
+      }
+      pageRows = rowsWithRepostContext.flatMap((row, i) => [row, ...(byIndex.get(i) ?? [])]);
+    }
+  }
+  next.organicServed = organicBefore + rowsWithRepostContext.length;
+
   next.seenPostIds = [...seen];
   return {
-    posts: rowsWithRepostContext.map((post, index) => mapApiPostToSellerThreadPost(post, index)),
+    posts: pageRows.map((post, index) => mapApiPostToSellerThreadPost(post, index)),
     cursor: next,
     hasMore: !next.followedDone || !next.generalDone,
   };

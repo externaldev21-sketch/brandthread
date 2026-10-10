@@ -19,7 +19,7 @@ export default function MobileAppBuilderScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Mobile App Builder" subtitle="Your brand, as a native app" />
+      <ScreenHeader title="Mobile App Builder" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}

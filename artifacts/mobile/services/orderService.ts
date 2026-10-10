@@ -339,6 +339,7 @@ export async function getParcelSuggestion(orderId: string): Promise<ParcelSugges
 }
 
 export async function getShippingRates(orderId: string, parcel: {
+  itemIds?: string[];
   fromAddress: OrderAddress;
   weight: string;
   length: string;
@@ -356,10 +357,11 @@ export async function purchaseShippingLabel(
   orderId: string,
   rate: ShippingRate,
   idempotencyKey: string,
+  itemIds?: string[],
 ): Promise<ShippingLabel> {
   const result = await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/purchase`, {
     method: 'POST',
-    body: JSON.stringify({ rateId: rate.id, priceCents: rate.priceCents, idempotencyKey }),
+    body: JSON.stringify({ rateId: rate.id, priceCents: rate.priceCents, idempotencyKey, ...(itemIds?.length ? { itemIds } : {}) }),
   }) as { label: any; fundingSource: 'pending_order_funds'; purchasePending?: boolean };
   if (result.purchasePending) {
     throw Object.assign(new Error('The carrier is still processing this label. Try again shortly.'), {

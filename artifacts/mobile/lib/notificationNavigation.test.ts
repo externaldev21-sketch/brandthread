@@ -76,6 +76,20 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/buyer-drop-detail?id=drop-abc');
   });
 
+  it('routes a live-started notification to the live viewer', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('live-1', { targetType: 'live', targetId: 'stream-abc' }));
+    expect(router.push).toHaveBeenCalledWith('/buyer-live?streamId=stream-abc');
+  });
+
+  it('routes a cart reminder to the cart', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('cart-1', { targetType: 'cart', type: 'cart_reminder' }));
+    expect(router.push).toHaveBeenCalledWith('/(buyer)/cart');
+  });
+
   it('routes a buyer-facing product alert (price drop / back in stock) to the buyer product screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);
@@ -148,6 +162,13 @@ describe('notification response navigation', () => {
     const handler = createNotificationResponseHandler(router);
     handler(targetResponse('payout-1', { targetType: 'payout', targetId: 'po_123' }));
     expect(router.push).toHaveBeenCalledWith('/payouts');
+  });
+
+  it('routes a dispute notification to the dispute detail screen', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('dispute-1', { targetType: 'dispute', targetId: 'd-1' }));
+    expect(router.push).toHaveBeenCalledWith('/dispute-detail?disputeId=d-1');
   });
 
   it('opens a community message push in the community chat, never a DM', () => {

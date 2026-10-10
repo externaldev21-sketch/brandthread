@@ -188,15 +188,18 @@ safe they are to gate hard immediately:
 
 - **Hard tier** (blocks CI on any *new* instance): console errors, dead
   controls, placeholder/stub copy, broken images, repeated/garbage labels,
-  visible preview/demo wording (see below), and error-boundary fallback
-  screens. These are unambiguous bugs — no legitimate design reason for any
-  of them — and a `docs/audit/half-done-baseline.json`
-  ratchet is used just for this tier: `--ci` fails only on a hard finding
-  that isn't already in the baseline. Existing hard findings are tracked (see
-  the report) but don't block; *new* ones do.
+  visible preview/demo wording (see below), error-boundary fallback screens,
+  and (added for the text-fit audit, see "Text-fit & alignment" below)
+  `truncated-label` and `container-overflow`. These are unambiguous bugs —
+  no legitimate design reason for any of them — and a
+  `docs/audit/half-done-baseline.json` ratchet is used just for this tier:
+  `--ci` fails only on a hard finding that isn't already in the baseline.
+  Existing hard findings are tracked (see the report) but don't block; *new*
+  ones do.
 - **Warn tier** (reported, never blocks): color-rule, font-family,
   type-scale, min-size, contrast, hit-target, clipped/overlapping text, and
-  button-system-consistency findings. These are pervasive (hundreds of
+  (added for the text-fit audit) `insufficient-padding` and
+  `button-row-inconsistent` findings. These are pervasive (hundreds of
   instances across 275 routes) and genuinely require per-screen design
   fixes — gating on them today would block every PR indefinitely. The CI job
   prints the warn-tier count and uploads the full report/screenshots as a
@@ -300,6 +303,64 @@ node -e "
 
 (`findingKey()` in the audit script is the source of truth for the key
 format — keep this in sync with it.)
+
+## Text-fit & alignment (added for the first-run-tips PR text-fit audit)
+
+Dev's screenshot review found "choppy" boxes/text — labels cut off with an
+ellipsis, text touching its container edge, button rows that don't line up —
+and made passing a text-fit & alignment audit at 393×852 a hard requirement
+for every UI PR going forward, applied retroactively to already-open ones.
+Four new automated checks in `half-done-audit.mjs` cover this permanently
+instead of relying on a one-time manual pass:
+
+- **`truncated-label` (hard tier)**: an ellipsis-truncated text node
+  (`text-overflow: ellipsis` + `scrollWidth > clientWidth`, or a
+  `-webkit-line-clamp: 1` node whose `scrollHeight > clientHeight`) that also
+  looks like small UI chrome rather than prose — either it (or an ancestor
+  within a few hops) has `role="button"`/`"tab"`/`"link"`, or the text itself
+  is short (≤24 chars) and doesn't end in sentence punctuation (`.`/`!`/`?`).
+  This is deliberately narrower than the pre-existing `clipped-text` check:
+  an ellipsis-truncated *paragraph* (a long caption/body that Dev's rule
+  explicitly allows to truncate) still only produces the warn-tier
+  `clipped-text` finding, not this one.
+  **Hard tier**: "Processi…"/"Fulfillm…" shipping to a real user is an
+  unambiguous bug with no legitimate design reason, exactly like the
+  pre-existing hard-tier checks (dead controls, placeholder copy) — it isn't
+  a matter of pre-existing app-wide debt the way color/contrast/type-scale
+  are, so it doesn't get the same "track but don't block" treatment.
+- **`container-overflow` (hard tier)**: a text node's own rendered box
+  extends past the border box of its nearest button/chip/card-style ancestor
+  (the first ancestor with a visible fill or a border) — i.e. the text is
+  literally clipped by or spilling out of its container, not just tightly
+  padded. **Hard tier**, same reasoning as `truncated-label`: once measured,
+  there's no legitimate reading of "text overflows its box" as intentional
+  design.
+- **`insufficient-padding` (warn tier)**: a text node sits inside its
+  container (no `container-overflow`) but its measured horizontal clearance
+  to the container's edge is under the stated minimum — 12px for a
+  button/chip-sized container (height ≤56px), 16px for a larger card-style
+  one. **Warn tier**: unlike outright overflow, "how much padding is enough"
+  is a design heuristic (this check guesses "button vs. card" from height
+  alone), the same kind of degree-based judgment call as the existing
+  contrast/hit-target/type-scale warn-tier checks — appropriate to track and
+  ratchet down, not to zero-tolerance gate on day one across ~275 routes of
+  pre-existing screens this specific PR never touched.
+- **`button-row-inconsistent` (warn tier)**: clusters clickable, button-sized
+  elements (height ≤72px) into rows by vertical band, and flags a row of 2+
+  where heights differ by more than 6px or widths differ by more than 25% of
+  the row's average width — Dev's "equal height AND equal width, no ragged
+  2-wide-+-2-different-width layout" rule. **Warn tier**: this is a
+  clustering heuristic (like the pre-existing button/type-scale
+  outlier-from-the-mode checks noted in "Known limitations" below), not a
+  hard per-element binary — it can misjudge which controls belong in the
+  same intentional "row" and will miss a consistently-wrong variant that
+  never appears next to a correct one, so it's tracked/ratcheted rather than
+  gated immediately.
+
+Both new hard-tier checks (`truncated-label`, `container-overflow`) are
+subject to the same zero-tolerance `audit:gate` rule as the other hard-tier
+checks (see "Zero-tolerance CI gate" below); the two new warn-tier checks
+count toward the warn-tier ratchet.
 
 ## Preview/demo wording (hard tier)
 

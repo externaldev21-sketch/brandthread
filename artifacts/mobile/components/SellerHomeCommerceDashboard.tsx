@@ -12,11 +12,12 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useApi } from '@/hooks/useApi';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ApiError } from '@/lib/networkNotice';
 import { useTeamRole } from '@/hooks/useTeamRole';
@@ -31,17 +32,19 @@ import {
   markWalkthroughShown, markCelebrated,
   type SetupState, type SetupTask,
 } from '@/lib/setupStore';
-import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import { withOrigin } from '@/lib/navigation/flowOrigin';
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
 import { middleTruncate } from '@/lib/middleTruncate';
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
 import SetupContinueBanner from '@/components/SetupContinueBanner';
 import SetupCelebration from '@/components/SetupCelebration';
+import LaunchChecklistCard from '@/components/LaunchChecklistCard';
 import { ResponsiveContainer, SkeletonBlock, useBreakpoint } from '@/components/layout';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { bucketLabel, type SellerHomeTimeRange } from '@/lib/sellerHomeChartLabels';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { allPreviewSellerOrders } from '@/lib/previewSellerOrders';
 import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
@@ -118,6 +121,8 @@ interface PersistedCashoutAttempt {
   currency: string;
 }
 
+const PREVIEW_ANALYTICS_USER = 'preview-seller';
+
 function cashoutAttemptStorageKey(userId: string): string {
   return `bt:seller-cashout-attempt:${userId}`;
 }
@@ -173,7 +178,7 @@ function formatMetricValue(metric: MetricKey, value: number): string {
 
 function compactDelta(current: number, previous: number): { direction: 'up' | 'down' | 'flat'; label: string } {
   const change = computeMetricChange(current, previous);
-  if (change.direction === 'flat') return { direction: 'flat', label: '—' };
+  if (change.direction === 'flat') return { direction: 'flat', label: '' };
   if (change.percent == null) return { direction: change.direction, label: 'New' };
   const sign = change.percent > 0 ? '+' : '';
   return { direction: change.direction, label: `${sign}${change.percent}%` };
@@ -191,14 +196,20 @@ export default function SellerHomeCommerceDashboard({
   onSetupStateChange: (next: SetupState) => void;
 }) {
   const router = useRouter();
+  const { isSignedIn } = useAuth();
   const api = useApi();
   const { theme } = useAppTheme();
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
-  const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
+  const sellerPreview = isSellerDevPreview();
+  const analyticsUserId = sellerPreview ? userId ?? PREVIEW_ANALYTICS_USER : userId;
+  // Scroll content must end ABOVE the floating bar — tab bar height + bottom
+  // safe inset + 16 (shared helper, same rule app-wide).
+  const tabBarClearance = useTabBarClearance(2); // seller bar: Studio + AI side circles
   const scrollResetRef = useScrollReset<ScrollView>();
 
-  const [range, setRange] = useState<SellerDashboardRange>('week');
+  // Opens on Today every launch (Dev) — nothing persisted across launches.
+  const [range, setRange] = useState<SellerDashboardRange>('today');
   const [metric, setMetric] = useState<MetricKey>('sales');
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
@@ -218,7 +229,6 @@ export default function SellerHomeCommerceDashboard({
   const balanceGenerationRef = useRef(0);
   const threadCash = useSellerThreadCashBalance();
   const payoutAttemptKeyRef = useRef<string | null>(null);
-
   const [topProducts, setTopProducts] = useState<TopProductSummary[] | null>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrderSummary[] | null>(null);
   const [everSoldCount, setEverSoldCount] = useState<number | null>(null);
@@ -265,7 +275,7 @@ export default function SellerHomeCommerceDashboard({
     setStoreContextTick((t) => t + 1);
   }), []);
 
-  const data = selectSellerHomeAnalytics(snapshot, userId, range);
+  const data = selectSellerHomeAnalytics(snapshot, analyticsUserId, range);
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
@@ -305,31 +315,25 @@ export default function SellerHomeCommerceDashboard({
 
   // ── Range-scoped analytics (hero + chart + stat grid) ────────────────────
   useEffect(() => {
-    if (!userId) {
+    if (sellerPreview) {
+      // Signed-out web previews use the same range-aware chart contract as
+      // the live dashboard, without querying a seller account.
+      const next = buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh');
+      setAnalyticsError(false);
+      setSnapshot({
+        key: sellerHomeAnalyticsKey(analyticsUserId ?? 'demo-seller', range),
+        data: next,
+      });
+      setLoading(false);
+      return;
+    }
+    if (!analyticsUserId) {
       setLoading(false);
       return;
     }
     let active = true;
-    const requestKey = sellerHomeAnalyticsKey(userId, range);
+    const requestKey = sellerHomeAnalyticsKey(analyticsUserId, range);
     setLoading(true);
-
-    // The dev web seller preview (?bt_preview=seller) has no real backend to
-    // call — previously this fell through to api.analytics.home() against an
-    // unreachable/placeholder host, which is exactly what produced the
-    // reported bug (every range showing the same stale bucket data, "Year"
-    // relabeling the current month 8x instead of 12 distinct trailing
-    // months). Generate deterministic local chart data instead: a flat $0
-    // baseline in fresh mode (a brand-new seller, never fake activity), or a
-    // realistic, range-varying curve in demo mode (isPreviewDemoMode() —
-    // explicit ?demo=1 opt-in). See lib/previewSellerChartData.ts and
-    // lib/devPreview.ts.
-    if (isSellerDevPreview()) {
-      const next = buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh');
-      setAnalyticsError(false);
-      setSnapshot({ key: requestKey, data: next });
-      setLoading(false);
-      return () => { active = false; };
-    }
 
     api.analytics.home(range as SellerHomeTimeRange)
       .then((next) => {
@@ -347,11 +351,31 @@ export default function SellerHomeCommerceDashboard({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [api, range, userId, retryTick, storeContextTick]);
+  }, [analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]);
 
   // ── Range-independent data (orders, inventory, hub, products) — fetched
   // once per seller/refresh, not re-fetched on every chart range switch. ────
   const loadSecondaryData = useCallback(async () => {
+    if (sellerPreview) {
+      // Dev preview: derive everything locally from the same demo order set the
+      // Orders tab lists (lib/previewSellerOrders.ts) - never call the API.
+      const previewOrders = isPreviewDemoMode() ? allPreviewSellerOrders() : [];
+      const byProduct = new Map<string, TopProductSummary>();
+      for (const order of previewOrders) {
+        for (const item of order.items) {
+          const row = byProduct.get(item.productId) ?? { productId: item.productId, name: item.productName, imageUrl: null, unitsSold: 0, revenueCents: 0 };
+          row.unitsSold += item.quantity;
+          row.revenueCents += item.priceCents * item.quantity;
+          byProduct.set(item.productId, row);
+        }
+      }
+      setSecondaryError(false);
+      setEverSoldCount(previewOrders.length);
+      setRecentOrders(previewOrders.slice(0, 5).map(normalizeRecentOrder));
+      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: filterOrders(previewOrders.map(apiRowToOrder), 'unfulfilled').length });
+      setTopProducts(mergeTopProductImages([...byProduct.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 5), []));
+      return;
+    }
     if (!userId) {
       setTopProducts([]);
       setRecentOrders([]);
@@ -409,12 +433,24 @@ export default function SellerHomeCommerceDashboard({
       if (__DEV__) console.warn('[seller-dashboard] secondary data unavailable', error);
       setSecondaryError(true);
     }
-  }, [api, userId]);
+  }, [api, sellerPreview, userId]);
 
   useEffect(() => { void loadSecondaryData(); }, [loadSecondaryData, retryTick, storeContextTick]);
 
   const loadFinanceBalance = useCallback(async () => {
     const generation = ++balanceGenerationRef.current;
+    if (sellerPreview) {
+      setFinanceBalance({
+        available: { amount: 428122, currency: 'usd', formatted: '$4,281.22' },
+        pending: { amount: 184250, currency: 'usd', formatted: '$1,842.50' },
+        connected: true,
+        payoutsEnabled: true,
+        bankConnected: true,
+        processingCashout: null,
+      });
+      setFinanceLoading(false);
+      return;
+    }
     if (!userId || isLoadingRole || currentRole !== 'owner') {
       setFinanceBalance(null);
       setFinanceLoading(isLoadingRole);
@@ -430,7 +466,7 @@ export default function SellerHomeCommerceDashboard({
     } finally {
       if (balanceGenerationRef.current === generation) setFinanceLoading(false);
     }
-  }, [api, currentRole, isLoadingRole, userId]);
+  }, [api, currentRole, isLoadingRole, sellerPreview, userId]);
 
   useEffect(() => { void loadFinanceBalance(); }, [loadFinanceBalance]);
 
@@ -486,6 +522,7 @@ export default function SellerHomeCommerceDashboard({
   }, [loadSecondaryData]);
 
   const requestCashOut = useCallback(() => {
+    if (!isSignedIn) return;
     if (currentRole !== 'owner') {
       Alert.alert('Owner access required', 'Only the store owner can cash out earnings.');
       return;
@@ -600,14 +637,16 @@ export default function SellerHomeCommerceDashboard({
         },
       ],
     );
-  }, [api, currentRole, financeBalance, loadFinanceBalance, nav, userId]);
+  }, [api, currentRole, financeBalance, isSignedIn, loadFinanceBalance, nav, userId]);
 
   const openTask = useCallback((task: SetupTask) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    // replace (not push): a setup task destination returns to the dashboard
-    // itself (see SELLER_HOME_ROUTE in each destination screen), so pushing
-    // would leave a dead, unreachable dashboard scene underneath it.
-    router.replace(withSellerSetupOrigin(task.route) as never);
+    // push (never replace) straight into the task's flow with an explicit
+    // `from=dashboard`: the destination's Cancel/Back pops to this exact
+    // dashboard scene (docs/NAVIGATION.md). replace() used to drop the
+    // dashboard from the stack, so the exit had to re-route to a tabs index
+    // and could land the seller on the wrong tab or the Studio menu.
+    router.push(withOrigin(task.route, 'dashboard') as never);
   }, [router]);
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
@@ -697,7 +736,7 @@ export default function SellerHomeCommerceDashboard({
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
         style={styles.scrollView}
-        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: tabBarMetrics.occupiedHeight + SP.md }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />
@@ -724,13 +763,13 @@ export default function SellerHomeCommerceDashboard({
                 </TouchableOpacity>
               )}
             </View>
-            <ActivityBellButton
+            {(!sellerPreview || isSignedIn) && <ActivityBellButton
               testID="seller-dashboard-activity"
               color={theme.text ?? FG}
               size={22}
               style={styles.topBarAction}
               badgeBorderColor={theme.background ?? BG}
-            />
+            />}
           </View>
 
           {!data && analyticsError ? (
@@ -765,9 +804,10 @@ export default function SellerHomeCommerceDashboard({
                 </Text>
                 {isEmptyChart && scrubIndex === null ? (
                   // Never a fabricated "+31.1%"-style comparison for a
-                  // brand-new/zero-sales account — matches Shopify's own
-                  // zero-state chart ("$0.00 —", no percent).
-                  <Text style={[styles.heroDelta, { color: theme.muted }]}>{EMPTY_CHART_MESSAGE[range]}</Text>
+                  // brand-new/zero-sales account. The range-aware empty
+                  // message is shown once, in the chart itself; this blank
+                  // line only holds the hero's height so nothing jumps.
+                  <Text style={[styles.heroDelta, { color: theme.muted }]}>{' '}</Text>
                 ) : deltaLine && scrubIndex === null && heroSettled ? (
                   <Text
                     style={[
@@ -857,8 +897,8 @@ export default function SellerHomeCommerceDashboard({
                     <SellerDashboardSetupCard
                       theme={theme}
                       hasSetupChecklist={Boolean(addProductTask)}
-                      onAddProduct={() => nav(withSellerSetupOrigin('/add-product'))}
-                      onOpenSetup={() => (addProductTask ? openTask(addProductTask) : nav(withSellerSetupOrigin('/add-product')))}
+                      onAddProduct={() => nav(withOrigin('/add-product', 'dashboard'))}
+                      onOpenSetup={() => (addProductTask ? openTask(addProductTask) : nav(withOrigin('/add-product', 'dashboard')))}
                     />
                   </View>
                 ) : actionCounts ? (
@@ -936,6 +976,8 @@ export default function SellerHomeCommerceDashboard({
               />
             </View>
           )}
+
+          <LaunchChecklistCard />
         </ResponsiveContainer>
         <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
       </ScrollView>

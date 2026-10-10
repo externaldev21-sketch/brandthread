@@ -6,7 +6,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Linking } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -14,11 +14,13 @@ import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { useApi } from '@/lib/api';
+import { useApi, type SellerQuickReply } from '@/lib/api';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
+import MediaViewer from '@/components/chat/MediaViewer';
+import VideoMessageViewer from '@/components/chat/VideoMessageViewer';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { hapticPrimaryAction, hapticSelection, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -38,6 +40,7 @@ import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
+import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
@@ -67,6 +70,7 @@ import {
 } from '@/lib/chatGrouping';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
+import { TypingBubble } from '@/components/chat/TypingBubble';
 import { ChatAttachmentCard } from '@/components/chat/ChatAttachmentCard';
 import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuItem } from '@/components/chat/ReactionOverlay';
 import { ReactionGlyph } from '@/components/chat/ReactionBar';
@@ -77,6 +81,7 @@ import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } fro
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { Snackbar } from '@/components/ui/Snackbar';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
+import { radius } from '@/constants/radii';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,6 +126,9 @@ interface Msg {
    *  message. Same field the API returns on app/buyer-conversation.tsx's
    *  Message type; see lib/chatGrouping.ts. */
   readAt?: string;
+  deliveredAt?: string;
+  /** True for the seller's own away auto-reply (server-marked). */
+  automated?: boolean;
   /** Swipe-to-reply — same shape as app/buyer-conversation.tsx's Message,
    *  resolved server-side (see api-server's adaptMessage/loadReplyPreviews)
    *  so both sides of a thread render the identical quoted context. */
@@ -266,6 +274,8 @@ export default function SellerConversationScreen() {
   const [isSending, setIsSending] = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
+  const [viewerUri, setViewerUri]               = useState<string | null>(null);
+  const [viewerVideoUri, setViewerVideoUri]     = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
@@ -461,6 +471,34 @@ export default function SellerConversationScreen() {
   function handleChangeText(next: string) {
     setText(next);
     sendTypingSignal(next.trim().length > 0);
+  }
+
+  // ── Quick replies (canned replies) ─────────────────────────────────────────
+  // Opened from the attach sheet's "Quick replies" row; picking one inserts
+  // its text into the existing composer input (never sends on its own).
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [quickReplies, setQuickReplies] = useState<SellerQuickReply[]>([]);
+  const [loadingQuickReplies, setLoadingQuickReplies] = useState(false);
+
+  async function openQuickReplies() {
+    setShowAttachPicker(false);
+    setShowQuickReplies(true);
+    if (isSellerDevPreview()) return; // preview: no protected API calls
+    setLoadingQuickReplies(true);
+    try {
+      const res = await api.seller.quickReplies.list();
+      setQuickReplies(res.quickReplies);
+    } catch {
+      setQuickReplies([]);
+    } finally {
+      setLoadingQuickReplies(false);
+    }
+  }
+
+  function insertQuickReply(reply: SellerQuickReply) {
+    hapticSelection();
+    handleChangeText(text.trim() ? `${text.trimEnd()} ${reply.body}` : reply.body);
+    setShowQuickReplies(false);
   }
 
   useEffect(() => {
@@ -891,23 +929,28 @@ export default function SellerConversationScreen() {
       return (
         <View style={s.photoGrid}>
           {uris.slice(0, 4).map((uri, idx) => (
-            <View key={idx} style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}>
+            <PressableScale rippleEnabled={false} key={idx} style={[s.photoCell, uris.length === 1 && s.photoCellSingle]} activeOpacity={0.9} onPress={() => setViewerUri(uri)}>
               <CachedImage source={{ uri }} style={s.photoImg} recyclingKey={uri} />
               {idx === 3 && uris.length > 4 && (
                 <View style={s.photoMore}><Text style={s.photoMoreText}>+{uris.length - 4}</Text></View>
               )}
-            </View>
+            </PressableScale>
           ))}
         </View>
       );
     }
     if (att.type === 'video') {
       return (
-        <View style={s.videoThumb}>
+        <PressableScale rippleEnabled={false}
+          style={s.videoThumb}
+          activeOpacity={0.9}
+          accessibilityLabel="Play video"
+          onPress={() => { if (att.uri && !att.meta?.uploading) setViewerVideoUri(att.uri); }}
+        >
           {att.uri ? <CachedImage source={{ uri: att.uri }} style={s.videoThumbImg} recyclingKey={att.uri} /> : null}
           <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
           {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
-        </View>
+        </PressableScale>
       );
     }
     if (att.type === 'voice') {
@@ -929,6 +972,7 @@ export default function SellerConversationScreen() {
           onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
           onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
           onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+          hasTranscription={ALLOW_DEV_TOOLS}
           onViewTranscription={() => {
             setTranscriptionToast(true);
             setTimeout(() => setTranscriptionToast(false), 2600);
@@ -1374,6 +1418,9 @@ export default function SellerConversationScreen() {
             // standalone product/order branch. See buyer-conversation.tsx.
             accessibilityRole={
               msg.attachment?.type === 'voice'
+              || msg.attachment?.type === 'image'
+              || msg.attachment?.type === 'video'
+              || msg.attachment?.type === 'post'
                 ? 'none' : undefined
             }
           >
@@ -1458,6 +1505,14 @@ export default function SellerConversationScreen() {
           {isOwn && msg.id === lastOwnMsgId && !!msg.readAt && (
             <Text style={s.seenReceipt}>
               Seen {formatTime(new Date(msg.readAt).getTime())}
+            </Text>
+          )}
+          {isOwn && msg.id === lastOwnMsgId && !msg.readAt && !!msg.deliveredAt && (
+            <Text style={s.seenReceipt} testID="seller-conversation-delivered">Delivered</Text>
+          )}
+          {!!msg.automated && (
+            <Text style={[s.seenReceipt, { alignSelf: isOwn ? 'flex-end' : 'flex-start' }]} testID="seller-conversation-automated-label">
+              Automated reply
             </Text>
           )}
         </View>
@@ -1721,6 +1776,7 @@ export default function SellerConversationScreen() {
               : item.msg.id
           )}
           renderItem={renderItem}
+          ListFooterComponent={conv?.otherTyping ? <TypingBubble testID="seller-conversation-typing-bubble" /> : null}
           contentContainerStyle={s.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -2001,11 +2057,81 @@ export default function SellerConversationScreen() {
             </PressableScale>
           ) : null}
 
+          <PressableScale style={s.sheetOption} onPress={openQuickReplies} testID="seller-conversation-quick-replies-row">
+            <View style={s.sheetOptionIcon}>
+              <Feather name="message-square" size={ICON.md} color={PURPLE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sheetOptionLabel}>Quick replies</Text>
+              <Text style={s.sheetOptionDesc}>Insert a saved reply</Text>
+            </View>
+            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+          </PressableScale>
+
           <PressableScale
             style={[s.sheetOption, { marginTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }]}
             onPress={() => setShowAttachPicker(false)}
           >
             <Text style={[s.sheetOptionLabel, { color: MUTED, textAlign: 'center', flex: 1 }]}>Cancel</Text>
+          </PressableScale>
+        </SheetRise>
+      </Modal>
+
+      {/* ── Quick replies picker ────────────────────────────────────────────── */}
+      <Modal
+        visible={showQuickReplies}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowQuickReplies(false)}
+      >
+        <PressableScale
+          style={s.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowQuickReplies(false)}
+        />
+        <SheetRise style={[s.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={s.sheetHandle} />
+          <View style={s.productSheetHeader}>
+            <Text style={s.sheetTitle}>Quick replies</Text>
+            <PressableScale onPress={() => setShowQuickReplies(false)} accessibilityLabel="Close">
+              <Feather name="x" size={ICON.md} color={MUTED} />
+            </PressableScale>
+          </View>
+
+          {loadingQuickReplies ? (
+            <View style={s.centerFill}><ActivityIndicator color={PURPLE} /></View>
+          ) : quickReplies.length === 0 ? (
+            <View style={s.emptyState}>
+              <Feather name="message-square" size={32} color={MUTED} />
+              <Text style={s.emptyText}>No quick replies yet</Text>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {quickReplies.map((reply) => (
+                <PressableScale
+                  key={reply.id}
+                  style={s.productRow}
+                  onPress={() => insertQuickReply(reply)}
+                  activeOpacity={0.7}
+                  testID={`seller-conversation-quick-reply-${reply.id}`}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.productName}>
+                      {reply.title}{reply.shortcut ? `  ${reply.shortcut}` : ''}
+                    </Text>
+                    <Text style={s.productPrice}>{reply.body}</Text>
+                  </View>
+                </PressableScale>
+              ))}
+            </ScrollView>
+          )}
+
+          <PressableScale
+            style={[s.sheetOption, { marginTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }]}
+            onPress={() => { setShowQuickReplies(false); router.push('/quick-replies' as never); }}
+            testID="seller-conversation-quick-replies-manage"
+          >
+            <Text style={[s.sheetOptionLabel, { textAlign: 'center', flex: 1 }]}>Manage quick replies</Text>
           </PressableScale>
         </SheetRise>
       </Modal>
@@ -2026,7 +2152,7 @@ export default function SellerConversationScreen() {
           <View style={s.sheetHandle} />
           <View style={s.productSheetHeader}>
             <Text style={s.sheetTitle}>Choose a product</Text>
-            <PressableScale onPress={() => setShowProductPicker(false)}>
+            <PressableScale accessibilityLabel="Close" onPress={() => setShowProductPicker(false)}>
               <Feather name="x" size={ICON.md} color={MUTED} />
             </PressableScale>
           </View>
@@ -2239,6 +2365,8 @@ export default function SellerConversationScreen() {
         }}
         onDismiss={() => setThreadCashNotice(null)}
       />
+      <MediaViewer visible={viewerUri != null} uri={viewerUri} onClose={() => setViewerUri(null)} />
+      <VideoMessageViewer uri={viewerVideoUri} onClose={() => setViewerVideoUri(null)} />
     </KeyboardAvoidingView>
   );
 }
@@ -2321,7 +2449,7 @@ const requestPanelStyles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     height: 44,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2397,7 +2525,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   requestProfileName: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   requestProfileHandle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.sm },
   requestProfilePill: {
-    height: 34, paddingHorizontal: SP.md, borderRadius: RADIUS.pill,
+    height: 34, paddingHorizontal: SP.md, borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
@@ -2475,7 +2603,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   reactionChip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: 1,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1,
   },
   reactionCount: { fontSize: 11, fontFamily: FONT.semibold },
   // Seen receipt (Instagram DM "Seen just now" reference) — small muted
@@ -2609,7 +2737,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   buyerContextOrderTotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginLeft: SP.xs },
   buyerContextRetry: {
     marginTop: SP.sm, paddingVertical: SP.xs, paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER,
+    borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER,
   },
   buyerContextRetryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE },
   buyerContextCartNote: {

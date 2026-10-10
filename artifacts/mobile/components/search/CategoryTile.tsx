@@ -27,7 +27,7 @@ export function CategoryTile({ item, width, onPress }: {
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"
-      accessibilityLabel={`Search ${item.category}, ${item.productCount} items`}
+      accessibilityLabel={`Shop ${item.category}, ${item.productCount} items`}
     >
       <Animated.View style={[styles.card, { width, height, transform: [{ scale }] }]}>
         {item.imageUri ? (

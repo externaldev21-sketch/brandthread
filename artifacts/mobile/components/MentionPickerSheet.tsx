@@ -22,6 +22,7 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useApi } from '@/lib/api';
 import { withAt } from '@/lib/storyMentionSticker';
 import type { MentionPerson } from '@/services/socialTypes';
+import { radius } from '@/constants/radii';
 
 /** Follow-first ordering, stable within each group. */
 export function sortFollowingFirst(people: MentionPerson[]): MentionPerson[] {
@@ -129,19 +130,27 @@ export function MentionPickerSheet({
 
 /** Suggestions strip for the text tool: shown while the caret is in an "@partial" token. */
 export function MentionSuggestionsBar({
-  query, active, enabled, onPick,
+  query, active, enabled, onPick, demoPeople,
 }: {
   query: string;
   active: boolean;
   enabled: boolean;
   onPick: (person: MentionPerson) => void;
+  /** Preview/demo only: local people to suggest instead of calling the API. */
+  demoPeople?: MentionPerson[];
 }) {
-  const { people, loading } = useMentionSearch(query, active, enabled);
+  const search = useMentionSearch(query, active, enabled && !demoPeople);
+  const q = query.trim().toLowerCase().replace(/^@/, '');
+  const people = demoPeople
+    ? demoPeople.filter((p) => !q || (p.username ?? p.handle ?? '').toLowerCase().includes(q) || p.name.toLowerCase().includes(q))
+    : search.people;
+  const loading = search.loading;
+  const enabledForCopy = demoPeople ? true : enabled;
   if (!active) return null;
   return (
     <View style={styles.bar} testID="mention-suggestions">
       {!people.length ? (
-        <Text style={styles.barEmpty}>{!enabled ? 'Sign in to tag people.' : loading ? 'Searching…' : 'No people found.'}</Text>
+        <Text style={styles.barEmpty}>{!enabledForCopy ? 'Sign in to tag people.' : loading ? 'Searching…' : 'No people found.'}</Text>
       ) : (
         <ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.barContent}>
           {people.map((p) => (
@@ -182,7 +191,7 @@ const styles = StyleSheet.create({
 
   bar: { minHeight: 48, justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },
   barContent: { paddingHorizontal: SP.sm, gap: SP.sm, alignItems: 'center' },
-  barItem: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 10, minHeight: 44, borderRadius: RADIUS.pill, backgroundColor: 'rgba(255,255,255,0.1)' },
+  barItem: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 10, minHeight: 44, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.1)' },
   barItemText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm, maxWidth: 120 },
   barEmpty: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, paddingHorizontal: SP.md },
 });

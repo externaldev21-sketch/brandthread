@@ -12,6 +12,8 @@
  * buyer settings screen is unaffected.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { previewSellerBrandName } from '@/lib/previewIdentity';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -55,6 +57,10 @@ export default function SellerSettingsScreen() {
   const [scopeSaveError, setScopeSaveError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isSellerDevPreview()) {
+      setIsModerator(false);
+      return;
+    }
     let active = true;
     api.moderation.me()
       .then((result) => { if (active) setIsModerator(result.isModerator); })
@@ -62,7 +68,7 @@ export default function SellerSettingsScreen() {
     return () => { active = false; };
   }, [api]);
 
-  const profileName = user?.fullName || user?.username || 'Your Brandthread store';
+  const profileName = previewSellerBrandName() ?? (user?.fullName || user?.username || 'Your Brandthread store');
   // Initials are derived from the exact same `profileName` string shown next
   // to the avatar (not a separate first/last-name pair that may be blank),
   // so the avatar and the name text can never disagree.
@@ -178,9 +184,10 @@ export default function SellerSettingsScreen() {
                 key={item.label}
                 icon={item.icon}
                 label={item.label}
+                testID={item.action === 'account-scope' ? 'account-reach' : undefined}
                 destructive={item.destructive}
                 soon={item.soon}
-                badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : undefined}
+                badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : item.route === '/ai-credits' && !planLoading && !planError && hasPlan('pro') ? 'Unlimited' : undefined}
                 last={i === group.items.length - 1}
                 onPress={() => handleItem(item)}
               />
@@ -294,6 +301,7 @@ function SettingsGroup({ title, children }: { title?: string; children: React.Re
 interface SettingsRowProps {
   icon: keyof typeof Feather.glyphMap;
   label: string;
+  testID?: string;
   onPress?: () => void;
   destructive?: boolean;
   soon?: boolean;
@@ -301,7 +309,7 @@ interface SettingsRowProps {
   last?: boolean;
 }
 
-function SettingsRow({ icon, label, onPress, destructive, soon, badge, last }: SettingsRowProps) {
+function SettingsRow({ icon, label, testID, onPress, destructive, soon, badge, last }: SettingsRowProps) {
   const colors = useColors();
   const s = useMemo(() => makeListStyles(colors), [colors]);
   const inert = !!soon;
@@ -329,7 +337,7 @@ function SettingsRow({ icon, label, onPress, destructive, soon, badge, last }: S
   if (!onPress || inert) return <View>{content}</View>;
 
   return (
-    <TouchableOpacity activeOpacity={0.65} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
+    <TouchableOpacity testID={testID} activeOpacity={0.65} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
       {content}
     </TouchableOpacity>
   );
@@ -370,37 +378,38 @@ function AccountScopeSheet({
           ) : (
             <View style={{ gap: 10 }}>
               <View style={{ gap: 10 }} accessibilityRole="radiogroup">
-              {([
-                { value: 'global' as const, label: 'Global account', description: 'Make your account available worldwide.', icon: 'globe' as const },
-                { value: 'us' as const, label: 'United States only', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
-              ]).map((option) => {
-                const selected = value === option.value;
-                const isSaving = saving === option.value;
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    activeOpacity={0.75}
-                    disabled={!!saving}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected, disabled: !!saving }}
-                    onPress={() => onChoose(option.value)}
-                    style={[s.option, { borderColor: selected ? colors.primary : colors.border }, selected && { backgroundColor: colors.secondary }]}
-                  >
-                    <View style={s.optionIcon}>
-                      <Feather name={option.icon} size={18} color={colors.foreground} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.optionTitle}>{option.label}</Text>
-                      <Text style={s.optionDescription}>{option.description}</Text>
-                    </View>
-                    {isSaving ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.mutedForeground} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+                {([
+                  { value: 'global' as const, label: 'Global account', description: 'Make your account available worldwide.', icon: 'globe' as const },
+                  { value: 'us' as const, label: 'United States only', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
+                ]).map((option) => {
+                  const selected = value === option.value;
+                  const isSaving = saving === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      testID={`account-reach-${option.value}`}
+                      activeOpacity={0.75}
+                      disabled={!!saving}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected, disabled: !!saving }}
+                      onPress={() => onChoose(option.value)}
+                      style={[s.option, { borderColor: selected ? colors.primary : colors.border }, selected && { backgroundColor: colors.secondary }]}
+                    >
+                      <View style={s.optionIcon}>
+                        <Feather name={option.icon} size={18} color={colors.foreground} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.optionTitle}>{option.label}</Text>
+                        <Text style={s.optionDescription}>{option.description}</Text>
+                      </View>
+                      {isSaving ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.mutedForeground} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
               {saveError && <Text accessibilityRole="alert" style={s.saveNotice}>{saveError}</Text>}
             </View>

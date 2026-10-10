@@ -244,7 +244,7 @@ export async function computeSellerRankingForToday(): Promise<void> {
       .from(users)
       .where(and(
         inArray(users.accountType, ["seller", "both"]),
-        isNull(users.deletedAt),
+        isNull(users.deletedAt), isNull(users.deletionRequestedAt),
         inArray(users.clerkId, [...activeProductOwnerSet]),
       ));
     const sellerMap = new Map(sellerRows.map((s) => [s.clerkId, s]));

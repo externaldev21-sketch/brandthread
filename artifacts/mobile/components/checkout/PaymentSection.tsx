@@ -29,6 +29,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { CheckoutSection, OptionRow, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 import { CardEntry } from './StripePayment';
 import { useCheckoutT, type CheckoutT } from './CheckoutLanguage';
+import { radius } from '@/constants/radii';
 
 export interface SavedCard {
   id: string;
@@ -40,6 +41,8 @@ export interface SavedCard {
 }
 
 export const NEW_CARD = 'new';
+/** Buy now, pay later (Klarna / Afterpay): shows Stripe's Payment Element on its Klarna / Afterpay tabs. */
+export const BNPL = 'bnpl';
 
 function brandLabel(brand: string) {
   if (!brand) return 'Card';
@@ -170,7 +173,7 @@ export function ExpressSection({ children, visible }: { children: React.ReactNod
 // ─── PAYMENT ─────────────────────────────────────────────────────────────────
 
 export function PaymentSection({
-  path, savedCards, selectedCard, onSelectCard, onCardComplete, sellerCount,
+  path, savedCards, selectedCard, onSelectCard, onCardComplete, sellerCount, bnplAvailable,
 }: {
   path: PaymentPath;
   savedCards: SavedCard[];
@@ -179,6 +182,8 @@ export function PaymentSection({
   onSelectCard: (id: string) => void;
   onCardComplete: (complete: boolean) => void;
   sellerCount: number;
+  /** Web, every seller opted in, amount eligible: offer Klarna / Afterpay next to saved cards. */
+  bnplAvailable?: boolean;
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
@@ -213,7 +218,8 @@ export function PaymentSection({
     );
   }
 
-  const showNewCard = savedCards.length === 0 || selectedCard === NEW_CARD;
+  const showBnplRow = !!bnplAvailable && savedCards.length > 0;
+  const showNewCard = savedCards.length === 0 || selectedCard === NEW_CARD || (showBnplRow && selectedCard === BNPL);
   return (
     <CheckoutSection title={t('Payment')} testID="checkout-payment">
       {savedCards.length > 0 ? (
@@ -232,9 +238,19 @@ export function PaymentSection({
             selected={selectedCard === NEW_CARD}
             onPress={() => onSelectCard(NEW_CARD)}
             title={t('Use a new card')}
-            last={selectedCard !== NEW_CARD}
+            last={selectedCard !== NEW_CARD && !showBnplRow}
             testID="checkout-new-card"
           />
+          {showBnplRow ? (
+            <OptionRow
+              selected={selectedCard === BNPL}
+              onPress={() => onSelectCard(BNPL)}
+              title="Klarna or Afterpay"
+              lines={['Pay over time']}
+              last={selectedCard !== BNPL}
+              testID="checkout-bnpl"
+            />
+          ) : null}
         </View>
       ) : null}
       {showNewCard ? (
@@ -275,7 +291,7 @@ const SYSTEM_FONT = Platform.select({
 // (see the module comment) and does not follow the app theme, so its styles
 // stay a plain module-level StyleSheet.
 const walletStyles = StyleSheet.create({
-  wallet: { height: 50, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: WALLET_BG },
+  wallet: { height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: WALLET_BG },
   walletMark: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   // The platform's own typeface, not Inter (see the module comment).
   walletLead: { fontFamily: SYSTEM_FONT, fontWeight: '500', fontSize: FS.base + 1, color: WALLET_FG },

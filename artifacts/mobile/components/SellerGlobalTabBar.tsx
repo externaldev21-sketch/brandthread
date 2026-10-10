@@ -43,8 +43,11 @@ import {
 } from '@/lib/orderBadgeStore';
 import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { countRealOrders, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
+import { radius } from '@/constants/radii';
+import { cancelStudioReturn } from '@/lib/navigation/studioReturn';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -72,6 +75,13 @@ const TABS: {
       'products', 'add-product', 'product-detail', 'product-editor',
       'product-store', 'product-import', 'product-size-chart',
       'product-bundles', 'product-bundle-edit', 'drafts',
+      'product-pairings',
+      'product-video',
+      'product-launches',
+      'waitlist-demand',
+      'products-bulk-edit', 'product-seo',
+      'product-variants',
+      'size-chart-templates', 'size-chart-template-edit', 'size-chart-template-apply',
     ],
     destination: '/(tabs)/products',
   },
@@ -95,6 +105,7 @@ const TABS: {
       'push-notifications', 'biometric-unlock', 'app-icon', 'app-theme', 'appearance', 'plan-details',
       'payouts', 'subscription', 'seller-data-export', 'account-switcher',
       'login-methods', 'account-type-settings', 'seller-verification',
+      'change-password', 'change-email', 'change-phone', 'backup-codes', 'disable-two-factor',
     ],
     destination: '/(tabs)/profile',
   },
@@ -118,6 +129,16 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'product-size-chart': 'products',
   'product-bundles': 'products',
   'product-bundle-edit': 'products',
+  'product-pairings': 'products',
+  'product-video': 'products',
+  'product-launches': 'products',
+  'waitlist-demand': 'products',
+  'products-bulk-edit': 'products',
+  'product-seo': 'products',
+  'product-variants': 'products',
+  'size-chart-templates': 'products',
+  'size-chart-template-edit': 'products',
+  'size-chart-template-apply': 'products',
   'drafts': 'products',
   // Orders
   'orders': 'orders',
@@ -150,6 +171,11 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'login-methods': 'profile',
   'account-type-settings': 'profile',
   'seller-verification': 'profile',
+  'change-password': 'profile',
+  'change-email': 'profile',
+  'change-phone': 'profile',
+  'backup-codes': 'profile',
+  'disable-two-factor': 'profile',
   // Design Studio → no primary tab active (returns 'index' as safe fallback)
   // All other seller screens default to 'index'
 };
@@ -196,6 +222,7 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
   const metrics = useTabBarMetrics(2);
   const router = useRouter();
   const segments = useSegments();
+  const onPushedScreen = (segments[0] as string | undefined) !== '(tabs)';
   const api = useApi();
   const { userId } = useAuth();
   const { theme } = useAppTheme();
@@ -246,6 +273,8 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
         if (count > 0) {
           void requestContextualPushPermission(userId, api);
         }
+        // A seller's first sale is a good moment for an App Store review ask.
+        if (count > 0 && countRealOrders(rows) === 1) void maybeRequestStoreReview(userId, 'first_sale');
         setBadgeCount(userId, count, pollStartMs);
         consecutiveFailuresRef.current = 0;
       } catch {
@@ -352,11 +381,11 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
           {
             width: metrics.capsuleWidth,
             height: metrics.capsuleHeight,
-            borderRadius: metrics.capsuleHeight / 2,
+            borderRadius: radius.bar,
           },
         ]}
       >
-        <TabBarGlass theme={theme} radius={metrics.capsuleHeight / 2} />
+        <TabBarGlass theme={theme} radius={radius.bar} />
         <TabBarIndicator x={indicatorX} target={indicatorTarget} opacity={indicatorOpacity} metrics={metrics} theme={theme} />
 
         <View
@@ -370,10 +399,20 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
 
             const onPress = () => {
               if (!isFocused) hapticTabChange();
-              // navigate() (not replace()) so the (tabs) navigator sees a
-              // real focus change and runs its transitionSpec — replace()
-              // swaps the route with no transition at all.
-              router.navigate(tabDef.destination as never);
+              // A tab tap is a deliberate destination, never "back" — so a
+              // tile opened from the Studio menu must not re-open the menu
+              // on top of the tab the seller just chose.
+              cancelStudioReturn();
+              // From a pushed root-stack screen (segments[0] !== '(tabs)'),
+              // dismissTo() pops the stack back down to the existing (tabs)
+              // scene and focuses the tab — "tapping a tab pops to that
+              // tab's root" (docs/NAVIGATION.md rule 3). navigate() alone
+              // would stack a second (tabs) instance on top of the flow.
+              // On a tab already, navigate() (not replace()) so the (tabs)
+              // navigator sees a real focus change and runs its
+              // transitionSpec — replace() swaps with no transition at all.
+              if (onPushedScreen && router.canGoBack()) router.dismissTo(tabDef.destination as never);
+              else router.navigate(tabDef.destination as never);
             };
 
             return (

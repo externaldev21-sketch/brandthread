@@ -7,6 +7,7 @@
  */
 import { Router } from "express";
 import { db, savedItems, posts } from "@workspace/db";
+import { notifyPostSave } from "../lib/activityEvents";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
@@ -70,6 +71,7 @@ router.post("/", async (req, res) => {
         lastNotifiedPriceCents: typeof priceCents === "number" ? priceCents : null,
       })
       .returning();
+    if (row.itemType === "post") void notifyPostSave({ postId: row.targetId, saverId: userId });
     if (savedPost) {
       // New row only (a duplicate hits 23505 below), so the taste signal fires once per save.
       void applyEventToProfile(userId, {

@@ -26,16 +26,21 @@
  * `live_viewers` table (a WebSocket heartbeat, or the /heartbeat route as
  * an HTTP fallback) by jobs/liveViewersPresence.ts.
  */
+import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
+import { notifyFollowersLiveStarted } from "../lib/liveNotifications";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { evaluateContent } from "../lib/contentModerator";
-import { optionalViewerId, publishingRestriction } from "../lib/safety";
+import { isBlockedEitherWay, optionalViewerId, publishingRestriction } from "../lib/safety";
 import { rankLiveFeed } from "../lib/liveFeed";
 import { logger } from "../lib/logger";
 import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
+import { markScheduledLiveStarted } from "../lib/scheduledLives";
 import { broadcastToRoom } from "../ws/liveHub";
+import { canJoinStream, checkCommentAllowed } from "../lib/liveModeration";
+import { loadEffectiveSettings, loadLastCommentAt, loadRestriction } from "../lib/liveModerationState";
 
 const router = Router();
 
@@ -44,7 +49,7 @@ const hostPlan = requirePlan("pro");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function generateToken(
+export function generateToken(
   appId: string,
   appCert: string,
   channelName: string,
@@ -68,7 +73,7 @@ function generateToken(
   }
 }
 
-function uidFromClerkId(clerkId: string): number {
+export function uidFromClerkId(clerkId: string): number {
   let h = 0;
   for (let i = 0; i < clerkId.length; i++) {
     h = (Math.imul(31, h) + clerkId.charCodeAt(i)) | 0;
@@ -83,7 +88,8 @@ function randomChannelName(): string {
 // ─── POST /api/live/start ─────────────────────────────────────────────────────
 router.post("/start", requireAuth, hostPlan, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const { title, description, thumbnailUrl, productTags = [] } = req.body;
+  if (await denyIfAgeRestricted(sellerId, res)) return;
+  const { title, description, thumbnailUrl, productTags = [], scheduledLiveId } = req.body;
 
   if (!title?.trim()) return res.status(400).json({ error: "title is required" });
 
@@ -134,6 +140,18 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
     logger.error({ err, streamId: stream.id }, "beginCloudRecording threw unexpectedly"),
   );
 
+  notifyFollowersLiveStarted({ streamId: stream.id, sellerId, title: stream.title }).catch((err) =>
+    logger.error({ err, streamId: stream.id }, "notifyFollowersLiveStarted threw unexpectedly"),
+  );
+
+  // Going live from a scheduled entry: link it and notify everyone who asked
+  // to be reminded. Never blocks or fails the start.
+  if (typeof scheduledLiveId === "string" && scheduledLiveId) {
+    markScheduledLiveStarted({ scheduledLiveId, sellerId, streamId: stream.id }).catch((err) =>
+      logger.error({ err, streamId: stream.id, scheduledLiveId }, "markScheduledLiveStarted threw unexpectedly"),
+    );
+  }
+
   return res.status(201).json({
     stream: {
       id: stream.id,
@@ -174,7 +192,7 @@ router.get("/feed", async (req, res) => {
   try {
     const rows = await db.execute(sql`
       SELECT ls.id, ls.seller_id, ls.title, ls.viewer_count, ls.product_tags,
-             ls.thumbnail_url, ls.started_at,
+             ls.pinned_product_id, ls.pin_updated_at, ls.thumbnail_url, ls.started_at,
              u.display_name AS seller_name, u.brand_name, u.avatar_url, u.username,
              COALESCE(u.verified, false) AS verified,
              ${viewerId
@@ -212,6 +230,10 @@ router.get("/:id", async (req, res) => {
 
     const row = rows.rows[0] as any;
     const isOwner = !!viewerId && viewerId === row.seller_id;
+    // Two-way block with the host: the stream does not exist for this viewer.
+    if (viewerId && !isOwner && await isBlockedEitherWay(viewerId, row.seller_id)) {
+      return res.status(404).json({ error: "Not found" });
+    }
 
     // Recording internals (Agora resourceId/sid) are never returned to any
     // client — they're only ever needed server-side. `recording_status` /
@@ -245,13 +267,22 @@ router.post("/:id/join", requireAuth, async (req, res) => {
 
   try {
     const rows = await db.execute(sql`
-      SELECT id, channel_name, status, agora_uid
+      SELECT id, seller_id, channel_name, status, agora_uid
       FROM live_streams WHERE id = ${id}::uuid
     `);
     if (!rows.rows.length) return res.status(404).json({ error: "Stream not found" });
     const stream = rows.rows[0] as any;
+    if (stream.seller_id !== viewerId && await isBlockedEitherWay(viewerId, stream.seller_id)) {
+      return res.status(404).json({ error: "Stream not found" });
+    }
     if (stream.status !== "live") {
       return res.status(410).json({ error: "Stream has ended" });
+    }
+
+    // Moderation: a viewer the host banned can't rejoin this stream. (See
+    // routes/live-moderation.ts.) Streams with no moderation rows are unaffected.
+    if (!canJoinStream(await loadRestriction(String(id), viewerId), viewerId === stream.seller_id)) {
+      return res.status(403).json({ error: "You can't join this live.", code: "BANNED" });
     }
 
     // Presence: mark this viewer live right away so the count feels instant
@@ -419,6 +450,41 @@ router.post("/:id/comment", requireAuth, async (req, res) => {
   }
 
   try {
+    // Check the host/block boundary before moderation so blocked viewers don't
+    // learn whether a stream's moderation state or chat restrictions exist.
+    const [modStream] = await db.execute(sql`
+      SELECT seller_id FROM live_streams WHERE id = ${req.params.id}::uuid LIMIT 1
+    `).then((r) => r.rows as any[]);
+    if (!modStream) return res.status(404).json({ error: "Stream not found" });
+    const hostId = String(modStream.seller_id);
+    if (hostId !== userId && await isBlockedEitherWay(userId, hostId)) {
+      return res.status(403).json({ error: "You can't comment on this live.", code: "BLOCKED" });
+    }
+
+    // Moderation (banned words / slow mode / mute / ban). No-op for a stream
+    // with no settings. The host is never restricted.
+    const [settings, restriction] = await Promise.all([
+      loadEffectiveSettings(String(req.params.id), hostId),
+      loadRestriction(String(req.params.id), userId),
+    ]);
+    const lastCommentAt = settings.slowModeSeconds > 0
+      ? await loadLastCommentAt(String(req.params.id), userId)
+      : null;
+    const verdict = checkCommentAllowed({
+      isHost: userId === hostId,
+      restriction,
+      bannedWords: settings.bannedWords,
+      slowModeSeconds: settings.slowModeSeconds,
+      lastCommentAt,
+      now: Date.now(),
+      message,
+    });
+    if (!verdict.ok) {
+      return res.status(verdict.status).json({
+        error: verdict.error, code: verdict.code, retryAfterSeconds: verdict.retryAfterSeconds,
+      });
+    }
+
     const result = await db.execute(sql`
       INSERT INTO live_comments (stream_id, user_id, display_name, avatar_url, message)
       VALUES (${req.params.id}::uuid, ${userId}, ${displayName ?? "Viewer"}, ${avatarUrl ?? null}, ${message.trim()})
@@ -441,6 +507,7 @@ router.get("/:id/comments", async (req, res) => {
       SELECT id, user_id, display_name, avatar_url, message, created_at
       FROM live_comments lc
       WHERE stream_id = ${req.params.id}::uuid
+        AND removed_at IS NULL
         ${since ? sql`AND created_at > ${since}::timestamptz` : sql``}
         AND NOT EXISTS (
           SELECT 1 FROM users su WHERE su.clerk_id = lc.user_id AND su.suspended_at IS NOT NULL

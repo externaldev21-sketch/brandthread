@@ -16,6 +16,8 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useAgeStatus } from '@/lib/ageGate';
+import { AgeAskInline, AgeRestrictedInline } from '@/components/age/AgeNotices';
 
 type AccountType = 'seller' | 'buyer';
 
@@ -27,6 +29,7 @@ export default function AccountTypeSettingsScreen() {
   const api = useApi();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const requestRef = useRef(0);
+  const age = useAgeStatus();
 
   const [currentType, setCurrentType] = useState<AccountType | null>(null);
   const [selectedType, setSelectedType] = useState<AccountType | null>(null);
@@ -174,7 +177,7 @@ export default function AccountTypeSettingsScreen() {
           })}
 
           {/* Save button */}
-          <TouchableOpacity
+          {age.status !== 'ok' && selectedType === 'seller' ? (age.status === 'restricted' ? <AgeRestrictedInline /> : <AgeAskInline onResolved={age.setBand} />) : <TouchableOpacity
             style={[s.saveBtn, { backgroundColor: colors.primary }, !isDirty && s.saveBtnDisabled]}
             activeOpacity={0.85}
             disabled={!isDirty || saving}
@@ -187,7 +190,7 @@ export default function AccountTypeSettingsScreen() {
                 {isDirty ? `Switch to ${selectedType ? accountInfo[selectedType].title : ''}` : 'No changes'}
               </Text>
             )}
-          </TouchableOpacity>
+          </TouchableOpacity>}
 
           <Text style={s.disclaimer}>
             Switching account types changes the features available to you. Your existing data (orders, products, etc.) is preserved.

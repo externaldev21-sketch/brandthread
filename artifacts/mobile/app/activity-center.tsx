@@ -43,7 +43,7 @@ import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
-import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, ICON, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -113,6 +113,7 @@ import {
   type SuggestedPerson,
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
+import { radius } from '@/constants/radii';
 
 /** Within this many points of the top, live arrivals come straight in (item 84). */
 const LIVE_TOP_SLOP = 48;
@@ -292,7 +293,7 @@ function ActivityAvatarStack({ row, styles }: { row: ActivityRow; styles: Styles
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
-const ActivityRowView = React.memo(function ActivityRowView({
+export const ActivityRowView = React.memo(function ActivityRowView({
   row,
   unread,
   now,
@@ -388,7 +389,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   ], [onDismiss, onOpenMenu, row, theme.cardElevated, theme.error, theme.text]);
 
   return (
-    <SwipeableActions actions={swipeActions}>
+    <SwipeableActions actions={swipeActions} backgroundColor={theme.background}>
     <View style={styles.row}>
       {/* Unread dot — LinkedIn-style leading dot in the row's own 16pt
           gutter (https://mobbin.com/screens/e455bcf1-7b85-4c0b-b4fd-76df1241fd5f),
@@ -465,7 +466,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   );
 });
 
-function SkeletonRows({ styles }: { styles: Styles }) {
+export function SkeletonRows({ styles }: { styles: Styles }) {
   return (
     <View style={styles.skeletonWrap} accessibilityLabel="Loading activity">
       <SkeletonBlock width={72} height={12} style={{ marginBottom: SP.md }} />
@@ -1352,7 +1353,7 @@ export default function ActivityCenterScreen() {
             testID="activity-new-pill"
             noMinHeight
           >
-            <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
+            <Glass variant="regular" tint="dark" radius={radius.md} style={StyleSheet.absoluteFill} />
             <Feather name="arrow-up" size={ICON.sm} color={theme.text} />
             <Text style={styles.livePillText}>New activity</Text>
           </PressableScale>
@@ -1385,7 +1386,7 @@ export default function ActivityCenterScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.background,
@@ -1440,7 +1441,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: SP.xs,
     paddingHorizontal: SP.md,
     height: 36,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     overflow: 'hidden',
   },
   livePillText: {
@@ -1620,7 +1621,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     minWidth: 88,
     height: 32,
     paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

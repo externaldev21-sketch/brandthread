@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
@@ -35,6 +36,8 @@ import { pickAndUploadCommunityPhoto } from '@/lib/communities/pickPhoto';
 import { validateGroupDescription, validateGroupName } from '@/lib/communities/validation';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
+import { useReportSheet } from '@/components/safety/ReportSheet';
+import { useBlockAction } from '@/lib/useBlockAction';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 const CHIP_PAD = { paddingHorizontal: 14 } as const;
@@ -52,6 +55,8 @@ export default function CommunityMembersScreen() {
   const router = useRouter();
   const client = useCommunityClient();
   const myId = useCommunityMyId();
+  const { openReport } = useReportSheet();
+  const blockUser = useBlockAction();
   const barInset = useBuyerTabBarInset();
   const { id: rawId } = useLocalSearchParams<{ id?: string }>();
   const id = (Array.isArray(rawId) ? rawId[0] : rawId) ?? '';
@@ -176,7 +181,8 @@ export default function CommunityMembersScreen() {
 
   const openMemberMenu = (m: CommunityMember) => {
     const buttons = [];
-    if (isOwner) {
+    const manage = canManage(m);
+    if (isOwner && manage) {
       const makeAdmin = m.role !== 'admin';
       buttons.push({
         text: makeAdmin ? 'Make admin' : 'Remove admin',
@@ -186,19 +192,32 @@ export default function CommunityMembersScreen() {
         }); },
       });
     }
-    buttons.push({
+    if (manage) buttons.push({
       text: 'Remove from group',
       onPress: () => confirmAction(`Remove ${m.name}?`, 'They can rejoin if the group is public or they have an invite link.', 'Remove', () => {
         void run(`rm-${m.userId}`, async () => { await client.removeMember(id, m.userId); dropMember(m.userId); });
       }),
     });
-    buttons.push({
+    if (manage) buttons.push({
       text: 'Ban from group',
       style: 'destructive' as const,
       onPress: () => confirmAction(`Ban ${m.name}?`, "They'll be removed and can't rejoin, even with an invite link. You can unban them later.", 'Ban', () => {
         void run(`ban-${m.userId}`, async () => { await client.banMember(id, m.userId); dropMember(m.userId); });
       }),
     });
+    if (m.userId !== myId) {
+      buttons.push({
+        text: 'Report member',
+        onPress: () => openReport({
+          targetType: 'profile', targetId: m.userId, label: m.name, ownerId: m.userId, ownerName: m.name,
+        }),
+      });
+      buttons.push({
+        text: 'Block member',
+        style: 'destructive' as const,
+        onPress: () => { void blockUser({ userId: m.userId, name: m.name }).then((done) => { if (done) dropMember(m.userId); }); },
+      });
+    }
     buttons.push({ text: 'Cancel', style: 'cancel' as const });
     showActionSheet(m.name, undefined, buttons);
   };
@@ -271,7 +290,7 @@ export default function CommunityMembersScreen() {
       .filter(Boolean).join(' · ');
     return (
       <View style={styles.row}>
-        <PressableScale onPress={() => openProfile(m)} style={styles.memberTap} accessibilityRole="button" accessibilityLabel={`Open ${m.name}'s profile`}>
+        <PressableScale onPress={() => openProfile(m)} onLongPress={m.userId === myId ? undefined : () => openMemberMenu(m)} style={styles.memberTap} accessibilityRole="button" accessibilityLabel={`Open ${m.name}'s profile`}>
           <Avatar uri={m.avatarUrl} name={m.name} size={40} />
           <View style={styles.copy}>
             <View style={styles.nameRow}>
@@ -335,6 +354,7 @@ export default function CommunityMembersScreen() {
     }
     return (
       <FlatList
+        {...LONG_LIST_TUNING}
         data={members}
         keyExtractor={(m) => m.userId}
         renderItem={renderMember}
@@ -358,7 +378,7 @@ export default function CommunityMembersScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Members" />
+      <ScreenHeader divider={false} title="Members" />
       {community && !needsSignIn ? (
         <View style={styles.searchWrap}>
           <SearchBar value={query} onChange={setQuery} placeholder="Search members" />
@@ -390,7 +410,7 @@ function FullScreenModal({ visible, title, onClose, children }: { visible: boole
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <ModalSafeArea>
         <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <ScreenHeader title={title} variant="modal" onBack={onClose} />
+          <ScreenHeader divider={false} title={title} variant="modal" onBack={onClose} />
           {children}
         </View>
       </ModalSafeArea>
@@ -602,7 +622,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { flexShrink: 1, fontFamily: FONT.semibold, fontSize: FS.base },
   sub: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17 },
-  badge: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 1 },
+  badge: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 1 },
   badgeText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   menuBtn: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
   empty: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingVertical: SP.lg },

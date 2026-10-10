@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { radius, nestedRadius } from '@/constants/radii';
 
 type Mode = 'buyer' | 'seller';
 
@@ -82,7 +83,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   track: {
     flexDirection: 'row',
     backgroundColor: theme.surface,
-    borderRadius: 100,
+    borderRadius: radius.md,
     padding: 3,
     position: 'relative',
     overflow: 'hidden',
@@ -93,7 +94,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     left: 3,
     width: 88,
     height: 30,
-    borderRadius: 100,
+    borderRadius: nestedRadius(radius.md, 3),
     backgroundColor: theme.accent,
   },
   option: {

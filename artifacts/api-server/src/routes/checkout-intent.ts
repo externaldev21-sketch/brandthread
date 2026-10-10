@@ -39,8 +39,12 @@ import {
   CART_CHECKOUT_KIND, CartCheckoutError, MAX_CART_GROUPS, MIN_CARD_CHARGE_CENTS,
   calculateGroupTax, findCardDataInRequest, priceCartGroup, type CartShipping, type PricedGroup,
 } from "../lib/money/cartCheckout";
+import { paymentIntentMethodParams, paymentMethodTypesFor } from "../lib/payments/bnpl";
+import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
 import { MAX_TIP_CENTS, checkTip, loadSellerCheckoutSettings } from "../lib/sellerCheckoutSettings";
+import { applyGiftCardToGroup, trimGiftCardsForMinimumCharge } from "../lib/giftCards/checkout";
+import { GiftCardError, claimCard, giftCentsForCheckouts, reserveForCheckout } from "../lib/giftCards/service";
 
 const router = Router();
 
@@ -81,6 +85,12 @@ const groupsSchema = z.array(z.object({
   discountCode: z.string().trim().min(1).max(64).optional(),
   /** The buyer's tip for this seller (only when the seller turned tipping on). */
   tipCents: z.coerce.number().int().min(0).max(MAX_TIP_CENTS).optional(),
+  liveStreamId: z.string().uuid().nullable().optional(),
+  /** A store gift card for this seller's group: a code, or the id of a card in the buyer's wallet. */
+  giftCard: z.object({
+    code: z.string().trim().min(4).max(64).optional(),
+    cardId: z.string().uuid().optional(),
+  }).refine((ref) => Boolean(ref.code) !== Boolean(ref.cardId)).optional(),
 })).min(1).max(MAX_CART_GROUPS);
 /** A quote only needs where the order goes (a wallet sheet shares no street until the buyer pays). */
 const quoteSchema = z.object({
@@ -113,13 +123,15 @@ type GroupBreakdown = {
   taxCents: number;
   /** Included in totalCents. */
   tipCents: number;
+  /** Covered by a store gift card; totalCents is what is left for the card payment. */
+  giftCardCents: number;
   totalCents: number;
   processingDays: number | null;
   /** The seller accepts tips (quote/create only; unknown on a retried intent). */
   tippingEnabled?: boolean;
 };
 
-function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>): GroupBreakdown[] {
+function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gift: Map<string, number> = new Map()): GroupBreakdown[] {
   return rows.map((row) => {
     const subtotal = (row.items ?? []).reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
     return {
@@ -130,6 +142,7 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>): G
       discountCents: row.discountCodeAmountCents ?? 0,
       taxCents: row.taxCents ?? 0,
       tipCents: row.tipCents ?? 0,
+      giftCardCents: gift.get(row.id) ?? 0,
       totalCents: row.amountTotalCents ?? 0,
       processingDays: null,
     };
@@ -144,6 +157,8 @@ type PricedCartGroup = PricedGroup & {
   /** The seller's checkout mode is "Guest checkout only": nothing is saved to the buyer's account. */
   guestCheckoutOnly: boolean;
   totalCents: number;
+  giftCardId: string | null;
+  giftCardCents: number;
 };
 
 /** Prices every seller group, then its Stripe Tax, then the buyer's tip (seller Checkout settings). Throws CartCheckoutError. */
@@ -156,12 +171,20 @@ async function priceCart(
   const priced: PricedCartGroup[] = [];
   const sellers = new Set<string>();
   for (const group of groups) {
-    const pricedGroup = await priceCartGroup({ buyerId, items: group.items, discountCode: group.discountCode ?? null, shipping });
+    const pricedGroup = await priceCartGroup({ buyerId, items: group.items, discountCode: group.discountCode ?? null, liveStreamId: group.liveStreamId ?? null, shipping });
     if (sellers.has(pricedGroup.sellerId)) {
       throw new CartCheckoutError(400, "DUPLICATE_SELLER_GROUP", "Each seller's items must be in one group.");
     }
     sellers.add(pricedGroup.sellerId);
     const tax = await calculateGroupTax(stripe, pricedGroup, shipping);
+    const fullTotalCents = pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents;
+    // A store gift card covers part of THIS seller's group only.
+    const gift = group.giftCard
+      ? await applyGiftCardToGroup({
+        buyerId, sellerId: pricedGroup.sellerId, ref: group.giftCard, groupTotalCents: fullTotalCents,
+        feeFloorCents: pricedGroup.platformFeeCents + pricedGroup.processingFeeEstimateCents,
+      })
+      : null;
     priced.push({
       ...pricedGroup,
       taxCents: tax.taxCents,
@@ -169,11 +192,14 @@ async function priceCart(
       tipCents: 0,
       tippingEnabled: false,
       guestCheckoutOnly: false,
-      totalCents: pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents,
+      giftCardId: gift?.cardId ?? null,
+      giftCardCents: gift?.cents ?? 0,
+      totalCents: fullTotalCents - (gift?.cents ?? 0),
     });
   }
   // Tips: only for sellers who turned tipping on; paid out with the order
-  // (the platform fee stays on the merchandise only).
+  // (the platform fee stays on the merchandise only). A gift card covers the
+  // merchandise total above; the tip is always added on top of what is left.
   const settings = await loadSellerCheckoutSettings(priced.map((group) => group.sellerId));
   priced.forEach((group, index) => {
     const tippingEnabled = settings.get(group.sellerId)?.tippingEnabled === true;
@@ -185,6 +211,7 @@ async function priceCart(
     group.tipCents = tipCents;
     group.totalCents += tipCents;
   });
+  trimGiftCardsForMinimumCharge(priced, MIN_CARD_CHARGE_CENTS);
   return priced;
 }
 
@@ -197,6 +224,7 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     discountCents: group.discountCents,
     taxCents: group.taxCents,
     tipCents: group.tipCents,
+    giftCardCents: group.giftCardCents,
     totalCents: group.totalCents,
     processingDays: group.processingDays,
     tippingEnabled: group.tippingEnabled,
@@ -213,6 +241,10 @@ function stripeFor(res: Response): ReturnType<typeof requireStripe> | null {
 }
 
 function sendError(res: Response, error: unknown): boolean {
+  if (error instanceof GiftCardError) {
+    res.status(error.status).json({ error: error.message, code: error.code });
+    return true;
+  }
   if (error instanceof CartCheckoutError) {
     res.status(error.status).json({ error: error.message, code: error.code, ...error.details });
     return true;
@@ -242,9 +274,12 @@ router.post("/quote", validateRequest({ body: quoteSchema }), async (req, res) =
   };
   try {
     const priced = await priceCart(stripe, buyerId, body.groups, shipping);
+    const amountCents = priced.reduce((sum, group) => sum + group.totalCents, 0);
+    const bnpl = await bnplMethodsForCart({ sellerIds: priced.map((g) => g.sellerId), amountCents, shipToCountry: shipping.country });
     res.json({
-      amountCents: priced.reduce((sum, group) => sum + group.totalCents, 0),
+      amountCents,
       groups: breakdown(priced),
+      paymentMethodTypes: paymentMethodTypesFor(bnpl),
     });
   } catch (error) {
     if (sendError(res, error)) return;
@@ -279,7 +314,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
       clientSecret: intent.client_secret,
       status: intent.status,
       amountCents: intent.amount,
-      groups: breakdownFromRows(prior),
+      groups: breakdownFromRows(prior, await giftCentsForCheckouts(db, prior.map((row) => row.id))),
     });
     return;
   }
@@ -328,6 +363,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
           clientIdempotencyKey: `${key}_${group.sellerId}`,
           chargeModel: "transfer",
           platformFeeCents: group.platformFeeCents,
+          platformFeeBps: group.platformFeeBps,
           processingFeeEstimateCents: group.processingFeeEstimateCents,
           ...(group.discountCodeId ? { discountCodeId: group.discountCodeId, discountCodeAmountCents: group.discountCents } : {}),
           amountTotalCents: group.totalCents,
@@ -339,6 +375,14 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
         await reserveStock(tx, row.id, group.items.map((item) => ({
           variantId: item.variantId, quantity: item.quantity, productName: item.productName,
         })));
+        if (group.giftCardId && group.giftCardCents > 0) {
+          // Claims an unclaimed card for this buyer, then atomically takes the amount off it.
+          await claimCard(tx, group.giftCardId, buyerId);
+          await reserveForCheckout(tx, {
+            cardId: group.giftCardId, checkoutSessionId: row.id, amountCents: group.giftCardCents,
+            actorId: buyerId, sellerId: group.sellerId,
+          });
+        }
         inserted.push(row);
       }
       return inserted;
@@ -364,15 +408,17 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
   // ── One PaymentIntent for the cart ────────────────────────────────────────
   let intent;
   try {
+    // Card always; Klarna / Afterpay only when the platform flag, every seller and the amount allow it.
+    const bnpl = await bnplMethodsForCart({ sellerIds: priced.map((g) => g.sellerId), amountCents, shipToCountry: shipping.country });
     const customer = await ensureStripeCustomer(stripe, buyerId, body.contactEmail, shipping, body.contactPhone);
     intent = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: "usd",
       customer,
-      // Card covers Apple Pay and Google Pay (both are card wallets).
-      payment_method_types: ["card"],
+      // Card covers Apple Pay and Google Pay (both are card wallets). BNPL
+      // can't be combined with a top-level setup_future_usage, see lib/payments/bnpl.ts.
       // A "Guest checkout only" store (seller Checkout settings) never saves the card.
-      ...(body.saveCard === false || priced.some((group) => group.guestCheckoutOnly) ? {} : { setup_future_usage: "off_session" as const }),
+      ...paymentIntentMethodParams(bnpl, body.saveCard !== false && !priced.some((group) => group.guestCheckoutOnly)),
       receipt_email: body.contactEmail,
       shipping: {
         name: shipping.name,
@@ -415,6 +461,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
     status: intent.status,
     amountCents,
     groups: breakdown(priced, rows),
+    paymentMethodTypes: intent.payment_method_types ?? ["card"],
   });
 });
 

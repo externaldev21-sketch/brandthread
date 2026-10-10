@@ -32,6 +32,9 @@ import { isUUID } from '@/lib/engagementUtils';
 import { useRouter } from 'expo-router';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { remixActionVisible, remixRoute } from '@/lib/remix';
+import { buildPostUrl } from '@/lib/shareLinks';
+import { quotePostHref } from '@/lib/quotePost';
+import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -66,6 +69,7 @@ export function ThreadShareSheet({
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const router = useRouter();
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [savingProgress, setSavingProgress] = useState<number | null>(null);
@@ -76,7 +80,6 @@ export function ThreadShareSheet({
   // "Remix" — offered only when the server says the author allows this viewer
   // to remix (GET /api/remix/posts/:id) and the viewer can publish video.
   const [remixAllowed, setRemixAllowed] = useState(false);
-  const router = useRouter();
   const abortRef = useRef<AbortController | null>(null);
   const actionInFlightRef = useRef(false);
 
@@ -91,7 +94,10 @@ export function ThreadShareSheet({
     api.posts.interact(postId, { type: 'share' }).catch(() => {});
   }, [api, postId]);
 
-  const postUrl = ExpoLinking.createURL('/buyer-post-viewer', {
+  // Shared out as the canonical https link (/p/:id) so it opens the app via
+  // universal links and unfurls with Open Graph in other apps. Demo/preview
+  // ids that can't form a public link keep the in-app deep link.
+  const postUrl = buildPostUrl(postId) ?? ExpoLinking.createURL('/buyer-post-viewer', {
     queryParams: { postId },
   });
   const shareText = productName
@@ -213,10 +219,12 @@ export function ThreadShareSheet({
     abortRef.current = controller;
     let destination: InstanceType<typeof import('expo-file-system').File> | null = null;
     try {
-      const [{ File, Paths }, MediaLibrary] = await Promise.all([
-        import('expo-file-system'),
-        import('expo-media-library'),
-      ]);
+      const [{ File, Paths }] = await Promise.all([import('expo-file-system')]);
+      const MediaLibrary = getMediaLibrary();
+      if (!MediaLibrary) {
+        onFeedback(mediaLibraryUnavailableMessage(), 'error');
+        return;
+      }
       const permission = await MediaLibrary.requestPermissionsAsync();
       if (!permission.granted) {
         if (!permission.canAskAgain) {
@@ -258,7 +266,7 @@ export function ThreadShareSheet({
         downloaded = destination;
         setSavingProgress(90);
       }
-      await MediaLibrary.Asset.create(downloaded.uri);
+      await MediaLibrary.createAssetAsync(downloaded.uri);
       setSavingProgress(100);
       onFeedback('Video saved to Photos.', 'info');
     } catch (error) {
@@ -339,6 +347,16 @@ export function ThreadShareSheet({
               ) : null}
               {remixAllowed ? (
                 <ShareAction label="Remix" icon="layers" onPress={() => { onClose(); router.push(remixRoute(postId) as never); }} muted />
+              ) : null}
+              {isUUID(postId) ? (
+                <ShareAction
+                  label="Quote"
+                  icon="edit-3"
+                  onPress={() => {
+                    onClose();
+                    router.push(quotePostHref({ postId, author: creator, caption, thumb: isVideo ? undefined : mediaUri, mediaType: isVideo ? 'video' : 'photo' }) as never);
+                  }}
+                />
               ) : null}
             </View>
           </View>

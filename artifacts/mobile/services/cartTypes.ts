@@ -125,6 +125,8 @@ export interface CheckoutDiscount {
   description: string;
   isValid: boolean;
   errorMessage?: string;
+  /** Multi-store carts: the seller whose group this code applies to. Absent on single-seller orders. */
+  sellerId?: string;
 }
 
 export interface CheckoutTax {
@@ -182,6 +184,8 @@ export interface CheckoutSession {
   savedAddresses: CheckoutAddress[];
   deliveryGroups: CheckoutDeliveryGroup[];
   discounts: CheckoutDiscount[];
+  /** Store gift card chosen per seller (one per seller group). */
+  giftCards?: Record<string, { cardId: string; last4: string | null }>;
   loyaltyRedemption?: CheckoutLoyaltyRedemption;
   threadCashRedemption?: CheckoutThreadCashRedemption;
   tax?: CheckoutTax;
@@ -441,6 +445,8 @@ export interface BuyerProduct {
   /** A photo of the seller's own size chart. Absent means no "Size guide"
    *  link shows — never a placeholder. */
   sizeChartImageUrl?: string | null;
+  /** The seller's structured size chart ({columns, rows, unit}); drives size recommendations. */
+  sizeChart?: import('@/lib/sizeRecommendation').SizeChartLike | null;
 }
 
 export interface BuyerProductOption {

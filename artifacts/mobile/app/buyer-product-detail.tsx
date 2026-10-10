@@ -2,6 +2,7 @@
  * Brandthread Buyer Product Detail
  * Variant selection, add to cart, buy now.
  */
+import { track } from '@/lib/analytics';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -29,6 +30,7 @@ import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import { reportHref } from '@/lib/safety';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { useAuth } from '@clerk/expo';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
@@ -40,14 +42,21 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
 } from '@/lib/theme';
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
+import { SaveHeart } from '@/components/SaveHeart';
 import { CachedImage } from '@/components/CachedImage';
 import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
+import { LaunchCountdown } from '@/components/products/LaunchCountdown';
+import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
+import { CompleteTheFit } from '@/components/products/CompleteTheFit';
+import { ProductVideo } from '@/components/products/ProductVideo';
+import { ProductQuestionsSection } from '@/components/ProductQuestionsSection';
+import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
@@ -60,6 +69,8 @@ import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
+import { StockCounter } from '@/components/products/StockCounter';
+import { ApiError } from '@/lib/networkNotice';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
   shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource,
@@ -131,6 +142,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
       title:             [v.size, v.color].filter(Boolean).join(' / ') || 'Default',
       optionValues:      ovs,
       priceCents:        v.priceCents ?? 0,
+      compareAtPriceCents: v.compareAtPriceCents ?? undefined,
       inventoryQuantity: v.stock ?? 0,
       isAvailable:       (v.stock ?? 0) > 0,
       imageUri:          firstImage,
@@ -147,6 +159,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     name:               row.name,
     description:        row.description ?? '',
     priceCents:         lowestPrice,
+    compareAtPriceCents: variants.find(v => v.priceCents === lowestPrice)?.compareAtPriceCents,
     imageUris:          row.images ?? [],
     category:           row.category ?? 'apparel',
     isPreOrder:           row.isPreOrder           ?? false,
@@ -159,6 +172,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     isActive:           true,
     tags:               row.tags ?? [],
     sizeChartImageUrl:  row.sizeChartImageUrl ?? null,
+    sizeChart:          row.sizeChart && typeof row.sizeChart === 'object' ? row.sizeChart : null,
   };
 }
 
@@ -279,7 +293,7 @@ const galleryStyles = StyleSheet.create({
   dot: { height: 6, borderRadius: 3, backgroundColor: ON_DARK },
   resetZoom: {
     position: 'absolute', right: SP.md, bottom: 56, flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.sm, backgroundColor: 'rgba(0,0,0,0.65)',
   },
   resetZoomText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.xs },
   thumbRail: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
@@ -378,7 +392,9 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
 
 // ─── Option Picker ────────────────────────────────────────────────────────────
 
-function OptionPicker({ product, option, selections, onSelect }: {
+function OptionPicker({ product, option, selections, onSelect, recommendedLabel }: {
+  /** Size chip to mark (never select) from the buyer's saved sizes. */
+  recommendedLabel?: string | null;
   product: BuyerProduct;
   option: BuyerProduct['options'][0];
   selections: Record<string, string>;
@@ -424,7 +440,7 @@ function OptionPicker({ product, option, selections, onSelect }: {
             );
           }
 
-          return (
+          const chipEl = (
             <Chip
               key={val.id}
               label={val.label}
@@ -442,6 +458,9 @@ function OptionPicker({ product, option, selections, onSelect }: {
               testID={`option-${option.id}-${val.id}`}
             />
           );
+          return recommendedLabel && recommendedLabel === val.label
+            ? <View key={val.id} style={{ alignItems: 'center' }}>{chipEl}<RecommendedTag /></View>
+            : chipEl;
         })}
       </View>
     </View>
@@ -507,9 +526,13 @@ export default function BuyerProductDetailScreen() {
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
   const { isSignedIn } = useAuth();
+  const { goToSignIn } = useSignInGate();
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
+  const sizeBadgeModel = useSizeBadgeModel(product);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [qty, setQty] = useState(1);
   const [addingToCart, setAddingToCart] = useState(false);
@@ -536,6 +559,7 @@ export default function BuyerProductDetailScreen() {
   const addedBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Waitlist & pre-order reservation state
+  const [launching, setLaunching] = useState(false);
   const [waitlistJoined,  setWaitlistJoined]  = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [reserved,        setReserved]        = useState(false);
@@ -576,6 +600,7 @@ export default function BuyerProductDetailScreen() {
     let cancelled = false;
 
     setLoading(true);
+    setLoadFailed(false);
     setSellerPaymentReady(null);
     setSellerPaymentReason(null);
     setSellerPreview(null);
@@ -629,7 +654,11 @@ export default function BuyerProductDetailScreen() {
                   : Promise.resolve(null),
               ]);
             }
-          } catch { /* API unavailable — product will show as not found */ }
+          } catch (loadError) {
+            // A missing product (404) reads as not found; any other failure is a
+            // load problem and gets a retry instead of a misleading dead end.
+            if (!(loadError instanceof ApiError && loadError.status === 404) && !cancelled) setLoadFailed(true);
+          }
         }
         // Dev-web preview only: a seeded `preview-product-*` has no catalog
         // row, so the real request fails. Build the same BuyerProduct from
@@ -649,13 +678,14 @@ export default function BuyerProductDetailScreen() {
           // Best-effort — a failed view record should never affect the
           // product page itself, so no error handling beyond swallowing it.
           if (prod?.id && isSignedIn && !previewKind) api.buyer.recentlyViewed.record(prod.id).catch(() => {});
+          if (prod?.id && !previewKind) track('product_viewed', { surface: 'detail' });
         }
       } catch {}
       if (!cancelled) setLoading(false);
     })();
 
     return () => { cancelled = true; };
-  }, [productId, localPreview]);
+  }, [productId, localPreview, reloadTick]);
 
   // Real per-source traffic tracking for the seller's own Dashboard — a
   // signed-out shopper's visit still counts, so this never gates on
@@ -753,11 +783,15 @@ export default function BuyerProductDetailScreen() {
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <View style={{ height: GALLERY_HEIGHT, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.lg }}>
           <Feather name="alert-circle" size={ICON.xl} color={RED} />
-          <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>Product not found</Text>
+          <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>{loadFailed ? "Couldn't load this product" : 'Product not found'}</Text>
           <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
-            This product may be unavailable or the link may have expired.
+            {loadFailed ? 'Check your connection and try again.' : 'This product may be unavailable or the link may have expired.'}
           </Text>
-          <Button label="Go back" onPress={leaveProduct} variant="secondary" size="small" icon="chevron-left" />
+          {loadFailed ? (
+            <Button label="Retry" onPress={() => setReloadTick((n) => n + 1)} variant="secondary" size="small" icon="refresh-cw" />
+          ) : (
+            <Button label="Go back" onPress={leaveProduct} variant="secondary" size="small" icon="chevron-left" />
+          )}
         </View>
         {/* Back button */}
         <View style={{ position: 'absolute', left: SP.md, top: headerTopInset + SP.sm }}>
@@ -803,7 +837,7 @@ export default function BuyerProductDetailScreen() {
   async function handleJoinWaitlist() {
     if (!product || !variant) return;
     if (!isSignedIn) {
-      router.replace('/sign-in' as never);
+      goToSignIn();
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -819,7 +853,7 @@ export default function BuyerProductDetailScreen() {
   async function handleReserve() {
     if (!product || sellerPreview) return;
     if (!isSignedIn) {
-      router.replace('/sign-in' as never);
+      goToSignIn();
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -893,7 +927,7 @@ export default function BuyerProductDetailScreen() {
       return;
     }
     if (!isSignedIn) {
-      router.push('/sign-in' as never);
+      goToSignIn();
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1000,6 +1034,18 @@ export default function BuyerProductDetailScreen() {
               </View>
             </View>
           )}
+          {/* Save heart — sits left of the cart button on the same chrome row
+              (tap saves, long-press files into a collection). */}
+          <SaveHeart
+            productId={product.id}
+            title={product.name}
+            brand={product.sellerName}
+            priceCents={product.priceCents > 0 ? product.priceCents : undefined}
+            size={44}
+            iconColor="#FFFFFF" // theme-exempt: same fixed chrome as the back/cart buttons over the photo
+            style={[s.mediaChromeBtn, { position: 'absolute', top: headerTopInset + SP.sm, right: SP.md + insets.right + 44 + SP.sm, borderWidth: 0 }]}
+            testID="product-save-heart"
+          />
           {/* Cart button */}
           <Animated.View
             ref={cartTargetRef}
@@ -1061,6 +1107,9 @@ export default function BuyerProductDetailScreen() {
             </Text>
           )}
 
+          <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />
+
+          <StockCounter productId={product.id} />
           {/* ── Buyer demand signals (server-supplied values only) ── */}
           {(demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
             (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
@@ -1129,6 +1178,8 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
+          <PreOrderShipBy productId={product.id} isPreOrder={product.isPreOrder} />
+
           <View style={s.divider} />
 
           {/* Options — unselected options highlight after the buyer attempts to add */}
@@ -1136,7 +1187,9 @@ export default function BuyerProductDetailScreen() {
             const isUnselected = optionsTouched && !selections[option.id];
             return (
               <View key={option.id}>
+                {option.name.toLowerCase() === 'size' && <SizeRecommendationBadge model={sizeBadgeModel} />}
                 <OptionPicker
+                  recommendedLabel={option.name.toLowerCase() === 'size' && sizeBadgeModel?.kind === 'recommend' ? sizeBadgeModel.size : null}
                   product={product}
                   option={option}
                   selections={selections}
@@ -1280,6 +1333,8 @@ export default function BuyerProductDetailScreen() {
             </>
           ) : null}
 
+          <ProductVideo productId={product.id} />
+
           {/* Returns & cancellation */}
           <View style={s.divider} />
           <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
@@ -1293,8 +1348,13 @@ export default function BuyerProductDetailScreen() {
               between the two surfaces. Renders nothing when there are none. */}
           <ProductReviewsSection productId={product.id} productName={product.name} />
 
+          {/* Questions — public Q&A, answered by the seller. */}
+          <ProductQuestionsSection productId={product.id} productName={product.name} />
+
           {/* Worn in these videos */}
           <WornInVideos productId={product.id} productName={product.name} />
+
+          <CompleteTheFit productId={product.id} />
 
           {/* You might also like — owns its header; renders nothing when empty. */}
           <RelatedProducts productId={product.id} dividerStyle={s.divider} headerStyle={s.reviewsHeader} />
@@ -1432,7 +1492,7 @@ export default function BuyerProductDetailScreen() {
             variant="secondary"
             onPress={handleAddToCart}
             loading={addingToCart}
-            disabled={!!sellerPreview || addingToCart || (allSelected && !inStock)}
+            disabled={!!sellerPreview || addingToCart || launching || (allSelected && !inStock)}
             accessibilityLabel={sellerPreview ? 'Add to cart unavailable in preview' : !allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
             style={s.buyNowBtn}
             testID="product-add-to-cart"
@@ -1454,7 +1514,7 @@ export default function BuyerProductDetailScreen() {
             onPress={handleReserve}
             variant={reserved ? 'secondary' : 'primary'}
             loading={reserveLoading}
-            disabled={reserveLoading || reserved}
+            disabled={reserveLoading || reserved || launching}
             accessibilityHint={reserved ? undefined : 'Reserves this pre-order at no charge'}
             style={s.buyNowBtn}
           />
@@ -1470,7 +1530,7 @@ export default function BuyerProductDetailScreen() {
             onPress={handleBuyNow}
             variant="primary"
             loading={buyingNow}
-            disabled={buyingNow || !inStock || !allSelected || paymentUnavailable}
+            disabled={buyingNow || launching || !inStock || !allSelected || paymentUnavailable}
             style={s.buyNowBtn}
           />
         )}

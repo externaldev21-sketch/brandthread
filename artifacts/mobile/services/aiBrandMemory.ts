@@ -6,6 +6,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   BrandMemory, BrandMemoryField, BrandMemorySummary, DEFAULT_BRAND_MEMORY,
 } from './aiTypes';
@@ -70,7 +71,9 @@ export async function rebuildBrandMemory(authToken?: string | null): Promise<Bra
   // failure this throws (the caller shows "Could not rebuild") — it never
   // fills the seller's brand memory with made-up demo values.
   const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-  if (!API_BASE || !authToken) throw new Error('Sign in to rebuild brand memory.');
+  // The signed-out seller dev preview never calls the API (no account to
+  // derive from), and never gets demo values either.
+  if (isSellerDevPreview() || !API_BASE || !authToken) throw new Error('Sign in to rebuild brand memory.');
   const res = await fetch(`${API_BASE}/api/ai/brand-memory/rebuild`, {
     method: 'POST',
     headers: {

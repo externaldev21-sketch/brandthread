@@ -42,7 +42,9 @@ describe('the old colored icon-in-a-square + two dots decoration is gone', () =>
     expect(src).not.toContain('esS.orbit');
     expect(src).not.toContain('esS.spark');
     expect(src).not.toContain('esS.artCard');
-    expect(src).toContain('esS.artCircle');
+    // Every empty state now draws the one shared badge (2px silver ring,
+    // optically-centred Feather-family stroke icon).
+    expect(src).toContain('<EmptyStateBadge');
   });
 });
 

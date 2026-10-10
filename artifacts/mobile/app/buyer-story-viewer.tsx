@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { prefetchImage } from '@/lib/prefetch';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, FontAwesome } from '@expo/vector-icons';
@@ -23,9 +23,10 @@ import {
   FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { AppleEmoji } from '@/components/ui/AppleEmoji';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
+import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -37,6 +38,11 @@ import {
   isPreviewInboxEnabled, getOrCreatePreviewConversationForAuthor, appendPreviewMessage, touchPreviewConversation,
 } from '@/lib/previewInbox';
 import { getPreviewActivityStory } from '@/lib/previewActivity';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { PREVIEW_HIGHLIGHT_ID, previewHighlightStories } from '@/lib/previewHighlights';
+import { ViewerStickerLayer } from '@/components/social/StoryStickers';
+import { StoryQuestionResponsesSheet, type QuestionResponses } from '@/components/social/StoryQuestionResponsesSheet';
+import { isPreviewStickerStory, previewStickerStory, PREVIEW_STICKER_ANSWERS } from '@/lib/previewStickers';
 import { useAuth } from '@clerk/expo';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import type { Story, StoryMedia, MessageAttachment } from '@/services/socialTypes';
@@ -104,6 +110,8 @@ function StorySlideVideo({ uri, paused }: { uri: string; paused: boolean }) {
  * (highlights don't expire). `null` for every id outside the preview seed.
  */
 function previewStory(id: string): Story | null {
+  const stickers = previewStickerStory(id);
+  if (stickers) return stickers;
   const seed = getPreviewActivityStory(id);
   if (!seed) return null;
   return {
@@ -125,7 +133,9 @@ export default function BuyerStoryViewer() {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
-  const { storyId, allStoryIds } = useLocalSearchParams<{ storyId: string; allStoryIds: string }>();
+  const { storyId, allStoryIds, highlightId } = useLocalSearchParams<{ storyId: string; allStoryIds: string; highlightId?: string }>();
+  // A profile highlight: its saved stories come from /highlights/:id and have no like / reply / view tracking.
+  const isHighlight = !!highlightId;
 
   const api = useApi();
   const { userId: myUserId } = useAuth();
@@ -147,7 +157,12 @@ export default function BuyerStoryViewer() {
   // Mention popover ("View profile") and the tagged-people sheet; playback is held while either is open.
   const [mentionTap, setMentionTap] = useState<MentionTap | null>(null);
   const [taggedSheetOpen, setTaggedSheetOpen] = useState(false);
-  const overlayPaused = !!mentionTap || taggedSheetOpen;
+  // Author's "Responses" sheet for question stickers.
+  const [responsesOpen, setResponsesOpen] = useState(false);
+  const [responsesLoading, setResponsesLoading] = useState(false);
+  const [responses, setResponses] = useState<QuestionResponses | null>(null);
+  const [stickerPaused, setStickerPaused] = useState(false);
+  const overlayPaused = !!mentionTap || taggedSheetOpen || responsesOpen || stickerPaused;
   const [serverViewers, setServerViewers] = useState<Array<{ userId: string; name: string; handle: string; avatarUrl: string | null; viewedAt: string }>>([]);
   const [viewersLoading, setViewersLoading] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
@@ -170,6 +185,26 @@ export default function BuyerStoryViewer() {
 
   const loadStories = useCallback(async () => {
     const generation = ++loadGeneration.current;
+    if (highlightId) {
+      // Demo preview only: the seeded highlight has no backend to answer.
+      if (isPreviewDemoMode() && highlightId === PREVIEW_HIGHLIGHT_ID) {
+        setStories(previewHighlightStories());
+        setStoryIdx(0);
+        setLoading(false);
+        return;
+      }
+      try {
+        const hl = await api.social.highlight(String(highlightId));
+        if (loadGeneration.current !== generation) return;
+        setStories((hl.stories ?? []) as Story[]);
+        setStoryIdx(0);
+      } catch {
+        if (loadGeneration.current === generation) setStories([]);
+      } finally {
+        if (loadGeneration.current === generation) setLoading(false);
+      }
+      return;
+    }
     try {
       const all = await getStories().catch(() => [] as Story[]);
       if (loadGeneration.current !== generation) return;
@@ -201,7 +236,7 @@ export default function BuyerStoryViewer() {
 
   useEffect(() => {
     loadStories();
-    if (storyId) {
+    if (storyId && !highlightId) {
       trackStoryView(storyId).catch(() => {});
       // Also record view server-side (fire-and-forget)
       api.social.viewStory(storyId).catch(() => {});
@@ -233,7 +268,7 @@ export default function BuyerStoryViewer() {
   // into the full viewers sheet.
   useEffect(() => {
     const isMine = (!!myUserId && currentStory?.authorId === myUserId) || currentStory?.authorId === 'me';
-    if (!currentStory || !isMine) return;
+    if (!currentStory || !isMine || isHighlight) return;
     let cancelled = false;
     setViewersLoading(true);
     api.social.storyViewers(currentStory.id)
@@ -266,7 +301,7 @@ export default function BuyerStoryViewer() {
   };
 
   useEffect(() => {
-    const unsub = subscribeSocial(() => loadStories());
+    const unsub = subscribeSocial(() => { if (!highlightId) loadStories(); });
     return unsub;
   }, []);
 
@@ -455,7 +490,7 @@ export default function BuyerStoryViewer() {
   // no real Clerk sign-in under ?bt_preview, so myUserId alone can't tell
   // "my own story" apart from anyone else's there. Same check the story
   // options menu below already uses for the same reason.
-  const isMyStory = (!!myUserId && currentStory.authorId === myUserId) || currentStory.authorId === 'me';
+  const isMyStory = !isHighlight && ((!!myUserId && currentStory.authorId === myUserId) || currentStory.authorId === 'me');
   const seenByCount = serverViewers.length || (currentStory as any).viewsCount || currentStory.viewers.length;
 
   const slidePeople = taggedPeople(currentSlide.overlays);
@@ -467,6 +502,68 @@ export default function BuyerStoryViewer() {
   const openOriginal = (originalId: string) => {
     hapticLight();
     router.push(`/buyer-story-viewer?storyId=${encodeURIComponent(originalId)}&allStoryIds=${encodeURIComponent(originalId)}` as never);
+  };
+
+  // ── Interactive sticker actions ──────────────────────────────────────────
+  const stickerActions = {
+    vote: async (sid: string, overlayId: string, optionIndex: number) => {
+      hapticLight();
+      try {
+        return (await api.social.pollVote(sid, overlayId, optionIndex)).stickerState;
+      } catch (err) {
+        // Already voted elsewhere: the server sends the current results with the 409.
+        const body = (() => { try { return JSON.parse((err as { body?: string })?.body ?? ''); } catch { return null; } })();
+        if (body?.stickerState) return body.stickerState;
+        throw err;
+      }
+    },
+    answer: async (sid: string, overlayId: string, text: string) => {
+      hapticLight();
+      try {
+        return (await api.social.questionAnswer(sid, overlayId, text)).stickerState;
+      } catch (err) {
+        const body = (() => { try { return JSON.parse((err as { body?: string })?.body ?? ''); } catch { return null; } })();
+        if (body?.stickerState) return body.stickerState;
+        Alert.alert('Could not send your answer', body?.error ?? 'Try again.');
+        throw err;
+      }
+    },
+    notify: async (dropId: string) => { hapticLight(); await api.publicDrops.subscribe(dropId); },
+    openProduct: (productId: string, name: string) => {
+      hapticLight();
+      router.push(`/thread-product-detail?productId=${encodeURIComponent(productId)}&productName=${encodeURIComponent(name)}` as never);
+    },
+    openDrop: (dropId: string, name: string) => {
+      hapticLight();
+      router.push(`/buyer-drop-detail?dropId=${encodeURIComponent(dropId)}&dropName=${encodeURIComponent(name)}` as never);
+    },
+    openResponses: async (sid: string) => {
+      hapticLight();
+      setResponsesOpen(true);
+      if (isPreviewStickerStory(sid)) {
+        setResponses({ questions: [{ overlayId: 'question', prompt: 'What should we drop next?', answers: PREVIEW_STICKER_ANSWERS }] });
+        return;
+      }
+      setResponsesLoading(true);
+      try {
+        setResponses(await api.social.questionAnswers(sid));
+      } catch {
+        setResponses({ questions: [] });
+      } finally {
+        setResponsesLoading(false);
+      }
+    },
+  };
+  const replyToAnswer = async (userId: string) => {
+    if (!currentStory) return;
+    if (isPreviewStickerStory(currentStory.id)) { setResponsesOpen(false); return; }
+    try {
+      const dm = await api.social.questionReplyConversation(currentStory.id, userId);
+      setResponsesOpen(false);
+      router.push(`/buyer-conversation?id=${encodeURIComponent(dm.conversationId)}` as never);
+    } catch {
+      Alert.alert('Could not open the conversation', 'Try again.');
+    }
   };
 
   const openViewersModal = async () => {
@@ -603,6 +700,17 @@ export default function BuyerStoryViewer() {
           44pt square around a tiny/invisible one) and the reshare credit are tappable. */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 6 }]} pointerEvents="box-none">
         <ViewerMentionStickers overlays={currentSlide.overlays ?? []} onTap={(t) => { hapticLight(); setMentionTap(t); }} />
+        {/* Interactive stickers: poll, question, product link, drop countdown. */}
+        <ViewerStickerLayer
+          key={currentStory.id}
+          storyId={currentStory.id}
+          overlays={currentSlide.overlays ?? []}
+          state={currentStory.stickerState}
+          isAuthor={isMyStory}
+          local={isPreviewStickerStory(currentStory.id)}
+          actions={stickerActions}
+          onPause={setStickerPaused}
+        />
         {(currentSlide.overlays ?? []).filter(o => o.type === 'reshare_card').map(o => (
           <ViewerReshareCard
             key={o.id}
@@ -826,10 +934,14 @@ export default function BuyerStoryViewer() {
                     text: 'Save to device',
                     onPress: async () => {
                       try {
-                        const MediaLibrary = await import('expo-media-library');
+                        const MediaLibrary = getMediaLibrary();
+                        if (!MediaLibrary) {
+                          Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
+                          return;
+                        }
                         const perm = await MediaLibrary.requestPermissionsAsync();
                         if (!perm.granted || !currentSlide?.imageUri) throw new Error('permission');
-                        await MediaLibrary.Asset.create(currentSlide.imageUri);
+                        await MediaLibrary.createAssetAsync(currentSlide.imageUri);
                         hapticSuccessAction();
                       } catch {
                         Alert.alert('Couldn’t save', 'Check your photo library permission and try again.');
@@ -869,9 +981,11 @@ export default function BuyerStoryViewer() {
           keyboardVerticalOffset={0}
         >
           {currentStory.repliesDisabled ? (
-            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
-              <Text style={styles.repliesDisabled}>Replies disabled</Text>
-            </View>
+            isHighlight ? null : (
+              <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
+                <Text style={styles.repliesDisabled}>Replies disabled</Text>
+              </View>
+            )
           ) : (
             <Composer
           overMedia
@@ -948,6 +1062,13 @@ export default function BuyerStoryViewer() {
       )}
       </Animated.View>
 
+      <StoryQuestionResponsesSheet
+        visible={responsesOpen}
+        loading={responsesLoading}
+        data={responses}
+        onClose={() => setResponsesOpen(false)}
+        onReply={(userId) => { void replyToAnswer(userId); }}
+      />
       <MentionPopover target={mentionTap} onClose={() => setMentionTap(null)} onViewProfile={openProfile} />
       <TaggedPeopleSheet visible={taggedSheetOpen} people={slidePeople} onClose={() => setTaggedSheetOpen(false)} onOpen={openProfile} />
 
@@ -1121,7 +1242,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: SP.xs,
     backgroundColor: CARD_ELEVATED,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs,
     borderWidth: 1,
@@ -1295,7 +1416,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 6,
     backgroundColor: `${PURPLE}E0`,
-    borderRadius: 22,
+    borderRadius: radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 8,
     maxWidth: 230,
@@ -1338,7 +1459,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   closeBtnWrap: { position: 'absolute', right: SP.sm },
   taggedChip: {
-    position: 'absolute', left: SP.md, zIndex: 11, minWidth: 44, height: 44, borderRadius: 22,
+    position: 'absolute', left: SP.md, zIndex: 11, minWidth: 44, height: 44, borderRadius: radius.md,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: SP.sm,
     backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)',
   },

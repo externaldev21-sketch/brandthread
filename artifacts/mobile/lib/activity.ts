@@ -163,7 +163,7 @@ export function groupByRecency<T extends Pick<ActivityItem, 'isRead' | 'createdA
 
 /** Types where repeat events read better as one row. Orders/payments never merge. */
 export const AGGREGATED_TYPES: ReadonlySet<string> = new Set([
-  'post_like', 'post_comment', 'new_follower', 'story_like', 'repost',
+  'post_like', 'post_comment', 'new_follower', 'story_like', 'repost', 'post_save', 'post_share',
 ]);
 
 /**
@@ -308,7 +308,8 @@ export function activityDetail(row: ActivityRow): string | null {
   // Merged comment rows would show only the newest excerpt; keep them tidy.
   if (row.type === 'post_comment' && row.ids.length > 1) return null;
   if (row.type === 'post_like' || row.type === 'new_follower' || row.type === 'story_like' || row.type === 'repost'
-    || row.type === 'story_mention' || row.type === 'story_reshare') return null;
+    || row.type === 'story_mention' || row.type === 'story_reshare' || row.type === 'post_save'
+    || row.type === 'post_share' || row.type === 'post_tag') return null;
   const body = row.body?.trim();
   if (!body) return null;
   if (row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention' || row.type === 'comment_like') {
@@ -377,7 +378,7 @@ export const ACTIVITY_CHIPS: readonly { key: ActivityChip; label: string }[] = [
 const FOLLOW_TYPES = new Set(['new_follower']);
 const LIKE_TYPES = new Set(['post_like', 'story_like', 'comment_like']);
 const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'mention', 'story_mention']);
-const THREAD_CASH_TYPES = new Set(['thread_cash_received']);
+const THREAD_CASH_TYPES = new Set(['thread_cash_received', 'referral_joined', 'referral_reward']);
 
 /** Which chip an item belongs to; 'other' rows (reposts, drops…) show under All only. */
 export function activityCategory(item: Pick<ActivityItem, 'category' | 'type'>): Exclude<ActivityChip, 'all'> | 'other' {
@@ -453,9 +454,15 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'mention':
     case 'story_mention': return 'at-sign';
     case 'new_follower': return 'user-plus';
+    case 'live_started': return 'radio';
+    case 'post_save': return 'bookmark';
+    case 'post_share': return 'send';
+    case 'post_tag': return 'tag';
     case 'repost':
     case 'story_reshare': return 'repeat';
-    case 'thread_cash_received': return 'dollar-sign';
+    case 'thread_cash_received':
+    case 'referral_reward': return 'dollar-sign';
+    case 'referral_joined': return 'user-plus';
     case 'price_drop': return 'trending-down';
     case 'back_in_stock':
     case 'waitlist_restock':
@@ -608,10 +615,24 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return row.type === 'story_mention'
         ? storyMentionViewerHref(id)
         : `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}`;
+    case 'live':
+      return id ? `/buyer-live?streamId=${q(id)}` : null;
+
+    case 'cart':
+      return '/(buyer)/cart';
+    case 'giveaway':
+      return id ? `/giveaway?code=${q(id)}` : null;
     case 'thread_cash_transfer':
       return '/thread-cash';
+    case 'referral':
+      return '/buyer-invite';
+    case 'live_cohost':
+      // "Invited you to co-host their live" — opens the accept / decline screen.
+      return id ? `/live-cohost-invite?streamId=${q(id)}` : '/live-cohost-invite';
     case 'product':
       return id ? `/buyer-product-detail?productId=${q(id)}` : null;
+    case 'product_question':
+      return '/seller-questions';
     case 'user': {
       if (!id) return null;
       const params = [`userId=${q(id)}`];
@@ -629,6 +650,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       // the low-stock filter is the closest equivalent destination without
       // a product id to deep-link straight to one variant's stock editor.
       return '/(tabs)/products?filter=low-stock';
+    case 'dispute':
+      return id ? `/dispute-detail?disputeId=${q(id)}` : '/disputes';
     case 'payout':
       return '/payouts';
     case 'subscription_invoice':

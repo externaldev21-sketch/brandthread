@@ -105,16 +105,18 @@ export function TranslationLink({ translation, style }: {
 }
 
 /** A caption <Text> with its translation link below — drop-in for `<Text style numberOfLines>{caption}</Text>`. */
-export function TranslatableCaption({ text, style, numberOfLines, linkStyle }: {
+export function TranslatableCaption({ text, style, numberOfLines, linkStyle, renderText }: {
   text: string;
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
   linkStyle?: StyleProp<TextStyle>;
+  /** Renders the shown text inside the caption <Text> (e.g. hashtag/mention spans). */
+  renderText?: (text: string) => React.ReactNode;
 }) {
   const translation = useCaptionTranslation(text);
   return (
     <>
-      <Text style={style} numberOfLines={numberOfLines}>{translation.text}</Text>
+      <Text style={style} numberOfLines={numberOfLines}>{renderText ? renderText(translation.text) : translation.text}</Text>
       <TranslationLink translation={translation} style={linkStyle} />
     </>
   );

@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
+import { SaveHeart } from '@/components/SaveHeart';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
@@ -73,6 +74,17 @@ export const ProfileProductTile = React.memo(function ProfileProductTile({
           </>
         )}
       </PressableScale>
+      {/* Visitors only — the owner's tile carries the edit badge instead.
+          Sibling of the tile Pressable, never nested. */}
+      {!owner ? (
+        <SaveHeart
+          productId={product.id}
+          title={product.name}
+          priceCents={product.priceCents > 0 ? product.priceCents : undefined}
+          size={26}
+          style={{ position: 'absolute', top: SP.sm, right: SP.sm }}
+        />
+      ) : null}
     </View>
   );
 });

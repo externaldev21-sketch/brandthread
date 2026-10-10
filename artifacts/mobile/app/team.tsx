@@ -12,6 +12,7 @@ import { useApi } from '@/lib/api';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { FONT } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -306,7 +307,7 @@ export default function TeamScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Team Management" subtitle="Staff, permissions & tasks" />
+      <ScreenHeader title="Team Management" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
@@ -336,7 +337,7 @@ export default function TeamScreen() {
               onPress={() => { setLoading(true); load(); }}
               accessibilityRole="button"
               accessibilityLabel="Retry loading team"
-              style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.primary }}
+              style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.md, backgroundColor: colors.primary }}
             >
               <Text style={{ color: colors.primaryForeground, fontSize: 13, fontFamily: FONT.semibold }}>Retry</Text>
             </TouchableOpacity>
@@ -352,7 +353,7 @@ export default function TeamScreen() {
               onPress={openInvite}
               accessibilityRole="button"
               accessibilityLabel="Invite teammate"
-              style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.primary }}
+              style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.md, backgroundColor: colors.primary }}
             >
               <Text style={{ color: colors.primaryForeground, fontSize: 13, fontFamily: FONT.semibold }}>Invite teammate</Text>
             </TouchableOpacity>

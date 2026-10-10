@@ -118,15 +118,17 @@ export const ProductCard = React.memo(function ProductCard({
         overshootRight={false}
         friction={2}
       >
-        <PressableScale
-          style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}
-          onPress={() => onPress(product)}
-          onPressIn={onPressIn ? () => onPressIn(product) : undefined}
-          activeScale={0.98}
-          accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
-        >
+        <View style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {/* Hero image */}
           <View style={[s.imageBox, { height: imageHeight }]}>
+            <PressableScale
+              style={StyleSheet.absoluteFill}
+              onPress={() => onPress(product)}
+              onPressIn={onPressIn ? () => onPressIn(product) : undefined}
+              activeScale={0.98}
+              accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
+            >
+            <View style={{ height: imageHeight, width: '100%' }}>
             {coverUri ? (
               <CachedImage source={{ uri: coverUri }} style={s.image} contentFit="cover" recyclingKey={product.id} />
             ) : (
@@ -137,6 +139,8 @@ export const ProductCard = React.memo(function ProductCard({
             <View style={s.chipTopLeft}>
               <StatusBadge label={statusLabel(product.status)} variant={statusVariant(product.status)} small />
             </View>
+            </View>
+            </PressableScale>
 
             {/* Quick more button */}
             <PressableScale
@@ -166,6 +170,11 @@ export const ProductCard = React.memo(function ProductCard({
 
           {/* Content below image */}
           <View style={s.content}>
+            <PressableScale
+              onPress={() => onPress(product)}
+              onPressIn={onPressIn ? () => onPressIn(product) : undefined}
+              accessibilityLabel={`View ${product.name}`}
+            >
             <Text style={[s.name, { color: theme.text }]} numberOfLines={2}>{product.name}</Text>
             <Text style={[s.meta, { color: theme.muted }]} numberOfLines={1}>
               {product.category}
@@ -181,6 +190,7 @@ export const ProductCard = React.memo(function ProductCard({
                 <Text style={[s.discount, { color: theme.error }]}>-{discountPct}%</Text>
               )}
             </View>
+            </PressableScale>
 
             {stock > threshold && (
               <PressableScale
@@ -192,7 +202,7 @@ export const ProductCard = React.memo(function ProductCard({
               </PressableScale>
             )}
           </View>
-        </PressableScale>
+        </View>
       </Swipeable>
     </View>
   );

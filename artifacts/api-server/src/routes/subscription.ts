@@ -26,6 +26,7 @@ import { logger } from "../lib/logger";
 import { getWebOrigin } from "../lib/webOrigin";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
+import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
 import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
 
 const router = Router();
@@ -101,6 +102,30 @@ async function ensureCustomer(stripe: any, clerkUserId: string): Promise<string>
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/seller/subscription/perks
+ * What each plan includes (price, platform commission, monthly AI credits,
+ * advanced analytics), built from planCatalogue + planPerks + the AI credit
+ * allowance, plus the caller's verified plan. Paywall copy reads this so the
+ * numbers are never hardcoded in the app. Contains no billing details, so any
+ * team member may read it. If the plan cannot be verified, `currentPlan` is
+ * null and the catalogue is still returned.
+ */
+router.get("/perks", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  let currentPlan: string | null = null;
+  try {
+    currentPlan = (await getEffectiveEntitlement(ownerId)).planId;
+  } catch (err) {
+    req.log?.warn({ err }, "Perks: plan lookup failed");
+  }
+  res.json({
+    plans: buildPlanPerks(),
+    currentPlan,
+    hasAdvancedAnalytics: currentPlan ? hasAdvancedAnalytics(currentPlan) : false,
+  });
+});
 
 /**
  * GET /api/seller/subscription/status

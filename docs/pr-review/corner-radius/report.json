@@ -1,0 +1,2620 @@
+[
+  {
+    "id": "buyer-account-center",
+    "textFitFindingsBefore": 3,
+    "textFitFindingsAfter": 3,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Password, two-factor authent\"",
+        "rect": [
+          77,
+          336,
+          253,
+          18
+        ],
+        "reasons": [
+          "scrollWidth 324 > clientWidth 253",
+          "ellipsis-truncated"
+        ]
+      },
+      {
+        "el": "div:\"Ad and recommendation prefer\"",
+        "rect": [
+          77,
+          599,
+          253,
+          20
+        ],
+        "reasons": [
+          "scrollWidth 270 > clientWidth 253",
+          "ellipsis-truncated"
+        ]
+      },
+      {
+        "el": "div:\"Permanently delete your acco\"",
+        "rect": [
+          77,
+          678,
+          253,
+          18
+        ],
+        "reasons": [
+          "scrollWidth 262 > clientWidth 253",
+          "ellipsis-truncated"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 0,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-activity",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 8,
+    "changedPixels": 2191,
+    "inCornerRegions": 2191,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-archive",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 2,
+    "changedPixels": 730,
+    "inCornerRegions": 730,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-cart",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 1812,
+    "inCornerRegions": 1812,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-checkout",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 3,
+    "changedPixels": 1168,
+    "inCornerRegions": 1166,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 2,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [
+      [
+        15,
+        235
+      ],
+      [
+        15,
+        236
+      ]
+    ],
+    "unexplainedBox": [
+      15,
+      235,
+      15,
+      236
+    ],
+    "unexplainedMaxChannelDelta": 6,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-close-friends",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 2,
+    "changedPixels": 604,
+    "inCornerRegions": 604,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-discover",
+    "textFitFindingsBefore": 11,
+    "textFitFindingsAfter": 13,
+    "textFitFindingsIntroduced": [
+      {
+        "el": "div:\"Onyx Anorak\"",
+        "rect": [
+          300,
+          3104,
+          130,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"$245.00\"",
+        "rect": [
+          300,
+          3122,
+          130,
+          15
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Drops\"",
+        "rect": [
+          358,
+          147,
+          37,
+          18
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"Drop 04 is live. Ember hoodi\"",
+        "rect": [
+          10,
+          271,
+          110,
+          42
+        ],
+        "reasons": [
+          "scrollWidth 116 > clientWidth 110",
+          "ellipsis-truncated"
+        ]
+      },
+      {
+        "el": "div:\"Ends in 1d\"",
+        "rect": [
+          360,
+          620,
+          55,
+          14
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"Boxy Fleece Hoodie — Graphit\"",
+        "rect": [
+          344,
+          818,
+          152,
+          32
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"Ember & Ash\"",
+        "rect": [
+          344,
+          854,
+          152,
+          15
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"$88.00\"",
+        "rect": [
+          344,
+          873,
+          152,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"Ends in 1d\"",
+        "rect": [
+          360,
+          1506,
+          55,
+          14
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"Boxy Fleece Hoodie — Graphit\"",
+        "rect": [
+          344,
+          1704,
+          152,
+          32
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"Ember & Ash\"",
+        "rect": [
+          344,
+          1740,
+          152,
+          15
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"$88.00\"",
+        "rect": [
+          344,
+          1759,
+          152,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"Quiet Hours\"",
+        "rect": [
+          328,
+          2444,
+          75,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"Onyx Anorak\"",
+        "rect": [
+          300,
+          3104,
+          130,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      },
+      {
+        "el": "div:\"$245.00\"",
+        "rect": [
+          300,
+          3122,
+          130,
+          15
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 25,
+    "changedPixels": 5895,
+    "inCornerRegions": 5362,
+    "behindTabBarBlur": 251,
+    "animationNoise": 0,
+    "unexplainedPixels": 282,
+    "nonRadiusDomDiffs": 598,
+    "nonRadiusDomDiffSample": [
+      "#26 <div > rect 0,0,393,2813 -> 0,0,393,3279",
+      "#26 <div > height: 2813px -> 3279px",
+      "#366 <div > rect 0,2703,393,0 -> 0,2703,393,174",
+      "#366 <div > height: 0px -> 174px"
+    ],
+    "beforeBuildUnstable": true,
+    "unexplainedSample": [
+      [
+        354,
+        748
+      ],
+      [
+        355,
+        748
+      ],
+      [
+        356,
+        748
+      ],
+      [
+        357,
+        748
+      ],
+      [
+        358,
+        748
+      ],
+      [
+        359,
+        748
+      ],
+      [
+        360,
+        748
+      ],
+      [
+        357,
+        749
+      ]
+    ],
+    "unexplainedBox": [
+      354,
+      748,
+      376,
+      849
+    ],
+    "unexplainedMaxChannelDelta": 6,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-drops",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 0,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-edit-profile",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 0,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-feed",
+    "textFitFindingsBefore": 60,
+    "textFitFindingsAfter": 60,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"$220.00 +1\"",
+        "rect": [
+          80,
+          620,
+          62,
+          16
+        ],
+        "reasons": [
+          "scrollWidth 71 > clientWidth 62",
+          "ellipsis-truncated",
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          621,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$88.00\"",
+        "rect": [
+          80,
+          1472,
+          44,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/22)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          132,
+          1473,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (108/42)"
+        ]
+      },
+      {
+        "el": "div:\"$165.00\"",
+        "rect": [
+          80,
+          2324,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          2325,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$92.00 +1\"",
+        "rect": [
+          80,
+          3176,
+          62,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          3177,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$198.00\"",
+        "rect": [
+          80,
+          4028,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          4029,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$220.00 +1\"",
+        "rect": [
+          80,
+          4880,
+          62,
+          16
+        ],
+        "reasons": [
+          "scrollWidth 71 > clientWidth 62",
+          "ellipsis-truncated",
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          4881,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$88.00\"",
+        "rect": [
+          80,
+          5732,
+          44,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/22)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          132,
+          5733,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (108/42)"
+        ]
+      },
+      {
+        "el": "div:\"$165.00\"",
+        "rect": [
+          80,
+          6584,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          6585,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$92.00 +1\"",
+        "rect": [
+          80,
+          7436,
+          62,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          7437,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$198.00\"",
+        "rect": [
+          80,
+          8288,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          8289,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$220.00 +1\"",
+        "rect": [
+          80,
+          9140,
+          62,
+          16
+        ],
+        "reasons": [
+          "scrollWidth 71 > clientWidth 62",
+          "ellipsis-truncated",
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          9141,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$88.00\"",
+        "rect": [
+          80,
+          9992,
+          44,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/22)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          132,
+          9993,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (108/42)"
+        ]
+      },
+      {
+        "el": "div:\"$165.00\"",
+        "rect": [
+          80,
+          10844,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          10845,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$92.00 +1\"",
+        "rect": [
+          80,
+          11696,
+          62,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          11697,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$198.00\"",
+        "rect": [
+          80,
+          12548,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          12549,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$220.00 +1\"",
+        "rect": [
+          80,
+          13400,
+          62,
+          16
+        ],
+        "reasons": [
+          "scrollWidth 71 > clientWidth 62",
+          "ellipsis-truncated",
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          13401,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$88.00\"",
+        "rect": [
+          80,
+          14252,
+          44,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/22)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          132,
+          14253,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (108/42)"
+        ]
+      },
+      {
+        "el": "div:\"$165.00\"",
+        "rect": [
+          80,
+          15104,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          15105,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$92.00 +1\"",
+        "rect": [
+          80,
+          15956,
+          62,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          15957,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$198.00\"",
+        "rect": [
+          80,
+          16808,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          16809,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$220.00 +1\"",
+        "rect": [
+          80,
+          17660,
+          62,
+          16
+        ],
+        "reasons": [
+          "scrollWidth 71 > clientWidth 62",
+          "ellipsis-truncated",
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          17661,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$88.00\"",
+        "rect": [
+          80,
+          18512,
+          44,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/22)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          132,
+          18513,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (108/42)"
+        ]
+      },
+      {
+        "el": "div:\"$165.00\"",
+        "rect": [
+          80,
+          19364,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          19365,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$92.00 +1\"",
+        "rect": [
+          80,
+          20216,
+          62,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          20217,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$198.00\"",
+        "rect": [
+          80,
+          21068,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          21069,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$220.00 +1\"",
+        "rect": [
+          80,
+          21920,
+          62,
+          16
+        ],
+        "reasons": [
+          "scrollWidth 71 > clientWidth 62",
+          "ellipsis-truncated",
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          21921,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$88.00\"",
+        "rect": [
+          80,
+          22772,
+          44,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/22)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          132,
+          22773,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (108/42)"
+        ]
+      },
+      {
+        "el": "div:\"$165.00\"",
+        "rect": [
+          80,
+          23624,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          23625,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      },
+      {
+        "el": "div:\"$92.00 +1\"",
+        "rect": [
+          80,
+          24476,
+          62,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/40)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          150,
+          24477,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (126/60)"
+        ]
+      },
+      {
+        "el": "div:\"$198.00\"",
+        "rect": [
+          80,
+          25328,
+          52,
+          16
+        ],
+        "reasons": [
+          "overflows parent horizontally (56/30)"
+        ]
+      },
+      {
+        "el": "div:\"\"",
+        "rect": [
+          140,
+          25329,
+          12,
+          14
+        ],
+        "reasons": [
+          "overflows parent horizontally (116/50)"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 10,
+    "changedPixels": 2328,
+    "inCornerRegions": 2268,
+    "behindTabBarBlur": 37,
+    "animationNoise": 0,
+    "unexplainedPixels": 23,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": true,
+    "unexplainedSample": [
+      [
+        162,
+        773
+      ],
+      [
+        165,
+        773
+      ],
+      [
+        168,
+        773
+      ],
+      [
+        169,
+        773
+      ],
+      [
+        170,
+        773
+      ],
+      [
+        181,
+        773
+      ],
+      [
+        182,
+        773
+      ],
+      [
+        183,
+        773
+      ]
+    ],
+    "unexplainedBox": [
+      162,
+      773,
+      216,
+      773
+    ],
+    "unexplainedMaxChannelDelta": 1,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-friends",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 10,
+    "changedPixels": 1830,
+    "inCornerRegions": 1830,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-inbox",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Your thoughts go here...\"",
+        "rect": [
+          20,
+          156,
+          64,
+          14
+        ],
+        "reasons": [
+          "scrollWidth 128 > clientWidth 64",
+          "ellipsis-truncated"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 12,
+    "changedPixels": 5193,
+    "inCornerRegions": 2395,
+    "behindTabBarBlur": 0,
+    "animationNoise": 2798,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 22,
+    "nonRadiusDomDiffSample": [
+      "#34 <div > rect 0,135,393,144 -> 0,135.2,393,144",
+      "#34 <div > opacity: 1 -> 0.983359",
+      "#34 <div > transform: matrix(1, 0, 0, 1, 0, 0) -> matrix(1, 0, 0, 1, 0, 0.19969)",
+      "#35 <div > rect 0,135,393,128 -> 0,135.2,393,128"
+    ],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-invite",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 0,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-live",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 0,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-orders",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Returns\"",
+        "rect": [
+          347,
+          129,
+          48,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 17,
+    "changedPixels": 3781,
+    "inCornerRegions": 3781,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-profile",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 15,
+    "changedPixels": 1988,
+    "inCornerRegions": 1981,
+    "behindTabBarBlur": 6,
+    "animationNoise": 0,
+    "unexplainedPixels": 1,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [
+      [
+        167,
+        825
+      ]
+    ],
+    "unexplainedBox": [
+      167,
+      825,
+      167,
+      825
+    ],
+    "unexplainedMaxChannelDelta": 1,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-qr-code",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"https://brandthread.app/u/jo\"",
+        "rect": [
+          147,
+          764,
+          193,
+          16
+        ],
+        "reasons": [
+          "scrollWidth 240 > clientWidth 193",
+          "ellipsis-truncated"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 1,
+    "changedPixels": 562,
+    "inCornerRegions": 562,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-saved",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 2,
+    "changedPixels": 644,
+    "inCornerRegions": 644,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "buyer-story-create",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 0,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "forgot-password",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 0,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "help",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Feature\"",
+        "rect": [
+          364,
+          1682,
+          48,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 5,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "manufacturer-compare",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 2772,
+    "inCornerRegions": 2772,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "manufacturer-hub",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Screen Printing\"",
+        "rect": [
+          320,
+          455,
+          95,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 26,
+    "changedPixels": 9030,
+    "inCornerRegions": 9030,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "onboarding",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 2,
+    "changedPixels": 1220,
+    "inCornerRegions": 1220,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "production-detail",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 2772,
+    "inCornerRegions": 2772,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 5,
+    "nonRadiusDomDiffSample": [
+      "#30 <div > rect 182.84,458.84,27.31,27.31 -> 182.46,458.46,28.07,28.07",
+      "#30 <div > transform: matrix(-0.498948, 0.866632, -0.866632, -0.498948, 0, 0) -> matrix(-0.615261, 0.788324, -0.788324, -0.615261, 0, 0)",
+      "#31 <svg > rect 182.84,458.84,27.31,27.31 -> 182.46,458.46,28.07,28.07",
+      "#32 <circle > rect 184.55,460.55,23.9,23.9 -> 184.22,460.22,24.56,24.56"
+    ],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "rfq-list",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 2772,
+    "inCornerRegions": 2772,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "rfq-post",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 24,
+    "changedPixels": 6333,
+    "inCornerRegions": 6333,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-add-product",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 19,
+    "changedPixels": 329,
+    "inCornerRegions": 329,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-analytics-sales",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 19,
+    "changedPixels": 4528,
+    "inCornerRegions": 4528,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-brand",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 25,
+    "changedPixels": 6531,
+    "inCornerRegions": 6531,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-content",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Archived\"",
+        "rect": [
+          358,
+          423,
+          56,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 19,
+    "changedPixels": 4870,
+    "inCornerRegions": 4870,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-create-post",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 17,
+    "changedPixels": 530,
+    "inCornerRegions": 530,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-customers",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 17,
+    "changedPixels": 3698,
+    "inCornerRegions": 3698,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-dashboard",
+    "textFitFindingsBefore": 5,
+    "textFitFindingsAfter": 5,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"$142.00\"",
+        "rect": [
+          240,
+          1684,
+          52,
+          19
+        ],
+        "reasons": [
+          "scrollWidth 60 > clientWidth 52",
+          "ellipsis-truncated"
+        ]
+      },
+      {
+        "el": "div:\"$98.00\"",
+        "rect": [
+          240,
+          1756,
+          52,
+          19
+        ],
+        "reasons": [
+          "scrollWidth 55 > clientWidth 52",
+          "ellipsis-truncated"
+        ]
+      },
+      {
+        "el": "div:\"$264.00\"",
+        "rect": [
+          240,
+          1828,
+          14,
+          19
+        ],
+        "reasons": [
+          "scrollWidth 63 > clientWidth 14",
+          "ellipsis-truncated"
+        ]
+      },
+      {
+        "el": "div:\"$220.00\"",
+        "rect": [
+          240,
+          1900,
+          41,
+          19
+        ],
+        "reasons": [
+          "scrollWidth 63 > clientWidth 41",
+          "ellipsis-truncated"
+        ]
+      },
+      {
+        "el": "div:\"$98.00\"",
+        "rect": [
+          240,
+          1972,
+          30,
+          19
+        ],
+        "reasons": [
+          "scrollWidth 55 > clientWidth 30",
+          "ellipsis-truncated"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 24,
+    "changedPixels": 6159,
+    "inCornerRegions": 6159,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-design-canvas",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-design",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 2772,
+    "inCornerRegions": 2772,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-drop-create",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Mon, Sep 21\"",
+        "rect": [
+          324,
+          476,
+          76,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 83,
+    "changedPixels": 6885,
+    "inCornerRegions": 6885,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-following",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 6220,
+    "inCornerRegions": 6220,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-go-live",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-inbox",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 16,
+    "changedPixels": 3180,
+    "inCornerRegions": 3180,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-live",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 0,
+    "inCornerRegions": 0,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-locations",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 15,
+    "changedPixels": 2887,
+    "inCornerRegions": 2887,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-marketing",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 6910,
+    "inCornerRegions": 6910,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-more",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Bank account and payout hist\"",
+        "rect": [
+          89,
+          1944,
+          239,
+          14
+        ],
+        "reasons": [
+          "scrollWidth 292 > clientWidth 239",
+          "ellipsis-truncated"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 4269,
+    "inCornerRegions": 4269,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-orders",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Archived\"",
+        "rect": [
+          387,
+          183,
+          56,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 29,
+    "changedPixels": 8333,
+    "inCornerRegions": 8241,
+    "behindTabBarBlur": 0,
+    "animationNoise": 86,
+    "unexplainedPixels": 6,
+    "nonRadiusDomDiffs": 8,
+    "nonRadiusDomDiffSample": [
+      "#123 <div > opacity: 0.954818 -> 0.970949",
+      "#172 <div > opacity: 0.963675 -> 0.976446",
+      "#223 <div > opacity: 0.962327 -> 0.972166",
+      "#281 <div > opacity: 0.965005 -> 0.976821"
+    ],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [
+      [
+        128,
+        723
+      ],
+      [
+        129,
+        723
+      ],
+      [
+        131,
+        723
+      ],
+      [
+        126,
+        724
+      ],
+      [
+        125,
+        725
+      ],
+      [
+        133,
+        725
+      ]
+    ],
+    "unexplainedBox": [
+      125,
+      723,
+      133,
+      725
+    ],
+    "unexplainedMaxChannelDelta": 1,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-payments",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 2772,
+    "inCornerRegions": 2772,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-products",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Low Stock\"",
+        "rect": [
+          368,
+          183,
+          64,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 20,
+    "changedPixels": 9751,
+    "inCornerRegions": 9751,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-settings",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 3601,
+    "inCornerRegions": 3601,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-shipping",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 15,
+    "changedPixels": 3679,
+    "inCornerRegions": 3679,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-store-builder",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 18,
+    "changedPixels": 5484,
+    "inCornerRegions": 5484,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-store-editor",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Product Page\"",
+        "rect": [
+          374,
+          158,
+          83,
+          16
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 2772,
+    "inCornerRegions": 2772,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-store-generate",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 26,
+    "changedPixels": 3420,
+    "inCornerRegions": 3420,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-studio",
+    "textFitFindingsBefore": 1,
+    "textFitFindingsAfter": 1,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Story Reel\"",
+        "rect": [
+          334,
+          1329,
+          84,
+          14
+        ],
+        "reasons": [
+          "cut off at the screen edge"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 15,
+    "changedPixels": 3888,
+    "inCornerRegions": 3888,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "seller-team",
+    "textFitFindingsBefore": 2,
+    "textFitFindingsAfter": 2,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [
+      {
+        "el": "div:\"Products, orders, payouts, m\"",
+        "rect": [
+          91,
+          318,
+          200,
+          15
+        ],
+        "reasons": [
+          "scrollWidth 252 > clientWidth 200",
+          "ellipsis-truncated"
+        ]
+      },
+      {
+        "el": "div:\"Invited 2d ago · Expires in \"",
+        "rect": [
+          91,
+          391,
+          152,
+          15
+        ],
+        "reasons": [
+          "scrollWidth 161 > clientWidth 152",
+          "ellipsis-truncated"
+        ]
+      }
+    ],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 3007,
+    "inCornerRegions": 3007,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "share-profile",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 2,
+    "changedPixels": 1146,
+    "inCornerRegions": 1146,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "shopping-preferences",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 11,
+    "changedPixels": 560,
+    "inCornerRegions": 560,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "sign-in",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 4,
+    "changedPixels": 1076,
+    "inCornerRegions": 1052,
+    "behindTabBarBlur": 0,
+    "animationNoise": 24,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "subscription",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 5588,
+    "inCornerRegions": 5588,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "tech-pack",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 2788,
+    "inCornerRegions": 2788,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  },
+  {
+    "id": "thread-cash",
+    "textFitFindingsBefore": 0,
+    "textFitFindingsAfter": 0,
+    "textFitFindingsIntroduced": [],
+    "textFitFindingsAfterList": [],
+    "size": "393x852",
+    "radiusChangedElements": 14,
+    "changedPixels": 3612,
+    "inCornerRegions": 3612,
+    "behindTabBarBlur": 0,
+    "animationNoise": 0,
+    "unexplainedPixels": 0,
+    "nonRadiusDomDiffs": 0,
+    "nonRadiusDomDiffSample": [],
+    "beforeBuildUnstable": false,
+    "unexplainedSample": [],
+    "unexplainedBox": null,
+    "unexplainedMaxChannelDelta": 0,
+    "unexplainedPixelsOver24": 0
+  }
+]

@@ -20,8 +20,13 @@ import postVideoRouter, {
   setComposedMediaVisibility,
 } from "./post-video";
 import postSlideRouter from "./post-slide";
-import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
-import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import postUploadRouter from "./post-upload";
+import postCarouselRouter from "./post-carousel";
+import { MAX_SLIDES_BY_SURFACE, isPostSurface, type PostSurface } from "../lib/postLimits";
+import { validateSlideOverlays } from "../lib/slideValidation";
+import { notifyPostLike, notifyPostShare, notifyRepost } from "../lib/activityEvents";
+import { MAX_DRAFTS_PER_USER, onPostPublished, scheduleWindowError } from "../lib/postPublish";
+import { scheduleAutoCaptions } from "../lib/captions";
 import { repostsAllowedBy } from "../lib/interactionSettings";
 import { checkRemix, remixCredits } from "../lib/remix";
 import { cleanTaggedUserIds, MAX_POST_USER_TAGS, recordPostUserTags } from "../lib/tagApproval";
@@ -34,7 +39,10 @@ import {
   isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs, signedUrlForObjectPath,
 } from "../lib/mediaModerationStore";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { locationsByPlaceId, resolvePostLocation, withLocation } from "../lib/places";
 import { decodeCursor, encodeCursor } from "../lib/cursor";
+import { mergeHashtags, syncPostHashtags } from "../lib/hashtags";
+import { attachQuoteData, postCardImage } from "../lib/quotedPosts";
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -59,9 +67,12 @@ function validObjectPath(value: unknown): value is string {
 }
 
 /** Published, public, not held/removed by moderation, author in good standing. */
-function visiblePostCondition(now = new Date()) {
-  return publicPostCondition(now);
+function visiblePostCondition(now = new Date(), viewerId?: string | null) {
+  return publicPostCondition(now, viewerId);
 }
+
+/** Only Thread-surface posts (never a profile-only POST) feed the Threads feed. */
+const threadSurfaceCondition = () => eq(posts.surface, "thread");
 
 /** Current access rule shared by watch recording and history reads. */
 function watchedPostAccessCondition(viewerId: string) {
@@ -164,6 +175,8 @@ async function productMinPrices(productIds: string[]): Promise<Record<string, nu
 
 router.use("/", postVideoRouter);
 router.use("/", postSlideRouter);
+router.use("/", postUploadRouter);
+router.use("/", postCarouselRouter);
 
 // ─── GET /api/posts/repost-context ────────────────────────────────────────────
 // Returns only the small, privacy-safe avatar context needed for Thread cards.
@@ -284,7 +297,7 @@ router.get("/repost-context", requireAuth, async (req, res) => {
   }
 });
 
-async function postDetails(postRows: typeof posts.$inferSelect[]) {
+async function postDetails(postRows: typeof posts.$inferSelect[], viewerId: string | null = null) {
   if (postRows.length === 0) return [];
   const postIds = postRows.map((post) => post.id);
   const sellerIds = [...new Set(postRows.map((post) => post.userId))];
@@ -322,6 +335,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
       .groupBy(savedItems.targetId),
     visibleCommentCounts(postIds),
   ]);
+  const locationById = await locationsByPlaceId(postRows.map((post) => post.placeId));
   const sellerById = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
   const tagsByPost: Record<string, typeof tagRows> = {};
   for (const tag of tagRows) (tagsByPost[tag.postId] ??= []).push(tag);
@@ -334,12 +348,12 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
   const savesByPost = countByPost(saveRows);
   const commentsByPost = Object.fromEntries(commentRows);
 
-  return postRows.map((post) => {
+  const detailed = postRows.map((post) => {
     const seller = sellerById.get(post.userId);
     const isDue = post.postStatus === "scheduled" &&
       !!post.scheduledAt && post.scheduledAt.getTime() <= Date.now();
     return {
-      ...post,
+      ...withLocation(post, locationById),
       postStatus: isDue ? "published" : post.postStatus,
       seller: seller ? {
         displayName: seller.displayName,
@@ -360,6 +374,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
       commentsCount: commentsByPost[post.id] ?? 0,
     };
   });
+  return attachQuoteData(detailed, viewerId);
 }
 
 // ─── GET /api/posts/feed ──────────────────────────────────────────────────────
@@ -396,8 +411,10 @@ router.get("/feed", requireAuth, async (req, res) => {
         mediaUrls:   posts.mediaUrls,
         mediaType:   posts.mediaType,
         aspectRatio: posts.aspectRatio,
+        surface: posts.surface,
         caption:     posts.caption,
         hashtags:    posts.hashtags,
+        placeId:     posts.placeId,
         styleTags:   posts.styleTags,
         sound:       posts.sound,
         visibility:  posts.visibility,
@@ -420,6 +437,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       ))
       .where(and(
         visiblePostCondition(),
+        threadSurfaceCondition(),
         notBlockedWith(clerkId, posts.userId),
         cursor ? sql`(${posts.createdAt}, ${posts.id}) < (${cursor.ts}::timestamp, ${cursor.id}::uuid)` : undefined,
       ))
@@ -527,7 +545,8 @@ router.get("/feed", requireAuth, async (req, res) => {
     }
 
     const remixOfByPost = await remixCredits(rows);
-    const result = rows.map((p) => ({
+    const feedLocations = await locationsByPlaceId(rows.map((p) => p.placeId));
+    const baseResult = rows.map((p) => ({
       id:        p.id,
       userId:    p.userId,
       remixOf:   remixOfByPost.get(p.id) ?? null,
@@ -536,7 +555,9 @@ router.get("/feed", requireAuth, async (req, res) => {
       mediaUrls: p.mediaUrls,
       mediaType: p.mediaType,
       aspectRatio: p.aspectRatio,
+      surface: p.surface,
       caption:   p.caption,
+      location:  p.placeId ? feedLocations.get(p.placeId) ?? null : null,
       hashtags:  p.hashtags,
       styleTags: p.styleTags,
       sound:     p.sound,
@@ -561,6 +582,8 @@ router.get("/feed", requireAuth, async (req, res) => {
       savesCount:    savesByPost[p.id]    ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
     }));
+
+    const result = await attachQuoteData(baseResult, clerkId);
 
     // Stable-sort: boosted posts surface first, rest preserve createdAt DESC order
     result.sort((a, b) => {
@@ -604,9 +627,12 @@ router.post("/", requireAuth, async (req, res) => {
     mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath,
     mediaPaths: requestedMediaPaths, slideOverlays: requestedSlideOverlays,
     mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
-    sound, visibility, taggedProductIds, isDraft, scheduledAt,
+    sound, visibility, taggedProductIds, isDraft, scheduledAt, quotedPostId, surface: requestedSurface,
+    slides: requestedSlides,
     remixOfPostId, taggedUserIds: requestedTaggedUserIds,
   } = req.body as {
+    surface?:           string;
+    slides?:            unknown;
     mediaUrl?:          string;
     thumbnailUrl?:      string;
     mediaPath?:         string;
@@ -624,6 +650,7 @@ router.post("/", requireAuth, async (req, res) => {
     taggedProductIds?:  string[];
     isDraft?:           boolean;
     scheduledAt?:       string | null;
+    quotedPostId?:      string;
     /** The video this post remixes (lib/remix.ts); the author's setting decides. */
     remixOfPostId?:     string | null;
     /** People tagged on the post (lib/tagApproval.ts). */
@@ -636,12 +663,23 @@ router.post("/", requireAuth, async (req, res) => {
   // ── Buyer posting rules ─────────────────────────────────────────────────────
   // Buyers may only post photos (single or carousel) to their own profile —
   // no video, no product tagging (they don't own products), no scheduling.
+  if (requestedSurface !== undefined && !isPostSurface(requestedSurface)) {
+    return res.status(400).json({ error: "surface must be 'thread' or 'profile'" });
+  }
+  const surface: PostSurface = requestedSurface ?? (isBuyer ? "profile" : "thread");
   if (isBuyer) {
-    const requestedType = (mediaType as string | undefined) ?? "photo";
-    if (requestedType !== "photo" && requestedType !== "slideshow") {
+    // Buyers can NEVER create Threads — enforced here, not just hidden in the UI.
+    if (surface === "thread") {
       return res.status(403).json({
-        error: "Buyer accounts can only post photos (single or carousel).",
-        code:  "BUYER_PHOTO_ONLY",
+        error: "Buyer accounts cannot post to Threads.",
+        code:  "BUYER_NO_THREADS",
+      });
+    }
+    const requestedType = (mediaType as string | undefined) ?? "photo";
+    if (requestedType !== "photo" && requestedType !== "slideshow" && requestedType !== "video") {
+      return res.status(403).json({
+        error: "Buyer accounts can post photos, slideshows and videos.",
+        code:  "BUYER_MEDIA_TYPE",
       });
     }
     if (taggedProductIds && taggedProductIds.length > 0) {
@@ -705,8 +743,9 @@ router.post("/", requireAuth, async (req, res) => {
     if (!Array.isArray(requestedMediaPaths)) {
       return res.status(400).json({ error: "mediaPaths must be an array" });
     }
-    if (requestedMediaPaths.length > MAX_SLIDES) {
-      return res.status(400).json({ error: `mediaPaths: max ${MAX_SLIDES} entries` });
+    const slideCap = MAX_SLIDES_BY_SURFACE[surface];
+    if (requestedMediaPaths.length > slideCap) {
+      return res.status(400).json({ error: `mediaPaths: max ${slideCap} entries` });
     }
     if (requestedMediaPaths.some((p) => !validObjectPath(p))) {
       return res.status(400).json({ error: "mediaPaths must be an array of valid object paths" });
@@ -743,8 +782,19 @@ router.post("/", requireAuth, async (req, res) => {
     }
   }
   const now = new Date();
-  if (parsedScheduledAt && parsedScheduledAt.getTime() <= now.getTime()) {
-    return res.status(400).json({ error: "scheduledAt must be in the future" });
+  if (parsedScheduledAt) {
+    const windowError = scheduleWindowError(parsedScheduledAt, now);
+    if (windowError) return res.status(400).json({ error: windowError, code: "INVALID_SCHEDULE_TIME" });
+  }
+  if (isDraft) {
+    const [{ value: draftCount }] = await db.select({ value: count() }).from(posts)
+      .where(and(eq(posts.userId, clerkId), eq(posts.postStatus, "draft")));
+    if (Number(draftCount) >= MAX_DRAFTS_PER_USER) {
+      return res.status(409).json({
+        error: `You can keep up to ${MAX_DRAFTS_PER_USER} drafts. Delete one to save another.`,
+        code: "DRAFT_LIMIT_REACHED",
+      });
+    }
   }
   const postStatus: PostStatus = isDraft
     ? "draft"
@@ -752,8 +802,77 @@ router.post("/", requireAuth, async (req, res) => {
       ? "scheduled"
       : "published";
 
-  const mediaUrl = mediaPath ? composedMediaUrl(req, mediaPath) : (requestedMediaUrl ?? "");
-  const thumbnailUrl = thumbnailPath ? composedMediaUrl(req, thumbnailPath) : requestedThumbnailUrl;
+  // ── Quote repost ────────────────────────────────────────────────────────────
+  // `quotedPostId` + caption makes a normal post that embeds ONE direct
+  // original. The original must be publicly visible, allow reposts, and have
+  // no block relation with the quoter; a quote whose own original is deleted
+  // cannot be re-quoted. A quote-of-a-quote embeds only the quote itself.
+  let quoteTarget: typeof posts.$inferSelect | null = null;
+  if (quotedPostId !== undefined && quotedPostId !== null) {
+    if (typeof quotedPostId !== "string" || !UUID_RE.test(quotedPostId)) {
+      return res.status(400).json({ error: "quotedPostId must be a post id", code: "VALIDATION_ERROR" });
+    }
+    const unavailable = () => res.status(404).json({ error: "This post is no longer available to quote.", code: "QUOTE_TARGET_UNAVAILABLE" });
+    const [original] = await db.select().from(posts)
+      .where(and(eq(posts.id, quotedPostId), publicPostCondition()))
+      .limit(1);
+    if (!original) return unavailable();
+    if (await isBlockedEitherWay(clerkId, original.userId)) return unavailable();
+    if (original.visibility?.allowReposts === false) {
+      return res.status(403).json({ error: "Reposts are disabled for this post", code: "REPOSTS_DISABLED" });
+    }
+    if (original.repostKind === "quote") {
+      const [inner] = original.quotedPostId
+        ? await db.select({ id: posts.id }).from(posts)
+            .where(and(eq(posts.id, original.quotedPostId), publicPostCondition()))
+            .limit(1)
+        : [];
+      if (!inner) {
+        return res.status(409).json({ error: "The post this quote is about was removed, so it can't be quoted.", code: "QUOTE_OF_UNAVAILABLE" });
+      }
+    }
+    if (typeof caption !== "string" || caption.trim().length === 0) {
+      return res.status(400).json({ error: "A quote needs a caption.", code: "QUOTE_CAPTION_REQUIRED" });
+    }
+    quoteTarget = original;
+  }
+
+  // POST carousels: ordered slides, each a photo or a video. URLs are derived
+  // from the owned object paths here (never trusted from the client) so they
+  // stay valid — the media route serves them while the post is public.
+  type SlideRecord = NonNullable<typeof posts.$inferInsert.slides>[number];
+  let slideRecords: SlideRecord[] = [];
+  if (requestedSlides !== undefined) {
+    const cap = MAX_SLIDES_BY_SURFACE[surface];
+    if (!Array.isArray(requestedSlides) || requestedSlides.length === 0 || requestedSlides.length > cap) {
+      return res.status(400).json({ error: `slides: between 1 and ${cap} entries` });
+    }
+    for (const raw of requestedSlides as Array<Record<string, unknown>>) {
+      if (!raw || (raw.kind !== "photo" && raw.kind !== "video") || !validObjectPath(raw.path) || !validObjectPath(raw.thumbnailPath)) {
+        return res.status(400).json({ error: "slides must be { kind, path, thumbnailPath } with valid object paths" });
+      }
+      slideRecords.push({
+        kind: raw.kind, path: raw.path, url: composedMediaUrl(req, raw.path),
+        thumbnailPath: raw.thumbnailPath, thumbnailUrl: composedMediaUrl(req, raw.thumbnailPath),
+        ...(typeof raw.duration === "number" && Number.isFinite(raw.duration) ? { duration: raw.duration } : {}),
+      });
+    }
+    const all = slideRecords.flatMap((sl) => [sl.path, sl.thumbnailPath]);
+    if (new Set(all).size !== all.length) return res.status(400).json({ error: "slides must not reuse the same media" });
+  }
+  const singleVideo = slideRecords.length === 1 && slideRecords[0].kind === "video";
+  // A quote with no media of its own renders with the original's still image
+  // so every existing post renderer keeps working.
+  const quoteStill = quoteTarget && !requestedMediaUrl && !mediaPath &&
+    resolvedMediaPaths.length === 0 && slideRecords.length === 0
+    ? postCardImage(quoteTarget)
+    : null;
+  const mediaUrl = slideRecords.length > 0
+    ? (singleVideo ? slideRecords[0].url : (slideRecords[0].kind === "video" ? slideRecords[0].thumbnailUrl : slideRecords[0].url))
+    : mediaPath ? composedMediaUrl(req, mediaPath) : (requestedMediaUrl ?? quoteStill ?? "");
+  const thumbnailUrl = slideRecords.length > 0
+    ? slideRecords[0].thumbnailUrl
+    : thumbnailPath ? composedMediaUrl(req, thumbnailPath) : requestedThumbnailUrl;
   const resolvedVisibility = visibility ?? {
     isPublic: true,
     allowComments: true,
@@ -767,22 +886,37 @@ router.post("/", requireAuth, async (req, res) => {
   }
   const safeSlideOverlays = slideOverlaysResult.records;
 
+  // Optional location: `placeId`, or `location: {placeId?, name, lat?, lng?}`.
+  const locationResult = await resolvePostLocation(clerkId, req.body as Record<string, unknown>);
+  if (!locationResult.ok) {
+    return res.status(locationResult.status).json({ error: locationResult.error, ...(locationResult.code ? { code: locationResult.code } : {}) });
+  }
   // Automatic media screening (off when the AI integration env is missing).
   // Clear violations are rejected; anything flagged or unverifiable is held
   // for a moderator and stays visible to its author only.
-  const isVideoPost = mediaType === "video";
+  const isVideoPost = mediaType === "video" || singleVideo;
   const signed = async (path: string | undefined) => (path ? signedUrlForObjectPath(path) : undefined);
   const storedUrls = mediaPath || resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []));
   const composedPrimary = await signed(mediaPath);
   const composedSlides = await Promise.all(resolvedMediaPaths.map((path) => signedUrlForObjectPath(path)));
+  const composedPostSlides = await Promise.all(slideRecords.map(async (slide) => ({
+    kind: slide.kind,
+    media: await signed(slide.path),
+    thumbnail: await signed(slide.thumbnailPath),
+  })));
   const composedThumb = await signed(thumbnailPath);
   const mediaRefs = {
     images: [
       ...(isVideoPost ? [] : [composedPrimary, ...storedUrls]),
       ...composedSlides,
+      ...composedPostSlides.filter((slide) => slide.kind === "photo").map((slide) => slide.media),
+      ...composedPostSlides.map((slide) => slide.thumbnail),
       composedThumb ?? thumbnailUrl,
     ].filter((v): v is string => !!v && v.length > 0),
-    videos: isVideoPost ? [composedPrimary ?? mediaUrl].filter((v): v is string => !!v) : [],
+    videos: [
+      ...(mediaType === "video" || singleVideo ? [composedPrimary ?? mediaUrl] : []),
+      ...composedPostSlides.filter((slide) => slide.kind === "video").map((slide) => slide.media),
+    ].filter((v): v is string => !!v),
     extraHosts: [req.get("host") ?? ""].filter(Boolean),
   };
   const mediaVerdict = mediaRefs.images.length + mediaRefs.videos.length > 0
@@ -805,16 +939,22 @@ router.post("/", requireAuth, async (req, res) => {
   const postHeld = captionHeld || screenHeld;
 
   const [post] = await db.insert(posts).values({
+    placeId: locationResult.placeId ?? null,
     userId:    clerkId,
     mediaUrl,
     thumbnailUrl: thumbnailUrl ?? null,
-    mediaUrls: mediaPath ? [mediaUrl] : (resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []))),
-    mediaPaths: resolvedMediaPaths,
+    mediaUrls: slideRecords.length > 0
+      ? slideRecords.map((sl) => sl.url)
+      : mediaPath ? [mediaUrl] : (resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []))),
+    mediaPaths: slideRecords.length > 0 ? slideRecords.map((sl) => sl.path) : resolvedMediaPaths,
+    slides: slideRecords,
     slideOverlays: safeSlideOverlays as any,
-    mediaType: (mediaType as any) ?? "photo",
-    aspectRatio: aspectRatio ?? "9:16",
+    mediaType: slideRecords.length > 0 ? (singleVideo ? "video" : "slideshow") : ((mediaType as any) ?? "photo"),
+    aspectRatio: slideRecords.length > 0 && surface === "profile" ? "3:4" : (aspectRatio ?? "9:16"),
+    surface,
     caption:   caption   ?? "",
-    hashtags: hashtags ?? [],
+    // Normalised, plus any #tags written in the caption (additive).
+    hashtags: mergeHashtags(hashtags, caption),
     styleTags: styleTags ?? [],
     sound: sound ?? null,
     visibility: resolvedVisibility,
@@ -826,9 +966,15 @@ router.post("/", requireAuth, async (req, res) => {
     moderationReason: captionDecision.action === "hold"
       ? captionDecision.category
       : screenHeld ? `media:${(heldVerdict?.categories ?? []).join(",")}`.slice(0, 200) : null,
+    quotedPostId: quoteTarget?.id ?? null,
+    repostKind: quoteTarget ? "quote" : null,
     updatedAt: now,
   }).returning();
 
+  // The tag index is rebuildable from posts.hashtags, so a failure here must
+  // not fail the post itself.
+  await syncPostHashtags(post.id, post.hashtags ?? [], post.createdAt)
+    .catch((err) => req.log.error({ err, postId: post.id }, "Could not index post hashtags"));
   if (!captionHeld && screenHeld && heldVerdict) {
     await recordHeldMedia({
       targetType: post.mediaType === "video" ? "video" : "post",
@@ -839,6 +985,19 @@ router.post("/", requireAuth, async (req, res) => {
       excerpt: publicPostText(caption, hashtags),
       label: post.mediaType === "video" ? "Video" : "Post",
     });
+  }
+
+  // A published, visible quote counts as a repost of the original and tells
+  // its author. Drafts / scheduled / held quotes do neither until public.
+  if (quoteTarget && postStatus === "published" && !postHeld) {
+    await db.insert(interactions)
+      .values({ userId: clerkId, postId: quoteTarget.id, type: "repost", value: "quote" })
+      .onConflictDoNothing({
+        target: [interactions.userId, interactions.postId],
+        where: sql`type = 'repost' AND post_id IS NOT NULL`,
+      })
+      .catch((err) => req.log.warn({ err, postId: post.id }, "Could not record quote repost interaction"));
+    void notifyRepost({ postId: quoteTarget.id, reposterId: clerkId, variant: "quote" });
   }
 
   if (captionDecision.action === "hold") {
@@ -857,6 +1016,7 @@ router.post("/", requireAuth, async (req, res) => {
     ...(mediaPath ? [mediaPath] : []),
     ...(thumbnailPath ? [thumbnailPath] : []),
     ...resolvedMediaPaths,
+    ...slideRecords.flatMap((sl) => [sl.path, sl.thumbnailPath]),
   ];
   if (allComposedPaths.length > 0) {
     try {
@@ -903,8 +1063,16 @@ router.post("/", requireAuth, async (req, res) => {
   }).catch((err) => req.log.error({ err, postId: post.id }, "Could not record people tags"));
   const remixOf = (await remixCredits([post])).get(post.id) ?? null;
 
+  const createdLocation = (await locationsByPlaceId([post.placeId])).get(post.placeId ?? "") ?? null;
+  const [withQuote] = await attachQuoteData([post], clerkId);
+  // Auto captions: additive, fire-and-forget, no-op unless the flag + AI keys are on.
+  if (post.mediaType === "video" && postStatus === "published" && !captionHeld) {
+    scheduleAutoCaptions(post.id);
+  }
+
   return res.status(201).json({
-    ...post,
+    ...withQuote,
+    location: createdLocation,
     taggedProducts,
     remixOf,
     moderation: postHeld
@@ -924,6 +1092,7 @@ router.post("/", requireAuth, async (req, res) => {
 // buyers need this too, to resume their own drafts (item 117).
 // Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT) — a
 // long-lived seller's full post history was previously loaded unbounded.
+const MINE_STATUS_FILTERS = ["draft", "scheduled", "published", "archived"] as const;
 router.get("/mine", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!await posterAccountType(clerkId)) {
@@ -933,16 +1102,22 @@ router.get("/mine", requireAuth, async (req, res) => {
   if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
   const { limit, offset } = page.data;
   try {
+    const statusFilter = typeof req.query.status === "string" ? req.query.status : undefined;
+    if (statusFilter !== undefined && !MINE_STATUS_FILTERS.includes(statusFilter as never)) {
+      return res.status(400).json({ error: `status must be one of ${MINE_STATUS_FILTERS.join(", ")}`, code: "VALIDATION_ERROR" });
+    }
     const rows = await db.select().from(posts)
       .where(and(
         eq(posts.userId, clerkId),
-        inArray(posts.postStatus, ["draft", "scheduled", "published", "archived"]),
+        statusFilter
+          ? eq(posts.postStatus, statusFilter)
+          : inArray(posts.postStatus, ["draft", "scheduled", "published", "archived"]),
       ))
       .orderBy(desc(posts.createdAt))
       .limit(limit)
       .offset(offset);
     setPaginationHeaders(res, page.data, rows.length);
-    return res.json(await postDetails(rows));
+    return res.json(await postDetails(rows, clerkId));
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch seller posts");
     return res.status(500).json({ error: "Failed to fetch seller posts" });
@@ -972,8 +1147,11 @@ router.patch("/:id", requireAuth, async (req, res) => {
   // see the matching isBuyer block in POST / above).
   if (isBuyerPoster) {
     const nextMediaType = (body.mediaType as string | undefined) ?? existing.mediaType;
-    if (nextMediaType !== "photo" && nextMediaType !== "slideshow") {
-      return res.status(403).json({ error: "Buyer accounts can only post photos (single or carousel).", code: "BUYER_PHOTO_ONLY" });
+    if (nextMediaType !== "photo" && nextMediaType !== "slideshow" && nextMediaType !== "video") {
+      return res.status(403).json({ error: "Buyer accounts can post photos, slideshows and videos.", code: "BUYER_MEDIA_TYPE" });
+    }
+    if (body.surface === "thread" || existing.surface === "thread") {
+      return res.status(403).json({ error: "Buyer accounts cannot post to Threads.", code: "BUYER_NO_THREADS" });
     }
     if (Array.isArray(body.taggedProductIds) && body.taggedProductIds.length > 0) {
       return res.status(403).json({ error: "Buyer accounts cannot tag products.", code: "BUYER_NO_PRODUCT_TAGS" });
@@ -1005,8 +1183,10 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (!Array.isArray(body.mediaPaths)) {
       return res.status(400).json({ error: "mediaPaths must be an array" });
     }
-    if ((body.mediaPaths as unknown[]).length > MAX_SLIDES) {
-      return res.status(400).json({ error: `mediaPaths: max ${MAX_SLIDES} entries` });
+    const patchSurface = isPostSurface(body.surface) ? body.surface : (isPostSurface(existing.surface) ? existing.surface : "thread");
+    const patchCap = MAX_SLIDES_BY_SURFACE[patchSurface];
+    if ((body.mediaPaths as unknown[]).length > patchCap) {
+      return res.status(400).json({ error: `mediaPaths: max ${patchCap} entries` });
     }
     if ((body.mediaPaths as unknown[]).some((p) => !validObjectPath(p))) {
       return res.status(400).json({ error: "mediaPaths must be an array of valid object paths" });
@@ -1030,6 +1210,10 @@ router.patch("/:id", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "mediaType must be a non-empty string" });
     }
     updates.mediaType = body.mediaType;
+  }
+  if (body.surface !== undefined) {
+    if (!isPostSurface(body.surface)) return res.status(400).json({ error: "surface must be 'thread' or 'profile'" });
+    updates.surface = body.surface;
   }
   if (body.aspectRatio !== undefined) {
     if (!["9:16", "3:4", "1:1"].includes(body.aspectRatio as string)) {
@@ -1077,8 +1261,18 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (!Array.isArray(body.hashtags) || body.hashtags.some((tag) => typeof tag !== "string")) {
       return res.status(400).json({ error: "hashtags must be an array of strings" });
     }
-    updates.hashtags = body.hashtags as string[];
   }
+  if (body.caption !== undefined || body.hashtags !== undefined) {
+    updates.hashtags = mergeHashtags(
+      body.hashtags !== undefined ? body.hashtags : existing.hashtags,
+      body.caption !== undefined ? body.caption : existing.caption,
+    );
+  }
+  const patchLocation = await resolvePostLocation(clerkId, body);
+  if (!patchLocation.ok) {
+    return res.status(patchLocation.status).json({ error: patchLocation.error, ...(patchLocation.code ? { code: patchLocation.code } : {}) });
+  }
+  if (patchLocation.placeId !== undefined) updates.placeId = patchLocation.placeId;
   if (body.styleTags !== undefined) {
     if (!Array.isArray(body.styleTags) || body.styleTags.some((tag) => typeof tag !== "string")) {
       return res.status(400).json({ error: "styleTags must be an array of strings" });
@@ -1114,8 +1308,9 @@ router.patch("/:id", requireAuth, async (req, res) => {
   if (body.scheduledAt !== undefined && parsedScheduledAt === undefined) {
     return res.status(400).json({ error: "scheduledAt must be a valid ISO date or null" });
   }
-  if (parsedScheduledAt && parsedScheduledAt.getTime() <= Date.now()) {
-    return res.status(400).json({ error: "scheduledAt must be in the future" });
+  if (parsedScheduledAt) {
+    const windowError = scheduleWindowError(parsedScheduledAt);
+    if (windowError) return res.status(400).json({ error: windowError, code: "INVALID_SCHEDULE_TIME" });
   }
   if (body.isDraft !== undefined && typeof body.isDraft !== "boolean") {
     return res.status(400).json({ error: "isDraft must be a boolean" });
@@ -1147,6 +1342,8 @@ router.patch("/:id", requireAuth, async (req, res) => {
     }),
     // Include all slide media paths (new or existing)
     ...((updates.mediaPaths as string[] | undefined) ?? existing.mediaPaths ?? []),
+    // Carousel posters
+    ...(existing.slides ?? []).map((sl) => sl.thumbnailPath),
   ].filter((p): p is string => !!p);
 
   const taggedProductIds = body.taggedProductIds;
@@ -1165,6 +1362,9 @@ router.patch("/:id", requireAuth, async (req, res) => {
     }
     const updated = await db.transaction(async (tx) => {
       const [post] = await tx.update(posts).set(updates).where(eq(posts.id, id)).returning();
+      if (updates.hashtags !== undefined) {
+        await syncPostHashtags(id, updates.hashtags, post.createdAt, tx as any);
+      }
       if (taggedProductIds !== undefined) {
         const validIds = (taggedProductIds as string[]).filter((productId) => UUID_RE.test(productId));
         const ownedProducts = validIds.length > 0
@@ -1183,11 +1383,101 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (shouldBePublic) {
       await setComposedMediaVisibility(clerkId, nextMediaPaths, "public");
     }
-    return res.json((await postDetails([updated]))[0]);
+    return res.json((await postDetails([updated], clerkId))[0]);
   } catch (err) {
     req.log.error({ err, clerkId, postId: id }, "Failed to update seller post");
     return res.status(500).json({ error: "Failed to update post" });
   }
+});
+
+// ─── Drafts & scheduling (see docs/social/drafts-and-scheduling.md) ──────────
+
+async function loadOwnedPost(req: any, res: any) {
+  const clerkId = req.clerkUserId as string;
+  const id = req.params.id;
+  if (typeof id !== "string" || !UUID_RE.test(id)) {
+    res.status(404).json({ error: "Post not found" });
+    return null;
+  }
+  const posterType = await posterAccountType(clerkId);
+  if (!posterType) {
+    res.status(403).json({ error: "Only buyer and seller accounts can manage posts.", code: "ACCOUNT_TYPE_REQUIRED" });
+    return null;
+  }
+  const [existing] = await db.select().from(posts)
+    .where(and(eq(posts.id, id), eq(posts.userId, clerkId))).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Post not found" });
+    return null;
+  }
+  return { clerkId, posterType, existing };
+}
+
+// POST /api/posts/:id/schedule { scheduledAt } — draft or scheduled -> scheduled (also reschedules)
+router.post("/:id/schedule", requireAuth, async (req, res) => {
+  const ctx = await loadOwnedPost(req, res);
+  if (!ctx) return;
+  const { clerkId, posterType, existing } = ctx;
+  if (posterType === "buyer") {
+    return res.status(403).json({ error: "Buyer posts cannot be scheduled.", code: "BUYER_NO_SCHEDULING" });
+  }
+  if (existing.postStatus !== "draft" && existing.postStatus !== "scheduled") {
+    return res.status(409).json({ error: "Only drafts and scheduled posts can be scheduled.", code: "POST_NOT_SCHEDULABLE" });
+  }
+  const restriction = await publishingRestriction(clerkId);
+  if (restriction) return res.status(restriction.status).json(restriction.body);
+  const at = parseScheduledAt((req.body as Record<string, unknown>)?.scheduledAt);
+  if (!at) return res.status(400).json({ error: "scheduledAt must be a valid ISO date", code: "INVALID_SCHEDULE_TIME" });
+  const windowError = scheduleWindowError(at);
+  if (windowError) return res.status(400).json({ error: windowError, code: "INVALID_SCHEDULE_TIME" });
+  const [updated] = await db.update(posts)
+    .set({ postStatus: "scheduled", scheduledAt: at, updatedAt: new Date() })
+    .where(and(eq(posts.id, existing.id), inArray(posts.postStatus, ["draft", "scheduled"])))
+    .returning();
+  if (!updated) return res.status(409).json({ error: "Post is no longer schedulable.", code: "POST_NOT_SCHEDULABLE" });
+  return res.json((await postDetails([updated]))[0]);
+});
+
+// POST /api/posts/:id/unschedule — scheduled -> draft
+router.post("/:id/unschedule", requireAuth, async (req, res) => {
+  const ctx = await loadOwnedPost(req, res);
+  if (!ctx) return;
+  const { existing } = ctx;
+  if (existing.postStatus === "draft") return res.json((await postDetails([existing]))[0]);
+  if (existing.postStatus !== "scheduled") {
+    return res.status(409).json({ error: "Only scheduled posts can be moved back to drafts.", code: "POST_NOT_SCHEDULED" });
+  }
+  const now = new Date();
+  const [updated] = await db.update(posts)
+    .set({ postStatus: "draft", scheduledAt: null, updatedAt: now })
+    .where(and(eq(posts.id, existing.id), eq(posts.postStatus, "scheduled"), gte(posts.scheduledAt, now)))
+    .returning();
+  if (!updated) return res.status(409).json({ error: "This post is already going live.", code: "POST_ALREADY_LIVE" });
+  return res.json((await postDetails([updated]))[0]);
+});
+
+// POST /api/posts/:id/publish-now — draft or scheduled -> published (idempotent for published)
+router.post("/:id/publish-now", requireAuth, async (req, res) => {
+  const ctx = await loadOwnedPost(req, res);
+  if (!ctx) return;
+  const { clerkId, existing } = ctx;
+  if (existing.postStatus === "published") return res.json((await postDetails([existing]))[0]);
+  if (existing.postStatus !== "draft" && existing.postStatus !== "scheduled") {
+    return res.status(409).json({ error: "Only drafts and scheduled posts can be published.", code: "POST_NOT_PUBLISHABLE" });
+  }
+  const restriction = await publishingRestriction(clerkId);
+  if (restriction) return res.status(restriction.status).json(restriction.body);
+  const now = new Date();
+  const [updated] = await db.update(posts)
+    .set({ postStatus: "published", scheduledAt: null, publishedAt: now, createdAt: now, updatedAt: now })
+    .where(and(eq(posts.id, existing.id), inArray(posts.postStatus, ["draft", "scheduled"])))
+    .returning();
+  if (!updated) {
+    const [current] = await db.select().from(posts).where(eq(posts.id, existing.id)).limit(1);
+    return res.json((await postDetails([current]))[0]);
+  }
+  await onPostPublished(updated);
+  return res.json((await postDetails([updated]))[0]);
 });
 
 // ─── DELETE /api/posts/:id ───────────────────────────────────────────────────
@@ -1209,7 +1499,10 @@ router.delete("/:id", requireAuth, async (req, res) => {
   if (!deleted) return res.status(404).json({ error: "Post not found" });
 
   // Fire-and-forget: clean up all composed slide media paths
-  const slidePaths = (existing.mediaPaths ?? []).filter(Boolean);
+  const slidePaths = [
+    ...(existing.mediaPaths ?? []),
+    ...(existing.slides ?? []).map((sl) => sl.thumbnailPath),
+  ].filter(Boolean);
   if (slidePaths.length > 0) {
     Promise.all(
       slidePaths.map((p) =>
@@ -1470,12 +1763,24 @@ router.get("/:id", async (req, res) => {
   if (!UUID_RE.test(id)) return res.status(404).json({ error: "Post not found" });
 
   const [post] = await db.select().from(posts)
-    .where(and(eq(posts.id, id), visiblePostCondition()))
+    .where(and(eq(posts.id, id), visiblePostCondition(new Date(), optionalViewerId(req))))
     .limit(1);
   if (!post) return res.status(404).json({ error: "Post not found" });
   const viewerId = optionalViewerId(req);
   if (viewerId && viewerId !== post.userId && await isBlockedEitherWay(viewerId, post.userId)) {
     return res.status(404).json({ error: "Post not found" });
+  }
+  // A buyer's profile POST is for the buyer and their mutual friends — never a public link.
+  if (post.surface === "profile" && viewerId !== post.userId) {
+    const [author] = await db.select({ accountType: users.accountType }).from(users).where(eq(users.clerkId, post.userId)).limit(1);
+    if (author?.accountType === "buyer") {
+      const edges = viewerId ? await db.select({ followerId: follows.followerId }).from(follows).where(or(
+        and(eq(follows.followerId, viewerId), eq(follows.followingId, post.userId)),
+        and(eq(follows.followerId, post.userId), eq(follows.followingId, viewerId)),
+      )) : [];
+      const mutual = !!viewerId && edges.some((e) => e.followerId === viewerId) && edges.some((e) => e.followerId === post.userId);
+      if (!mutual) return res.status(404).json({ error: "Post not found" });
+    }
   }
 
   const [sellerRows, tags, likeRows, repostRows] = await Promise.all([
@@ -1497,13 +1802,78 @@ router.get("/:id", async (req, res) => {
   ]);
 
   const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
-  return res.json({
-    ...post,
+  const singleLocation = await locationsByPlaceId([post.placeId]);
+  const [detail] = await attachQuoteData([{
+    ...withLocation(post, singleLocation),
     seller:       sellerRows[0] ?? null,
     taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,
     repostCount:  repostRows[0]?.count ?? 0,
-  });
+  }], viewerId);
+  return res.json(detail);
+});
+
+// ─── GET /api/posts/:id/quotes ───────────────────────────────────────────────
+// Public, paginated list of quote reposts of a post (newest first). Same
+// visibility as any public post read; viewers never see quotes by people in a
+// block relation with them. The original itself must be publicly visible.
+router.get("/:id/quotes", async (req, res) => {
+  const { id } = req.params;
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: "Post not found" });
+  const page = parsePagination(req.query, { limit: 20 });
+  if (!page.success || page.data.limit > 50) {
+    return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  }
+  const { limit, offset } = page.data;
+  const viewerId = optionalViewerId(req);
+  try {
+    const [original] = await db.select({ id: posts.id, userId: posts.userId }).from(posts)
+      .where(and(eq(posts.id, id), publicPostCondition()))
+      .limit(1);
+    if (!original || (viewerId && await isBlockedEitherWay(viewerId, original.userId))) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    const rows = await db.select({
+      id: posts.id,
+      userId: posts.userId,
+      caption: posts.caption,
+      mediaUrl: posts.mediaUrl,
+      thumbnailUrl: posts.thumbnailUrl,
+      mediaType: posts.mediaType,
+      createdAt: posts.createdAt,
+      displayName: users.displayName,
+      brandName: users.brandName,
+      username: users.username,
+      accountType: users.accountType,
+    }).from(posts)
+      .innerJoin(users, eq(users.clerkId, posts.userId))
+      .where(and(
+        eq(posts.quotedPostId, id),
+        eq(posts.repostKind, "quote"),
+        publicPostCondition(),
+        notBlockedWith(viewerId, posts.userId),
+      ))
+      .orderBy(desc(posts.createdAt), posts.id)
+      .limit(limit)
+      .offset(offset);
+    setPaginationHeaders(res, page.data, rows.length);
+    return res.json(rows.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      caption: row.caption ?? "",
+      thumbnailUrl: postCardImage(row),
+      mediaType: row.mediaType,
+      createdAt: row.createdAt,
+      author: {
+        displayName: row.displayName ?? null,
+        brandName: row.accountType === "seller" ? row.brandName ?? null : null,
+        username: row.username ?? null,
+      },
+    })));
+  } catch (err) {
+    req.log.error({ err, postId: id }, "Failed to fetch quotes");
+    return res.status(500).json({ error: "Failed to fetch quotes" });
+  }
 });
 
 // ─── POST /api/posts/:id/interact ────────────────────────────────────────────
@@ -1530,7 +1900,7 @@ router.post("/:id/interact", requireAuth, rateLimit("post-interact"), async (req
     return res.status(400).json({ error: "type must be like, repost, view, watch_time, shop_click, share, or not_interested" });
   }
   const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility, ownerId: posts.userId }).from(posts)
-    .where(and(eq(posts.id, id), visiblePostCondition()))
+    .where(and(eq(posts.id, id), visiblePostCondition(new Date(), clerkId)))
     .limit(1);
   if (!visiblePost) return res.status(404).json({ error: "Post not found" });
   // Blocked in either direction: behave exactly like a missing post (same as comments).
@@ -1554,6 +1924,7 @@ router.post("/:id/interact", requireAuth, rateLimit("post-interact"), async (req
 
   if (RECORDED_ONLY_TYPES.includes(type)) {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
+    if (type === "share") void notifyPostShare({ postId: id, sharerId: clerkId });
     if (type === "not_interested") {
       // Persist the hide so For You never serves this post again; the taste
       // penalty applies only for a newly hidden post (retries don't stack).

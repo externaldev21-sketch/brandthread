@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
+  ScrollView, FlatList, View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -9,13 +9,16 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
 import {
-  archiveSellerPost, deleteSellerPost, getSellerPosts, updateSellerPost,
+  archiveSellerPost, deleteSellerPost, getSellerPosts, publishSellerPostNow, unscheduleSellerPost, updateSellerPost,
 } from '@/services/socialService';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
+import { radius } from '@/constants/radii';
 
 type FilterTab = 'all' | ContentStatus;
 
@@ -60,7 +63,10 @@ export default function ContentScreen() {
   const router  = useRouter();
 
   // Read optional tab query param (e.g. from /content?tab=draft)
-  const params  = useLocalSearchParams<{ tab?: string }>();
+  const params  = useLocalSearchParams<{ tab?: string; from?: string }>();
+  const onBack = params.from === STUDIO_MENU_ORIGIN
+    ? () => returnToStudioMenu(router)
+    : undefined;
   const initialTab: FilterTab = (
     params.tab && VALID_TABS.includes(params.tab as FilterTab)
       ? params.tab as FilterTab
@@ -144,6 +150,42 @@ export default function ContentScreen() {
         text: 'Edit',
         onPress: () => router.push(('/create-post?editId=' + encodeURIComponent(post.id)) as never),
       },
+      ...(post.status === 'draft' || post.status === 'scheduled' ? [{
+        text: 'Publish now',
+        onPress: async () => {
+          setDeletingPostId(post.id);
+          try {
+            await publishSellerPostNow(post.id);
+            setContent(current => current.map(item => (
+              item.id === post.id ? { ...item, status: 'published' as const, scheduledFor: undefined } : item
+            )));
+          } catch {
+            Alert.alert('Post not published', 'Check your connection and try again.');
+          } finally {
+            setDeletingPostId(null);
+          }
+        },
+      }] : []),
+      ...(post.status === 'scheduled' ? [{
+        text: 'Move to drafts',
+        onPress: async () => {
+          setDeletingPostId(post.id);
+          try {
+            await unscheduleSellerPost(post.id);
+            setContent(current => current.map(item => (
+              item.id === post.id ? { ...item, status: 'draft' as const, scheduledFor: undefined } : item
+            )));
+          } catch {
+            Alert.alert('Post not moved', 'Check your connection and try again.');
+          } finally {
+            setDeletingPostId(null);
+          }
+        },
+      }] : []),
+      {
+        text: 'Write caption with AI',
+        onPress: () => router.push(('/ai-helper?mode=caption&postId=' + encodeURIComponent(post.id) + (post.caption ? '&draft=' + encodeURIComponent(post.caption) : '')) as never),
+      },
       {
         text: post.status === 'archived' ? 'Restore' : 'Archive',
         onPress: async () => {
@@ -210,6 +252,7 @@ export default function ContentScreen() {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <ScreenHeader
         title="Content"
+        onBack={onBack}
         actions={[
           { icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View analytics' },
           {
@@ -220,7 +263,71 @@ export default function ContentScreen() {
         ]}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+      <FlatList
+        {...LONG_LIST_TUNING}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.scrollContent}
+        data={loading || loadError ? [] : posts}
+        keyExtractor={(post) => post.id}
+        ItemSeparatorComponent={PostSeparator}
+        renderItem={({ item: post }) => (
+          <View style={s.postRowPad}>
+            <TouchableOpacity
+              key={post.id}
+              style={[s.postCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              activeOpacity={0.82}
+              onPress={() => router.push(('/post-analytics?id=' + encodeURIComponent(post.id)) as never)}
+              accessibilityRole="button"
+              accessibilityLabel={post.caption || 'Untitled post'}
+            >
+              <View style={[s.postThumb, { backgroundColor: colors.elevated }]}>
+                <Feather name={typeIcon(post.type)} size={ICON.md} color={colors.mutedForeground} />
+              </View>
+              <View style={s.postBody}>
+                <View style={s.postTopRow}>
+                  <View style={[
+                    s.statusBadge,
+                    { backgroundColor: statusColor(post.status, colors) + '22', borderColor: statusColor(post.status, colors) + '44' },
+                  ]}>
+                    <Text style={[s.statusText, { color: statusColor(post.status, colors) }]}>
+                      {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                    </Text>
+                  </View>
+                  <Text style={[s.postType, { color: colors.mutedForeground }]}>{post.type.replace('_', ' ')}</Text>
+                </View>
+                <Text style={[s.postCaption, { color: colors.foreground }]} numberOfLines={2}>{post.caption}</Text>
+                {post.status === 'published' && (
+                  <View style={s.postMetrics}>
+                    <View style={s.metric}>
+                      <Feather name="heart" size={ICON.xs - 3} color={colors.mutedForeground} />
+                      <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.likes.toLocaleString()}</Text>
+                    </View>
+                    <View style={s.metric}>
+                      <Feather name="message-circle" size={ICON.xs - 3} color={colors.mutedForeground} />
+                      <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.comments}</Text>
+                    </View>
+                  </View>
+                )}
+                {post.status === 'scheduled' && post.scheduledFor && (
+                  <Text style={[s.scheduledText, { color: colors.mutedForeground }]}>Goes live {formatScheduledDate(post.scheduledFor)}</Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={s.moreBtn}
+                onPress={() => openPostActions(post)}
+                disabled={deletingPostId === post.id}
+                accessibilityRole="button"
+                accessibilityLabel="Manage post"
+              >
+                {deletingPostId === post.id
+                  ? <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  : <Feather name="more-horizontal" size={ICON.sm} color={colors.mutedForeground} />}
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
+        )}
+        ListHeaderComponent={(
+      <>
         {/* Overview stats */}
         <View style={s.statsRow}>
           {[
@@ -303,6 +410,11 @@ export default function ContentScreen() {
             ))}
           </ScrollView>
 
+        </View>
+      </>
+        )}
+        ListEmptyComponent={(
+          <View style={s.listPad}>
           {loading ? (
             <View style={s.loading}>
               <ActivityIndicator color={colors.primary} />
@@ -320,69 +432,17 @@ export default function ContentScreen() {
               <Text style={[s.emptyTitle, { color: colors.foreground }]}>No {tabLabel}posts yet</Text>
               <Text style={[s.emptyDesc, { color: colors.mutedForeground }]}>Create content to engage your audience.</Text>
             </View>
-          ) : (
-            <View style={s.postList}>
-              {posts.map(post => (
-                <TouchableOpacity
-                  key={post.id}
-                  style={[s.postCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  activeOpacity={0.82}
-                  onPress={() => router.push(('/post-analytics?id=' + encodeURIComponent(post.id)) as never)}
-                  accessibilityRole="button"
-                  accessibilityLabel={post.caption || 'Untitled post'}
-                >
-                  <View style={[s.postThumb, { backgroundColor: colors.elevated }]}>
-                    <Feather name={typeIcon(post.type)} size={ICON.md} color={colors.mutedForeground} />
-                  </View>
-                  <View style={s.postBody}>
-                    <View style={s.postTopRow}>
-                      <View style={[
-                        s.statusBadge,
-                        { backgroundColor: statusColor(post.status, colors) + '22', borderColor: statusColor(post.status, colors) + '44' },
-                      ]}>
-                        <Text style={[s.statusText, { color: statusColor(post.status, colors) }]}>
-                          {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
-                        </Text>
-                      </View>
-                      <Text style={[s.postType, { color: colors.mutedForeground }]}>{post.type.replace('_', ' ')}</Text>
-                    </View>
-                    <Text style={[s.postCaption, { color: colors.foreground }]} numberOfLines={2}>{post.caption}</Text>
-                    {post.status === 'published' && (
-                      <View style={s.postMetrics}>
-                        <View style={s.metric}>
-                          <Feather name="heart" size={ICON.xs - 3} color={colors.mutedForeground} />
-                          <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.likes.toLocaleString()}</Text>
-                        </View>
-                        <View style={s.metric}>
-                          <Feather name="message-circle" size={ICON.xs - 3} color={colors.mutedForeground} />
-                          <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.comments}</Text>
-                        </View>
-                      </View>
-                    )}
-                    {post.status === 'scheduled' && post.scheduledFor && (
-                      <Text style={[s.scheduledText, { color: colors.mutedForeground }]}>Goes live {formatScheduledDate(post.scheduledFor)}</Text>
-                    )}
-                  </View>
-                  <TouchableOpacity
-                    style={s.moreBtn}
-                    onPress={() => openPostActions(post)}
-                    disabled={deletingPostId === post.id}
-                    accessibilityRole="button"
-                    accessibilityLabel="Manage post"
-                  >
-                    {deletingPostId === post.id
-                      ? <ActivityIndicator size="small" color={colors.mutedForeground} />
-                      : <Feather name="more-horizontal" size={ICON.sm} color={colors.mutedForeground} />}
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+          ) : null}
+          </View>
+        )}
+      />
       <AIBrainFAB context={{ screen: 'content' as const }} bottomOffset={0} />
     </View>
   );
+}
+
+function PostSeparator() {
+  return <View style={{ height: SP.sm }} />;
 }
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
@@ -417,11 +477,13 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   libraryCount: { fontSize: FS.xs, fontFamily: FONT.regular },
   filterScroll: { flexGrow: 0, marginBottom: SP.md },
   filterRow: { flexDirection: 'row', gap: SP.xs },
-  filterTab: { borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
+  filterTab: { borderRadius: radius.md, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
   filterText: { fontSize: FS.sm, fontFamily: FONT.medium },
 
   // Post cards
   postList: { gap: SP.sm },
+  listPad: { paddingHorizontal: SP.md },
+  postRowPad: { paddingHorizontal: SP.md },
   postCard: { flexDirection: 'row', gap: SP.sm + 4, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.sm + 2 },
   postThumb: { width: 56, height: 56, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   postBody: { flex: 1, gap: 4 },

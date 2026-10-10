@@ -7,12 +7,14 @@ import {
   AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createThreadFeedCursor,
@@ -21,6 +23,7 @@ import {
   setSellerFollowing,
   subscribeSocial,
 } from '@/services/socialService';
+import { confirmSponsoredImpression } from '@/services/sponsoredService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
@@ -34,6 +37,7 @@ import {
 } from '@/lib/engagementRetryQueue';
 import { computeJustDroppedDrops, type FollowedDrop } from '@/lib/justDroppedDrops';
 import type { ViewToken } from 'react-native';
+import { Platform } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
 import { useSettled } from '@/lib/animationUtils';
@@ -45,12 +49,15 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
+import { remoteVideoUri, withVideoCaching } from '@/lib/videoPreload';
+import { useFeedVideoPreload } from '@/hooks/useFeedVideoPreload';
 import { mark as perfMark } from '@/lib/perf';
 import { getLiveDirectory, useOpenLive } from '@/lib/live/useLiveDirectory';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
@@ -83,7 +90,7 @@ import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
@@ -326,6 +333,7 @@ interface SpotlightItem {
   videoPosterSource?: ImageSourcePropType;
   contentType: 'photo' | 'slideshow' | 'video';
   caption: string;
+  hashtags?: string[];
   sound: string;
   productName: string;
   productPrice: string;
@@ -349,6 +357,9 @@ interface SpotlightItem {
   productTags?: { productId: string; productName: string; priceCents: number; imageUri?: string }[];
   /** Authoritative comment count from the server (preferred over local comments array length) */
   commentsCount?: number;
+  /** Admin-approved paid promotion served in For You; rendered with a "Sponsored" label. */
+  sponsored?: boolean;
+  sponsoredBoostId?: string;
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
@@ -1336,9 +1347,7 @@ function LiveVideoVisual({
           nativeControls={false}
         />
         <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none">
-          <View style={styles.pauseOverlayCircle}>
-            <Feather name="play" size={56} color={ON_DARK} />
-          </View>
+          <FontAwesome name="play" size={56} color={ON_DARK} />
         </Animated.View>
       </View>
       {progressBottom != null && isActive && (
@@ -1458,6 +1467,7 @@ function SpotlightPageImpl({
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { openReport } = useReportSheet();
   const { push } = useThreadPull();
   const commentCountDelta = useCommentCountDelta(item.id);
   // The creator player (no tab bar) always plays edge to edge like Buyer Home.
@@ -1654,7 +1664,7 @@ function SpotlightPageImpl({
           {item.contentType === 'video'
             ? (
               <VideoVisual
-                source={item.videoSource ?? item.mediaUris[0]}
+                source={withVideoCaching(item.videoSource ?? item.mediaUris[0], Platform.OS !== 'web')}
                 isActive={isActive}
                 preload={preload}
                 paused={paused || holdPaused}
@@ -1775,7 +1785,13 @@ function SpotlightPageImpl({
         mediaUri={item.mediaUris[0]}
         isVideo={item.contentType === 'video'}
         onClose={() => setShareOpen(false)}
-        onReport={() => router.push(`/buyer-report?targetType=post&targetId=${encodeURIComponent(item.id)}&targetLabel=Post` as never)}
+        onReport={() => openReport({
+          targetType: item.contentType === 'video' ? 'video' : 'post',
+          targetId: item.id,
+          label: 'Post',
+          ownerId: item.sellerId,
+          ownerName: item.creator,
+        })}
         onNotInterested={() => onNotInterested(item.id)}
         onFeedback={showToast}
       />
@@ -1785,7 +1801,13 @@ function SpotlightPageImpl({
         speedActive={speedActive}
         onToggleSpeed={() => setSpeedActive(v => !v)}
         onNotInterested={() => onNotInterested(item.id)}
-        onReport={() => router.push(`/buyer-report?targetType=post&targetId=${encodeURIComponent(item.id)}&targetLabel=Post` as never)}
+        onReport={() => openReport({
+          targetType: item.contentType === 'video' ? 'video' : 'post',
+          targetId: item.id,
+          label: 'Post',
+          ownerId: item.sellerId,
+          ownerName: item.creator,
+        })}
         onClose={() => setMenuOpen(false)}
       />
 
@@ -1798,6 +1820,7 @@ function SpotlightPageImpl({
         creator={item.creator}
         verified={!!item.verified}
         remixCredit={item.remixCredit}
+        sponsored={item.sponsored}
         caption={item.caption}
         sound={item.sound}
         soundOn={soundOn}
@@ -1899,6 +1922,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     videoPosterUri: post.thumbnailUri,
     contentType: post.contentType === 'video' || post.contentType === 'slideshow' ? post.contentType : 'photo',
     caption: post.caption,
+    hashtags: post.hashtags,
     sound: post.sound
       ? `${post.sound.soundTitle} · ${post.sound.artist}`
       : `Original Sound · ${post.authorHandle.slice(1)}`,
@@ -1921,6 +1945,8 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     authorAccountType: post.authorAccountType === 'buyer' ? 'buyer' : 'seller',
     productTags: post.productTags ?? [],
     commentsCount: post.commentsCount,
+    sponsored: post.sponsored === true ? true : undefined,
+    sponsoredBoostId: post.sponsoredBoostId,
   };
 }
 
@@ -2040,19 +2066,13 @@ export default function FeedScreen({
   // truth so BuyerHighDemandPage's content never renders underneath it
   // (see styles.topBar / styles.buyerTopRow below).
   const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;
-  // Bug fix (urgent rail-fixes pass): the previous 14pt/12pt gaps left only
-  // ~9pt of clearance between the left cluster's third icon (TV/Live) and
-  // the centered "Following" label at 390pt width — well under the 16pt
-  // minimum clear-space this row needs, and it read as the TV icon almost
-  // touching the tab text. Tightened to 8pt/6pt between icons *within* each
-  // cluster (each cluster stays evenly spaced internally, just narrower
-  // overall) — that alone reclaims enough width to clear 16pt+ to the
-  // centered tabs on both sides, at both 375pt and 390pt, without dropping
-  // any icon into an overflow menu.
-  const topRowIconGap = windowWidth < 380 ? 6 : 8;
+  // Cart sits beside LIVE, away from the right edge. Narrow phones use a
+  // tighter gap and gutter so the centered tabs still clear both 24pt icons.
+  const topRowIconGap = windowWidth < 350 ? 8 : 14;
+  const topRowSideGutter = windowWidth < 350 ? 12 : 16;
   // Guard width for the centered tabs (buyerTabSwitcherWrap below): the
-  // left cluster is 1 icon (LIVE), the right is 2 (search, cart) — always
-  // wider. Bounding the tabs' wrap symmetrically by the wider cluster's
+  // left cluster is 2 icons (LIVE, cart), the right is search alone.
+  // Bounding the tabs' wrap symmetrically by the wider cluster's
   // width (not a flat 0) keeps the tabs screen-centered (both bounds equal
   // — that's what centering means here) while guaranteeing the underline
   // labels' own box never physically reaches into either icon cluster's
@@ -2070,6 +2090,8 @@ export default function FeedScreen({
   const buyerBarTopInset = useBuyerTabBarTopInset('compact');
   const router = useRouter();
   const { userId } = useAuth();
+  // Guests browse the feed; like/save/repost/follow prompt sign-in (returnTo).
+  const { requireSignIn } = useSignInGate();
   const { push } = useThreadPull();
   const { showToast } = useFeedToast();
 
@@ -2124,6 +2146,7 @@ export default function FeedScreen({
   // nothing in memory yet; `hydrateFeedPostsCache` below fills it in from
   // AsyncStorage a beat later, still well before any skeleton would ever be
   // justified, and with no placeholder shapes in between either way.
+  const [guestMutedPhrases, setGuestMutedPhrases] = useState<string[] | null>(null);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>(() => (
     creatorSource && creatorId ? [] : getCachedFeedPosts<SpotlightItem>('for-you') ?? []
   ));
@@ -2342,6 +2365,22 @@ export default function FeedScreen({
   // the real count and bump only if it went up (an add happened) — never on
   // first load, a plain refocus, or a removal.
   const screenFocused = useIsFocused();
+  useEffect(() => {
+    if (userId) {
+      setGuestMutedPhrases([]);
+      return;
+    }
+    if (!screenFocused) return;
+    let active = true;
+    // Read again on return from settings. Until then, do not briefly reveal
+    // a cached post whose caption was muted in the last visit.
+    setGuestMutedPhrases(null);
+    void readGuestMutedWords().then(
+      (words) => { if (active) setGuestMutedPhrases(words.map((word) => word.phrase)); },
+      () => { if (active) setGuestMutedPhrases(null); },
+    );
+    return () => { active = false; };
+  }, [userId, screenFocused]);
   const wasScreenFocusedRef = useRef(screenFocused);
   useEffect(() => {
     const refocused = screenFocused && !wasScreenFocusedRef.current;
@@ -2418,10 +2457,14 @@ export default function FeedScreen({
   // Production and seller feeds remain real published seller posts only.
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
+    if (!userId && guestMutedPhrases === null) return [];
     const previewPosts = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you'
       ? FASHION_PREVIEW_POSTS
       : [];
-    const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts];
+    const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts]
+      .filter((post) => userId || !matchesGuestMutedWords(
+        [post.caption, ...(post.hashtags ?? [])].join(' '), guestMutedPhrases ?? [],
+      ));
     // A creator/product-scoped player shows only those videos — no live
     // streams or rails woven in.
     if (isCreatorFeed || feedTab === 'following') return regular;
@@ -2435,7 +2478,7 @@ export default function FeedScreen({
     // so a live card never has to fit inside the feed's own search bar/tabs/
     // tab bar chrome.
     return regular;
-  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed]);
+  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed, userId, guestMutedPhrases]);
 
   // Every on-screen post's real engagement snapshot (server-backed likes/
   // saves/reposts/liked-by-me/saved-by-me), keyed by id. `engagements` state
@@ -2625,6 +2668,17 @@ export default function FeedScreen({
     api.posts.interact(id, { type: 'view' }).catch(() => {});
   }, [activeIndex, api, displayItems, userId]);
 
+  // Sponsored posts bill on the server once they are actually on screen.
+  const confirmedSponsoredRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!userId) return;
+    const item = displayItems[activeIndex];
+    const boostId = item && 'sponsored' in item && item.sponsored ? item.sponsoredBoostId : undefined;
+    if (!boostId || confirmedSponsoredRef.current.has(boostId)) return;
+    confirmedSponsoredRef.current.add(boostId);
+    void confirmSponsoredImpression(boostId);
+  }, [activeIndex, displayItems, userId]);
+
   const handleVideoWatched = useCallback((id: string) => {
     if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
     void api.posts.recordWatchedVideo(id).catch(() => {});
@@ -2639,6 +2693,7 @@ export default function FeedScreen({
   }
 
   const handleLike = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     const snapshot = engagements[id] ?? engagementFor(id);
     const willLike = !snapshot.liked;
     // Optimistic update
@@ -2671,9 +2726,10 @@ export default function FeedScreen({
       }
       return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
     });
-  }, [engagementFor]);
+  }, [engagementFor, requireSignIn]);
 
   const handleSave = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     const cur = engagements[id] ?? engagementFor(id);
     const willSave = !cur.saved;
     const snapshot = { saved: cur.saved, saves: cur.saves };
@@ -2703,7 +2759,7 @@ export default function FeedScreen({
         }
       }
     }
-  }, [engagements, engagementFor, itemsById, showToast]);
+  }, [engagements, engagementFor, itemsById, showToast, requireSignIn]);
 
   const showRepostEducationOnce = useCallback(async () => {
     const key = `bt:repost-education:${userId ?? 'preview'}:v1`;
@@ -2718,6 +2774,7 @@ export default function FeedScreen({
   }, [userId]);
 
   const handleRepost = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     if (repostPendingRef.current.has(id)) return;
     repostPendingRef.current.add(id);
     const snapshot = engagements[id] ?? engagementFor(id);
@@ -2750,9 +2807,10 @@ export default function FeedScreen({
       await showRepostEducationOnce();
     }
     repostPendingRef.current.delete(id);
-  }, [api, engagements, engagementFor, showRepostEducationOnce, showToast]);
+  }, [api, engagements, engagementFor, showRepostEducationOnce, showToast, requireSignIn]);
 
   const handleFollow = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     const item = sellerFeedPosts.find(post => post.id === id);
     if (!item?.sellerId) return;
     const sellerId = item.sellerId;
@@ -2787,7 +2845,7 @@ export default function FeedScreen({
       ])));
       showToast('Could not update follow. Check your connection.', 'error');
     }
-  }, [engagements, feedTab, loadFeed, sellerFeedPosts, showToast]);
+  }, [engagements, feedTab, loadFeed, sellerFeedPosts, showToast, requireSignIn]);
 
   // "Not interested" removes the post from this session's feed immediately
   // (a real, visible effect — not just a toast) and records the signal so
@@ -2893,6 +2951,19 @@ export default function FeedScreen({
       if (uri) ExpoImage.prefetch(uri).catch(() => {});
     }
   }, [activeIndex, displayItems]);
+
+  // Keep the videos after the mounted neighbour buffering + disk-cached
+  // (current, +1 mounted by the list, +2 by this hook). Native, signed-in only.
+  const preloadCandidates = useMemo(
+    () => displayItems.map((entry) => {
+      const post = entry as { contentType?: string; videoSource?: VideoSource; mediaUris?: string[] };
+      return post.contentType === 'video'
+        ? { kind: 'video' as const, uri: remoteVideoUri(post.videoSource ?? post.mediaUris?.[0]) }
+        : { kind: 'other' as const, uri: null };
+    }),
+    [displayItems],
+  );
+  useFeedVideoPreload(preloadCandidates, activeIndex, Boolean(userId));
 
   const viewabilityConfig = useRef(VERTICAL_PAGER_VIEWABILITY).current;
   // Buyer Home: chrome clearance for the rail/caption/scrub-bar, padded with
@@ -3244,24 +3315,19 @@ export default function FeedScreen({
             styles.topBar,
             {
               paddingTop: previewTopInset + 4,
-              // 16px gutter PLUS the real safe-area inset (notch/Dynamic-
-              // Island/landscape cutouts) on each side — a flat
-              // paddingHorizontal here is what let the cart icon sit
-              // flush against, and on some real devices past, the true
-              // safe edge. insets.left/right are 0 on a plain rectangular
-              // screen, so this is a no-op there and just widens the
-              // gutter exactly where a device actually has a cutout.
-              paddingLeft: 16 + insets.left,
-              paddingRight: 16 + insets.right,
+              // Add the real safe-area inset on top of the device-width
+              // gutter so no top-row icon ever reaches a notch or edge.
+              paddingLeft: topRowSideGutter + insets.left,
+              paddingRight: topRowSideGutter + insets.right,
             },
           ]}
           pointerEvents="box-none"
         >
           {/* Buyer Threads Home: For You feed chrome — one line, TikTok-
-              style: LIVE only on the left, a centered "Following | Threads"
+              style: LIVE and cart on the left, a centered "Following | Threads"
               underline switcher (real SegmentedControl from the shared
               design system — see components/ui/SegmentedControl.tsx),
-              search/cart on the right. Friends and Drops used to also live
+              search alone on the right. Friends and Drops used to also live
               on the left (3 icons vs. the right's 2), crowding the row;
               Friends moved to a "Find friends" row in the Following empty
               state and the profile Menu, Drops moved to Discover — see
@@ -3286,17 +3352,40 @@ export default function FeedScreen({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Live"
-                hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
+                hitSlop={{ top: 4, bottom: 4, left: 10, right: topRowIconGap / 2 }}
                 testID="buyer-home-live"
               >
                 <Feather name="tv" size={24} color={ON_DARK} />
               </TouchableOpacity>
+              <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
+                <TouchableOpacity
+                  style={styles.buyerTopIconBtn}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push('/(buyer)/cart' as never);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+                  hitSlop={{ top: 4, bottom: 4, left: topRowIconGap / 2, right: 7 }}
+                  testID="buyer-home-cart-icon"
+                >
+                  <Feather name="shopping-cart" size={24} color={ON_DARK} />
+                  {cartCount > 0 && (
+                    <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
+                      <Text style={styles.cartCountText}>
+                        {cartCount > 99 ? '99+' : cartCount}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             </View>
 
             {/* Absolutely centered on the screen (left:0/right:0), not a
                 flex sibling of the two icon clusters — a flex-centered tab
                 switcher shifts off-center whenever the two clusters aren't
-                the same width (they aren't: 3 icons left, 2 right), which
+                the same width (they aren't: 2 icons left, 1 right), which
                 is exactly what put the tabs' center at ~180 instead of ~195
                 on a 390pt screen. pointerEvents box-none so it never steals
                 taps meant for the icon clusters underneath its empty
@@ -3339,29 +3428,6 @@ export default function FeedScreen({
               >
                 <Feather name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
-              <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
-              <TouchableOpacity
-                style={styles.buyerTopIconBtn}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/(buyer)/cart' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-                hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
-                testID="buyer-home-cart-icon"
-              >
-                <Feather name="shopping-cart" size={24} color={ON_DARK} />
-                {cartCount > 0 && (
-                  <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
-                    <Text style={styles.cartCountText}>
-                      {cartCount > 99 ? '99+' : cartCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              </Animated.View>
             </View>
           </View>
         </View>
@@ -3379,7 +3445,7 @@ export default function FeedScreen({
               returnKeyType="search"
               onSubmitEditing={() => setShowSearch(false)}
             />
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Close search" accessibilityRole="button"
               style={styles.topIconBtn}
               activeOpacity={0.7}
               onPress={() => { setShowSearch(false); setSearchQuery(''); }}
@@ -3389,7 +3455,7 @@ export default function FeedScreen({
           </View>
         ) : (
           <View style={styles.topRow}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Notifications" accessibilityRole="button"
               style={styles.topAvatarBtn}
               activeOpacity={0.75}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -3401,7 +3467,7 @@ export default function FeedScreen({
               {hasUnread && <View style={styles.unreadDot} />}
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Search" accessibilityRole="button"
               style={styles.topIconBtn}
               activeOpacity={0.7}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
@@ -3557,12 +3623,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_BG },
 
   pauseOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  // 30% black circle behind the 56pt play glyph — sized with room to spare
-  // around the icon, not a tight fit.
-  pauseOverlayCircle: {
-    width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center', justifyContent: 'center',
-  },
   mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },
   heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
@@ -3673,14 +3733,14 @@ const styles = StyleSheet.create({
   // simpler back/cart top bar (isCreatorFeed), distinct from the compact
   // buyer Threads Home top row above which needs to fit more controls.
   buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  // flexShrink: 0 — the LIVE cluster (left) and search+cart cluster
+  // flexShrink: 0 — the LIVE+cart cluster (left) and search cluster
   // (right) must never shrink or get squeezed out of the row by the
   // center tabs; only the tabs (buyerTabSwitcherWrap/SegmentedControl)
   // are allowed to shrink under Dynamic Type or a narrow screen.
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
   // Absolutely centered on the row (left:0/right:0), not a flex sibling of
-  // the icon clusters: those two clusters are different widths (3 icons
-  // left, 2 right), so centering the tabs in the flex space *between* them
+  // the icon clusters: those two clusters are different widths (2 icons
+  // left, 1 right), so centering the tabs in the flex space *between* them
   // would put the tabs' true center off the screen's actual center by half
   // that width difference — which is what caused the ~180-vs-195 mismatch
   // this fixes. box-none so its empty left/right margin never intercepts
@@ -3695,14 +3755,8 @@ const styles = StyleSheet.create({
     // which sit outside this wrap entirely and are unaffected by it.
     overflow: 'hidden',
   },
-  // `right: -6` (an earlier pass's "true top-right corner" polish) pushed
-  // the badge outward past the cart glyph's own box — fine with the old
-  // flat 10px row padding, but on a real device with a right-edge safe-area
-  // inset on top of that, it pushed the badge (on the last, rightmost icon
-  // in the row) outside the safe screen bounds entirely. `right: 0` keeps
-  // the same top-right-corner read without ever stepping outside the
-  // icon's own box, which the row's padding already keeps clear of the
-  // real edge (see the buyer topBar padding fix).
+  // The badge stays inside the cart's own box, now beside LIVE instead of
+  // against the right safe-area edge.
   buyerCartBadge: { top: -4, right: 0 },
   // Same shadow as the rail's icons (RightActionRail's iconShadow) — the
   // top-row search icon sits directly on video with nothing behind it, so
@@ -3726,7 +3780,7 @@ const styles = StyleSheet.create({
   cartCountText: { fontSize: 10, lineHeight: 12, fontFamily: FONT.bold, color: '#000000', ...TABULAR_NUMS },
   findFriendsBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4,
-    paddingHorizontal: 18, paddingVertical: 10, borderRadius: RADII.pill,
+    paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.md,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   findFriendsBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
@@ -3736,7 +3790,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   creatorRetry: {
-    minHeight: 44, minWidth: 140, paddingHorizontal: SP.lg, borderRadius: RADIUS.pill,
+    minHeight: 44, minWidth: 140, paddingHorizontal: SP.lg, borderRadius: radius.md,
     borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center',
   },
   creatorRetryText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },

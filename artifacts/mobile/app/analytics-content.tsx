@@ -1,253 +1,128 @@
 /**
- * Content Analytics — Brandthread Seller App
- *
- * Mobbin reference: eBay "Performance" scrollable metric-tile row + Shopify
- * "Marketing" channel-card grid (https://mobbin.com/screens/14328f90-76c9-44b6-8675-f0c534c2fba7,
- * https://mobbin.com/screens/6122bfe2-f660-4354-8c46-545ed12c96ba) informed the
- * metric tile strip, attribution card and ranked post list.
+ * Threads and videos — views, engagement and sales from the seller's posts.
+ * Mobbin reference: TikTok Studio Analytics "Content" (range pills, "Key
+ * metrics" grid, line chart, "Your top posts" ranked list with thumbnails),
+ * reskinned to the Brandthread palette. Data: GET /api/analytics/insights/content.
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '@clerk/expo';
-import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
-import { getContentAnalytics, getFilterState } from '@/services/analyticsService';
-import { ContentAnalytics, ContentPostRow, VideoRetentionPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { useColors } from '@/hooks/useColors';
+import { FONT, FS, SP } from '@/lib/theme';
+import { formatCents } from '@/lib/money';
+import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { formatCompactCount } from '@/lib/compactFormat';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import {
-  AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatTileRow,
-} from '@/components/analytics/AnalyticsKit';
+import { Card, CardDivider, PillTabs, SectionTitle, StatRow } from '@/components/analytics/AnalyticsKit';
+import { InsightFrame } from '@/components/analytics/InsightFrame';
+import { InsightLineChart, KpiGrid, RankedRow } from '@/components/analytics/InsightCharts';
+import { useSellerInsight } from '@/hooks/useSellerInsight';
+import { DEFAULT_INSIGHT_RANGE, getContentStats, type ContentPost, type InsightRange } from '@/services/sellerInsightsService';
 
-function PostCard({ p }: { p: ContentPostRow }) {
-  const colors = useColors();
-  const s = React.useMemo(() => createStyles(colors), [colors]);
-  const router = useRouter();
-  return (
-    <TouchableOpacity
-      onPress={() => { Haptics.selectionAsync(); router.push(`/post-analytics?id=${p.postId}` as never); }}
-      style={s.postCard}
-      activeOpacity={0.8}
-    >
-      <View style={s.postThumb}>
-        <Feather name={p.type === 'video' ? 'play-circle' : 'image'} size={22} color={colors.primary} />
-        <View style={s.postTypeBadge}>
-          <Text style={s.postTypeText}>{p.type === 'video' ? 'Vid' : p.type === 'slideshow' ? 'SS' : 'Img'}</Text>
-        </View>
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={s.postCaption} numberOfLines={1}>{p.caption}</Text>
-        <View style={s.postMetaRow}>
-          <Feather name="eye" size={10} color={colors.mutedForeground} />
-          <Text style={s.postMeta}>{formatCompactCount(p.views)}</Text>
-          <Feather name="heart" size={10} color={colors.mutedForeground} />
-          <Text style={s.postMeta}>{formatCompactCount(p.likes)}</Text>
-          <Feather name="shopping-bag" size={10} color={colors.mutedForeground} />
-          <Text style={s.postMeta}>{p.productClicks}</Text>
-        </View>
-        <View style={s.postRevenueRow}>
-          <Text style={s.postRevenue}>${p.revenue.toLocaleString()}</Text>
-          <Text style={s.postCompletion}>{p.completionRate}% completion</Text>
-        </View>
-      </View>
-      <Feather name="chevron-right" size={16} color={colors.subtle} />
-    </TouchableOpacity>
-  );
-}
+type Sort = 'views' | 'likes' | 'revenue';
+const TYPE_LABEL = { video: 'Video', slideshow: 'Slideshow', image: 'Photo' } as const;
 
-function RetentionGraph({ points }: { points: VideoRetentionPoint[] }) {
-  const colors = useColors();
-  const s = React.useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View>
-      <View style={s.retentionWrap}>
-        {points.map((p, i) => (
-          <View key={i} style={s.retentionBarWrap}>
-            <View style={[s.retentionBar, { height: `${p.retentionPct}%`, backgroundColor: p.retentionPct < 40 ? colors.destructive : p.retentionPct < 60 ? colors.warning : colors.success }]} />
-          </View>
-        ))}
-      </View>
-      <View style={s.retentionXRow}>
-        {['0%', '25%', '50%', '75%', '100%'].map(l => (
-          <Text key={l} style={s.retentionX}>{l}</Text>
-        ))}
-      </View>
-      <View style={s.retentionLegend}>
-        <View style={s.legendItem}><View style={[s.legendDot, { backgroundColor: colors.success }]} /><Text style={s.legendText}>High retention</Text></View>
-        <View style={s.legendItem}><View style={[s.legendDot, { backgroundColor: colors.warning }]} /><Text style={s.legendText}>Drop-off</Text></View>
-        <View style={s.legendItem}><View style={[s.legendDot, { backgroundColor: colors.destructive }]} /><Text style={s.legendText}>Low</Text></View>
-      </View>
-    </View>
-  );
+function sortPosts(posts: ContentPost[], sort: Sort): ContentPost[] {
+  const key = sort === 'views' ? 'views' : sort === 'likes' ? 'likes' : 'revenueCents';
+  return [...posts].sort((a, b) => b[key] - a[key] || b.views - a.views);
 }
 
 export default function AnalyticsContentScreen() {
   const colors = useColors();
-  const s = React.useMemo(() => createStyles(colors), [colors]);
-  const { isLoaded: authLoaded, userId } = useAuth();
+  const router = useRouter();
+  const s = React.useMemo(() => styles(colors), [colors]);
+  const [range, setRange] = useState<InsightRange>(DEFAULT_INSIGHT_RANGE);
+  const [sort, setSort] = useState<Sort>('views');
+  const { data, loading, error, reload } = useSellerInsight(() => getContentStats(range), [range]);
 
-  const [data,       setData]       = useState<ContentAnalytics | null>(null);
-  const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
-  const [loading,    setLoading]    = useState(true);
-  const [loadError,  setLoadError]  = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [tab,        setTab]        = useState<'videos' | 'slideshows' | 'top_revenue'>('videos');
-  const requestUser = useRef<string | null>(null);
-
-  const load = useCallback(async (isRefresh = false) => {
-    if (!authLoaded || !userId) return;
-    const requestedUser = userId;
-    requestUser.current = requestedUser;
-    if (isRefresh) setRefreshing(true); else setLoading(true);
-    try {
-      const f = filter ?? await getFilterState();
-      if (!filter) setFilter(f);
-      const next = await getContentAnalytics(f);
-      if (requestUser.current !== requestedUser) return;
-      setData(next);
-      setLoadError(false);
-    } catch (err) {
-      if (requestUser.current !== requestedUser) return;
-      setLoadError(true);
-        } finally { setLoading(false); setRefreshing(false); }
-  }, [filter, authLoaded, userId]);
-
-  useEffect(() => {
-    requestUser.current = null;
-    setData(null); setFilter(null);
-    setLoading(!authLoaded);
-    if (authLoaded && userId) { setLoading(true); load(); }
-  }, [authLoaded, userId]); // load reads the current filter
-
-  const posts: ContentPostRow[] = data
-    ? (tab === 'videos' ? data.topVideos : tab === 'slideshows' ? data.topSlideshows : data.highestRevenuePosts)
-    : [];
-
+  const t = data?.totals;
+  const hasData = !!data && (data.totals.views > 0 || data.posts.length > 0 || data.totals.followerGrowth > 0);
+  const posts = data ? sortPosts(data.posts, sort).slice(0, 20) : [];
   return (
-    <View style={{ flex: 1 }}>
-      <ScreenHeader title="Content Analytics" subtitle={filter?.dateRange.label ?? '30 days'} />
-      {loading ? (
-        <AnalyticsSkeleton kpiCount={3} listRows={3} />
-      ) : loadError && !data ? (
-        <View style={s.loadWrap}>
-          <ErrorState message="Couldn't load content analytics." onRetry={() => load()} />
-        </View>
-      ) : (
-    <ScrollView
-      style={s.scroll}
-      contentContainerStyle={s.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
-    >
-      {!data ? (
+    <InsightFrame title="Content Analytics" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={reload} range={range} onRangeChange={setRange}>
+      {!data ? null : !hasData ? (
         <EmptyState
           icon="video"
-          title="No content views yet"
-          description="We'll show post performance once your Seller posts start getting views."
+          title="No views yet"
+          description="Post a Thread to see how it performs."
+          action={{ label: 'Create post', onPress: () => router.push('/create-post' as never) }}
+          actionVariant="pill"
           style={{ marginTop: SP.lg }}
+          testID="content-analytics-empty"
         />
       ) : (
         <>
-          {/* Metric tiles grid */}
-          <SectionTitle>Performance</SectionTitle>
-          <StatTileRow
-            scroll
-            items={[data.views, data.uniqueViewers, data.likes, data.saves, data.shares, data.productClicks, data.purchases, data.revenueAttributed, data.avgWatchTime, data.completionRate, data.followerGrowth]
-              .map(m => ({ key: m.key, label: m.label, value: m.formatted, changePct: m.changePct }))}
-          />
+          <KpiGrid range={range} items={[
+            { key: 'views', label: 'Post views', value: formatCompactCount(t!.views), changePct: data.deltas.viewsPct, featured: true },
+            { key: 'likes', label: 'Likes', value: formatCompactCount(t!.likes), changePct: data.deltas.likesPct },
+            { key: 'comments', label: 'Comments', value: formatCompactCount(t!.comments), changePct: data.deltas.commentsPct },
+            { key: 'shares', label: 'Shares', value: formatCompactCount(t!.shares), changePct: data.deltas.sharesPct },
+            { key: 'saves', label: 'Saves', value: formatCompactCount(t!.saves), changePct: data.deltas.savesPct },
+            { key: 'followers', label: 'New followers', value: formatCompactCount(t!.followerGrowth), changePct: data.deltas.followerGrowthPct },
+          ]} />
 
-          {/* Attribution summary */}
-          <View style={s.attrCard}>
-            <Feather name="dollar-sign" size={16} color={colors.warning} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.attrTitle}>Content-attributed revenue</Text>
-              <Text style={s.attrSub}>Purchases that started from a Seller post in the last 7 days</Text>
-            </View>
-            <Text style={s.attrValue}>{data.revenueAttributed.formatted}</Text>
-          </View>
+          <SectionTitle>Views</SectionTitle>
+          <Card padded>
+            <InsightLineChart range={range} points={data.buckets.map(b => ({ bucket: b.bucket, value: b.views }))} />
+          </Card>
 
-          {/* Post rankings */}
+          <SectionTitle>Shopping from posts</SectionTitle>
+          <Card>
+            <StatRow label="Product taps" value={formatCompactCount(t!.productClicks)} />
+            <CardDivider />
+            <StatRow label="Added to bag" value={formatCompactCount(t!.addToCarts)} />
+            <CardDivider />
+            <StatRow label="Purchases" value={formatCompactCount(t!.purchases)} />
+            <CardDivider />
+            <StatRow label="Revenue from posts" value={formatCentsCompact(t!.revenueCents)} changePct={data.deltas.revenuePct ?? undefined} />
+            <CardDivider />
+            <StatRow label="Profile visits from posts" value={formatCompactCount(t!.profileVisits)} />
+            {t!.avgWatchSeconds !== null && (<><CardDivider /><StatRow label="Average watch time" value={`${t!.avgWatchSeconds}s`} /></>)}
+          </Card>
+
+          <SectionTitle>Top posts</SectionTitle>
           <PillTabs
             scroll={false}
-            options={[
-              { key: 'videos', label: 'Top Videos' },
-              { key: 'slideshows', label: 'Slideshows' },
-              { key: 'top_revenue', label: 'By Revenue' },
-            ] as const}
-            value={tab}
-            onChange={setTab}
+            options={[{ key: 'views', label: 'Most views' }, { key: 'likes', label: 'Most likes' }, { key: 'revenue', label: 'Most sales' }] as const}
+            value={sort}
+            onChange={setSort}
           />
-
           {posts.length === 0 ? (
-            <EmptyState icon="video" title="No post stats yet" description="Post stats will show once your posts start getting views." />
+            <Card><Text style={s.empty}>No posts were viewed in this period.</Text></Card>
           ) : (
             <Card>
               {posts.map((p, i) => (
                 <View key={p.postId}>
                   {i > 0 && <CardDivider />}
-                  <PostCard p={p} />
+                  <RankedRow
+                    rank={i + 1}
+                    thumbnailUrl={p.thumbnailUrl}
+                    icon={p.type === 'video' ? 'play-circle' : 'image'}
+                    title={p.caption || `Untitled ${TYPE_LABEL[p.type].toLowerCase()}`}
+                    subtitle={`${TYPE_LABEL[p.type]} · ${formatCompactCount(p.likes)} likes · ${formatCompactCount(p.saves)} saves`}
+                    value={sort === 'revenue' ? formatCents(p.revenueCents) : sort === 'likes' ? formatCompactCount(p.likes) : formatCompactCount(p.views)}
+                    valueLabel={sort === 'revenue' ? `${p.purchases} sold` : sort === 'likes' ? 'likes' : 'views'}
+                    onPress={() => router.push(`/post-analytics?id=${encodeURIComponent(p.postId)}` as never)}
+                  />
                 </View>
               ))}
             </Card>
           )}
 
-          {/* Video retention */}
-          {data.retention.length > 0 && (
-            <>
-              <SectionTitle>Video Retention</SectionTitle>
-              <Card padded>
-                <View style={s.retentionStats}>
-                  <View style={s.retStat}><Text style={s.retStatValue}>{data.avgWatchTime.formatted}s</Text><Text style={s.retStatLabel}>Avg watch time</Text></View>
-                  <View style={s.retStat}><Text style={s.retStatValue}>{data.completionRate.formatted}</Text><Text style={s.retStatLabel}>Completion</Text></View>
-                </View>
-                <RetentionGraph points={data.retention} />
-              </Card>
-            </>
-          )}
+          <SectionTitle>By format</SectionTitle>
+          <Card>
+            {data.byType.map((row, i) => (
+              <View key={row.type}>
+                {i > 0 && <CardDivider />}
+                <StatRow label={`${TYPE_LABEL[row.type]}s · ${row.posts} viewed`} value={`${formatCompactCount(row.views)} views`} />
+              </View>
+            ))}
+          </Card>
         </>
       )}
-
-      <View style={{ height: 120 }} />
-    </ScrollView>
-      )}
-    </View>
+    </InsightFrame>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  scroll:   { flex: 1, backgroundColor: 'transparent' },
-  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
-  content:  { paddingHorizontal: SP.md },
-  attrCard: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: colors.elevated, borderRadius: RADIUS.md, padding: SP.sm + 2, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg },
-  attrTitle:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
-  attrSub:  { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
-  attrValue:{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.warning },
-  postCard: { flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget, paddingHorizontal: SP.sm + 2, paddingVertical: SP.sm, gap: SP.sm },
-  postThumb:{ width: 50, height: 50, borderRadius: RADIUS.sm, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  postTypeBadge:{ position: 'absolute', top: 2, right: 2, backgroundColor: colors.card, borderRadius: 4, paddingHorizontal: 3 },
-  postTypeText:{ fontSize: FS.xs, fontFamily: FONT.bold, color: colors.mutedForeground },
-  postCaption:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground, marginBottom: 4 },
-  postMetaRow:{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  postMeta: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
-  postRevenueRow:{ flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  postRevenue:{ fontSize: FS.sm, fontFamily: FONT.bold, color: colors.success },
-  postCompletion:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
-  retentionStats:{ flexDirection: 'row', gap: SP.lg, marginBottom: SP.md },
-  retStat:  { gap: 2 },
-  retStatValue:{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.foreground },
-  retStatLabel:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
-  retentionWrap:{ flexDirection: 'row', alignItems: 'flex-end', height: 80, gap: 3, marginBottom: 6 },
-  retentionBarWrap:{ flex: 1, height: 80, justifyContent: 'flex-end' },
-  retentionBar:{ width: '100%', borderRadius: 3 },
-  retentionXRow:{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  retentionX:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle },
-  retentionLegend:{ flexDirection: 'row', gap: SP.sm + 4, marginTop: SP.sm },
-  legendItem:{ flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot:{ width: 8, height: 8, borderRadius: 4 },
-  legendText:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
+const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+  empty: { fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, padding: SP.md },
 });

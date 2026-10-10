@@ -42,6 +42,26 @@ export interface BuyerSocialProfile {
 export type BuyerPostType = 'photo' | 'slideshow' | 'video';
 export type BuyerPostVisibility = 'public' | 'friends_only';
 
+/** Embedded original of a quote repost (server: lib/quotedPosts.ts). */
+export type QuotedPostSummary =
+  | {
+      id: string;
+      userId: string;
+      author: { displayName: string | null; brandName: string | null; username: string | null };
+      caption: string;
+      thumbnailUrl: string | null;
+      mediaType: string;
+    }
+  | { unavailable: true };
+
+/** One slide of a POST carousel — a photo or a (muted-autoplay) video. */
+export interface PostSlide {
+  kind: 'photo' | 'video';
+  url: string;
+  thumbnailUrl?: string;
+  duration?: number;
+}
+
 export interface BuyerPost {
   id: string;
   authorId: string;
@@ -57,6 +77,10 @@ export interface BuyerPost {
   hashtags: string[];
   mediaColors: string[];             // Demo gradient colors (real URIs in production)
   mediaUrl?: string;
+  /** Ordered carousel media (POST). */
+  slides?: PostSlide[];
+  mediaUrls?: string[];
+  aspectRatio?: string;
   likesCount: number;
   commentsCount: number;
   repostsCount: number;
@@ -65,8 +89,13 @@ export interface BuyerPost {
   repostedByMe: boolean;
   isArchived: boolean;
   isDraft: boolean;
+  /** Set when this post quotes another; null/absent otherwise. */
+  quotedPost?: QuotedPostSummary | null;
+  quotesCount?: number;
   createdAt: string;
   updatedAt: string;
+  /** Tagged place, when the author added one (see /api/places). */
+  location?: { id: string; name: string } | null;
 }
 
 // ─── Repost Record ────────────────────────────────────────────────────────────
@@ -233,11 +262,14 @@ export interface Message {
   /** ISO timestamp the recipient read the message, when known — drives the
    *  double-check "read" receipt. */
   readAt?: string;
+  /** True for a seller's away auto-reply (server-marked). */
+  automated?: boolean;
   ts: number;              // Unix ms
   deletedForMe: boolean;
 }
 
 export interface Conversation {
+  isMuted?: boolean;
   id: string;
   type: ConversationType;
   participants: ConversationParticipant[];
@@ -310,7 +342,7 @@ export type StoryReplyPermission = 'everyone' | 'friends' | 'off';
 export type StoryOverlayType =
   | 'link' | 'gif' | 'text'
   | 'mention' | 'location' | 'time' | 'poll' | 'question'
-  | 'product' | 'shop' | 'threadcash'
+  | 'product' | 'shop' | 'threadcash' | 'countdown'
   /** The original story shown as a rounded card in a reshare ("Add to your story"). */
   | 'reshare_card';
 
@@ -366,6 +398,8 @@ export interface StoryOverlay {
   cardRadius?: number;
   // location sticker
   locationLabel?: string;
+  /** Resolved /api/places id; when set, the viewer may open the location page from the sticker. */
+  locationPlaceId?: string;
   // question sticker (answers are not yet persisted server-side — UI-only)
   questionPrompt?: string;
   // poll sticker (results are not yet persisted server-side — UI-only)
@@ -376,6 +410,10 @@ export interface StoryOverlay {
   productName?: string;
   productImageUri?: string;
   productPriceCents?: number;
+  // drop countdown sticker (sellers): the server validates dropId; name / date are a snapshot, live data is in Story.stickerState
+  dropId?: string;
+  dropName?: string;
+  dropReleaseAt?: string;
   // shop-link sticker (sellers)
   shopUrl?: string;
   shopLabel?: string;
@@ -424,6 +462,21 @@ export interface Story {
   original?: StoryOriginal | null;
   createdAt: number;         // Unix ms
   expiresAt: number;         // createdAt + 24h
+  /** Live state of interactive stickers (poll results, question status, product / drop facts). Null when there are none. */
+  stickerState?: StoryStickerState | null;
+}
+
+export interface StoryPollState { counts: number[] | null; percentages: number[] | null; total: number | null; myVote: number | null }
+export interface StoryQuestionState { answered: boolean; count: number | null }
+export interface StoryProductState { productId: string; name: string; imageUrl: string | null; priceCents: number | null; available: boolean; soldOut: boolean }
+export interface StoryCountdownState { dropId: string; name: string; releaseAt: string | null; launched: boolean; live: boolean; subscribed: boolean }
+export interface StoryStickerState {
+  /** Server clock (ms) when the state was built: countdowns tick from it, not from the phone's clock. */
+  serverNow: number;
+  polls: Record<string, StoryPollState>;
+  questions: Record<string, StoryQuestionState>;
+  products: Record<string, StoryProductState>;
+  countdowns: Record<string, StoryCountdownState>;
 }
 
 export interface StoryOriginal {
@@ -479,14 +532,14 @@ export type NotificationCategory =
   | 'seller_updates' | 'products' | 'marketing' | 'system';
 
 export type NotificationType =
-  | 'friend_request' | 'friend_accepted' | 'post_like' | 'post_comment'
+  | 'friend_request' | 'follow_request' | 'friend_accepted' | 'post_like' | 'post_comment'
   | 'repost' | 'mention' | 'story_mention' | 'story_reshare' | 'story_reaction' | 'story_reply' | 'new_follower'
   | 'order_confirmed' | 'order_processing' | 'order_production'
   | 'order_shipped' | 'order_delivered' | 'order_cancelled' | 'order_delay'
   | 'order_out_for_delivery' | 'order_exception' | 'order_returned_to_sender'
   | 'order_preparing' | 'order_auto_refunded' | 'order_refund_warning'
   | 'return_update' | 'refund_update' | 'dispute_update'
-  | 'product_restocked' | 'drop_live' | 'preorder_closing'
+  | 'product_restocked' | 'drop_live' | 'live_reminder' | 'live_started' | 'preorder_closing'
   | 'price_drop' | 'saved_product_update'
   | 'new_friend_message' | 'new_seller_reply' | 'new_order_message' | 'message_request'
   | 'system' | 'marketing';

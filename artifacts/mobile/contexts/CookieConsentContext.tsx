@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { usePathname } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,19 +11,13 @@ import { WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 
 export { COOKIE_CONSENT_VERSION, CookieConsent, canUseAnalytics, canUseMarketing } from '@/lib/cookieConsent';
 const KEY = 'bt:cookie-consent';
-type Value = { consent: CookieConsent | null; saveConsent: (choices: Pick<CookieConsent, 'analytics' | 'marketing'>) => Promise<void>; openPreferences: () => void };
-const Context = createContext<Value>({ consent: null, saveConsent: async () => {}, openPreferences: () => {} });
+// Keep the banner off pre-auth screens with bottom-pinned actions.
+const SUPPRESS_ON_PATHNAMES = new Set(['/splash', '/sign-in', '/onboarding', '/forgot-password']);
+type Value = { consent: CookieConsent | null; saveConsent: (choices: Pick<CookieConsent, 'analytics' | 'marketing'>) => Promise<void>; openPreferences: () => void; noticeClearance: number };
+const Context = createContext<Value>({ consent: null, saveConsent: async () => {}, openPreferences: () => {}, noticeClearance: 0 });
 export function useCookieConsent() { return useContext(Context); }
 export function useCanUseAnalytics() { return canUseAnalyticsValue(useCookieConsent().consent); }
 export function useCanUseMarketing() { return canUseMarketingValue(useCookieConsent().consent); }
-
-// Pre-auth screens (splash, sign-in, the onboarding wizard) have their own
-// sticky footer CTA pinned to the exact bottom edge, and no floating tab bar
-// to give the banner a natural shelf above. Showing the banner there means
-// it floats on top of "Continue"/"Sign in" instead of beside it. Defer
-// consent to the first screen that actually has room for it (the main app,
-// once the person is in); their choice still applies everywhere once made.
-const SUPPRESS_ON_PATHNAMES = new Set(['/splash', '/sign-in', '/onboarding', '/forgot-password']);
 
 export function CookieConsentProvider({ children }: { children: React.ReactNode }) {
   const { theme } = useAppTheme();
@@ -45,11 +39,21 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
     const value: CookieConsent = { version: COOKIE_CONSENT_VERSION, timestamp: Date.now(), necessary: true, ...choices };
     await AsyncStorage.setItem(KEY, JSON.stringify(value)); setConsent(value); setCustomizing(false);
   }, []);
-  if (Platform.OS !== 'web') return <>{children}</>;
+  const openPreferences = useCallback(() => {
+    setAnalytics(consent?.analytics ?? false);
+    setMarketing(consent?.marketing ?? false);
+    setCustomizing(true);
+  }, [consent]);
   const suppressForCapture = __DEV__ && typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('bt_capture') === '1';
-  const openPreferences = () => { setAnalytics(consent?.analytics ?? false); setMarketing(consent?.marketing ?? false); setCustomizing(true); };
   const showSheet = !suppressForCapture && !suppressForRoute && loaded && (!consent || customizing);
+  // The sheet is a docked flex sibling that takes its own height out of the
+  // layout, so screens never need to reserve extra room for it.
+  const noticeClearance = 0;
+  const value = useMemo(() => ({ consent, saveConsent, openPreferences, noticeClearance }),
+    [consent, saveConsent, openPreferences, noticeClearance]);
+  // Cookie consent is a web concern; native apps never show the sheet.
+  if (Platform.OS !== 'web') return <Context.Provider value={value}>{children}</Context.Provider>;
   // A bottom sheet docked to the window's bottom edge that takes its own
   // height out of the layout (a flex sibling, not an absolute overlay), so
   // the app — fields, tiles, the floating tab bar — sits fully above it and
@@ -60,7 +64,7 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   // (mobbin.com/screens/ebf2fdf2-414d-4d73-b9b8-94ad2392ab22): copy, then
   // two equal-width pill buttons.
   return (
-    <Context.Provider value={{ consent, saveConsent, openPreferences }}>
+    <Context.Provider value={value}>
       <View style={s.root}>
         <View style={s.app}>{children}</View>
         {showSheet && (

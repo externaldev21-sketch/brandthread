@@ -52,12 +52,20 @@ export default function BuyerPrivacySettings() {
   // dmPrivacy is server-backed — loaded from and saved to /api/auth/privacy
   const [dmPrivacy, setDmPrivacy] = useState<DmPrivacy>('requests');
   const [picker, setPicker] = useState<PickerKey | null>(null);
+  // Private account is server-backed (follow requests); null until loaded, then it wins over the local value.
+  const [serverPrivate, setServerPrivate] = useState<boolean | null>(null);
+  const [privateBusy, setPrivateBusy] = useState(false);
+  const [requestCount, setRequestCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       getPrivacySettings().then(setSettings);
       // Load server-side DM privacy setting
-      api.privacy.get().then(({ dmPrivacy: p }) => setDmPrivacy(p)).catch(() => {});
+      api.privacy.get().then(({ dmPrivacy: p, isPrivate }) => {
+        setDmPrivacy(p);
+        if (typeof isPrivate === 'boolean') setServerPrivate(isPrivate);
+      }).catch(() => {});
+      api.followRequests.list(50, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
     }, [])
   );
 
@@ -79,6 +87,29 @@ export default function BuyerPrivacySettings() {
       if (showConfirmation) setSaveError("Couldn't save. Try again.");
       // On silent (back-navigation) saves, leave hasChanges set so the user
       // isn't told their change was saved when it wasn't.
+    }
+  }
+
+  // Writes the private-account flag through to the server immediately (not via
+  // Save) and mirrors it into the local profileVisibility value. Optimistic,
+  // rolled back if the request fails.
+  async function applyPrivate(next: boolean) {
+    if (privateBusy) return;
+    setPrivateBusy(true);
+    const before = serverPrivate ?? settings?.profileVisibility === 'private';
+    setServerPrivate(next);
+    try {
+      const res = await api.privacy.update({ isPrivate: next });
+      const value = typeof res.isPrivate === 'boolean' ? res.isPrivate : next;
+      setServerPrivate(value);
+      const saved = await updatePrivacySettings({ profileVisibility: value ? 'private' : 'public' });
+      setSettings(saved);
+      setSaveError(null);
+    } catch {
+      setServerPrivate(before);
+      setSaveError("Couldn't update your account privacy. Try again.");
+    } finally {
+      setPrivateBusy(false);
     }
   }
 
@@ -114,11 +145,27 @@ export default function BuyerPrivacySettings() {
         <SectionHeader title="PROFILE" />
         <Card style={styles.card}>
           <ListRow
-            icon="eye"
-            title="Profile visibility"
-            value={settings.profileVisibility === 'public' ? 'Public' : 'Private'}
+            icon="lock"
+            title="Private account"
+            subtitle="Approve who can follow you"
+            toggle={{ value: serverPrivate ?? settings.profileVisibility === 'private', onChange: (v) => { void applyPrivate(v); } }}
+            disabled={privateBusy}
+            testID="private-account-switch"
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon="user-plus"
+            title="Follow requests"
+            value={requestCount > 0 ? String(requestCount) : undefined}
             chevron
-            onPress={() => setPicker('profileVisibility')}
+            onPress={() => router.push('/buyer-friend-requests' as never)}
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon="star"
+            title="Close friends"
+            chevron
+            onPress={() => router.push('/buyer-close-friends' as never)}
           />
         </Card>
 
@@ -198,6 +245,7 @@ export default function BuyerPrivacySettings() {
             icon="phone"
             title="Contact discovery"
             subtitle="Find friends from contacts (no contacts uploaded without permission)"
+            subtitleNumberOfLines={2}
             toggle={{ value: settings.contactDiscovery, onChange: v => update('contactDiscovery', v) }}
           />
         </Card>
@@ -208,6 +256,7 @@ export default function BuyerPrivacySettings() {
           <ListRow
             icon="message-circle"
             title="Who can message you"
+            subtitleNumberOfLines={2}
             subtitle={
               dmPrivacy === 'followers_only'
                 ? 'Only people you follow can message you'
@@ -248,17 +297,6 @@ export default function BuyerPrivacySettings() {
         </Card>
       </ScrollView>
 
-      <OptionSheet
-        visible={picker === 'profileVisibility'}
-        onClose={() => setPicker(null)}
-        title="Profile visibility"
-        options={[
-          { id: 'public', label: 'Public', description: 'Anyone can see your profile and posts', icon: 'globe' },
-          { id: 'private', label: 'Private', description: 'Only people you approve can see your posts', icon: 'lock' },
-        ]}
-        selectedId={settings.profileVisibility}
-        onSelect={(id) => { update('profileVisibility', id); setPicker(null); }}
-      />
       <OptionSheet
         visible={picker === 'whoCanSendFriendRequests'}
         onClose={() => setPicker(null)}

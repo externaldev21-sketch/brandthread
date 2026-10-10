@@ -6,12 +6,16 @@
  * ─────────
  * GET  /api/seller/notification-prefs   → { digest: 'realtime' | 'daily' }
  * PUT  /api/seller/notification-prefs   ← { digest: 'realtime' | 'daily' }
+ *
+ * `promotionalPush` (boolean, default false) is the explicit opt-in for
+ * promotional/marketing pushes (App Store 4.5.4); see lib/pushPolicy.ts.
  */
 
 import { Router } from "express";
 import { db, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { channelView, parseChannelKey, channelPrefKey } from "../lib/notificationChannels";
 
 const router = Router();
 router.use(requireAuth);
@@ -25,6 +29,8 @@ const BUYER_DEFAULTS = {
   friend_activity: true,
   price_alerts: true,
   return_updates: true,
+  cart_reminders: true,
+  seller_announcements: true,
 };
 const SELLER_DEFAULTS = {
   new_orders: true,
@@ -34,10 +40,21 @@ const SELLER_DEFAULTS = {
   disputes: true,
   subscription_trial: true,
   inventory_alerts: true,
+  seller_announcements: true,
 };
 
 function defaultsFor(accountType: string | null | undefined) {
   return accountType === "seller" ? SELLER_DEFAULTS : BUYER_DEFAULTS;
+}
+
+/** Separate read so a deploy before migration 260 reports false instead of failing the screen. */
+async function readPromoOptIn(clerkId: string): Promise<boolean> {
+  try {
+    const [r] = await db.select({ v: users.promoPushOptIn }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+    return r?.v === true;
+  } catch {
+    return false;
+  }
 }
 
 const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -69,12 +86,14 @@ router.get("/", async (req, res) => {
       digest: (row?.digest ?? "realtime") as DigestMode,
       role,
       pushEnabled: row?.pushEnabled ?? true,
+      promotionalPush: await readPromoOptIn(clerkId),
       quietHours: {
         start: row?.quietHoursStart ?? null,
         end: row?.quietHoursEnd ?? null,
         timezone: row?.quietHoursTimezone ?? "UTC",
       },
       categories: { ...defaultsFor(row?.accountType), ...(row?.preferences ?? {}) },
+      channels: channelView(row?.accountType, row?.preferences),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch notification preferences");
@@ -85,10 +104,13 @@ router.get("/", async (req, res) => {
 // ── PUT /api/seller/notification-prefs ───────────────────────────────────────
 router.put("/", async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { digest, categories, pushEnabled, quietHours } = req.body as {
+  const { digest, categories, channels, pushEnabled, promotionalPush, quietHours } = req.body as {
     digest?: string;
     categories?: Record<string, unknown>;
+    /** { inApp?: { [type]: boolean }, email?: { [type]: boolean } } */
+    channels?: Record<string, unknown>;
     pushEnabled?: unknown;
+    promotionalPush?: unknown;
     quietHours?: { start?: unknown; end?: unknown; timezone?: unknown } | null;
   };
   if (digest !== undefined && !VALID_DIGEST.includes(digest as DigestMode)) {
@@ -98,8 +120,14 @@ router.put("/", async (req, res) => {
   if (categories !== undefined && (!categories || typeof categories !== "object" || Array.isArray(categories))) {
     return res.status(400).json({ error: "categories must be an object" });
   }
+  if (channels !== undefined && (!channels || typeof channels !== "object" || Array.isArray(channels))) {
+    return res.status(400).json({ error: "channels must be an object" });
+  }
   if (pushEnabled !== undefined && typeof pushEnabled !== "boolean") {
     return res.status(400).json({ error: "pushEnabled must be a boolean" });
+  }
+  if (promotionalPush !== undefined && typeof promotionalPush !== "boolean") {
+    return res.status(400).json({ error: "promotionalPush must be a boolean" });
   }
   let quietHoursPatch: { start: string | null; end: string | null; timezone?: string } | undefined;
   if (quietHours !== undefined) {
@@ -121,8 +149,8 @@ router.put("/", async (req, res) => {
       };
     }
   }
-  if (digest === undefined && categories === undefined && pushEnabled === undefined && quietHoursPatch === undefined) {
-    return res.status(400).json({ error: "digest, categories, pushEnabled, or quietHours is required" });
+  if (digest === undefined && categories === undefined && channels === undefined && pushEnabled === undefined && promotionalPush === undefined && quietHoursPatch === undefined) {
+    return res.status(400).json({ error: "digest, categories, channels, pushEnabled, promotionalPush, or quietHours is required" });
   }
 
   try {
@@ -142,6 +170,18 @@ router.put("/", async (req, res) => {
       }
       patch[key] = value;
     }
+    for (const [channelName, map] of Object.entries(channels ?? {})) {
+      if ((channelName !== "inApp" && channelName !== "email") || !map || typeof map !== "object" || Array.isArray(map)) {
+        return res.status(400).json({ error: `Invalid notification channel: ${channelName}` });
+      }
+      for (const [typeKey, value] of Object.entries(map as Record<string, unknown>)) {
+        const parsed = parseChannelKey(current.accountType, typeKey);
+        if (!parsed || typeof value !== "boolean") {
+          return res.status(400).json({ error: `Invalid notification type: ${typeKey}` });
+        }
+        patch[channelPrefKey(channelName, parsed.key)] = value;
+      }
+    }
     const merged = { ...defaults, ...(current.preferences ?? {}), ...patch };
 
     const updates: Record<string, unknown> = {
@@ -149,6 +189,7 @@ router.put("/", async (req, res) => {
       updatedAt: new Date(),
     };
     if (pushEnabled !== undefined) updates.pushEnabled = pushEnabled;
+    if (promotionalPush !== undefined) updates.promoPushOptIn = promotionalPush;
     if (quietHoursPatch !== undefined) {
       updates.quietHoursStart = quietHoursPatch.start;
       updates.quietHoursEnd = quietHoursPatch.end;
@@ -179,12 +220,14 @@ router.put("/", async (req, res) => {
       digest: (saved?.digest ?? digest ?? "realtime") as DigestMode,
       role: current.accountType === "seller" ? "seller" : "buyer",
       pushEnabled: saved?.pushEnabled ?? true,
+      promotionalPush: await readPromoOptIn(clerkId),
       quietHours: {
         start: saved?.quietHoursStart ?? null,
         end: saved?.quietHoursEnd ?? null,
         timezone: saved?.quietHoursTimezone ?? "UTC",
       },
       categories: merged,
+      channels: channelView(current.accountType, merged),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to update notification preferences");

@@ -6,7 +6,7 @@
  * block — so this screen doesn't fabricate a non-functional Restrict row;
  * see docs/dm-flows.md for this documented scope decision.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -15,9 +15,10 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
-import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
+import { confirmBlock, confirmUnblock } from '@/lib/safety';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 
 export default function ConversationPrivacySafetyScreen() {
   const { theme } = useAppTheme();
@@ -25,7 +26,18 @@ export default function ConversationPrivacySafetyScreen() {
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{ id: string; participantUserId: string; participantName: string }>();
+  const { openReport } = useReportSheet();
   const [isBlocked, setIsBlocked] = useState(false);
+
+  // The switch reflects the server, not a guess: load whether I already blocked them.
+  useEffect(() => {
+    if (!params.participantUserId) return;
+    let cancelled = false;
+    api.trust.blockStatus(params.participantUserId)
+      .then((status) => { if (!cancelled) setIsBlocked(status.blockedByMe); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [api, params.participantUserId]);
 
   async function toggleBlock() {
     hapticSelection();
@@ -38,12 +50,12 @@ export default function ConversationPrivacySafetyScreen() {
 
   function report() {
     hapticSelection();
-    router.push(reportHref({
+    openReport({
       targetType: 'profile',
       targetId: params.participantUserId,
       ownerId: params.participantUserId,
       ownerName: params.participantName,
-    }) as never);
+    });
   }
 
   return (

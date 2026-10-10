@@ -10,7 +10,7 @@ import {
   StyleSheet, TouchableOpacity, Platform,
   ActivityIndicator,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,6 +47,7 @@ import {
   SHADOW_PURPLE,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { radius } from '@/constants/radii';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -689,7 +690,6 @@ export default function SampleDetailScreen() {
     <BrandthreadScreen noSafeTop>
       <ScreenHeader
         title="Sample Details"
-        subtitle={manufacturerName}
         onBack={() => goBackOr(router)}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -1228,7 +1228,7 @@ const s = StyleSheet.create({
   chip: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: CARD,

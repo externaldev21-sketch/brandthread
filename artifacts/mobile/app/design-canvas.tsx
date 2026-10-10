@@ -25,7 +25,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder, Pressable,
   Alert, ScrollView, TextInput, Modal, Dimensions, Share,
   Platform, AppState, AppStateStatus, Image as RNImage, GestureResponderEvent,
-  LayoutAnimation, UIManager,
+  LayoutAnimation, UIManager, Linking,
 } from 'react-native';
 
 // Android needs this opt-in for LayoutAnimation (iOS/web animate by default).
@@ -33,7 +33,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 import Svg, {
-  Path, Rect, Circle, G, Line, Text as SvgText,
+  Path, Rect, Circle, G, Line, Text as SvgText, TSpan,
   Image as SvgImage, Defs, Mask as SvgMask, Filter, FeColorMatrix, FeBlend, FeComposite,
 } from 'react-native-svg';
 import { File, Paths, EncodingType } from 'expo-file-system';
@@ -50,6 +50,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
+import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -76,16 +77,20 @@ import {
   TransformMode, ExtHandleKind,
   computeHandlePositions, applyFreeformHandle, applyUniformHandle,
   transformToQuad, deriveAffineFromQuad, defaultWarpMesh, deriveAffineFromWarpMesh,
+  computeRotationDelta, applyRotateHandle,
   DistortQuad, WarpMeshPoint,
 } from '@/lib/transformModel';
+import { isDoubleTap, isPointInTransformBounds, TapRecord } from '@/lib/doubleTapModel';
 import {
   CurvesAdjustment, CurveChannel, LiquifyPushStroke,
   defaultCurvesAdjustment, curveToTableValues,
   computeHistogramFromColors, HISTOGRAM_UNAVAILABLE,
   netLiquifyDisplacement, DesignLayerAdjustments,
+  HsbAdjustment, defaultHsbAdjustment, isIdentityHsb, clampHsb,
 } from '@/lib/adjustmentsModel';
 import {
   buildLayerTransform, curvesToColorMatrixString, isIdentityCurves,
+  hsbToColorMatrixString,
 } from '@/lib/layerRenderer';
 import {
   DesignPreferences, QuickMenuAction, PressurePoint, DesignTimerState,
@@ -115,7 +120,11 @@ import CanvasHost, { type CanvasHostHandle } from '@/components/design-studio/Ca
 import CanvasGestureLayer from '@/components/design-studio/CanvasGestureLayer';
 import LayersPanelComponent from '@/components/design-studio/LayersPanel';
 import ColorPickerComponent from '@/components/design-studio/ColorPicker';
+import BrushLibraryComponent from '@/components/design-studio/BrushLibrary';
 import type { BrushKind as EngineBrushKind } from '@/lib/brushEngine';
+import {
+  type BrushDef, duplicateBrush, deleteBrush, nextActiveBrushAfterDelete,
+} from '@/lib/brushLibraryModel';
 import {
   UndoModel, type UndoCommand,
 } from '@/lib/undoModel';
@@ -124,46 +133,45 @@ import {
   type GarmentTemplateDef,
 } from '@/lib/garmentTemplates';
 import {
-  pushRecentColor, addColorToPalette, createPalette, type BrandPalette,
+  pushRecentColor, addColorToPalette, createPalette,
+  renamePalette, deletePalette, setDefaultPalette,
+  type BrandPalette,
 } from '@/lib/colorModel';
 import { getColorPickerState, saveColorPickerState } from '@/services/designService';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { DESIGN_STUDIO_FONTS, DEFAULT_DESIGN_STUDIO_FONT, useDesignStudioFonts } from '@/lib/designStudioFonts';
+import { radius } from '@/constants/radii';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FONT_FAMILIES = ['System', 'serif', 'monospace', 'Inter_400Regular', 'Georgia'];
 
-interface BrushDef {
-  name: string;
-  category: string;
-  widthMult: number;
-  opacityMult: number;
-  linecap: 'round' | 'square' | 'butt';
-}
-
-const BRUSH_LIBRARY: BrushDef[] = [
-  { name: 'HB Pencil',  category: 'Sketching', widthMult: 0.6,  opacityMult: 0.85, linecap: 'round' },
-  { name: '6B Pencil',  category: 'Sketching', widthMult: 1.2,  opacityMult: 0.75, linecap: 'round' },
-  { name: 'Technical',  category: 'Sketching', widthMult: 0.4,  opacityMult: 1.0,  linecap: 'round' },
-  { name: 'Studio Pen', category: 'Inking',    widthMult: 1.0,  opacityMult: 1.0,  linecap: 'round' },
-  { name: 'Dry Ink',    category: 'Inking',    widthMult: 1.4,  opacityMult: 0.9,  linecap: 'square' },
-  { name: 'Syrup',      category: 'Inking',    widthMult: 2.5,  opacityMult: 0.95, linecap: 'round' },
-  { name: 'Flat Brush', category: 'Painting',  widthMult: 3.0,  opacityMult: 0.7,  linecap: 'square' },
-  { name: 'Soft Brush', category: 'Painting',  widthMult: 4.0,  opacityMult: 0.4,  linecap: 'round' },
-  { name: 'Old Brush',  category: 'Painting',  widthMult: 2.0,  opacityMult: 0.6,  linecap: 'butt'   },
-  { name: 'Soft Air',   category: 'Airbrushing', widthMult: 5.0, opacityMult: 0.25, linecap: 'round' },
-  { name: 'Hard Air',   category: 'Airbrushing', widthMult: 3.5, opacityMult: 0.45, linecap: 'round' },
-  { name: 'Marker',     category: 'Marker',    widthMult: 2.8,  opacityMult: 0.88, linecap: 'square' },
-  { name: 'Neon',       category: 'Marker',    widthMult: 3.2,  opacityMult: 0.7,  linecap: 'round' },
+// BrushDef/duplicateBrush/deleteBrush/nextActiveBrushAfterDelete now live in
+// lib/brushLibraryModel.ts (dependency-free, so they're unit-testable under
+// vitest) — the Brush Library sheet needs real add/duplicate/delete, not
+// just this fixed read-only list.
+const DEFAULT_BRUSHES: BrushDef[] = [
+  { id: 'b1',  name: 'HB Pencil',  category: 'Sketching', widthMult: 0.6,  opacityMult: 0.85, linecap: 'round' },
+  { id: 'b2',  name: '6B Pencil',  category: 'Sketching', widthMult: 1.2,  opacityMult: 0.75, linecap: 'round' },
+  { id: 'b3',  name: 'Technical',  category: 'Sketching', widthMult: 0.4,  opacityMult: 1.0,  linecap: 'round' },
+  { id: 'b4',  name: 'Studio Pen', category: 'Inking',    widthMult: 1.0,  opacityMult: 1.0,  linecap: 'round' },
+  { id: 'b5',  name: 'Dry Ink',    category: 'Inking',    widthMult: 1.4,  opacityMult: 0.9,  linecap: 'square' },
+  { id: 'b6',  name: 'Syrup',      category: 'Inking',    widthMult: 2.5,  opacityMult: 0.95, linecap: 'round' },
+  { id: 'b7',  name: 'Flat Brush', category: 'Painting',  widthMult: 3.0,  opacityMult: 0.7,  linecap: 'square' },
+  { id: 'b8',  name: 'Soft Brush', category: 'Painting',  widthMult: 4.0,  opacityMult: 0.4,  linecap: 'round' },
+  { id: 'b9',  name: 'Old Brush',  category: 'Painting',  widthMult: 2.0,  opacityMult: 0.6,  linecap: 'butt'   },
+  { id: 'b10', name: 'Soft Air',   category: 'Airbrushing', widthMult: 5.0, opacityMult: 0.25, linecap: 'round' },
+  { id: 'b11', name: 'Hard Air',   category: 'Airbrushing', widthMult: 3.5, opacityMult: 0.45, linecap: 'round' },
+  { id: 'b12', name: 'Marker',     category: 'Marker',    widthMult: 2.8,  opacityMult: 0.88, linecap: 'square' },
+  { id: 'b13', name: 'Neon',       category: 'Marker',    widthMult: 3.2,  opacityMult: 0.7,  linecap: 'round' },
 ];
 
-const BRUSH_CATEGORIES = [...new Set(BRUSH_LIBRARY.map(b => b.category))];
-
 const SMUDGE_BRUSH: BrushDef = {
+  id: 'smudge',
   name: 'Smudge', category: 'Smudge', widthMult: 3.0, opacityMult: 0.3, linecap: 'round',
 };
 const ERASER_BRUSH: BrushDef = {
-  name: 'Eraser', category: 'Eraser', widthMult: 3.0, opacityMult: 1.0, linecap: 'round',
+  id: 'eraser', name: 'Eraser', category: 'Eraser', widthMult: 3.0, opacityMult: 1.0, linecap: 'round',
 };
 
 // react-native-svg supported blend modes
@@ -204,8 +212,11 @@ type ActiveSheet =
   | 'brushLib' | 'color' | 'layers' | 'wrench' | 'text' | 'export' | 'canvasInfo'
   | 'layerOptions' | 'canvasResize' | 'selection' | 'transformTool' | 'adjustments' | null;
 
-// Wrench tab type — now includes 'prefs' as sixth tab
-type WrenchTab = 'add' | 'canvas' | 'guides' | 'share' | 'prefs';
+// Wrench tab type — Procreate's own Actions tabs are Add / Canvas / Guides /
+// Share / Video / Preferences / Help. 'video' is deliberately absent: its
+// Replay / Time-lapse / Export actions need real recording infrastructure
+// this app doesn't have, and a tab of non-working buttons would be a stub.
+type WrenchTab = 'add' | 'canvas' | 'guides' | 'share' | 'prefs' | 'help';
 
 // Transform handle kind (legacy 4-corner system, kept for compat)
 type HandleKind =
@@ -215,6 +226,8 @@ type HandleKind =
 
 // Handle size constant (display px) for hit-testing overlay
 const HS = 22; // tap target — larger than visual for 44pt finger usability
+// Distance (display px) from the layer's top edge up to the rotate handle.
+const ROTATE_HANDLE_OFFSET = 28;
 
 // Selection mode
 type SelectionSubMode = SelectionMode;
@@ -276,6 +289,11 @@ export default function DesignCanvasScreen() {
   const params = useLocalSearchParams<{ id?: string; addAssetId?: string }>();
   const projectId = params.id ?? '';
   const addAssetId = params.addAssetId ?? '';
+
+  // Real Google Fonts for the text-layer font picker (lib/designStudioFonts.ts).
+  // Gated into the screen's own loading state below — same "never render
+  // text in a system fallback font" rule app/_layout.tsx applies to Inter.
+  const [designFontsLoaded] = useDesignStudioFonts();
 
   // ── Project state ──────────────────────────────────────────────────────────
   const [project, setProject]         = useState<DesignProject | null>(null);
@@ -405,11 +423,18 @@ export default function DesignCanvasScreen() {
     origTransform: import('../services/designTypes').DesignTransform;
     origQuad: DistortQuad | null;
     origMesh: WarpMeshPoint[] | null;
+    // Rotate-only: the layer's (unrotated) center and the drag's start
+    // touch position, both in LOCATION space (locationX/locationY — local
+    // to the canvas View extTransformPanResponder is attached to), not
+    // page space. Needed because rotation measures an angle from a fixed
+    // point, unlike the other handles which only ever need a page-space
+    // delta (where any canvas offset cancels out).
+    cx?: number; cy?: number; startLocX?: number; startLocY?: number;
   } | null>(null);
   const pendingExtHandleRef = useRef<ExtHandleKind>('move');
 
   // ── Adjustments tool state ──────────────────────────────────────────────────
-  const [adjustmentsSubMode, setAdjustmentsSubMode] = useState<'curves' | 'liquify'>('curves');
+  const [adjustmentsSubMode, setAdjustmentsSubMode] = useState<'hsb' | 'curves' | 'liquify'>('curves');
   const [adjustmentsCurveChannel, setAdjustmentsCurveChannel] = useState<CurveChannel>('gamma');
   // Liquify brush settings
   const [liquifySize, setLiquifySize] = useState(40);
@@ -482,7 +507,8 @@ export default function DesignCanvasScreen() {
   canvasSizeRef.current  = canvasSize;
 
   // ── Brush state ────────────────────────────────────────────────────────────
-  const [brushIdx, setBrushIdx]         = useState(3);
+  const [brushes, setBrushes]           = useState<BrushDef[]>(DEFAULT_BRUSHES);
+  const [activeBrushId, setActiveBrushId] = useState('b4'); // Studio Pen, matches the old default index 3
   const [brushSize, setBrushSize]       = useState(10);
   const [brushOpacity, setBrushOpacity] = useState(1.0);
   const [drawColor, setDrawColor]       = useState('#FFFFFF');
@@ -494,14 +520,16 @@ export default function DesignCanvasScreen() {
   const [opacitySliderDragging, setOpacitySliderDragging] = useState(false);
   const sizeSliderHeightRef = useRef(200);
 
-  const brushIdxRef     = useRef(brushIdx);
+  const brushesRef       = useRef(brushes);
+  const activeBrushIdRef = useRef(activeBrushId);
   const brushSizeRef    = useRef(brushSize);
   const brushOpacityRef = useRef(brushOpacity);
   const drawColorRef    = useRef(drawColor);
   const eraserSizeRef   = useRef(eraserSize);
   const smudgeSizeRef   = useRef(smudgeSize);
 
-  brushIdxRef.current     = brushIdx;
+  brushesRef.current       = brushes;
+  activeBrushIdRef.current = activeBrushId;
   brushSizeRef.current    = brushSize;
   brushOpacityRef.current = brushOpacity;
   drawColorRef.current    = drawColor;
@@ -916,7 +944,7 @@ export default function DesignCanvasScreen() {
   function resolveActiveBrush(): BrushDef {
     if (activeTopToolRef.current === 'eraser') return ERASER_BRUSH;
     if (activeTopToolRef.current === 'smudge') return SMUDGE_BRUSH;
-    return BRUSH_LIBRARY[brushIdxRef.current] ?? BRUSH_LIBRARY[3];
+    return brushesRef.current.find(b => b.id === activeBrushIdRef.current) ?? brushesRef.current[0];
   }
 
   function resolveActiveSize(): number {
@@ -960,6 +988,44 @@ export default function DesignCanvasScreen() {
     quickMenuTouchStartRef.current = null;
   }
 
+  // ─── Double-tap-to-edit (Transform tool, text layers) ──────────────────────
+  // Procreate's own text tool: double-tap a placed text layer to re-open it
+  // for editing. There was previously NO way to reach text editing at all
+  // for a freshly-placed layer — the old "Edit" button only rendered in the
+  // 'select' tool's selBar, but every layer now auto-selects into the
+  // 'transform' tool on insert (see handleAddText etc.), where that bar
+  // never shows. This adds the real double-tap gesture instead of just
+  // moving the Edit button, matching Procreate's actual interaction.
+  const lastTapRef = useRef<TapRecord | null>(null);
+  const DOUBLE_TAP_MS = 300;
+  const DOUBLE_TAP_DIST = 30; // display px — generous since text can render small
+
+  function handleCanvasDoubleTapCheck(locX: number, locY: number) {
+    const current: TapRecord = { t: Date.now(), lx: locX, ly: locY };
+    const wasDoubleTap = isDoubleTap(lastTapRef.current, current, DOUBLE_TAP_MS, DOUBLE_TAP_DIST);
+
+    if (!wasDoubleTap) {
+      lastTapRef.current = current;
+      return;
+    }
+    lastTapRef.current = null; // consume — don't chain into a triple-tap
+
+    if (activeTopToolRef.current !== 'transform') return;
+    const sel = layersRef.current.find(l => l.id === selectedLayerIdRef.current);
+    if (!sel || sel.type !== 'text' || sel.locked) return;
+
+    const sx = dispScaleXRef.current || 1;
+    const sy = dispScaleYRef.current || 1;
+    const lx = locX / sx;
+    const ly = locY / sy;
+    if (!isPointInTransformBounds(lx, ly, sel.transform)) return;
+
+    const data = sel.data as DesignTextLayer;
+    setEditingTextLayerId(sel.id);
+    setEditingTextValue(data.content ?? data.text ?? '');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
   function handleCanvasTouchStart(e: GestureResponderEvent) {
     const touch = e.nativeEvent.touches[0] ?? e.nativeEvent.changedTouches[0];
     if (!touch) return;
@@ -973,6 +1039,8 @@ export default function DesignCanvasScreen() {
       }
       quickMenuLongPressTimerRef.current = null;
     }, QUICK_MENU_DELAY_MS);
+    // Double-tap-to-edit is hooked into extTransformPanResponder's
+    // onPanResponderGrant instead of here — see its comment for why.
   }
 
   function handleCanvasTouchMove(e: GestureResponderEvent) {
@@ -1347,15 +1415,31 @@ export default function DesignCanvasScreen() {
         const layer = layersRef.current.find(l => l.id === selId);
         if (!layer || layer.locked) return;
         const kind = pendingExtHandleRef.current;
+        const sx = dispScaleXRef.current || 1;
+        const sy = dispScaleYRef.current || 1;
+        const t = layer.transform;
         extHandleDragRef.current = {
           layerId: selId,
           kind,
           startX: e.nativeEvent.pageX,
           startY: e.nativeEvent.pageY,
-          origTransform: { ...layer.transform },
+          origTransform: { ...t },
           origQuad: distortQuadRef.current ? { ...distortQuadRef.current } : null,
           origMesh: warpMeshRef.current ? [...warpMeshRef.current] : null,
+          // Only meaningful for 'rotate', but cheap to always capture.
+          cx: (t.x + t.width  / 2) * sx,
+          cy: (t.y + t.height / 2) * sy,
+          startLocX: e.nativeEvent.locationX,
+          startLocY: e.nativeEvent.locationY,
         };
+        // Double-tap-to-edit only makes sense for a plain body tap (kind
+        // 'move' — pendingExtHandleRef always resets to 'move' after each
+        // gesture, so a tap that didn't land on a specific resize/rotate
+        // handle Pressable has this kind), not a tap that happened to land
+        // on a handle.
+        if (kind === 'move') {
+          handleCanvasDoubleTapCheck(e.nativeEvent.locationX, e.nativeEvent.locationY);
+        }
       },
 
       onPanResponderMove: (e) => {
@@ -1366,6 +1450,20 @@ export default function DesignCanvasScreen() {
         const ddx = (e.nativeEvent.pageX - drag.startX) / sx;
         const ddy = (e.nativeEvent.pageY - drag.startY) / sy;
         const mode = transformModeRef.current;
+
+        if (drag.kind === 'rotate') {
+          const deltaDeg = computeRotationDelta(
+            drag.cx ?? 0, drag.cy ?? 0,
+            drag.startLocX ?? 0, drag.startLocY ?? 0,
+            e.nativeEvent.locationX, e.nativeEvent.locationY,
+          );
+          setLayers(prev => prev.map(l =>
+            l.id === drag.layerId
+              ? { ...l, transform: applyRotateHandle(drag.origTransform, deltaDeg) }
+              : l
+          ));
+          return;
+        }
 
         setLayers(prev => prev.map(l => {
           if (l.id !== drag.layerId) return l;
@@ -1630,6 +1728,18 @@ export default function DesignCanvasScreen() {
   }
 
   // ─── LayersPanel handlers (components/design-studio/LayersPanel.tsx) ──────
+  /** Toggles the pinned "Background colour" row's visibility checkbox — flips
+   * the real canvas backgroundOpacity between 0 and 1, which both the live
+   * canvas and the export SVG's background Rect read (see bgOpacity above). */
+  function handleToggleCanvasBackgroundVisible() {
+    setProject(p => {
+      if (!p) return p;
+      const current = p.canvas.backgroundOpacity ?? 1;
+      return { ...p, canvas: { ...p.canvas, backgroundOpacity: current === 0 ? 1 : 0 } };
+    });
+    markDirty();
+  }
+
   function handleRenameLayer(id: string, name: string) {
     mutateLayer(prev => prev.map(l => l.id === id ? { ...l, name, updatedAt: new Date().toISOString() } : l));
   }
@@ -1720,6 +1830,7 @@ export default function DesignCanvasScreen() {
   function handleAddText(
     content: string, fontSize: number, color: string,
     bold: boolean, italic: boolean, align: 'left'|'center'|'right', fontFamily: string,
+    letterSpacing: number = 0, lineHeight: number = 1.4,
   ) {
     if (!content.trim()) return;
     const maxOrder = layers.reduce((m, l) => Math.max(m, l.order), 0);
@@ -1729,7 +1840,7 @@ export default function DesignCanvasScreen() {
       id: uid(), name: 'Text', type: 'text',
       visible: true, locked: false, order: maxOrder + 1,
       transform: { x: 50, y: 120, width: Math.min(lw - 100, 400), height: 80, rotation: 0, scaleX: 1, scaleY: 1 },
-      data: { kind: 'text', content, fontFamily, fontSize, bold, italic, underline: false, align, color, letterSpacing: 0, lineHeight: 1.4 } as DesignTextLayer,
+      data: { kind: 'text', content, fontFamily, fontSize, bold, italic, underline: false, align, color, letterSpacing, lineHeight } as DesignTextLayer,
       opacity: 1,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
@@ -1940,6 +2051,16 @@ export default function DesignCanvasScreen() {
         ...l,
         adjustments: { ...l.adjustments, curves },
       };
+    }));
+    markDirty();
+  }
+
+  // ─── Adjustments: HSB mutations ──────────────────────────────────────────
+  function updateLayerHsb(layerId: string, hsb: HsbAdjustment) {
+    const clamped = clampHsb(hsb);
+    mutateLayer(prev => prev.map(l => {
+      if (l.id !== layerId) return l;
+      return { ...l, adjustments: { ...l.adjustments, hsb: clamped } };
     }));
     markDirty();
   }
@@ -2247,7 +2368,14 @@ export default function DesignCanvasScreen() {
         uri: localUri, mimeType: 'image/png',
         width: desc.width, height: desc.height, format: 'png', lossless: true,
       };
-      await saveImageToMediaLibrary(asset.uri);
+      const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
+      if (mediaSaveResult !== 'saved') {
+        Alert.alert(
+          mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
+          mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
+        );
+        return;
+      }
       void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
       Alert.alert(
         'Saved to Camera Roll',
@@ -2299,7 +2427,14 @@ export default function DesignCanvasScreen() {
         uri: localUri, mimeType: 'image/png',
         width: desc.width, height: desc.height, format: 'png', lossless: true,
       };
-      await saveImageToMediaLibrary(asset.uri);
+      const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
+      if (mediaSaveResult !== 'saved') {
+        Alert.alert(
+          mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
+          mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
+        );
+        return;
+      }
       void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
       Alert.alert(
         'Saved to Camera Roll',
@@ -2547,7 +2682,10 @@ export default function DesignCanvasScreen() {
         if (sharingAvailable) {
           await Sharing.shareAsync(asset.uri, { mimeType: asset.mimeType, dialogTitle: `Export ${projectName}`, UTI: uti });
         } else {
-          Alert.alert('Permission required', 'Allow media-library access in Settings to save the export.');
+          Alert.alert(
+            mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
+            mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow media-library access in Settings to save the export.',
+          );
         }
         return;
       }
@@ -2664,6 +2802,38 @@ export default function DesignCanvasScreen() {
     });
   }
 
+  function handleNewPalette() {
+    setColorPalettes(prev => {
+      const next = createPalette(prev, `Palette ${prev.length + 1}`);
+      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      return next;
+    });
+  }
+
+  function handleRenamePalette(paletteId: string, name: string) {
+    setColorPalettes(prev => {
+      const next = renamePalette(prev, paletteId, name);
+      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      return next;
+    });
+  }
+
+  function handleDeletePalette(paletteId: string) {
+    setColorPalettes(prev => {
+      const next = deletePalette(prev, paletteId);
+      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      return next;
+    });
+  }
+
+  function handleSetDefaultPalette(paletteId: string) {
+    setColorPalettes(prev => {
+      const next = setDefaultPalette(prev, paletteId);
+      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      return next;
+    });
+  }
+
   /**
    * approximateColorAtPoint — SVG-fallback eyedropper: react-native-svg has no
    * surface to read actual composited pixels from, so this approximates by
@@ -2731,7 +2901,25 @@ export default function DesignCanvasScreen() {
   const layerOptionsLayer = useMemo(() =>
     layers.find(l => l.id === layerOptionsTarget) ?? null, [layers, layerOptionsTarget]);
 
-  const activeBrush = BRUSH_LIBRARY[brushIdx] ?? BRUSH_LIBRARY[3];
+  const activeBrush = brushes.find(b => b.id === activeBrushId) ?? brushes[0];
+
+  function handleSelectBrush(id: string) {
+    setActiveBrushId(id);
+  }
+  function handleDuplicateBrush(id: string) {
+    const { brushes: next, newId } = duplicateBrush(brushesRef.current, id);
+    setBrushes(next);
+    if (newId) setActiveBrushId(newId); // select the new copy, matching Procreate's own duplicate behaviour
+  }
+  function handleDeleteBrush(id: string) {
+    const before = brushesRef.current;
+    const { brushes: next, deleted } = deleteBrush(before, id);
+    if (!deleted) return; // refused (would have emptied the whole library) — leave state untouched
+    setBrushes(next);
+    if (id === activeBrushIdRef.current) {
+      setActiveBrushId(nextActiveBrushAfterDelete(before, id, next));
+    }
+  }
   const activeSize  = activeTopTool === 'eraser' ? eraserSize : activeTopTool === 'smudge' ? smudgeSize : brushSize;
 
   // Logical → display scale
@@ -2797,6 +2985,14 @@ export default function DesignCanvasScreen() {
     // ── Shared transform: affine→liquify→rotation→flip (same logic as compositor) ──
     const transformAttr = buildLayerTransform(t, xScale, yScale);
 
+    // ── HSB filter: feColorMatrix (hue rotate × saturate × brightness gain),
+    // applied first in the chain, to ALL layer types (unlike Curves'
+    // histogram preview, this is a pure colour-space transform with no
+    // raster/vector distinction) ──
+    const hsbAdj = layer.adjustments?.hsb;
+    const hasRealHsb = !!hsbAdj && !isIdentityHsb(hsbAdj);
+    const hsbMatrixValues = hasRealHsb ? hsbToColorMatrixString(hsbAdj!) : null;
+
     // ── Curves filter: feColorMatrix applied to all layer types ──
     const curvesAdj = layer.adjustments?.curves;
     const hasRealCurves = !!curvesAdj && !isIdentityCurves(curvesAdj);
@@ -2809,21 +3005,28 @@ export default function DesignCanvasScreen() {
     const blendMode = (layer.blendMode ?? legacyImageBlend ?? 'normal') as BlendModeKind;
     const hasBlend = blendMode !== 'normal' && RN_SVG_BLEND_MODES.has(blendMode);
 
-    // ── Combined filter (curves + blend), built once per layer. react-native-svg
-    // (both iOS/Apple and Android native filter pipelines) resolves a feBlend's
-    // in2="BackgroundImage" against whatever was already drawn below it in the
-    // same <Svg> tree, which is exactly the real backdrop compositing a CSS
-    // mix-blend-mode would use — this is real compositing, not a visual no-op. ──
-    const needsFilter = hasRealCurves || hasBlend;
+    // ── Combined filter (hsb + curves + blend), built once per layer, chained
+    // SourceGraphic → hsb'd → curved → blended via each stage's in/result.
+    // react-native-svg (both iOS/Apple and Android native filter pipelines)
+    // resolves a feBlend's in2="BackgroundImage" against whatever was already
+    // drawn below it in the same <Svg> tree, which is exactly the real
+    // backdrop compositing a CSS mix-blend-mode would use — this is real
+    // compositing, not a visual no-op. ──
+    const needsFilter = hasRealHsb || hasRealCurves || hasBlend;
     const filterId = needsFilter ? `lf_${safeSvgId(layer.id)}` : null;
     const filterRef: string | undefined = filterId ? `url(#${filterId})` : undefined;
+    const hsbResult = (hasRealCurves || hasBlend) ? 'hsbd' : undefined;
+    const curvesIn = hasRealHsb ? 'hsbd' : 'SourceGraphic';
     const curvesResult = hasBlend ? 'curved' : undefined;
-    const blendIn = hasRealCurves ? 'curved' : 'SourceGraphic';
+    const blendIn = hasRealCurves ? 'curved' : (hasRealHsb ? 'hsbd' : 'SourceGraphic');
     const filterDefs = needsFilter ? (
       <Defs>
         <Filter id={filterId!} x="-20%" y="-20%" width="140%" height="140%">
+          {hasRealHsb && (
+            <FeColorMatrix type="matrix" values={hsbMatrixValues!} result={hsbResult} />
+          )}
           {hasRealCurves && (
-            <FeColorMatrix type="matrix" values={matrixValues!} result={curvesResult} />
+            <FeColorMatrix type="matrix" in={curvesIn} values={matrixValues!} result={curvesResult} />
           )}
           {hasBlend && blendMode === 'overlay' && (
             <>
@@ -2985,20 +3188,35 @@ export default function DesignCanvasScreen() {
 
     if (layer.type === 'text') {
       const d = layer.data as DesignTextLayer;
+      const fs = (d.fontSize ?? 24) * Math.min(xScale, yScale);
+      const lh = (d.lineHeight ?? 1.4) * fs;
+      // Multi-line support: SVG <Text> doesn't wrap or honor newlines on its
+      // own, so each '\n'-separated line becomes its own <TSpan> offset by
+      // the real line-height — previously this was always a single line
+      // with lineHeight completely unused. textAnchor="middle" centers each
+      // TSpan independently around the same x, matching the field's
+      // centered horizontal anchor.
+      const lines = (d.content ?? d.text ?? '').split('\n');
+      const anchorX = (t.x + t.width / 2) * xScale;
+      const startY = (t.y + fs) * yScale;
       return (
         <G key={layer.id} opacity={layer.opacity}>
           {filterDefs}
           {clipDefs}
           <SvgText
-            x={(t.x + t.width / 2) * xScale} y={(t.y + (d.fontSize ?? 24)) * yScale}
+            x={anchorX} y={startY}
             fill={d.color ?? d.textColor ?? FG}
-            fontSize={(d.fontSize ?? 24) * Math.min(xScale, yScale)}
+            fontSize={fs}
             textAnchor="middle"
+            fontFamily={d.fontFamily}
             fontWeight={d.bold ? 'bold' : 'normal'}
             fontStyle={d.italic ? 'italic' : 'normal'}
+            letterSpacing={d.letterSpacing ?? 0}
             transform={transformAttr} filter={filterRef} mask={clipMaskRef}
           >
-            {d.content ?? d.text ?? ''}
+            {lines.map((line, i) => (
+              <TSpan key={i} x={anchorX} dy={i === 0 ? 0 : lh}>{line}</TSpan>
+            ))}
           </SvgText>
         </G>
       );
@@ -3013,8 +3231,10 @@ export default function DesignCanvasScreen() {
   // project fetch itself is fast (AsyncStorage); what actually takes a
   // moment is this screen's own large bundle hydrating on web, and a
   // skeleton reads as "the editor is opening" rather than "something is
-  // stuck".
-  if (loading) {
+  // stuck". Also waits on designFontsLoaded so the font picker and any
+  // already-placed text layer never render in a system fallback font for a
+  // flash before their real face loads in.
+  if (loading || !designFontsLoaded) {
     const skW = Math.min(SW - SP.lg * 2, 420);
     return (
       <View style={[styles.root, { paddingTop: headerTopInset }]}>
@@ -3039,6 +3259,11 @@ export default function DesignCanvasScreen() {
   }
 
   const bgHex = project?.canvas?.backgroundHex ?? BG;
+  // Real background-visibility toggle, driven from the Layers panel's pinned
+  // "Background colour" row checkbox — not a fake control. `backgroundOpacity`
+  // is an existing DesignCanvas field (services/designTypes.ts); undefined
+  // means fully visible (1), matching the old always-opaque default.
+  const bgOpacity = project?.canvas?.backgroundOpacity ?? 1;
 
   // ─── Selection handle positions (display px) ───────────────────────────────
   // Computed here so we can use them both in the SVG overlay and the Pressable overlays
@@ -3350,7 +3575,7 @@ export default function DesignCanvasScreen() {
               pointerEvents="none"
             >
               {/* Canvas background */}
-              <Rect x={0} y={0} width={canvasSize.w} height={canvasSize.h} fill={bgHex} />
+              <Rect x={0} y={0} width={canvasSize.w} height={canvasSize.h} fill={bgHex} opacity={bgOpacity} />
 
               {/* Layer paths and live strokes are stored in logical coordinates. */}
               <G transform={`scale(${dispScaleX} ${dispScaleY})`}>
@@ -3482,6 +3707,26 @@ export default function DesignCanvasScreen() {
                         />
                       );
                     })}
+                    {/* Rotate handle — a small circle offset above top-center,
+                        connected by a stem line, same as Procreate's own
+                        rotate handle. Only meaningful for freeform/uniform
+                        (distort/warp already give full per-corner control). */}
+                    {(transformMode === 'freeform' || transformMode === 'uniform') && (() => {
+                      const rhX = cx;
+                      const rhY = t.y * dispScaleY - ROTATE_HANDLE_OFFSET;
+                      return (
+                        <G key="rotate-handle">
+                          <Line
+                            x1={rhX} y1={t.y * dispScaleY} x2={rhX} y2={rhY}
+                            stroke={PURPLE_LIGHT} strokeWidth={1} opacity={0.7}
+                          />
+                          <Circle
+                            cx={rhX} cy={rhY} r={VS / 2 + 1}
+                            fill={CARD_ELEVATED} stroke={PURPLE_LIGHT} strokeWidth={1.5}
+                          />
+                        </G>
+                      );
+                    })()}
                     {/* Warp mesh grid lines */}
                     {transformMode === 'warp' && warpMesh && warpMesh.map((p, pi) => (
                       <Circle key={`wp${pi}`}
@@ -3585,24 +3830,47 @@ export default function DesignCanvasScreen() {
             </Pressable>
           )}
 
-          {/* ── EXTENDED TRANSFORM HANDLE PRESSABLE OVERLAYS (8 handles) ── */}
+          {/* ── EXTENDED TRANSFORM HANDLE PRESSABLE OVERLAYS (8 handles + rotate) ── */}
           {selectedLayer && activeTopTool === 'transform' && (() => {
             const handles = computeHandlePositions(selectedLayer.transform);
-            return handles.map(h => (
+            const t = selectedLayer.transform;
+            const rotateHandle = (transformMode === 'freeform' || transformMode === 'uniform') ? (
               <Pressable
-                key={h.kind}
+                key="rotate"
+                testID="transform-handle-rotate"
                 style={[
                   styles.handlePressable,
                   {
-                    left:   h.lx * dispScaleX - HS / 2,
-                    top:    h.ly * dispScaleY - HS / 2,
+                    left: (t.x + t.width / 2) * dispScaleX - HS / 2,
+                    top:  t.y * dispScaleY - ROTATE_HANDLE_OFFSET - HS / 2,
                     width:  HS,
                     height: HS,
                   },
                 ]}
-                onPressIn={() => { pendingExtHandleRef.current = h.kind; }}
+                onPressIn={() => { pendingExtHandleRef.current = 'rotate'; }}
               />
-            ));
+            ) : null;
+            return (
+              <>
+                {handles.map(h => (
+                  <Pressable
+                    key={h.kind}
+                    testID={`transform-handle-${h.kind}`}
+                    style={[
+                      styles.handlePressable,
+                      {
+                        left:   h.lx * dispScaleX - HS / 2,
+                        top:    h.ly * dispScaleY - HS / 2,
+                        width:  HS,
+                        height: HS,
+                      },
+                    ]}
+                    onPressIn={() => { pendingExtHandleRef.current = h.kind; }}
+                  />
+                ))}
+                {rotateHandle}
+              </>
+            );
           })()}
 
           {/* Select mode intentionally has no handle Pressables: transformPanResponder
@@ -3623,7 +3891,7 @@ export default function DesignCanvasScreen() {
               viewBox={`${exportX} ${exportY} ${exportW} ${exportH}`}
               pointerEvents="none"
             >
-              <Rect x={0} y={0} width={logicalW} height={logicalH} fill={bgHex} />
+              <Rect x={0} y={0} width={logicalW} height={logicalH} fill={bgHex} opacity={bgOpacity} />
               {/* Garment guide/template layers (layer.isTemplate) are a non-exportable
                   placement aid and are always excluded from the flattened export. */}
               {sortedLayers.filter(layer => !layer.isTemplate).map(layer =>
@@ -3651,6 +3919,8 @@ export default function DesignCanvasScreen() {
                     fontStyle: d.italic ? 'italic' : 'normal',
                     textAlign: d.align ?? d.alignment ?? 'center',
                     fontFamily: d.fontFamily ?? FONT.regular,
+                    letterSpacing: (d.letterSpacing ?? 0) * Math.min(dispScaleX, dispScaleY),
+                    lineHeight: (d.fontSize ?? 24) * (d.lineHeight ?? d.lineSpacing ?? 1.4) * Math.min(dispScaleX, dispScaleY),
                   },
                 ]}
                 value={editingTextValue}
@@ -3664,6 +3934,7 @@ export default function DesignCanvasScreen() {
                 }}
                 onBlur={() => setEditingTextLayerId(null)}
                 multiline autoFocus
+                testID="inline-text-edit-input"
               />
             );
           })()}
@@ -3801,6 +4072,13 @@ export default function DesignCanvasScreen() {
           {activeTopTool === 'adjustments' && (
             <View style={styles.subModeBar} testID="adjustments-mode-bar">
               <TouchableOpacity
+                style={[styles.subModeChip, adjustmentsSubMode === 'hsb' && styles.subModeChipActive]}
+                onPress={() => { setAdjustmentsSubMode('hsb'); openSheet('adjustments'); }}
+                testID="adj-mode-hsb"
+              >
+                <Text style={[styles.subModeLabel, adjustmentsSubMode === 'hsb' && styles.subModeLabelActive]}>HSB</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.subModeChip, adjustmentsSubMode === 'curves' && styles.subModeChipActive]}
                 onPress={() => { setAdjustmentsSubMode('curves'); openSheet('adjustments'); }}
                 testID="adj-mode-curves"
@@ -3919,6 +4197,9 @@ export default function DesignCanvasScreen() {
         }}
         onInsertFile={() => { closeSheet(); setTimeout(() => handleInsertFile(), 100); }}
         onAddText={() => { closeSheet(); openSheet('text'); }}
+        // HELP tab
+        onOpenHelpCenter={() => { closeSheet(); router.push('/help' as never); }}
+        onOpenSettings={() => { closeSheet(); router.push('/settings' as never); }}
         onCut={handleCut}
         onCopy={handleCopyLayer}
         onCopyCanvas={handleCopyCanvas}
@@ -3988,133 +4269,99 @@ export default function DesignCanvasScreen() {
         onQuickMenuEditSlot={setQuickMenuEditSlot}
       />
 
-      {/* ── BRUSH LIBRARY ── */}
-      <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, { maxHeight: '72%' }]}>
-            <SheetHandle />
-            <View style={styles.sheetHeaderRow}>
-              <Text style={styles.sheetTitle}>
-                {activeTopTool === 'eraser' ? 'Eraser' : activeTopTool === 'smudge' ? 'Smudge' : 'Brush Library'}
-              </Text>
-              <TouchableOpacity onPress={closeSheet}>
-                <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.brushSliders}>
-              <View style={styles.sliderRow}>
-                <Text style={styles.sliderLabel}>Size</Text>
-                <TouchableOpacity onPress={() => {
-                  if (activeTopTool === 'eraser') setEraserSize(v => Math.max(2, v - 2));
-                  else setBrushSize(v => Math.max(1, v - 2));
-                }}>
-                  <Feather name="minus" size={14} color={MUTED} />
+      {/* ── BRUSH LIBRARY — Procreate's own full-screen "Brushes" picker
+          (left sidebar of brush-set categories, right pane of that set's
+          brushes, swipe-left for Share/Duplicate/Delete) when the active
+          tool is the brush itself. Eraser/Smudge keep the small Size-only
+          sheet below — they were never a "Brush Library" sheet, just a
+          quick size control, so that part is unchanged. ── */}
+      {activeTopTool === 'brush' ? (
+        <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
+          <View style={styles.modalOverlay}>
+            <BrushLibraryComponent
+              brushes={brushes}
+              activeBrushId={activeBrushId}
+              strokeColor={drawColor}
+              onSelectBrush={id => { handleSelectBrush(id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+              onDuplicateBrush={handleDuplicateBrush}
+              onDeleteBrush={handleDeleteBrush}
+              onClose={closeSheet}
+            />
+          </View>
+        </Modal>
+      ) : (
+        <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
+          <View style={styles.modalOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
+            <SheetRise style={[styles.sheet, { maxHeight: '40%' }]}>
+              <SheetHandle />
+              <View style={styles.sheetHeaderRow}>
+                <Text style={styles.sheetTitle}>{activeTopTool === 'eraser' ? 'Eraser' : 'Smudge'}</Text>
+                <TouchableOpacity onPress={closeSheet}>
+                  <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
                 </TouchableOpacity>
-                <View style={styles.sliderTrack}>
-                  <View style={[styles.sliderFill, { width: `${(activeSize / 80) * 100}%` }]} />
-                </View>
-                <TouchableOpacity onPress={() => {
-                  if (activeTopTool === 'eraser') setEraserSize(v => Math.min(80, v + 2));
-                  else setBrushSize(v => Math.min(80, v + 2));
-                }}>
-                  <Feather name="plus" size={14} color={MUTED} />
-                </TouchableOpacity>
-                <Text style={styles.sliderValue}>{activeSize}</Text>
               </View>
-              {activeTopTool === 'brush' && (
+
+              <View style={styles.brushSliders}>
                 <View style={styles.sliderRow}>
-                  <Text style={styles.sliderLabel}>Opacity</Text>
-                  <TouchableOpacity onPress={() => setBrushOpacity(v => Math.max(0.05, +(v - 0.05).toFixed(2)))}>
+                  <Text style={styles.sliderLabel}>Size</Text>
+                  <TouchableOpacity onPress={() => {
+                    if (activeTopTool === 'eraser') setEraserSize(v => Math.max(2, v - 2));
+                    else setBrushSize(v => Math.max(1, v - 2));
+                  }}>
                     <Feather name="minus" size={14} color={MUTED} />
                   </TouchableOpacity>
                   <View style={styles.sliderTrack}>
-                    <View style={[styles.sliderFill, { width: `${brushOpacity * 100}%` }]} />
+                    <View style={[styles.sliderFill, { width: `${(activeSize / 80) * 100}%` }]} />
                   </View>
-                  <TouchableOpacity onPress={() => setBrushOpacity(v => Math.min(1, +(v + 0.05).toFixed(2)))}>
+                  <TouchableOpacity onPress={() => {
+                    if (activeTopTool === 'eraser') setEraserSize(v => Math.min(80, v + 2));
+                    else setBrushSize(v => Math.min(80, v + 2));
+                  }}>
                     <Feather name="plus" size={14} color={MUTED} />
                   </TouchableOpacity>
-                  <Text style={styles.sliderValue}>{Math.round(brushOpacity * 100)}%</Text>
+                  <Text style={styles.sliderValue}>{activeSize}</Text>
                 </View>
-              )}
-            </View>
+              </View>
+            </SheetRise>
+          </View>
+        </Modal>
+      )}
 
-            {activeTopTool === 'brush' && (
-              <>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScrollView}>
-                  {BRUSH_CATEGORIES.map(cat => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[styles.catChip, BRUSH_LIBRARY[brushIdx]?.category === cat && styles.catChipActive]}
-                      onPress={() => {
-                        const idx = BRUSH_LIBRARY.findIndex(b => b.category === cat);
-                        if (idx >= 0) setBrushIdx(idx);
-                      }}
-                    >
-                      <Text style={[styles.catChipText, BRUSH_LIBRARY[brushIdx]?.category === cat && { color: PURPLE_LIGHT }]}>
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <ScrollView showsVerticalScrollIndicator={false} style={styles.brushList}>
-                  {BRUSH_LIBRARY.map((b, i) => (
-                    <TouchableOpacity
-                      key={b.name}
-                      style={[styles.brushRow, brushIdx === i && styles.brushRowActive]}
-                      onPress={() => { setBrushIdx(i); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-                    >
-                      <View style={styles.brushStrokePreview}>
-                        <Svg width={80} height={24}>
-                          <Path
-                            d="M8,16 Q20,4 40,12 Q60,20 72,8"
-                            stroke={drawColor} strokeWidth={Math.min(10, b.widthMult * 3)}
-                            fill="none" strokeLinecap={b.linecap} strokeLinejoin="round"
-                            opacity={b.opacityMult}
-                          />
-                        </Svg>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.brushName, brushIdx === i && { color: PURPLE_LIGHT }]}>{b.name}</Text>
-                        <Text style={styles.brushCategory}>{b.category}</Text>
-                      </View>
-                      {brushIdx === i && <Feather name="check" size={14} color={PURPLE_LIGHT} />}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </>
-            )}
-          </SheetRise>
-        </View>
-      </Modal>
-
-      {/* ── COLOR PICKER ── */}
+      {/* ── COLOR PICKER — Procreate's own full-height "Colours" sheet
+          (Disc/Classic/Harmony/Value/Palettes tabs), not a small floating
+          popover. Drops from the top like the Layers sheet. ── */}
       <Modal visible={activeSheet === 'color'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <View style={styles.modalOverlay}>
+        <View style={styles.layersModalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <View>
+          <View style={styles.layersModalSheetWrap} pointerEvents="box-none">
             <ColorPickerComponent
               color={drawColor}
+              previousColor={prevColor}
               onChange={applyColor}
               recentColors={colorRecents}
               palettes={colorPalettes}
               onSaveToPalette={handleSaveToPalette}
+              onNewPalette={handleNewPalette}
+              onRenamePalette={handleRenamePalette}
+              onDeletePalette={handleDeletePalette}
+              onSetDefaultPalette={handleSetDefaultPalette}
               onRequestEyedropper={() => { closeSheet(); setEyedropperActive(true); }}
               onClose={closeSheet}
             />
           </View>
         </View>
       </Modal>
-      {/* ── LAYER MANAGER ── */}
+      {/* ── LAYER MANAGER — Procreate's own full-height Layers sheet, dropping
+          down from the top under the status bar, not a small corner popover. ── */}
       <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <View style={styles.modalOverlay}>
+        <View style={styles.layersModalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <View>
+          <View style={styles.layersModalSheetWrap} pointerEvents="box-none">
             <LayersPanelComponent
               layers={layers}
               selectedLayerId={selectedLayerId}
-              onSelect={id => { setSelectedLayerId(id); setActiveTopTool('select'); }}
+              onSelect={id => { setSelectedLayerId(id); setActiveTopTool('transform'); }}
               onAddLayer={handleAddDrawingLayer}
               onDuplicateLayer={handleDuplicateLayer}
               onDeleteLayer={handleDeleteLayer}
@@ -4128,6 +4375,9 @@ export default function DesignCanvasScreen() {
               onReorder={handleReorderLayers}
               onMergeDown={handleMergeLayerDown}
               onClose={closeSheet}
+              canvasBackgroundHex={project?.canvas?.backgroundHex ?? '#FFFFFF'}
+              canvasBackgroundVisible={(project?.canvas?.backgroundOpacity ?? 1) !== 0}
+              onToggleBackgroundVisible={handleToggleCanvasBackgroundVisible}
             />
           </View>
         </View>
@@ -4550,15 +4800,65 @@ export default function DesignCanvasScreen() {
           <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
-              <Text style={styles.sheetTitle}>Curves</Text>
-              <TouchableOpacity onPress={closeSheet}>
+              <Text style={styles.sheetTitle}>{adjustmentsSubMode === 'hsb' ? 'HSB' : 'Curves'}</Text>
+              <TouchableOpacity onPress={closeSheet} testID="adjustments-sheet-done">
                 <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
               </TouchableOpacity>
             </View>
             {!selectedLayer ? (
               <Text style={{ fontSize: FS.sm, color: MUTED, fontFamily: FONT.regular, marginBottom: SP.md }}>
-                Select a layer to edit its curves.
+                Select a layer to edit its {adjustmentsSubMode === 'hsb' ? 'HSB' : 'curves'}.
               </Text>
+            ) : adjustmentsSubMode === 'hsb' ? (
+              <View testID="adjustments-hsb-panel">
+                {(() => {
+                  const hsb = selectedLayer.adjustments?.hsb ?? defaultHsbAdjustment();
+                  const rows: { key: keyof HsbAdjustment; label: string; min: number; max: number; step: number; format: (v: number) => string }[] = [
+                    { key: 'hue', label: 'Hue', min: -180, max: 180, step: 10, format: v => `${v > 0 ? '+' : ''}${v}°` },
+                    { key: 'saturation', label: 'Saturation', min: -1, max: 1, step: 0.1, format: v => `${v > 0 ? '+' : ''}${Math.round(v * 100)}%` },
+                    { key: 'brightness', label: 'Brightness', min: -1, max: 1, step: 0.1, format: v => `${v > 0 ? '+' : ''}${Math.round(v * 100)}%` },
+                  ];
+                  return (
+                    <View style={{ gap: SP.md }}>
+                      {rows.map(row => {
+                        const value = hsb[row.key];
+                        const pct = ((value - row.min) / (row.max - row.min)) * 100;
+                        return (
+                          <View key={row.key} style={styles.sliderRow}>
+                            <Text style={[styles.sliderLabel, { minWidth: 72 }]}>{row.label}</Text>
+                            <TouchableOpacity
+                              style={styles.animBtn}
+                              onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.max(row.min, +(value - row.step).toFixed(2)) })}
+                              testID={`hsb-${row.key}-dec`}
+                            >
+                              <Feather name="minus" size={14} color={MUTED} />
+                            </TouchableOpacity>
+                            <View style={styles.sliderTrack}>
+                              <View style={[styles.sliderFill, { width: `${Math.max(0, Math.min(100, pct))}%` }]} />
+                            </View>
+                            <TouchableOpacity
+                              style={styles.animBtn}
+                              onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.min(row.max, +(value + row.step).toFixed(2)) })}
+                              testID={`hsb-${row.key}-inc`}
+                            >
+                              <Feather name="plus" size={14} color={MUTED} />
+                            </TouchableOpacity>
+                            <Text style={[styles.sliderValue, { minWidth: 48 }]} testID={`hsb-${row.key}-value`}>{row.format(value)}</Text>
+                          </View>
+                        );
+                      })}
+                      <TouchableOpacity
+                        style={[styles.fontChip, { alignSelf: 'flex-start' }]}
+                        onPress={() => updateLayerHsb(selectedLayer.id, defaultHsbAdjustment())}
+                        testID="hsb-reset"
+                      >
+                        <Feather name="refresh-cw" size={12} color={MUTED} />
+                        <Text style={styles.fontChipText}>Reset</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })()}
+              </View>
             ) : (
               <>
                 {/* Channel tabs */}
@@ -4746,6 +5046,10 @@ interface WrenchActionsSheetProps {
   timerDisplay: { session: string; total: string };
   quickMenuEditSlot: number | null;
   onQuickMenuEditSlot: (slot: number | null) => void;
+  // HELP — in-app destinations are navigated by the host screen (it owns
+  // the router + closes the sheet first); external ones use Linking here.
+  onOpenHelpCenter: () => void;
+  onOpenSettings: () => void;
 }
 
 const WRENCH_TABS: { key: WrenchTab; label: string }[] = [
@@ -4754,11 +5058,12 @@ const WRENCH_TABS: { key: WrenchTab; label: string }[] = [
   { key: 'guides', label: 'Guides' },
   { key: 'share',  label: 'Share' },
   { key: 'prefs',  label: 'Prefs' },
+  { key: 'help',   label: 'Help' },
 ];
 
 function WrenchActionsSheet({
   visible, onClose, wrenchTab, setWrenchTab, selectedLayerId,
-  onInsertPhoto, onInsertFile, onTakePhoto, onAddText,
+  onInsertPhoto, onInsertFile, onTakePhoto, onAddText, onOpenHelpCenter, onOpenSettings,
   onCut, onCopy, onCopyCanvas, onPaste, hasClipboard,
   onCropResize, animEnabled, onToggleAnimAssist,
   onFlipHorizontal, onFlipVertical, onCanvasInfo,
@@ -4774,7 +5079,7 @@ function WrenchActionsSheet({
   const hasSelection = !!selectedLayerId;
 
   function ActionCell({
-    icon, label, sub, onPress, disabled = false, active = false,
+    icon, label, sub, onPress, disabled = false, active = false, testID,
   }: {
     icon: React.ComponentProps<typeof Feather>['name'];
     label: string;
@@ -4782,6 +5087,7 @@ function WrenchActionsSheet({
     onPress: () => void;
     disabled?: boolean;
     active?: boolean;
+    testID?: string;
   }) {
     return (
       <TouchableOpacity
@@ -4791,6 +5097,7 @@ function WrenchActionsSheet({
         disabled={disabled}
         accessibilityLabel={label}
         accessibilityRole="button"
+        testID={testID}
       >
         <Feather name={icon} size={ICON.md} color={active ? FG : disabled ? SUBTLE : MUTED} />
         <Text style={styles.actionCellLabel}>{label}</Text>
@@ -4847,12 +5154,13 @@ function WrenchActionsSheet({
         <SheetHandle />
 
         {/* Tab row */}
-        <View style={styles.wrenchTabsRow}>
+        <View style={styles.wrenchTabsRow} testID="wrench-tabs-row">
           {WRENCH_TABS.map(t => (
             <TouchableOpacity
               key={t.key}
               style={[styles.wrenchTabBtn, wrenchTab === t.key && styles.wrenchTabBtnActive]}
               onPress={() => { setWrenchTab(t.key); Haptics.selectionAsync(); }}
+              testID={`wrench-tab-${t.key}`}
               accessibilityRole="tab"
               accessibilityState={{ selected: wrenchTab === t.key }}
             >
@@ -5245,6 +5553,36 @@ function WrenchActionsSheet({
             </View>
           )}
 
+          {/* ── HELP TAB — Procreate's Help tab is Advanced settings / Support /
+              Procreate Folio / Leave a review / Handbook. Every cell here
+              opens a REAL destination: the in-app Help Center screen, the
+              support mailbox, live chat, and in-app Settings. Deliberately
+              absent, not faked: "Leave a review" (no store listing URL or
+              review API exists in this app yet) and a Folio equivalent
+              (no Brandthread gallery to link to). ── */}
+          {wrenchTab === 'help' && (
+            <View style={styles.actionGrid} testID="wrench-help-grid">
+              <ActionCell
+                icon="help-circle" label="Help Center" sub="Guides & FAQs"
+                onPress={onOpenHelpCenter} testID="help-center"
+              />
+              <ActionCell
+                icon="mail" label="Contact Support" sub="support@brandthread.app"
+                onPress={() => { Linking.openURL('mailto:support@brandthread.app').catch(() => {}); }}
+                testID="help-support"
+              />
+              <ActionCell
+                icon="message-circle" label="Live Chat" sub="brandthread.app/chat"
+                onPress={() => { Linking.openURL('https://brandthread.app/chat').catch(() => {}); }}
+                testID="help-chat"
+              />
+              <ActionCell
+                icon="settings" label="Settings" sub="Account & app settings"
+                onPress={onOpenSettings} testID="help-settings"
+              />
+            </View>
+          )}
+
         </ScrollView>
       </SheetRise>
     </Modal>
@@ -5256,7 +5594,10 @@ function WrenchActionsSheet({
 interface TextSheetProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (content: string, fontSize: number, color: string, bold: boolean, italic: boolean, align: 'left'|'center'|'right', fontFamily: string) => void;
+  onAdd: (
+    content: string, fontSize: number, color: string, bold: boolean, italic: boolean,
+    align: 'left'|'center'|'right', fontFamily: string, letterSpacing: number, lineHeight: number,
+  ) => void;
   drawColor: string;
   PURPLE_DIM: string;
   PURPLE_LIGHT: string;
@@ -5269,13 +5610,15 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
   const [bold, setBold]             = useState(false);
   const [italic, setItalic]         = useState(false);
   const [align, setAlign]           = useState<'left'|'center'|'right'>('center');
-  const [fontFamily, setFontFamily] = useState('System');
+  const [fontFamily, setFontFamily] = useState(DEFAULT_DESIGN_STUDIO_FONT);
+  const [letterSpacing, setLetterSpacing] = useState(0);
+  const [lineHeight, setLineHeight]       = useState(1.4);
 
   useEffect(() => { if (visible) setColor(drawColor); }, [visible, drawColor]);
 
   function submit() {
     if (!content.trim()) return;
-    onAdd(content.trim(), fontSize, color, bold, italic, align, fontFamily);
+    onAdd(content.trim(), fontSize, color, bold, italic, align, fontFamily, letterSpacing, lineHeight);
     setContent('');
   }
 
@@ -5294,23 +5637,42 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
             </View>
 
             <TextInput
-              style={[styles.textInput, { fontWeight: bold ? 'bold' : 'normal', fontStyle: italic ? 'italic' : 'normal', textAlign: align, color, fontSize }]}
+              style={[
+                styles.textInput,
+                {
+                  fontWeight: bold ? 'bold' : 'normal', fontStyle: italic ? 'italic' : 'normal',
+                  textAlign: align, color, fontSize, fontFamily,
+                },
+              ]}
               value={content}
               onChangeText={setContent}
               placeholder="Type something…"
               placeholderTextColor={SUBTLE}
               multiline autoFocus
+              testID="add-text-input"
             />
 
             <Text style={styles.sheetLabel}>Font</Text>
+            {/* Each chip's own label renders in that font, not a plain list
+                of names — the real preview Dev asked for, not a generic
+                system-font list. */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SP.sm }}>
-              {FONT_FAMILIES.map(ff => (
+              {DESIGN_STUDIO_FONTS.map(f => (
                 <TouchableOpacity
-                  key={ff}
-                  style={[styles.fontChip, fontFamily === ff && styles.fontChipActive]}
-                  onPress={() => setFontFamily(ff)}
+                  key={f.family}
+                  style={[styles.fontChip, fontFamily === f.family && styles.fontChipActive]}
+                  onPress={() => setFontFamily(f.family)}
+                  testID={`font-chip-${f.family}`}
                 >
-                  <Text style={[styles.fontChipText, fontFamily === ff && { color: PURPLE_LIGHT }]}>{ff}</Text>
+                  <Text
+                    style={[
+                      styles.fontChipText,
+                      { fontFamily: f.family },
+                      fontFamily === f.family && { color: PURPLE_LIGHT },
+                    ]}
+                  >
+                    {f.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -5327,6 +5689,34 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
                 <Feather name="plus" size={14} color={MUTED} />
               </TouchableOpacity>
               <Text style={styles.sliderValue}>{fontSize}</Text>
+            </View>
+
+            <Text style={styles.sheetLabel}>Letter spacing: {letterSpacing.toFixed(1)}</Text>
+            <View style={styles.sliderRow} testID="letter-spacing-row">
+              <TouchableOpacity onPress={() => setLetterSpacing(v => Math.max(-2, Math.round((v - 0.5) * 10) / 10))} testID="letter-spacing-minus">
+                <Feather name="minus" size={14} color={MUTED} />
+              </TouchableOpacity>
+              <View style={styles.sliderTrack}>
+                <View style={[styles.sliderFill, { width: `${((letterSpacing + 2) / 12) * 100}%` }]} />
+              </View>
+              <TouchableOpacity onPress={() => setLetterSpacing(v => Math.min(10, Math.round((v + 0.5) * 10) / 10))} testID="letter-spacing-plus">
+                <Feather name="plus" size={14} color={MUTED} />
+              </TouchableOpacity>
+              <Text style={styles.sliderValue}>{letterSpacing.toFixed(1)}</Text>
+            </View>
+
+            <Text style={styles.sheetLabel}>Line height: {lineHeight.toFixed(2)}×</Text>
+            <View style={styles.sliderRow} testID="line-height-row">
+              <TouchableOpacity onPress={() => setLineHeight(v => Math.max(0.8, Math.round((v - 0.1) * 100) / 100))} testID="line-height-minus">
+                <Feather name="minus" size={14} color={MUTED} />
+              </TouchableOpacity>
+              <View style={styles.sliderTrack}>
+                <View style={[styles.sliderFill, { width: `${((lineHeight - 0.8) / 1.7) * 100}%` }]} />
+              </View>
+              <TouchableOpacity onPress={() => setLineHeight(v => Math.min(2.5, Math.round((v + 0.1) * 100) / 100))} testID="line-height-plus">
+                <Feather name="plus" size={14} color={MUTED} />
+              </TouchableOpacity>
+              <Text style={styles.sliderValue}>{lineHeight.toFixed(2)}</Text>
             </View>
 
             <View style={styles.toggleRow}>
@@ -5524,6 +5914,20 @@ const styles = StyleSheet.create({
   wrenchItemText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
 
   modalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  // Full-height sheets (Layers, Colours) drop from the top under the status
+  // bar — Procreate's own placement — rather than sitting at the bottom
+  // like the other sheets.
+  layersModalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-start' },
+  // flex: 1 here (not just paddingTop) matters on web: a sheet inside this
+  // wrap (e.g. the Colours picker) sizes itself with a percentage height
+  // ('82%'). RNW's flexbox only resolves a percentage height against an
+  // ancestor with a DEFINITE height — without flex: 1 this wrap has none
+  // (justifyContent: 'flex-start' on the parent means it shrinks to content
+  // instead of stretching), so the percentage silently falls back to the
+  // sheet's own content size. That under-sized the Colours sheet enough for
+  // its last scrollable row to render behind the fixed tab bar below it — a
+  // real, user-visible clipping bug this rebuild's zoomed screenshot caught.
+  layersModalSheetWrap: { flex: 1, paddingTop: Platform.OS === 'ios' ? 54 : 32 },
   sheet: {
     backgroundColor: SURFACE,
     borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
@@ -5537,7 +5941,7 @@ const styles = StyleSheet.create({
 
   brushSliders:   { gap: SP.xs, marginBottom: SP.sm },
   catScrollView:  { marginBottom: SP.sm },
-  catChip:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
+  catChip:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
   catChipActive:  { borderColor: BORDER_ACTIVE },
   catChipText:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   brushList:      { maxHeight: 200 },
@@ -5555,7 +5959,7 @@ const styles = StyleSheet.create({
   hexHash:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   hexInput:  { width: 70, fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
   pickerTabRow:   { flexDirection: 'row', gap: SP.xs, marginBottom: SP.sm },
-  pickerTab:      { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER },
+  pickerTab:      { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER },
   pickerTabActive:{ borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED },
   pickerTabText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   hueDiscContainer: { gap: SP.xs },
@@ -5581,7 +5985,7 @@ const styles = StyleSheet.create({
   layerActionBtn: { padding: 6 },
 
   layerActionsRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, marginTop: SP.md },
-  blendChip:          { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
+  blendChip:          { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
   blendChipActive:    { borderColor: BORDER_ACTIVE },
   blendChipText:      { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 
@@ -5590,7 +5994,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.sm, paddingVertical: SP.sm, fontFamily: FONT.regular,
     minHeight: 80, textAlignVertical: 'top', marginBottom: SP.sm,
   },
-  fontChip:       { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
+  fontChip:       { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
   fontChipActive: { borderColor: BORDER_ACTIVE },
   fontChipText:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   toggleRow:      { flexDirection: 'row', gap: SP.xs, marginBottom: SP.sm },
@@ -5671,7 +6075,13 @@ const styles = StyleSheet.create({
   // 2-column action grid
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: SP.md, gap: SP.sm },
   actionCell: {
-    width: (SW - SP.md * 2 - SP.sm) / 2,
+    // Percent, not (SW - padding - gap) / 2: that absolute formula is 2px
+    // too wide once the sheet's own 1px side borders come off its inner
+    // width, so the second cell on every row wrapped and the whole grid
+    // rendered single-column with the right half empty (caught by the Help
+    // tab's zoomed screenshot). Procreate's Actions grid is 2-up; 48% plus
+    // the row gap always fits two regardless of surrounding chrome.
+    width: '48%',
     backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
     paddingVertical: SP.md, gap: SP.xs, minHeight: 80,
@@ -5685,7 +6095,7 @@ const styles = StyleSheet.create({
   guideRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
   guideLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   guideSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  togglePill: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, minHeight: 36 },
+  togglePill: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, minHeight: 36 },
   togglePillActive: { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED },
   togglePillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
   togglePillTextActive: { color: FG },

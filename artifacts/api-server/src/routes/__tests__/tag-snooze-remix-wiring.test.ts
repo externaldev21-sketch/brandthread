@@ -28,7 +28,7 @@ describe("migration 119 enforcement wiring", () => {
     const social = src("social.ts");
     expect(social).toContain('eq(postUserTags.status, "approved")');
     expect(social).toContain('eq(storyMentions.status, "approved")');
-    expect(social).toContain("mentions.filter((m) => !pendingMentions?.has(m.userId))");
+    expect(social).toContain("taggable.filter((m) => !pendingMentions?.has(m.userId))");
     expect(src("story-mentions.ts")).toContain('eq(storyMentions.status, "approved")');
   });
 

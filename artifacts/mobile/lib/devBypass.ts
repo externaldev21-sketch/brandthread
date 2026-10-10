@@ -1,9 +1,11 @@
+import { Platform } from 'react-native';
+import { DEV_SELLER_PREVIEW, DEV_WEB_BYPASS_ROLE } from './buildFlags';
+
 /**
- * Opt-in development entry bypass for Expo device testing. Off by default so
- * a fresh Expo Go install always sees real splash -> sign-up -> onboarding.
- * Set EXPO_PUBLIC_DEV_BYPASS_ROLE=buyer|seller locally to skip straight to a
- * dashboard while iterating on non-onboarding screens.
+ * Temporary development-only role bypass. Native defaults to the normal
+ * onboarding flow; the seller preview must be explicitly opted into.
  */
-const envRole = process.env.EXPO_PUBLIC_DEV_BYPASS_ROLE;
 export const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null =
-  __DEV__ && (envRole === 'buyer' || envRole === 'seller') ? envRole : null;
+  !__DEV__ ? null
+    : Platform.OS !== 'web' ? (DEV_SELLER_PREVIEW ? 'seller' : null)
+    : DEV_WEB_BYPASS_ROLE;

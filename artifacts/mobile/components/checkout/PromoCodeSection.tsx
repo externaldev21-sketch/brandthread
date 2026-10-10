@@ -14,7 +14,7 @@ import { CheckoutField, CheckoutSection, TextAction, useCheckoutColors, type Che
 import { useCheckoutT } from './CheckoutLanguage';
 
 export function PromoCodeSection({
-  discounts, onApply, onRemove, unavailableReason,
+  discounts, onApply, onRemove, unavailableReason, title = 'Promo code', idSuffix = '',
 }: {
   discounts: CheckoutDiscount[];
   /** Validates against the server and persists a valid code; resolves to the result. */
@@ -22,6 +22,9 @@ export function PromoCodeSection({
   onRemove: (code: string) => void;
   /** Shown instead of the field when codes can't apply to this order. */
   unavailableReason?: string;
+  /** Multi-store orders: one section per store, titled with the store name. */
+  title?: string;
+  idSuffix?: string;
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
@@ -48,7 +51,7 @@ export function PromoCodeSection({
   }
 
   return (
-    <CheckoutSection title={t('Promo code')} testID="checkout-promo">
+    <CheckoutSection title={title === 'Promo code' ? t('Promo code') : title} testID={`checkout-promo${idSuffix}`}>
       {applied.map(discount => (
         <View key={discount.code} style={styles.applied} testID="checkout-promo-applied">
           <Feather name="check-circle" size={18} color={ck.text} />
