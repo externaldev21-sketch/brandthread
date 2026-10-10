@@ -91,6 +91,7 @@ import {
   SP,
 } from '@/lib/theme';
 import { Icon } from '@/components/ui/Icon';
+import { updateSellerTodayWidget } from '@/lib/nativeSystem';
 
 type MetricKey = 'sales' | 'orders' | 'visitors' | 'conversion' | 'aov';
 
@@ -274,6 +275,18 @@ export default function SellerHomeCommerceDashboard({
   }), []);
 
   const data = selectSellerHomeAnalytics(snapshot, analyticsUserId, range);
+
+  // Home Screen "Today" widget (Shopify pattern): mirrors this seller's real
+  // Today numbers whenever they load. Never fed from the preview/demo data.
+  useEffect(() => {
+    if (sellerPreview || range !== 'today' || !analyticsUserId || !snapshot) return;
+    if (snapshot.key !== sellerHomeAnalyticsKey(analyticsUserId, 'today')) return;
+    updateSellerTodayWidget({
+      salesCents: snapshot.data.totalCents,
+      ordersCount: snapshot.data.orderCount,
+      toShipCount: snapshot.data.toFulfill,
+    });
+  }, [analyticsUserId, range, sellerPreview, snapshot]);
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(false);

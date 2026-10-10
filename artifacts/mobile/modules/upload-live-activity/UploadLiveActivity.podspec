@@ -19,10 +19,9 @@ Pod::Spec.new do |s|
 
   s.source_files = 'ios/**/*.{h,m,mm,swift}'
 
-  # UploadLiveActivityAttributes.swift is shared with the widget extension
-  # target (see plugins/with-upload-live-activity.js, which adds
-  # ios-extensions/UploadLiveActivity/UploadLiveActivityAttributes.swift to
-  # BOTH targets' Compile Sources). It is intentionally not duplicated
-  # here — this podspec only builds this module's own ios/ sources, which
-  # reference that type by name once the app target compiles it in.
+  # ios/Shared/*Attributes.swift are the ActivityAttributes types; this pod
+  # compiles them for the app, and plugins/with-upload-live-activity.js
+  # copies the same files into the widget extension target.
+  s.frameworks = 'WidgetKit'
+  s.weak_frameworks = 'ActivityKit'
 end

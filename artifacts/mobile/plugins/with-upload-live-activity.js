@@ -63,12 +63,30 @@ const {
 const APP_GROUP = 'group.com.brandthread.mobile.liveactivity';
 const EXTENSION_NAME = 'UploadLiveActivity';
 const SOURCE_DIR = path.join(__dirname, '..', 'ios-extensions', 'UploadLiveActivity');
-
-const SWIFT_SOURCES = [
+/**
+ * ActivityAttributes types shared by the app and the extension. Their one
+ * canonical copy lives in the local Expo module
+ * (`modules/upload-live-activity/ios/Shared/`), which compiles them into the
+ * app (a pod cannot see types compiled into the app target, so the module
+ * must own them); this plugin copies the same files into the extension so
+ * ActivityKit matches the type on both sides.
+ */
+const SHARED_DIR = path.join(__dirname, '..', 'modules', 'upload-live-activity', 'ios', 'Shared');
+const SHARED_SOURCES = [
   'UploadLiveActivityAttributes.swift',
+  'OrderTrackingAttributes.swift',
+  'LiveStreamAttributes.swift',
+];
+
+const EXTENSION_SOURCES = [
   'UploadLiveActivityBundle.swift',
   'UploadLiveActivityWidget.swift',
+  'OrderTrackingWidget.swift',
+  'LiveStreamWidget.swift',
+  'HomeWidgets.swift',
 ];
+
+const SWIFT_SOURCES = [...SHARED_SOURCES, ...EXTENSION_SOURCES];
 
 function withUploadLiveActivityInfoPlist(config) {
   return withInfoPlist(config, (cfg) => {
@@ -94,12 +112,15 @@ function withUploadLiveActivityFiles(config) {
       const destDir = path.join(cfg.modRequest.platformProjectRoot, EXTENSION_NAME);
       fs.mkdirSync(destDir, { recursive: true });
       const filesToCopy = [
-        ...SWIFT_SOURCES,
+        ...EXTENSION_SOURCES,
         'Info.plist',
         `${EXTENSION_NAME}.entitlements`,
       ];
       for (const fileName of filesToCopy) {
         fs.copyFileSync(path.join(SOURCE_DIR, fileName), path.join(destDir, fileName));
+      }
+      for (const fileName of SHARED_SOURCES) {
+        fs.copyFileSync(path.join(SHARED_DIR, fileName), path.join(destDir, fileName));
       }
       return cfg;
     },
@@ -139,17 +160,9 @@ function withUploadLiveActivityXcodeTarget(config) {
       target.uuid,
     );
 
-    // Also compile the shared attributes file into the MAIN app target —
-    // it declares the `ActivityAttributes` type
-    // `UploadLiveActivityModule.swift` (the local Expo module, autolinked
-    // separately) needs to call `Activity<UploadLiveActivityAttributes>.request(...)`.
-    const mainTarget = project.getFirstTarget().uuid;
-    project.addBuildPhase(
-      ['UploadLiveActivityAttributes.swift'],
-      'PBXSourcesBuildPhase',
-      'Sources',
-      mainTarget,
-    );
+    // The shared attributes are compiled into the app by the local Expo
+    // module's pod (modules/upload-live-activity/ios/Shared/), so the main
+    // target needs no extra Compile Sources entry.
 
     // Per-target build settings: Swift, deployment target, entitlements,
     // Info.plist path, bundle id (already set via addTarget's 4th arg, but
@@ -190,3 +203,5 @@ module.exports = function withUploadLiveActivity(config) {
 
 module.exports.APP_GROUP = APP_GROUP;
 module.exports.EXTENSION_NAME = EXTENSION_NAME;
+module.exports.SWIFT_SOURCES = SWIFT_SOURCES;
+module.exports.SHARED_SOURCES = SHARED_SOURCES;

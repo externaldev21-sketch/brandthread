@@ -1118,6 +1118,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       featureFlags: () =>
         get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
     },
+    // ── iOS Live Activity push tokens (lib/nativeSystem.ts) ──────────────────
+    liveActivities: {
+      registerToken: (body: { kind: 'order' | 'live'; targetId: string; token: string }) =>
+        post<{ ok: boolean }>('/api/live-activities/tokens', body),
+      removeToken: (token: string) =>
+        del<{ ok: boolean }>(`/api/live-activities/tokens/${encodeURIComponent(token)}`),
+    },
     // ── Live replays + Live tips (PR: live-replays-profile-tips) ──────────────
     liveReplays: {
       bySeller: (sellerId: string, opts: { limit?: number; offset?: number } = {}) =>
