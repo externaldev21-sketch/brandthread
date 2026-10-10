@@ -905,7 +905,8 @@ export default function ProfileScreen() {
                 router.push('/buyer-story-create' as any);
               }
             }}
-            onPressBadge={() => { router.push('/buyer-story-create' as any); }}
+            onPressBadge={() => { hapticSelection(); router.push('/buyer-story-create' as any); }}
+            onLongPress={() => { hapticSelection(); setAccountSwitcherOpen(true); }}
           />
         )}
         name={displayName}

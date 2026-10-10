@@ -16,7 +16,7 @@ describe('settings catalog', () => {
       '/shopping-preferences',
       '/store-settings',
     ]) {
-      expect(items.some(item => item.route === destination)).toBe(true);
+      expect(items.some(item => item.route?.split('?')[0] === destination)).toBe(true);
     }
   });
 

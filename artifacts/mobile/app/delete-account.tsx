@@ -44,6 +44,8 @@ import {
 } from '@/lib/deletionReauth';
 import { storeSubscriptionsUrl } from '@/lib/currentPlan';
 import { isOAuthCancellationError } from '@/lib/oauthFlow';
+import { ListRow } from '@/components/ui';
+import { useLinkedProfiles } from '@/hooks/useLinkedProfiles';
 
 type Step = 'overview' | 'confirm' | 'done';
 
@@ -80,6 +82,18 @@ export default function DeleteAccountScreen() {
   const [scheduledFor, setScheduledFor] = useState<string | null>(null);
   const [appleProof, setAppleProof] = useState<{ identityToken: string; authorizationCode: string | null } | null>(null);
   const [appleBusy, setAppleBusy] = useState(false);
+  // One login can hold a buyer and a seller profile. Deleting this profile
+  // keeps the other one; "Delete login" deletes both.
+  const linked = useLinkedProfiles();
+  const thisProfile = linked.data?.profiles.find((p) => p.isCurrent) ?? null;
+  const otherProfiles = (linked.data?.profiles ?? []).filter((p) => !p.isCurrent && !p.pendingDeletion);
+  const hasOther = otherProfiles.length > 0;
+  const [scope, setScope] = useState<'profile' | 'login'>('profile');
+  const handleOf = (p: { username: string | null; displayName: string | null } | null | undefined, fallback: string) =>
+    p?.username ? `@${p.username}` : (p?.displayName || fallback);
+  const thisHandle = handleOf(thisProfile, 'this profile');
+  const otherHandle = handleOf(otherProfiles[0], otherProfiles[0]?.role === 'seller' ? 'your store' : 'your buyer profile');
+  const keepsOther = hasOther && scope === 'profile';
 
   const loadCheck = useCallback(async () => {
     setLoading(true);
@@ -154,18 +168,21 @@ export default function DeleteAccountScreen() {
     setDeleting(true);
     setDeleteError(null);
     try {
-      const result = await api.auth.deleteAccount(
-        !usesCode ? { password }
+      const reauth = !usesCode ? { password }
           : appleProof ? { appleIdentityToken: appleProof.identityToken, appleAuthorizationCode: appleProof.authorizationCode ?? undefined }
             : code.trim() ? { code: code.trim() }
-              : {},
-      );
+              : {};
+      const result = scope === 'login' && hasOther
+        ? await api.accounts.deleteLogin(reauth)
+        : await api.auth.deleteAccount(reauth);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await clearAccountLifecycleState().catch(() => {});
       setScheduledFor(result.scheduledFor);
       setStep('done');
-      // Every session was revoked server-side; clear the local one too.
-      signOut().catch(() => {});
+      if (!keepsOther) {
+        await clearAccountLifecycleState().catch(() => {});
+        // Every session was revoked server-side; clear the local one too.
+        signOut().catch(() => {});
+      }
     } catch (err) {
       haptics.error();
       if (apiErrorCode(err) === 'DELETION_BLOCKED') {
@@ -192,13 +209,24 @@ export default function DeleteAccountScreen() {
       <View style={[s.root, { paddingTop: headerTopInset + SP.xxl, paddingBottom: insets.bottom + SP.lg }]}>
         <View style={s.doneBody}>
           <View style={s.doneIcon}><Icon name="check" size={30} color={theme.onAccent} /></View>
-          <Text style={s.title}>Your account is scheduled for deletion</Text>
+          <Text style={s.title}>{keepsOther ? `${thisHandle} is scheduled for deletion` : 'Your account is scheduled for deletion'}</Text>
           <Text style={s.lead}>
-            {`Your account is hidden and you’ve been signed out on every device. It will be permanently deleted on ${formatScheduledDate(scheduledFor)}. Sign back in before then to cancel.`}
+            {keepsOther
+              ? `${thisHandle} is hidden now and will be permanently deleted on ${formatScheduledDate(scheduledFor)}. ${otherHandle} keeps working with your login.`
+              : `Your account is hidden and you’ve been signed out on every device. It will be permanently deleted on ${formatScheduledDate(scheduledFor)}. Sign back in before then to cancel.`}
           </Text>
         </View>
         <View style={{ paddingHorizontal: SP.md }}>
-          <PrimaryButton label="Done" onPress={() => router.replace('/sign-in' as never)} />
+          <PrimaryButton
+            label={keepsOther ? `Go to ${otherHandle}` : 'Done'}
+            onPress={() => {
+              if (keepsOther && otherProfiles[0]) {
+                linked.switchTo(otherProfiles[0].clerkId).catch(() => router.replace('/sign-in' as never));
+              } else {
+                router.replace('/sign-in' as never);
+              }
+            }}
+          />
         </View>
       </View>
     );
@@ -216,6 +244,28 @@ export default function DeleteAccountScreen() {
             <Text style={s.lead}>
               {`Your account${isSeller ? ' and storefront are' : ' is'} hidden right away and permanently deleted after ${graceDays} days. Sign back in before then to cancel.`}
             </Text>
+
+            {hasOther ? (
+              <View style={s.scopeList} accessibilityRole="radiogroup">
+                <ListRow
+                  title={`Delete ${thisHandle} only`}
+                  subtitle={`${otherHandle} keeps working with your login.`}
+                  subtitleNumberOfLines={2}
+                  onPress={() => setScope('profile')}
+                  right={scope === 'profile' ? <Feather name="check" size={20} color={theme.text} /> : undefined}
+                  divider
+                  testID="delete-scope-profile"
+                />
+                <ListRow
+                  title="Delete login"
+                  subtitle={`Deletes ${thisHandle}, ${otherHandle} and the login they share.`}
+                  subtitleNumberOfLines={2}
+                  onPress={() => setScope('login')}
+                  right={scope === 'login' ? <Feather name="check" size={20} color={theme.text} /> : undefined}
+                  testID="delete-scope-login"
+                />
+              </View>
+            ) : null}
 
             {check?.deletionCancelledAt ? (
               <View style={s.readyCard}>
@@ -355,7 +405,11 @@ export default function DeleteAccountScreen() {
             <View style={s.heroIcon}><Icon name="alert-octagon" size={24} color={theme.error} /></View>
             <Text style={s.title}>Are you absolutely sure?</Text>
             <Text style={s.lead}>
-              {`Your account will be hidden now and permanently deleted after ${graceDays} days. Signing back in before then cancels it.`}
+              {keepsOther
+                ? `${thisHandle} will be hidden now and permanently deleted after ${graceDays} days. ${otherHandle} keeps working.`
+                : scope === 'login' && hasOther
+                  ? `${thisHandle}, ${otherHandle} and your login will be hidden now and permanently deleted after ${graceDays} days. Signing back in before then cancels it.`
+                  : `Your account will be hidden now and permanently deleted after ${graceDays} days. Signing back in before then cancels it.`}
             </Text>
 
             <Text style={s.fieldLabel}>Type <Text style={{ color: theme.text, fontFamily: FONT.bold }}>{CONFIRM_WORD}</Text> to confirm</Text>
@@ -496,6 +550,7 @@ export default function DeleteAccountScreen() {
 }
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+    scopeList: { marginTop: SP.lg },
   root: { flex: 1, backgroundColor: 'transparent' },
   heroIcon: {
     width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',

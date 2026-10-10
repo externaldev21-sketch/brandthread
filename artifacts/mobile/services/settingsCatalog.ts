@@ -68,6 +68,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Accounts Center', description: 'Password, security, personal details', aliases: ['password', 'email', 'phone', 'sign in', 'security', 'account ownership', 'personal details'], icon: 'user', route: '/buyer-account-center', audience: 'buyer', showDescription: true },
       { label: 'Edit profile', description: 'Name, photo, bio, and public profile', aliases: ['profile', 'name', 'photo', 'bio'], icon: 'edit-3', route: '/(buyer)/edit-profile', audience: 'buyer' },
       { label: 'Share profile', description: 'Send your profile link or card', aliases: ['share', 'link', 'profile link'], icon: 'share-2', action: 'share-profile', audience: 'buyer' },
+      { label: 'Start selling', description: 'Open a store with this login', aliases: ['sell', 'seller account', 'open a store', 'brand', 'account type', 'role', 'buyer seller'], icon: 'shopping-bag', route: '/account-type-settings?add=seller', audience: 'buyer' },
       { label: 'QR code', description: 'Share your Brandthread profile', aliases: ['qr', 'scan'], icon: 'grid', route: '/buyer-qr-code', audience: 'buyer' },
       { label: 'Login activity', description: 'Review devices signed into your account', aliases: ['sessions', 'devices', 'signed in'], icon: 'monitor', route: '/login-activity', audience: 'buyer', searchOnly: true },
       { label: 'Download my data', description: 'Export your profile, orders, and messages', aliases: ['export', 'data', 'download'], icon: 'download', route: '/buyer-download-data', audience: 'shared', searchOnly: true },
@@ -320,6 +321,12 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Invite friends', description: 'Give $10, get $10 purchase-only Thread Cash; share your referral code and see rewards', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'seller' },
       { label: 'About Brandthread', description: 'App version, terms, policies, and licenses', aliases: ['about', 'version', 'legal', 'licenses'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'seller' },
       ...LEGAL_ITEMS,
+    ],
+  },
+  {
+    title: 'Switch mode',
+    items: [
+      { label: 'Shop as a buyer', description: 'A buyer profile with this login', aliases: ['switch', 'buyer mode', 'account type', 'shop', 'buyer account'], icon: 'shopping-cart', route: '/account-type-settings?add=buyer', audience: 'seller' },
     ],
   },
   {
