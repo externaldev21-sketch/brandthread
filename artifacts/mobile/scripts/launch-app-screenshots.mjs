@@ -90,6 +90,10 @@ async function run() {
   await pageRef.waitForTimeout(800);
   await pageRef.screenshot({ path: path.join(OUT, 'agent-consent-sheet.png') });
   console.log('sheet visible:', await pageRef.getByTestId('ai-consent-sheet').isVisible().catch(() => false));
+  console.log('focused element outline:', await pageRef.evaluate(() => {
+    const el = document.activeElement;
+    return el ? `${el.tagName} role=${el.getAttribute('role')} outline=${getComputedStyle(el).outlineStyle}/${getComputedStyle(el).outlineWidth}` : 'none';
+  }));
   // Not now keeps the draft and sends nothing; Allow then sends it.
   await pageRef.getByTestId('ai-consent-not-now').click();
   await pageRef.waitForTimeout(800);

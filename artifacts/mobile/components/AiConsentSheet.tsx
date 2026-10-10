@@ -14,7 +14,7 @@
  *   {aiConsent.sheet}
  */
 import React, { useCallback, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -29,6 +29,9 @@ import {
 
 const SHEET_BG = '#1C1C1E';
 const SILVER = '#C0C0C0';
+// react-native-web focuses the modal root on open; hide that frame-wide ring
+// (buttons keep their own focus styles for keyboard users).
+const NO_FOCUS_RING = Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as object) : null;
 
 interface Options {
   /** Preview / demo conversation: no backend, keep the answer in memory only. */
@@ -120,10 +123,10 @@ export function AiConsentSheet({ visible, saving, error, onAllow, onNotNow }: Sh
   const router = useRouter();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onNotNow} statusBarTranslucent>
-      <View style={s.root}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onNotNow} accessibilityLabel={COPY.notNow} />
+      <View style={[s.root, NO_FOCUS_RING]}>
+        <Pressable style={[StyleSheet.absoluteFill, NO_FOCUS_RING]} onPress={onNotNow} accessibilityLabel={COPY.notNow} focusable={false} />
         <View
-          style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.md) + SP.sm }]}
+          style={[s.sheet, NO_FOCUS_RING, { paddingBottom: Math.max(insets.bottom, SP.md) + SP.sm }]}
           accessibilityViewIsModal
           testID="ai-consent-sheet"
         >
