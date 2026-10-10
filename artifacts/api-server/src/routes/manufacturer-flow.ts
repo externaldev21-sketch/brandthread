@@ -39,6 +39,7 @@ import {
 import { publishNotification } from "./notifications-feed";
 import { serializeMessage } from "./manufacturers";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { VERIFICATION_REQUIRED_FOR_CARDS, refreshManufacturerVerification } from "../lib/manufacturerTrust";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -150,6 +151,13 @@ router.post("/me/threads/:threadId/order-cards", requireAuth, async (req, res) =
   if (!mfr) { res.status(404).json({ error: "Manufacturer profile not found" }); return; }
   if (mfr.status !== "active") {
     res.status(403).json({ error: "Your manufacturer profile is not active." }); return;
+  }
+  // Light vetting: payable cards only from verified manufacturers.
+  if (mfr.verificationStatus !== "verified") {
+    const check = await refreshManufacturerVerification(mfr.id);
+    if (check.status !== "verified") {
+      res.status(403).json({ ...VERIFICATION_REQUIRED_FOR_CARDS, missing: check.gaps }); return;
+    }
   }
   const [thread] = await db.select().from(manufacturerThreads).where(and(
     eq(manufacturerThreads.id, threadId),

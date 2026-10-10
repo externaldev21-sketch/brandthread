@@ -12,8 +12,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ApiRequestError, useApiRequest } from "@/lib/api";
 import { useConnectStatus } from "@/hooks/use-connect-status";
+import { useVerificationStatus } from "@/hooks/use-verification-status";
 
 type OrderType = "sample" | "bulk";
+
+/** Brandthread's B2B platform fee on paid order cards (card / ACH processing is passed through on top). */
+const PLATFORM_FEE_RATE = 0.05;
 
 export function SendCardDialog({
   open, onOpenChange, threadId, sellerName, initialType = "sample",
@@ -27,6 +31,7 @@ export function SendCardDialog({
   const request = useApiRequest();
   const queryClient = useQueryClient();
   const connect = useConnectStatus();
+  const verification = useVerificationStatus();
   const [orderType, setOrderType] = useState<OrderType>(initialType);
   const [title, setTitle] = useState("");
   const [quantity, setQuantity] = useState(initialType === "sample" ? "1" : "");
@@ -73,6 +78,7 @@ export function SendCardDialog({
   };
 
   const payoutBlocked = connect.data ? !connect.data.ready : false;
+  const verificationPending = verification.data ? verification.data.status !== "verified" : false;
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!send.isPending) onOpenChange(next); }}>
@@ -135,10 +141,15 @@ export function SendCardDialog({
           </div>
 
           <p className="rounded-md border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
-            Prices are in US dollars. Stripe converts your payout to your bank's currency. Brandthread's platform fee and Stripe processing fees are deducted before payout.
+            Prices are in US dollars. Brandthread's 5% fee and payment processing are deducted before payout{priceCents ? `. You receive ${formatMoney(priceCents - Math.round(priceCents * PLATFORM_FEE_RATE))} before processing` : ""}. Stripe converts your payout to your bank's currency.
           </p>
 
-          {payoutBlocked && (
+          {verificationPending ? (
+            <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200" role="status" data-testid="status-card-verification">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>You can send order cards once your profile is verified. {verification.data?.message}</p>
+            </div>
+          ) : payoutBlocked && (
             <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200" role="status">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <p>You can send this card now, but the seller can't pay until your payout account is verified. <Link href="/payment" className="font-medium underline">Finish payout setup</Link></p>
@@ -148,7 +159,7 @@ export function SendCardDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={send.isPending}>Cancel</Button>
-            <Button type="submit" disabled={send.isPending} data-testid="button-send-card">
+            <Button type="submit" disabled={send.isPending || verificationPending} data-testid="button-send-card">
               {send.isPending ? "Sending…" : priceCents ? `Send card · ${formatMoney(priceCents)}` : "Send card"}
             </Button>
           </DialogFooter>

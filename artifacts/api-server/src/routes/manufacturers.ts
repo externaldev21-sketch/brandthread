@@ -37,6 +37,13 @@ import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
 import { findCountry, isValidTimeZone, validateTransition } from "@workspace/manufacturer-flow";
 import { afterStageChange, attachOrderSnapshots, postThreadSystemMessage } from "../lib/manufacturerOrders";
+import { recordLegalAcceptance } from "../lib/legalAcceptance";
+import {
+  MANUFACTURER_TERMS_REQUIRED, MANUFACTURER_TERMS_VERSION, acceptedCurrentManufacturerTerms,
+  contactFieldsForViewer, filterManufacturerMessage, hasPaidOrderBetween, manufacturerTermsAcceptanceVersion,
+  recordContactSignal, refreshManufacturerVerification, verificationGapLine, visibleToSellerCondition,
+} from "../lib/manufacturerTrust";
+import { emailManufacturerNewMessage, inBackground } from "../lib/manufacturerNotifications";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -110,6 +117,12 @@ function serializeQuoteRequest(row: typeof sellerQuoteRequests.$inferSelect) {
 }
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
+
+/** The terms checkbox travels with the signup body but isn't a profile column. */
+function withoutTermsField<T extends { acceptedTermsVersion?: unknown }>(data: T): Omit<T, "acceptedTermsVersion"> {
+  const { acceptedTermsVersion: _accepted, ...profile } = data;
+  return profile;
+}
 
 /** A valid IANA zone from the client, else the country's main zone, else null. */
 export function resolveTimeZone(supplied: unknown, country: string | null | undefined): string | null {
@@ -436,24 +449,33 @@ router.get("/partners/:manufacturerId", ...requireGrowthSeller, async (req, res)
     res.status(404).json({ error: "Manufacturer not found" }); return;
   }
   const m = row.manufacturer;
+  if (row.manufacturer.isPublicDirectory && !row.relationshipId && m.verificationStatus !== "verified") {
+    res.status(404).json({ error: "Manufacturer not found" }); return;
+  }
   const [summary] = await db.select({
     reviewCount: sql<number>`count(*)::integer`,
     rating: sql<number | null>`round(avg(${manufacturerReviews.rating})::numeric, 2)::float`,
   }).from(manufacturerReviews).where(eq(manufacturerReviews.manufacturerId, m.id));
+  // Website / email / phone stay hidden until this seller has paid an order card.
+  const contact = contactFieldsForViewer(m, await hasPaidOrderBetween(sellerId, m.id));
   res.json({
     id: m.id,
     businessName: m.businessName,
     country: m.country,
     city: m.city,
     specialty: m.specialty,
-    description: m.description,
+    description: contact.description,
     yearsInBusiness: m.yearsInBusiness,
     moq: m.moq,
     priceRange: m.priceRange,
     bulkTurnaround: m.bulkTurnaround,
     sampleTurnaround: m.sampleTurnaround,
     photos: await signedProfilePhotos(m.photos),
-    website: m.website,
+    website: contact.website,
+    contactEmail: contact.contactEmail,
+    contactPhone: contact.contactPhone,
+    contactHidden: contact.contactHidden,
+    verified: m.verificationStatus === "verified",
     timeZone: m.timeZone,
     responseTime: m.responseTime || null,
     isVerified: !!m.verifiedAt,
@@ -475,8 +497,9 @@ router.post("/relationships", ...requireGrowthSeller, async (req, res) => {
   if (!isUuid(manufacturerId)) {
     res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return;
   }
+  // Private or not-yet-verified manufacturers can't be "saved" into a relationship by a stranger.
   const [manufacturer] = await db.select({ id: manufacturers.id }).from(manufacturers)
-    .where(and(eq(manufacturers.id, manufacturerId), eq(manufacturers.status, "active")))
+    .where(and(eq(manufacturers.id, manufacturerId), visibleToSellerCondition(sellerId)))
     .limit(1);
   if (!manufacturer) { res.status(404).json({ error: "Manufacturer not found" }); return; }
   const [created] = await db.insert(manufacturerRelationships)
@@ -916,6 +939,7 @@ router.post("/register-via-invite/:token", async (req, res) => {
 
   const parsed = RegisterManufacturerBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+  if (!acceptedCurrentManufacturerTerms(req.body)) { res.status(400).json(MANUFACTURER_TERMS_REQUIRED); return; }
 
   const mfr = await db.transaction(async (tx) => {
     const [claimed] = await tx.update(manufacturerInviteTokens)
@@ -923,17 +947,25 @@ router.post("/register-via-invite/:token", async (req, res) => {
       .where(and(eq(manufacturerInviteTokens.id, inv.id), isNull(manufacturerInviteTokens.usedAt)))
       .returning({ id: manufacturerInviteTokens.id });
     if (!claimed) return null;
+    const acceptedAt = new Date();
     const [created] = await tx
       .insert(manufacturers)
       .values({
         clerkId:           userId,
-        ...parsed.data,
+        ...withoutTermsField(parsed.data),
         timeZone:          resolveTimeZone(parsed.data.timeZone, parsed.data.country),
         isPublicDirectory: false,
         status:            "active",
+        // Light vetting: the profile works right away; payable cards wait for verification.
+        verificationStatus: "pending_verification",
+        termsVersion:      MANUFACTURER_TERMS_VERSION,
+        termsAcceptedAt:   acceptedAt,
         photos:            [],
       })
       .returning();
+    await recordLegalAcceptance(tx, {
+      clerkId: userId, version: manufacturerTermsAcceptanceVersion(), acceptedAt, updateAccountTerms: false,
+    });
     await tx.update(manufacturerInviteTokens)
       .set({ manufacturerId: created.id })
       .where(eq(manufacturerInviteTokens.id, inv.id));
@@ -993,6 +1025,26 @@ router.get("/me", async (req, res) => {
     verifiedAt: mfr.verifiedAt?.toISOString() ?? null,
     createdAt:  mfr.createdAt.toISOString(),
     updatedAt:  mfr.updatedAt.toISOString(),
+  });
+});
+
+// GET /api/manufacturers/me/verification — light-vetting state for the portal
+// checklist. Re-checks a pending profile, so a newly verified email or a
+// finished Stripe setup is picked up here too.
+router.get("/me/verification", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+  const result = await refreshManufacturerVerification(mfr.id);
+  return res.json({
+    status: result.status,
+    missing: result.gaps,
+    message: result.status === "rejected"
+      ? "Verification was declined. Contact support@brandthread.app."
+      : verificationGapLine(result.gaps),
+    termsVersion: mfr.termsVersion ?? null,
+    currentTermsVersion: MANUFACTURER_TERMS_VERSION,
   });
 });
 
@@ -1190,6 +1242,9 @@ router.patch("/me", async (req, res) => {
       code: "STALE_WRITE",
     });
   }
+  if (updated.verificationStatus === "pending_verification" && changes.contactPhone !== undefined) {
+    inBackground(refreshManufacturerVerification(updated.id), { manufacturerId: updated.id });
+  }
 
   return res.json({
     ...updated,
@@ -1213,16 +1268,29 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ error: "Years in business must be between 0 and 200" });
   }
 
-  // Self-serve signups go live in the public directory immediately; there is
-  // no manual approval step.
-  const [mfr] = await db
-    .insert(manufacturers)
-    .values({
-      clerkId: userId, isPublicDirectory: true, status: "active", ...parsed.data,
-      timeZone: resolveTimeZone(parsed.data.timeZone, parsed.data.country),
-      photos: [],
-    })
-    .returning();
+  if (!acceptedCurrentManufacturerTerms(req.body)) return res.status(400).json(MANUFACTURER_TERMS_REQUIRED);
+
+  // Self-serve signups can build their profile right away. They join the
+  // public directory and can send payable order cards once verified (email +
+  // phone + Stripe payouts, or an admin approval): see lib/manufacturerTrust.
+  const acceptedAt = new Date();
+  const mfr = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(manufacturers)
+      .values({
+        clerkId: userId, isPublicDirectory: true, status: "active", ...withoutTermsField(parsed.data),
+        verificationStatus: "pending_verification",
+        termsVersion: MANUFACTURER_TERMS_VERSION,
+        termsAcceptedAt: acceptedAt,
+        timeZone: resolveTimeZone(parsed.data.timeZone, parsed.data.country),
+        photos: [],
+      })
+      .returning();
+    await recordLegalAcceptance(tx, {
+      clerkId: userId, version: manufacturerTermsAcceptanceVersion(), acceptedAt, updateAccountTerms: false,
+    });
+    return created;
+  });
 
   const signupEmail = await resolveManufacturerEmail(userId, parsed.data.contactEmail);
   if (signupEmail) {
@@ -1305,13 +1373,15 @@ router.post("/threads", ...requireGrowthSeller, async (req, res) => {
   const { manufacturerId, subject = "General" } = req.body;
 
   if (!isUuid(manufacturerId)) { res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return; }
-  const [manufacturer] = await db.select({ id: manufacturers.id, isPublicDirectory: manufacturers.isPublicDirectory })
+  const [manufacturer] = await db.select({
+    id: manufacturers.id, isPublicDirectory: manufacturers.isPublicDirectory, verificationStatus: manufacturers.verificationStatus,
+  })
     .from(manufacturers)
     .where(and(eq(manufacturers.id, manufacturerId), eq(manufacturers.status, "active")))
     .limit(1);
   if (!manufacturer) { res.status(404).json({ error: "Manufacturer not found" }); return; }
-  if (!manufacturer.isPublicDirectory) {
-    // Private manufacturers only talk to sellers they are already connected to.
+  if (!manufacturer.isPublicDirectory || manufacturer.verificationStatus !== "verified") {
+    // Private (and not-yet-verified) manufacturers only talk to sellers they are already connected to.
     const [relationship] = await db.select({ id: manufacturerRelationships.id }).from(manufacturerRelationships)
       .where(and(eq(manufacturerRelationships.sellerId, sellerId), eq(manufacturerRelationships.manufacturerId, manufacturerId)))
       .limit(1);
@@ -1426,13 +1496,19 @@ router.post("/threads/:threadId/messages", ...requireGrowthSeller, async (req, r
     ))
     .limit(1);
   if (!thread) { res.status(404).json({ error: "Thread not found" }); return; }
+  // Contact details / off-platform payment steering are masked until the
+  // pair's first paid order (lib/manufacturerTrust.ts).
+  const filtered = content?.trim()
+    ? filterManufacturerMessage(content, await hasPaidOrderBetween(sellerId, thread.manufacturerId))
+    : null;
+  const storedContent = filtered?.content ?? content ?? "";
   const [duplicate] = await db.select().from(manufacturerMessages).where(and(
     eq(manufacturerMessages.threadId, threadId),
     eq(manufacturerMessages.senderClerkId, sellerId),
     eq(manufacturerMessages.clientRequestId, clientRequestId),
   )).limit(1);
   if (duplicate) {
-    if (!isSameMessageSubmission(duplicate, parsed.data)) {
+    if (!isSameMessageSubmission(duplicate, { ...parsed.data, content: storedContent })) {
       res.status(409).json({ error: "clientRequestId was already used for a different message" }); return;
     }
     res.json(await serializeMessage(duplicate)); return;
@@ -1455,10 +1531,11 @@ router.post("/threads/:threadId/messages", ...requireGrowthSeller, async (req, r
       senderRole:  "seller",
       senderClerkId: sellerId,
       clientRequestId,
-      content:     content ?? "",
+      content:     storedContent,
       messageType: messageType ?? "text",
       mediaUrls:   paths,
       cardData:    cardData ?? null,
+      contactFlags: filtered?.contactFlags ?? null,
     }).onConflictDoNothing()
     .returning();
   if (!msg) {
@@ -1480,24 +1557,37 @@ router.post("/threads/:threadId/messages", ...requireGrowthSeller, async (req, r
   await db
     .update(manufacturerThreads)
     .set({
-      lastMessage: content ?? "",
+      lastMessage: storedContent,
       lastMessageAt: new Date(),
       manufacturerUnreadCount: sql`${manufacturerThreads.manufacturerUnreadCount} + 1`,
       unreadCount: sql`${manufacturerThreads.unreadCount} + 1`,
     })
     .where(eq(manufacturerThreads.id, threadId));
+  if (filtered?.flagged && filtered.contactFlags) {
+    await recordContactSignal({
+      threadId, messageId: msg.id, manufacturerId: thread.manufacturerId, sellerId,
+      senderClerkId: sellerId, senderRole: "seller", kinds: filtered.contactFlags,
+      masked: filtered.masked, originalContent: content ?? "",
+    });
+  }
 
   const [recipient] = await db.select({ clerkId: manufacturers.clerkId, businessName: manufacturers.businessName })
     .from(manufacturers).where(eq(manufacturers.id, thread.manufacturerId)).limit(1);
   if (recipient?.clerkId) {
     await notify(req, {
       userId: recipient.clerkId, category: "message", type: "manufacturer_message",
-      title: "New seller message", body: content || "Sent an attachment",
+      title: "New seller message", body: storedContent || "Sent an attachment",
       actorName: (req as any).clerkUserName ?? "Seller",
       targetId: threadId, targetType: "manufacturer_thread",
       cta: `/manufacturers/messages/${threadId}`,
     });
   }
+  // Manufacturers work in the web portal without push, so also email them
+  // (at most one email per thread every 30 minutes).
+  inBackground((async () => emailManufacturerNewMessage({
+    threadId, manufacturerId: thread.manufacturerId,
+    sellerName: await sellerDisplayName(sellerId), preview: storedContent,
+  }))(), { threadId });
 
   res.status(201).json(await serializeMessage(msg));
 });
@@ -1573,13 +1663,17 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
     ))
     .limit(1);
   if (!thread) return res.status(404).json({ error: "Thread not found" });
+  const filtered = content?.trim()
+    ? filterManufacturerMessage(content, await hasPaidOrderBetween(thread.buyerClerkId, thread.manufacturerId))
+    : null;
+  const storedContent = filtered?.content ?? content ?? "";
   const [duplicate] = await db.select().from(manufacturerMessages).where(and(
     eq(manufacturerMessages.threadId, threadId),
     eq(manufacturerMessages.senderClerkId, userId),
     eq(manufacturerMessages.clientRequestId, clientRequestId),
   )).limit(1);
   if (duplicate) {
-    if (!isSameMessageSubmission(duplicate, parsed.data)) {
+    if (!isSameMessageSubmission(duplicate, { ...parsed.data, content: storedContent })) {
       return res.status(409).json({ error: "clientRequestId was already used for a different message" });
     }
     return res.json(await serializeMessage(duplicate));
@@ -1602,10 +1696,11 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
       senderRole:  "manufacturer",
       senderClerkId: userId,
       clientRequestId,
-      content:     content ?? "",
+      content:     storedContent,
       messageType: messageType ?? "text",
       mediaUrls:   paths,
       cardData:    cardData ?? null,
+      contactFlags: filtered?.contactFlags ?? null,
     }).onConflictDoNothing()
     .returning();
   if (!msg) {
@@ -1627,15 +1722,22 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
   await db
     .update(manufacturerThreads)
     .set({
-      lastMessage: content ?? "",
+      lastMessage: storedContent,
       lastMessageAt: new Date(),
       sellerUnreadCount: sql`${manufacturerThreads.sellerUnreadCount} + 1`,
     })
     .where(eq(manufacturerThreads.id, threadId));
+  if (filtered?.flagged && filtered.contactFlags) {
+    await recordContactSignal({
+      threadId, messageId: msg.id, manufacturerId: thread.manufacturerId, sellerId: thread.buyerClerkId,
+      senderClerkId: userId, senderRole: "manufacturer", kinds: filtered.contactFlags,
+      masked: filtered.masked, originalContent: content ?? "",
+    });
+  }
 
   await notify(req, {
     userId: thread.buyerClerkId, category: "message", type: "manufacturer_message",
-    title: `New message from ${mfr.businessName}`, body: content || "Sent an attachment",
+    title: `New message from ${mfr.businessName}`, body: storedContent || "Sent an attachment",
     actorName: mfr.businessName, targetId: threadId, targetType: "manufacturer_thread",
     cta: `/manufacturer-messages/${threadId}`,
   });

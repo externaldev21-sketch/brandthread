@@ -142,7 +142,7 @@ beforeAll(async () => {
   `);
   // Seed a real manufacturer as part of the integration fixture: this confirms
   // the wallet/drop fixture coexists with the manufacturer subsystem's rows.
-  await db.insert(manufacturers).values({
+  await db.insert(manufacturers).values({ verificationStatus: "verified",
     businessName: `${RUN} manufacturer`, country: "US", specialty: "apparel",
   });
   const app = express();

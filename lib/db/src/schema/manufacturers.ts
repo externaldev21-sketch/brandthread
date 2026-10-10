@@ -32,7 +32,17 @@ export const manufacturers = pgTable('manufacturers', {
   // false = only visible to the seller who invited them
   isPublicDirectory:  boolean('is_public_directory').notNull().default(true),
   verifiedAt:         timestamp('verified_at'),
-  paymentSetup:       boolean('payment_setup').notNull().default(false),
+  // Light vetting (migration 454). 'pending_verification' | 'verified' | 'rejected'.
+  // Pending manufacturers can build their profile but stay out of the public
+  // directory and can't send payable order cards.
+  verificationStatus: text('verification_status').notNull().default('pending_verification'),
+  verificationNote:   text('verification_note'),
+  verificationDecidedBy: text('verification_decided_by'),
+  verificationDecidedAt: timestamp('verification_decided_at', { withTimezone: true }),
+  // Manufacturer Terms version accepted at registration (history: legal_acceptances).
+  termsVersion:       text('terms_version'),
+  termsAcceptedAt:    timestamp('terms_accepted_at', { withTimezone: true }),
+  paymentSetup:      boolean('payment_setup').notNull().default(false),
   // Stripe Connect Express — manufacturer receives payouts here
   stripeAccountId:    text('stripe_account_id'),
   stripeAccountStatus: text('stripe_account_status'), // 'pending' | 'active' | 'restricted'
@@ -148,6 +158,8 @@ export const manufacturerThreads = pgTable('manufacturer_threads', {
   lastMessage:    text('last_message').notNull().default(''),
   lastMessageAt:  timestamp('last_message_at').defaultNow().notNull(),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
+  // Last "new message" email sent to the manufacturer (30-minute throttle, migration 455).
+  manufacturerEmailedAt: timestamp('manufacturer_emailed_at', { withTimezone: true }),
 }, (table) => ({
   manufacturerIdx: index('manufacturer_threads_manufacturer_id_idx').on(table.manufacturerId),
 }));
@@ -169,6 +181,9 @@ export const manufacturerMessages = pgTable('manufacturer_messages', {
   mediaUrls:   json('media_urls').$type<string[]>().notNull().default([]),
   // For sample_card / bulk_card messages
   cardData:    json('card_data').$type<Record<string, unknown> | null>(),
+  // Off-platform contact / payment-steering kinds found by the chat filter
+  // (migration 455). Null when nothing was detected.
+  contactFlags: json('contact_flags').$type<string[] | null>(),
   sentAt:      timestamp('sent_at').defaultNow().notNull(),
 }, (table) => ({
   threadIdx: index('manufacturer_messages_thread_id_idx').on(table.threadId),
@@ -408,4 +423,26 @@ export const dropWalletTransactions = pgTable('drop_wallet_transactions', {
   walletIdx: index('dwt_wallet_idx').on(t.walletId),
   orderIdx:  index('dwt_order_idx').on(t.orderId),
   sampleOrderIdx: index('dwt_sample_order_id_idx').on(t.sampleOrderId),
+}));
+
+// ─── Manufacturer chat contact signals (migration 455) ───────────────────────
+// One row per seller↔manufacturer message that tripped the off-platform
+// contact / payment-steering detector. Admin-only: the excerpt is the original
+// text, while the stored message keeps the masked text.
+export const manufacturerContactSignals = pgTable('manufacturer_contact_signals', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  threadId:       uuid('thread_id').notNull().references(() => manufacturerThreads.id, { onDelete: 'cascade' }),
+  messageId:      uuid('message_id').references(() => manufacturerMessages.id, { onDelete: 'set null' }),
+  manufacturerId: uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  sellerId:       text('seller_id').notNull(),
+  senderClerkId:  text('sender_clerk_id').notNull(),
+  senderRole:     text('sender_role').notNull(), // 'seller' | 'manufacturer'
+  kinds:          json('kinds').$type<string[]>().notNull().default([]),
+  masked:         boolean('masked').notNull().default(false),
+  excerpt:        text('excerpt').notNull().default(''),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  senderIdx:  index('manufacturer_contact_signals_sender_idx').on(t.senderClerkId, t.createdAt),
+  createdIdx: index('manufacturer_contact_signals_created_idx').on(t.createdAt),
+  threadIdx:  index('manufacturer_contact_signals_thread_idx').on(t.threadId),
 }));

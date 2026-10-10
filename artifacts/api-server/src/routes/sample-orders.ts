@@ -32,6 +32,7 @@ import { CreateProductionOrderBody } from "@workspace/api-zod";
 import { connectReadiness } from "./manufacturer-connect";
 import { afterStageChange } from "../lib/manufacturerOrders";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { emailManufacturerOrderPaid, inBackground } from "../lib/manufacturerNotifications";
 
 const router = Router();
 router.use(requireAuth);
@@ -261,6 +262,7 @@ router.post("/:id/checkout-session", async (req, res) => {
       order: sampleOrders,
       stripeAccountId: manufacturers.stripeAccountId,
       manufacturerName: manufacturers.businessName,
+      verificationStatus: manufacturers.verificationStatus,
     })
       .from(sampleOrders).leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
       .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.sellerId, sellerId))).limit(1);
@@ -269,6 +271,9 @@ router.post("/:id/checkout-session", async (req, res) => {
       res.status(409).json({ error: "Order is not awaiting payment" }); return;
     }
     if (!row.stripeAccountId) { res.status(409).json({ error: "Manufacturer cannot receive card payment" }); return; }
+    if (row.verificationStatus !== "verified") {
+      res.status(409).json({ error: "This manufacturer isn't verified yet, so this card can't be paid.", code: "MANUFACTURER_NOT_VERIFIED" }); return;
+    }
     const stripe = requireStripe();
     const connectedAccount = await stripe.accounts.retrieve(row.stripeAccountId);
     // Cross-border "recipient" accounts never have charges enabled; destination
@@ -437,6 +442,7 @@ router.post("/:id/pay", async (req, res) => {
         cta: notificationContext.manufacturerCta,
       }).catch((error) => req.log.error({ err: error, orderId: row.order.id }, "Payment notification failed"));
     }
+    inBackground(emailManufacturerOrderPaid(row.order.id), { orderId: row.order.id });
     res.json({ ...updated, paymentStatus, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
   } catch (err) {
     req.log.error({ err, orderId: req.params.id }, "Failed to confirm sample order payment");
@@ -767,6 +773,7 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
         order:       sampleOrders,
         mfrStripeId: manufacturers.stripeAccountId,
         mfrClerkId: manufacturers.clerkId,
+        mfrVerificationStatus: manufacturers.verificationStatus,
         wallet:      dropWallets,
       })
       .from(sampleOrders)
@@ -797,6 +804,9 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
       return;
     }
     if (!row.mfrStripeId) { res.status(409).json({ error: "Manufacturer cannot receive wallet payment" }); return; }
+    if (row.mfrVerificationStatus !== "verified") {
+      res.status(409).json({ error: "This manufacturer isn't verified yet, so this card can't be paid.", code: "MANUFACTURER_NOT_VERIFIED" }); return;
+    }
     const connectedAccount = await stripe.accounts.retrieve(row.mfrStripeId);
     if (connectedAccount.deleted || !connectedAccount.charges_enabled
       || !connectedAccount.payouts_enabled || !connectedAccount.details_submitted) {
@@ -933,6 +943,7 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
         cta: notificationContext.manufacturerCta,
       }).catch((error) => req.log.error({ err: error, orderId: order.id }, "Wallet payment notification failed"));
     }
+    if (reconciliation.ownsNotification) inBackground(emailManufacturerOrderPaid(order.id), { orderId: order.id });
 
     res.json({
       ...reconciliation.order,

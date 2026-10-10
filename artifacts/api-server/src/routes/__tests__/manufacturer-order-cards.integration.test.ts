@@ -11,6 +11,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { eq, inArray, like } from "drizzle-orm";
+import { MANUFACTURER_TERMS_VERSION } from "../../lib/manufacturerTrust";
 import {
   db, manufacturerActivityEvents, manufacturerInviteTokens, manufacturerMessages, manufacturerOrderEvents,
   manufacturerRelationships, manufacturerThreads, manufacturers, sampleOrders, users,
@@ -108,7 +109,7 @@ async function call(path: string, method = "GET", body?: unknown, as?: string) {
 }
 
 async function seedFactory(overrides: Partial<typeof manufacturers.$inferInsert> = {}) {
-  const [row] = await db.insert(manufacturers).values({
+  const [row] = await db.insert(manufacturers).values({ verificationStatus: "verified",
     clerkId: `${prefix}-mfr-${manufacturerIds.length}`,
     businessName: `${prefix} Saigon Knit ${manufacturerIds.length}`,
     country: "Vietnam", city: "Ho Chi Minh City", specialty: "Knitwear",
@@ -407,6 +408,7 @@ describe("private seller invites", () => {
     const registered = await call(`/api/manufacturers/register-via-invite/${token}`, "POST", {
       businessName: `${prefix} Lisbon Leather`, country: "Portugal", specialty: "Leather Goods",
       yearsInBusiness: 22, moq: 50, priceRange: "$40 - $120", bulkTurnaround: "30 days", sampleTurnaround: "14 days",
+      acceptedTermsVersion: MANUFACTURER_TERMS_VERSION,
     }, privateUser);
     expect(registered.status).toBe(201);
     expect(registered.body).toMatchObject({ isPublicDirectory: false, status: "active", timeZone: "Europe/Lisbon", invitedBySellerId: seller });

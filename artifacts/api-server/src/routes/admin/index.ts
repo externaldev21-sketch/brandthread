@@ -16,6 +16,7 @@ import commerceRouter from "./commerce";
 import insightsRouter from "./insights";
 import growthRouter from "./growth";
 import accessRouter from "./access";
+import manufacturerTrustRouter from "./manufacturerTrust";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,5 +35,6 @@ router.use(commerceRouter);
 router.use(insightsRouter);
 router.use(growthRouter);
 router.use("/access", accessRouter); // invite-only launch waitlist
+router.use("/manufacturer-trust", manufacturerTrustRouter); // manufacturer vetting + chat contact signals
 
 export default router;

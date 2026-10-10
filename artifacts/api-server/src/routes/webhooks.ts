@@ -90,6 +90,8 @@ import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
+import { refreshManufacturerVerification } from "../lib/manufacturerTrust";
+import { emailManufacturerOrderPaid, inBackground } from "../lib/manufacturerNotifications";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1944,6 +1946,25 @@ async function handleAccountUpdated(account: any, providerEventId?: string) {
         cta: "/manufacturers/payment",
       });
     }
+    // Light vetting: a pending manufacturer is verified automatically once
+    // Stripe is ready (nothing past due), email is verified and a phone is on file.
+    try {
+      const verification = await refreshManufacturerVerification(manufacturer.id, { stripeAccount: account });
+      if (verification.changed && manufacturer.clerkId) {
+        await publishNotification({
+          userId: manufacturer.clerkId,
+          category: "production",
+          type: "manufacturer_verified",
+          title: "Your profile is verified",
+          body: "You can send payable order cards, and public listings now appear in the directory.",
+          targetId: manufacturer.id,
+          targetType: "manufacturer_profile",
+          cta: "/manufacturers/dashboard",
+        });
+      }
+    } catch (err) {
+      logger.warn({ err, stripeAccountId }, "Manufacturer auto-verification check failed");
+    }
   }
 
   logger.info({ stripeAccountId, accountStatus: status }, "Connect account updated");
@@ -2010,6 +2031,7 @@ async function handleManufacturerCheckoutPaid(session: any, providerEventId?: st
       cta: `/manufacturers/orders/${row.order.id}`,
     });
   }
+  if (updated) inBackground(emailManufacturerOrderPaid(row.order.id), { orderId: row.order.id });
   return true;
 }
 
@@ -2088,6 +2110,7 @@ async function handleManufacturerTransfer(transfer: any, providerEventId: string
         cta: `/manufacturers/orders/${order.id}`,
       });
     }
+    inBackground(emailManufacturerOrderPaid(order.id), { orderId: order.id });
   }
 }
 
