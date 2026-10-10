@@ -441,6 +441,10 @@ export interface BuyerProduct {
   sizeChartImageUrl?: string | null;
   /** The seller's structured size chart ({columns, rows, unit}); drives size recommendations. */
   sizeChart?: import('@/lib/sizeRecommendation').SizeChartLike | null;
+  /** The seller's domestic shipping rate / free-over threshold / processing
+   *  days (GET /api/public/products/:id `sellerShipping`). Absent or null
+   *  means the seller set none, and no shipping line shows. */
+  sellerShipping?: import('@/lib/productTrust').SellerShippingSummary | null;
 }
 
 export interface BuyerProductOption {

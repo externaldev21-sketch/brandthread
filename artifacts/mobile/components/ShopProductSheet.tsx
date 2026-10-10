@@ -38,6 +38,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { profileHref } from '@/lib/profileNavigation';
 import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
 import { formatCents } from '@/lib/money';
+import { processingTimeLine, sellerAcceptsReturns } from '@/lib/productTrust';
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
 import {
   ON_DARK, OVERLAY,
@@ -149,17 +150,16 @@ function buildPreviewReviewsSeed(productPhotos: string[]): ReviewsSeed {
 }
 
 // ─── Shipping / returns copy (item 7) ──────────────────────────────────────────
-// The returns half reuses `product.refundPolicy` — real, per-product copy
-// already computed for the buyer product-detail page (adaptApiProduct in
-// services/cartService.ts, and the seeded preview catalog in
-// lib/previewProducts.ts). The shipping-estimate half has no equivalent
-// source anywhere in the app yet (grepped services/cartTypes.ts,
-// cartService.ts and buyer-product-detail.tsx — no generic per-product
-// shipping-time field exists), so it's a placeholder pending real
-// seller-level shipping data — flagged in this PR, not silently presented
-// as real.
-const SHIPPING_ESTIMATE_COPY = 'Ships in 2-3 days'; // PLACEHOLDER — see comment above
-const DEFAULT_RETURNS_COPY = 'Free returns within 14 days';
+// Both halves are the seller's own data (BT-262): the processing time from
+// their shipping zone (`product.sellerShipping`, GET /api/public/products/:id)
+// and their written return policy (`product.refundPolicy`, '' when none).
+// A missing half is left out; with neither, the line is hidden. No
+// placeholder promises.
+function shippingReturnsLine(product: BuyerProduct): string | null {
+  const parts = [processingTimeLine(product.sellerShipping, product.isPreOrder), product.refundPolicy.trim() || null]
+    .filter((part): part is string => !!part);
+  return parts.length ? parts.join(' · ') : null;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1179,12 +1179,14 @@ export function ShopProductSheet({
 
             {/* One grey info line: shipping estimate + this product's real
                 return policy (item 7), positioned under the size chips. */}
+            {shippingReturnsLine(product) ? (
             <View style={ss.infoLine}>
               <Feather name="truck" size={12} color={theme.subtle} />
               <Text style={ss.infoLineText} numberOfLines={2}>
-                {SHIPPING_ESTIMATE_COPY} · {product.refundPolicy || DEFAULT_RETURNS_COPY}
+                {shippingReturnsLine(product)}
               </Text>
             </View>
+            ) : null}
 
             {/* Seller row — avatar, white/monochrome verified check, name;
                 the WHOLE row taps through to the seller's store (item 5). A
@@ -1243,8 +1245,8 @@ export function ShopProductSheet({
             {/* Trust cues */}
             <View style={ss.trustRow}>
               <TrustCue icon="shield" label="Secure checkout" />
-              <TrustCue icon="refresh-cw" label="Easy returns" />
-              <TrustCue icon="truck" label="Fast shipping" />
+              {/* Only when the seller's own policy offers returns; no unbacked "Fast shipping". */}
+              {sellerAcceptsReturns(product.refundPolicy) ? <TrustCue icon="refresh-cw" label="Returns accepted" /> : null}
             </View>
 
             <ProductReviewsSection

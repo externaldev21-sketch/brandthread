@@ -49,6 +49,7 @@ export default function ProductImportScreen() {
   const [bulkNames, setBulkNames] = useState('');
   const [bulkCategory, setBulkCategory] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
+  const [bulkStock, setBulkStock] = useState('');
   const [importing, setImporting] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [csvText, setCsvText] = useState('');
@@ -169,14 +170,17 @@ export default function ProductImportScreen() {
           name: parts[0]?.trim() ?? line,
           price: parts[1]?.trim() ?? (bulkPrice || '0'),
           category: parts[2]?.trim() ?? bulkCategory,
+          ...(parts[3]?.trim() ? { stock: parts[3].trim() } : {}),
         };
       });
-      const result = await api.products.import(rows);
+      const result = await api.products.import(rows, bulkStock.trim() ? { defaultStock: bulkStock.trim() } : undefined);
       setBulkNames('');
+      const zeroStock = result.zeroStockCount ?? 0;
       Alert.alert(
         'Import Complete',
-        `Imported ${result.successCount} products.${result.failCount > 0 ? ` ${result.failCount} failed.` : ''}`,
+        `Imported ${result.successCount} products.${result.failCount > 0 ? ` ${result.failCount} failed.` : ''}${zeroStock > 0 ? ` ${zeroStock} ${zeroStock === 1 ? 'has' : 'have'} no stock yet.` : ''}`,
         [
+          ...(zeroStock > 0 ? [{ text: 'Set inventory', onPress: () => router.push('/(tabs)/products' as never) }] : []),
           {
             text: 'OK',
             onPress: () => {
@@ -341,6 +345,14 @@ export default function ProductImportScreen() {
                 value={bulkPrice}
                 onChange={setBulkPrice}
                 keyboardType="decimal-pad"
+                style={s.formInput}
+              />
+              <FormInput
+                label="Default stock"
+                value={bulkStock}
+                onChange={setBulkStock}
+                keyboardType="numeric"
+                placeholder="0"
                 style={s.formInput}
               />
               <PrimaryButton
