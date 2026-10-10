@@ -1,5 +1,5 @@
 import type * as Notifications from 'expo-notifications';
-import { activityHref, isBuyerOrderNotification } from './activity';
+import { activityHref, isBuyerOrderNotification, sellerSetupHref } from './activity';
 
 export type NotificationRouter = {
   push: (href: string) => void;
@@ -129,6 +129,11 @@ export function createNotificationResponseHandler(
     }
     if (data?.targetType === 'payout') {
       router.push('/payouts');
+      return;
+    }
+    if (data?.targetType === 'seller_setup') {
+      const href = sellerSetupHref(typeof data.targetId === 'string' ? data.targetId : null);
+      if (href) router.push(href as any);
       return;
     }
     // Social pushes (likes, comments, replies, mentions, reposts, story likes,

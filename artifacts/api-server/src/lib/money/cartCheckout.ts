@@ -24,6 +24,7 @@
  * number or CVC, so a buggy client can't leak one into our logs or database.
  */
 import { and, eq, isNull } from "drizzle-orm";
+import { notifySellerCheckoutBlocked } from "../sellerLifecycle/checkoutBlocked";
 import type Stripe from "stripe";
 import {
   db, productVariants, products, shippingRates, shippingZones, shippingZoneWeightTiers, users,
@@ -207,6 +208,7 @@ export async function priceCartGroup(input: {
     shipFrom: users.sellerShipFromCountry,
   }).from(users).where(eq(users.clerkId, sellerId)).limit(1);
   if (!seller?.stripeAccountId || seller.stripeAccountStatus !== "active") {
+    void notifySellerCheckoutBlocked(sellerId); // once a day: "A buyer couldn't pay you"
     throw new CartCheckoutError(400, "SELLER_PAYMENTS_UNAVAILABLE", "This seller can't accept payments right now.");
   }
 
