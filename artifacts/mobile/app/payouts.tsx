@@ -18,7 +18,7 @@ import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { EmptyState } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
-import { buildDemoSellerFinance } from '@/lib/previewSellerFinance';
+import { buildPreviewPayouts } from '@/lib/previewPayouts';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
@@ -58,12 +58,14 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Shopify payout list pattern: status is quiet silver text under the date; only a
+// failed payout stands out (white), so nothing outside the palette is used.
 function statusConfig(status: PayoutStatus, theme: AppThemePreset) {
   return {
-    paid:       { label: 'Paid',       color: theme.success,   bg: `${theme.success}20` },
-    pending:    { label: 'Pending',    color: theme.warning,   bg: `${theme.warning}20` },
-    in_transit: { label: 'In transit', color: theme.secondary, bg: theme.secondaryDim },
-    failed:     { label: 'Failed',     color: theme.error,     bg: `${theme.error}20` },
+    paid:       { label: 'Paid',       color: theme.muted },
+    pending:    { label: 'Pending',    color: theme.muted },
+    in_transit: { label: 'In transit', color: theme.muted },
+    failed:     { label: 'Failed',     color: theme.text },
   }[status];
 }
 
@@ -79,9 +81,12 @@ function PayoutsScreenContent() {
   const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  // No API call without a loaded, signed-in session, and none at all in the
+  // seller web preview (lib/api.ts rejects every request there, signed in or
+  // not — which used to land a signed-in preview on "Owner access required").
   const isPreviewMode = isSellerDevPreview();
-  const isPreview = (isPreviewMode && !userId) || (isPreviewMode && (!authLoaded || !isSignedIn));
+  const isPreview = isPreviewMode || (!authLoaded || !isSignedIn);
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const api    = useApi();
   // ?bt_preview=seller with no real signed-in account: no token to fetch
@@ -138,11 +143,18 @@ function PayoutsScreenContent() {
 
   const load = useCallback(async () => {
     if (isPreview) {
-      // Demo preview: the same balance Finance shows (lib/previewSellerFinance.ts).
-      setBalance(isPreviewDemoMode()
-        ? buildDemoSellerFinance().balance
-        : { available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false });
-      setPayouts([]);
+      // Fresh: zero balance, no history. With demo=1: local illustration only.
+      // Only the current web URL may enable demo data, never a native route param.
+      const preview = buildPreviewPayouts(isPreviewDemoMode());
+      setBalance(preview);
+      setPayouts(preview.payouts.map((p): PayoutRecord => ({
+        id: p.id,
+        date: fmtDate(p.arrivalDate),
+        amount: formatCents(p.amountCents),
+        status: p.status,
+        bankLast4: p.bankLast4,
+        ordersCount: 0,
+      })));
       setLoadError(false);
       setLoading(false);
       void refreshConnectStatus();
@@ -169,9 +181,8 @@ function PayoutsScreenContent() {
     }
     setLoading(false);
     void refreshConnectStatus();
-  }, [api, isPreview, refreshConnectStatus]);
+  }, [api, isPreview, params.demo, refreshConnectStatus]);
 
-  useEffect(() => { load(); }, [load]);
 
   function handleCashedOut(result: { threadCashCents: number; payoutCents: number; feeCents: number }) {
     setCashOutVisible(false);
@@ -180,9 +191,11 @@ function PayoutsScreenContent() {
     Alert.alert('Cashed out', `${formatCents(result.threadCashCents)} Thread Cash moved to your payout balance as ${formatCents(result.payoutCents)}.`);
   }
 
+  // Load on every focus (first mount included): the balance and history are
+  // fresh whenever the seller comes back, the way Thread Cash above refreshes.
   useFocusEffect(useCallback(() => {
-    void refreshConnectStatus();
-  }, [refreshConnectStatus]));
+    void load();
+  }, [load]));
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -265,6 +278,14 @@ function PayoutsScreenContent() {
         }]}
       />
 
+      {/* One scroll for the whole page (Shopify payouts): the balance, tabs
+          and list move together, so nothing is squeezed above the tab bar. */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: tabBarMetrics.occupiedHeight + SP.md }}
+        showsVerticalScrollIndicator={false}
+        testID="seller-payouts-scroll"
+      >
       <SellerThreadCashCard
         balanceCents={threadCash.balanceCents}
         cashableCents={threadCash.cashableCents}
@@ -285,7 +306,7 @@ function PayoutsScreenContent() {
 
       {/* Balance hero */}
       <View style={styles.balanceHero}>
-        <Text style={styles.balanceHeroLabel}>{payoutsPaused ? 'Balance' : 'Available balance'}</Text>
+        <Text style={styles.balanceHeroLabel}>{payoutsPaused ? 'Balance' : 'Payout balance'}</Text>
         {loading ? (
           <LoadingSkeleton height={44} style={{ width: 160, marginTop: 6, marginBottom: 6 }} />
         ) : loadError ? (
@@ -295,8 +316,7 @@ function PayoutsScreenContent() {
         ) : (
           <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
         )}
-        {!loadError && !loading && <Text style={styles.balanceHeroSub}>{payoutsPaused ? 'Payouts paused' : nextPayoutLabel}</Text>}
-        <View style={styles.balanceDivider} />
+        {!loadError && !loading && <Text style={styles.balanceHeroSub} testID="seller-payouts-next">{payoutsPaused ? 'Payouts paused' : nextPayoutLabel}</Text>}
         <View style={styles.balancePendingRow}>
           <Text style={styles.balancePendingLabel}>Pending</Text>
           <Text style={styles.balancePendingAmount}>{loadError ? '—' : pendFmt}</Text>
@@ -341,14 +361,7 @@ function PayoutsScreenContent() {
       </View>
 
       {activeTab === 'payouts' ? (
-        <ScrollView
-          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
-          contentContainerStyle={[
-            styles.list,
-            { paddingBottom: SP.md },
-            payouts.length === 0 && { flexGrow: 1, justifyContent: 'center' },
-          ]}
-        >
+        <View style={[styles.list, payouts.length === 0 && { paddingTop: SP.lg }]}>
           {loading && !isPreview ? (
             <View style={{ gap: 10 }}>
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
@@ -382,35 +395,27 @@ function PayoutsScreenContent() {
                 >
                   <View style={styles.payoutLeft}>
                     <Text style={styles.payoutDate}>{p.date}</Text>
-                    <Text style={styles.payoutSub}>···{p.bankLast4}</Text>
+                    <Text style={[styles.payoutSub, { color: cfg.color }]}>{cfg.label} · ···{p.bankLast4}</Text>
                   </View>
-                  <View style={styles.payoutRight}>
-                    <Text style={styles.payoutAmount}>{p.amount}</Text>
-                    <View style={[styles.statusPill, { backgroundColor: cfg.bg }]}>
-                      <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
-                    </View>
-                  </View>
+                  <Text style={styles.payoutAmount}>{p.amount}</Text>
                 </TouchableOpacity>
               );
             })
           )}
-        </ScrollView>
+        </View>
       ) : (
-        <ScrollView
-          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
-          contentContainerStyle={[styles.list, { paddingBottom: SP.md }]}
-        >
+        <View style={styles.list}>
            <View style={styles.bankCard}>
              <Feather name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
                 <Text style={styles.bankLabel}>
                   {isPreview
-                    ? 'Bank account details are not loaded'
+                    ? balance?.bankLast4 ? `Bank account ···${balance.bankLast4}` : 'No bank account connected'
                     : connectStatus?.bankLast4 ? `Bank account ···${connectStatus.bankLast4}` : 'No bank account connected'}
                </Text>
                <Text style={styles.bankSub}>
                   {isPreview
-                    ? 'Account information unavailable'
+                    ? balance?.bankLast4 ? 'Default payout account' : 'Connect Stripe to receive payouts'
                     : connectLoading
                    ? 'Checking Stripe account status…'
                    : connectStatus?.verified
@@ -423,11 +428,9 @@ function PayoutsScreenContent() {
                </Text>
             </View>
               {!isPreview && !connectLoading && connectStatus && (
-               <View style={[styles.statusPill, {
-                 backgroundColor: connectStatus.verified ? `${theme.success}20` : `${theme.warning}20`,
-               }]}>
+               <View style={[styles.statusPill, { borderWidth: 1, borderColor: theme.border }]}>
                  <Text style={[styles.statusText, {
-                   color: connectStatus.verified ? theme.success : theme.warning,
+                   color: connectStatus.verified ? theme.text : theme.muted,
                  }]}>
                    {connectStatus.verified
                      ? 'Verified'
@@ -510,7 +513,7 @@ function PayoutsScreenContent() {
                <Text style={styles.settingsLabel}>Method</Text>
                <Text style={styles.settingsValue}>
                   {isPreview
-                    ? 'Not loaded'
+                    ? balance?.bankLast4 ? `Bank transfer ···${balance.bankLast4}` : 'Not set up'
                     : connectStatus?.bankLast4 ? `Bank transfer ···${connectStatus.bankLast4}` : 'Not set up'}
                </Text>
              </View>
@@ -560,8 +563,9 @@ function PayoutsScreenContent() {
                </View>
              );
            })()}
-        </ScrollView>
+        </View>
       )}
+      </ScrollView>
     </View>
   );
 }
@@ -574,12 +578,12 @@ const createStyles = (theme: AppThemePreset) => {
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: border },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, textAlign: 'center', color: text, fontSize: FS.lg, fontFamily: FONT.semibold },
-  balanceHero:  { margin: SP.md, backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, padding: SP.lg, alignItems: 'center' },
+  balanceHero:  { marginHorizontal: SP.md, marginTop: SP.md, marginBottom: SP.lg },
   balanceHeroLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
   balanceHeroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5, marginTop: 6, marginBottom: 2 },
-  balanceHeroSub: { color: subtle, fontSize: FS.xs, fontFamily: FONT.regular },
+  balanceHeroSub: { color: muted, fontSize: FS.sm, fontFamily: FONT.regular },
   balanceDivider: { alignSelf: 'stretch', height: 1, backgroundColor: border, marginVertical: SP.md },
-  balancePendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  balancePendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   balancePendingLabel: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium },
   balancePendingAmount: { color: muted, fontSize: FS.sm, fontFamily: FONT.semibold },
   pausedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: border },
@@ -598,7 +602,7 @@ const createStyles = (theme: AppThemePreset) => {
     maxWidth: 280, marginTop: -4,
   },
   payoutRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: border },
-  payoutLeft:   {},
+  payoutLeft:   { flex: 1, minWidth: 0 },
   payoutRight:  { alignItems: 'flex-end', gap: 4 },
   payoutDate:   { color: text, fontSize: FS.base, fontFamily: FONT.medium },
   payoutSub:    { color: muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
