@@ -21,7 +21,6 @@ export const CORE_LEGACY_ROUTES: LegacyRoute[] = [
 
   // Placeholders nothing linked to.
   { from: '/automation', to: '/(tabs)/marketing', note: 'Unlinked "coming" placeholder; Marketing holds the real tools.' },
-  { from: '/mobile-app-builder', to: '/store-builder', note: 'Unlinked marketing placeholder with a dead CTA.' },
   { from: '/metafields', to: '/store-settings', note: 'Unlinked placeholder; rows were no-ops.' },
 
   // Removed features: data and API stay, the screens go.
