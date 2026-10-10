@@ -438,6 +438,7 @@ export async function getStorefront(options: {
       // Sync server title/slug if we don't have one locally. storeUrl is the
       // bare subdomain ("northline"); screens add ".brandthread.app" (BT-316).
       if (!local.settings.storeUrl && remote?.slug) {
+        // Bare slug only — callers add the domain (BT-316 doubled domain).
         local.settings.storeUrl = remote.slug;
       }
     } catch { /* no-op — API may not be reachable */ }

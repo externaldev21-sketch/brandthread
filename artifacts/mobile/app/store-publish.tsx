@@ -15,6 +15,8 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
+import { useStoreLink } from '@/hooks/useStoreLink';
+import { displayStoreLink } from '@/lib/storeShare';
 import { getStorefront, validateStore, publishStore, unpublishStore, StoreValidationResult } from '@/services/storeService';
 import { Storefront } from '@/services/storeTypes';
 import { isSellerSetupOrigin, leaveSetupFlow, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
@@ -57,6 +59,7 @@ function errorRowHitSlop(height: number | undefined, index: number, count: numbe
 
 export default function StorePublishScreen() {
   const { theme } = useAppTheme();
+  const storeLink = useStoreLink();
   const {
     primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN,
     foreground: FG, mutedForeground: MUTED, subtle: SUBTLE,
@@ -148,10 +151,10 @@ export default function StorePublishScreen() {
 
   const handlePublish = () => {
     if (!store) return;
-    const host = storeAddressHost(store);
     Alert.alert(
       'Publish your store?',
-      host ? `Your store will be live at https://${host}` : 'Your store will be visible to buyers.',
+      // One store link (BT-220/BT-316): the store website, not a subdomain.
+      storeLink.url ? `Your store will be live at ${displayStoreLink(storeLink.url)}` : 'Your store will go live.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -203,6 +206,7 @@ export default function StorePublishScreen() {
   // Real address only (Domains screen is the source); no placeholder host.
   const storeHost = storeAddressHost(store);
   const viewUrl = storeHost?.endsWith('.brandthread.app') ? storeViewUrl(storeHost) : storeHost ? `https://${storeHost}` : null;
+  const storeUrlLabel = storeLink.url ? displayStoreLink(storeLink.url) : null;
 
   return (
     <View style={pub.root}>
@@ -327,10 +331,10 @@ export default function StorePublishScreen() {
                 <Icon name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
               <Text style={pub.successTitle}>Your store is live</Text>
-              {storeHost ? <Text style={pub.successUrl}>https://{storeHost}</Text> : null}
+              {storeUrlLabel ? <Text style={pub.successUrl}>{storeUrlLabel}</Text> : storeHost ? <Text style={pub.successUrl}>https://{storeHost}</Text> : null}
               <View style={pub.successActions}>
-                {storeHost ? (
-                  <SecondaryButton label="View store" onPress={() => Linking.openURL(viewUrl ?? `https://${storeHost}`).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
+                {storeLink.url || viewUrl ? (
+                  <SecondaryButton label="View store" onPress={() => Linking.openURL(storeLink.url ?? viewUrl!).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
                 ) : (
                   <SecondaryButton label="Set address" onPress={() => router.push('/store-domain' as never)} icon="globe" style={{ flex: 1 }} />
                 )}
@@ -346,7 +350,7 @@ export default function StorePublishScreen() {
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
             <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
             <Text style={[pub.publishStoreName, { color: `${theme.onAccent}CC` }]}>{store?.settings.storeName || 'Your Store'}</Text>
-              {storeHost ? <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>https://{storeHost}</Text> : null}
+              {storeUrlLabel ? <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>{storeUrlLabel}</Text> : null}
             <PrimaryButton
               label={publishing ? 'Publishing...' : 'Publish Store →'}
               onPress={handlePublish}

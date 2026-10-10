@@ -133,6 +133,10 @@ function hasHardcodedThemeColor(source: string, file: string): boolean {
 // `useAppTheme()`/`useColors()` tokens, then delete its line here in the
 // same change.
 const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
+  // The store website's own themes (seller-picked colours for THEIR site,
+  // mirrored from the API server) and the QR dark/light pair — colour data,
+  // not app chrome.
+  'lib/storeSiteDesign.ts',
   'app/(buyer)/cart.tsx',
   'app/(buyer)/edit-profile.tsx',
   'app/(buyer)/friends.tsx',

@@ -4,6 +4,7 @@
  * Fresh preview = empty; `&demo=1` = populated fixtures.
  */
 import { isPreviewDemoMode } from './devPreview';
+import { PREVIEW_SELLER_IDENTITY } from './previewIdentity';
 import type {
   BioLink, BioPage, BioPageInput, BioStats, GrowthDestinations, LinkDetail, NewLinkInput, PixelIds, TrackedLink,
 } from '@/services/growthTypes';
@@ -11,6 +12,9 @@ import type {
 const demo = () => isPreviewDemoMode();
 let links: TrackedLink[] | null = null;
 let bio: BioPage | null = null;
+// Which dataset `bio` was built for: demo is URL-only (lib/devPreview), so a
+// page without demo=1 must not keep an earlier page's demo data, or vice versa.
+let bioDemo: boolean | null = null;
 let pixels: PixelIds = { metaPixelId: null, tiktokPixelId: null };
 let n = 100;
 
@@ -60,21 +64,34 @@ export const previewGrowth = {
   },
   async archiveLink(id: string) { links = L().filter((x) => x.id !== id); },
   async getBio(): Promise<BioPage> {
+    // The one preview identity (lib/previewIdentity); demo=1 adds a bio,
+    // socials, links and the preview catalog's products.
+    const siteUrl = `https://brandthread.app/@${PREVIEW_SELLER_IDENTITY.username}`;
+    // Loaded lazily: the preview catalog pulls in bundled images (expo-asset).
+    if (bio && bioDemo !== demo()) bio = null;
+    bioDemo = demo();
+    const catalog = demo() ? (await import('./previewSellerProducts')).getPreviewSellerProducts() : [];
     return (bio ??= {
-      exists: false, slug: null, url: null, published: true,
-      displayName: demo() ? 'Northline Studio' : '', bio: demo() ? 'Small-batch streetwear made in Portugal.' : '', avatarUrl: null,
-      showShopButton: true, shopButtonLabel: 'Shop my store', featuredProductIds: [], socials: demo() ? { instagram: 'https://www.instagram.com/northline' } : {},
-      theme: 'mono', accentColor: null, storeAccentColor: null,
+      exists: false, slug: null, url: siteUrl, published: true,
+      displayName: PREVIEW_SELLER_IDENTITY.brandName, bio: demo() ? PREVIEW_SELLER_IDENTITY.bio : '', avatarUrl: null,
+      showShopButton: true, shopButtonLabel: 'Shop my store', featuredProductIds: [],
+      socials: demo() ? { instagram: 'https://www.instagram.com/preview_studio', tiktok: 'https://www.tiktok.com/@preview_studio' } : {},
+      theme: 'dark', accentColor: null, storeAccentColor: null,
       links: demo() ? [
-        { id: 'demo-bl-1', title: 'Spring lookbook', url: 'https://northline.example/lookbook', enabled: true, position: 0, clicks30: 84 },
-        { id: 'demo-bl-2', title: 'Press kit', url: 'https://northline.example/press', enabled: true, position: 1, clicks30: 12 },
-        { id: 'demo-bl-3', title: 'Wholesale inquiries', url: 'mailto:wholesale@northline.example', enabled: false, position: 2, clicks30: 0 },
+        { id: 'demo-bl-1', title: 'Drop waitlist', url: 'https://preview.example/waitlist', enabled: true, position: 0, clicks30: 84 },
+        { id: 'demo-bl-2', title: 'Lookbook', url: 'https://preview.example/lookbook', enabled: true, position: 1, clicks30: 12 },
       ] : [],
+      siteUrl, username: PREVIEW_SELLER_IDENTITY.username, logoUrl: null, bannerUrl: null, showBanner: true,
+      siteTheme: 'black', buttonStyle: 'rounded', font: 'system',
+      products: catalog.slice(0, 6).map((p) => ({
+        id: p.id, name: p.name, image: p.media?.[0]?.uri ?? null,
+        priceLabel: `$${((p.pricing?.priceCents ?? 0) / 100).toFixed(2)}`,
+      })),
     });
   },
   async saveBio(i: BioPageInput): Promise<BioPage> {
     const cur = await this.getBio();
-    bio = { ...cur, ...i, exists: true, slug: cur.slug ?? 'preview', url: 'https://brandthread.app/bio/preview' } as BioPage;
+    bio = { ...cur, ...i, exists: true, slug: cur.slug ?? PREVIEW_SELLER_IDENTITY.username } as BioPage;
     return bio;
   },
   async addBioLink(title: string, url: string): Promise<BioLink> {

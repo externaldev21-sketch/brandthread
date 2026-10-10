@@ -1,7 +1,6 @@
 /**
  * The seller's store link with its three actions — copy, share, save QR —
- * for the Store link card (Share store, the Add Product publish sheet). Copying
- * or sharing marks the dashboard checklist's "Share your store" step done.
+ * for the Store link card on the Share Store screen.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Share } from 'react-native';
