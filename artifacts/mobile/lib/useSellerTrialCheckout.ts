@@ -32,6 +32,8 @@ export function useSellerTrialCheckout({ onActive }: { onActive: () => void }) {
   const [busy, setBusy] = useState(false);
   const [awaitingReturn, setAwaitingReturn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** False once this account or device already had a trial (server, #843): Stripe charges today. */
+  const [trialEligible, setTrialEligible] = useState(true);
   const openedRef = useRef(false);
   const onActiveRef = useRef(onActive);
   onActiveRef.current = onActive;
@@ -47,9 +49,12 @@ export function useSellerTrialCheckout({ onActive }: { onActive: () => void }) {
 
   /** Free-trial days for this plan, or null when no free trial is on offer. */
   const trialDays = useCallback((id: SellerPlanId): number | null => {
-    if (!native) return config.trialDays;
+    // Web: the server decides (one trial per person/device/card), so never
+    // promise a trial Stripe won't give. Native: the store's intro offer
+    // eligibility decides, and the store sheet shows it.
+    if (!native) return trialEligible ? config.trialDays : null;
     return trialDaysFromIntro(pkgFor(id)?.product.introPrice as never);
-  }, [config.trialDays, native, pkgFor]);
+  }, [config.trialDays, native, pkgFor, trialEligible]);
 
   const pollUntilLive = useCallback(async (attempts: number): Promise<boolean> => {
     for (let i = 0; i < attempts; i++) {
@@ -82,6 +87,7 @@ export function useSellerTrialCheckout({ onActive }: { onActive: () => void }) {
   const checkExisting = useCallback(async () => {
     try {
       const status = await api.seller.subscription.status();
+      if ((status as { trialEligible?: unknown }).trialEligible === false) setTrialEligible(false);
       if (LIVE.has(status.status)) onActiveRef.current();
     } catch { /* not subscribed yet */ }
   }, [api]);
