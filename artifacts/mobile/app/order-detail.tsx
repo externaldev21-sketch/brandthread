@@ -550,10 +550,18 @@ function DeliveryStatusSheet({ visible, order, onClose, onSave }: {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function OrderDetailScreen() {
+/**
+ * `orderId` + `embedded` let the seller Orders tab show this screen as the
+ * detail pane of its iPad split view (Shopify iPad: list left, order right).
+ * As a pushed route both are unset and it reads `?id=` as before.
+ */
+export default function OrderDetailScreen({ orderId, embedded = false }: { orderId?: string; embedded?: boolean } = {}) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const { id, refund: refundParam } = useLocalSearchParams<{ id: string; refund?: string }>();
+  const params = useLocalSearchParams<{ id: string; tab?: string; refund?: string }>();
+  const id = orderId ?? params.id;
+  const tab = embedded ? undefined : params.tab;
+  const refundParam = embedded ? undefined : params.refund;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
@@ -979,6 +987,7 @@ export default function OrderDetailScreen() {
         title={orderTitle(order.orderNumber)}
         divider={false}
         variant="push"
+        showBack={!embedded}
         onBack={() => goBackOr(router, '/(tabs)/orders')}
         actions={[
           { icon: 'share', onPress: shareOrderInvoice, accessibilityLabel: 'Share invoice' },
