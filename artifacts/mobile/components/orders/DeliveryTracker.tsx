@@ -154,7 +154,7 @@ export function DeliveryTrackerCard({
               <View style={{ flex: 1, paddingBottom: SP.md }}>
                 <Text style={[s.eventText, i === 0 && { fontFamily: FONT.semibold }]}>{ev.description}</Text>
                 <Text style={s.eventMeta}>
-                  {[ev.location, formatLocalDateTime(ev.at)].filter(Boolean).join(' · ')}
+                  {[ev.location, formatLocalDateTime(ev.at)].filter(Boolean).join(', ')}
                 </Text>
               </View>
             </View>

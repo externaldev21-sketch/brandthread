@@ -119,7 +119,7 @@ export default function LiveReplayScreen() {
           <View style={styles.stage}><ReplayVideo uri={replay.replayUrl} /></View>
           <View style={styles.meta}>
             <Text style={styles.title} numberOfLines={2}>{replay.title}</Text>
-            <Text style={styles.sub}>{[date, duration, hidden ? 'Hidden from visitors' : null].filter(Boolean).join(' · ')}</Text>
+            <Text style={styles.sub}>{[date, duration, hidden ? 'Hidden from visitors' : null].filter(Boolean).join(', ')}</Text>
             {replay.isOwner ? (
               <View style={styles.actions}>
                 <View style={styles.actionCell}><Button

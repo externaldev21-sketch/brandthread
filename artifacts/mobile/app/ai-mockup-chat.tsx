@@ -90,7 +90,7 @@ export default function AIMockupChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      <ScreenHeader title="AI Clothing Mockups" divider={false} />
+      <ScreenHeader title="Clothing mockups" divider={false} />
 
       {/* Messages */}
       <FlatList

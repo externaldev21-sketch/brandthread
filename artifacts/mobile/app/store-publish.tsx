@@ -326,7 +326,7 @@ export default function StorePublishScreen() {
               <View style={[pub.successIcon, { backgroundColor: SUCCESS_DIM }]}>
                 <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
-              <Text style={pub.successTitle}>Your store is live!</Text>
+              <Text style={pub.successTitle}>Your store is live</Text>
               {storeHost ? <Text style={pub.successUrl}>https://{storeHost}</Text> : null}
               <View style={pub.successActions}>
                 {storeHost ? (

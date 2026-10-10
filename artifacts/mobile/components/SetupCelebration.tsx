@@ -52,7 +52,7 @@ export default function SetupCelebration({
           <View style={[styles.badge, { backgroundColor: theme.accent }]}>
             <Feather name="check" size={ICON.lg} color={theme.onAccent} />
           </View>
-          <Text style={[styles.title, { color: theme.text }]}>Your store is ready!</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Your store is ready</Text>
           <Text style={[styles.body, { color: theme.muted }]}>
             You've completed every required setup step. Time to start selling.
           </Text>

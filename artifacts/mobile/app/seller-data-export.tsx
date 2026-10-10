@@ -164,7 +164,7 @@ export default function SellerDataExportScreen() {
           <View style={styles.resultCard}>
             <View style={styles.resultHeader}>
               <Feather name="check-circle" size={18} color={theme.success} />
-              <Text style={styles.resultTitle}>Export ready!</Text>
+              <Text style={styles.resultTitle}>Export ready</Text>
             </View>
             <Text style={styles.resultDate}>
               Generated {new Date(result.exportedAt).toLocaleString()}

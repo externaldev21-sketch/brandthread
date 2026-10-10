@@ -31,7 +31,7 @@ function Thumb({ uri, ck, styles }: { uri?: string; ck: CheckoutColors; styles: 
 
 function ItemRow({ item, ck, styles }: { item: LineItem; ck: CheckoutColors; styles: ReturnType<typeof makeStyles> }) {
   const t = useCheckoutT();
-  const meta = [item.variantTitle, t('Qty {n}', { n: item.quantity })].filter(Boolean).join(' · ');
+  const meta = [item.variantTitle, t('Qty {n}', { n: item.quantity })].filter(Boolean).join(', ');
   return (
     <View style={styles.itemRow} accessible accessibilityLabel={`${item.productName}, ${meta}, ${formatCents(item.priceCents * item.quantity)}`}>
       <Thumb uri={item.imageUri} ck={ck} styles={styles} />
