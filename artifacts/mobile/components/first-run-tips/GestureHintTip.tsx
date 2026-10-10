@@ -13,7 +13,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { GestureGlyph } from './GestureGlyph';
 import type { GestureKind } from './types';
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   root: { position: 'absolute', left: SP.lg, right: SP.lg, alignItems: 'center', zIndex: 9998, elevation: 9998 },
   card: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: 'rgba(20,20,20,0.92)',
+    backgroundColor: FILL_ELEVATED, // solid: content never shows through a tip
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
     borderRadius: RADIUS.lg,
     paddingVertical: 10, paddingHorizontal: 14,
