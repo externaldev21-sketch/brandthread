@@ -56,6 +56,14 @@ export function buildPlaceUrl(placeId: string | null | undefined): string | null
   return placeId && ID_RE.test(placeId) ? `${SHARE_ORIGIN}/place/${placeId}` : null;
 }
 
+/** https link to a live stream: opens the app (AASA /live/*) or the web preview (BT-320). */
+export function buildLiveUrl(streamId: string | null | undefined): string | null {
+  return streamId && ID_RE.test(streamId) ? `${SHARE_ORIGIN}/live/${streamId}` : null;
+}
+
+const GIVEAWAY_CODE_RE = /^[A-Za-z0-9]{6,12}$/;
+const INVITE_CODE_RE = /^[A-Za-z0-9]{4,12}$/;
+
 export type ShareLinkTarget =
   | { kind: 'post'; id: string; href: string }
   | { kind: 'store'; handle: string; href: string }
@@ -64,7 +72,10 @@ export type ShareLinkTarget =
   | { kind: 'hashtag'; tag: string; href: string }
   | { kind: 'place'; id: string; href: string }
   | { kind: 'collection'; id: string; href: string }
-  | { kind: 'drop'; id: string; href: string };
+  | { kind: 'drop'; id: string; href: string }
+  | { kind: 'live'; id: string; href: string }
+  | { kind: 'giveaway'; code: string; href: string }
+  | { kind: 'invite'; code: string; href: string };
 
 const HOSTS = /^(?:https?:\/\/(?:www\.)?brandthread\.app|brandthread:\/\/\/?)/i;
 
@@ -117,5 +128,14 @@ export function parseShareLink(raw: string | null | undefined): ShareLinkTarget 
   }
   if (head === 'c' && parts.length === 2) return { kind: 'collection', id: a, href: `/c/${q(a)}` };
   if (head === 'drops' && parts.length === 2) return { kind: 'drop', id: a, href: `/drops/${q(a)}` };
+  if (head === 'live' && parts.length === 2 && ID_RE.test(a)) return { kind: 'live', id: a, href: `/live/${q(a)}` };
+  if (head === 'g' && parts.length === 2 && GIVEAWAY_CODE_RE.test(a)) {
+    const code = a.toUpperCase();
+    return { kind: 'giveaway', code, href: `/giveaway?code=${q(code)}` };
+  }
+  if (head === 'invite' && parts.length === 2 && INVITE_CODE_RE.test(a)) {
+    const code = a.toUpperCase();
+    return { kind: 'invite', code, href: `/invite/${q(code)}` };
+  }
   return null;
 }

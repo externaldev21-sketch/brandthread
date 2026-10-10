@@ -18,6 +18,12 @@ const router: IRouter = Router();
 export const DEEP_LINK_PATHS = [
   "/u/*",
   "/c/*",
+  // Growth links (BT-311): referral invites, community invites, live
+  // streams and giveaways open in the app instead of Safari.
+  "/invite/*",
+  "/community-join*",
+  "/live/*",
+  "/g/*",
   "/store/*",
   "/drops/*",
   "/p/*",

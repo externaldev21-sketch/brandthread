@@ -15,6 +15,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatDay, timeLeft } from '@/lib/sellerEngagement';
+import { useSignInGate } from '@/hooks/useSignInGate';
 
 export default function GiveawayScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
@@ -25,6 +26,7 @@ export default function GiveawayScreen() {
   const [g, setG] = useState<any>(null);
   const [failed, setFailed] = useState(false);
   const [rules, setRules] = useState(false);
+  const { isSignedIn, goToSignIn } = useSignInGate();
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
@@ -44,7 +46,9 @@ export default function GiveawayScreen() {
   ];
   const openSeller = () => router.push(`/buyer-other-profile?userId=${encodeURIComponent(g.seller.id)}` as never);
   const openPost = () => router.push(`/buyer-post-comments?postId=${encodeURIComponent(g.postId)}` as never);
-  const cta = !live ? null : !me ? null
+  // Signed out (a shared /g/ link): the page is readable; entering needs an
+  // account, so the CTA is the sign-in gate and returns here (BT-319).
+  const cta = !live ? null : !me ? (isSignedIn ? null : { label: 'Log in to enter', onPress: goToSignIn })
     : !me.followed ? { label: `Follow ${g.seller.name}`, onPress: openSeller }
     : g.requiresComment && !me.commented ? { label: 'Comment to enter', onPress: openPost }
     : null;

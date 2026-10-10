@@ -33,11 +33,23 @@ const GUEST_TOP_LEVEL = new Set([
   'store', // store/product/[productId]
   'u', // u/[username] public profile
   'c', // c/[collectionId] public collection
+  // Share-link entry points (BT-303): listed explicitly so a signed-out
+  // visitor is never bounced to sign-in by effect ordering before the
+  // redirect screen forwards them on.
+  'p', // p/[postId] -> buyer-post-viewer
+  'tag', // tag/[tag] -> hashtag
+  'place', // place/[placeId] -> location
+  'invite', // invite/[code] referral link -> onboarding with the code
+  'g', // g/[code] -> giveaway
+  'giveaway', // public giveaway page; Enter is gated at the action (BT-319)
 ]);
 
 export function isGuestBrowseRoute(segments: readonly string[]): boolean {
   const first = segments[0] ?? '';
   if (first === '(buyer)') return GUEST_BUYER_TABS.has(segments[1] ?? '');
+  // live/[streamId] (a shared live link) shows guests a preview with
+  // "Log in to watch" (BT-320/321); the /live feed screen itself is unchanged.
+  if (first === 'live') return segments.length > 1;
   return GUEST_TOP_LEVEL.has(first);
 }
 

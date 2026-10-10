@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import * as ExpoLinking from 'expo-linking';
+import { buildLiveUrl } from '@/lib/shareLinks';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -297,7 +298,8 @@ function BuyerLiveNativeScreen() {
   async function shareStream() {
     const sellerName: string = stream?.brand_name ?? stream?.seller_name ?? 'this seller';
     const title = stream?.title ?? `${sellerName} live`;
-    const streamUrl = ExpoLinking.createURL('/buyer-live', {
+    // https link (BT-320): unfurls and opens for people without the app.
+    const streamUrl = buildLiveUrl(params.streamId) ?? ExpoLinking.createURL('/buyer-live', {
       queryParams: { streamId: params.streamId },
     });
     try {
