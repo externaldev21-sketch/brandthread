@@ -12,10 +12,21 @@
  * signed-in seller with no Thread Cash yet sees an honest $0.00.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { useApi } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { getPreviewSellerThreadCashBalanceCents, getPreviewSellerThreadCashHistory } from '@/lib/previewSellerThreadCash';
 import type { ThreadCashEntry } from '@/lib/threadCashTypes';
+import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
+
+/** Reload when any Thread Cash balance changes (either side) or the app comes back to the foreground. */
+function useThreadCashRefresh(load: () => void) {
+  useEffect(() => {
+    const unsubscribe = subscribeThreadCashChanged(load);
+    const appState = AppState.addEventListener('change', (state) => { if (state === 'active') load(); });
+    return () => { unsubscribe(); appState.remove(); };
+  }, [load]);
+}
 
 export function useSellerThreadCashBalance() {
   const api = useApi();
@@ -52,6 +63,7 @@ export function useSellerThreadCashBalance() {
   }, [api]);
 
   useEffect(() => { void load(); }, [load]);
+  useThreadCashRefresh(load);
 
   return { balanceCents, cashableCents, promoCents, loading, error, reload: load };
 }
@@ -83,6 +95,7 @@ export function useSellerThreadCashHistory(limit = 50) {
   }, [api, limit]);
 
   useEffect(() => { void load(); }, [load]);
+  useThreadCashRefresh(load);
 
   return { history, loading, error, reload: load };
 }
