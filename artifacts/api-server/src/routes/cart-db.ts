@@ -1,50 +1,50 @@
 /**
  * Server-side cart persistence — full-replace sync model.
- * The client keeps AsyncStorage as the primary store; this is a durable backup.
+ * For a signed-in buyer this is the bag's source of truth; the client keeps
+ * AsyncStorage as a cache and pushes unsynced local edits first.
  *
- * GET    /api/buyer/cart       — load cart from DB
+ * GET    /api/buyer/cart       — load cart from DB (each line + `live` catalog fields)
  * POST   /api/buyer/cart/sync  — full replace (delete all + insert new)
  * DELETE /api/buyer/cart       — clear cart
  */
 import { Router } from "express";
-import { db, cartItems, products, productVariants } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { db, cartItems } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { z } from "@workspace/api-zod";
 import { bodyObject, looseRecord, validateInput } from "../lib/commerceValidation";
 import { newlyAddedVariantIds, recordAddToCartEvents } from "../lib/sellerProductEvents";
-import { isProductAvailable } from "../lib/productVisibility";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-type CartRow = typeof cartItems.$inferSelect;
-
-function cartLineProductId(r: CartRow, variantToProduct: Map<string, string>): string | null {
-  const productId = (r.itemData as any)?.productId;
-  if (typeof productId === "string" && UUID_RE.test(productId)) return productId;
-  return variantToProduct.get(r.variantId) ?? null;
-}
-
-/** Product ids in these cart rows that are deleted or no longer active. */
-async function unavailableCartProductIds(rows: CartRow[]) {
-  const variantIds = rows.map((r) => r.variantId).filter((id) => UUID_RE.test(id));
-  const variantRows = variantIds.length === 0 ? [] : await db
-    .select({ id: productVariants.id, productId: productVariants.productId })
-    .from(productVariants)
-    .where(inArray(productVariants.id, variantIds));
-  const variantToProduct = new Map(variantRows.map((v) => [v.id, v.productId]));
-  const productIds = [...new Set(rows.map((r) => cartLineProductId(r, variantToProduct)).filter((id): id is string => !!id))];
-  const productRows = productIds.length === 0 ? [] : await db
-    .select({ id: products.id, status: products.status, deletedAt: products.deletedAt })
-    .from(products)
-    .where(inArray(products.id, productIds));
-  return {
-    variantToProduct,
-    ids: new Set(productRows.filter((p) => !isProductAvailable(p)).map((p) => p.id)),
-  };
-}
+import { loadCartLiveFields, type CartLiveFields } from "../lib/cartLive";
 
 const router = Router();
+
+/** Server-computed per read; never part of the stored snapshot. */
+const READ_ONLY_KEYS = ["live", "unavailable"] as const;
+function stripLive(item: any): any {
+  if (!item || typeof item !== "object" || !READ_ONLY_KEYS.some((k) => k in item)) return item;
+  const { live: _live, unavailable: _unavailable, ...rest } = item;
+  return rest;
+}
+
+/**
+ * One line as the bag reads it: the stored snapshot, `live` catalog fields,
+ * and the availability flags derived from them. A deleted / off-sale product
+ * or a sold-out variant stays in the bag (the seller may restore or restock)
+ * but is flagged `unavailable` / `isAvailable: false` so it can't be checked
+ * out; a line that is shoppable again loses any stale flag.
+ */
+function withLive(itemData: unknown, live: CartLiveFields): Record<string, unknown> {
+  const line: Record<string, unknown> = { ...stripLive(itemData && typeof itemData === "object" ? itemData : {}), live };
+  if (live.available) {
+    line.isAvailable = true;
+    delete line.unavailableReason;
+  } else {
+    line.unavailable = true;
+    line.isAvailable = false;
+    line.unavailableReason = live.reason === "out_of_stock" ? "Out of stock" : "No longer available";
+  }
+  return line;
+}
 router.use(requireAuth);
 
 // Cart lines are the client's own cached item objects (stored verbatim as a
@@ -58,19 +58,20 @@ const cartSyncBody = bodyObject({
 router.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const rows = await db.select().from(cartItems).where(eq(cartItems.userId, userId));
-  const unavailable = await unavailableCartProductIds(rows);
-  // Lines whose product was deleted / taken off sale stay in the bag (the
-  // seller may undo a delete) but are flagged so they can't be checked out.
-  const withAvailability = (r: typeof rows[number]) => {
-    const productId = cartLineProductId(r, unavailable.variantToProduct);
-    return productId && unavailable.ids.has(productId)
-      ? { ...(r.itemData as object), unavailable: true, isAvailable: false, unavailableReason: "No longer available" }
-      : r.itemData;
-  };
+
+  // Older line shapes carry the variant id only in the row's column.
+  const lookups = rows.map((r) => {
+    const d = (r.itemData && typeof r.itemData === "object" ? r.itemData : {}) as Record<string, unknown>;
+    return { ...d, variantId: d.variantId ?? r.variantId };
+  });
+  // A catalog read failure never fails the bag load — lines are then
+  // returned as stored, without `live`.
+  const live = await loadCartLiveFields(lookups).catch(() => null);
+  const lines = rows.map((r, i) => (live ? withLive(r.itemData, live[i]) : r.itemData));
 
   return res.json({
-    items:      rows.filter((r) => !r.savedForLater).map(withAvailability),
-    savedItems: rows.filter((r) =>  r.savedForLater).map(withAvailability),
+    items:      lines.filter((_, i) => !rows[i].savedForLater),
+    savedItems: lines.filter((_, i) =>  rows[i].savedForLater),
   });
 });
 
@@ -91,26 +92,31 @@ router.post("/sync", validateInput({ body: cartSyncBody }), async (req, res) => 
     .then((prev) => prev.filter((r) => !r.savedForLater).map((r) => r.variantId))
     .catch(() => []);
 
-  await db.delete(cartItems).where(eq(cartItems.userId, userId));
-
   const rows: (typeof cartItems.$inferInsert)[] = [
     ...items.map((item: any) => ({
       userId,
       variantId:     String(item.variantId ?? item.id ?? "unknown"),
       savedForLater: false as const,
-      itemData:      item,
+      itemData:      stripLive(item),
     })),
     ...(saved as any[]).map((item: any) => ({
       userId,
       variantId:     String(item.variantId ?? item.id ?? "unknown"),
       savedForLater: true as const,
-      itemData:      item,
+      itemData:      stripLive(item),
     })),
   ];
 
-  if (rows.length > 0) {
-    await db.insert(cartItems).values(rows);
-  }
+  // One transaction, serialized per buyer: two overlapping full-replace syncs
+  // (two devices, or a retry racing the original) can never interleave their
+  // delete + insert and leave duplicated or half-replaced lines behind.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"buyer_cart_sync:" + userId}))`);
+    await tx.delete(cartItems).where(eq(cartItems.userId, userId));
+    if (rows.length > 0) {
+      await tx.insert(cartItems).values(rows);
+    }
+  });
 
   // Fire-and-forget: recordAddToCartEvents swallows its own errors.
   void recordAddToCartEvents(

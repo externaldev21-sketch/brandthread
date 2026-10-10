@@ -28,6 +28,7 @@ import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { clearCheckoutTokens, restoreCheckoutSession, serializeCheckoutSession } from '@/lib/secureCheckoutTokens';
+import { reconcileCartLoad, chargeableSubtotalCents, mergeGuestLines } from './cartSync';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
@@ -275,17 +276,18 @@ export function resolveRemoteCart(
   local: Cart,
   remote: { items: any[]; savedItems: any[] } | null,
 ): { cart: Cart; adoptedRemote: boolean } {
-  if (!remote || local.syncPending) return { cart: local, adoptedRemote: false };
-  if (remote.items.length === 0 && remote.savedItems.length === 0) return { cart: local, adoptedRemote: false };
-  return {
-    cart: {
-      ...local,
-      items: remote.items.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents)),
-      savedItems: remote.savedItems.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents)),
-      syncPending: false,
-    },
-    adoptedRemote: true,
-  };
+  const decision = reconcileCartLoad({
+    local,
+    server: remote,
+    dirty: local.syncPending === true ? '1' : local.syncPending === false ? '0' : null,
+  });
+  return { cart: { ...decision.cart, syncPending: decision.push }, adoptedRemote: !!remote };
+}
+
+/** Retry pending account-scoped writes on foreground without changing queue ordering. */
+export async function flushDirtyCart(): Promise<void> {
+  const k = keys();
+  if (k.userId !== 'anon') await scheduleSync(k);
 }
 
 // ─── Cart storage ─────────────────────────────────────────────────────────────
@@ -728,10 +730,10 @@ export function groupCartBySeller(items: CartItem[]): CartSellerGroup[] {
 // ─── Cart summary ─────────────────────────────────────────────────────────────
 
 export function calculateCartSummary(items: CartItem[], discountTotalCents = 0, shippingTotalCents = 0): CheckoutSummary {
-  const subtotalCents = items.reduce((s, i) => s + i.priceCents * i.quantity, 0);
+  const subtotalCents = chargeableSubtotalCents(items);
   // Every bundle item present at its quantity → the bundle price applies
   // (estimate; checkout prices it server-side with the same rules).
-  const bundleSavingsCents = bundleSavings(items).totalCents;
+  const bundleSavingsCents = bundleSavings(items.filter(i => i.isAvailable !== false)).totalCents;
   const taxTotalCents = 0; // Calculated accurately by Stripe at checkout; not estimated here
   const totalCents = Math.max(0, subtotalCents - bundleSavingsCents - discountTotalCents + shippingTotalCents + taxTotalCents);
   return {
