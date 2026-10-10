@@ -122,6 +122,7 @@ import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
 import { UnavailableScreen } from '@/components/ui/UnavailableScreen';
 import { useRole } from '@/contexts/RoleContext';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { useScreenInteractive } from '@/lib/perf';
 
 /**
  * A fully verified order reference returned from the server after payment.
@@ -196,6 +197,7 @@ export default function BuyerCheckoutScreen() {
   const [serverSaidHosted, setServerSaidHosted] = useState(false);
   const [stripeLoadFailed, setStripeLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
+  useScreenInteractive('checkout', !loading);
   const [loadFailed, setLoadFailed] = useState(false);
   /** No saved session and nothing in the cart — render an empty state here
    * instead of bouncing back to whatever screen sits underneath (QA-0007). */

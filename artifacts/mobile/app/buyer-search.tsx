@@ -65,6 +65,7 @@ import { EmptyState as OneLineEmptyState } from '@/components/ui/EmptyState';
 import { FilterSheet } from '@/components/search/FilterSheet';
 import { countActiveFilters, filtersToApiOptions, type SearchFacets, type SearchFilters } from '@/lib/searchFilters';
 import { profileVideosHref } from '@/lib/profileNavigation';
+import { useScreenInteractive } from '@/lib/perf';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
@@ -200,6 +201,7 @@ export default function BuyerSearchScreen() {
   // to its Explore grid too).
   const [browsePosts, setBrowsePosts] = useState<DiscoverPost[]>([]);
   const [browseLoading, setBrowseLoading] = useState(true);
+  useScreenInteractive('search', !browseLoading);
   const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);

@@ -41,6 +41,9 @@ import { BrandedLoader, PressableScale, useUndoToast } from '@/components/Brandt
 import { Button, ErrorState, ThemedRefreshControl } from '@/components/ui';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
+import { useScreenInteractive } from '@/lib/perf';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -136,6 +139,7 @@ export default function CartScreen() {
   // The line whose size/qty is being changed in the inline picker.
   const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   const [loading, setLoading] = useState(true);
+  useScreenInteractive('bag', !loading);
   /** True only when we couldn't confirm the cart is really empty (see getCartForScreen). */
   const [loadError, setLoadError] = useState(false);
   const [validating, setValidating] = useState(false);

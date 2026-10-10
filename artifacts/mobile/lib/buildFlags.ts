@@ -64,3 +64,12 @@ export const REVENUECAT_TEST_API_KEY: string | undefined = __DEV__
  */
 export const GROWTH_UI_BYPASS =
   __DEV__ || (!IS_PROD_NATIVE && process.env.EXPO_PUBLIC_BT_GROWTH_BYPASS === '1');
+
+/**
+ * Performance marks: per-screen time-to-interactive, the feed frame-drop
+ * sampler and their console lines (see lib/perf.ts). On in dev builds; off in
+ * every release build unless it was built with EXPO_PUBLIC_PERF_MARKS=1 (a
+ * dedicated perf build), so the samplers cost nothing in store builds. The
+ * one-off cold-start timing is recorded either way.
+ */
+export const PERF_MARKS = __DEV__ || process.env.EXPO_PUBLIC_PERF_MARKS === '1';
