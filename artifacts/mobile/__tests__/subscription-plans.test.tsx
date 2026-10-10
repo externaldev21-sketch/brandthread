@@ -138,6 +138,14 @@ vi.mock('@/lib/growthTools', () => ({
   getGrowthStudioTools: () => [],
   GROWTH_EXTRAS: [],
 }));
+vi.mock('@/components/ui/Icon', () => {
+  const React = require('react');
+  return { Icon: (props: Record<string, unknown>) => React.createElement('Icon', props) };
+});
+vi.mock('@/components/ui/BottomSheet', () => {
+  const React = require('react');
+  return { BottomSheet: (props: { visible: boolean; children: unknown }) => (props.visible ? React.createElement('BottomSheet', null, props.children) : null) };
+});
 vi.mock('@/components/ui', () => {
   const React = require('react');
   return {

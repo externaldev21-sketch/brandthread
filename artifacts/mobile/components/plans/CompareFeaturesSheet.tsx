@@ -5,7 +5,8 @@
  */
 import React from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { BottomSheet, Icon } from '@/components/ui';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FONT, TEXT } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';

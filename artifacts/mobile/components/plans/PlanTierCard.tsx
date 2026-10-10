@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Icon } from '@/components/ui';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';
@@ -14,35 +14,41 @@ import { radius } from '@/constants/radii';
 import { keyDifferences, productHeadline, type PlanTier } from '@/lib/planTiers';
 
 export function PlanTierCard({
-  tier, below, selected, onSelect, priceLabel, badge, testID,
+  tier, below, selected, onSelect, priceLabel, badge, testID, footer,
 }: {
   tier: PlanTier;
   /** The tier under this one, so the card names only what this tier adds. */
   below: PlanTier | null;
   selected: boolean;
-  onSelect: () => void;
+  onSelect?: () => void;
   /** "$49", or null while the store price loads. */
   priceLabel: string | null;
   /** "Recommended" / "Current plan". */
   badge?: string | null;
   testID?: string;
+  /** Under the lines, e.g. a "Switch to Growth" button. Without onSelect the card isn't selectable. */
+  footer?: React.ReactNode;
 }) {
   const palette = useColors();
   const lines = keyDifferences(tier, below);
   const headline = productHeadline(tier.limits);
+  const selectable = !!onSelect;
   return (
     <Pressable
       testID={testID}
       onPress={onSelect}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      disabled={!selectable}
+      accessibilityRole={selectable ? 'radio' : undefined}
+      accessibilityState={selectable ? { selected } : undefined}
       accessibilityLabel={`${tier.name}${priceLabel ? `, ${priceLabel} a month` : ''}. ${headline}. ${lines.join('. ')}`}
       style={[styles.card, { borderColor: selected ? palette.foreground : 'transparent' }]}
     >
       <View style={styles.top}>
-        <View style={[styles.radio, { borderColor: selected ? palette.foreground : palette.mutedForeground }]}>
-          {selected ? <View style={[styles.radioDot, { backgroundColor: palette.foreground }]} /> : null}
-        </View>
+        {selectable ? (
+          <View style={[styles.radio, { borderColor: selected ? palette.foreground : palette.mutedForeground }]}>
+            {selected ? <View style={[styles.radioDot, { backgroundColor: palette.foreground }]} /> : null}
+          </View>
+        ) : null}
         <View style={styles.nameBlock}>
           <Text style={[styles.name, { color: palette.foreground }]}>{tier.name}</Text>
           {badge ? <Text style={[styles.badge, { color: palette.mutedForeground }]}>{badge}</Text> : null}
@@ -70,6 +76,7 @@ export function PlanTierCard({
           ))}
         </View>
       ) : null}
+      {footer}
     </Pressable>
   );
 }

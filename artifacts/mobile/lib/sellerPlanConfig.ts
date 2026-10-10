@@ -189,7 +189,9 @@ export function useSellerPlanConfig(): SellerPlanConfig {
   const [config, setConfig] = useState<SellerPlanConfig>(DEFAULT_SELLER_PLAN_CONFIG);
   useEffect(() => {
     let cancelled = false;
-    api.config.sellerPlans()
+    const load = api.config?.sellerPlans;
+    if (!load) return () => { cancelled = true; };
+    load()
       .then((raw) => { if (!cancelled) setConfig(parseSellerPlanConfig(raw)); })
       .catch(() => { /* bundled defaults stay */ });
     return () => { cancelled = true; };

@@ -383,6 +383,11 @@ vi.mock('@/hooks/useColors', () => ({
   useColors: () => ({ foreground: '#FFFFFF', mutedForeground: '#C0C0C0', destructive: '#FF3B30', border: '#333333', background: '#000000' }),
 }));
 vi.mock('@/components/AiGeneratedBadge', () => ({ AiGeneratedBadge: () => null }));
+vi.mock('@/components/ui/Icon', () => {
+  const React = require('react') as typeof import('react');
+  return { Icon: (props: Record<string, unknown>) => React.createElement('Icon', props) };
+});
+vi.mock('@/components/ui/BottomSheet', () => ({ BottomSheet: () => null }));
 vi.mock('@/components/ui', () => {
   const React = require('react') as typeof import('react');
   return {
