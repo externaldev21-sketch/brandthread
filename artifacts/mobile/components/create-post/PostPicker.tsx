@@ -21,6 +21,7 @@ import { CP, IconButton, PillButton, SubPage, tap } from '@/components/create-po
 import { ModeBar } from '@/components/create-post/ModeBar';
 import { CropFrame } from '@/components/create-post/CropFrame';
 import { formatDuration, MediaThumb } from '@/components/create-post/GalleryPicker';
+import { crispPx } from '@/lib/crispPixel';
 
 const COLS = 4;
 const GAP = 1;
@@ -228,7 +229,7 @@ const s = StyleSheet.create({
   tile: {},
   duration: { position: 'absolute', right: 5, bottom: 4, color: CP.white, fontFamily: FONT.semibold, fontSize: 11 },
   focusRing: { ...({ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } as const), borderWidth: 2, borderColor: CP.white },
-  circle: { position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: CP.white, alignItems: 'center', justifyContent: 'center' },
+  circle: { position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: CP.white, alignItems: 'center', justifyContent: 'center' },
   circleOn: { backgroundColor: CP.white },
   circleNum: { color: CP.black, fontFamily: FONT.bold, fontSize: 12 },
   bottom: { backgroundColor: CP.black, paddingTop: 4 },

@@ -17,6 +17,7 @@ import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { SHOP_PILL_HEIGHT } from './profileLayout';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 type PressState = { pressed: boolean; hovered?: boolean; focused?: boolean };
 type FeatherName = keyof typeof Feather.glyphMap;
@@ -618,7 +619,7 @@ const styles = StyleSheet.create({
     gap: 6, paddingLeft: 7, paddingRight: 12, overflow: 'hidden',
   },
   walletText: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
-  glassBadge: { position: 'absolute', top: 9, right: 9, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
+  glassBadge: { position: 'absolute', top: 9, right: 9, width: 9, height: 9, borderRadius: 5, borderWidth: crispPx(1.5) },
 
   statsRow: {
     flexDirection: 'row', alignItems: 'stretch',
@@ -662,7 +663,7 @@ const styles = StyleSheet.create({
   pillCopy: { flexShrink: 1, flexGrow: 1 },
   pillLabel: { fontFamily: FONT.bold, fontSize: FS.md, lineHeight: 21, letterSpacing: -0.3 },
   pillSub: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, opacity: 0.7 },
-  pillArrow: { width: 46, height: 46, borderRadius: 23, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  pillArrow: { width: 46, height: 46, borderRadius: 23, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
 
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',

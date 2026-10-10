@@ -42,6 +42,7 @@ import { groupByLocalDate } from '@/lib/groupByLocalDate';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
+import { crispPx } from '@/lib/crispPixel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1335,7 +1336,7 @@ const createStyles = (theme: any) => {
     width: 20,
     height: 20,
     borderRadius: 10,
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
     borderColor: BORDER,
     backgroundColor: CARD,
     alignItems: 'center',

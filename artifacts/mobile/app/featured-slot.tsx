@@ -26,6 +26,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { buildFeaturedReturnUrl, featuredStateLabel } from '@/services/featuredSlotService';
 import type { FeaturedAvailability, FeaturedSlot } from '@/lib/api';
+import { crispPx } from '@/lib/crispPixel';
 
 const DAY = 86_400_000;
 type Styles = ReturnType<typeof makeStyles>;
@@ -283,7 +284,7 @@ function makeStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
   optionTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
   optionPrice: { fontFamily: FONT.bold, fontSize: FS.md, color: FG },
   meta: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: 2 },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: MUTED, alignItems: 'center', justifyContent: 'center' },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: crispPx(1.5), borderColor: MUTED, alignItems: 'center', justifyContent: 'center' },
   radioOn: { borderColor: FG },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: FG },
   summary: { marginTop: SP.md, paddingTop: SP.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER },

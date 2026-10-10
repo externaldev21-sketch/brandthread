@@ -1,17 +1,11 @@
 {
   "app/(buyer)/cart.tsx": {
-    "fadedText": 1,
-    "hairline": 3
+    "fadedText": 1
   },
   "app/(buyer)/edit-profile.tsx": {
-    "hairline": 1,
     "fractionalFont": 7
   },
-  "app/(buyer)/friends.tsx": {
-    "hairline": 1
-  },
   "app/(buyer)/inbox.tsx": {
-    "hairline": 1,
     "fractionalRadius": 1,
     "rnImage": 6
   },
@@ -19,23 +13,14 @@
     "rnImage": 1
   },
   "app/(tabs)/feed.tsx": {
-    "hairline": 3,
     "fractionalRadius": 1,
     "fractionalFont": 1
   },
   "app/(tabs)/orders.tsx": {
-    "hairline": 1,
     "fractionalRadius": 1
   },
-  "app/account-type.tsx": {
-    "hairline": 1
-  },
   "app/add-product.tsx": {
-    "hairline": 1,
     "rnImage": 4
-  },
-  "app/ai-credits.tsx": {
-    "hairline": 1
   },
   "app/ai-mockup-chat.tsx": {
     "fractionalRadius": 1,
@@ -44,12 +29,6 @@
   "app/ai-photography-chat.tsx": {
     "fractionalRadius": 1,
     "rnImage": 4
-  },
-  "app/analytics-export.tsx": {
-    "hairline": 1
-  },
-  "app/biometric-unlock.tsx": {
-    "hairline": 1
   },
   "app/boost.tsx": {
     "smearShadow": 1
@@ -60,14 +39,10 @@
   "app/buyer-account-center.tsx": {
     "fractionalFont": 1
   },
-  "app/buyer-checkout.tsx": {
-    "hairline": 1
-  },
   "app/buyer-conversation.tsx": {
     "smearShadow": 1
   },
   "app/buyer-drop-detail.tsx": {
-    "hairline": 1,
     "rnImage": 2
   },
   "app/buyer-order-detail.tsx": {
@@ -92,20 +67,10 @@
     "rnImage": 2
   },
   "app/buyer-story-create.tsx": {
-    "hairline": 4,
     "rnImage": 3
-  },
-  "app/buyer-story-viewer.tsx": {
-    "hairline": 1
   },
   "app/c/[collectionId].tsx": {
     "rnImage": 2
-  },
-  "app/checkout.tsx": {
-    "hairline": 1
-  },
-  "app/delete-account.tsx": {
-    "hairline": 1
   },
   "app/design-ai-photoshoot.tsx": {
     "rnImage": 2
@@ -144,19 +109,12 @@
   "app/design.tsx": {
     "hairline": 1
   },
-  "app/discounts.tsx": {
-    "hairline": 1
-  },
   "app/edit-profile.tsx": {
-    "hairline": 1,
     "fractionalFont": 3,
     "rnImage": 4
   },
   "app/email-campaign-compose.tsx": {
     "rnImage": 2
-  },
-  "app/featured-slot.tsx": {
-    "hairline": 1
   },
   "app/forgot-password.tsx": {
     "smearShadow": 2
@@ -167,15 +125,10 @@
   "app/fulfill-order.tsx": {
     "rnImage": 1
   },
-  "app/launch-checklist.tsx": {
-    "hairline": 1
-  },
   "app/lifestyle-images.tsx": {
-    "hairline": 1,
     "rnImage": 3
   },
   "app/link-in-bio.tsx": {
-    "hairline": 1,
     "rnImage": 2
   },
   "app/manufacturer-hub.tsx": {
@@ -192,18 +145,11 @@
     "rnImage": 3
   },
   "app/onboarding.tsx": {
-    "hairline": 1,
     "rnImage": 1,
     "smearShadow": 2
   },
   "app/payments.tsx": {
     "smearShadow": 1
-  },
-  "app/payout-schedule.tsx": {
-    "hairline": 1
-  },
-  "app/payout-setup.tsx": {
-    "hairline": 1
   },
   "app/product-detail.tsx": {
     "rnImage": 2,
@@ -212,9 +158,6 @@
   "app/product-launches.tsx": {
     "rnImage": 1
   },
-  "app/product-pairings.tsx": {
-    "hairline": 1
-  },
   "app/product-store.tsx": {
     "rnImage": 1
   },
@@ -222,46 +165,30 @@
     "rnImage": 1
   },
   "app/products-bulk-edit.tsx": {
-    "hairline": 1,
     "rnImage": 1
   },
   "app/return-detail.tsx": {
     "rnImage": 1
   },
-  "app/rfq-post.tsx": {
-    "hairline": 1
-  },
   "app/sample-detail.tsx": {
     "rnImage": 2
   },
   "app/seller-drop-create.tsx": {
-    "hairline": 1,
     "rnImage": 2
   },
   "app/seller-drop-preview.tsx": {
     "rnImage": 2
   },
   "app/seller-go-live.tsx": {
-    "hairline": 1,
     "rnImage": 1
   },
   "app/seller-inbox.tsx": {
     "rnImage": 1
   },
-  "app/seller-live.tsx": {
-    "hairline": 1
-  },
-  "app/seller-schedule-live.tsx": {
-    "hairline": 2
-  },
-  "app/setup.tsx": {
-    "hairline": 1
-  },
   "app/shopify-import.tsx": {
     "rnImage": 1
   },
   "app/size-chart-template-apply.tsx": {
-    "hairline": 1,
     "rnImage": 1
   },
   "app/store-collections.tsx": {
@@ -277,7 +204,6 @@
     "rnImage": 1
   },
   "app/store-from-social.tsx": {
-    "hairline": 1,
     "rnImage": 1
   },
   "app/store-seo.tsx": {
@@ -289,9 +215,6 @@
   "app/subscription.tsx": {
     "smearShadow": 2
   },
-  "app/team.tsx": {
-    "hairline": 2
-  },
   "app/tech-pack-generator.tsx": {
     "rnImage": 1
   },
@@ -301,14 +224,8 @@
   "app/u/[username].tsx": {
     "rnImage": 1
   },
-  "app/vacation-mode.tsx": {
-    "hairline": 1
-  },
   "components/AIBrainFAB.tsx": {
     "smearShadow": 3
-  },
-  "components/ActivityBellButton.tsx": {
-    "hairline": 1
   },
   "components/BrandthreadUI.tsx": {
     "smearShadow": 1,
@@ -316,9 +233,6 @@
   },
   "components/CommerceSignal.tsx": {
     "fractionalRadius": 2
-  },
-  "components/DateRangePicker.tsx": {
-    "hairline": 1
   },
   "components/EngagementButton.tsx": {
     "smearShadow": 1
@@ -335,9 +249,6 @@
   },
   "components/OfflineBanner.tsx": {
     "smearShadow": 1
-  },
-  "components/ScreenHeader.tsx": {
-    "hairline": 1
   },
   "components/SellerCreateFAB.tsx": {
     "smearShadow": 2
@@ -359,13 +270,11 @@
     "smearShadow": 2
   },
   "components/ShopProductSheet.tsx": {
-    "hairline": 1,
     "fractionalRadius": 1,
     "rnImage": 1,
     "smearShadow": 4
   },
   "components/StoryMentionSticker.tsx": {
-    "hairline": 1,
     "rnImage": 1,
     "smearShadow": 3
   },
@@ -375,9 +284,6 @@
   "components/SupportChatBubble.tsx": {
     "fractionalRadius": 1,
     "smearShadow": 2
-  },
-  "components/TextOverlayEditor.tsx": {
-    "hairline": 1
   },
   "components/ai-tools/AiResultViewer.tsx": {
     "rnImage": 1
@@ -396,17 +302,10 @@
   "components/ai/AuroraGlow.tsx": {
     "blur": 1
   },
-  "components/auth/OtpCodeInput.tsx": {
-    "hairline": 1
-  },
   "components/branding/BrandthreadLogo.tsx": {
     "rnImage": 1
   },
-  "components/buyer-feed/CaptionBlock.tsx": {
-    "hairline": 1
-  },
   "components/buyer-feed/RightActionRail.tsx": {
-    "hairline": 2,
     "rnImage": 1
   },
   "components/calls/CallAvatarCircle.tsx": {
@@ -418,14 +317,8 @@
   "components/chat/ReactionOverlay.tsx": {
     "smearShadow": 2
   },
-  "components/checkout/CheckoutPrimitives.tsx": {
-    "hairline": 1
-  },
   "components/checkout/OrderConfetti.tsx": {
     "smearShadow": 1
-  },
-  "components/checkout/OrderConfirmation.tsx": {
-    "hairline": 1
   },
   "components/checkout/OrderSummarySection.tsx": {
     "rnImage": 1
@@ -439,27 +332,16 @@
   "components/checkout/StripePayment.web.tsx": {
     "disabledOpacity": 1
   },
-  "components/create-post/CarouselEditor.tsx": {
-    "hairline": 1
-  },
-  "components/create-post/CreateCamera.tsx": {
-    "hairline": 1
-  },
   "components/create-post/CropFrame.tsx": {
     "rnImage": 1
   },
   "components/create-post/GalleryPicker.tsx": {
-    "hairline": 1,
     "rnImage": 1
   },
   "components/create-post/ModeBar.tsx": {
     "fractionalRadius": 1
   },
-  "components/create-post/PostPicker.tsx": {
-    "hairline": 1
-  },
   "components/create-post/PostScreen.tsx": {
-    "hairline": 1,
     "rnImage": 2
   },
   "components/create-post/SlideEditor.tsx": {
@@ -476,12 +358,6 @@
   },
   "components/discover/DiscoverPostViewer.tsx": {
     "rnImage": 1
-  },
-  "components/discover/EditorialTile.tsx": {
-    "hairline": 1
-  },
-  "components/disputes/DisputeTimeline.tsx": {
-    "hairline": 1
   },
   "components/feed/UploadProgressPill.tsx": {
     "fractionalRadius": 2,
@@ -502,15 +378,8 @@
   "components/layout/StickyFooter.tsx": {
     "smearShadow": 1
   },
-  "components/legal/LegalConsent.tsx": {
-    "hairline": 1
-  },
   "components/live/LiveAvatarRing.tsx": {
-    "hairline": 1,
     "smearShadow": 2
-  },
-  "components/live/LiveOverlays.tsx": {
-    "hairline": 1
   },
   "components/live/LiveProductsSheet.tsx": {
     "fractionalFont": 1
@@ -521,25 +390,14 @@
   "components/onboarding/BrandsToFollowStep.tsx": {
     "rnImage": 1
   },
-  "components/orders/OrderStatusTimeline.tsx": {
-    "hairline": 1
-  },
   "components/paywall/SellerPlanSelector.tsx": {
     "smearShadow": 2
   },
   "components/profile/BrandHero.tsx": {
-    "hairline": 1,
     "rnImage": 3
   },
   "components/profile/ProfileControls.tsx": {
-    "hairline": 2,
     "smearShadow": 2
-  },
-  "components/profile/ProfileStoriesRow.tsx": {
-    "hairline": 1
-  },
-  "components/profile/ProfileTopBar.tsx": {
-    "hairline": 1
   },
   "components/share-cards/BuyerShareCard.tsx": {
     "rnImage": 2
@@ -552,12 +410,6 @@
   },
   "components/social/QuotedPostCard.tsx": {
     "rnImage": 1
-  },
-  "components/social/StoryQuestionResponsesSheet.tsx": {
-    "hairline": 1
-  },
-  "components/social/StoryStickers.tsx": {
-    "hairline": 1
   },
   "components/tab-bar/TabBarParts.tsx": {
     "hairline": 1
@@ -574,9 +426,6 @@
   },
   "components/ui/AppleEmoji.tsx": {
     "rnImage": 1
-  },
-  "components/ui/IconButton.tsx": {
-    "hairline": 1
   },
   "components/ui/Snackbar.tsx": {
     "rnImage": 1

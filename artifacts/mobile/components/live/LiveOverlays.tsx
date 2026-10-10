@@ -21,6 +21,7 @@ import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LIVE_RED } from './LiveAvatarRing';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 const ND = Platform.OS !== 'web';
 /** One consistent rail-icon treatment (point 4): every icon the same size on
@@ -443,7 +444,7 @@ const styles = StyleSheet.create({
   viewerStack: { flexDirection: 'row', alignItems: 'center', width: 56, flexShrink: 0 },
   viewerDot: {
     width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden', flexShrink: 0,
+    borderWidth: crispPx(1.5), borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden', flexShrink: 0,
   },
   viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   viewerCountPill: { marginLeft: 6 },

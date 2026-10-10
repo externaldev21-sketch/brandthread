@@ -27,6 +27,7 @@ import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationO
 import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
 import { radius } from '@/constants/radii';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
+import { crispPx } from '@/lib/crispPixel';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -589,7 +590,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pickerRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   pickerRowName:    { fontSize: FS.sm, fontFamily: FONT.semibold },
   pickerRowPrice:   { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   emptyText:        { textAlign: 'center', padding: 24, fontFamily: FONT.regular, fontSize: FS.sm },
   });
 };

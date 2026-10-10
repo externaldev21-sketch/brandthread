@@ -17,6 +17,7 @@ import {
   GRACE_OPTIONS, authenticateForAppLock, getDeviceSecurity, loadAppLockSettings, saveAppLockSettings,
   type AppLockSettings, type DeviceSecurity, type GraceSeconds,
 } from '@/lib/appLock';
+import { crispPx } from '@/lib/crispPixel';
 
 export default function AppLockSettingsScreen() {
   const { theme } = useAppTheme();
@@ -184,7 +185,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   rowTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base },
   rowSub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs + 1, marginTop: 2 },
   sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
   radioOn: { borderColor: theme.text },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.accent },
   footnote: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, marginTop: SP.sm },

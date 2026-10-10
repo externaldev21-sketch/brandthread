@@ -101,6 +101,7 @@ import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { crispPx } from '@/lib/crispPixel';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -3671,7 +3672,7 @@ const styles = StyleSheet.create({
   repostAvatarStack: { minWidth: 22, height: 22, flexDirection: 'row', alignItems: 'center' },
   repostAvatar: {
     width: 22, height: 22, borderRadius: RADII.pill, overflow: 'hidden',
-    borderWidth: 1.5, borderColor: ON_DARK,
+    borderWidth: crispPx(1.5), borderColor: ON_DARK,
   },
   repostAvatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#35353A' },
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
@@ -3742,7 +3743,7 @@ const styles = StyleSheet.create({
   },
   topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   topAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
+  unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: crispPx(1.5), borderColor: BG },
   topIconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   cartHeaderBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   // Fixed white/black regardless of the active theme's accent color — this
@@ -3751,7 +3752,7 @@ const styles = StyleSheet.create({
   cartCountBadge: {
     position: 'absolute', top: 1, right: -1, minWidth: 16, height: 16,
     borderRadius: RADII.pill, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: BG, backgroundColor: '#FFFFFF',
+    borderWidth: crispPx(1.5), borderColor: BG, backgroundColor: '#FFFFFF',
   },
   cartCountText: { fontSize: 10, lineHeight: 12, fontFamily: FONT.bold, color: '#000000', ...TABULAR_NUMS },
   findFriendsBtn: {

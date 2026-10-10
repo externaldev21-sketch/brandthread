@@ -40,6 +40,7 @@ import {
   nearestChipIndex, nextTimerSetting, recordingProgress, shouldAutoStop,
   type CaptureChip, type CreateMode, type TimerSetting,
 } from '@/lib/createCamera';
+import { crispPx } from '@/lib/crispPixel';
 
 // expo-media-library has no web implementation — same lazy require as
 // components/create-post/MediaGrid.tsx. Only used for the camera-roll thumb.
@@ -676,7 +677,7 @@ const s = StyleSheet.create({
 
   shutterRow: { width: '100%', height: SHUTTER, alignItems: 'center', justifyContent: 'center' },
   roll: {
-    position: 'absolute', left: 28, width: 44, height: 44, borderRadius: 10, borderWidth: 1.5,
+    position: 'absolute', left: 28, width: 44, height: 44, borderRadius: 10, borderWidth: crispPx(1.5),
     overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
   },
   rollSpacer: { position: 'absolute', left: 28, width: 44, height: 44 },

@@ -27,6 +27,7 @@ import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { Avatar } from '@/components/ui/Avatar';
 import { FONT, TEXT_DISABLED } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -817,7 +818,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   logoEmpty: { backgroundColor: theme.surface },
   cameraBadge: {
     position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2.5,
+    alignItems: 'center', justifyContent: 'center', borderWidth: crispPx(2.5),
   },
   imageOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 42,

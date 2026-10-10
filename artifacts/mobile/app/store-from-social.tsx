@@ -18,6 +18,7 @@ import {
 import { BrandthreadCard, PrimaryButton, SecondaryButton, FilterChip, EmptyState } from '@/components/BrandthreadUI';
 import { generateFromSocial, getStoreApplyFailure, StoreApplyFailure } from '@/services/storeService';
 import { useApi } from '@/lib/api';
+import { crispPx } from '@/lib/crispPixel';
 
 type TabMode = 'upload' | 'posts' | 'url';
 
@@ -403,7 +404,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   postRowSelected: { borderColor: PURPLE_LIGHT, backgroundColor: PURPLE_DIM },
   postCheck: {
     width: 22, height: 22, borderRadius: RADIUS.xs,
-    borderWidth: 1.5, borderColor: MUTED,
+    borderWidth: crispPx(1.5), borderColor: MUTED,
     alignItems: 'center', justifyContent: 'center',
   },
   postCheckActive: { backgroundColor: PURPLE, borderColor: PURPLE },

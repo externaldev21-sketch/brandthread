@@ -22,6 +22,7 @@ import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 const MAX_PAIRINGS = 6;
 
@@ -274,7 +275,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
     paddingHorizontal: SP.md, height: 44, borderRadius: RADIUS.md, backgroundColor: c.card,
   },
   searchInput: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: c.foreground, height: 44 },
-  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: crispPx(1.5), borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
   checkboxOn: { backgroundColor: c.primary, borderColor: c.primary },
   empty: { fontSize: FS.base, fontFamily: FONT.medium, color: c.mutedForeground, textAlign: 'center', padding: SP.lg },
   retry: { paddingVertical: SP.sm, paddingHorizontal: SP.md },

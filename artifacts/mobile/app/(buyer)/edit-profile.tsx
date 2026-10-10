@@ -27,6 +27,7 @@ import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia } from '@/components/profile/ProfileCover';
 import { COVER_MAX_SECONDS } from '@/components/profile/profileCoverRules';
+import { crispPx } from '@/lib/crispPixel';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
 const BIO_MAX = 150;
@@ -775,7 +776,7 @@ const styles = StyleSheet.create({
   avatarWrap: { width: 96, height: 96, borderRadius: 48 },
   cameraBadge: {
     position: 'absolute', right: -2, bottom: -2, width: 30, height: 30, borderRadius: 15,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2.5,
+    alignItems: 'center', justifyContent: 'center', borderWidth: crispPx(2.5),
   },
   avatarOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 48,

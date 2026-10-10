@@ -15,6 +15,7 @@ import { hapticLight } from '@/lib/haptics';
 import { FONT, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { InteractionLayer } from './ProfileControls';
+import { crispPx } from '@/lib/crispPixel';
 
 export function ProfileAccountSwitcher({
   label,
@@ -103,5 +104,5 @@ const styles = StyleSheet.create({
   // 24pt icon, hitSlop 10 on every side -> 44pt effective tap target,
   // invisible (no background), matching the buyer header's icon size/stroke.
   iconButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  iconBadge: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
+  iconBadge: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: 5, borderWidth: crispPx(1.5) },
 });

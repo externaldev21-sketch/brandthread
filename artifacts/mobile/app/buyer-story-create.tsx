@@ -61,6 +61,7 @@ import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackgr
 import type { MentionPerson } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
 import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
+import { crispPx } from '@/lib/crispPixel';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -225,7 +226,7 @@ function OverlayChip({
           style={[styles.selectionOutline, {
             left: -slop.x, right: -slop.x, top: -slop.y, bottom: -slop.y,
             // keep the outline ~1.5pt on screen however far the sticker is zoomed out
-            borderWidth: 1.5 / Math.max(scale, MENTION_MIN_SCALE),
+            borderWidth: crispPx(1.5) / Math.max(scale, MENTION_MIN_SCALE),
             borderRadius: 10 / Math.max(scale, MENTION_MIN_SCALE),
           }]}
         />
@@ -314,7 +315,7 @@ function GridIcon({ spec, active }: { spec: GridSpec; active: boolean }) {
           style={{
             width: `${100 / spec.cols}%`,
             height: `${100 / spec.rows}%`,
-            borderWidth: 0.5,
+            borderWidth: StyleSheet.hairlineWidth,
             borderColor: 'rgba(255,255,255,0.3)',
             backgroundColor: active ? 'rgba(255,255,255,0.25)' : 'transparent',
           }}
@@ -2383,7 +2384,7 @@ const styles = StyleSheet.create({
   colorCircleBorder: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   bgSwatchRow: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: SP.sm, justifyContent: 'center' },
   bgSwatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
-  bgSwatchActive: { borderWidth: 2.5, borderColor: ON_DARK },
+  bgSwatchActive: { borderWidth: crispPx(2.5), borderColor: ON_DARK },
 
 
   overlayChip: { position: 'absolute', top: 0, left: 0, zIndex: 15 },
@@ -2485,7 +2486,7 @@ const styles = StyleSheet.create({
   shareRowAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
   shareRowTitle: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
   shareRowSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
   radioOuterActive: { borderColor: ON_DARK },
   radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: ON_DARK },
 

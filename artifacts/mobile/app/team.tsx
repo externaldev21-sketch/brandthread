@@ -13,6 +13,7 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -582,9 +583,9 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 17, fontFamily: FONT.semibold },
   modalSub: { fontSize: 13, fontFamily: FONT.regular, marginTop: 6, lineHeight: 18 },
   roleRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  rolePill: { flex: 1, borderWidth: 1.5, borderRadius: 12, padding: 12 },
+  rolePill: { flex: 1, borderWidth: crispPx(1.5), borderRadius: 12, padding: 12 },
   roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
-  rolePillWrap: { width: '47%', borderWidth: 1.5, borderRadius: 12, padding: 12 },
+  rolePillWrap: { width: '47%', borderWidth: crispPx(1.5), borderRadius: 12, padding: 12 },
   rolePillTitle: { fontSize: 14, fontFamily: FONT.semibold },
   rolePillSub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   modalActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },

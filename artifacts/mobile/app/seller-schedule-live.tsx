@@ -23,6 +23,7 @@ import {
   cancelScheduledLive, combineSchedule, createScheduledLive, fetchMyScheduledLives,
   scheduleDayOptions, scheduleTimeOptions, type ScheduledLive,
 } from '@/lib/live/liveCommerce';
+import { crispPx } from '@/lib/crispPixel';
 
 export default function SellerScheduleLiveScreen() {
   const { theme } = useAppTheme();
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
   section: { fontFamily: FONT.bold, fontSize: FS.base, marginTop: SP.sm },
   bleed: { marginHorizontal: -SP.md, flexGrow: 0 },
   dayRow: { gap: SP.sm, paddingHorizontal: SP.md },
-  dayCard: { borderWidth: 1.5, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 10, minWidth: 84 },
+  dayCard: { borderWidth: crispPx(1.5), borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 10, minWidth: 84 },
   dayLabel: { fontFamily: FONT.semibold, fontSize: FS.sm },
   daySub: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   note: { fontFamily: FONT.regular, fontSize: FS.xs },
@@ -244,5 +245,5 @@ const styles = StyleSheet.create({
   cardActions: { flexDirection: 'row', gap: SP.sm, marginTop: SP.sm },
   list: { borderWidth: 1, borderRadius: RADIUS.md, overflow: 'hidden' },
   pickRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  check: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  check: { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
 });

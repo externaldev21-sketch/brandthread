@@ -28,6 +28,7 @@ import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { getProducts, updateProduct } from '@/services/productService';
 import { Product, ProductMedia } from '@/services/productTypes';
 import { FONT } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 interface Photo {
   id: string;
@@ -451,7 +452,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontFamily: FONT.bold, marginBottom: 4 },
   sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
   dropzone: {
-    borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center',
+    borderRadius: 16, borderWidth: crispPx(1.5), borderStyle: 'dashed', alignItems: 'center',
     justifyContent: 'center', paddingVertical: 40, gap: 10,
   },
   dropzoneTitle: { fontSize: 14, fontFamily: FONT.semibold },

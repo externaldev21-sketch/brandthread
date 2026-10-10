@@ -18,6 +18,7 @@ import { RADII } from '@/constants/radii';
 import { hapticLight } from '@/lib/haptics';
 import { formatTimeRemaining } from '@/lib/countdown';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
+import { crispPx } from '@/lib/crispPixel';
 
 export interface EditorialTileItem {
   id: string;
@@ -108,7 +109,7 @@ const tile = StyleSheet.create({
   // imagery (e.g. an accent-red product on a red-toned photo).
   urgentDot: {
     position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4,
-    borderWidth: 1.5, borderColor: '#FFFFFF',
+    borderWidth: crispPx(1.5), borderColor: '#FFFFFF',
   },
   // theme-exempt: fixed monochrome badge (black pill/white text) regardless
   // of theme — same fixed-dark-chrome pattern as Discover/Search's other

@@ -55,6 +55,7 @@ import {
 import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/storyMentionSticker';
 import { reshareGradientFromBackground } from '@/lib/storyReshare';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
+import { crispPx } from '@/lib/crispPixel';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -1309,7 +1310,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: 22,
     height: 22,
     borderRadius: 11,
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
     borderColor: '#000',
     backgroundColor: CARD_ELEVATED,
     alignItems: 'center',

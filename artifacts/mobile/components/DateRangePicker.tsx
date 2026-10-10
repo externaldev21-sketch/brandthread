@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { FONT } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -257,7 +258,7 @@ function Calendar({ month, rangeStart, rangeEnd, onDayPress, colors, isDark }: C
                   style={[
                     calStyles.dayCircle,
                     edge && { backgroundColor: rangeEdgeBg },
-                    isToday && !edge && { borderWidth: 1.5, borderColor: primary },
+                    isToday && !edge && { borderWidth: crispPx(1.5), borderColor: primary },
                   ]}
                 >
                   <Text

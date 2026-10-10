@@ -41,6 +41,7 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { Hairline } from './CheckoutPrimitives';
 import { groupDeliveryWindow } from './OrderSummarySection';
 import { OrderConfetti } from './OrderConfetti';
+import { crispPx } from '@/lib/crispPixel';
 
 export interface VerifiedOrderRef {
   id: string;
@@ -456,7 +457,7 @@ export function OrderConfirmationActions({
 
 const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingTop: SP.sm, paddingBottom: SP.md },
-  pending: { width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  pending: { width: 64, height: 64, borderRadius: 32, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
   titleBlock: { paddingBottom: SP.md },
   eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, },
   orderNumbers: { marginTop: 4, gap: 2 },

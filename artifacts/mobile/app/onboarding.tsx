@@ -50,6 +50,7 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { ONBOARDING_KEY, ONBOARDING_OWNER_KEY } from './_layout';
 import { AccountTypeStep, type AccountType } from './account-type';
+import { crispPx } from '@/lib/crispPixel';
 
 // Required on Android so the in-app browser tab closes after OAuth redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -327,7 +328,7 @@ const createSr = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.
   label:   { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold, color: theme.text, marginBottom: 2 },
   labelOn: { color: theme.text },
   sub:     { ...TYPE.body, color: theme.muted },
-  circle:  { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  circle:  { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: theme.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   dot:     { width: 10, height: 10, borderRadius: 5 },
 });
 

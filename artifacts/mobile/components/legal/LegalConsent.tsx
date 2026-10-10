@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 export function LegalConsent({
   checked,
@@ -99,7 +100,7 @@ const styles = StyleSheet.create({
   notice: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 4 },
   box: {
-    width: 22, height: 22, borderRadius: 11, borderWidth: 1.5,
+    width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5),
     alignItems: 'center', justifyContent: 'center', marginTop: 0,
   },
   text: { flex: 1, fontFamily: FONT.regular, fontSize: 13, lineHeight: 19 },

@@ -27,6 +27,7 @@ import {
   PRICE_EDIT_MODES, buildPriceChange, bulkErrorMessage, priceRangeLabel,
   type BulkPriceResult, type BulkProduct, type BulkRounding, type BulkStatusFilter, type PriceEditMode,
 } from '@/lib/productBulk';
+import { crispPx } from '@/lib/crispPixel';
 
 const STATUS_CHIPS: Array<{ key: BulkStatusFilter; label: string }> = [
   { key: 'all', label: 'All' },
@@ -443,7 +444,7 @@ function PriceEditPanel({ productIds, topInset, onClose, onDone }: {
 function Checkbox({ checked, theme }: { checked: boolean; theme: any }) {
   return (
     <View style={{
-      width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
+      width: 22, height: 22, borderRadius: 6, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center',
       borderColor: checked ? theme.text : theme.subtle, backgroundColor: checked ? theme.text : 'transparent',
     }}>
       {checked && <Feather name="check" size={14} color={theme.background} />}

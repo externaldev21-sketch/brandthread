@@ -32,6 +32,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 type Step = 'overview' | 'confirm' | 'done';
 
@@ -433,7 +434,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   codeLink: { alignSelf: 'flex-start', marginTop: SP.sm, minHeight: 28, justifyContent: 'center' },
   ackRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginTop: SP.lg },
   checkbox: {
-    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: theme.muted,
+    width: 22, height: 22, borderRadius: 6, borderWidth: crispPx(1.5), borderColor: theme.muted,
     alignItems: 'center', justifyContent: 'center', marginTop: 1,
   },
   checkboxOn: { backgroundColor: theme.accent, borderColor: theme.accent },

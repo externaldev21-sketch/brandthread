@@ -9,6 +9,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { crispPx } from '@/lib/crispPixel';
 
 export interface ScreenHeaderAction {
   icon: IconName;
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
   },
   titleBlock: {
     flex: 1,

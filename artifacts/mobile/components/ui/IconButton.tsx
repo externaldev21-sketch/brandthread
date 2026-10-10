@@ -15,6 +15,7 @@ import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { Glass } from '@/components/ui/Glass';
 import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { crispPx } from '@/lib/crispPixel';
 
 export interface IconButtonProps {
   name: IconName;
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
   },
   // fontFamily, not fontWeight: without an explicit `fontFamily` this
   // badge digit rendered in the browser's default sans font on web (no

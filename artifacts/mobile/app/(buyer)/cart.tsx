@@ -57,6 +57,7 @@ import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
+import { crispPx } from '@/lib/crispPixel';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -312,7 +313,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   swipeBleed: { marginHorizontal: -SP.md },
   swipeFront: { paddingHorizontal: SP.md, backgroundColor: theme.background },
   checkbox: { width: COMP.minTouchTarget, height: 72, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
-  checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: crispPx(1.5), borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
@@ -514,7 +515,7 @@ function SellerGroupLine({
 
 const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  avatar: { width: 38, height: 38, borderRadius: RADII.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatar: { width: 38, height: 38, borderRadius: RADII.pill, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
@@ -1321,7 +1322,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     paddingHorizontal: SP.md, paddingBottom: SP.xs,
   },
-  selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: crispPx(1.5), borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   selectAllText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   // Same label + hairline as a checkout section (CheckoutPrimitives).
   savedSection: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingTop: 14, marginBottom: SP.md },

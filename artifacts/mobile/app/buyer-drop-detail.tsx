@@ -28,6 +28,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { buildCanonicalDropUrl } from '@/lib/shareDrop';
 import { computeCountdownParts, type CountdownParts } from '@/lib/dropCountdown';
+import { crispPx } from '@/lib/crispPixel';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -679,7 +680,7 @@ const styles = StyleSheet.create({
   heroBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.5 },
   heroCopy: { padding: 20, paddingBottom: 28 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SP.md },
-  brandMark: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center' },
+  brandMark: { width: 38, height: 38, borderRadius: 19, borderWidth: crispPx(1.5), backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center' },
   brandInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11 },
   brandNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   brandName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },

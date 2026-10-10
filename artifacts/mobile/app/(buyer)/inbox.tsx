@@ -65,6 +65,7 @@ import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
 // (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
@@ -1968,7 +1969,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     position: 'absolute', left: -2, top: -2, right: -2, bottom: -2, borderRadius: 34,
   },
   storyRingUnseen: { borderWidth: 2 },
-  storyRingSeen: { borderWidth: 1.5 },
+  storyRingSeen: { borderWidth: crispPx(1.5) },
   // "Add to your story" badge — pure visual decoration on top of the single
   // "Your story" Pressable, never its own tappable element.
   addStoryBadge: {

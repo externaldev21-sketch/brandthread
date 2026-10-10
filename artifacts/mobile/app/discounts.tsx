@@ -31,6 +31,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/layout';
+import { crispPx } from '@/lib/crispPixel';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products' | 'collections';
@@ -818,7 +819,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   modal:       { flex: 1, backgroundColor: BG },
 
-  summaryCard: { backgroundColor: CARD_ELEVATED, borderWidth: 1.5, borderRadius: RADIUS.md, padding: SP.md, gap: 6 },
+  summaryCard: { backgroundColor: CARD_ELEVATED, borderWidth: crispPx(1.5), borderRadius: RADIUS.md, padding: SP.md, gap: 6 },
   summaryCode: { fontSize: FS.md, fontFamily: FONT.bold, letterSpacing: 1.5 },
   summaryValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: 2 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },

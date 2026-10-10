@@ -25,6 +25,7 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { createRfq, getRfqTargetManufacturers, type RfqTargetManufacturer } from '@/services/manufacturerRfq';
 import { radius } from '@/constants/radii';
+import { crispPx } from '@/lib/crispPixel';
 
 const MAX_TARGETS = 10;
 
@@ -218,7 +219,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   loadingWrap: { paddingVertical: SP.xl, alignItems: 'center' },
   mfgRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: theme.cardGlass, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, marginBottom: SP.xs },
   mfgRowActive: { borderColor: theme.accent },
-  checkbox: { width: 22, height: 22, borderRadius: RADIUS.xs, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 22, height: 22, borderRadius: RADIUS.xs, borderWidth: crispPx(1.5), borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   mfgInfo: { flex: 1 },
   mfgNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
