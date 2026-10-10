@@ -5,7 +5,7 @@
  * `@workspace/integrations-openai-ai-server`'s `editImages()`, which the
  * live route keeps using unchanged.
  *
- * Uses `getOpenAiImageModel()` (default `gpt-image-2.5-flare`) rather than
+ * Uses `getOpenAiImageModel()` (default `gpt-image-2`, see image-model) rather than
  * hardcoding `gpt-image-1`, since gpt-image-1 retires Oct 23, 2026 and this
  * is new code being written after that migration was already flagged.
  */

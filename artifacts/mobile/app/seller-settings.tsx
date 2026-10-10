@@ -189,7 +189,7 @@ export default function SellerSettingsScreen() {
                 // for the genuinely destructive delete row.
                 destructive={item.destructive && item.action !== 'sign-out'}
                 soon={item.soon}
-                badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : item.route === '/ai-credits' && !planLoading && !planError && hasPlan('pro') ? 'Unlimited' : undefined}
+                badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : item.route === '/ai-credits' && !planLoading && !planError && hasPlan('pro') ? 'Pro' : undefined}
                 last={i === group.items.length - 1}
                 onPress={() => handleItem(item)}
               />

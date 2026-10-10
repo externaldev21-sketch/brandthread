@@ -33,7 +33,7 @@ describe("premium provider contract", () => {
   it("requests high quality for image generation by default", async () => {
     await generateImageBuffer("premium fashion logo", "1024x1024");
     expect(provider.generate).toHaveBeenCalledWith(expect.objectContaining({
-      model: "gpt-image-1",
+      model: "gpt-image-2",
       quality: "high",
       size: "1024x1024",
     }));
@@ -44,7 +44,7 @@ describe("premium provider contract", () => {
     await fs.writeFile(source, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
     await editImages([source], "remove background", undefined, { background: "transparent" });
     expect(provider.edit).toHaveBeenCalledWith(expect.objectContaining({
-      model: "gpt-image-1",
+      model: "gpt-image-2",
       quality: "high",
       background: "transparent",
     }));

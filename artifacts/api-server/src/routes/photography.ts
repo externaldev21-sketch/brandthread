@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middlewares/requireAuth";
+import { AI_FAILED_UNITS_LOCAL } from "../lib/aiCredits/catalogue";
 import {
   buildFashionPrompt,
   editImages,
@@ -285,6 +286,8 @@ router.post("/mockup-to-model", async (req, res) => {
     }
 
     // At least one succeeded — return partial results with per-index errors.
+    // The credits gate gives back the failed references (charged per reference).
+    res.locals[AI_FAILED_UNITS_LOCAL] = errors.length;
     res.json({
       results,
       ...(errors.length > 0 ? { errors } : {}),
@@ -485,6 +488,8 @@ router.post("/outfit-swap", async (req, res) => {
       });
       return;
     }
+    // The credits gate gives back the failed garments (charged per garment).
+    res.locals[AI_FAILED_UNITS_LOCAL] = errors.length;
     res.json({
       results,
       ...(errors.length > 0 ? { errors } : {}),

@@ -16,7 +16,30 @@ export const AI_MODEL_PRICES: Record<string, ModelPrice> = {
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
   "gpt-5": { input: 1.25, output: 10 },
   "gpt-5-mini": { input: 0.25, output: 2 },
+  "gpt-5.4-mini": { input: 0.75, output: 4.5 },
+  // Image models: `input` is the text-input rate; `output` the image-output token rate.
   "gpt-image-1": { input: 5, output: 40 },
+  "gpt-image-1.5": { input: 5, output: 32 },
+  "gpt-image-2": { input: 5, output: 30 },
+};
+
+/**
+ * Per-image list prices for the OpenAI image models in the shared client's
+ * model chain (lib/integrations-openai-ai-server/src/image/model.ts), used by
+ * the credit cost table (lib/aiCredits/costTable.ts) to price every tool.
+ * `output` is one generated 1024x1024 image at each quality; input images and
+ * prompt text are billed per token on top.
+ */
+export interface ImageModelPrice {
+  output: { low: number; medium: number; high: number };
+  imageInputPerMTok: number;
+  textInputPerMTok: number;
+}
+
+export const AI_IMAGE_MODEL_PRICES: Record<string, ImageModelPrice> = {
+  "gpt-image-2":   { output: { low: 0.006, medium: 0.053, high: 0.211 }, imageInputPerMTok: 8,  textInputPerMTok: 5 },
+  "gpt-image-1.5": { output: { low: 0.009, medium: 0.034, high: 0.133 }, imageInputPerMTok: 8,  textInputPerMTok: 5 },
+  "gpt-image-1":   { output: { low: 0.011, medium: 0.042, high: 0.167 }, imageInputPerMTok: 10, textInputPerMTok: 5 },
 };
 
 function lookup(model: string): ModelPrice | null {

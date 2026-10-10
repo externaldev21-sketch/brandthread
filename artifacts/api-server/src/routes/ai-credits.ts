@@ -1,7 +1,7 @@
 /**
  * AI credits (balance + history + packs).
  *
- * GET /api/ai/credits            — plan, balance (null when unlimited), allowance, rollover, packs, tool prices
+ * GET /api/ai/credits            — plan, billing state, balance, allowance, rollover, packs, tool prices
  * GET /api/ai/credits/history    — ledger, newest first (?limit=&before=ISO)
  * POST /api/ai/credits/packs/:packId/checkout — Stripe Checkout for a pack (web)
  * POST /api/ai/credits/purchases/verify       — confirms a paid session and credits it once
@@ -9,7 +9,7 @@
  */
 import express, { Router } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
-import { AI_TOOL_RULES, packsForPlan } from "../lib/aiCredits/catalogue";
+import { creditToolPrices, packsForPlan } from "../lib/aiCredits/catalogue";
 import { getAccount, listHistory } from "../lib/aiCredits/ledger";
 import { createPackCheckout, fulfilCreditCheckoutSession, isAllowedCreditsReturnUrl, stripeConfigured } from "../lib/aiCredits/purchases";
 import { findPack } from "../lib/aiCredits/catalogue";
@@ -22,24 +22,12 @@ router.get("/", async (req, res, next) => {
   try {
     const userId = (req as any).clerkUserId as string;
     const account = await getAccount(userId);
-    const base = {
+    // Every plan, Pro included, has a finite balance (`unlimited` is always false).
+    res.json({
       plan: account.plan,
       unlimited: account.unlimited,
       resetsAt: account.resetsAt,
-    };
-    // Pro has no balance concept: no counts, no packs, no costs.
-    if (account.unlimited) {
-      res.json({
-        ...base,
-        balance: null, monthlyAllowance: null, rolloverBalance: null, monthlyBalance: null, purchasedBalance: null,
-        lowCreditsThreshold: null, isLow: false, packs: [],
-        purchase: { stripe: false },
-        tools: AI_TOOL_RULES.filter((r) => r.kind === "credits").map((r) => ({ tool: r.tool, label: r.label })),
-      });
-      return;
-    }
-    res.json({
-      ...base,
+      billing: account.billing,
       balance: account.balance,
       monthlyAllowance: account.monthlyAllowance,
       rolloverBalance: account.rolloverBalance,
@@ -49,7 +37,7 @@ router.get("/", async (req, res, next) => {
       isLow: account.isLow,
       packs: packsForPlan(account.plan),
       purchase: { stripe: stripeConfigured() },
-      tools: AI_TOOL_RULES.filter((r) => r.kind === "credits").map((r) => ({ tool: r.tool, label: r.label, cost: r.cost })),
+      tools: creditToolPrices(),
     });
   } catch (err) { next(err); }
 });

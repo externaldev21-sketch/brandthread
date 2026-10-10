@@ -85,6 +85,8 @@ describe("buildPlanPerks", () => {
     expect(perks.find((p) => p.planId === "pro")).toMatchObject({
       amountCents: PLAN_CATALOGUE.pro.amountCents, advancedAnalytics: true,
     });
+    // No plan is unlimited on AI: Pro has a finite monthly allowance too.
+    for (const perk of perks) expect(perk).toMatchObject({ unlimitedAiCredits: false, monthlyAiCredits: expect.any(Number) });
   });
 
   it("carries each plan's product cap and team seats from the plan catalogue", () => {

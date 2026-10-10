@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { getAuth } from "@clerk/express";
-import { findToolRule } from "./catalogue";
-import { allowTextRequest, debitCredits, refundDebit } from "./ledger";
+import { AI_FAILED_UNITS_LOCAL, findToolRule, unitsFor } from "./catalogue";
+import { allowTextRequest, debitCredits, meterRequest, refundDebit } from "./ledger";
 import { acquireLowPrioritySlot } from "./lowPriority";
 
 const GENERIC_LIMIT = { error: "Too many requests, try again later" };
@@ -11,14 +11,16 @@ const GENERIC_LIMIT = { error: "Too many requests, try again later" };
  * route. Mounted once in routes/index.ts ahead of the AI routers, so the
  * routes themselves stay untouched. Requests without a signed-in user pass
  * through; the route's own auth answers them and no AI provider is reached.
+ * Paths are matched in normalized form (case, repeated and trailing slashes).
  *
- *  - text rules (chat, store AI text) are free; only a silent anti-abuse
- *    ceiling applies and it answers with a generic message
- *  - generation rules debit credits before the handler runs, which makes it
- *    impossible to run a paid call without credits or past the emergency cap;
- *    if the handler then answers with an error the credits are returned
- *  - Pro is never blocked by a balance. Past the hidden fair-use line its jobs
- *    wait in a small FIFO queue (slower, never failed)
+ *  - text rules (chat) are free; only a silent anti-abuse ceiling applies and
+ *    it answers with a generic message
+ *  - metered rules (support chat, store AI, the onboarding sample) are free to
+ *    the user but capped per user per day and counted toward the global cap
+ *  - generation rules debit cost x units credits before the handler runs, which
+ *    makes it impossible to run a paid call without credits or past the caps;
+ *    if the handler answers with an error the credits are returned, and units a
+ *    handler reports as failed are returned on success
  */
 export async function aiCreditsGate(req: Request, res: Response, next: NextFunction): Promise<void> {
   const rule = findToolRule(req.method, req.path);
@@ -39,8 +41,35 @@ export async function aiCreditsGate(req: Request, res: Response, next: NextFunct
     return next();
   }
 
+  if (rule.kind === "metered") {
+    try {
+      const result = await meterRequest({
+        clerkUserId: userId, toolKey: rule.tool, cost: rule.cost, dailyLimit: rule.dailyLimit?.() ?? 1,
+      });
+      if (!result.ok) {
+        if (result.reason === "rate_limited") res.status(429).json(GENERIC_LIMIT);
+        else res.status(503).json({ error: "AI limit reached", code: result.reason, toolKey: rule.tool });
+        return;
+      }
+      const entryId = result.entryId;
+      res.on("finish", () => {
+        if (res.statusCode >= 400) {
+          refundDebit(entryId).catch((err) => req.log?.error({ err, entryId }, "AI metered refund failed"));
+        }
+      });
+      return next();
+    } catch (err) {
+      // Fail closed: the global spend cap could not be checked.
+      req.log?.error({ err }, "AI metering failed");
+      res.status(503).json({ error: "AI is temporarily unavailable", code: "credits_unavailable" });
+      return;
+    }
+  }
+
+  const units = unitsFor(rule, req.body);
+  const cost = rule.cost * units;
   try {
-    const result = await debitCredits({ clerkUserId: userId, cost: rule.cost, toolKey: rule.tool });
+    const result = await debitCredits({ clerkUserId: userId, cost, units, toolKey: rule.tool });
     if (!result.ok) {
       if (result.reason === "rate_limited") {
         res.status(429).json(GENERIC_LIMIT);
@@ -51,23 +80,39 @@ export async function aiCreditsGate(req: Request, res: Response, next: NextFunct
           error: "Not enough AI credits",
           code: "insufficient_credits",
           toolKey: rule.tool,
-          cost: rule.cost,
+          cost,
           balance: result.balance,
         });
         return;
       }
-      res.status(503).json({ error: "AI limit reached", code: result.reason, toolKey: rule.tool, cost: rule.cost, balance: result.balance });
+      if (result.reason === "billing_issue") {
+        res.status(402).json({
+          error: "AI tools are paused until your subscription payment goes through",
+          code: "billing_issue",
+          toolKey: rule.tool,
+          cost,
+          balance: result.balance,
+        });
+        return;
+      }
+      res.status(503).json({ error: "AI limit reached", code: result.reason, toolKey: rule.tool, cost, balance: result.balance });
       return;
     }
     const entryId = result.entryId;
     (req as Request & { aiCreditEntryId?: string }).aiCreditEntryId = entryId;
     if (!result.unlimited) {
-      res.setHeader("X-AI-Credits-Charged", String(rule.cost));
+      res.setHeader("X-AI-Credits-Charged", String(cost));
       res.setHeader("X-AI-Credits-Balance", String(result.balance));
     }
     res.on("finish", () => {
       if (res.statusCode >= 400) {
         refundDebit(entryId).catch((err) => req.log?.error({ err, entryId }, "AI credit refund failed"));
+        return;
+      }
+      const failed = Number(res.locals?.[AI_FAILED_UNITS_LOCAL] ?? 0);
+      if (units > 1 && Number.isInteger(failed) && failed > 0) {
+        refundDebit(entryId, { units: Math.min(failed, units) })
+          .catch((err) => req.log?.error({ err, entryId }, "AI credit partial refund failed"));
       }
     });
 
