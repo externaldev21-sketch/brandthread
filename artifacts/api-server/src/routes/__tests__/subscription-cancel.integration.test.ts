@@ -58,10 +58,10 @@ const periodEnd = Math.floor(Date.now() / 1000) + 20 * 24 * 60 * 60;
 let server: Server;
 let base = "";
 
-async function call(user: string, path: string, method = "GET") {
+async function call(user: string, path: string, method = "GET", body: Record<string, unknown> = {}) {
   const res = await fetch(`${base}/api/seller/subscription${path}`, {
     method, headers: { "x-test-user": user, "content-type": "application/json" },
-    body: method === "GET" ? undefined : "{}",
+    body: method === "GET" ? undefined : JSON.stringify(body),
   });
   return { status: res.status, body: (await res.json()) as any };
 }
@@ -111,6 +111,26 @@ describe("seller subscription cancel / resume", () => {
     expect(resumed.status).toBe(200);
     expect(resumed.body).toMatchObject({ cancelAtPeriodEnd: false, endsAt: null });
     expect(state.updates[1].params).toMatchObject({ cancel_at_period_end: false });
+  });
+
+  it("records the seller's main reason as Stripe cancellation feedback", async () => {
+    const cancelled = await call(seller, "/cancel", "POST", { reason: "too_expensive", comment: "  Sales are slow  " });
+    expect(cancelled.status).toBe(200);
+    expect(state.updates[0].params).toMatchObject({
+      cancel_at_period_end: true,
+      cancellation_details: { feedback: "too_expensive", comment: "Sales are slow" },
+      metadata: { cancelReason: "too_expensive" },
+    });
+    await call(seller, "/resume", "POST");
+    expect(state.updates[1].params.cancellation_details).toBeUndefined();
+    expect(state.updates[1].params.metadata.cancelReason).toBe("");
+  });
+
+  it("ignores an unknown reason instead of failing the cancel", async () => {
+    const cancelled = await call(seller, "/cancel", "POST", { reason: "drop table", comment: "x" });
+    expect(cancelled.status).toBe(200);
+    expect(state.updates[0].params.cancellation_details).toBeUndefined();
+    expect(state.updates[0].params.metadata.cancelReason).toBe("");
   });
 
   it("does not call Stripe again when already in the requested state", async () => {
