@@ -33,6 +33,7 @@ import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
 import { startCommunityPushJob } from "./lib/communityPush";
 import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
+import { startFreelancerAutoReleaseJob } from "./jobs/freelancerAutoRelease";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
 
@@ -100,6 +101,7 @@ const server = app.listen(port, (err) => {
   startCommunityPushJob();
   startScheduledPostPublisherJob();
   startPayoutReviewJob();
+  startFreelancerAutoReleaseJob();
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────
