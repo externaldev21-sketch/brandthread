@@ -1,11 +1,9 @@
 /**
  * The seller's store link with its three actions — copy, share, save QR —
- * for the Store link card (Share store, the Add Product publish sheet). Copying
- * or sharing marks the dashboard checklist's "Share your store" step done.
+ * for the Store link card (Share store, the Add Product publish sheet).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Share } from 'react-native';
-import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 
 import { useApi } from '@/lib/api';
@@ -13,7 +11,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { saveImageToCameraRoll } from '@/lib/aiToolMedia';
 import { storeQrDataUri } from '@/lib/storeQr';
-import { markStoreShared, sellerStoreLink } from '@/lib/storeShare';
+import { sellerStoreLink } from '@/lib/storeShare';
 
 export interface StoreLinkState {
   loading: boolean;
@@ -38,7 +36,6 @@ async function writeClipboard(text: string): Promise<void> {
 
 export function useStoreLink(): StoreLinkState {
   const api = useApi();
-  const { userId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<{ username: string | null; brandName: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -77,23 +74,21 @@ export function useStoreLink(): StoreLinkState {
     try {
       await writeClipboard(url);
       flash(setCopied);
-      void markStoreShared(userId);
     } catch {
       Alert.alert("Couldn't copy the link", 'Try again.');
     }
-  }, [url, userId]);
+  }, [url]);
 
   const share = useCallback(async () => {
     if (!url) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
       const name = profile?.brandName ?? (profile?.username ? `@${profile.username}` : 'my store');
-      const result = await Share.share({ message: `Shop ${name} on Brandthread: ${url}`, url });
-      if (result.action !== Share.dismissedAction) void markStoreShared(userId);
+      await Share.share({ message: `Shop ${name} on Brandthread: ${url}`, url });
     } catch {
       // dismissed or unavailable
     }
-  }, [profile, url, userId]);
+  }, [profile, url]);
 
   const saveQr = useCallback(async () => {
     if (!url) return;
@@ -101,14 +96,13 @@ export function useStoreLink(): StoreLinkState {
     const result = await saveImageToCameraRoll(storeQrDataUri(url), 'brandthread-store-qr');
     if (result.ok) {
       flash(setSaved);
-      void markStoreShared(userId);
       return;
     }
     Alert.alert(
       result.reason === 'permission' ? 'Photos access is off' : "Couldn't save the QR code",
       result.reason === 'permission' ? 'Allow Photos access in Settings to save your QR code.' : 'Try again.',
     );
-  }, [url, userId]);
+  }, [url]);
 
   return {
     loading, url, brandName: profile?.brandName ?? null, username: profile?.username ?? null,
