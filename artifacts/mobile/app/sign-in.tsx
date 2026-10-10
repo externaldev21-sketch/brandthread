@@ -64,7 +64,7 @@ export default function SignInScreen() {
   const clerk = useClerk();
 
   const router = useRouter();
-  const { addAccount, returnTo } = useLocalSearchParams<{ addAccount?: string; returnTo?: string }>();
+  const { addAccount, returnTo, email: emailParam } = useLocalSearchParams<{ addAccount?: string; returnTo?: string; email?: string }>();
   // Guest tapped an account-only action: come back to it after signing in.
   const afterSignIn = safeReturnTo(returnTo);
   const insets = useSafeAreaInsets();
@@ -86,7 +86,8 @@ export default function SignInScreen() {
   }, []);
 
   const [step, setStep]             = useState<AuthStep>('identifier');
-  const [identifier, setIdentifier] = useState('');
+  // Onboarding's "This email already has an account → Switch to it" passes the email along.
+  const [identifier, setIdentifier] = useState(typeof emailParam === 'string' ? emailParam : '');
   const [password, setPassword]     = useState('');
   const passwordRef = useRef<TextInput>(null);
   const [showPw, setShowPw]         = useState(false);

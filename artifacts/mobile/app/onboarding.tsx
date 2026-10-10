@@ -42,7 +42,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
-import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
+import { useAuth, useClerk, useSSO, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -63,6 +63,7 @@ import {
   type AppThemeId,
 } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { classifySignUpError, clerkErrorParam, existingAccountHeadline, findSessionForEmail } from '@/lib/signUpErrors';
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
 import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
 import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlanRecommendationStep';
@@ -188,8 +189,12 @@ function mapClerkError(err: any): string {
   const code  = (inner?.code ?? '').toLowerCase();
   const msg   = (inner?.message ?? inner?.longMessage ?? err?.message ?? '').toLowerCase();
 
-  if (code === 'form_identifier_exists')
-    return 'An account already exists with this email. Sign in instead.';
+  if (code === 'form_identifier_exists') {
+    const param = clerkErrorParam(err);
+    if (param === 'username') return 'That username is taken.';
+    if (param && param !== 'email_address') return 'Check your details and try again.';
+    return 'This email already has an account.';
+  }
   if (code === 'session_exists' || code === 'identifier_already_signed_in')
     return 'You are already signed in. Sign out to create another account.';
   if (code === 'form_password_pwned' || code === 'form_password_strength_insufficient')
@@ -211,8 +216,8 @@ function mapClerkError(err: any): string {
   if (code === 'form_identifier_not_found' || code === 'form_password_incorrect')
     return 'Incorrect email or password.';
 
-  if (msg.includes('that email address is taken') || (msg.includes('email') && msg.includes('already exists') && !msg.includes('session')))
-    return 'An account already exists with this email. Sign in instead.';
+  if (msg.includes('that email address is taken'))
+    return 'This email already has an account.';
   if (msg.includes('already signed in') || (msg.includes('session') && msg.includes('exists')))
     return 'You are already signed in. Sign out to create another account.';
   if (msg.includes('password') && (msg.includes('weak') || msg.includes('pwned')))
@@ -1142,6 +1147,8 @@ function SharedAuthStep({
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
+  const clerk = useClerk();
+  const api = useApi();
   const { apple: appleOAuthEnabled, google: googleOAuthEnabled } = oauthProviderVisibility(Platform.OS, {
     apple: useFeatureFlag('oauthAppleEnabled'),
     google: useFeatureFlag('oauthGoogleEnabled'),
@@ -1163,6 +1170,10 @@ function SharedAuthStep({
   const [error, setError]             = useState('');
   const [clearingSession, setClearSession] = useState(false);
   const [usernameError, setUsernameError] = useState('');
+  // Set only when Clerk says the EMAIL itself is taken (see lib/signUpErrors).
+  const [existingRole, setExistingRole] = useState<'buyer' | 'seller' | null>(null);
+  const [existingSessionId, setExistingSessionId] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
   // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
   // is required before any account is created (email, Google or Apple).
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -1233,13 +1244,10 @@ function SharedAuthStep({
     if (!requireConsent()) return;
     if (!requireAge()) return;
     if (!passwordsMatch) { setError('Passwords do not match.'); return; }
-    if (isSignedIn && !allowSignedInAccountCreation) {
-      const who = currentEmail ? `as ${currentEmail}` : 'with another account';
-      setError(`You are currently signed in ${who}. Tap "Sign out and create another account" below.`);
-      return;
-    }
     setLoading(true);
     setError('');
+    setUsernameError('');
+    const emailAddress = email.trim().toLowerCase();
     try {
       // Prefill name fields before account creation so draft restore gets them
       const fn = formFirstName.trim();
@@ -1247,33 +1255,66 @@ function SharedAuthStep({
       onFirstNamePrefill(fn);
       onLastNamePrefill(ln);
 
-      const { error: err } = await signUp.password({
-        emailAddress: email.trim().toLowerCase(),
-        password,
-      });
-      if (err) {
-        const inner = (err as any)?.errors?.[0] ?? err;
-        const errCode = ((inner as any)?.code ?? '').toLowerCase();
-        if (errCode === 'form_identifier_exists') {
-          setPhase('existing-account');
-        } else {
-          setError(mapClerkError(err));
-        }
-        return;
+      // Always start a fresh sign-up. signUp.password() PATCHes whatever
+      // sign-up the client still holds (an attempt abandoned at the code
+      // step), so a new email could inherit the old attempt's state.
+      let { error: err } = await signUp.create({ emailAddress, password });
+      if (err && classifySignUpError(err, '').kind === 'signed-in-elsewhere' && isSignedIn && !allowSignedInAccountCreation) {
+        // A leftover session (earlier test, preview, another account) must
+        // never block creating a new account: sign it out and go on.
+        await signOut();
+        ({ error: err } = await signUp.create({ emailAddress, password }));
       }
+      if (err) { handleCreateError(err, emailAddress); return; }
       await signUp.verifications.sendEmailCode();
       setPhase('verify');
     } catch (e: any) {
-      const excInner = e?.errors?.[0] ?? e;
-      const excCode  = (excInner?.code ?? '').toLowerCase();
-      if (excCode === 'form_identifier_exists') {
-        setPhase('existing-account');
-      } else {
-        setError(mapClerkError(e));
-      }
+      handleCreateError(e, emailAddress);
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleCreateError(err: unknown, emailAddress: string) {
+    const outcome = classifySignUpError(err, mapClerkError(err));
+    if (outcome.kind === 'email-exists') {
+      // Only Clerk naming the email field gets here. If that account is
+      // already signed in on this device, "Switch to it" is one tap.
+      const session = findSessionForEmail((clerk as any)?.client?.sessions, emailAddress);
+      setExistingSessionId(session?.id ?? null);
+      setExistingRole(null);
+      setPhase('existing-account');
+      const ownerId = session?.user?.id;
+      if (ownerId) {
+        api.auth.accountTypes?.([ownerId])
+          .then((res) => {
+            const type = res?.accountTypes?.[ownerId]?.accountType;
+            setExistingRole(type === 'buyer' || type === 'seller' ? type : null);
+          })
+          .catch(() => {});
+      }
+      return;
+    }
+    if (outcome.kind === 'username-taken') { setUsernameError(outcome.message); return; }
+    if (outcome.kind === 'signed-in-elsewhere') { setError(mapClerkError(err)); return; }
+    setError(outcome.message);
+  }
+
+  async function switchToExistingAccount() {
+    if (switching) return;
+    if (existingSessionId && clerk?.setActive) {
+      setSwitching(true);
+      try {
+        await clerk.setActive({ session: existingSessionId });
+        router.replace('/' as never);
+      } catch {
+        setSwitching(false);
+        setError("Couldn't switch accounts. Try again.");
+      }
+      return;
+    }
+    const query = `email=${encodeURIComponent(email.trim().toLowerCase())}${isSignedIn ? '&addAccount=1' : ''}`;
+    router.replace(`/sign-in?${query}` as never);
   }
 
   async function handleVerify() {
@@ -1334,56 +1375,28 @@ function SharedAuthStep({
     }
   }
 
-  // Already signed in
-  if (isSignedIn && phase === 'form' && !allowSignedInAccountCreation) {
-    return (
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
-          <StepHeadline>Already signed in</StepHeadline>
-          <StepSub>
-            {currentEmail ? `You are currently signed in as ${currentEmail}.` : 'You are currently signed in.'}
-            {'\n\n'}Sign out first to create a new account, or continue with your current account.
-          </StepSub>
-          <Reveal index={2} style={ssa.stack}>
-            <PillButton
-              label="Sign out and create another account"
-              onPress={handleClearSession}
-              loading={clearingSession}
-              disabled={clearingSession}
-            />
-            <PillButton label="Continue with current account →" variant="ghost" onPress={onAuthComplete} />
-          </Reveal>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    );
-  }
-
-  // Existing account
+  // Existing account: only when Clerk said this EMAIL is taken.
   if (phase === 'existing-account') {
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
-          <StepHeadline>Account exists.</StepHeadline>
-          <StepSub>An account already exists with this email.</StepSub>
+          <StepHeadline>{existingAccountHeadline(existingRole)}</StepHeadline>
           <Reveal index={2}>
             <View style={[ssa.existingEmailChip, { borderColor: theme.border }]}>
               <Feather name="mail" size={13} color={theme.muted} />
               <Text style={[ssa.existingEmailText, { color: theme.text }]}>{email}</Text>
             </View>
           </Reveal>
-          <Reveal index={3}>
-            <View style={[ssa.existingCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Text style={ssa.existingCardTitle}>Sign in to continue your Brandthread journey.</Text>
-              <Text style={ssa.existingCardSub}>Use your existing account to complete setup. Your onboarding answers are saved.</Text>
-            </View>
-          </Reveal>
-          <Reveal index={4} style={ssa.stack}>
-            <PillButton label="Sign in" onPress={() => router.replace('/sign-in' as never)} />
-            <PillButton
-              label="Use a different email"
-              variant="secondary"
-              onPress={() => { setPhase('form'); setEmail(''); setPassword(''); setConfirm(''); setError(''); }}
-            />
+          {error ? <InlineError message={error} /> : null}
+          <Reveal index={3} style={ssa.stack}>
+            <PillButton label="Switch to it" onPress={switchToExistingAccount} loading={switching} disabled={switching} />
+            <TouchableOpacity
+              style={ssa.resendBtn}
+              accessibilityRole="button"
+              onPress={() => { setPhase('form'); setEmail(''); setPassword(''); setConfirm(''); setError(''); setExistingSessionId(null); setExistingRole(null); }}
+            >
+              <Text style={[ssa.resendText, { color: theme.text }]}>Use a different email</Text>
+            </TouchableOpacity>
           </Reveal>
         </ScrollView>
       </KeyboardAvoidingView>
