@@ -1,10 +1,10 @@
 ---
-name: Onboarding billing target
-description: Owner's expected seller plan placement and trial terms
+name: Seller onboarding billing decision
+description: Owner-approved dashboard billing placement and trial policy
 ---
 
-**Rule:** The owner expects plan selection after the store preview, with a seven-day trial requiring a payment method.
+**Rule:** Keep billing on the seller dashboard rather than restoring plan selection after the onboarding store preview. Do not add the previously described seven-day, card-required onboarding trial.
 
-**Why:** The owner explicitly described this as the intended new seller onboarding experience. A fetched implementation or its description is not proof that these billing requirements are present.
+**Why:** After being told that the merged implementation uses dashboard billing and a five-day trial instead of the earlier described seven-day onboarding flow, the owner explicitly chose to keep the dashboard flow on 2026-10-09.
 
-**How to apply:** Verify the actual flow and provider configuration before reporting this target as implemented. Preserve native RevenueCat and web Stripe boundaries. Do not merely advertise seven days while the provider or server still enforces five, or collect raw card details in native onboarding.
+**How to apply:** Treat the earlier post-preview seven-day trial request as superseded. Leave current trial terms unchanged unless the owner requests a new billing change. Verify actual provider terms before advertising any trial duration, and preserve native RevenueCat and web Stripe boundaries.
