@@ -65,11 +65,11 @@ describe("seller launch checklist API", () => {
     authState.clerkUserId = sellerA;
     const { status, body } = await get();
     expect(status).toBe(200);
-    expect(body.total).toBe(8);
+    expect(body.total).toBe(9);
     expect(body.doneCount).toBe(0);
     expect(body.dismissed).toBe(false);
     expect(body.steps.map((s: any) => s.id)).toEqual([
-      "name_handle", "logo_banner", "accent", "socials", "first_product", "preview", "publish", "payouts",
+      "name_handle", "logo_banner", "accent", "socials", "first_product", "shipping", "preview", "publish", "payouts",
     ]);
   });
 
@@ -86,13 +86,14 @@ describe("seller launch checklist API", () => {
     }).where(eq(users.clerkId, sellerA));
     await db.insert(products).values({ ownerId: sellerA, name: "Tee" } as any);
     await db.insert(storefronts).values({ ownerId: sellerA, slug: `slug-${suffix}`, status: "published" });
+    await db.insert(shippingRates).values({ id: `rate-${suffix}`, sellerId: sellerA, name: "Standard", flatRateCents: 500 } as any);
 
     const { body } = await get();
-    for (const id of ["name_handle", "logo_banner", "accent", "socials", "first_product", "publish", "payouts"]) {
+    for (const id of ["name_handle", "logo_banner", "accent", "socials", "first_product", "shipping", "publish", "payouts"]) {
       expect(stepDone(body, id)).toBe(true);
     }
     expect(stepDone(body, "preview")).toBe(false);
-    expect(body.doneCount).toBe(7);
+    expect(body.doneCount).toBe(8);
     expect(body.handle).toBe(`atelier_${suffix}`);
   });
 
