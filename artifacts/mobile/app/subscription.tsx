@@ -604,12 +604,8 @@ const createStyles = (theme: AppThemePreset) => {
     borderColor: PURPLE,
     backgroundColor: CARD_ELEVATED,
     borderWidth: 2,
-    shadowColor: PURPLE,
-    shadowOpacity: 0.32,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 7,
-    transform: [{ scale: 1.015 }],
+    // The 2pt border carries the emphasis: no soft halo, and no resting
+    // scale (a 1.015x card re-samples every line of text in it).
   },
    growthComparison:   { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
    growthComparisonHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.lg },

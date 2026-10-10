@@ -24,7 +24,7 @@ import {
   SUCCESS, SUCCESS_DIM,
   BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, FILL_ELEVATED,
-  SHADOW, SHADOW_SM, TEXT_DISABLED,
+  SHADOW_SM, TEXT_DISABLED,
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -400,7 +400,8 @@ export function BrandthreadCard({ children, style, onPress, glow = false, elevat
     borderRadius: RADIUS.lg,
     // No border: cards sit on black (BRANDTHREAD_DESIGN.md, "Surfaces").
     padding: SP.md,
-    ...(glow ? { ...SHADOW, shadowColor: theme.accent } : {}),
+    // `glow` is a crisp hairline in the accent, never a soft halo.
+    ...(glow ? { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.accent } : {}),
   };
   if (onPress) {
     return (
@@ -431,7 +432,7 @@ export function GradientCard({ children, style, onPress, colors, glow = false }:
       colors={cardColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[gcS.card, glow && { ...SHADOW, shadowColor: theme.accent } as ViewStyle, style]}
+      style={[gcS.card, glow && { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.accent }, style]}
     >
       {children}
     </LinearGradient>

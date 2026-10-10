@@ -212,9 +212,6 @@
   "app/store-theme-picker.tsx": {
     "smearShadow": 2
   },
-  "app/subscription.tsx": {
-    "smearShadow": 2
-  },
   "app/tech-pack-generator.tsx": {
     "rnImage": 1
   },
