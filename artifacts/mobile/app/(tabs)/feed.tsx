@@ -14,6 +14,7 @@ import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
+import { ForYouEmptyShop } from '@/components/feed/ForYouEmptyShop';
 import { useSignInGate } from '@/hooks/useSignInGate';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -3134,6 +3135,7 @@ export default function FeedScreen({
                   <Text style={styles.findFriendsBtnText}>Find friends</Text>
                 </TouchableOpacity>
               )}
+              {feedTab === 'for-you' && isBuyerSurface && <ForYouEmptyShop width={pageWidth} />}
             </View>
           ) : null
         }
