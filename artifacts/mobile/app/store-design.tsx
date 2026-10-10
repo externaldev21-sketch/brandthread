@@ -38,7 +38,7 @@ import {
 import { saveBio } from '@/services/growthService';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { draftHistoryReducer, type DesignDraft } from '@/lib/storeDesignHistory';
 
 type Panel = 'theme' | 'header' | 'style';
@@ -169,7 +169,7 @@ export default function StoreDesignScreen() {
 
   if (failed && !page) return <View style={[s.root, { backgroundColor: theme.background }]}>{header}<ErrorState onRetry={reload} /></View>;
 
-  const sheetHeight = 360;
+  const sheetHeight = 400;
 
   return (
     <View style={[s.root, { backgroundColor: theme.background }]} testID="store-design-screen">
@@ -248,7 +248,7 @@ export default function StoreDesignScreen() {
                 onFocus={history.checkpoint}
                 onChangeText={(v) => history.type({ displayName: v })}
                 maxLength={60}
-                style={s.field}
+                style={[s.field, { borderColor: theme.border }]}
                 testID="store-design-name"
               />
               <Input
@@ -257,7 +257,7 @@ export default function StoreDesignScreen() {
                 onFocus={history.checkpoint}
                 onChangeText={(v) => history.type({ bio: v.replace(/\n/g, ' ') })}
                 maxLength={80}
-                style={s.field}
+                style={[s.field, { borderColor: theme.border }]}
                 testID="store-design-bio"
               />
             </ScrollView>
@@ -353,16 +353,17 @@ const s = StyleSheet.create({
   close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingBottom: 24, rowGap: 12 },
   themeCell: { width: '33.33%', alignItems: 'center', paddingHorizontal: 4 },
-  themeTile: { width: '100%', aspectRatio: 1, borderRadius: 12, padding: 10, justifyContent: 'space-between' },
-  themeAa: { fontSize: 22, fontWeight: '600' },
-  themeBtn: { height: 16, width: '100%' },
+  themeTile: { width: '100%', aspectRatio: 1.35, borderRadius: 12, padding: 10, justifyContent: 'space-between' },
+  themeAa: { fontSize: 20, fontWeight: '600' },
+  themeBtn: { height: 12, width: '100%' },
   themeLabel: { fontSize: 13, marginTop: 6 },
   panelBody: { paddingHorizontal: 16, paddingBottom: 24, gap: 12 },
   imageRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
   logoThumb: { width: 48, height: 48, borderRadius: 24 },
   bannerThumb: { width: 96, height: 32, borderRadius: 6 },
   rowTitle: { fontSize: 17 },
-  field: { marginTop: 4 },
+  // Inputs sit on the #1C1C1E sheet, the same fill as the field: a hairline outline keeps them visible.
+  field: { marginTop: 4, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md },
   optionRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
   option: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 18, borderRadius: 12 },
   sampleBtn: { width: '70%', height: 28 },

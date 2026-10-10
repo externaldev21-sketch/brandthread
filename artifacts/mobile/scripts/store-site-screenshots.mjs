@@ -46,6 +46,14 @@ const SHOTS = [
   { name: 'store-site-settings-add-link', route: '/store-site-settings', steps: [tap('store-settings-add-link')] },
 ];
 
+const SCREEN_MARKER = {
+  '/': 'seller-dashboard-share-store',
+  '/share-store': 'share-store-screen',
+  '/my-store': 'my-store-screen',
+  '/store-design': 'store-design-screen',
+  '/store-site-settings': 'store-site-settings',
+};
+
 let issues = 0;
 
 async function capture(browser, origin, mode, shots) {
@@ -56,13 +64,19 @@ async function capture(browser, origin, mode, shots) {
     const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images: {} });
     page.on('pageerror', (e) => console.log(`  [pageerror ${mode}/${shot.name}]`, e.message.slice(0, 160)));
     await openScreen(page, activity, origin, 'seller', '/', { extraQuery: extra });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
     const url = `${shot.route}${shot.route.includes('?') ? '&' : '?'}bt_preview=seller${extra}`;
-    await page.evaluate((target) => {
-      history.pushState(history.state, '', target);
-      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
-    }, url);
-    await page.waitForTimeout(3000);
+    // A startup redirect can race the first push; push again until the
+    // screen's own testID is on the page.
+    const marker = SCREEN_MARKER[shot.route.split('?')[0]];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await page.evaluate((target) => {
+        history.pushState(history.state, '', target);
+        window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+      }, url);
+      await page.waitForTimeout(2500);
+      if (!marker || await page.locator(`[data-testid="${marker}"]`).count()) break;
+    }
     try {
       for (const step of shot.steps ?? []) await step(page);
     } catch (e) {

@@ -28,7 +28,7 @@ import { FILL_ELEVATED } from '@/lib/theme';
 import { MAX_STORE_SITE_LINKS } from '@/lib/storeSiteDesign';
 import { normalizeUrlInput } from '@/lib/growthValidation';
 import { addBioLink, deleteBioLink, patchBioLink, saveBio, type BioLink } from '@/services/growthService';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 
 const SOCIALS = [
   { key: 'instagram', label: 'Instagram', placeholder: '@handle' },
@@ -208,7 +208,7 @@ function EditSheet({ editing, socials, onClose, onSaved, onError, ensurePage }: 
             </View>
             <View style={s.form}>
               {current?.kind === 'link' ? (
-                <Input label="Title" value={title} onChangeText={setTitle} maxLength={80} testID="store-settings-link-title" />
+                <Input label="Title" value={title} onChangeText={setTitle} maxLength={80} style={[s.field, { borderColor: theme.border }]} testID="store-settings-link-title" />
               ) : null}
               <Input
                 label={current?.kind === 'link' ? 'Link' : social?.placeholder ?? ''}
@@ -217,6 +217,7 @@ function EditSheet({ editing, socials, onClose, onSaved, onError, ensurePage }: 
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType={current?.kind === 'social' && current.key === 'email' ? 'email-address' : 'url'}
+                style={[s.field, { borderColor: theme.border }]}
                 testID="store-settings-value"
               />
               <Button label="Save" onPress={() => { void save(); }} loading={busy} fullWidth testID="store-settings-save" />
@@ -242,4 +243,6 @@ const s = StyleSheet.create({
   sheetTitle: { fontSize: 20, fontWeight: '700' },
   close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   form: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
+  // Inputs sit on the #1C1C1E sheet, the same fill as the field: a hairline outline keeps them visible.
+  field: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md },
 });
