@@ -319,6 +319,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const quickReplyScrollRefs = useRef<Record<string, ScrollView | null>>({});
   const api = useApi();
   const { userId } = useAuth();
+  const currentUserRef = useRef(userId);
+  currentUserRef.current = userId;
   const { startCall, callsAvailable } = useCallSession();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   // A sent/claimed/cancelled Thread Cash bubble's status is set once, in the
@@ -529,7 +531,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
 
       if (params.id) {
         const [cachedConv, cachedMsgs] = await Promise.all([getCachedConversation(params.id).catch(() => null), getCachedMessages(params.id).catch(() => [] as Message[])]);
-        if (!active) return;
+        if (currentUserRef.current !== userId) return;
         if (cachedConv) setConv(prev => prev ?? cachedConv);
         if (cachedMsgs.length) setMessages(prev => prev.length ? prev : cachedMsgs);
         loadedConv = await getConversation(params.id);

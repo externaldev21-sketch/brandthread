@@ -19,9 +19,9 @@ async function makeBuyer(): Promise<string> {
   return clerkId;
 }
 
-async function credit(buyerId: string, amountCents: number, daysAgo: number, source = "daily_checkin") {
+async function credit(buyerId: string, amountCents: number, daysAgo: number, source = "daily_checkin", funding: "promo" | "paid" = "promo") {
   await db.insert(threadCashEntries).values({
-    buyerId, amountCents, source, referenceId: crypto.randomUUID(),
+    buyerId, amountCents, source, funding, referenceId: crypto.randomUUID(),
     createdAt: new Date(Date.now() - daysAgo * DAY),
   });
 }
@@ -44,11 +44,26 @@ afterEach(async () => {
 });
 
 describe("thread cash expiry job", () => {
-  it("does nothing while expiry_days is unset", async () => {
+  it("with expiry_days unset, reward credit still expires after the policy's 90 days", async () => {
     const buyer = await makeBuyer();
-    await credit(buyer, 100, 400);
+    await credit(buyer, 100, 400); // lapsed under the 90-day policy
+    await credit(buyer, 40, 30);   // still live
     await runThreadCashExpiry();
-    expect(await getBalanceCents(db, buyer)).toBe(100);
+    expect(await getBalanceCents(db, buyer)).toBe(40);
+    expect((await getExpirySummary(buyer)).expiryDays).toBe(90);
+  });
+
+  it("a row can shorten expiry but never lengthen it past the policy", async () => {
+    await setConfig(365);
+    expect((await getExpirySummary(await makeBuyer())).expiryDays).toBe(90);
+  });
+
+  it("never expires paid funds, but does expire a promo Live gift (no dodging expiry by gifting)", async () => {
+    const seller = await makeBuyer();
+    await credit(seller, 300, 400, "live_gift", "paid");
+    await credit(seller, 200, 400, "live_gift", "promo");
+    await runThreadCashExpiry();
+    expect(await getBalanceCents(db, seller)).toBe(300);
   });
 
   it("expires only lapsed credit and is idempotent across runs", async () => {

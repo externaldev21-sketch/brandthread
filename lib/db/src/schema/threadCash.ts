@@ -150,3 +150,12 @@ export const threadCashDeviceClaims = pgTable('thread_cash_device_claims', {
   buyerIdx: index('thread_cash_device_claims_buyer_idx').on(t.buyerId, t.localDate),
 }));
 
+export const threadCashDeviceRewards = pgTable('thread_cash_device_rewards', {
+  deviceKey: text('device_key').notNull(),
+  buyerId: text('buyer_id').notNull(),
+  localDate: text('local_date').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, t => ({
+  pk: primaryKey({ columns: [t.deviceKey, t.buyerId, t.localDate] }),
+}));
+

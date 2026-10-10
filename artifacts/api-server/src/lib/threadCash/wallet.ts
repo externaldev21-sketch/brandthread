@@ -10,12 +10,15 @@
  * amount and have it credited.
  */
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 import {
-  blocks, db, follows, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks, threadCashDeviceClaims,
+  blocks, db, follows, orders, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks, threadCashDeviceClaims,
   threadCashTransfers, users,
 } from "@workspace/db";
 import { DEFAULT_THREAD_CASH_CONFIG, type ThreadCashConfig } from "./streaks";
+import { rewardsPolicy, type ThreadCashRewardsPolicy } from "./rewardsConfig";
+import { assertThreadCashEarnAllowed, claimDeviceReward, reserveRewardsBudget } from "./earnGate";
+import { postRewardIssued, postThreadCashSpendReturned, postThreadCashSpent } from "./liability";
 import { activeExpiryDays, redemptionCapViolation } from "./rules";
 import { postDueExpiries } from "./expiry";
 import {
@@ -44,10 +47,29 @@ function isUniqueViolation(error: any): boolean {
   return error?.code === "23505" || error?.cause?.code === "23505";
 }
 
+/**
+ * thread_cash_config, bounded by the env rewards policy (./rewardsConfig.ts):
+ * the row can tighten a limit but never loosen one past the policy — reward
+ * credit always expires (90 days by default), the streak bonus is capped,
+ * and peer sends keep the policy's age gate and daily caps.
+ */
+export function applyRewardsPolicy(config: ThreadCashConfig, policy: ThreadCashRewardsPolicy = rewardsPolicy()): ThreadCashConfig {
+  const rowExpiry = typeof config.expiryDays === "number" && config.expiryDays > 0 ? config.expiryDays : null;
+  return {
+    ...config,
+    streakBonusCents: Math.min(config.streakBonusCents, policy.streakBonusMaxCents),
+    expiryDays: Math.min(rowExpiry ?? policy.rewardExpiryDays, policy.rewardExpiryDays),
+    dailySendCapCents: Math.min(config.dailySendCapCents, policy.sendDailyCapCents),
+    dailyReceiveCapCents: Math.min(config.dailyReceiveCapCents, policy.receiveDailyCapCents),
+    minAccountAgeHoursForSend: Math.max(config.minAccountAgeHoursForSend, policy.sendMinAccountAgeDays * 24),
+    maxCheckInsPerDevicePerDay: Math.min(config.maxCheckInsPerDevicePerDay, policy.deviceMaxAccountsPerDay),
+  };
+}
+
 export async function getThreadCashConfig(executor: DbExecutor = db): Promise<ThreadCashConfig> {
   const [row] = await executor.select().from(threadCashConfig).where(eq(threadCashConfig.id, "default")).limit(1);
-  if (!row) return DEFAULT_THREAD_CASH_CONFIG;
-  return {
+  if (!row) return applyRewardsPolicy(DEFAULT_THREAD_CASH_CONFIG);
+  return applyRewardsPolicy({
     dailyAmountCents: row.dailyAmountCents,
     streakBonusCents: row.streakBonusCents,
     streakBonusDays: row.streakBonusDays,
@@ -58,7 +80,7 @@ export async function getThreadCashConfig(executor: DbExecutor = db): Promise<Th
     dailyReceiveCapCents: row.dailyReceiveCapCents,
     minAccountAgeHoursForSend: row.minAccountAgeHoursForSend,
     maxCheckInsPerDevicePerDay: row.maxCheckInsPerDevicePerDay,
-  };
+  });
 }
 
 export async function getBalanceCents(executor: DbExecutor, buyerId: string): Promise<number> {
@@ -71,11 +93,12 @@ export async function getBalanceCents(executor: DbExecutor, buyerId: string): Pr
 
 /**
  * The part of a balance that may be cashed out to real money: PAID-funded
- * Thread Cash received from other people (Live gifts, message payments), less
- * paid money already cashed out or spent, capped at the balance. Promo credit
- * — platform rewards, including promo a buyer gifted — is spendable in the
- * app but never cashable (lib/threadCash/funding.ts). This narrows the older
- * "earned − cashed out" rule: only real buyer-paid money is withdrawable.
+ * Thread Cash received as Live gifts, less paid money already cashed out or
+ * spent, capped at the balance. Promo credit — check-in, streak, referral,
+ * refund and promo credit, and anything a buyer relayed from it — and every
+ * peer send are spendable in the app but never cashable
+ * (lib/threadCash/funding.ts). Only money a person actually paid in is
+ * withdrawable.
  */
 export async function getCashableBalanceCents(executor: DbExecutor, userId: string): Promise<number> {
   return (await getFundingBalances(executor, userId)).cashableCents;
@@ -163,6 +186,33 @@ async function claimDeviceDailyReward(tx: DbExecutor, award: CheckInAward): Prom
 }
 
 /**
+ * Inserts one day's reward rows after the per-device cap and the monthly
+ * budget (lib/threadCash/earnGate.ts) admit them, and books each on the
+ * money ledger as a marketing expense owed to the buyer. Called inside the
+ * award transaction, after the buyer's own locks; the budget lock is last.
+ */
+async function insertDailyRewardRows(tx: DbExecutor, award: CheckInAward, dailyNote: string): Promise<void> {
+  await claimDeviceReward(tx, { buyerId: award.buyerId, deviceId: award.deviceId, localDate: award.localDate });
+  await reserveRewardsBudget(tx, award.earnedCents + Math.max(0, award.streakBonusCents));
+  const rows: Array<{ source: string; amountCents: number; note: string }> = [
+    { source: "daily_checkin", amountCents: award.earnedCents, note: dailyNote },
+  ];
+  if (award.streakBonusCents > 0) {
+    rows.push({ source: "streak_bonus", amountCents: award.streakBonusCents, note: `Streak bonus (${award.localDate})` });
+  }
+  for (const row of rows) {
+    const [entry] = await tx.insert(threadCashEntries).values({
+      buyerId: award.buyerId,
+      amountCents: row.amountCents,
+      source: row.source,
+      referenceId: award.localDate,
+      note: row.note,
+    }).returning({ id: threadCashEntries.id });
+    await postRewardIssued(tx, { entryId: entry.id, buyerId: award.buyerId, amountCents: row.amountCents, source: row.source });
+  }
+}
+
+/**
  * Awards one day's Thread Cash (and streak bonus, if any) exactly once per
  * buyer-local calendar date. The unique index on
  * (buyer_id, reference_id) WHERE source = 'daily_checkin' is the ultimate
@@ -171,6 +221,8 @@ async function claimDeviceDailyReward(tx: DbExecutor, award: CheckInAward): Prom
 export async function awardDailyCheckInOnce(
   award: CheckInAward,
 ): Promise<{ created: boolean }> {
+  // Server-side kill switch, before any lock is taken (reads flags on the pool).
+  await assertThreadCashEarnAllowed();
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-checkin:${award.buyerId}:${award.localDate}`}))`);
     await assertThreadCashNotFrozen(tx, award.buyerId);
@@ -188,22 +240,7 @@ export async function awardDailyCheckInOnce(
 
     await claimDeviceDailyReward(tx, award);
 
-    await tx.insert(threadCashEntries).values({
-      buyerId: award.buyerId,
-      amountCents: award.earnedCents,
-      source: "daily_checkin",
-      referenceId: award.localDate,
-      note: `Daily check-in (${award.localDate})`,
-    });
-    if (award.streakBonusCents > 0) {
-      await tx.insert(threadCashEntries).values({
-        buyerId: award.buyerId,
-        amountCents: award.streakBonusCents,
-        source: "streak_bonus",
-        referenceId: award.localDate,
-        note: `Streak bonus (${award.localDate})`,
-      });
-    }
+    await insertDailyRewardRows(tx, award, `Daily check-in (${award.localDate})`);
     return { created: true };
   });
 }
@@ -272,6 +309,7 @@ export async function awardDailyActiveTimeClaimOnce(
       "THREAD_CASH_NOT_ENOUGH_ACTIVE_TIME",
     );
   }
+  await assertThreadCashEarnAllowed();
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-checkin:${award.buyerId}:${award.localDate}`}))`);
     await assertThreadCashNotFrozen(tx, award.buyerId);
@@ -298,22 +336,7 @@ export async function awardDailyActiveTimeClaimOnce(
 
     await claimDeviceDailyReward(tx, award);
 
-    await tx.insert(threadCashEntries).values({
-      buyerId: award.buyerId,
-      amountCents: award.earnedCents,
-      source: "daily_checkin",
-      referenceId: award.localDate,
-      note: `Daily Thread Cash (${award.localDate})`,
-    });
-    if (award.streakBonusCents > 0) {
-      await tx.insert(threadCashEntries).values({
-        buyerId: award.buyerId,
-        amountCents: award.streakBonusCents,
-        source: "streak_bonus",
-        referenceId: award.localDate,
-        note: `Streak bonus (${award.localDate})`,
-      });
-    }
+    await insertDailyRewardRows(tx, award, `Daily Thread Cash (${award.localDate})`);
     return { created: true };
   });
 }
@@ -507,10 +530,12 @@ export async function consumeThreadCashRedemption(
       eq(threadCashEntries.checkoutSessionId, checkoutRecordId),
       isNull(threadCashEntries.usedAt),
     ))
-    .returning({ id: threadCashEntries.id });
+    .returning({ id: threadCashEntries.id, amountCents: threadCashEntries.amountCents });
   if (!consumed) {
     throw new ThreadCashError("The Thread Cash discount could not be finalized for this order.", 409, "THREAD_CASH_TOKEN_NOT_RESERVED");
   }
+  // Spent: no longer owed to the buyer; Brandthread funds the seller's top-up.
+  await postThreadCashSpent(transaction, { orderId, amountCents: -consumed.amountCents });
 }
 
 /**
@@ -686,6 +711,7 @@ export async function refundThreadCashSpend(
     note: `Thread Cash returned from refunded order ${orderId}`,
     usedOrderId: orderId,
   }, { promoCents: amountCents - paidCents, paidCents });
+  await postThreadCashSpendReturned(transaction, { orderId, amountCents });
   return { created: true };
 }
 
@@ -737,6 +763,16 @@ async function sendableBalanceCents(executor: DbExecutor, buyerId: string): Prom
   const spent = Number(row?.spent ?? 0);
   const heldReceived = Math.max(0, received - spent);
   return Math.max(0, balance - heldReceived);
+}
+
+/** Whether the user has at least one paid order that was not cancelled or refunded. */
+async function hasPaidOrder(executor: DbExecutor, buyerId: string): Promise<boolean> {
+  const [row] = await executor.select({ id: orders.id }).from(orders).where(and(
+    eq(orders.buyerId, buyerId),
+    isNotNull(orders.paidAt),
+    notInArray(orders.status, ["cancelled", "refunded", "refund_pending"]),
+  )).limit(1);
+  return !!row;
 }
 
 async function rollingWindowCents(
@@ -831,6 +867,15 @@ export async function sendThreadCash(
           "THREAD_CASH_ACCOUNT_TOO_NEW",
         );
       }
+      // Only a real customer can send: a farm of fresh alt accounts with no
+      // purchase can't relay their sign-up/check-in credit to one wallet.
+      if (!(await hasPaidOrder(tx, senderId))) {
+        throw new ThreadCashError(
+          "You can send Thread Cash after your first order.",
+          403,
+          "THREAD_CASH_SENDER_NO_PAID_ORDER",
+        );
+      }
 
       const sendable = await sendableBalanceCents(tx, senderId);
       if (amountCents > sendable) {
@@ -847,7 +892,18 @@ export async function sendThreadCash(
       if (sentToday + amountCents > config.dailySendCapCents) {
         throw new ThreadCashError("You've reached today's Thread Cash sending limit.", 400, "THREAD_CASH_DAILY_SEND_CAP");
       }
-      const receivedTodayByRecipient = await rollingWindowCents(tx, recipientId, "send_received");
+      // Every send addressed to the recipient in the window, claimed or still
+      // pending — counting only claimed ones would let several senders queue
+      // past the cap and have it all claimed at once.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-send-receive:${recipientId}`}))`);
+      const [inbound] = await tx.select({ total: sql<string>`COALESCE(SUM(${threadCashTransfers.amountCents}), 0)` })
+        .from(threadCashTransfers)
+        .where(and(
+          eq(threadCashTransfers.recipientId, recipientId),
+          inArray(threadCashTransfers.status, ["pending", "claimed"]),
+          gt(threadCashTransfers.createdAt, sql`now() - interval '24 hours'`),
+        ));
+      const receivedTodayByRecipient = Number(inbound?.total ?? 0);
       if (receivedTodayByRecipient + amountCents > config.dailyReceiveCapCents) {
         throw new ThreadCashError("This person has reached today's Thread Cash receiving limit.", 400, "THREAD_CASH_DAILY_RECEIVE_CAP");
       }

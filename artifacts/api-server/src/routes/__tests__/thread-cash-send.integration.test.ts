@@ -13,18 +13,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.setConfig({ testTimeout: 10_000, hookTimeout: 10_000 });
 import { and, eq } from "drizzle-orm";
 import {
-  blocks, db, follows, threadCashConfig, threadCashEntries, threadCashStreaks, threadCashTransfers, users,
+  blocks, db, follows, orders, threadCashEntries, threadCashStreaks, threadCashTransfers, users,
 } from "@workspace/db";
 import {
   cancelThreadCash,
   claimThreadCash,
   getBalanceCents,
+  getCashableBalanceCents,
+  getThreadCashConfig,
   sendThreadCash,
 } from "../../lib/threadCash/wallet";
 
 const testUserIds: string[] = [];
 
-async function makeUser(agedHours = 48): Promise<string> {
+/** By default an 8-day-old account with one paid order — eligible to send. */
+async function makeUser(agedHours = 8 * 24, options: { paidOrder?: boolean } = {}): Promise<string> {
   const clerkId = `thread-cash-send-test-${crypto.randomUUID()}`;
   testUserIds.push(clerkId);
   await db.insert(users).values({
@@ -33,6 +36,17 @@ async function makeUser(agedHours = 48): Promise<string> {
     name: "Test User",
     createdAt: new Date(Date.now() - agedHours * 3_600_000),
   });
+  if (options.paidOrder !== false) {
+    await db.insert(orders).values({
+      ownerId: `thread-cash-send-test-seller-${crypto.randomUUID()}`,
+      buyerId: clerkId,
+      orderNumber: `TCS-${crypto.randomUUID().slice(0, 8)}`,
+      status: "processing",
+      totalCents: 2_500,
+      subtotalCents: 2_500,
+      paidAt: new Date(),
+    });
+  }
   return clerkId;
 }
 
@@ -53,6 +67,7 @@ afterEach(async () => {
   while (testUserIds.length > 0) {
     const id = testUserIds.pop()!;
     await db.delete(threadCashTransfers).where(eq(threadCashTransfers.senderId, id));
+    await db.delete(orders).where(eq(orders.buyerId, id));
     await db.delete(threadCashEntries).where(eq(threadCashEntries.buyerId, id));
     await db.delete(threadCashStreaks).where(eq(threadCashStreaks.buyerId, id));
     await db.delete(follows).where(eq(follows.followerId, id));
@@ -87,7 +102,7 @@ describe("sendThreadCash", () => {
   });
 
   it("rejects a send from an account younger than the minimum age", async () => {
-    const a = await makeUser(1); // 1 hour old, default minimum is 24h
+    const a = await makeUser(1); // 1 hour old, default minimum is 7 days
     const b = await makeUser();
     await makeMutualFollow(a, b);
     await grant(a, 500);
@@ -95,6 +110,60 @@ describe("sendThreadCash", () => {
     await expect(
       sendThreadCash(a, b, 100, { idempotencyKey: crypto.randomUUID() }),
     ).rejects.toMatchObject({ code: "THREAD_CASH_ACCOUNT_TOO_NEW" });
+  });
+
+  it("rejects a send from a 3-day-old account (the minimum is 7 days by default)", async () => {
+    const a = await makeUser(72);
+    const b = await makeUser();
+    await makeMutualFollow(a, b);
+    await grant(a, 500);
+
+    await expect(
+      sendThreadCash(a, b, 100, { idempotencyKey: crypto.randomUUID() }),
+    ).rejects.toMatchObject({ code: "THREAD_CASH_ACCOUNT_TOO_NEW" });
+  });
+
+  it("rejects a send from an account that has never placed a paid order", async () => {
+    const a = await makeUser(8 * 24, { paidOrder: false });
+    const b = await makeUser();
+    await makeMutualFollow(a, b);
+    await grant(a, 500);
+
+    await expect(
+      sendThreadCash(a, b, 100, { idempotencyKey: crypto.randomUUID() }),
+    ).rejects.toMatchObject({ code: "THREAD_CASH_SENDER_NO_PAID_ORDER" });
+    expect(await getBalanceCents(db, a)).toBe(500);
+  });
+
+  it("caps what one receiver can be sent per day across every sender, pending sends included", async () => {
+    const { dailyReceiveCapCents, dailySendCapCents } = await getThreadCashConfig();
+    const receiver = await makeUser();
+    const senders = await Promise.all(Array.from({ length: 3 }, () => makeUser()));
+    const each = Math.min(dailySendCapCents, Math.ceil(dailyReceiveCapCents / 2));
+    for (const sender of senders) {
+      await makeMutualFollow(sender, receiver);
+      await grant(sender, each);
+    }
+    await sendThreadCash(senders[0], receiver, each, { idempotencyKey: crypto.randomUUID() });
+    await sendThreadCash(senders[1], receiver, dailyReceiveCapCents - each, { idempotencyKey: crypto.randomUUID() });
+    // Neither send is claimed yet; the receiver is still at the cap.
+    await expect(
+      sendThreadCash(senders[2], receiver, 1, { idempotencyKey: crypto.randomUUID() }),
+    ).rejects.toMatchObject({ code: "THREAD_CASH_DAILY_RECEIVE_CAP" });
+  });
+
+  it("received Thread Cash is promo credit: spendable, never cashable", async () => {
+    const a = await makeUser();
+    const b = await makeUser();
+    await makeMutualFollow(a, b);
+    await grant(a, 500);
+    const { transferId } = await sendThreadCash(a, b, 300, { idempotencyKey: crypto.randomUUID() });
+    await claimThreadCash(transferId, b);
+
+    const rows = await db.select().from(threadCashEntries).where(eq(threadCashEntries.buyerId, b));
+    expect(rows.map((r) => [r.source, r.funding])).toEqual([["send_received", "promo"]]);
+    expect(await getBalanceCents(db, b)).toBe(300);
+    expect(await getCashableBalanceCents(db, b)).toBe(0);
   });
 
   it("allows a mutual-follow send and moves funds out of the sender's balance immediately", async () => {
@@ -148,8 +217,8 @@ describe("sendThreadCash", () => {
       Array.from({ length: 20 }, () => sendThreadCash(a, b, 100, { idempotencyKey: crypto.randomUUID() })),
     );
     const succeeded = results.filter((r) => r.status === "fulfilled").length;
-    // 5 sends of 100 exhaust the 500 balance; the daily send cap (default
-    // $20) also caps it at 5×100 — either way, never more than the balance.
+    // 5 sends of 100 exhaust the 500 balance; the daily caps (default $10
+    // sent / $20 received) bound it too — either way, never more than the balance.
     expect(succeeded).toBeLessThanOrEqual(5);
     expect(await getBalanceCents(db, a)).toBeGreaterThanOrEqual(0);
   });
@@ -158,8 +227,8 @@ describe("sendThreadCash", () => {
     const a = await makeUser();
     const b = await makeUser();
     await makeMutualFollow(a, b);
-    const [config] = await db.select().from(threadCashConfig).limit(1);
-    const cap = config?.dailySendCapCents ?? 2000;
+    // The effective cap: thread_cash_config bounded by the env policy.
+    const cap = (await getThreadCashConfig()).dailySendCapCents;
     await grant(a, cap * 3);
 
     await sendThreadCash(a, b, cap, { idempotencyKey: crypto.randomUUID() });

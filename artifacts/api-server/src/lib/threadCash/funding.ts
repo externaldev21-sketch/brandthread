@@ -6,7 +6,7 @@
  *           withdrawable, and it stays promo when a buyer gifts it to a
  *           seller.
  *   paid  — money a buyer actually paid for Thread Cash. There is no
- *           purchase source yet (migration 306 backfilled everything as
+ *           purchase source yet (migration 261 backfilled everything as
  *           promo); a future one only has to write `funding: 'paid'`.
  *
  * Every row of thread_cash_entries carries one funding. Rules:
@@ -21,8 +21,14 @@
  *    sender's debit consumed (two rows when mixed).
  *  - Reversals (cancelled redemption/send, expiry) restore exactly what was
  *    consumed; a refund of checkout spend restores paid first.
- *  - Withdrawable (cashable) = min(balance, paid balance, paid received from
- *    others − paid cashed out). Promo is never cashable; cash-outs debit paid.
+ *  - Withdrawable (cashable) = min(balance, paid balance, paid Live gifts
+ *    received − paid cashed out). Promo is never cashable; cash-outs debit
+ *    paid. A peer send is never cashable even when paid-funded: send is a
+ *    friend-to-friend spend rail, not an earnings rail (revenue audit BT-106).
+ *
+ * Ported from the open PR "promo Thread Cash never withdrawable" (same names,
+ * same column) so the two merge cleanly; the only difference is that
+ * `send_received` is not an earned (cashable) source here.
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db, threadCashEntries } from "@workspace/db";
@@ -34,14 +40,14 @@ export type ThreadCashFunding = "promo" | "paid";
 export type FundingSplit = { promoCents: number; paidCents: number };
 
 export const FUNDING_SHIFT_SOURCE = "funding_shift";
-/** Credits from other people: the only paid money a seller may withdraw. */
-export const EARNED_SOURCES = ["live_gift", "send_received"] as const;
+/** Credits from other people that a seller may withdraw when paid-funded. */
+export const EARNED_SOURCES = ["live_gift"] as const;
 
 export type FundingBalances = {
   balanceCents: number;
   promoCents: number;
   paidCents: number;
-  /** Withdrawable: paid money received from others, not yet cashed out or spent. */
+  /** Withdrawable: paid Live gifts received, not yet cashed out or spent. */
   cashableCents: number;
 };
 
@@ -50,7 +56,7 @@ export async function getFundingBalances(executor: DbExecutor, userId: string): 
     balance: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}), 0)`,
     promo: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.funding} = 'promo'), 0)`,
     paid: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.funding} = 'paid'), 0)`,
-    paidEarned: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.funding} = 'paid' AND ${threadCashEntries.source} IN ('live_gift', 'send_received')), 0)`,
+    paidEarned: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.funding} = 'paid' AND ${threadCashEntries.source} = 'live_gift'), 0)`,
     paidCashedOut: sql<string>`COALESCE(SUM(-${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.funding} = 'paid' AND ${threadCashEntries.source} = 'cash_out'), 0)`,
   }).from(threadCashEntries).where(eq(threadCashEntries.buyerId, userId));
   const balanceCents = Number(row?.balance ?? 0);

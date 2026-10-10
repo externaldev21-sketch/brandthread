@@ -7,11 +7,13 @@
  * GET /api/admin/refunds?limit=&offset=
  * GET /api/admin/disputes?status=open|closed|all&limit=&offset=
  * GET /api/admin/revenue?days=30
+ * GET /api/admin/thread-cash/liability   outstanding Thread Cash owed + this month's rewards budget
  */
 import { Router } from "express";
 import { and, count, desc, eq, gte, ilike, inArray, isNotNull, or, sql, sum } from "drizzle-orm";
 import { boosts, db, disputes, orderItems, orders, users } from "@workspace/db";
 import { UUID_RE, clampDays, likePattern, pageParams, queryString } from "./util";
+import { getThreadCashLiabilityReport } from "../../lib/threadCash/liability";
 
 const router = Router();
 
@@ -207,6 +209,15 @@ router.get("/revenue", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Admin revenue failed");
     return res.status(500).json({ error: "Could not load revenue." });
+  }
+});
+
+router.get("/thread-cash/liability", async (req, res) => {
+  try {
+    return res.json(await getThreadCashLiabilityReport());
+  } catch (err) {
+    req.log.error({ err }, "Admin Thread Cash liability failed");
+    return res.status(500).json({ error: "Could not load Thread Cash liability." });
   }
 });
 

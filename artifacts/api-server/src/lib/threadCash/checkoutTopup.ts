@@ -91,3 +91,26 @@ export async function applyThreadCashSellerTopup(
     });
   });
 }
+
+/**
+ * Retries top-ups that should have gone out but didn't (Stripe down, seller
+ * account not ready). A hold-mode order is released by a sweep days after
+ * payment, long after any webhook redelivery could retry its top-up.
+ * Idempotent: applyThreadCashSellerTopup no-ops once the transfer is recorded.
+ */
+export async function sweepThreadCashSellerTopups(
+  stripeClient: StripeLike | null,
+  options: { now?: Date; limit?: number } = {},
+): Promise<number> {
+  const since = new Date((options.now ?? new Date()).getTime() - 60 * 86_400_000);
+  const due = await db.select({ id: orders.id }).from(orders).where(sql`
+    ${orders.threadCashAppliedCents} > 0
+    AND ${orders.stripeThreadCashTransferId} IS NULL
+    AND ${orders.status} NOT IN ('cancelled', 'refunded', 'refund_pending')
+    AND ${orders.paidAt} >= ${since}
+    AND (${orders.chargeModel} = 'destination'
+      OR (${orders.chargeModel} = 'transfer' AND ${orders.fundsState} = 'released'))
+  `).limit(options.limit ?? 100);
+  for (const { id } of due) await applyThreadCashSellerTopup(stripeClient, id);
+  return due.length;
+}

@@ -16,6 +16,7 @@ import {
 } from "./lots";
 import { EXPIRY_WARNING_DAYS, activeExpiryDays } from "./rules";
 import { getThreadCashConfig } from "./wallet";
+import { postRewardExpired } from "./liability";
 
 type DbExecutor = Pick<typeof db, "select" | "insert" | "update" | "execute">;
 
@@ -27,6 +28,7 @@ export async function loadLedgerEntries(executor: DbExecutor, buyerId: string): 
       source: threadCashEntries.source,
       referenceId: threadCashEntries.referenceId,
       note: threadCashEntries.note,
+      funding: threadCashEntries.funding,
       createdAt: threadCashEntries.createdAt,
     })
     .from(threadCashEntries)
@@ -57,7 +59,11 @@ export async function postDueExpiries(executor: DbExecutor, buyerId: string, exp
       idempotencyKey: key,
       note: `Expired $${(lot.remainingCents / 100).toFixed(2)} Thread Cash earned ${lot.earnedAt.toISOString().slice(0, 10)}`,
     }).onConflictDoNothing().returning({ id: threadCashEntries.id });
-    if (inserted.length > 0) expired += lot.remainingCents;
+    if (inserted.length > 0) {
+      expired += lot.remainingCents;
+      // No longer owed: reverse the liability booked when it was issued.
+      await postRewardExpired(executor, { lotEntryId: lot.entryId, buyerId, amountCents: lot.remainingCents });
+    }
   }
   return expired;
 }
@@ -96,7 +102,8 @@ const BATCH = 500;
 async function candidateBuyers(from: Date | null, to: Date): Promise<string[]> {
   const conditions = [
     gt(threadCashEntries.amountCents, 0),
-    ne(threadCashEntries.source, "live_gift"),
+    // Paid funds never expire; every promo credit (incl. a promo Live gift) does.
+    ne(threadCashEntries.funding, "paid"),
     lte(threadCashEntries.createdAt, to),
     ...(from ? [gt(threadCashEntries.createdAt, from)] : []),
   ];

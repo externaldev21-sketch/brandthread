@@ -9,13 +9,14 @@ import { Router } from "express";
 import { and, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, sql, sum } from "drizzle-orm";
 import { adminAuditLog, aiUsageEvents, boostReviews, boosts, db, disputes, orders, reports, users } from "@workspace/db";
 import { clampDays, likePattern, pageParams, queryString } from "./util";
+import { accountBalanceCents } from "../../lib/money/ledger";
 
 const router = Router();
 
 router.get("/overview", async (req, res) => {
   const since = new Date(Date.now() - 30 * 86_400_000);
   try {
-    const [[people], [sales], [open], [disp], [pendingBoosts]] = await Promise.all([
+    const [[people], [sales], [open], [disp], [pendingBoosts], threadCashLiabilityCents] = await Promise.all([
       db.select({
         total: count(),
         sellers: sql<number>`count(*) FILTER (WHERE ${users.accountType} IN ('seller','both'))`,
@@ -30,6 +31,8 @@ router.get("/overview", async (req, res) => {
       db.select({ n: count() }).from(boosts)
         .leftJoin(boostReviews, eq(boostReviews.boostId, boosts.id))
         .where(and(isNotNull(boosts.paidAt), isNull(boostReviews.boostId))),
+      // Thread Cash owed to holders, per the money ledger (detail: /thread-cash/liability).
+      accountBalanceCents(db, { account: "thread_cash_liability" }),
     ]);
     return res.json({
       users: Number(people?.total ?? 0),
@@ -42,6 +45,7 @@ router.get("/overview", async (req, res) => {
       openReports: Number(open?.n ?? 0),
       openDisputes: Number(disp?.n ?? 0),
       boostsAwaitingReview: Number(pendingBoosts?.n ?? 0),
+      threadCashLiabilityCents,
     });
   } catch (err) {
     req.log.error({ err }, "Admin overview failed");
