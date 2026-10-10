@@ -2213,10 +2213,13 @@ export default function AddProductScreen() {
             if (id) router.replace(('/product-detail?id=' + id) as never);
           },
         }}
-        secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
-        // A newly published product: hand the seller the one Share store sheet.
-        tertiaryAction={publishSuccess?.kind === 'created' && currentStatus === 'active'
+        // A newly published product: hand the seller the one Share store sheet
+        // (then Done moves to a text button under it).
+        secondaryAction={publishSuccess?.kind === 'created' && currentStatus === 'active'
           ? { label: 'Share store', onPress: () => { shareStoreAfterClose.current = true; setPublishSuccess(null); } }
+          : { label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
+        tertiaryAction={publishSuccess?.kind === 'created' && currentStatus === 'active'
+          ? { label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }
           : undefined}
         testID="add-product-success-sheet"
       />
