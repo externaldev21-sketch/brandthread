@@ -42,13 +42,12 @@ describe('detail screens never fetch without their required id', () => {
     expect(guardIdx).toBeLessThan(returnsFetchIdx);
   });
 
-  it('refund-detail.tsx returns before fetching when orderId is missing', () => {
+  it('refund-detail.tsx goes back before redirecting when orderId is missing', () => {
     const source = read('app/refund-detail.tsx');
-    const loadStart = source.indexOf('const load = useCallback(async () => {');
-    const guardIdx = source.indexOf('if (!orderId) {', loadStart);
-    const fetchIdx = source.indexOf('api.orders.get(orderId)', loadStart);
+    const guardIdx = source.indexOf('if (!orderId) {');
+    const redirectIdx = source.indexOf('router.replace(refundSheetHref(orderId)');
     expect(guardIdx).toBeGreaterThan(-1);
-    expect(guardIdx).toBeLessThan(fetchIdx);
+    expect(guardIdx).toBeLessThan(redirectIdx);
   });
 
   it('fulfill-order.tsx returns before fetching when orderId is missing', () => {

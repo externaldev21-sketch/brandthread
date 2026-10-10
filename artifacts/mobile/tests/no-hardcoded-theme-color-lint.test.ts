@@ -229,7 +229,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/quote-compare.tsx',
   'app/quote-detail.tsx',
   'app/quote-request.tsx',
-  'app/refund-detail.tsx',
   'app/sample-detail.tsx',
   'app/seller-conversation.tsx',
   'app/seller-drop-preview.tsx',

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
+import { FONT } from '@/lib/theme';
 
 interface StatCardProps {
   label: string;
@@ -45,7 +46,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 6,
   },
-  value: { fontSize: 22, fontWeight: '700', fontFamily: 'Inter_700Bold' },
-  label: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  change: { fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 2 },
+  value: { fontSize: 22, fontWeight: '700', fontFamily: FONT.bold },
+  label: { fontSize: 11, fontFamily: FONT.regular },
+  change: { fontSize: 11, fontFamily: FONT.medium, marginTop: 2 },
 });
