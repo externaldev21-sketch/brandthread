@@ -34,11 +34,11 @@ export function storeSiteChecklist(i: StoreSiteChecklistInput): StoreSiteStep[] 
   const steps: StoreSiteStep[] = [];
   const add = (id: StoreSiteStepId, title: string, detail: string, action: string, done: boolean) =>
     steps.push({ id, title, detail, action, done: done || skipped.has(id) });
-  add('logo_bio', 'Add your logo and bio', 'Show buyers who you are at the top of your site.', 'Add logo and bio', i.hasLogo && i.bio.trim().length > 0);
-  add('products', 'Add your products', 'Products you publish show up on your site.', 'Add a product', i.productCount > 0);
+  add('logo_bio', 'Add your logo and bio', 'Shown at the top of your site.', 'Add logo and bio', i.hasLogo && i.bio.trim().length > 0);
+  add('products', 'Add your products', 'Products you publish appear on your site.', 'Add a product', i.productCount > 0);
   add('socials', 'Add your socials', 'Link your Instagram, TikTok and more.', 'Add socials', i.socialCount > 0);
-  add('design', 'Customize your design', 'Pick a theme, buttons and font for your site.', 'Customize design', i.designSaved);
-  add('share', 'Share your link', 'Put your link in your Instagram and TikTok bio.', 'Share link', i.linkShared);
+  add('design', 'Customize your design', 'Pick a theme, buttons and a font.', 'Customize design', i.designSaved);
+  add('share', 'Share your link', 'Put your link in your Instagram bio.', 'Share link', i.linkShared);
   return steps;
 }
 
