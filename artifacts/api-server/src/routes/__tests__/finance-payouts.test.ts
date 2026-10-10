@@ -39,6 +39,7 @@ vi.mock("../../middlewares/requireRole", () => ({
 }));
 
 vi.mock("../notifications-feed", () => ({ publishNotification: async () => undefined }));
+vi.mock("../../lib/admin/payoutControls", () => ({ isPayoutHeld: async () => false }));
 
 // seller_payouts reads are covered against a real database in
 // lib/money/__tests__/sellerPayouts.integration.test.ts.

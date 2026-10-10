@@ -26,7 +26,7 @@ export default function Join() {
       { icon: Wallet, title: "Get paid through Stripe", body: "Sellers pay by card or Apple Pay. Payouts go to your bank in your currency." },
     ]
     : [
-      { icon: BadgeCheck, title: "Live in minutes", body: "No approval queue. Your listing appears in the directory as soon as you finish." },
+      { icon: BadgeCheck, title: "Listed once verified", body: "Your listing appears in the directory once your email, phone and payouts are verified." },
       { icon: Camera, title: "Show your factory", body: "Photos, years in business, MOQ and turnaround — what brands look for first." },
       { icon: Wallet, title: "Get paid through Stripe", body: "Price samples and bulk orders in chat. Sellers pay by card or Apple Pay." },
     ];
@@ -55,7 +55,7 @@ export default function Join() {
                 <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-5xl">
                   <span className="text-primary">{resolved.data.sellerName}</span> wants to make their collection with {resolved.data.companyName ?? "you"}.
                 </h1>
-                <p className="max-w-xl text-lg text-muted-foreground">Create your free manufacturer account to start working together on Brandthread.</p>
+                <p className="max-w-xl text-lg text-muted-foreground">Create your manufacturer account to start working together on Brandthread. Free to join. 5% + processing on paid orders.</p>
               </>
             ) : (
               <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-6" data-testid="status-invite-invalid">
@@ -75,10 +75,10 @@ export default function Join() {
           ) : (
             <>
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/50 px-3 py-1 font-mono text-xs text-muted-foreground">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-primary" /> Free for manufacturers
+                <span className="h-2 w-2 animate-pulse rounded-full bg-primary" /> Free to join. 5% + processing on paid orders.
               </div>
               <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-5xl">List your factory where new fashion brands look for makers.</h1>
-              <p className="max-w-xl text-lg text-muted-foreground">Add your business, photos and experience. You're live in the Brandthread directory the moment you finish.</p>
+              <p className="max-w-xl text-lg text-muted-foreground">Add your business, photos and experience. You're listed in the Brandthread directory once your profile is verified.</p>
             </>
           )}
 

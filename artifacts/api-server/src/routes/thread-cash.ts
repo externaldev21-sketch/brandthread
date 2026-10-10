@@ -102,6 +102,7 @@ function sendNoRewardToday(res: any, error: ThreadCashError, balanceCents: numbe
     balanceCents,
   });
 }
+import { CHECKOUT_PAUSED_ERROR, isThreadCashPaused, pausedRewardBody } from "../lib/threadCash/killSwitch";
 
 const router = Router();
 router.use(requireAuth);
@@ -187,6 +188,8 @@ router.get("/", async (req, res) => {
 // the DB enforces one row per (buyer, date).
 router.post("/check-in", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  // Admin kill switch (BT-448): answer "nothing today" so the client stops retrying.
+  if (await isThreadCashPaused("rewards")) { res.json(pausedRewardBody(await getBalanceCents(db, buyerId))); return; }
   const timezone = normalizeTimezone(req.body?.timezone);
   const deviceId = typeof req.body?.deviceId === "string" ? req.body.deviceId.slice(0, 128) : null;
 
@@ -298,6 +301,7 @@ router.post("/daily/heartbeat", async (req, res) => {
 // as /check-in — see that handler's note.
 router.post("/daily/claim", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  if (await isThreadCashPaused("rewards")) { res.json(pausedRewardBody(await getBalanceCents(db, buyerId))); return; }
   const timezone = normalizeTimezone(req.body?.timezone);
   const deviceId = typeof req.body?.deviceId === "string" ? req.body.deviceId.slice(0, 128) : null;
   const activeSeconds = Math.max(0, Math.floor(Number(req.body?.activeSeconds)) || 0);
@@ -423,6 +427,7 @@ router.get("/ledger", async (req, res) => {
 // can fund the discount without changing seller payout (see PR description).
 router.post("/redeem", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  if (await isThreadCashPaused("checkout")) { res.status(403).json(CHECKOUT_PAUSED_ERROR); return; }
   if (!(await isFeatureEnabled("threadCashCheckoutDiscount"))) {
     res.status(403).json({
       error: "Spending Thread Cash at checkout isn't available yet.",

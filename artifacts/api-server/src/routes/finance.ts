@@ -45,6 +45,12 @@ import { listSellerRecoveries, payoutPauseForRecovery } from "../lib/money/selle
 import { z } from "@workspace/api-zod";
 import { bodyObject, validateInput } from "../lib/commerceValidation";
 import { listSellerPayouts, paidToBankCents as syncedPaidToBankCents, upsertPayoutFromApi } from "../lib/money/sellerPayouts";
+import { isPayoutHeld } from "../lib/admin/payoutControls";
+
+const PAYOUTS_ON_HOLD = {
+  error: "Payouts on this account are paused while our team reviews it. Contact support for details.",
+  code: "PAYOUTS_ON_HOLD",
+} as const;
 
 const router = Router();
 router.use(requireAuth);
@@ -669,6 +675,7 @@ router.get("/statement.csv", requirePayoutsRead(), async (req, res) => {
 router.post("/payout", requirePermission("payouts"), validateInput({ body: payoutBody }), async (req, res) => {
   const sellerId = getSellerId(req);
   if (await denyIfAgeRestricted(sellerId, res)) return;
+  if (await isPayoutHeld("seller", sellerId)) { res.status(409).json(PAYOUTS_ON_HOLD); return; }
   const { amount, currency, idempotencyKey } = req.body;
   const methodInput = req.body?.method;
 
@@ -1163,6 +1170,7 @@ router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
 
 router.patch("/payout-schedule", requirePermission("payouts"), validateInput({ body: payoutScheduleBody }), async (req, res) => {
   const sellerId = getSellerId(req);
+  if (await isPayoutHeld("seller", sellerId)) { res.status(409).json(PAYOUTS_ON_HOLD); return; }
   try {
     const parsed = validateScheduleInput(req.body);
     if (!parsed.ok) {

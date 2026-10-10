@@ -20,6 +20,7 @@ const onboardBody = bodyObject({
 });
 import { requireStripe, stripe } from "../lib/stripe";
 import { allowedWebOrigins, getWebOrigin } from "../lib/webOrigin";
+import { applyNewAccountPayoutDelay } from "../lib/admin/payoutControls";
 import {
   APP_REFRESH_DEEP_LINK,
   APP_RETURN_DEEP_LINK,
@@ -117,6 +118,8 @@ async function ensureConnectAccount(client: Stripe, clerkUserId: string) {
     .update(users)
     .set({ stripeAccountId: account.id, stripeAccountStatus: "pending", updatedAt: new Date() })
     .where(eq(users.clerkId, clerkUserId));
+  // New accounts start with a payout delay (BT-471); never blocks onboarding.
+  await applyNewAccountPayoutDelay({ partyType: "seller", partyId: clerkUserId, stripeAccountId: account.id, client });
   return { stripeAccountId: account.id, created: true };
 }
 

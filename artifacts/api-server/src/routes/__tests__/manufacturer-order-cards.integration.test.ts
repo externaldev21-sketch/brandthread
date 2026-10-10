@@ -11,6 +11,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { eq, inArray, like } from "drizzle-orm";
+import { MANUFACTURER_TERMS_VERSION } from "../../lib/manufacturerTrust";
 import {
   db, manufacturerActivityEvents, manufacturerInviteTokens, manufacturerMessages, manufacturerOrderEvents,
   manufacturerRelationships, manufacturerThreads, manufacturers, sampleOrders, users,
@@ -108,7 +109,7 @@ async function call(path: string, method = "GET", body?: unknown, as?: string) {
 }
 
 async function seedFactory(overrides: Partial<typeof manufacturers.$inferInsert> = {}) {
-  const [row] = await db.insert(manufacturers).values({
+  const [row] = await db.insert(manufacturers).values({ verificationStatus: "verified",
     clerkId: `${prefix}-mfr-${manufacturerIds.length}`,
     businessName: `${prefix} Saigon Knit ${manufacturerIds.length}`,
     country: "Vietnam", city: "Ho Chi Minh City", specialty: "Knitwear",
@@ -211,7 +212,8 @@ describe("manufacturer order card → payment → tracker", () => {
     const checkout = await call(`/api/sample-orders/${orderId}/checkout-session`, "POST", { returnUrl: returnUrl(orderId) }, seller);
     expect(checkout.status).toBe(201);
     expect(stripeState.created[0].payment_intent_data).toMatchObject({
-      application_fee_amount: 425, transfer_data: { destination: "acct_recipient_vn" },
+      // 5% (425) + card processing passed through (2.9% + 30¢ = 277), BT-452.
+      application_fee_amount: 702, transfer_data: { destination: "acct_recipient_vn" },
     });
     expect(stripeState.created[0].line_items[0].price_data).toMatchObject({ currency: "usd", unit_amount: 8_500 });
     stripeState.sessions.get(checkout.body.sessionId)!.payment_status = "paid";
@@ -407,6 +409,7 @@ describe("private seller invites", () => {
     const registered = await call(`/api/manufacturers/register-via-invite/${token}`, "POST", {
       businessName: `${prefix} Lisbon Leather`, country: "Portugal", specialty: "Leather Goods",
       yearsInBusiness: 22, moq: 50, priceRange: "$40 - $120", bulkTurnaround: "30 days", sampleTurnaround: "14 days",
+      acceptedTermsVersion: MANUFACTURER_TERMS_VERSION,
     }, privateUser);
     expect(registered.status).toBe(201);
     expect(registered.body).toMatchObject({ isPublicDirectory: false, status: "active", timeZone: "Europe/Lisbon", invitedBySellerId: seller });

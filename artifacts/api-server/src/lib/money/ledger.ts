@@ -18,6 +18,12 @@ import { db, ledgerPostings, ledgerTransactions } from "@workspace/db";
 import { MoneyError } from "./fees";
 
 export const LEDGER_ACCOUNTS = {
+  /** B2B chargebacks (lib/b2b/disputes.ts): paid to a freelancer (party = freelancer id). */
+  freelancer_paid: "freelancer_paid",
+  /** A hirer's freelancer-job payment Brandthread still holds (never paid out). */
+  freelancer_escrow: "freelancer_escrow",
+  /** Stripe's fee on a lost B2B (sample/bulk card, freelancer job) chargeback. */
+  b2b_dispute_fees: "b2b_dispute_fees",
   /** Money paid in by buyers (negative) and refunded to them (positive). */
   buyer_payments: "buyer_payments",
   /** Preorder funds Brandthread holds for a seller (party = seller, per drop). */

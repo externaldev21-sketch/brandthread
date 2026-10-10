@@ -299,3 +299,277 @@ export function matchesMutedWords(text: string | null | undefined, phrases: read
     return pattern.test(haystack);
   });
 }
+
+// ─── Off-platform contact / payment steering (manufacturer chat) ─────────────
+//
+// Seller↔manufacturer messages are scanned for contact details (email, phone,
+// messaging-app IDs, websites) and off-platform payment details or phrasing
+// (IBAN/SWIFT/account numbers, PayPal/Wise/Zelle/…, "pay me directly", T/T).
+// Before the pair's first paid order, identifier spans are masked; phrasing is
+// flagged but left readable. See routes/manufacturers.ts.
+
+export type OffPlatformKind =
+  | 'email'
+  | 'phone'
+  | 'messaging_id'
+  | 'link'
+  | 'iban'
+  | 'swift'
+  | 'bank_account'
+  | 'payment_handle'
+  | 'payment_app'
+  | 'off_platform_payment'
+  | 'contact_request';
+
+/** Kinds that describe moving payment off Brandthread (vs. sharing contact details). */
+export const OFF_PLATFORM_PAYMENT_KINDS: ReadonlySet<OffPlatformKind> = new Set([
+  'iban', 'swift', 'bank_account', 'payment_handle', 'payment_app', 'off_platform_payment',
+]);
+
+export const OFF_PLATFORM_MASK = '[hidden until first order]';
+
+export interface OffPlatformMatch {
+  kind: OffPlatformKind;
+  /** Character range in the original text. Absent for phrasing-only flags. */
+  start?: number;
+  end?: number;
+}
+
+export interface OffPlatformDetection {
+  kinds: OffPlatformKind[];
+  matches: OffPlatformMatch[];
+}
+
+/**
+ * Same-length normalization so match offsets map straight back onto the
+ * original text: lowercase, full-width forms → ASCII, ideographic full stop →
+ * ".", zero-width characters → spaces.
+ */
+function sameLengthNormalize(text: string): string {
+  let out = '';
+  for (const ch of text) {
+    const code = ch.codePointAt(0)!;
+    let mapped = ch;
+    if (code >= 0xff01 && code <= 0xff5e) mapped = String.fromCharCode(code - 0xfee0);
+    else if (code === 0x3002 || code === 0xff61) mapped = '.';
+    else if (code === 0x3000) mapped = ' ';
+    else if (/[​-‍⁠﻿]/.test(ch)) mapped = ' ';
+    const lower = mapped.toLowerCase();
+    // Keep offsets stable: only accept mappings that keep UTF-16 length.
+    out += lower.length === ch.length ? lower : (mapped.length === ch.length ? mapped : ch);
+  }
+  return out;
+}
+
+const TLDS = 'com|net|org|cn|co|io|vn|in|pk|bd|tr|uk|de|it|pt|es|fr|hk|tw|kr|jp|me|biz|info|email|us|ca|au|id|th|ph|my|mx|br|ru|nl|pl|ae|sa|eg|ma|lk|kh|mm|so|store|shop|online|site|xyz';
+
+// name@domain.tld, with optional spaces and (at)/[at]/{at} and (dot)/[dot] tokens.
+const EMAIL_SYMBOLIC = new RegExp(
+  String.raw`[a-z0-9][a-z0-9._%+\-]*\s*(?:@|\(\s*at\s*\)|\[\s*at\s*\]|\{\s*at\s*\}|<\s*at\s*>)\s*[a-z0-9\-]+(?:\s*(?:\.|\(\s*dot\s*\)|\[\s*dot\s*\]|\{\s*dot\s*\}|<\s*dot\s*>)\s*[a-z0-9\-]+)*\s*(?:\.|\(\s*dot\s*\)|\[\s*dot\s*\]|\{\s*dot\s*\}|<\s*dot\s*>)\s*[a-z]{2,10}\b`,
+  'g',
+);
+// "john at gmail dot com" — spelled out, so require a known TLD to stay precise.
+const EMAIL_SPELLED = new RegExp(
+  String.raw`\b[a-z0-9][a-z0-9._%+\-]{1,}\s+at\s+[a-z0-9\-]+(?:\s+dot\s+[a-z0-9\-]+)*\s+dot\s+(?:${TLDS})\b`,
+  'g',
+);
+// "my gmail is john.factory88"
+const EMAIL_PROVIDER_HANDLE = /\b(?:gmail|g-mail|hotmail|outlook|yahoo|icloud|protonmail|proton\s*mail|qq\s*mail|163\s*mail|126\s*mail)\b\s*(?:id|address|account)?\s*(?:is|:|=|-|->)?\s*[a-z0-9][a-z0-9._\-]{3,}/g;
+
+const MESSAGING_APPS = String.raw`we\s*chat|weixin|wei\s*xin|wx|vx|whats\s*app|whatsapp|wa\.me|telegram|t\.me|skype|viber|kakao\s*talk|kakao|zalo|line\s*id|imo|signal\s*(?:app|number|id)`;
+// App name followed by an ID / handle / number.
+const MESSAGING_ID = new RegExp(
+  String.raw`\b(?:${MESSAGING_APPS})\b\s*(?:id|number|no\.?|#|account|handle|username)?\s*(?:is|:|=|-|->|@|\/)?\s*@?[a-z0-9+][a-z0-9_.\-+]{3,}`,
+  'g',
+);
+// App mentioned as a place to talk ("add me on WhatsApp", "let's move to WeChat").
+const MESSAGING_MENTION = new RegExp(
+  String.raw`\b(?:add|message|text|ping|dm|contact|reach|find|call|chat\s+with|talk\s+(?:to|with))\s+(?:me|us)\s+(?:on|via|in|through|at)\s+(?:${MESSAGING_APPS})\b|\b(?:move|continue|talk|chat|switch)\s+(?:this\s+)?(?:to|on|over\s+to)\s+(?:${MESSAGING_APPS})\b|\b(?:my|our)\s+(?:${MESSAGING_APPS})\b`,
+  'g',
+);
+
+// Links. File-sharing links (tech packs, artwork) stay readable.
+const LINK = new RegExp(
+  String.raw`\b(?:https?:\/\/|www\.)[^\s<>()]+|(?<![@\w.\-])[a-z0-9][a-z0-9\-]{1,62}(?:\.[a-z0-9\-]{2,62})*\.(?:${TLDS})(?:\/[^\s<>()]*)?(?![a-z0-9@])`,
+  'g',
+);
+const ALLOWED_LINK_HOSTS = /(?:^|\.)(?:brandthread\.app|drive\.google\.com|docs\.google\.com|dropbox\.com|wetransfer\.com|we\.tl|figma\.com|canva\.com|onedrive\.live\.com|1drv\.ms|box\.com|icloud\.com)$/;
+
+const IBAN = /\b[a-z]{2}\d{2}(?:\s?[a-z0-9]{4}){2,7}(?:\s?[a-z0-9]{1,4})?\b/g;
+const SWIFT = /\b(?:swift|bic)(?:\s*(?:\/\s*bic|code|no\.?|number))?\s*(?:is|:|=|-|#)?\s*[a-z]{4}[a-z]{2}[a-z0-9]{2}(?:[a-z0-9]{3})?\b/g;
+const BANK_ACCOUNT = /\b(?:iban|account\s*(?:number|no\.?|#)|acct\s*(?:number|no\.?|#)?|a\/c\s*(?:no\.?)?|routing\s*(?:number|no\.?|#)?|aba|sort\s*code|bsb|ifsc|clabe)\s*(?:is|:|=|-|#)?\s*[a-z0-9][a-z0-9\s\-]{5,40}[a-z0-9]/g;
+
+const PAYMENT_HANDLE = /\b(?:paypal\.me|venmo\.com|cash\.app|wise\.com\/pay)\/[^\s]+|\b(?:venmo|cash\s*app|cashapp)\s*(?:is|:|=|-)?\s*[@$][a-z0-9_\-]{2,}|\$[a-z][a-z0-9_\-]{2,}\b/g;
+const PAYMENT_APP = /\b(?:pay\s*pal|paypal|zelle|cash\s*app|cashapp|venmo|western\s+union|moneygram|alipay|wechat\s*pay|weixin\s*pay|payoneer|revolut|transferwise|skrill|remitly|world\s*remit)\b|\b(?:via|through|by|with|use|using|on|over)\s+wise\b|\bwise\s+(?:transfer|account|payment|invoice)\b/g;
+const OFF_PLATFORM_PAYMENT = [
+  /\bpay(?:ing|ment)?\s+(?:me|us|you|him|her|them)?\s*(?:directly|direct|outside|off\s*(?:the\s+)?(?:app|platform|brandthread|site))\b/g,
+  /\b(?:direct|bank|wire|telegraphic)\s+(?:bank\s+)?(?:transfer|payment|deposit)\b/g,
+  /\bwire\s+(?:the\s+)?(?:money|funds|payment|deposit|balance)\b/g,
+  /\bt\s*\/\s*t\b/g,
+  /\b(?:outside|off)\s+(?:of\s+)?(?:brandthread|the\s+app|the\s+platform|this\s+app|this\s+platform|the\s+site)\b/g,
+  /\b(?:avoid|save|skip|split|dodge|cut)\s+(?:the\s+)?(?:brandthread\s+|platform\s+|app\s+|stripe\s+)?(?:fees?|commission|cut)\b/g,
+  /\b(?:skip|bypass|go\s+around)\s+(?:brandthread|the\s+platform|the\s+app|this\s+app)\b/g,
+  /\b(?:send|invoice)\s+(?:you|u)\s+(?:an?\s+|my\s+|our\s+)?(?:invoice|payment\s+link)\s+(?:directly|by\s+email|via\s+email|outside)\b/g,
+  /\b(?:i'?ll|we'?ll|let\s+me|we\s+can)\s+invoice\s+(?:you|u)\s+(?:directly|by\s+email|via\s+email|outside)\b/g,
+];
+const CONTACT_REQUEST = [
+  /\b(?:send|give|share|drop|dm)\s+(?:me|us)\s+(?:your|ur)\s+(?:e-?mail|email\s+address|phone|phone\s+number|number|cell|mobile|whats\s*app|we\s*chat|contact(?:\s+info|\s+details)?)\b/g,
+  /\b(?:what'?s|what\s+is)\s+(?:your|ur)\s+(?:e-?mail|phone\s+number|number|whats\s*app|we\s*chat|contact)\b/g,
+  /\b(?:e-?mail|call|text|phone|ring)\s+(?:me|us)\s+(?:at|on)\b/g,
+  /\b(?:my|our)\s+(?:e-?mail|phone|phone\s+number|number|cell|mobile)\s+(?:is|:)/g,
+];
+
+// ── Phone numbers ──
+const NUMBER_WORD = String.raw`zero|oh|one|two|three|four|five|six|seven|eight|nine`;
+const NUMBER_WORDS: Record<string, string> = {
+  zero: '0', oh: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9',
+};
+// Runs of digits / number words separated by spaces, dots, dashes, parens or slashes.
+const PHONE_CANDIDATE = new RegExp(
+  String.raw`(?:\+|\b00)?\s*(?:\(\s*)?(?:\d|\b(?:${NUMBER_WORD})\b)(?:[\s().\-\/_]{0,3}(?:\d|\b(?:${NUMBER_WORD})\b)){6,}`,
+  'g',
+);
+const PHONE_KEYWORD_BEFORE = /(?:phone|tel|telephone|call|text|sms|whats\s*app|whatsapp|wa|we\s*chat|wechat|viber|mobile|cell|number|contact|reach\s+me|hotline|landline|fax)\s*(?:is|:|=|-|#|at|on|no\.?)?\s*$/;
+const NOT_PHONE_BEFORE = /(?:\$|usd|us\$|eur|€|£|¥|rmb|cny|price|cost|total|budget|moq|qtys?|quantit(?:y|ies)|lots?|batch(?:es)?|tiers?|pcs|pieces|units|order\s*(?:#|no\.?|number|id)?|po\s*(?:#|no\.?)?|invoice\s*(?:#|no\.?)?|tracking\s*(?:#|no\.?|number)?|awb|sku|style\s*(?:#|no\.?)?|item\s*(?:#|no\.?)?|ref\s*(?:#|no\.?)?|size[sd]?|sizes?:|#)\s*:?\s*$/;
+const NOT_PHONE_AFTER = /^\s*(?:pcs|pieces|units|pc|sets|yards|yds|meters|metres|m\b|cm|mm|in\b|inch|inches|kg|kgs|g\b|gsm|lbs?|oz|usd|dollars|eur|rmb|cny|%|x\b|days|weeks|colors|colours|styles|skus)/;
+const DATE_LIKE = /^\(?\s*(?:\d{4}[\s.\-\/]\d{1,2}[\s.\-\/]\d{1,2}|\d{1,2}[\s.\-\/]\d{1,2}[\s.\-\/]\d{2,4})\s*\)?$/;
+const TIME_RANGE_LIKE = /^\d{1,2}[:.]\d{2}\s*-\s*\d{1,2}[:.]\d{2}$/;
+
+function phoneDigits(candidate: string): { digits: string; groups: string[] } {
+  const converted = candidate.replace(new RegExp(String.raw`\b(?:${NUMBER_WORD})\b`, 'g'), (word) => NUMBER_WORDS[word] ?? word);
+  const groups = converted.split(/[^\d]+/).filter(Boolean);
+  return { digits: groups.join(''), groups };
+}
+
+function isPhoneCandidate(norm: string, start: number, end: number): boolean {
+  const candidate = norm.slice(start, end).trim();
+  const { digits, groups } = phoneDigits(candidate);
+  if (digits.length < 7 || digits.length > 15) return false;
+  const before = norm.slice(Math.max(0, start - 24), start);
+  const after = norm.slice(end, end + 12);
+  const international = /^\s*(?:\+|00)/.test(norm.slice(start, end));
+  // Order / PO / tracking / style numbers and prices win over a generic "number" keyword.
+  if (NOT_PHONE_BEFORE.test(before) && !international) return false;
+  const keyword = PHONE_KEYWORD_BEFORE.test(before);
+  if (!keyword && NOT_PHONE_AFTER.test(after)) return false;
+  if (/^[\d\s]*$/.test(candidate) === false && DATE_LIKE.test(candidate)) return false;
+  if (DATE_LIKE.test(candidate) && !keyword && !international) return false;
+  if (TIME_RANGE_LIKE.test(candidate)) return false;
+  // Lists of sizes / quantities ("36 38 40 42 44", "100 200 300"): same-length,
+  // strictly increasing groups that don't start with 0.
+  if (!international && !keyword && groups.length >= 3) {
+    const sameLength = groups.every((g) => g.length === groups[0].length && g.length <= 4);
+    const increasing = groups.every((g, i) => i === 0 || Number(g) > Number(groups[i - 1]));
+    if (sameLength && increasing && !groups[0].startsWith('0') && groups[0].length >= 2) return false;
+  }
+  if (international || keyword) return digits.length >= 7;
+  return digits.length >= 9 || (digits.length >= 8 && groups.length >= 2 && groups.every((g) => g.length <= 4));
+}
+
+function collect(pattern: RegExp, text: string, kind: OffPlatformKind, out: OffPlatformMatch[], keepSpan = true,
+  accept?: (start: number, end: number, value: string) => boolean) {
+  pattern.lastIndex = 0;
+  for (let m = pattern.exec(text); m; m = pattern.exec(text)) {
+    if (m[0].length === 0) { pattern.lastIndex += 1; continue; }
+    let start = m.index;
+    let end = m.index + m[0].length;
+    // Trim surrounding whitespace / trailing punctuation from the span.
+    while (start < end && /\s/.test(text[start])) start++;
+    while (end > start && /[\s.,;:!?)]/.test(text[end - 1])) end--;
+    if (accept && !accept(start, end, text.slice(start, end))) continue;
+    out.push(keepSpan ? { kind, start, end } : { kind });
+  }
+}
+
+/** Find off-platform contact details and payment steering in a message. */
+export function detectOffPlatformContact(raw: string | null | undefined): OffPlatformDetection {
+  if (!raw || !raw.trim()) return { kinds: [], matches: [] };
+  const norm = sameLengthNormalize(raw);
+  const matches: OffPlatformMatch[] = [];
+
+  collect(EMAIL_SYMBOLIC, norm, 'email', matches);
+  collect(EMAIL_SPELLED, norm, 'email', matches);
+  collect(EMAIL_PROVIDER_HANDLE, norm, 'email', matches);
+  // Spaced-out letters: "j o h n @ g m a i l . c o m".
+  {
+    const indexMap: number[] = [];
+    let compact = '';
+    for (let i = 0; i < norm.length; i++) {
+      if (!/\s/.test(norm[i])) { compact += norm[i]; indexMap.push(i); }
+    }
+    const compactEmail = /[a-z0-9][a-z0-9._%+\-]*@[a-z0-9\-]+(?:\.[a-z0-9\-]+)*\.[a-z]{2,10}/g;
+    for (let m = compactEmail.exec(compact); m; m = compactEmail.exec(compact)) {
+      const start = indexMap[m.index];
+      const end = indexMap[m.index + m[0].length - 1] + 1;
+      // Only for genuinely spaced-out text; ordinary emails are found above.
+      const tokens = norm.slice(start, end).split(/\s+/).filter(Boolean);
+      const singles = tokens.filter((token) => token.length === 1).length;
+      if (tokens.length >= 6 && singles / tokens.length >= 0.6) matches.push({ kind: 'email', start, end });
+    }
+  }
+  collect(MESSAGING_ID, norm, 'messaging_id', matches, true, (_s, _e, value) => {
+    // The handle must look like an ID: contain a digit, an underscore, or
+    // follow an explicit "id"/":"/"@" marker.
+    return /\d|_/.test(value) || /(?:\bid\b|:|@|=)/.test(value);
+  });
+  collect(MESSAGING_MENTION, norm, 'messaging_id', matches, false);
+  collect(LINK, norm, 'link', matches, true, (_s, _e, value) => {
+    if (value.includes('@')) return false;
+    const host = value.replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[\/?#]/)[0];
+    if (ALLOWED_LINK_HOSTS.test(host)) return false;
+    // Ignore things like "2.5cm", "v1.0" and file names ("techpack.pdf").
+    if (/\.(?:pdf|png|jpe?g|ai|psd|zip|xlsx?|docx?|csv)$/.test(host)) return false;
+    return /[a-z]/.test(host.split('.')[0] ?? '');
+  });
+  collect(IBAN, norm, 'iban', matches, true, (_s, _e, value) => {
+    const compact = value.replace(/\s/g, '');
+    return compact.length >= 15 && compact.length <= 34 && /\d{6,}/.test(compact.replace(/[a-z]/g, '')) && /^[a-z]{2}\d{2}/.test(compact);
+  });
+  collect(SWIFT, norm, 'swift', matches);
+  collect(BANK_ACCOUNT, norm, 'bank_account', matches, true, (_s, _e, value) => /\d{4,}/.test(value.replace(/[\s\-]/g, '')));
+  collect(PAYMENT_HANDLE, norm, 'payment_handle', matches, true, (start) => {
+    // "$20" etc. are prices: the $handle form must start with a letter (enforced by the pattern).
+    return start >= 0;
+  });
+  collect(PAYMENT_APP, norm, 'payment_app', matches, false);
+  for (const pattern of OFF_PLATFORM_PAYMENT) collect(pattern, norm, 'off_platform_payment', matches, false);
+  for (const pattern of CONTACT_REQUEST) collect(pattern, norm, 'contact_request', matches, false);
+
+  PHONE_CANDIDATE.lastIndex = 0;
+  for (let m = PHONE_CANDIDATE.exec(norm); m; m = PHONE_CANDIDATE.exec(norm)) {
+    let start = m.index;
+    let end = m.index + m[0].length;
+    while (start < end && /[\s(]/.test(norm[start])) start++;
+    while (end > start && /[\s.\-\/_(]/.test(norm[end - 1])) end--;
+    if (norm[start - 1] && /[a-z0-9]/.test(norm[start - 1]) && !/\b(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)$/.test(norm.slice(0, start))) {
+      // Part of a longer token (an SKU like "AB12345678"): not a phone.
+      if (/[a-z]/.test(norm[start - 1])) continue;
+    }
+    if (norm[end] && /[a-z]/.test(norm[end]) && !/\s/.test(norm[end])) continue;
+    if (isPhoneCandidate(norm, start, end)) matches.push({ kind: 'phone', start, end });
+  }
+
+  const kinds = [...new Set(matches.map((m) => m.kind))];
+  return { kinds, matches };
+}
+
+/** Replace detected identifier spans with OFF_PLATFORM_MASK. Phrasing-only flags are left as written. */
+export function maskOffPlatformContact(raw: string, detection = detectOffPlatformContact(raw)): string {
+  const spans = detection.matches
+    .filter((m): m is Required<OffPlatformMatch> => typeof m.start === 'number' && typeof m.end === 'number' && m.end > m.start)
+    .sort((a, b) => a.start - b.start);
+  if (spans.length === 0) return raw;
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const span of spans) {
+    const last = merged[merged.length - 1];
+    if (last && span.start <= last.end) last.end = Math.max(last.end, span.end);
+    else merged.push({ start: span.start, end: span.end });
+  }
+  let out = '';
+  let cursor = 0;
+  for (const span of merged) {
+    out += raw.slice(cursor, span.start) + OFF_PLATFORM_MASK;
+    cursor = span.end;
+  }
+  return out + raw.slice(cursor);
+}

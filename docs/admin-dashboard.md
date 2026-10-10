@@ -34,8 +34,11 @@ onboarding redirect).
 | --- | --- |
 | Overview | `GET /admin/overview` |
 | Users | `GET /admin/users?q=&kind=all\|sellers\|buyers\|suspended\|admins&limit=&offset=` · `GET /admin/users/:clerkId` · `POST /admin/users/:clerkId/verify {verified}` · `POST …/suspend {reason}` · `POST …/reinstate` |
-| Orders | `GET /admin/orders?q=&status=` · `GET /admin/orders/:id` · `GET /admin/refunds` · `GET /admin/disputes?status=open\|closed\|all` |
-| Revenue | `GET /admin/revenue?days=` — gross sales, platform fees (net of refunded fees), refunds, promotion revenue, daily series |
+| Orders | `GET /admin/orders?q=&status=&risk=elevated\|highest` · `GET /admin/orders/:id` · `GET /admin/refunds` · `GET /admin/disputes?status=open\|closed\|all` |
+| Revenue | `GET /admin/revenue?days=` — gross sales, platform fees (net of refunded fees), refunds, promotion revenue, daily series, plus `lines` (retail, sample, bulk, freelancer, promotions, AI credits, subscriptions), `deductions` (Stripe fees, store fees, dispute fees, Thread Cash redeemed and rewards) and `netTakeCents` — see `lib/admin/revenue.ts` · `GET /admin/mrr?days=` — MRR by tier, active, trialing, trial conversions, churn (Stripe + RevenueCat) |
+| Money actions | `POST /admin/orders/:id/refund {amountCents?, reason, note?, idempotencyKey}` · `GET /admin/disputes/:id` · `POST /admin/disputes/:id/evidence {type, description}` · `POST …/evidence/upload` (raw file) · `POST …/submit` · `GET /admin/payouts/review?state=review\|held\|all` · `POST /admin/payouts/:seller\|manufacturer/:id/hold {reason}` · `POST …/release` |
+| Thread Cash | `GET /admin/thread-cash/summary?days=` · `POST /admin/thread-cash/pause {kind: rewards\|checkout, paused}` |
+| Risk | `GET /admin/risk` — Radar elevated/highest orders, fast new sellers, Thread Cash anomalies |
 | AI spend | `GET /admin/ai-spend?days=` — per-user estimated cost, calls, tokens |
 | Promotions | `GET /admin/boosts?status=pending\|reviewed\|all` · `POST /admin/boosts/:id/review {decision: approve\|reject, reason}` |
 | Featured | `GET/POST /admin/featured` · `PATCH/DELETE /admin/featured/:id` · public read: `GET /api/public/featured` |
@@ -43,8 +46,23 @@ onboarding redirect).
 | Invite codes | `GET/POST /admin/invites` · `POST /admin/invites/:id/disable\|enable` |
 | Audit | `GET /admin/audit?actor=&action=&targetId=` |
 
-Nothing here deletes accounts or data, and nothing moves money: refunds and disputes are
-read-only views; rejecting a promotion stops it but the refund stays a deliberate step in Stripe.
+Nothing here deletes accounts or data. Money moves only through the audited actions above,
+which reuse the app's own money code (`lib/money/refunds.ts` for refunds, the dispute evidence
+lib for evidence) so the ledger, seller payouts and Thread Cash stay in sync; each is
+idempotent (same `idempotencyKey` → same refund; a second submit/hold/release is a no-op).
+Rejecting a promotion stops it but the refund stays a deliberate step in Stripe.
+
+**Payout holds.** A hold sets the connected account's Stripe payout schedule to `manual` and
+remembers the previous schedule; release restores it. While held, the seller can't request a
+payout or change their schedule. New seller and manufacturer Connect accounts get a
+`NEW_ACCOUNT_PAYOUT_DELAY_DAYS` (7) payout delay for their first `NEW_ACCOUNT_REVIEW_DAYS` (30);
+the hourly payout-review job then drops it to Stripe's minimum (`lib/admin/payoutControls.ts`).
+
+**Thread Cash kill switches.** Two `feature_flags` rows, `threadCashRewardsPaused` and
+`threadCashCheckoutPaused`, toggled from Admin → Thread Cash. Paused rewards answer the daily
+claim with `{ ok: true, awarded: false, code: "THREAD_CASH_REWARDS_PAUSED" }` so the app marks the
+day done; paused checkout refuses new reservations with `THREAD_CASH_CHECKOUT_PAUSED` (cancelling
+an existing reservation still works).
 
 ## Audit log
 
@@ -53,7 +71,8 @@ and `DELETE`. Each mutating admin route writes its entry **in the same transacti
 change, so an action can't succeed without being logged (and a failed action leaves no entry).
 Logged actions: `user.verify`, `user.unverify`, `user.suspend`, `user.reinstate`,
 `featured.add|update|remove`, `announcement.send`, `invite.create|disable|enable`,
-`boost.approve|reject`, `moderation.resolve`. The purge-test-data tool lists the table in
+`boost.approve|reject`, `moderation.resolve`, `order.refund`, `dispute.evidence_add|evidence_upload|submit`,
+`payouts.hold|release`, `thread_cash.pause|resume`. The purge-test-data tool lists the table in
 `NON_DELETABLE_TABLES`, like the money ledger.
 
 ## Moderation — interface with the trust & safety API

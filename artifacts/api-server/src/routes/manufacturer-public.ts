@@ -6,7 +6,7 @@
  *                     minYears, maxMoq, verified, hasPhotos, sort)
  * GET  /facets        countries and specialties in the live directory, with counts
  * POST /apply         legacy anonymous application — stays private and pending; the
- *                     portal's authenticated signup (POST /manufacturers/register) goes live instantly
+ *                     portal's authenticated signup (POST /manufacturers/register) is listed once verified
  * GET  /:id           get a single public manufacturer profile
  */
 import { Router } from "express";
@@ -19,6 +19,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { setPublicCacheHeaders } from "../lib/httpCache";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { contactFieldsForViewer } from "../lib/manufacturerTrust";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -33,7 +34,8 @@ const publicManufacturerFields = {
   yearsInBusiness: manufacturers.yearsInBusiness,
   moq:             manufacturers.moq,
   photos:          manufacturers.photos,
-  website:         manufacturers.website,
+  // website / contact email / phone are never part of the public directory:
+  // sellers see them on /manufacturers/partners/:id after their first paid order.
   timeZone:        manufacturers.timeZone,
   priceRange:      manufacturers.priceRange,
   sampleTurnaround: manufacturers.sampleTurnaround,
@@ -46,6 +48,7 @@ const publicManufacturerFields = {
   revision:        manufacturers.revision,
   status:          manufacturers.status,
   isPublicDirectory: manufacturers.isPublicDirectory,
+  verificationStatus: manufacturers.verificationStatus,
 };
 
 type ReviewSummary = { rating: number | null; reviewCount: number };
@@ -112,14 +115,23 @@ async function serializePublicManufacturer(
   summary?: ReviewSummary,
   reviews?: Awaited<ReturnType<typeof listManufacturerReviews>>,
 ) {
-  if (mfr.status !== "active" || mfr.isPublicDirectory !== true) return null;
-  const { status: _status, isPublicDirectory: _isPublicDirectory, photos: storedPhotos, ...publicFields } = mfr;
+  if (mfr.status !== "active" || mfr.isPublicDirectory !== true || mfr.verificationStatus !== "verified") return null;
+  const {
+    status: _status, isPublicDirectory: _isPublicDirectory, verificationStatus: _verificationStatus,
+    photos: storedPhotos, ...publicFields
+  } = mfr;
+  // Publicly cached, so never viewer-specific: contact details always hidden here.
+  const contact = contactFieldsForViewer({ description: mfr.description }, false);
   const photos = await Promise.all((storedPhotos ?? [])
     .filter((path: unknown): path is string => typeof path === "string" && path.startsWith("/objects/"))
     .map((path: string) => objectStorage.getObjectEntityDownloadURL(path)));
   return {
     ...publicFields,
     photos,
+    description: contact.description,
+    website: null,
+    contactHidden: true,
+    verified: true,
     isVerified: !!mfr.verifiedAt,
     rating: summary?.rating ?? null,
     reviewCount: summary?.reviewCount ?? 0,
@@ -154,7 +166,7 @@ const HAS_PHOTOS = sql`jsonb_array_length(COALESCE(${manufacturers.photos}::json
 
 router.get("/facets", async (req, res) => {
   try {
-    const live = and(eq(manufacturers.isPublicDirectory, true), eq(manufacturers.status, "active"));
+    const live = and(eq(manufacturers.isPublicDirectory, true), eq(manufacturers.status, "active"), eq(manufacturers.verificationStatus, "verified"));
     const [countries, specialties, [total]] = await Promise.all([
       db.select({ name: manufacturers.country, count: sql<number>`count(*)::integer` })
         .from(manufacturers).where(live).groupBy(manufacturers.country).orderBy(sql`count(*) DESC`, manufacturers.country),
@@ -186,6 +198,7 @@ router.get("/", async (req, res) => {
     const conditions: SQL[] = [
       eq(manufacturers.isPublicDirectory, true),
       eq(manufacturers.status, "active"),
+      eq(manufacturers.verificationStatus, "verified"),
     ];
     if (minYears != null) conditions.push(gte(manufacturers.yearsInBusiness, minYears));
     if (maxMoq != null) conditions.push(lte(manufacturers.moq, maxMoq));
@@ -400,6 +413,7 @@ async function assertActivePublicManufacturer(manufacturerId: string) {
     eq(manufacturers.id, manufacturerId),
     eq(manufacturers.isPublicDirectory, true),
     eq(manufacturers.status, "active"),
+    eq(manufacturers.verificationStatus, "verified"),
   )).limit(1);
   return mfr ?? null;
 }
@@ -468,6 +482,7 @@ router.get("/:id", async (req, res) => {
           eq(manufacturers.id, req.params.id),
           eq(manufacturers.isPublicDirectory, true),
           eq(manufacturers.status, "active"),
+          eq(manufacturers.verificationStatus, "verified"),
         ),
       )
       .limit(1);

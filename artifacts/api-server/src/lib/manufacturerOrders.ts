@@ -165,6 +165,10 @@ export type OrderCardSnapshot = {
   manufacturerPayoutReady: boolean;
   revision: number;
   updatedAt: string;
+  /** Paid-card refunds and seller cancel requests (BT-460). */
+  refundedCents: number;
+  cancelRequestState: string;
+  cancelRequestReason: string | null;
 };
 
 export function toCardSnapshot(order: SampleOrderRow, manufacturerPayoutReady: boolean): OrderCardSnapshot {
@@ -184,6 +188,9 @@ export function toCardSnapshot(order: SampleOrderRow, manufacturerPayoutReady: b
     manufacturerPayoutReady,
     revision: order.revision,
     updatedAt: order.updatedAt.toISOString(),
+    refundedCents: order.refundedCents,
+    cancelRequestState: order.cancelRequestState,
+    cancelRequestReason: order.cancelRequestReason,
   };
 }
 

@@ -25,6 +25,10 @@ export type OrderCardSnapshot = {
   manufacturerPayoutReady: boolean;
   revision: number;
   updatedAt: string;
+  /** Paid-card refunds and seller cancel requests (older servers omit these). */
+  refundedCents?: number;
+  cancelRequestState?: 'none' | 'requested' | 'declined' | 'approved' | string;
+  cancelRequestReason?: string | null;
 };
 
 export type TimelineStep = {
@@ -66,6 +70,15 @@ export async function getOrderTimeline(orderId: string): Promise<OrderTimeline> 
 export async function declineOrderCard(orderId: string, reason?: string): Promise<void> {
   assertOrderId(orderId);
   await serviceRequest(`/api/manufacturers/orders/${encodeURIComponent(orderId)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify(reason?.trim() ? { reason: reason.trim() } : {}),
+  });
+}
+
+/** Seller asks the manufacturer to cancel a paid card before production starts (approval refunds it). */
+export async function requestOrderCancellation(orderId: string, reason?: string): Promise<void> {
+  assertOrderId(orderId);
+  await serviceRequest(`/api/sample-orders/${encodeURIComponent(orderId)}/cancel-request`, {
     method: 'POST',
     body: JSON.stringify(reason?.trim() ? { reason: reason.trim() } : {}),
   });

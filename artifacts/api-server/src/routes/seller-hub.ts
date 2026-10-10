@@ -2,11 +2,16 @@
  * Seller Hub — seller-facing manufacturer discovery and quote/sample requests.
  * Distinct from /manufacturers which is the manufacturer portal (their own profile mgmt).
  */
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { db, manufacturers, sellerQuoteRequests, sellerRfqs } from "@workspace/db";
+import { formatMoney } from "@workspace/manufacturer-flow";
+import { createOrderCardForAcceptedQuote } from "../lib/b2b/quoteCards";
+import { publishNotification } from "./notifications-feed";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { contactFieldsForViewer, paidManufacturerIdsForSeller, visibleToSellerCondition } from "../lib/manufacturerTrust";
+import { inBackground, notifyManufacturerOfRequest, sellerNameFor } from "../lib/manufacturerNotifications";
 
 const router = Router();
 router.use(requireAuth);
@@ -36,8 +41,12 @@ function serializeQuoteRequest(row: typeof sellerQuoteRequests.$inferSelect) {
 // ─── Manufacturer Discovery ────────────────────────────────────────────────────
 
 // GET /api/seller-hub/manufacturers
-// Public directory of active/verified manufacturers sellers can request quotes from.
+// Manufacturers this seller can request quotes from: verified public listings
+// plus private / pending ones the seller already works with (invite, thread,
+// order or saved relationship). Website and contact details stay hidden until
+// the seller has paid an order card with that manufacturer.
 router.get("/manufacturers", async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
   const page = parsePagination(req.query, { limit: 100 });
   if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
   const { limit, offset } = page.data;
@@ -54,16 +63,29 @@ router.get("/manufacturers", async (req, res) => {
       sampleTurnaround: manufacturers.sampleTurnaround,
       photos:           manufacturers.photos,
       website:          manufacturers.website,
+      contactEmail:     manufacturers.contactEmail,
+      contactPhone:     manufacturers.contactPhone,
       verifiedAt:       manufacturers.verifiedAt,
+      verificationStatus: manufacturers.verificationStatus,
     })
     .from(manufacturers)
-    .where(eq(manufacturers.status, "active"))
+    .where(visibleToSellerCondition(sellerId))
     .orderBy(desc(manufacturers.verifiedAt), manufacturers.id)
     .limit(limit)
     .offset(offset);
 
   setPaginationHeaders(res, page.data, rows.length);
-  return res.json(rows);
+  const paid = await paidManufacturerIdsForSeller(sellerId, rows.map((row) => row.id));
+  return res.json(rows.map(({ verificationStatus, contactEmail: _email, contactPhone: _phone, ...row }) => {
+    const contact = contactFieldsForViewer({ ...row, contactEmail: _email, contactPhone: _phone }, paid.has(row.id));
+    return {
+      ...row,
+      description: contact.description,
+      website: contact.website,
+      contactHidden: contact.contactHidden,
+      verified: verificationStatus === "verified",
+    };
+  }));
 });
 
 // ─── Quote & Sample Requests ───────────────────────────────────────────────────
@@ -119,11 +141,11 @@ router.post("/quote-requests", async (req, res) => {
     return res.status(400).json({ error: "quantity must be a positive integer" });
   }
 
-  // Verify manufacturer is active
+  // Active and visible to this seller (verified public listing, or one they already work with).
   const [mfg] = await db
     .select({ id: manufacturers.id })
     .from(manufacturers)
-    .where(and(eq(manufacturers.id, manufacturerId), eq(manufacturers.status, "active")));
+    .where(and(eq(manufacturers.id, manufacturerId), visibleToSellerCondition(sellerId)));
 
   if (!mfg) {
     return res.status(404).json({ error: "Manufacturer not found or not active" });
@@ -143,6 +165,11 @@ router.post("/quote-requests", async (req, res) => {
       status: "submitted",
     })
     .returning();
+
+  inBackground((async () => notifyManufacturerOfRequest({
+    manufacturerId, requestId: row.id, kind: type === "sample" ? "sample" : "quote",
+    sellerName: await sellerNameFor(sellerId), productName: row.productName, quantity: row.quantity,
+  }))(), { quoteRequestId: row.id });
 
   return res.status(201).json(serializeQuoteRequest(row));
 });
@@ -192,6 +219,12 @@ router.patch("/quote-requests/:id", async (req, res) => {
 
   if (!existing) return res.status(404).json({ error: "Not found" });
 
+  // Retried accept: the quote is already accepted, so just make sure its
+  // payable order card exists and return it (BT-461).
+  if (status === "accepted" && existing.status === "accepted") {
+    return res.json({ ...serializeQuoteRequest(existing), orderCard: await orderCardForQuote(req, existing, false) });
+  }
+
   if (!status || !canSellerTransitionQuote(existing.status, status)) {
     return res.status(409).json({ error: `Cannot move quote request from ${existing.status} to ${status ?? "an unspecified status"}` });
   }
@@ -226,8 +259,36 @@ router.patch("/quote-requests/:id", async (req, res) => {
     .returning();
 
   if (!updated) return res.status(409).json({ error: "Quote request changed; refresh and try again" });
+  if (updated.status === "accepted") {
+    return res.json({ ...serializeQuoteRequest(updated), orderCard: await orderCardForQuote(req, updated, true) });
+  }
   return res.json(serializeQuoteRequest(updated));
 });
+
+// An accepted quote becomes a payable order card in the seller↔manufacturer
+// conversation. Card problems never undo the accept; the seller can retry it.
+async function orderCardForQuote(req: Request, quote: typeof sellerQuoteRequests.$inferSelect, justAccepted: boolean) {
+  try {
+    const card = await createOrderCardForAcceptedQuote(quote);
+    if (card.status === "skipped") return { status: card.status, reason: card.reason };
+    if (card.status === "created" && card.manufacturerClerkId) {
+      await publishNotification({
+        userId: card.manufacturerClerkId,
+        category: "production",
+        type: "manufacturer_order_card",
+        title: justAccepted ? `Quote accepted: ${quote.productName}` : `Order card ready: ${quote.productName}`,
+        body: `A payable order card for ${formatMoney(card.priceCents)} is in your conversation. Production starts once the seller pays.`,
+        targetId: card.threadId,
+        targetType: "manufacturer_thread",
+        cta: `/manufacturers/messages/${card.threadId}`,
+      }).catch((err) => req.log.error({ err, quoteId: quote.id }, "Quote accepted notification failed"));
+    }
+    return { status: card.status, orderId: card.orderId, threadId: card.threadId, priceCents: card.priceCents };
+  } catch (err) {
+    req.log.error({ err, quoteId: quote.id }, "Order card for accepted quote failed");
+    return { status: "failed" as const };
+  }
+}
 
 // ─── RFQs (broadcast one request to many manufacturers, compare quotes) ────────
 // A seller posts one RFQ; it fans out into one seller_quote_requests row per
@@ -314,9 +375,11 @@ router.post("/rfqs", async (req, res) => {
     return res.status(400).json({ error: "manufacturerIds must be canonical manufacturer UUIDs" });
   }
 
+  // Only manufacturers this seller may see: private (invite-only) and
+  // not-yet-verified ones are reachable only through an existing relationship.
   const activeManufacturers = await db.select({ id: manufacturers.id })
     .from(manufacturers)
-    .where(and(inArray(manufacturers.id, uniqueManufacturerIds), eq(manufacturers.status, "active")));
+    .where(and(inArray(manufacturers.id, uniqueManufacturerIds), visibleToSellerCondition(sellerId)));
   if (activeManufacturers.length === 0) {
     return res.status(404).json({ error: "None of the selected manufacturers are active" });
   }
@@ -334,7 +397,7 @@ router.post("/rfqs", async (req, res) => {
       status: "matched",
     }).returning();
 
-    await tx.insert(sellerQuoteRequests).values(activeManufacturers.map((mfr) => ({
+    const quotes = await tx.insert(sellerQuoteRequests).values(activeManufacturers.map((mfr) => ({
       sellerId,
       manufacturerId: mfr.id,
       rfqId: rfq.id,
@@ -344,13 +407,21 @@ router.post("/rfqs", async (req, res) => {
       quantity: quantity as number,
       details: description.trim(),
       status: "submitted",
-    })));
+    }))).returning({ id: sellerQuoteRequests.id, manufacturerId: sellerQuoteRequests.manufacturerId });
 
-    return rfq;
+    return { rfq, quotes };
   });
 
+  inBackground((async () => {
+    const sellerName = await sellerNameFor(sellerId);
+    await Promise.all(created.quotes.map((quote) => notifyManufacturerOfRequest({
+      manufacturerId: quote.manufacturerId, requestId: quote.id, kind: "rfq",
+      sellerName, productName: garmentType.trim(), quantity: quantity as number,
+    })));
+  })(), { rfqId: created.rfq.id });
+
   return res.status(201).json({
-    ...serializeRfq(created),
+    ...serializeRfq(created.rfq),
     manufacturersCount: activeManufacturers.length,
     quotesReceivedCount: 0,
   });

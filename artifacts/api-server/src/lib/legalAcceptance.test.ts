@@ -94,6 +94,19 @@ describe("recordLegalAcceptance", () => {
     expect(fake.history).toHaveLength(0);
   });
 
+  it("records a separate agreement in history only when updateAccountTerms is false", async () => {
+    const fake = fakeExecutor(["user_1"], "user_1");
+    expect(await recordLegalAcceptance(fake.executor, {
+      clerkId: "user_1", version: "manufacturer-terms/2026-10-10", updateAccountTerms: false,
+    })).toBe(true);
+    expect(fake.userRows.get("user_1")?.termsVersion).toBeNull();
+    expect(fake.history.map((h) => h.version)).toEqual(["manufacturer-terms/2026-10-10"]);
+    // No users row needed (portal-only manufacturer accounts).
+    const ghost = fakeExecutor([], "ghost");
+    expect(await recordLegalAcceptance(ghost.executor, { clerkId: "ghost", version: "manufacturer-terms/2026-10-10", updateAccountTerms: false })).toBe(true);
+    expect(ghost.history).toHaveLength(1);
+  });
+
   it("accepts only the two known sources", () => {
     expect([...LEGAL_ACCEPTANCE_SOURCES]).toEqual(["signup", "update_prompt"]);
   });

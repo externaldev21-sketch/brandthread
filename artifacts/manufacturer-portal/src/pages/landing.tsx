@@ -51,8 +51,9 @@ export default function Landing() {
               href="/join" 
               className="inline-flex items-center justify-center gap-3 h-14 px-8 rounded bg-primary text-primary-foreground text-base font-semibold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 active:scale-[0.98]"
             >
-              List your factory — free <ArrowRight className="w-5 h-5" />
+              List your factory <ArrowRight className="w-5 h-5" />
             </Link>
+            <p className="mt-4 text-sm text-muted-foreground" data-testid="text-landing-fee">Free to join. 5% + processing on paid orders.</p>
           </div>
         </div>
 
@@ -62,7 +63,7 @@ export default function Landing() {
               <Globe2 className="w-6 h-6 text-primary" />
             </div>
             <h3 className="font-semibold text-lg">Get discovered</h3>
-            <p className="text-sm text-muted-foreground">Your listing goes live the moment you finish signing up — photos, years in business, MOQ and turnaround.</p>
+            <p className="text-sm text-muted-foreground">Your listing goes live once your profile is verified — photos, years in business, MOQ and turnaround.</p>
           </div>
           <div className="p-6 border border-border bg-card rounded-lg flex flex-col items-center text-center gap-4">
             <div className="w-12 h-12 bg-secondary border border-border rounded flex items-center justify-center">

@@ -44,13 +44,13 @@ export default function ManufacturerOnboardScreen() {
         <StepHeadline size="title1">{token ? 'You were invited to work on Brandthread' : 'List your factory on Brandthread'}</StepHeadline>
         <Reveal index={1}>
         <Text style={s.text}>
-          Manufacturers use the Brandthread Manufacturer Portal to set up their profile and photos, chat with sellers, send priced sample and bulk-order quotes, update production and get paid through Stripe.
-          {token ? ' Your invite is private: only the seller who invited you will see your profile.' : ' Your listing goes live in the directory as soon as you finish.'}
+          Manufacturers use the Brandthread Manufacturer Portal to set up their profile and photos, chat with sellers, send priced sample and bulk cards, update production and get paid through Stripe.
+          {token ? ' Your invite is private: only the seller who invited you will see your profile.' : ' Your listing goes live in the directory once your profile is verified.'}
         </Text>
         </Reveal>
         <Reveal index={2}>
         <View style={s.card}>
-          {['Free for manufacturers', 'Works in any browser, on phone or computer', 'Paid out to your bank in your currency'].map((line) => (
+          {['Free to join. 5% + processing on paid orders.', 'Works in any browser, on phone or computer', 'Paid out to your bank in your currency'].map((line) => (
             <View key={line} style={s.row}><Icon name="check" size={14} color={FG} /><Text style={s.rowText}>{line}</Text></View>
           ))}
         </View>

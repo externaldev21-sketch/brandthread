@@ -52,5 +52,23 @@ export function useOrderActions(threadId?: string | null) {
     onSettled: (_data, _error, variables) => refresh(variables.orderId),
   });
 
-  return { advance, withdraw };
+  /** Refund a paid card, fully or partially (POST /api/sample-orders/:id/refund). */
+  const refund = useMutation<unknown, ApiRequestError, { orderId: string; amountCents: number; reason: string | null; idempotencyKey: string }>({
+    mutationFn: ({ orderId, ...body }) => request(`/api/sample-orders/${orderId}/refund`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+    onSettled: (_data, _error, variables) => refresh(variables.orderId),
+  });
+
+  /** Approve (refund in full) or decline the seller's cancel request. */
+  const answerCancel = useMutation<unknown, ApiRequestError, { orderId: string; decision: "approve" | "decline" }>({
+    mutationFn: ({ orderId, decision }) => request(`/api/sample-orders/${orderId}/cancel-request/${decision}`, {
+      method: "POST",
+      body: "{}",
+    }),
+    onSettled: (_data, _error, variables) => refresh(variables.orderId),
+  });
+
+  return { advance, withdraw, refund, answerCancel };
 }

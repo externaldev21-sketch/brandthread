@@ -66,7 +66,7 @@ async function json<T>(response: Response): Promise<T> {
 }
 
 async function seedManufacturer(clerkId: string | null, overrides: Partial<typeof manufacturers.$inferInsert> = {}) {
-  const [row] = await db.insert(manufacturers).values({
+  const [row] = await db.insert(manufacturers).values({ verificationStatus: "verified",
     clerkId,
     businessName: `${prefix}-factory-${createdManufacturerIds.length}`,
     country: "US",

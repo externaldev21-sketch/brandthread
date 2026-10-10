@@ -75,7 +75,7 @@ async function postImage(path: string) {
 beforeAll(async () => {
   state.userId = `manufacturer-revision-${crypto.randomBytes(8).toString("hex")}`;
   manufacturerUserId = state.userId;
-  const [manufacturer] = await db.insert(manufacturers).values({
+  const [manufacturer] = await db.insert(manufacturers).values({ verificationStatus: "verified",
     clerkId: state.userId, businessName: "Revision Factory", country: "US",
     specialty: "Cut and sew", moq: 100, priceRange: "$$", bulkTurnaround: "30 days",
     sampleTurnaround: "7 days", status: "active",
@@ -325,11 +325,11 @@ describe("manufacturer revision concurrency", () => {
   });
 
   it("does not publicly serialize pending or private profiles", async () => {
-    const [pending] = await db.insert(manufacturers).values({
+    const [pending] = await db.insert(manufacturers).values({ verificationStatus: "verified",
       businessName: "Pending Private Factory", country: "US", specialty: "Knits",
       status: "pending", isPublicDirectory: true, photos: ["/objects/pending-private"],
     }).returning();
-    const [privateActive] = await db.insert(manufacturers).values({
+    const [privateActive] = await db.insert(manufacturers).values({ verificationStatus: "verified",
       businessName: "Active Private Factory", country: "US", specialty: "Knits",
       status: "active", isPublicDirectory: false, photos: ["/objects/active-private"],
     }).returning();
@@ -345,7 +345,7 @@ describe("manufacturer revision concurrency", () => {
   });
 
   it("signs paths only after active public eligibility is confirmed", async () => {
-    const [publicManufacturer] = await db.insert(manufacturers).values({
+    const [publicManufacturer] = await db.insert(manufacturers).values({ verificationStatus: "verified",
       businessName: "Eligible Public Factory", country: "US", specialty: "Wovens",
       status: "active", isPublicDirectory: true, photos: ["/objects/eligible-public"],
     }).returning();
@@ -362,7 +362,7 @@ describe("manufacturer revision concurrency", () => {
 
   it("deletes a newly created object when the profile DB write cannot attach it", async () => {
     const cleanupUserId = `manufacturer-photo-cleanup-${crypto.randomBytes(6).toString("hex")}`;
-    await db.insert(manufacturers).values({
+    await db.insert(manufacturers).values({ verificationStatus: "verified",
       clerkId: cleanupUserId, businessName: "Cleanup Factory", country: "US", specialty: "Denim",
       status: "active",
     });

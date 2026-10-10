@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deriveCardState, formatMoney, formatTimestamp, localTimeLabel, orderStatusLabel, orderTypeLabel } from '@workspace/manufacturer-flow';
 import { SecondaryButton } from '@/components/BrandthreadUI';
@@ -78,6 +79,13 @@ export default function ProductionDetailScreen() {
     const timer = setInterval(() => void load(true), 15_000);
     return () => clearInterval(timer);
   }, [load, id]);
+
+  // Coming back from the cancel-request screen shows the new state at once.
+  const focusedOnce = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (focusedOnce.current) void load(true);
+    focusedOnce.current = true;
+  }, [load]));
 
   const order = data?.order;
   const isBulkAwaiting = order?.orderType === 'bulk' && order.status === 'pending_payment' && order.manufacturerPayoutReady;
@@ -237,6 +245,26 @@ export default function ProductionDetailScreen() {
           <View style={styles.card}><Text style={styles.section}>Closed</Text><Text style={styles.muted}>This card was withdrawn or declined before payment. Nothing was charged.</Text></View>
         )}
 
+        {(order.refundedCents ?? 0) > 0 && (
+          <View style={styles.card} testID="tracker-refunded">
+            <Text style={styles.section}>{order.status === 'refunded' ? 'Refunded' : 'Partially refunded'}</Text>
+            <Text style={styles.muted}>{formatMoney(order.refundedCents ?? 0, order.currency)} was refunded to your original payment method.</Text>
+          </View>
+        )}
+        {order.cancelRequestState === 'requested' && order.status !== 'refunded' && (
+          <View style={styles.card} testID="tracker-cancel-pending">
+            <Text style={styles.section}>Cancellation pending</Text>
+            <Text style={styles.muted}>You asked {data.manufacturer?.businessName ?? 'the manufacturer'} to cancel this order. If they approve, you're refunded in full.</Text>
+            {order.cancelRequestReason ? <Text style={styles.small}>Your note: {order.cancelRequestReason}</Text> : null}
+          </View>
+        )}
+        {order.cancelRequestState === 'declined' && order.status !== 'refunded' && (
+          <View style={styles.card} testID="tracker-cancel-declined">
+            <Text style={styles.section}>Cancel request declined</Text>
+            <Text style={styles.muted}>{data.manufacturer?.businessName ?? 'The manufacturer'} is going ahead with production. Message them if something needs to change.</Text>
+          </View>
+        )}
+
         {(data.tracking.trackingNumber || order.status === 'shipped') && (
           <View style={styles.card} testID="tracker-shipment">
             <Text style={styles.section}>Shipment</Text>
@@ -293,6 +321,11 @@ export default function ProductionDetailScreen() {
           <SecondaryButton label="Review the sample" icon="star" onPress={() => router.push({ pathname: '/sample-detail', params: { id: order.id } } as never)} />
         )}
         <SecondaryButton label={`Message ${data.manufacturer?.businessName ?? 'manufacturer'}`} icon="message-circle" onPress={() => void openThread()} />
+        {order.status === 'payment_received' && (order.cancelRequestState ?? 'none') === 'none' && (
+          <TouchableOpacity onPress={() => router.push({ pathname: '/cancel-request', params: { id: order.id } } as never)} style={styles.textBtn} testID="tracker-request-cancel">
+            <Text style={styles.textBtnLabel}>Ask to cancel this order</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </View>
   );

@@ -1372,6 +1372,9 @@ components:
         contactEmail:     { type: string }
         contactPhone:     { type: string }
         timeZone:         { type: string, maxLength: 64 }
+        acceptedTermsVersion:
+          type: string
+          description: Version of the Manufacturer Terms the user ticked at signup. Required by register and register-via-invite (new profiles); must equal the current version.
 
     ManufacturerUpdate:
       type: object

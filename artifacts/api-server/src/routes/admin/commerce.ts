@@ -1,8 +1,8 @@
 /**
- * Admin → orders, refunds, disputes, revenue. Read-only: money is never moved
- * from the admin dashboard.
+ * Admin → orders, refunds, disputes, revenue (read views). The audited money
+ * actions — refunds, dispute evidence, payout holds — live in ./money.ts.
  *
- * GET /api/admin/orders?q=&status=&limit=&offset=
+ * GET /api/admin/orders?q=&status=&risk=elevated|highest&limit=&offset=
  * GET /api/admin/orders/:id
  * GET /api/admin/refunds?limit=&offset=
  * GET /api/admin/disputes?status=open|closed|all&limit=&offset=
@@ -14,6 +14,7 @@ import { and, count, desc, eq, gte, ilike, inArray, isNotNull, or, sql, sum } fr
 import { boosts, db, disputes, orderItems, orders, users } from "@workspace/db";
 import { UUID_RE, clampDays, likePattern, pageParams, queryString } from "./util";
 import { getThreadCashLiabilityReport } from "../../lib/threadCash/liability";
+import { computeRevenueBreakdown } from "../../lib/admin/revenue";
 
 const router = Router();
 
@@ -41,17 +42,23 @@ function orderSummary(o: typeof orders.$inferSelect, names: Map<string, string>)
     buyer: o.buyerId ? { clerkId: o.buyerId, name: names.get(o.buyerId) ?? null } : { clerkId: null, name: o.guestEmail },
     paidAt: o.paidAt?.toISOString() ?? null,
     createdAt: o.createdAt.toISOString(),
+    riskLevel: o.riskLevel,
+    riskScore: o.riskScore,
   };
 }
 
 router.get("/orders", async (req, res) => {
   const q = queryString(req, "q");
   const status = queryString(req, "status");
+  const risk = queryString(req, "risk");
   const { limit, offset } = pageParams(req);
   if (status && !ORDER_STATUSES.includes(status)) return res.status(400).json({ error: "Unknown status" });
+  if (risk && risk !== "elevated" && risk !== "highest") return res.status(400).json({ error: "risk must be elevated or highest" });
 
   const filters = [];
   if (status) filters.push(eq(orders.status, status));
+  // elevated = elevated or worse; highest = highest only.
+  if (risk) filters.push(risk === "highest" ? eq(orders.riskLevel, "highest") : inArray(orders.riskLevel, ["elevated", "highest"]));
   if (q) {
     const p = likePattern(q);
     filters.push(or(ilike(orders.orderNumber, p), ilike(orders.guestEmail, p), UUID_RE.test(q) ? eq(orders.id, q) : undefined)!);
@@ -98,6 +105,10 @@ router.get("/orders/:id", async (req, res) => {
       deliveredAt: order.deliveredAt?.toISOString() ?? null,
       autoRefundedAt: order.autoRefundedAt?.toISOString() ?? null,
       cancellationReason: order.cancellationReason,
+      riskFlags: order.riskFlags ?? [],
+      refundableCents: order.stripePaymentIntentId
+        ? Math.max(0, (order.grossChargedCents > 0 ? order.grossChargedCents : order.totalCents) - order.refundedCents)
+        : 0,
       items,
       disputes: orderDisputes.map((d) => ({ id: d.id, status: d.status, reason: d.reason, amountCents: d.amountCents })),
     });
@@ -159,6 +170,11 @@ router.get("/disputes", async (req, res) => {
         reason: d.reason,
         status: d.status,
         evidenceDueBy: d.evidenceDueBy?.toISOString() ?? null,
+        evidenceSubmittedAt: d.evidenceSubmittedAt?.toISOString() ?? null,
+        // B2B chargebacks (sample/bulk cards, freelancer jobs) have no retail order.
+        sampleOrderId: d.sampleOrderId,
+        freelancerJobId: d.freelancerJobId,
+        clawbackCents: d.clawbackCents,
         createdAt: d.createdAt.toISOString(),
       })),
       hasMore: rows.length > limit,
@@ -176,7 +192,7 @@ router.get("/revenue", async (req, res) => {
   try {
     const paid = and(isNotNull(orders.paidAt), gte(orders.paidAt, since));
     const day = sql<string>`to_char(date_trunc('day', ${orders.paidAt}), 'YYYY-MM-DD')`;
-    const [[totals], series, [boostRev]] = await Promise.all([
+    const [[totals], series, [boostRev], breakdown] = await Promise.all([
       db.select({
         orders: count(),
         gmv: sum(orders.totalCents),
@@ -188,6 +204,7 @@ router.get("/revenue", async (req, res) => {
         .from(orders).where(paid).groupBy(day).orderBy(day),
       db.select({ n: count(), cents: sum(boosts.budgetCents) }).from(boosts)
         .where(and(isNotNull(boosts.paidAt), gte(boosts.paidAt, since))),
+      computeRevenueBreakdown(days),
     ]);
     const gmv = Number(totals?.gmv ?? 0);
     const fees = Number(totals?.fees ?? 0) - Number(totals?.feesRefunded ?? 0);
@@ -205,6 +222,12 @@ router.get("/revenue", async (req, res) => {
         gmvCents: Number(s.gmv ?? 0),
         platformFeesCents: Number(s.fees ?? 0) - Number(s.feesRefunded ?? 0),
       })),
+      // Additive (BT-447 / BT-469): every revenue line, each deduction, net take and MRR.
+      lines: breakdown.lines,
+      grossPlatformRevenueCents: breakdown.grossPlatformRevenueCents,
+      deductions: breakdown.deductions,
+      netTakeCents: breakdown.netTakeCents,
+      subscriptions: breakdown.mrr,
     });
   } catch (err) {
     req.log.error({ err }, "Admin revenue failed");

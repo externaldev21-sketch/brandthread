@@ -31,6 +31,7 @@ import { startScheduledLiveReminderJob } from "./jobs/scheduledLiveReminders";
 import { startEmailCampaignJob } from "./jobs/emailCampaigns";
 import { startOrderPostAttributionJob } from "./jobs/orderPostAttribution";
 import { startReviewRequestJob } from "./jobs/reviewRequest";
+import { startPayoutReviewJob } from "./jobs/payoutReview";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
@@ -124,6 +125,7 @@ const server = app.listen(port, (err) => {
   startReviewRequestJob();
   startCommunityPushJob();
   startScheduledPostPublisherJob();
+  startPayoutReviewJob();
   startFreelancerAutoReleaseJob();
 });
 

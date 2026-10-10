@@ -295,7 +295,8 @@ export const RegisterManufacturerBody = zod.object({
   "website": zod.string().optional(),
   "contactEmail": zod.string().optional(),
   "contactPhone": zod.string().optional(),
-  "timeZone": zod.string().max(registerManufacturerBodyTimeZoneMax).optional()
+  "timeZone": zod.string().max(registerManufacturerBodyTimeZoneMax).optional(),
+  "acceptedTermsVersion": zod.string().optional().describe('Version of the Manufacturer Terms the user ticked at signup. Required by register and register-via-invite (new profiles); must equal the current version.')
 })
 
 
@@ -448,7 +449,8 @@ export const ApplyAsManufacturerBody = zod.object({
   "website": zod.string().optional(),
   "contactEmail": zod.string().optional(),
   "contactPhone": zod.string().optional(),
-  "timeZone": zod.string().max(applyAsManufacturerBodyOneTimeZoneMax).optional()
+  "timeZone": zod.string().max(applyAsManufacturerBodyOneTimeZoneMax).optional(),
+  "acceptedTermsVersion": zod.string().optional().describe('Version of the Manufacturer Terms the user ticked at signup. Required by register and register-via-invite (new profiles); must equal the current version.')
 }).and(zod.object({
   "clientRequestId": zod.string().min(1).max(applyAsManufacturerBodyTwoClientRequestIdMax)
 }))
@@ -501,7 +503,8 @@ export const RegisterManufacturerViaInviteBody = zod.object({
   "website": zod.string().optional(),
   "contactEmail": zod.string().optional(),
   "contactPhone": zod.string().optional(),
-  "timeZone": zod.string().max(registerManufacturerViaInviteBodyTimeZoneMax).optional()
+  "timeZone": zod.string().max(registerManufacturerViaInviteBodyTimeZoneMax).optional(),
+  "acceptedTermsVersion": zod.string().optional().describe('Version of the Manufacturer Terms the user ticked at signup. Required by register and register-via-invite (new profiles); must equal the current version.')
 })
 
 
