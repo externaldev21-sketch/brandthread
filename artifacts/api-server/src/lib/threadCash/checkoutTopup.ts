@@ -8,8 +8,18 @@
  * buyer's ACTUAL (discounted) Stripe charge correctly. What is missing is
  * the gap between that reduced charge and the full price: this module tops
  * the seller up for exactly that gap with a supplemental Stripe Transfer,
- * for destination-charge (in-stock) orders only, funded from Brandthread's
- * own balance and recorded as a platform expense in the ledger.
+ * funded from Brandthread's own balance and recorded as a platform expense
+ * in the ledger.
+ *
+ * When it runs (topupDue):
+ *  - destination charges: right away (the seller was paid at checkout);
+ *  - "transfer" (in-app checkout, hold-until-delivered) and "held"
+ *    (preorder) charges: only once the order's own payout has gone out
+ *    (funds_state "released"), so the top-up never pays a seller ahead of
+ *    the order. settleTransferOrder and executeOrderRelease call this right
+ *    after they pay the seller. It is a separate transfer with no
+ *    source_transaction: the cart's card charge is smaller than the
+ *    seller's full share by exactly this amount.
  *
  * Idempotent and safe to call on every webhook delivery for an order,
  * including retries of an already-processed one: it does nothing once
@@ -23,6 +33,20 @@ import { postLedgerTransaction } from "../money/ledger";
 
 type StripeLike = Pick<Stripe, "transfers">;
 
+/** Whether an order's Thread Cash top-up should go out now (see the header). */
+export function topupDue(order: {
+  chargeModel: string | null;
+  fundsState: string | null;
+  threadCashAppliedCents: number | null;
+  stripeThreadCashTransferId: string | null;
+}): boolean {
+  if (!order.threadCashAppliedCents || order.threadCashAppliedCents < 1) return false;
+  if (order.stripeThreadCashTransferId) return false; // already topped up
+  if (order.chargeModel === "destination") return true;
+  if (order.chargeModel === "transfer" || order.chargeModel === "held") return order.fundsState === "released";
+  return false;
+}
+
 export async function applyThreadCashSellerTopup(
   stripeClient: StripeLike | null,
   orderId: string,
@@ -31,14 +55,12 @@ export async function applyThreadCashSellerTopup(
     id: orders.id,
     ownerId: orders.ownerId,
     chargeModel: orders.chargeModel,
+    fundsState: orders.fundsState,
     threadCashAppliedCents: orders.threadCashAppliedCents,
     stripeThreadCashTransferId: orders.stripeThreadCashTransferId,
   }).from(orders).where(eq(orders.id, orderId)).limit(1);
 
-  if (!order) return;
-  if (order.chargeModel !== "destination") return;
-  if (!order.threadCashAppliedCents || order.threadCashAppliedCents < 1) return;
-  if (order.stripeThreadCashTransferId) return; // already topped up
+  if (!order || !topupDue(order)) return;
   if (!stripeClient) {
     logger.error({ orderId }, "Thread Cash seller top-up could not run: Stripe not configured");
     return;
@@ -54,7 +76,7 @@ export async function applyThreadCashSellerTopup(
   let transfer: Stripe.Transfer;
   try {
     transfer = await stripeClient.transfers.create({
-      amount: order.threadCashAppliedCents,
+      amount: order.threadCashAppliedCents!,
       currency: "usd",
       destination: seller.stripeAccountId,
       metadata: { orderId, kind: "thread_cash_seller_topup" },
@@ -79,8 +101,8 @@ export async function applyThreadCashSellerTopup(
       stripeObjectId: transfer.id,
       memo: "Platform-funded top-up so the seller receives the full item price",
       postings: [
-        { account: "thread_cash_seller_topup", amountCents: -order.threadCashAppliedCents },
-        { account: "seller_paid_out", partyId: order.ownerId, amountCents: order.threadCashAppliedCents },
+        { account: "thread_cash_seller_topup", amountCents: -order.threadCashAppliedCents! },
+        { account: "seller_paid_out", partyId: order.ownerId, amountCents: order.threadCashAppliedCents! },
       ],
     });
   });

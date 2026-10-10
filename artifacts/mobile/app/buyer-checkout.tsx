@@ -26,9 +26,10 @@
  *    confirms it with Stripe's SDK, which handles 3DS. The paid webhook then
  *    creates one order per seller. Card data only ever goes to Stripe.
  *  - hosted fallback: the previous per-seller Stripe Checkout loop,
- *    unchanged. Used for guests, preorders, Thread Cash, loyalty, a build
- *    without Stripe's native module (Expo Go), or when the
- *    hostedCheckoutFallback flag is on.
+ *    unchanged. Used for guests on the web, a build without Stripe's native
+ *    module (Expo Go), when the server can't price tax, or when the
+ *    hostedCheckoutFallback flag is on. Guests in the native app, preorders,
+ *    Thread Cash and loyalty pay in the app.
  *  - preview: the dev-web preview's fake pay path (no Stripe), with the same
  *    confirmation screen.
  */
@@ -47,7 +48,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useCheckoutThreadCash } from '@/hooks/useCheckoutThreadCash';
-import { threadCashCeilingCents, withThreadCashRedemption } from '@/lib/threadCashCheckout';
+import { threadCashCeilingCents, threadCashMultiStoreAllowed, withThreadCashRedemption } from '@/lib/threadCashCheckout';
 import { isPreviewCheckoutGroup, placePreviewOrder, withPreviewCheckoutDetails } from '@/lib/previewCheckout';
 import {
   applyDiscount, createCheckoutSession,
@@ -70,7 +71,7 @@ import {
 } from '@/lib/checkoutReadiness';
 import {
   buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath, paymentErrorMessage,
-  isCartQuote, quoteKey, quoteOffersBnpl, quoteTotals, recipientName, walletContactToCheckout,
+  groupDiscountFields, isCartQuote, quoteKey, quoteOffersBnpl, quoteTotals, recipientName, walletContactToCheckout,
   type CartQuote, type PaymentIntentStart, type WalletContact,
 } from '@/lib/checkoutPayment';
 import { ApiError } from '@/lib/networkNotice';
@@ -338,11 +339,25 @@ export default function BuyerCheckoutScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveCodeToApply]);
 
+  // ── Which way this order pays ───────────────────────────────────────────
+  const payment = useMemo(() => choosePaymentPath({
+    previewOnly,
+    signedIn: !!isSignedIn,
+    // Guests pay in the app only on iOS / Android (BT-257).
+    nativeApp: Platform.OS !== 'web',
+    hostedFallbackFlag,
+    stripeAvailable: stripePaymentAvailable() && !stripeLoadFailed,
+    serverSaidHosted,
+  }), [previewOnly, isSignedIn, hostedFallbackFlag, serverSaidHosted, stripeLoadFailed]);
+  const inApp = payment.path === 'in_app';
+
   // ── Thread Cash (item 109) ──────────────────────────────────────────────
-  // Single-seller, signed-in orders only (a token discounts one Stripe
-  // session), behind the OFF-by-default 'threadCashCheckoutDiscount' flag.
+  // Signed-in orders, behind the OFF-by-default 'threadCashCheckoutDiscount'
+  // flag. Several stores only when paid in the app (BT-270: the server
+  // splits it); the hosted fallback takes one token per Stripe session.
   const threadCashEligible = !!session && !!isSignedIn && threadCashCheckoutEnabled
-    && session.deliveryGroups.length === 1 && session.step !== 'confirmation'
+    && threadCashMultiStoreAllowed({ storeCount: session.deliveryGroups.length, paysInApp: inApp })
+    && session.step !== 'confirmation'
     // Preview orders never reach the server, so there's no wallet to use.
     && !previewOnly;
   const liveTotals = session ? getCheckoutDisplayTotals(session) : null;
@@ -355,6 +370,7 @@ export default function BuyerCheckoutScreen() {
           shippingCents: liveTotals.shippingCents,
           promoCents: liveTotals.promoCents,
           loyaltyCents: session.loyaltyRedemption?.discountCents ?? 0,
+          storeCount: session.deliveryGroups.length,
         })
       : 0,
     onChange: async (redemption) => {
@@ -362,19 +378,6 @@ export default function BuyerCheckoutScreen() {
       await persist(withThreadCashRedemption(sessionRef.current, redemption, `ck_${randomUUID()}`));
     },
   });
-
-  // ── Which way this order pays ───────────────────────────────────────────
-  const payment = useMemo(() => choosePaymentPath({
-    previewOnly,
-    signedIn: !!isSignedIn,
-    hostedFallbackFlag,
-    stripeAvailable: stripePaymentAvailable() && !stripeLoadFailed,
-    hasPreOrder: !!session?.deliveryGroups.some(group => group.hasPreOrder || group.items.some(item => item.isPreOrder)),
-    threadCashApplied: (session?.threadCashRedemption?.discountCents ?? 0) > 0,
-    loyaltyApplied: (session?.loyaltyRedemption?.discountCents ?? 0) > 0,
-    serverSaidHosted,
-  }), [previewOnly, isSignedIn, hostedFallbackFlag, session, serverSaidHosted, stripeLoadFailed]);
-  const inApp = payment.path === 'in_app';
 
   // ── Server quote: real shipping + tax for the address (in-app only) ─────
   const quoteBody = session && inApp && canQuote(address) ? buildQuoteBody(session, address) : null;
@@ -749,6 +752,7 @@ export default function BuyerCheckoutScreen() {
                 phone: contact.phone!,
               },
               clientIdempotencyKey: `${current.idempotencyKey}_${group.sellerId}`,
+              ...groupDiscountFields(current, group.sellerId),
             },
           );
         }
@@ -953,8 +957,9 @@ export default function BuyerCheckoutScreen() {
         shippingCents: quoted.shippingCents,
         taxCents: quoted.taxCents,
         promoCents: quoted.discountCents,
-        rewardsCents: 0,
-        threadCashCents: 0,
+        // Server-priced rewards (BT-258), so the lines add up to the total.
+        rewardsCents: quoted.loyaltyCents ?? 0,
+        threadCashCents: quoted.threadCashCents ?? 0,
         orderTotalCents: quoted.totalCents,
         totalCents: quoted.totalCents,
       }

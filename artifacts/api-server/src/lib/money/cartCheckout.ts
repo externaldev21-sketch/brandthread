@@ -11,12 +11,15 @@
  * Tax, calculated on the seller's own connected account, so the seller stays
  * the liable party, as with the hosted flow's liability setting.
  *
- * Deliberately NOT supported here, so they keep using hosted Checkout:
- *  - preorder drops (held escrow);
- *  - loyalty points;
- *  - Thread Cash;
- *  - guest checkout.
- * The route answers 409 USE_HOSTED_CHECKOUT and the app falls back.
+ * Also supported here (BT-257/258/270):
+ *  - preorder drops: the group keeps its "held" charge plan, so the order is
+ *    held on Brandthread's balance until it ships, as on hosted Checkout;
+ *  - loyalty points (one store, like hosted) and Thread Cash (split across
+ *    every store, see allocateThreadCash);
+ *  - guest checkout (no account: the discount customer key is
+ *    "guest:<email>", the same key the order webhook records).
+ * The route still answers 409 USE_HOSTED_CHECKOUT when Stripe Tax can't
+ * price a group, and the app falls back to hosted Checkout.
  *
  * PCI: card data never reaches this server. The app collects it only in
  * Stripe's own fields (CardField / Payment Element), and
@@ -32,22 +35,20 @@ import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneW
 import { getSellerVacationStatus } from "../sellerAvailability";
 import { validateDiscountCode, DiscountValidationError } from "../discounts";
 import { effectiveUnitPrice } from "../pricing/salesRuntime";
-import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
+import { CheckoutPlanError, resolveChargePlan, type ChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
 import { resolveSellerPlatformFeeBps } from "../planPerks";
 
+import { CartCheckoutError, taxableAmounts } from "./cartMath";
+
+export {
+  CartCheckoutError, MIN_CARD_CHARGE_CENTS, allocateThreadCash, groupPreTaxRemainingCents, planCartRewards,
+  spreadDiscount, taxableAmounts, threadCashGroupCeilingCents, type CartRewardPlan,
+} from "./cartMath";
+
 export const CART_CHECKOUT_KIND = "cart_checkout";
-/** Stripe's minimum USD card charge. */
-export const MIN_CARD_CHARGE_CENTS = 50;
 /** Sellers in one cart payment (bounded by what the order pipeline handles per webhook). */
 export const MAX_CART_GROUPS = 10;
-
-export class CartCheckoutError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string, readonly details: Record<string, unknown> = {}) {
-    super(message);
-    this.name = "CartCheckoutError";
-  }
-}
 
 // ─── Card data guard (PCI SAQ-A) ─────────────────────────────────────────────
 
@@ -139,10 +140,15 @@ export type PricedGroup = {
   /** Commission rate (bps) fixed for this checkout from the seller's plan. */
   platformFeeBps: number;
   processingFeeEstimateCents: number;
+  /** "held" for a preorder drop (paid out per order when it ships), else "destination". */
+  chargePlan: ChargePlan;
 };
 
 export async function priceCartGroup(input: {
-  buyerId: string;
+  /** Null for a guest. Used for drop early access. */
+  buyerId: string | null;
+  /** Who the discount code's per-customer limits count against (the buyer id, or "guest:<email>"). */
+  customerKey?: string;
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string | null;
   /** Live stream the buyer is shopping from (live-only discount codes). */
@@ -210,12 +216,11 @@ export async function priceCartGroup(input: {
     throw new CartCheckoutError(400, "SELLER_PAYMENTS_UNAVAILABLE", "This seller can't accept payments right now.");
   }
 
-  // Preorder drops stay on hosted Checkout (held escrow is its own model).
+  // A preorder drop keeps its held charge plan (decided from the products,
+  // never the client); the route stores it on this group's checkout row.
+  let chargePlan: ChargePlan;
   try {
-    const plan = await resolveChargePlan({ productIds: items.map((i) => i.productId), sellerId, buyerId: input.buyerId, clientDropId: null });
-    if (plan.chargeModel !== "destination") {
-      throw new CartCheckoutError(409, "USE_HOSTED_CHECKOUT", "Preorders use the secure Stripe checkout page.", { reason: "preorder" });
-    }
+    chargePlan = await resolveChargePlan({ productIds: items.map((i) => i.productId), sellerId, buyerId: input.buyerId, clientDropId: null });
   } catch (error) {
     if (error instanceof CheckoutPlanError) throw new CartCheckoutError(error.status, error.code, error.message);
     throw error;
@@ -260,7 +265,7 @@ export async function priceCartGroup(input: {
   if (input.discountCode?.trim()) {
     try {
       discount = await validateDiscountCode({
-        sellerId, code: input.discountCode, customerKey: input.buyerId, cartSubtotalCents: subtotalCents, lines: discountLines,
+        sellerId, code: input.discountCode, customerKey: input.customerKey ?? input.buyerId ?? "", cartSubtotalCents: subtotalCents, lines: discountLines,
         liveStreamId: input.liveStreamId ?? null,
       });
     } catch (error) {
@@ -299,21 +304,8 @@ export async function priceCartGroup(input: {
     platformFeeCents: fee.platformFeeCents,
     platformFeeBps,
     processingFeeEstimateCents: fee.processingFeeEstimateCents,
+    chargePlan,
   };
-}
-
-/** Spreads a discount across line amounts in proportion, exact to the cent (the last line takes the remainder). */
-export function spreadDiscount(lineAmounts: number[], discountCents: number): number[] {
-  const total = lineAmounts.reduce((sum, amount) => sum + amount, 0);
-  if (discountCents <= 0 || total <= 0) return [...lineAmounts];
-  const capped = Math.min(discountCents, total);
-  let left = capped;
-  return lineAmounts.map((amount, index) => {
-    if (index === lineAmounts.length - 1) return amount - left;
-    const share = Math.floor((capped * amount) / total);
-    left -= share;
-    return amount - share;
-  });
 }
 
 /**
@@ -326,9 +318,12 @@ export async function calculateGroupTax(
   stripeClient: Pick<Stripe, "tax">,
   group: PricedGroup,
   shipping: CartShipping,
+  /** Loyalty + Thread Cash on this group: they lower the taxable amount, as on hosted Checkout. */
+  rewardDiscountCents = 0,
 ): Promise<{ taxCents: number; calculationId: string | null }> {
-  const lineAmounts = spreadDiscount(group.items.map((i) => i.priceCents * i.quantity), group.merchandiseDiscountCents);
-  const taxableShipping = Math.max(0, group.shippingCents - group.shippingDiscountCents);
+  const taxable = taxableAmounts(group, rewardDiscountCents);
+  const lineAmounts = taxable.lineAmounts;
+  const taxableShipping = taxable.shippingCents;
   if (lineAmounts.every((amount) => amount <= 0) && taxableShipping <= 0) return { taxCents: 0, calculationId: null };
   try {
     const calculation = await stripeClient.tax.calculations.create({

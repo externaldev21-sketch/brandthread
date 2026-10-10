@@ -10,7 +10,7 @@
  * amount and have it credited.
  */
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, like, sql } from "drizzle-orm";
 import {
   blocks, db, follows, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks,
   threadCashTransfers, users,
@@ -485,6 +485,206 @@ export async function consumeThreadCashRedemption(
   }
 }
 
+// ─── One token across several stores (BT-270) ────────────────────────────────
+//
+// A redemption token is reserved to exactly one checkout row, and a
+// multi-store in-app payment has one row per store. So the in-app route
+// splits the buyer's token into one child token per store, in one
+// transaction that leaves the balance unchanged:
+//   parent  marked used, with a +X `redemption_cancelled` entry
+//           (idempotency key `redemption-split:<parent>`, the split marker);
+//   child   one `redemption` entry per store, -x_i each, sum x_i = X,
+//           token `<parent>-S<generation>-<n>`.
+// Each child then goes through the normal reserve → bind → consume path, so
+// the order webhook (handleCheckoutPaid) settles every store on its own.
+//
+// The buyer's app keeps holding the parent token. A later pay attempt (after
+// a failed or cancelled one released the children) splits again: the open
+// children of the last generation are returned and a new generation is
+// made. Cancelling the parent (the toggle turned off) returns the open
+// children. Money held by a child that was spent or is attached to a live
+// payment is never touched.
+
+const SPLIT_MARKER = (token: string) => `redemption-split:${token}`;
+/** Child tokens of a split parent start with this. */
+export const threadCashChildPrefix = (token: string) => `${token}-S`;
+
+type ChildRow = {
+  referenceId: string | null; amountCents: number; checkoutSessionId: string | null;
+  usedAt: Date | null; usedOrderId: string | null;
+};
+
+function generationOf(parent: string, child: string): number {
+  const match = /^S(\d+)-\d+$/.exec(child.slice(parent.length + 1));
+  return match ? Number(match[1]) : 0;
+}
+
+async function splitChildren(executor: DbExecutor, buyerId: string, parent: string): Promise<ChildRow[]> {
+  return executor.select({
+    referenceId: threadCashEntries.referenceId,
+    amountCents: threadCashEntries.amountCents,
+    checkoutSessionId: threadCashEntries.checkoutSessionId,
+    usedAt: threadCashEntries.usedAt,
+    usedOrderId: threadCashEntries.usedOrderId,
+  }).from(threadCashEntries).where(and(
+    eq(threadCashEntries.buyerId, buyerId),
+    eq(threadCashEntries.source, "redemption"),
+    like(threadCashEntries.referenceId, `${threadCashChildPrefix(parent)}%`),
+  ));
+}
+
+async function hasSplitMarker(executor: DbExecutor, buyerId: string, parent: string): Promise<boolean> {
+  const [marker] = await executor.select({ id: threadCashEntries.id }).from(threadCashEntries)
+    .where(and(eq(threadCashEntries.buyerId, buyerId), eq(threadCashEntries.idempotencyKey, SPLIT_MARKER(parent))))
+    .limit(1);
+  return !!marker;
+}
+
+/** The latest generation of a split parent's children, and whether every one of them still holds its money. */
+export function latestSplitGeneration(parent: string, children: ChildRow[]): { rows: ChildRow[]; intact: boolean; generation: number } {
+  const generation = Math.max(0, ...children.map((child) => generationOf(parent, child.referenceId ?? "")));
+  const rows = children.filter((child) => generationOf(parent, child.referenceId ?? "") === generation);
+  return { rows, intact: rows.length > 0 && rows.every((child) => !child.usedAt), generation };
+}
+const latestGeneration = latestSplitGeneration;
+
+/** Returns open (unattached, unspent) children to the balance. Returns the cents given back. */
+async function returnOpenChildren(executor: DbExecutor, buyerId: string, rows: ChildRow[]): Promise<number> {
+  let returned = 0;
+  for (const child of rows) {
+    if (child.usedAt || child.checkoutSessionId || !child.referenceId) continue;
+    const cents = -child.amountCents;
+    const [closed] = await executor.update(threadCashEntries).set({ usedAt: new Date() }).where(and(
+      eq(threadCashEntries.buyerId, buyerId),
+      eq(threadCashEntries.source, "redemption"),
+      eq(threadCashEntries.referenceId, child.referenceId),
+      isNull(threadCashEntries.usedAt),
+      isNull(threadCashEntries.checkoutSessionId),
+    )).returning({ id: threadCashEntries.id });
+    if (!closed) continue;
+    await executor.insert(threadCashEntries).values({
+      buyerId,
+      amountCents: cents,
+      source: "redemption_cancelled",
+      referenceId: child.referenceId,
+      idempotencyKey: `redemption-cancel:${child.referenceId}`,
+      note: `Returned $${(cents / 100).toFixed(2)} Thread Cash from checkout`,
+    });
+    returned += cents;
+  }
+  return returned;
+}
+
+/**
+ * What a token can take off an order right now, read-only (for quotes). For
+ * a split parent, what its children still hold. Throws ThreadCashError when
+ * the token is not this buyer's or was already spent or returned.
+ */
+export async function peekThreadCashRedemption(buyerId: string, token: string): Promise<{ token: string; discountCents: number; split: boolean }> {
+  const normalizedToken = String(token ?? "").trim().toUpperCase();
+  if (!normalizedToken || normalizedToken.length > 120) throw new ThreadCashError("Enter a valid Thread Cash token.");
+  const [redemption] = await db.select({ amountCents: threadCashEntries.amountCents, usedAt: threadCashEntries.usedAt })
+    .from(threadCashEntries).where(and(
+      eq(threadCashEntries.buyerId, buyerId),
+      eq(threadCashEntries.source, "redemption"),
+      eq(threadCashEntries.referenceId, normalizedToken),
+    )).limit(1);
+  if (!redemption || redemption.amountCents >= 0) throw new ThreadCashError("This Thread Cash token is not valid for your account.");
+  if (redemption.usedAt) {
+    const children = await hasSplitMarker(db, buyerId, normalizedToken)
+      ? latestGeneration(normalizedToken, await splitChildren(db, buyerId, normalizedToken))
+      : null;
+    if (!children?.intact) throw new ThreadCashError("This Thread Cash token has already been used.", 409, "THREAD_CASH_TOKEN_USED");
+  }
+  return { token: normalizedToken, discountCents: -redemption.amountCents, split: !!redemption.usedAt };
+}
+
+/**
+ * Splits a redemption token into one child token per amount (see the block
+ * comment above). `amounts` must add up to the token's amount; zero amounts
+ * are not allowed (leave that store out). A fresh token needs at least two
+ * stores; an already split one can be re-split into one (the buyer removed
+ * a store between attempts). Returns the child tokens in the same order.
+ */
+export async function splitThreadCashRedemption(buyerId: string, token: string, amounts: number[]): Promise<string[]> {
+  const parent = String(token ?? "").trim().toUpperCase();
+  if (!parent || parent.length > 120) throw new ThreadCashError("Enter a valid Thread Cash token.");
+  if (amounts.length < 1 || amounts.some((amount) => !Number.isInteger(amount) || amount < 1)) {
+    throw new ThreadCashError("Thread Cash can't be split this way.", 400, "THREAD_CASH_SPLIT_INVALID");
+  }
+  return db.transaction(async (tx) => {
+    // Same lock order as redeem/cancel/reserve: balance, then the token.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-balance:${buyerId}`}))`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-redemption:${parent}`}))`);
+    const [redemption] = await tx.select({
+      amountCents: threadCashEntries.amountCents,
+      checkoutSessionId: threadCashEntries.checkoutSessionId,
+      usedAt: threadCashEntries.usedAt,
+    }).from(threadCashEntries).where(and(
+      eq(threadCashEntries.buyerId, buyerId),
+      eq(threadCashEntries.source, "redemption"),
+      eq(threadCashEntries.referenceId, parent),
+    )).limit(1);
+    if (!redemption || redemption.amountCents >= 0) throw new ThreadCashError("This Thread Cash token is not valid for your account.");
+    const total = -redemption.amountCents;
+    if (amounts.reduce((sum, amount) => sum + amount, 0) !== total) {
+      throw new ThreadCashError("Thread Cash can't be split this way.", 400, "THREAD_CASH_SPLIT_INVALID");
+    }
+
+    let generation = 1;
+    if (!redemption.usedAt) {
+      if (amounts.length < 2) {
+        throw new ThreadCashError("Thread Cash can't be split this way.", 400, "THREAD_CASH_SPLIT_INVALID");
+      }
+      if (redemption.checkoutSessionId) {
+        throw new ThreadCashError("This Thread Cash token is already being used for another checkout.", 409, "THREAD_CASH_TOKEN_RESERVED");
+      }
+      await tx.update(threadCashEntries).set({ usedAt: new Date() }).where(and(
+        eq(threadCashEntries.buyerId, buyerId),
+        eq(threadCashEntries.source, "redemption"),
+        eq(threadCashEntries.referenceId, parent),
+        isNull(threadCashEntries.usedAt),
+      ));
+      await tx.insert(threadCashEntries).values({
+        buyerId,
+        amountCents: total,
+        source: "redemption_cancelled",
+        referenceId: parent,
+        idempotencyKey: SPLIT_MARKER(parent),
+        note: `Split $${(total / 100).toFixed(2)} Thread Cash across ${amounts.length} stores`,
+      });
+    } else {
+      if (!(await hasSplitMarker(tx, buyerId, parent))) {
+        throw new ThreadCashError("This Thread Cash token has already been used.", 409, "THREAD_CASH_TOKEN_USED");
+      }
+      const latest = latestGeneration(parent, await splitChildren(tx, buyerId, parent));
+      if (latest.rows.some((child) => child.checkoutSessionId && !child.usedAt)) {
+        throw new ThreadCashError("This Thread Cash token is already being used for another checkout.", 409, "THREAD_CASH_TOKEN_RESERVED");
+      }
+      if (!latest.intact) {
+        throw new ThreadCashError("This Thread Cash token has already been used.", 409, "THREAD_CASH_TOKEN_USED");
+      }
+      await returnOpenChildren(tx, buyerId, latest.rows);
+      generation = latest.generation + 1;
+    }
+
+    const tokens: string[] = [];
+    for (let index = 0; index < amounts.length; index++) {
+      const child = `${threadCashChildPrefix(parent)}${generation}-${index + 1}`;
+      await tx.insert(threadCashEntries).values({
+        buyerId,
+        amountCents: -amounts[index],
+        source: "redemption",
+        referenceId: child,
+        idempotencyKey: `redemption-split:${child}`,
+        note: `Redeemed $${(amounts[index] / 100).toFixed(2)} Thread Cash (one store's share)`,
+      });
+      tokens.push(child);
+    }
+    return tokens;
+  });
+}
+
 /**
  * Item 108/109: undo a redemption the buyer no longer wants (they turned the
  * checkout toggle off, or the app is re-sizing it to a new order total).
@@ -540,6 +740,23 @@ export async function cancelThreadCashRedemption(
       throw new ThreadCashError("This Thread Cash token is not valid for your account.", 404, "THREAD_CASH_TOKEN_NOT_FOUND");
     }
     if (redemption.usedAt) {
+      // A token split across stores (splitThreadCashRedemption): give back
+      // what its children still hold, unless a payment is using them.
+      if (await hasSplitMarker(tx, buyerId, normalizedToken)) {
+        const latest = latestGeneration(normalizedToken, await splitChildren(tx, buyerId, normalizedToken));
+        if (latest.rows.some((child) => child.checkoutSessionId && !child.usedAt)) {
+          throw new ThreadCashError(
+            "This Thread Cash is attached to a checkout that's still open. Finish or close that payment first.",
+            409,
+            "THREAD_CASH_TOKEN_RESERVED",
+          );
+        }
+        if (latest.rows.some((child) => child.usedOrderId)) {
+          throw new ThreadCashError("This Thread Cash was already spent on an order.", 409, "THREAD_CASH_TOKEN_USED");
+        }
+        const returnedCents = await returnOpenChildren(tx, buyerId, latest.rows);
+        return { returnedCents, balanceCents: await getBalanceCents(tx, buyerId) };
+      }
       throw new ThreadCashError("This Thread Cash was already spent on an order.", 409, "THREAD_CASH_TOKEN_USED");
     }
     if (redemption.checkoutSessionId) {

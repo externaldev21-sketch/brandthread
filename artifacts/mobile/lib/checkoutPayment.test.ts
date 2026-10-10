@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GENERIC_DELIVERY_WINDOW, buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath,
-  deliveryWindowLabel, paymentErrorMessage, quoteTotals, walletContactToCheckout,
+  deliveryWindowLabel, groupDiscountFields, paymentErrorMessage, paymentRewards, quoteTotals, walletContactToCheckout,
 } from './checkoutPayment';
 
 const TEST_CARD = '4242424242424242';
@@ -79,12 +79,67 @@ describe('which way an order pays', () => {
     ['flag', { hostedFallbackFlag: true }],
     ['guest', { signedIn: false }],
     ['stripe_unavailable', { stripeAvailable: false }],
-    ['preorder', { hasPreOrder: true }],
-    ['thread_cash', { threadCashApplied: true }],
-    ['loyalty', { loyaltyApplied: true }],
     ['server', { serverSaidHosted: true }],
   ])('falls back to hosted Checkout for %s', (reason, patch) => {
     expect(choosePaymentPath({ ...base, ...patch })).toEqual({ path: 'hosted', reason });
+  });
+
+  // BT-258 / BT-270: the in-app PaymentIntent covers them now.
+  it.each([
+    ['a preorder', { hasPreOrder: true }],
+    ['Thread Cash', { threadCashApplied: true }],
+    ['loyalty points', { loyaltyApplied: true }],
+  ])('pays %s in the app', (_label, patch) => {
+    expect(choosePaymentPath({ ...base, ...patch })).toEqual({ path: 'in_app', reason: null });
+  });
+
+  // BT-257: guests get the Apple Pay / Google Pay sheet in the native app.
+  it('pays a guest in the native app', () => {
+    expect(choosePaymentPath({ ...base, signedIn: false, nativeApp: true })).toEqual({ path: 'in_app', reason: null });
+  });
+  it('keeps guests on the web on the hosted page, so a signed-out web preview never calls the paying API', () => {
+    expect(choosePaymentPath({ ...base, signedIn: false, nativeApp: false })).toEqual({ path: 'hosted', reason: 'guest' });
+    expect(choosePaymentPath({ ...base, signedIn: false })).toEqual({ path: 'hosted', reason: 'guest' });
+  });
+  it('still falls back for a native guest when the build cannot take payments or the kill switch is on', () => {
+    expect(choosePaymentPath({ ...base, signedIn: false, nativeApp: true, stripeAvailable: false }))
+      .toEqual({ path: 'hosted', reason: 'stripe_unavailable' });
+    expect(choosePaymentPath({ ...base, signedIn: false, nativeApp: true, hostedFallbackFlag: true }))
+      .toEqual({ path: 'hosted', reason: 'flag' });
+  });
+});
+
+describe('rewards and discount codes on the request bodies', () => {
+  const withRewards = {
+    ...session,
+    loyaltyRedemption: { token: 'LOY-1', discountCents: 500 },
+    threadCashRedemption: { token: 'TCASH-1', discountCents: 700 },
+  };
+
+  it('sends the reward tokens with the in-app payment and its quote (BT-258)', () => {
+    const body = buildCreatePaymentIntentBody({ session: withRewards, contact: {}, address: {}, idempotencyKey: 'k1234567', saveCard: false });
+    expect(body).toMatchObject({ loyaltyToken: 'LOY-1', threadCashToken: 'TCASH-1' });
+    expect(buildQuoteBody(withRewards, { postalCode: '10012' })).toMatchObject({ loyaltyToken: 'LOY-1', threadCashToken: 'TCASH-1' });
+    expect(paymentRewards({ ...session, threadCashRedemption: { token: 'T', discountCents: 0 } })).toEqual({});
+    expect('threadCashToken' in buildQuoteBody(session, { postalCode: '10012' })).toBe(false);
+  });
+
+  it('gives a guest hosted session the same per-store code (BT-255)', () => {
+    const multi = {
+      ...session,
+      discounts: [{ code: 'S1ONLY', isValid: true, sellerId: 's1' }, { code: 'S2ONLY', isValid: true, sellerId: 's2' }],
+    } as any;
+    expect(groupDiscountFields(multi, 's2')).toEqual({ discountCode: 'S2ONLY' });
+    expect(groupDiscountFields(session, 's1')).toEqual({});
+    expect(groupDiscountFields({ ...session, deliveryGroups: [session.deliveryGroups[0]] }, 's1')).toEqual({ discountCode: 'TENOFF' });
+  });
+
+  it('adds server-priced loyalty and Thread Cash to the totals only when applied', () => {
+    const group = { sellerId: 's1', checkoutSessionId: '', subtotalCents: 5_000, shippingCents: 0, discountCents: 0, taxCents: 0, totalCents: 3_800, processingDays: null };
+    expect(quoteTotals({ amountCents: 3_800, groups: [{ ...group, loyaltyCents: 500, threadCashCents: 700 }] }))
+      .toMatchObject({ loyaltyCents: 500, threadCashCents: 700, totalCents: 3_800 });
+    const plain = quoteTotals({ amountCents: 5_000, groups: [{ ...group, totalCents: 5_000 }] });
+    expect('loyaltyCents' in plain || 'threadCashCents' in plain).toBe(false);
   });
 });
 

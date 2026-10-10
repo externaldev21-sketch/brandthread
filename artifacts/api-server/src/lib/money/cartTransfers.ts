@@ -32,6 +32,7 @@ import { isDefinitiveStripeRejection, stripeErrorCode } from "./stripeMoney";
 import {
   expiredReservationCheckouts, releaseStockReservation,
 } from "./stockReservation";
+import { applyThreadCashSellerTopup } from "../threadCash/checkoutTopup";
 
 type StripeTransfers = Pick<Stripe, "transfers">;
 
@@ -57,7 +58,13 @@ export async function settleTransferOrder(
     disputePausedAt: orders.disputePausedAt,
   }).from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!order || order.chargeModel !== "transfer") return "not_transfer_order";
-  if (order.stripeTransferId || order.fundsState === "released") return "already";
+  if (order.stripeTransferId || order.fundsState === "released") {
+    // A retry after the payout: finish a Thread Cash top-up that failed then.
+    await applyThreadCashSellerTopup(stripeClient ?? null, orderId).catch((error) => {
+      logger.error({ err: error, orderId }, "Thread Cash seller top-up failed; the money sweep retries it");
+    });
+    return "already";
+  }
   // Refunded / cancelled before the transfer: nothing is owed to the seller.
   if (order.fundsState !== "held" || order.status === "refund_pending" || order.status === "cancelled") return "not_ready";
   if (!stripeClient) return "not_ready";
@@ -126,6 +133,13 @@ export async function settleTransferOrder(
       });
     }
   });
+  // Thread Cash on this order is Brandthread's to fund: pay the seller that
+  // part now that their share went out (idempotent; checkoutTopup.ts).
+  try {
+    if (settled) await applyThreadCashSellerTopup(stripeClient, orderId);
+  } catch (error) {
+    logger.error({ err: error, orderId }, "Thread Cash seller top-up failed; the money sweep retries it");
+  }
   return settled ? "transferred" : "already";
 }
 

@@ -84,6 +84,11 @@ one-time setup this overlaps with).
 - [ ] **Stripe Connect / Stripe account review** for real payouts to go live — separate
       from the App Store/Play accounts entirely, but blocking for sellers to receive real
       money.
+- [ ] **Apple Pay / Google Pay in checkout** — merchant ID `merchant.com.brandthread.mobile`,
+      the Apple Pay certificate from Stripe's CSR on the new LLC Stripe account, web domain
+      verification, and `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` in the EAS `production`
+      environment. Without these every buyer silently gets the hosted Stripe page instead of
+      the native sheet. Step by step: [`apple-pay-merchant-setup.md`](./apple-pay-merchant-setup.md).
 - [ ] **Sentry account + DSN** (optional but recommended before launch) — crash reporting
       stays off until a human creates the Sentry project and sets
       `EXPO_PUBLIC_SENTRY_DSN`/`SENTRY_AUTH_TOKEN` per `release-flow.md`.

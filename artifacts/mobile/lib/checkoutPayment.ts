@@ -28,28 +28,36 @@ export type HostedReason =
  * fallback, for what the in-app flow does not cover (see
  * api-server lib/money/cartCheckout.ts), and behind the hostedCheckoutFallback
  * kill switch.
+ *
+ * Paid in the app now (the server path covers them fully):
+ *  - guests in the native app (BT-257): /api/guest/checkout/payment-intent,
+ *    no account, so they get the Apple Pay / Google Pay sheet. Guests on the
+ *    web keep the hosted page: a signed-out web preview never calls the
+ *    paying API, and the hosted page is the web's wallet-capable path;
+ *  - preorders (held until they ship), Thread Cash (split across stores) and
+ *    loyalty points (BT-258 / BT-270). hasPreOrder, threadCashApplied and
+ *    loyaltyApplied are still accepted but no longer force the hosted page.
  */
 export function choosePaymentPath(input: {
   previewOnly: boolean;
   signedIn: boolean;
   hostedFallbackFlag: boolean;
   stripeAvailable: boolean;
-  hasPreOrder: boolean;
-  threadCashApplied: boolean;
-  loyaltyApplied: boolean;
+  /** iOS / Android build (not the web). Guests pay in the app only there. Defaults to false. */
+  nativeApp?: boolean;
+  hasPreOrder?: boolean;
+  threadCashApplied?: boolean;
+  loyaltyApplied?: boolean;
   /** The server answered USE_HOSTED_CHECKOUT for this order earlier. */
   serverSaidHosted: boolean;
 }): { path: PaymentPath; reason: HostedReason | null } {
   if (input.previewOnly) return { path: 'preview', reason: null };
   const reason: HostedReason | null =
     input.hostedFallbackFlag ? 'flag'
-      : !input.signedIn ? 'guest'
+      : !input.signedIn && !input.nativeApp ? 'guest'
         : !input.stripeAvailable ? 'stripe_unavailable'
-          : input.hasPreOrder ? 'preorder'
-            : input.threadCashApplied ? 'thread_cash'
-              : input.loyaltyApplied ? 'loyalty'
-                : input.serverSaidHosted ? 'server'
-                  : null;
+          : input.serverSaidHosted ? 'server'
+            : null;
   return reason ? { path: 'hosted', reason } : { path: 'in_app', reason: null };
 }
 
@@ -74,7 +82,13 @@ export type PaymentIntentAddress = {
   country: string;
 };
 
-export type CreatePaymentIntentBody = {
+/** Reward redemption tokens; the server re-checks and prices them (signed-in buyers only). */
+export type PaymentIntentRewards = {
+  loyaltyToken?: string;
+  threadCashToken?: string;
+};
+
+export type CreatePaymentIntentBody = PaymentIntentRewards & {
   groups: PaymentIntentGroup[];
   contactEmail: string;
   contactPhone: string;
@@ -83,12 +97,27 @@ export type CreatePaymentIntentBody = {
   saveCard: boolean;
 };
 
-export type QuoteBody = {
+export type QuoteBody = PaymentIntentRewards & {
   groups: PaymentIntentGroup[];
   shippingAddress: { street?: string; line2?: string | null; city?: string; state?: string; postalCode: string; country: string };
 };
 
-type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'> & Partial<Pick<CheckoutSession, 'giftCards'>>;
+type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'>
+  & Partial<Pick<CheckoutSession, 'giftCards' | 'loyaltyRedemption' | 'threadCashRedemption'>>;
+
+/**
+ * The session's loyalty / Thread Cash tokens for the in-app payment (BT-258).
+ * Only when they discount something; the server splits Thread Cash across
+ * stores and keeps loyalty to one store.
+ */
+export function paymentRewards(session: SessionForPayment): PaymentIntentRewards {
+  const loyalty = session.loyaltyRedemption;
+  const threadCash = session.threadCashRedemption;
+  return {
+    ...(loyalty?.token && loyalty.discountCents > 0 ? { loyaltyToken: String(loyalty.token) } : {}),
+    ...(threadCash?.token && threadCash.discountCents > 0 ? { threadCashToken: String(threadCash.token) } : {}),
+  };
+}
 
 /**
  * One group per seller. A single-seller order takes the one valid code; a
@@ -113,6 +142,25 @@ export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] 
       ...(session.giftCards?.[group.sellerId] ? { giftCard: { cardId: session.giftCards[group.sellerId].cardId } } : {}),
     };
   });
+}
+
+/**
+ * One store's discount code (and the live it came from) for a hosted Stripe
+ * session, the same choice paymentGroups makes: the one valid code on a
+ * single-store order, else the code tagged with this store. Used by the
+ * hosted fallback for signed-in buyers and guests alike (BT-255).
+ */
+export function groupDiscountFields(
+  session: Pick<CheckoutSession, 'deliveryGroups' | 'discounts'>,
+  sellerId: string,
+): { discountCode?: string; liveStreamId?: string } {
+  const single = session.deliveryGroups.length === 1;
+  const code = session.discounts.find(d => d.isValid && (single || d.sellerId === sellerId))?.code;
+  const liveStreamId = code ? getLiveCheckoutContext(sellerId)?.streamId : undefined;
+  return {
+    ...(code ? { discountCode: String(code) } : {}),
+    ...(liveStreamId ? { liveStreamId } : {}),
+  };
 }
 
 export function recipientName(address: Partial<CheckoutAddress>): string {
@@ -142,6 +190,7 @@ export function buildCreatePaymentIntentBody(input: {
     },
     clientIdempotencyKey: String(input.idempotencyKey),
     saveCard: input.saveCard === true,
+    ...paymentRewards(input.session),
   };
 }
 
@@ -161,6 +210,7 @@ export function buildQuoteBody(session: SessionForPayment, address: Partial<Chec
       postalCode: (address.postalCode ?? '').trim(),
       country: (address.country || 'US').trim().toUpperCase(),
     },
+    ...paymentRewards(session),
   };
 }
 
@@ -180,6 +230,10 @@ export type QuoteGroup = {
   taxCents: number;
   /** Covered by a store gift card; totalCents is what the card payment still covers. */
   giftCardCents?: number;
+  /** Loyalty points on this store (server-priced). */
+  loyaltyCents?: number;
+  /** This store's share of the buyer's Thread Cash (server-split). */
+  threadCashCents?: number;
   totalCents: number;
   processingDays: number | null;
 };
@@ -219,6 +273,10 @@ export type QuoteTotals = {
   subtotalCents: number; shippingCents: number; discountCents: number; taxCents: number; totalCents: number;
   /** Present only when a store gift card is applied. */
   giftCardCents?: number;
+  /** Present only when loyalty points are applied. */
+  loyaltyCents?: number;
+  /** Present only when Thread Cash is applied. */
+  threadCashCents?: number;
 };
 
 export function quoteTotals(quote: CartQuote): QuoteTotals {
@@ -229,9 +287,17 @@ export function quoteTotals(quote: CartQuote): QuoteTotals {
     taxCents: sum.taxCents + group.taxCents,
     totalCents: sum.totalCents + group.totalCents,
   }), { subtotalCents: 0, shippingCents: 0, discountCents: 0, taxCents: 0, totalCents: 0 });
-  const giftCardCents = quote.groups.reduce((sum, group) => sum + (group.giftCardCents ?? 0), 0);
-  // Only present when a store gift card is applied, so other orders keep their exact shape.
-  return giftCardCents > 0 ? { ...base, giftCardCents } : base;
+  const add = (pick: (group: QuoteGroup) => number | undefined) => quote.groups.reduce((sum, group) => sum + (pick(group) ?? 0), 0);
+  const giftCardCents = add(group => group.giftCardCents);
+  const loyaltyCents = add(group => group.loyaltyCents);
+  const threadCashCents = add(group => group.threadCashCents);
+  // Each only present when applied, so other orders keep their exact shape.
+  return {
+    ...base,
+    ...(giftCardCents > 0 ? { giftCardCents } : {}),
+    ...(loyaltyCents > 0 ? { loyaltyCents } : {}),
+    ...(threadCashCents > 0 ? { threadCashCents } : {}),
+  };
 }
 
 // ─── Delivery window ─────────────────────────────────────────────────────────

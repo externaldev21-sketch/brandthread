@@ -44,7 +44,7 @@ import profileMediaRouter from "./profile-media";
 import profileCoverRouter from "./profile-cover";
 import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
-import checkoutIntentRouter from "./checkout-intent";
+import checkoutIntentRouter, { guestCheckoutIntentRouter } from "./checkout-intent";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter, { connectRedirectRouter } from "./connect";
 import subscriptionRouter from "./subscription";
@@ -194,6 +194,8 @@ router.use("/public",          discoveryRouter); // /categories, /trending/produ
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
 router.use("/profile",         avatarVideoRouter);  // avatar video (moving profile picture), all account types
+// Guest in-app payment (BT-257): no Clerk; card-data guard + guest token inside. Rate limited as checkout.
+router.use("/guest/checkout/payment-intent", guestCheckoutIntentRouter);
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks/resend-marketing", emailMarketingWebhookRouter);
 router.use("/webhooks",        webhooksRouter);
