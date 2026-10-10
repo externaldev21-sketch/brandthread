@@ -147,6 +147,8 @@ vi.mock('@/services/orderService', () => ({
   createPackagePreset: (...args: unknown[]) => createPackagePresetMock(...args),
   deletePackagePreset: (...args: unknown[]) => deletePackagePresetMock(...args),
   updateFulfillmentChecklist: (...args: unknown[]) => updateFulfillmentChecklistMock(...args),
+  getParcelSuggestion: () => Promise.resolve({ weightLb: 0, weightKnown: false }),
+  isShipFromError: (err: any) => err?.code === 'SHIP_FROM_REQUIRED' || err?.code === 'SHIP_FROM_IS_BUYER',
 }));
 
 vi.mock('@/lib/packingSlip', () => ({
@@ -280,12 +282,14 @@ describe('fulfill-order shipping label purchase', () => {
     await advanceToShippingStep(renderer);
 
     expect(getShippingRatesMock).toHaveBeenCalled();
+    // Never the buyer's address as the sender (BT-207): the server uses the seller's location.
+    expect(getShippingRatesMock.mock.calls[0][1]).not.toHaveProperty('fromAddress');
 
     const rateRow = renderer.root.findAllByType('TouchableOpacity' as any).find(n => typeof n.props.onPress === 'function' && !n.props.disabled);
     await act(async () => { await rateRow!.props.onPress(); });
     await flush();
 
-    expect(purchaseShippingLabelMock).toHaveBeenCalledWith('order-1', expect.objectContaining({ id: 'rate-1' }), 'fulfill-order-1');
+    expect(purchaseShippingLabelMock).toHaveBeenCalledWith('order-1', expect.objectContaining({ id: 'rate-1' }), 'fulfill-order-1', undefined); // whole order: no itemIds
 
     await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Continue').props.onPress(); });
     await flush();

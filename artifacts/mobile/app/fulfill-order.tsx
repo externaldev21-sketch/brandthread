@@ -29,7 +29,7 @@ import { Order, ShippingRate, ShippingLabel } from '@/services/orderTypes';
 import {
   getShippingRates, purchaseShippingLabel, voidShippingLabel, addTracking as addTrackingService,
   getPackagePresets, createPackagePreset, deletePackagePreset,
-  updateFulfillmentChecklist, PackagePreset, getParcelSuggestion,
+  updateFulfillmentChecklist, PackagePreset, getParcelSuggestion, isShipFromError,
 } from '@/services/orderService';
 import { sharePackingSlip } from '@/lib/packingSlip';
 import { radius } from '@/constants/radii';
@@ -91,6 +91,7 @@ export default function FulfillOrderScreen() {
   const [loadingRates, setLoadingRates] = useState(false);
   const [rates, setRates] = useState<ShippingRate[]>([]);
   const [ratesError, setRatesError] = useState<string | null>(null);
+  const [shipFromMissing, setShipFromMissing] = useState(false);
   const [buying, setBuying] = useState(false);
   const [label, setLabel] = useState<ShippingLabel | null>(null);
   const [manualMode, setManualMode] = useState(false);
@@ -243,8 +244,9 @@ export default function FulfillOrderScreen() {
     setLoadingRates(true);
     setRatesError(null);
     try {
-      const fromAddress = order.fulfillment.fromAddress ?? order.customer.shippingAddress;
-      const nextRates = await getShippingRates(orderId, { fromAddress, ...parcelDims, ...(isPartial ? { itemIds: partialItemIds } : {}) });
+      // Never the buyer's address: the server uses the seller's primary location when none is sent.
+      const fromAddress = order.fulfillment.fromAddress;
+      const nextRates = await getShippingRates(orderId, { ...(fromAddress ? { fromAddress } : {}), ...parcelDims, ...(isPartial ? { itemIds: partialItemIds } : {}) });
       const sorted = [...nextRates].sort((a, b) => a.priceCents - b.priceCents);
       setRates(sorted);
       if (sorted.length === 0) {
@@ -252,6 +254,13 @@ export default function FulfillOrderScreen() {
         setManualMode(true);
       }
     } catch (err: any) {
+      if (isShipFromError(err)) {
+        setShipFromMissing(true);
+        setRatesError(err.code === 'SHIP_FROM_IS_BUYER'
+          ? 'Your ship-from address matches the buyer\'s address. Update it in Locations.'
+          : 'Add the address you ship from to buy a label.');
+        return;
+      }
       setRatesError(err?.message ?? 'Could not load carrier rates.');
       setManualMode(true);
     } finally {
@@ -611,6 +620,9 @@ export default function FulfillOrderScreen() {
                 ) : ratesError ? (
                   <BrandthreadCard style={{ gap: SP.sm }}>
                     <Text style={[s.mutedText, { color: ERROR }]}>{ratesError}</Text>
+                    {shipFromMissing && (
+                      <PrimaryButton label="Add ship-from address" small onPress={() => router.push('/locations' as any)} />
+                    )}
                     <SecondaryButton label="Retry" icon="refresh-cw" small onPress={handleLoadRates} />
                   </BrandthreadCard>
                 ) : (

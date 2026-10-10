@@ -326,6 +326,7 @@ router.use("/affiliate",                 affiliateCreatorRouter); // creator sid
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
 router.use("/shipping-labels",           shippingLabelsRouter);
+router.use("/package-presets",           packagePresetsRouter); // router applies requireAuth + teamContext itself
 router.use("/discount-codes",            tc, discountCodesRouter);
 router.use("/sales",                     tc, salesRouter);
 router.use("/returns",                   tc, returnsRouter);

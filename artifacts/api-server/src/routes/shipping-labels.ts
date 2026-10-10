@@ -17,6 +17,7 @@ import { parseItemIds, partialLabelItemError } from "../lib/partialLabel";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
 import { publishNotification } from "./notifications-feed";
+import { resolveShipFrom } from "../lib/shipping/shipFrom";
 
 const router = Router();
 router.use(requireAuth);
@@ -72,9 +73,12 @@ router.post("/:orderId/rates", requireRole("staff"), async (req, res) => {
   if (!(ratesItemIds ? PARTIAL_ELIGIBLE_STATUSES : ELIGIBLE_STATUSES).includes(order.status)) {
     return void res.status(409).json({ error: "Labels are only available before shipment" });
   }
+  // Never quote from the buyer's own address: request → Settings → Locations → refuse.
+  const shipFrom = await resolveShipFrom(ownerId, req.body?.fromAddress, order.shippingAddress as any);
+  if (!shipFrom.ok) return void res.status(shipFrom.status).json({ error: shipFrom.error, code: shipFrom.code });
   try {
     const shipment = await createShipment({
-      address_from: address(req.body.fromAddress),
+      address_from: address(shipFrom.address),
       address_to: address(order.shippingAddress),
       parcels: [{
         length: req.body.length, width: req.body.width, height: req.body.height,
