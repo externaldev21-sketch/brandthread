@@ -169,6 +169,15 @@ export const FLOWS = [
     await p.getByRole('switch').last().click(); await p.waitForTimeout(500);
     await p.getByText('Active dates', { exact: true }).last().scrollIntoViewIfNeeded(); await p.waitForTimeout(400);
   }, wait: null },
+  { name: 'a11-discount-dates-filled', role: 'seller', act: async (p) => {
+    await openSellerSettings(p);
+    await p.getByLabel('Discounts', { exact: true }).first().click(); await p.waitForTimeout(2500);
+    await p.getByLabel('New discount', { exact: true }).first().click(); await p.waitForTimeout(1500);
+    await p.getByRole('switch').last().click(); await p.waitForTimeout(500);
+    await p.getByLabel('Start date', { exact: true }).last().fill('2026-11-01');
+    await p.getByLabel('End date', { exact: true }).last().fill('2026-11-30');
+    await p.getByText('Active dates', { exact: true }).last().scrollIntoViewIfNeeded(); await p.waitForTimeout(400);
+  }, wait: null },
   { name: 'a11-vacation', role: 'seller', act: async (p) => {
     await openSellerSettings(p);
     await p.getByLabel('Vacation mode', { exact: true }).first().click(); await p.waitForTimeout(2500);

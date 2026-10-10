@@ -33,6 +33,7 @@ import { haptics } from '@/lib/haptics';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { BODY_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { SPACING } from '@/constants/spacing';
+import { TYPE_SCALE } from '@/constants/typography';
 import {
   clampDate, dateToHm, dateToYmd, defaultPickerValue, formatFieldValue, fromWebInputValue, mergeDayAndTime,
   toWebInputValue, type DateTimeFieldMode,
@@ -149,7 +150,7 @@ export function NativeDateTimeField({
           style: {
             appearance: 'none', WebkitAppearance: 'none', border: 'none', outline: 'none', margin: 0,
             background: 'transparent', color: value ? palette.foreground : palette.mutedForeground,
-            colorScheme: 'dark', fontFamily: WEB_FONT, fontSize: 17, lineHeight: '22px',
+            colorScheme: 'dark', fontFamily: WEB_FONT, fontSize: 15, lineHeight: '20px',
             padding: '6px 11px', minHeight: 34, boxSizing: 'border-box', cursor: disabled ? 'default' : 'pointer',
           },
         })}
@@ -260,7 +261,7 @@ export function NativeDateTimeField({
     <View style={style}>
       <View style={variant === 'pill' ? styles.pillRow : styles.row} testID={testID ? `${testID}-row` : undefined}>
         {variant === 'row' && (
-          <Text style={[styles.label, { color: palette.foreground }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>
+          <Text style={[styles.label, { color: palette.foreground }]} numberOfLines={2} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>
             {label}
           </Text>
         )}
@@ -316,14 +317,14 @@ function FallbackTextField({
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, minHeight: 52, paddingVertical: SPACING.xs },
-  label: { ...TEXT.body, fontFamily: FONT.regular, flexShrink: 1 },
-  trailing: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: SPACING.xs },
+  label: { ...TYPE_SCALE.body, fontFamily: FONT.regular, flex: 1, minWidth: 0 },
+  trailing: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: SPACING.xs },
   pillRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   pillTrailing: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   pair: { flexDirection: 'row', gap: 6 },
   pill: { backgroundColor: FILL_ELEVATED, borderRadius: 8, paddingHorizontal: 11, minHeight: 34, justifyContent: 'center' },
   webPill: { backgroundColor: FILL_ELEVATED, borderRadius: 8, overflow: 'hidden' },
-  pillText: { ...TEXT.body, fontFamily: FONT.regular, fontVariant: ['tabular-nums'] },
+  pillText: { ...TYPE_SCALE.body, fontFamily: FONT.regular, fontVariant: ['tabular-nums'] },
   fallbackInput: { minWidth: 120, textAlign: 'right', paddingVertical: 6 },
   disabled: { opacity: 0.5 },
   note: { ...TEXT.footnote, marginTop: 2 },
