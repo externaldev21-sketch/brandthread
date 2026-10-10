@@ -18,7 +18,7 @@ import { z } from "@workspace/api-zod";
 import { bodyObject, idParams, validateInput } from "../lib/commerceValidation";
 import { deliverDropBroadcast } from "../lib/dropBroadcast";
 import {
-  defaultFulfillmentDeadline, failDrop, validateFulfillmentDeadline,
+  defaultFulfillmentDeadline, failDrop, validateFulfillmentDeadline, validatePreorderShipDate,
 } from "../lib/money/dropLifecycle";
 import { maybeCompleteDrop } from "../lib/money/escrow";
 
@@ -146,6 +146,9 @@ router.post("/", requireRole("manager"), validateInput({ body: createDropBody })
   // refunded automatically if unshipped orders remain after the deadline.
   let deadline: Date | undefined;
   if (type === "pre-order") {
+    // Buyers' delivery deadline is the ship date + 15 days (max 180 days).
+    const shipDateError = shipDate ? validatePreorderShipDate(shipDate) : null;
+    if (shipDateError) { res.status(400).json({ error: shipDateError, code: "INVALID_SHIP_DATE" }); return; }
     deadline = fulfillmentDeadlineAt
       ? new Date(fulfillmentDeadlineAt)
       : defaultFulfillmentDeadline({ estimatedShipDate: shipDate ?? null });
@@ -269,6 +272,11 @@ router.patch("/:id", requireRole("manager"), validateInput({ params: dropIdParam
     .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, ownerId)))
     .limit(1);
   if (!currentDrop) { res.status(404).json({ error: "Not found" }); return; }
+
+  if (estimatedShipDate && currentDrop.escrowState) {
+    const shipDateError = validatePreorderShipDate(new Date(estimatedShipDate));
+    if (shipDateError) { res.status(400).json({ error: shipDateError, code: "INVALID_SHIP_DATE" }); return; }
+  }
 
   let deadline: Date | undefined;
   if (fulfillmentDeadlineAt !== undefined) {

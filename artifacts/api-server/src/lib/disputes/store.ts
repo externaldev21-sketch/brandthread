@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, disputes, disputeEvents, orders } from "@workspace/db";
 import { logger } from "../logger";
 import { recordDisputeReinstatement } from "../money/disputes";
+import { recordDisputeClosedRecovery } from "../money/sellerRecovery";
 import type { DisputeDeps, DisputeStore } from "./webhook";
 
 const STATUS_EVENT_KINDS = ["created", "updated", "evidence_submitted", "won", "lost", "warning_closed"] as const;
@@ -98,6 +99,7 @@ export function buildDisputeDeps(notify: DisputeDeps["notify"]): DisputeDeps {
       // book the same chargeback again at funds_withdrawn.
       withdraw: async () => ({ posted: false, reason: "awaiting_final_outcome" }),
       reinstate: (input) => recordDisputeReinstatement(input),
+      settle: (input) => recordDisputeClosedRecovery(input),
     },
     notify,
     log: logger,

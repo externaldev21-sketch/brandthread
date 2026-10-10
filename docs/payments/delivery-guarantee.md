@@ -6,12 +6,13 @@ Dev's rule, verbatim: *"For a regular order, if it's not pre-order, it should on
 
 | | Regular order | Pre-order |
 |---|---|---|
-| Must be **delivered** within | 15 days of purchase | 60 days of purchase |
+| Must be **delivered** within | 15 days of purchase | 15 days after the seller's promised ship date (`PREORDER_DELIVERY_GRACE_DAYS`), never later than 180 days after purchase (`PREORDER_MAX_DELIVERY_DAYS`); 60 days of purchase when the item has no ship date |
 | Stored as | `orders.deliver_by`, `order_items.deliver_by` (stamped when the payment is captured) | same |
 
 * **Purchase** = `orders.paid_at` (Stripe capture). Deadlines are absolute instants (`paid_at + N × 24h`). Only display is time-zone aware.
 * **Delivered** = the carrier says delivered (Shippo webhook or the hourly tracking poll) **or** the buyer taps "I received it". A seller can never mark an order delivered (the status and tracking endpoints refuse it).
-* A **pre-order** is any item whose product has `is_pre_order = true` or belongs to a pre-order drop. Each item carries its own deadline, so one order with both kinds refunds the regular items at day 15 and the pre-order items at day 60. `orders.deliver_by` is the earliest open item deadline.
+* A **pre-order** is any item whose product has `is_pre_order = true` or belongs to a pre-order drop. Its ship date is the product's `pre_order_est_ship_date`, else the drop's `estimated_ship_date`. Each item carries its own deadline, so one order with both kinds refunds the regular items at day 15 and the pre-order items 15 days after their ship date. `orders.deliver_by` is the earliest open item deadline.
+* So that delivery always fits the 180-day cap, a pre-order ship date (product or drop) may be at most **165 days** away when it is set (`PREORDER_SHIP_DATE_TOO_FAR` / `INVALID_SHIP_DATE`), and a drop's fulfilment deadline at most 165 days away (`INVALID_DEADLINE`).
 * **Multi-seller carts** already create one order per seller, so each seller has their own deadline.
 * Orders created before migration 110 have `deliver_by = NULL` and keep the old behaviour (no auto-refund, old payout timing).
 
@@ -21,12 +22,18 @@ Dev's rule, verbatim: *"For a regular order, if it's not pre-order, it should on
 
 * **hold** (default): every new order is charged on the platform's balance (Stripe *separate charges and transfers*, `charge_model = 'transfer'`). The seller's transfer is created only when **all items are delivered + the buffer** have passed (`orders.payout_release_at`), nothing is open (no dispute, no open return), and the order isn't refunded. Pre-order drop orders (`held`) also release on delivery + buffer instead of on tracking entry.
 * **immediate**: the old behaviour (in-stock orders are destination charges that pay the seller instantly). The auto-refund still runs, but it has to claw the money back from the seller's Stripe balance and **can leave the platform paying out of pocket** if the seller has already withdrawn it. Keep `hold` unless Dev decides otherwise.
-* In hold mode an auto-refund refunds money the platform still holds, so it never costs the platform anything. The platform keeps Stripe's non-refundable processing fee; that cost is charged to the seller's held funds like every other refund (see `lib/money/refunds.ts`).
+* In hold mode an auto-refund refunds money the platform still holds. Stripe keeps its processing fee (and a label may already have been paid from the order), so the order's held money is short of the full refund by that much: the shortfall is a debt the seller owes (`seller_recoverable`), netted from their next order payout (`lib/money/sellerRecovery.ts`, money-flow §2.6). Drop orders take it from the drop's pool instead.
 
 ## Auto-refund job (`jobs/deliveryDeadlines.ts`, every 10 minutes)
 
 1. Sync tracking for shipped, undelivered orders (covers missed webhooks and lost tracking).
-2. Refund every order with undelivered items past `deliver_by`:
+2. Refund the undelivered items past `deliver_by` that have a **"not delivered" signal** (`autoRefundableItemSql`):
+   * **never shipped**: no tracking number, or no carrier scan at all (a label the carrier never scanned, Shippo `PRE_TRANSIT`, is not a shipment);
+   * **the carrier says it won't arrive**: latest status `exception` (Shippo `FAILURE`) or `returned_to_sender`;
+   * **the buyer says it didn't arrive**: a pending/approved return request with a "not received" reason (the app's refund request screen sends `Order not received` to `POST /api/returns`). The refund closes that request (`refunded`).
+
+   A parcel the carrier scanned in transit with no delivered scan (unknown carrier, local delivery, guest buyer) is **not** refunded by default, because the goods have often arrived. It waits for the buyer's claim; its payout stays held.
+   For each refunded order:
    * skipped while a dispute is open (`dispute_paused_at`), a refund is already in flight, or the order is cancelled/delivered;
    * amount = the undelivered items' share (`undeliveredRefundCents`); when nothing was delivered it's the full remainder;
    * goes through `refundOrder` with the idempotency key `auto-refund/<orderId>/<hash of item ids>`, which maps to the Stripe idempotency key `order-refund/<refundId>/<attempt>`, so a re-run or two servers can never refund twice;
@@ -108,8 +115,8 @@ every 5 min (jobs/moneySweep.ts):
 | Carrier exception / returned to sender | Buyer is notified; the deadline still applies. |
 | Refund to original payment method | Stripe refunds the PaymentIntent, i.e. back to the buyer's card. Thread Cash spent on the order is returned to their Thread Cash wallet. |
 | Multi-seller carts | One order per seller (already the case), each with its own `deliver_by`, refund and payout. |
-| Mixed regular + pre-order in one order | Per-item deadlines: the regular items are refunded at day 15, the pre-order items at day 60, sum = exactly what was charged. |
-| Pre-order drops (`held` model) | Orders released on delivery + buffer instead of on tracking entry. A drop's production deadline no longer refunds an order that is already shipped; that order's own 60-day guarantee applies. |
+| Mixed regular + pre-order in one order | Per-item deadlines: the regular items are refunded at day 15, the pre-order items 15 days after their ship date, sum = exactly what was charged. |
+| Pre-order drops (`held` model) | Orders released on delivery + buffer instead of on tracking entry. A drop's production deadline no longer refunds an order that is already shipped; that order's own pre-order guarantee (ship date + 15 days) applies. |
 | Shipping labels | In hold mode a label is paid from the order's held money (`label_paid_from_held`), so the platform never fronts it and the transfer is net of it. |
 | Time zones | Deadlines are absolute instants (`paid_at + N×24h`), immune to DST and server zone. The app shows the date in the viewer's local zone; pushes use the recipient's `quiet_hours_timezone` (UTC if unset). |
 | Seller declares "delivered" | Refused (`DELIVERY_NOT_SELLER_CONFIRMED`). |

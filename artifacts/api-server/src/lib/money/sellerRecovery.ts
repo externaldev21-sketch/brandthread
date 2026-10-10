@@ -80,7 +80,14 @@ export async function sellerRecoveryOwedCents(executor: DbExecutor, sellerId: st
     owed: sql<string>`COALESCE(SUM(GREATEST(0, ${sellerRecoveries.amountCents} + ${sellerRecoveries.feeCents} - ${sellerRecoveries.recoveredCents} - ${sellerRecoveries.forgivenCents})), 0)`,
   }).from(sellerRecoveries)
     .where(and(eq(sellerRecoveries.sellerId, sellerId), eq(sellerRecoveries.status, "open")));
-  return Number(row?.owed ?? 0);
+  const ledgerOwed = Math.max(0, -(await accountBalanceCents(executor, { account: "seller_recoverable", partyId: sellerId })));
+  return Math.max(Number(row?.owed ?? 0), ledgerOwed);
+}
+
+export function refundShortfallPosting(order: { id: string; owner_id: string; drop_id: string | null }, amountCents: number): LedgerPosting {
+  return order.drop_id
+    ? { account: "seller_held", partyId: order.owner_id, orderId: null, amountCents }
+    : { account: "seller_recoverable", partyId: order.owner_id, orderId: order.id, dropId: null, amountCents };
 }
 
 export async function payoutPauseForRecovery(executor: DbExecutor, sellerId: string): Promise<{ paused: boolean; owedCents: number }> {
@@ -202,8 +209,7 @@ export async function netRecoveriesFromRelease(tx: DbExecutor, input: {
     allocations.push({ recovery, amountCents: take });
     left -= take;
   }
-  if (allocations.length === 0) return { nettedCents: 0, recovered: [] };
-  const { applied, recovered } = await applyToRecoveries(tx, {
+  const { applied, recovered } = allocations.length === 0 ? { applied: 0, recovered: [] as SellerRecovery[] } : await applyToRecoveries(tx, {
     sellerId: input.sellerId,
     allocations,
     source: "release_netting",
@@ -215,7 +221,62 @@ export async function netRecoveriesFromRelease(tx: DbExecutor, input: {
     orderId: input.orderId,
     dropId: input.dropId ?? null,
   });
-  return { nettedCents: applied, recovered };
+  // Refund shortfalls can predate any chargeback recovery row. Collect that
+  // remaining ledger debt after the tracked recoveries, under the same lock.
+  const remainingOwed = Math.max(0, -(await accountBalanceCents(tx, { account: "seller_recoverable", partyId: input.sellerId })));
+  const extra = Math.min(Math.max(0, input.availableCents - applied), remainingOwed);
+  let additional = 0;
+  if (extra > 0) {
+    const result = await postLedgerTransaction(tx, {
+      idempotencyKey: `recovery-netting/refund-debt/${input.ledgerKey}`,
+      kind: "recovery_release_netted",
+      sellerId: input.sellerId, orderId: input.orderId, dropId: input.dropId ?? null,
+      stripeObjectId: input.releaseRef ?? null,
+      memo: "Kept from this payout to cover outstanding refund costs or dispute fees",
+      postings: [
+        { account: "seller_held", partyId: input.sellerId, orderId: input.orderId, amountCents: -extra },
+        { account: "seller_recoverable", partyId: input.sellerId, orderId: input.orderId, amountCents: extra },
+      ],
+    });
+    if (result.posted) additional = extra;
+  }
+  return { nettedCents: applied + additional, recovered };
+}
+
+/** Keep one final-loss collector; fee-only won outcomes use the ledger debt lane. */
+export async function recordDisputeClosedRecovery(input: { dispute: any; orderId: string; stripeEventId: string }): Promise<{ feeDeltaCents: number; lostMovedCents: number }> {
+  const status = String(input.dispute?.status ?? "");
+  if (status === "lost") {
+    const results = await recordLostChargeback(input.dispute);
+    return {
+      feeDeltaCents: results.filter(r => r.opened).reduce((n, r) => n + r.feeCents, 0),
+      lostMovedCents: results.filter(r => r.opened).reduce((n, r) => n + r.owedCents, 0),
+    };
+  }
+  if (status !== "won" && status !== "warning_closed") return { feeDeltaCents: 0, lostMovedCents: 0 };
+  await reinstateLostChargeback(input.dispute);
+  return db.transaction(async tx => {
+    const [order] = await tx.select({ sellerId: orders.ownerId }).from(orders).where(eq(orders.id, input.orderId)).for("update");
+    if (!order || typeof input.dispute?.id !== "string") return { feeDeltaCents: 0, lostMovedCents: 0 };
+    await lockSellerRecoveries(tx, order.sellerId);
+    const [booked] = ((await tx.execute(sql`
+      SELECT COALESCE(SUM(p.amount_cents), 0) AS total FROM ledger_postings p
+      JOIN ledger_transactions t ON t.id = p.transaction_id
+      WHERE t.kind = 'dispute_fee' AND t.stripe_object_id = ${input.dispute.id} AND p.account = 'stripe_dispute_fees'
+    `)) as unknown as { rows: Array<{ total: string }> }).rows;
+    const delta = disputeFeeFromDispute(input.dispute, 0) - Number(booked?.total ?? 0);
+    if (!delta) return { feeDeltaCents: 0, lostMovedCents: 0 };
+    const result = await postLedgerTransaction(tx, {
+      idempotencyKey: `dispute-fee/${input.dispute.id}/${input.stripeEventId}`,
+      kind: "dispute_fee", sellerId: order.sellerId, orderId: input.orderId,
+      stripeObjectId: input.dispute.id, memo: "Final retained dispute fee, netted from future payouts",
+      postings: [
+        { account: "stripe_dispute_fees", orderId: input.orderId, amountCents: delta },
+        { account: "seller_recoverable", partyId: order.sellerId, orderId: input.orderId, amountCents: -delta },
+      ],
+    });
+    return { feeDeltaCents: result.posted ? delta : 0, lostMovedCents: 0 };
+  });
 }
 
 /**
