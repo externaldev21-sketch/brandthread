@@ -17,6 +17,7 @@ import { startMoneySweepJob } from "./jobs/moneySweep";
 import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
+import { startSellerWinbackJob } from "./jobs/sellerWinback";
 import { startAnalyticsRetentionJob } from "./jobs/analyticsRetention";
 import { startAccountPurgeJob } from "./jobs/accountPurge";
 import { startDataExportJob } from "./jobs/dataExportJob";
@@ -86,6 +87,7 @@ const server = app.listen(port, (err) => {
   startAffiliatePayoutsJob();
   startDeliveryDeadlinesJob();
   startStoryCleanupJob();
+  startSellerWinbackJob(); // one "your store is saved" after a plan ends
   startAnalyticsRetentionJob();
   startAccountPurgeJob();
   startDataExportJob();

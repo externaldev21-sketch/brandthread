@@ -6,6 +6,7 @@ export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './productVariantsStock';
 export * from './security';
+export * from './sellerWinback';
 export * from './money';
 export * from './productLaunches';
 export * from './threadCash';
