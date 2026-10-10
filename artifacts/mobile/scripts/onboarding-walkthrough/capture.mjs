@@ -255,6 +255,28 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir, demo }) 
       if (user.username !== id.username.toLowerCase()) throw new Error(`Expected username ${id.username}, got ${JSON.stringify(user.username)}`);
       if (!api.getCalls().some((c) => c.pathname.endsWith('/auth/age'))) throw new Error('Expected the birthday to be sent to /api/auth/age.');
     });
+
+    // Dev P0: "Create an account" while a session is still on the device, then
+    // the email that really exists vs. a brand-new one.
+    await report.step('create another account: taken email shows "Switch to it", a new one goes to the code', async () => {
+      await page.goto(`${origin}/onboarding?start=account-type`);
+      await waitClerkLoaded(page);
+      await page.getByTestId('onboarding-account-type-buyer').waitFor({ timeout: 20_000 });
+      await page.getByTestId('onboarding-account-type-buyer').click();
+      await page.getByTestId('onboarding-account-type-continue').click();
+      await page.getByTestId('onboarding-email-input').waitFor({ timeout: 10_000 });
+      await page.getByTestId('onboarding-email-input').fill(id.email);
+      await page.getByTestId('onboarding-email-next').click();
+      await page.getByTestId('onboarding-email-switch').waitFor({ timeout: 10_000 });
+      await page.waitForTimeout(450);
+      await shot('email-already-has-account');
+      await page.getByTestId('onboarding-email-use-different').click();
+      await page.getByTestId('onboarding-email-input').fill(`new-${id.email}`);
+      await page.getByTestId('onboarding-email-next').click();
+      await page.getByTestId('onboarding-code-input').waitFor({ timeout: 10_000 });
+      await page.waitForTimeout(450);
+      await shot('new-email-goes-to-code');
+    });
   } finally {
     await context.close();
   }

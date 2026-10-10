@@ -45,6 +45,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
 import { suggestUsername } from '@/lib/onboarding/usernameSuggestion';
+import { classifySignUpCreateError, identifierTakenMessage } from '@/lib/onboarding/signUpErrors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
@@ -170,7 +171,7 @@ function mapClerkError(err: any): string {
   const code = clerkCode(err);
   const msg = String(inner?.message ?? inner?.longMessage ?? err?.message ?? '').toLowerCase();
 
-  if (code === 'form_identifier_exists') return 'An account with this email already exists. Log in instead.';
+  if (code === 'form_identifier_exists') return identifierTakenMessage(err) ?? 'Check what you entered and try again.';
   if (code === 'session_exists' || code === 'identifier_already_signed_in') return 'This device is logged in to another account. Log out first.';
   if (code === 'form_password_pwned' || code === 'form_password_strength_insufficient') return 'This password is too common. Choose a stronger one.';
   if (code === 'form_password_length_too_short') return 'Use at least 8 characters.';
@@ -208,7 +209,7 @@ function StyleChip({ label, selected, onPress }: { label: string; selected: bool
 // ─── Main onboarding component ────────────────────────────────────────────────
 export default function OnboardingScreen() {
   const { theme } = useAppTheme();
-  const { isSignedIn, isLoaded: authLoaded } = useAuth();
+  const { isSignedIn, isLoaded: authLoaded, sessionId, signOut } = useAuth();
   const { user, isLoaded: userLoaded } = useUser();
   const { signUp } = useSignUp();
   const { startSSOFlow } = useSSO();
@@ -295,6 +296,8 @@ export default function OnboardingScreen() {
   const [resending, setResending] = useState(false);
   const [oauthBusy, setOauthBusy] = useState<'' | 'apple' | 'google'>('');
   const [stepError, setStepError] = useState<string | null>(null);
+  // Set only when Clerk says the typed email itself is taken.
+  const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [building, setBuilding] = useState(false);
   const [built, setBuilt] = useState(false);
@@ -384,6 +387,13 @@ export default function OnboardingScreen() {
     if (deviceProbeEnabled || restored.current) return;
     if (!authLoaded || (isSignedIn && !userLoaded)) return;
     if (isAddAccount && addAccountSourceUserId === undefined) return;
+    // "Create an account" is only offered signed out. A session still here
+    // is left over (dev preview, an earlier test): sign it out quietly so the
+    // new account is created instead of onboarding the old one.
+    if (start === 'account-type' && !isAddAccount && postAuth !== '1' && isSignedIn && !isDevWebPreviewUser) {
+      void signOut({ sessionId: sessionId ?? undefined }).catch(() => {});
+      return;
+    }
     restored.current = true;
 
     void (async () => {
@@ -528,9 +538,24 @@ export default function OnboardingScreen() {
     setAuthMethod('email');
     setBusy(true);
     setStepError(null);
+    setExistingEmail(null);
+    const submitted = email.trim().toLowerCase();
+    // Every submit starts a fresh sign-up; an abandoned one is never reused.
+    const create = async () => {
+      try { return (await signUp.create({ emailAddress: submitted })).error ?? null; } catch (e) { return e; }
+    };
     try {
-      const { error } = await signUp.create({ emailAddress: email.trim().toLowerCase() });
-      if (error) { setStepError(mapClerkError(error)); return; }
+      let error = await create();
+      if (error && classifySignUpCreateError(error, submitted, email).kind === 'stale-session' && !isAddAccount) {
+        // A leftover session on this device, not the email: clear it and retry once.
+        await signOut({ sessionId: sessionId ?? undefined }).catch(() => {});
+        error = await create();
+      }
+      if (error) {
+        if (classifySignUpCreateError(error, submitted, email).kind === 'email-exists') setExistingEmail(submitted);
+        else setStepError(mapClerkError(error));
+        return;
+      }
       await signUp.verifications.sendEmailCode();
       track('signup_started', { method: 'email' });
       setCode('');
@@ -974,11 +999,16 @@ export default function OnboardingScreen() {
         return (
           <EmailStep
             email={email}
-            onChange={(v) => { setEmail(v); setStepError(null); }}
+            onChange={(v) => { setEmail(v); setStepError(null); setExistingEmail(null); }}
             onNext={() => { void submitEmail(); }}
             loading={busy}
             error={stepError}
             onLogin={goLogin}
+            existing={existingEmail && existingEmail === email.trim().toLowerCase() && flow ? {
+              role: flow,
+              onSwitch: goLogin,
+              onUseDifferent: () => { setEmail(''); setExistingEmail(null); },
+            } : null}
             apple={appleOAuthEnabled ? { label: 'Continue with Apple', onPress: () => chooseOAuth('apple'), disabled: busy, testID: 'onboarding-email-apple' } : null}
             google={googleOAuthEnabled ? { label: 'Continue with Google', onPress: () => chooseOAuth('google'), disabled: busy, testID: 'onboarding-email-google' } : null}
             extra={referralSlot}

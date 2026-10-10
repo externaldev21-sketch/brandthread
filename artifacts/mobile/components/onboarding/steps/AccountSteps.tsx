@@ -13,6 +13,7 @@ import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 import { ageInYears, formatDob, MONTH_NAMES } from '@/lib/ageGate';
+import { existingAccountCopy } from '@/lib/onboarding/signUpErrors';
 import { StepScreen, InlineLink, type StepAction } from './StepScreen';
 import { ClearButton, RevealButton } from './FieldAccessories';
 import { WheelDatePicker, type WheelDate } from './WheelDatePicker';
@@ -65,7 +66,7 @@ function DomainChips({ email, onPick }: { email: string; onPick: (domain: string
 }
 
 export function EmailStep({
-  email, onChange, onNext, loading, error, onLogin, apple, google, extra,
+  email, onChange, onNext, loading, error, onLogin, apple, google, extra, existing,
 }: {
   email: string;
   onChange: (v: string) => void;
@@ -77,17 +78,23 @@ export function EmailStep({
   google?: StepAction | null;
   /** Under the field: the "Have a code?" link or the invite-code field. */
   extra?: React.ReactNode;
+  /** Only when Clerk says this exact email already has an account. */
+  existing?: { role: 'buyer' | 'seller'; onSwitch: () => void; onUseDifferent: () => void } | null;
 }) {
   return (
     <StepScreen
       testID="onboarding-email-step"
       title="What's your email?"
       subtitle="Enter the email where you can be contacted. No one will see this on your profile."
-      error={error}
-      primary={{ label: 'Next', onPress: onNext, disabled: !isPlausibleEmail(email), loading, testID: 'onboarding-email-next' }}
-      secondary={apple ?? google ?? undefined}
-      extraSecondary={apple && google ? google : undefined}
-      footerLink={{ label: 'I already have an account', onPress: onLogin, testID: 'onboarding-have-account' }}
+      error={existing ? existingAccountCopy(existing.role) : error}
+      primary={existing
+        ? { label: 'Switch to it', onPress: existing.onSwitch, testID: 'onboarding-email-switch' }
+        : { label: 'Next', onPress: onNext, disabled: !isPlausibleEmail(email), loading, testID: 'onboarding-email-next' }}
+      secondary={existing ? undefined : apple ?? google ?? undefined}
+      extraSecondary={!existing && apple && google ? google : undefined}
+      footerLink={existing
+        ? { label: 'Use a different email', onPress: existing.onUseDifferent, testID: 'onboarding-email-use-different' }
+        : { label: 'I already have an account', onPress: onLogin, testID: 'onboarding-have-account' }}
       docked={<DomainChips email={email} onPick={(d) => onChange(applyEmailDomain(email, d))} />}
     >
       <Input

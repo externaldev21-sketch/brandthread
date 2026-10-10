@@ -89,8 +89,9 @@ export function clerkOnboardingStubScript() {
     signUpListeners.forEach((fn) => { try { fn(); } catch {} });
   }
 
-  function fakeError(code, message) {
-    return { code, message, longMessage: message, clerkError: true, errors: [{ code, message, longMessage: message }] };
+  function fakeError(code, message, meta) {
+    const inner = meta ? { code, message, longMessage: message, meta } : { code, message, longMessage: message };
+    return { code, message, longMessage: message, clerkError: true, errors: [inner] };
   }
 
   function makeUser(profile) {
@@ -192,7 +193,7 @@ export function clerkOnboardingStubScript() {
     async create(params) {
       const emailAddress = (params?.emailAddress || '').trim().toLowerCase();
       if (usedEmails.has(emailAddress)) {
-        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.') };
+        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.', { paramName: 'email_address' }) };
       }
       signUpState = { ...freshSignUpState(), id: genId('su'), emailAddress };
       notifySignUp();
@@ -214,7 +215,7 @@ export function clerkOnboardingStubScript() {
       }
       const emailAddress = (params?.emailAddress || '').trim().toLowerCase();
       if (usedEmails.has(emailAddress)) {
-        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.') };
+        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.', { paramName: 'email_address' }) };
       }
       signUpState = {
         ...freshSignUpState(),

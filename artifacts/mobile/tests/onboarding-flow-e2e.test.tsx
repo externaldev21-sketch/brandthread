@@ -89,6 +89,11 @@ const {
     listeners: new Set<() => void>(),
     isSignedIn: false,
     userId: null as string | null,
+    /** Emails that already have a Clerk account (create fails for these). */
+    existingEmails: new Set<string>(),
+    /** One-shot error for the next signUp.create call. */
+    createErrorOnce: null as null | { errors: Array<{ code: string; message: string; meta?: { paramName?: string } }> },
+    createCalls: [] as string[],
     signUp: {
       id: null as string | null,
       status: 'missing_requirements' as string,
@@ -238,6 +243,15 @@ vi.mock('@clerk/expo', () => {
     get status() { return clerkStore.signUp.status; },
     get emailAddress() { return clerkStore.signUp.emailAddress; },
     async create({ emailAddress }: { emailAddress: string }) {
+      clerkStore.createCalls.push(emailAddress);
+      if (clerkStore.createErrorOnce) {
+        const error = clerkStore.createErrorOnce;
+        clerkStore.createErrorOnce = null;
+        return { error };
+      }
+      if (clerkStore.existingEmails.has(emailAddress)) {
+        return { error: { errors: [{ code: 'form_identifier_exists', message: 'That email address is taken. Please try another.', meta: { paramName: 'email_address' } }] } };
+      }
       clerkStore.signUp = { ...clerkStore.signUp, id: 'su_test', emailAddress, status: 'missing_requirements', emailVerified: false, hasPassword: false };
       clerkStore.notify();
       return { error: null };
@@ -508,6 +522,9 @@ function resetState() {
   apiCalls.length = 0;
   clerkStore.isSignedIn = false;
   clerkStore.userId = null;
+  clerkStore.existingEmails.clear();
+  clerkStore.createErrorOnce = null;
+  clerkStore.createCalls.length = 0;
   clerkStore.signUp = { id: null, status: 'missing_requirements', emailAddress: null, pendingCode: null, emailVerified: false, hasPassword: false, finalized: false };
   routerReplaceMock.mockClear();
   routerPushMock.mockClear();
@@ -721,6 +738,112 @@ describe('onboarding entry points and resume', () => {
     renderer = await renderScreen();
     await settle();
     expect(findByTestId(renderer, 'onboarding-brand-name-input').props.value).toBe('Noir');
+  });
+});
+
+describe('Dev P0: a brand-new email never shows "this email already has an account"', () => {
+  let renderer: ReactTestRenderer | undefined;
+  beforeEach(resetState);
+  afterEach(async () => {
+    await act(async () => { renderer?.unmount(); });
+    renderer = undefined;
+  });
+
+  async function toEmailStep(r: ReactTestRenderer) {
+    if (has(r, 'onboarding-welcome-get-started')) await tap(r, 'onboarding-welcome-get-started');
+    await tap(r, 'onboarding-account-type-buyer');
+    await tap(r, 'onboarding-account-type-continue');
+    expect(has(r, 'onboarding-email-input')).toBe(true);
+  }
+
+  async function submitNewEmail(r: ReactTestRenderer, email: string) {
+    await type(r, 'onboarding-email-input', email);
+    await tap(r, 'onboarding-email-next');
+  }
+
+  function expectCodeStepWithoutSwitch(r: ReactTestRenderer) {
+    expect(has(r, 'onboarding-code-step')).toBe(true);
+    expect(has(r, 'onboarding-email-switch')).toBe(false);
+  }
+
+  it('(a) clean device: a fresh email goes straight to the code step', async () => {
+    renderer = await renderScreen();
+    await settle();
+    await toEmailStep(renderer);
+    await submitNewEmail(renderer, 'fresh-a@x.test');
+    expectCodeStepWithoutSwitch(renderer);
+  });
+
+  it('(b) device still signed in to another account: "Create an account" signs it out quietly and creates the new one', async () => {
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_left_over';
+    searchParams.start = 'account-type';
+    renderer = await renderScreen();
+    await settle();
+    expect(clerkStore.isSignedIn).toBe(false);
+    await toEmailStep(renderer);
+    await submitNewEmail(renderer, 'fresh-b@x.test');
+    expectCodeStepWithoutSwitch(renderer);
+  });
+
+  it('(b) a session Clerk still reports on create is cleared and the create retried, never shown as "exists"', async () => {
+    renderer = await renderScreen();
+    await settle();
+    await toEmailStep(renderer);
+    clerkStore.createErrorOnce = { errors: [{ code: 'session_exists', message: 'You\'re already signed in.' }] };
+    await submitNewEmail(renderer, 'fresh-b2@x.test');
+    expect(clerkStore.createCalls).toEqual(['fresh-b2@x.test', 'fresh-b2@x.test']);
+    expectCodeStepWithoutSwitch(renderer);
+  });
+
+  it('(c) an earlier sign-up abandoned at the code step is not reused for the new email', async () => {
+    clerkStore.signUp = { ...clerkStore.signUp, id: 'su_abandoned', emailAddress: 'abandoned@x.test', status: 'missing_requirements' };
+    renderer = await renderScreen();
+    await settle();
+    await toEmailStep(renderer);
+    await submitNewEmail(renderer, 'fresh-c@x.test');
+    expect(clerkStore.createCalls).toEqual(['fresh-c@x.test']);
+    expect(clerkStore.signUp.emailAddress).toBe('fresh-c@x.test');
+    expectCodeStepWithoutSwitch(renderer);
+  });
+
+  it('(d) after the multi-account add flow: a fresh email goes straight to the code step', async () => {
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_source_account';
+    searchParams.addAccount = '1';
+    renderer = await renderScreen();
+    await settle();
+    await toEmailStep(renderer);
+    await submitNewEmail(renderer, 'fresh-d@x.test');
+    expectCodeStepWithoutSwitch(renderer);
+    expect(clerkStore.isSignedIn).toBe(true); // the source account stays signed in
+  });
+
+  it('a taken identifier that is not the email shows a field error, not the switch screen', async () => {
+    renderer = await renderScreen();
+    await settle();
+    await toEmailStep(renderer);
+    clerkStore.createErrorOnce = { errors: [{ code: 'form_identifier_exists', message: 'taken', meta: { paramName: 'username' } }] };
+    await submitNewEmail(renderer, 'fresh-e@x.test');
+    expect(has(renderer, 'onboarding-email-switch')).toBe(false);
+    expect(findByTestId(renderer, 'onboarding-step-error').props.children).toBe('That username is taken. Try another.');
+  });
+
+  it('only an email that really has an account shows Dev\'s copy, "Switch to it" and "Use a different email"', async () => {
+    clerkStore.existingEmails.add('taken@x.test');
+    renderer = await renderScreen();
+    await settle();
+    await toEmailStep(renderer);
+    await submitNewEmail(renderer, 'taken@x.test');
+    expect(has(renderer, 'onboarding-code-step')).toBe(false);
+    expect(findByTestId(renderer, 'onboarding-step-error').props.children).toBe('This email already has a buyer account.');
+    await tap(renderer, 'onboarding-email-use-different');
+    expect(findByTestId(renderer, 'onboarding-email-input').props.value).toBe('');
+    expect(has(renderer, 'onboarding-email-switch')).toBe(false);
+
+    await submitNewEmail(renderer, 'taken@x.test');
+    await tap(renderer, 'onboarding-email-switch');
+    expect(routerReplaceMock).toHaveBeenCalledWith('/sign-in');
   });
 });
 
