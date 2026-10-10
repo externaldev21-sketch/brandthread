@@ -1652,6 +1652,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="checkout"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="shopping-preferences"    options={{ headerShown: false, animation: 'ios_from_right' }} />

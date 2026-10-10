@@ -7,7 +7,7 @@ query string is carried over). In-app links point straight at the new home;
 `tests/legacy-routes.test.ts` fails if anything links to an old path, if a
 target is missing, or if this file falls out of date.
 
-Screens in `app/` now: **340** (route files, excluding layouts and tests).
+Screens in `app/` now: **341** (route files, excluding layouts and tests).
 
 | Old route | New home | Why |
 |---|---|---|
@@ -20,7 +20,6 @@ Screens in `app/` now: **340** (route files, excluding layouts and tests).
 | `/buyer-refund-request` | `/buyer-return-request?orderId=ORDER_ID` (without params: `/(buyer)/orders`) | Unlinked duplicate of the Return / refund request. |
 | `/drafts` | `/(tabs)/products?filter=draft` | Drafts is a filter on the Products tab. |
 | `/automation` | `/(tabs)/marketing` | Unlinked "coming" placeholder; Marketing holds the real tools. |
-| `/mobile-app-builder` | `/store-builder` | Unlinked marketing placeholder with a dead CTA. |
 | `/metafields` | `/store-settings` | Unlinked placeholder; rows were no-ops. |
 | `/ai-brand-memory` | `/ai-settings` | Brand Memory removed from the app (server + data kept). |
 | `/seller-drops` | `/(tabs)/products` | Drops removed from the seller app (server + data kept). |
