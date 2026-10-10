@@ -85,6 +85,9 @@ export const users = pgTable('users', {
   subscriptionTrialStartedAt: timestamp('subscription_trial_started_at', { withTimezone: true }),
   subscriptionTrialEndsAt:    timestamp('subscription_trial_ends_at', { withTimezone: true }),
   subscriptionTrialBannerDismissedTrialEnd: text('subscription_trial_banner_dismissed_trial_end'),
+  // When the Stripe subscription went past_due; the plan's grace period
+  // (PAST_DUE_GRACE_DAYS) runs from here. NULL when not past_due.
+  subscriptionPastDueSince: timestamp('subscription_past_due_since', { withTimezone: true }),
   // Buyer-only "Watching Threads" gesture coach mark on the feed. Stores the
   // FEED_GESTURES_TIP_VERSION the user has already seen (0 = never shown).
   // Bumping the client-side version constant shows the tip one more time per
@@ -273,6 +276,8 @@ export const products = pgTable('products', {
   recoverableUntil: timestamp('recoverable_until', { withTimezone: true }),
   // `seller_deleted` can be restored briefly; `moderation_removed` is final.
   removalKind: text('removal_kind'),
+  // Moved to drafts because the seller's plan no longer covers it (lib/planProductSync.ts).
+  planHiddenAt: timestamp('plan_hidden_at', { withTimezone: true }),
   images: json('images').$type<string[]>().notNull().default([]),
   tags: json('tags').$type<string[]>().notNull().default([]),
   // jsonb, not json: migration 088 GIN-indexes this with jsonb_path_ops for

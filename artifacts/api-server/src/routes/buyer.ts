@@ -40,6 +40,7 @@ import {
 } from "../lib/threadCash/wallet";
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { productsBeyondSellerPlan, SELLER_PLAN_LIMIT_CODE, SELLER_PLAN_LIMIT_MESSAGE } from "../lib/planGate";
 import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
@@ -673,6 +674,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         code: "SELLER_ON_VACATION",
         vacationUntil: vacation.until?.toISOString() ?? null,
       });
+      return;
+    }
+    if ((await productsBeyondSellerPlan(sellerId, items.map((item: { productId: string }) => item.productId))).length > 0) {
+      res.status(409).json({ error: SELLER_PLAN_LIMIT_MESSAGE, code: SELLER_PLAN_LIMIT_CODE });
       return;
     }
 

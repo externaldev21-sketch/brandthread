@@ -70,6 +70,8 @@ beforeAll(async () => {
     accountType: "seller",
     stripeAccountId: `acct_guest_${suffix}`,
     stripeAccountStatus: "active",
+    subscriptionStatus: "trialing",
+    subscriptionPlanId: "starter",
   }).returning();
   const [product] = await db.insert(products).values({
     ownerId: seller.clerkId,

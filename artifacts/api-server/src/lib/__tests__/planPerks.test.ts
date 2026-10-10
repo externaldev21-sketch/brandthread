@@ -103,7 +103,7 @@ describe("buildPlanPerks", () => {
       expect(perk.platformFeeBps).toBe(platformFeeBpsForPlan(perk.planId));
     }
     expect(perks.find((p) => p.planId === "pro")).toMatchObject({
-      amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true,
+      amountCents: 12900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true,
     });
   });
 

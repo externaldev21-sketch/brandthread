@@ -56,6 +56,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { useTeamRole } from '@/hooks/useTeamRole';
+import { track } from '@/lib/analytics';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
 import { displayPriceFor } from '@/lib/sellerPlansDisplay';
 import { commissionSummary, wantsProHighlight, DEMO_PERKS, type PerksResponse } from '@/lib/proPerks';
@@ -100,8 +101,14 @@ export default function PlansScreen() {
   const insets    = useSafeAreaInsets();
   const router    = useRouter();
   const api       = useApi();
-  const { fromOnboarding, highlight } = useLocalSearchParams<{ fromOnboarding?: string; highlight?: string; source?: string }>();
+  const { fromOnboarding, highlight, source } = useLocalSearchParams<{ fromOnboarding?: string; highlight?: string; source?: string }>();
   const isOnboarding = fromOnboarding === 'true';
+
+  useEffect(() => {
+    track('paywall_viewed', { source: source ?? (isOnboarding ? 'onboarding' : 'settings'), from_onboarding: isOnboarding });
+  // Once per visit.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { currentRole } = useTeamRole();
   const { available: revenueCatAvailable, packages, purchase, restore } = useRevenueCat();
 
@@ -244,6 +251,7 @@ export default function PlansScreen() {
     // status:'none' means no paid plan yet — Starter must remain selectable.
     if (!isOnboarding && plan.id === currentPlanId && currentPlanStatus !== 'none') return;
 
+    track('plan_selected', { plan: plan.id });
     setLoadingId(plan.id);
 
     try {
@@ -273,6 +281,11 @@ export default function PlansScreen() {
       setLoadingId(null);
       if (parseRoleError(e)) {
         Alert.alert('Only the store owner can do this');
+        return;
+      }
+      // Closing the App Store / Play sheet isn't an error.
+      if (e?.userCancelled === true) {
+        track('paywall_purchase_cancelled', { plan: plan.id });
         return;
       }
       Alert.alert(
@@ -305,6 +318,7 @@ export default function PlansScreen() {
   /** The real exit — leaves the paywall. Reached only after the exit drawer
    *  (and, if enabled, the one-time offer) has been shown and dismissed. */
   async function performExit() {
+    track('paywall_dismissed', { from_onboarding: isOnboarding });
     if (isOnboarding) {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
       router.replace('/(tabs)/' as never);
