@@ -5,7 +5,8 @@
  * wired to api.social.follow/unfollow.
  */
 import React from 'react';
-import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useRouter } from 'expo-router';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -17,7 +18,7 @@ import type { DiscoverPersonSuggestion } from '@/lib/discoverFeed';
 
 function PersonAvatar({ person, size }: { person: DiscoverPersonSuggestion; size: number }) {
   if (person.avatarUrl) {
-    return <Image source={{ uri: person.avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+    return <CachedImage source={{ uri: person.avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   }
   return (
     <View style={[styles.avatarFallback, { width: size, height: size, borderRadius: size / 2, backgroundColor: person.color }]}>

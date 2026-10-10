@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -1384,7 +1383,7 @@ export function ShopProductSheet({
           ]}
         >
           {product?.imageUris?.[0] ? (
-            <Image source={{ uri: product.imageUris[0] }} style={ss.cartFlyImage} />
+            <CachedImage source={{ uri: product.imageUris[0] }} style={ss.cartFlyImage} />
           ) : (
             <View style={[ss.cartFlyFallback, { backgroundColor: theme.accent }]}>
               <Feather name="shopping-bag" size={21} color={theme.onAccent} />

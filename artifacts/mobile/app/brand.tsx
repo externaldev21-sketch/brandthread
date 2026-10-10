@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Image, Alert } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Alert } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -231,10 +232,10 @@ export default function BrandScreen() {
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedLogo(i); }}
                     style={[styles.logoCard, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border, borderWidth: isSelected ? 2 : 1 }]}
                   >
-                    <Image
+                    <CachedImage
                       source={{ uri: `data:image/png;base64,${b64}` }}
                       style={styles.logoImage}
-                      resizeMode="contain"
+                      contentFit="contain"
                     />
                     <AiGeneratedBadge position="topLeft" />
                     {isSelected && (

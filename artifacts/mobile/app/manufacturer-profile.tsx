@@ -9,8 +9,9 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Platform, Image,
+  Alert, ActivityIndicator, Platform,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -205,7 +206,7 @@ export default function ManufacturerProfileScreen() {
           {/* Factory icon */}
           <View style={s.factoryIconWrap}>
             {m.profileImageUri ? (
-              <Image source={{ uri: m.profileImageUri }} style={s.factoryIconBg} resizeMode="cover" accessibilityLabel={`${m.name} lead photo`} />
+              <CachedImage source={{ uri: m.profileImageUri }} style={s.factoryIconBg} contentFit="cover" accessibilityLabel={`${m.name} lead photo`} />
             ) : (
               <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.factoryIconBg}>
                 <Feather name="settings" size={ICON.xxl} color={theme.onAccent} />
@@ -423,7 +424,7 @@ export default function ManufacturerProfileScreen() {
                       testID={`catalog-product-${product.id}`}
                     >
                       {product.images[0] ? (
-                        <Image source={{ uri: product.images[0] }} style={s.catalogImage} resizeMode="cover" />
+                        <CachedImage source={{ uri: product.images[0] }} style={s.catalogImage} contentFit="cover" />
                       ) : (
                         <View style={[s.catalogImage, s.catalogImageFallback]}>
                           <Feather name="package" size={ICON.lg} color={SUBTLE} />
@@ -458,7 +459,7 @@ export default function ManufacturerProfileScreen() {
             {m.galleryUris.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.galleryRow}>
                 {m.galleryUris.map((uri, index) => (
-                  <Image key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />
+                  <CachedImage key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />
                 ))}
               </ScrollView>
             ) : (

@@ -13,9 +13,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, FlatList, Image, Modal, Platform, Pressable,
+  ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable,
   RefreshControl, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -120,7 +121,7 @@ function MessageBubble({ msg, accent, onAccent, onOpenImage }: { msg: ApiMessage
           <View style={[bub.grid, images.length === 1 && { width: 220 }]}>
             {images.map((uri) => (
               <Pressable key={uri} onPress={() => onOpenImage(uri)} accessibilityRole="imagebutton" accessibilityLabel="Open photo">
-                <Image source={{ uri }} style={images.length === 1 ? bub.imageSingle : bub.imageTile} resizeMode="cover" />
+                <CachedImage source={{ uri }} style={images.length === 1 ? bub.imageSingle : bub.imageTile} contentFit="cover" />
               </Pressable>
             ))}
           </View>
@@ -449,7 +450,7 @@ export default function ManufacturerMessagesScreen() {
           <View style={s.previewRow} testID="pending-photos">
             {pending.map((asset, index) => (
               <View key={`${asset.uri}-${index}`} style={s.previewTile}>
-                <Image source={{ uri: asset.uri }} style={s.previewImage} />
+                <CachedImage source={{ uri: asset.uri }} style={s.previewImage} />
                 <TouchableOpacity style={s.previewRemove} onPress={() => setPending((current) => current.filter((_, i) => i !== index))} accessibilityLabel="Remove photo">
                   <Feather name="x" size={12} color={theme.text} />
                 </TouchableOpacity>
@@ -488,7 +489,7 @@ export default function ManufacturerMessagesScreen() {
       {/* Full-screen photo viewer */}
       <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
         <Pressable style={s.viewer} onPress={() => setViewer(null)} accessibilityLabel="Close photo">
-          {viewer ? <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} resizeMode="contain" /> : null}
+          {viewer ? <CachedImage source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} contentFit="contain" /> : null}
           <View style={[s.viewerClose, { top: headerTopInset + SP.sm }]}><Feather name="x" size={22} color="#fff" /></View>
         </Pressable>
       </Modal>

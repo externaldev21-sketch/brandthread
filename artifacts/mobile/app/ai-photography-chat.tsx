@@ -6,10 +6,10 @@ import {
   FlatList,
   StyleSheet,
   Platform,
-  Image,
   ScrollView,
   Alert,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -408,7 +408,7 @@ export default function AIPhotographyChatScreen() {
               <View style={styles.attachedRow}>
                 {msg.photos.map((uri: string, index: number) => (
                   <View key={`${uri}-${index}`} style={styles.attachedItem}>
-                    <Image source={{ uri }} style={styles.attachedThumb} resizeMode="cover" />
+                    <CachedImage source={{ uri }} style={styles.attachedThumb} contentFit="cover" />
                     {msg.photoLabels?.[index] && (
                       <Text style={[styles.attachedLabel, { color: msg.role === 'user' ? colors.primaryForeground : colors.mutedForeground }]}>
                         {msg.photoLabels[index]}
@@ -423,10 +423,10 @@ export default function AIPhotographyChatScreen() {
             </Text>
             {msg.image && (
               <View>
-                <Image
+                <CachedImage
                   source={{ uri: `data:image/png;base64,${msg.image}` }}
                   style={styles.resultImage}
-                  resizeMode="cover"
+                  contentFit="cover"
                 />
                 <AiGeneratedBadge />
               </View>
@@ -451,7 +451,7 @@ export default function AIPhotographyChatScreen() {
       {/* Photo tray */}
       {mode === 'outfitSwap' && heroPhoto && (
         <View style={[styles.lockedHeroTray, { backgroundColor: colors.card, borderColor: colors.primary }]}>
-          <Image source={{ uri: heroPhoto.uri }} style={styles.trayThumb} resizeMode="cover" />
+          <CachedImage source={{ uri: heroPhoto.uri }} style={styles.trayThumb} contentFit="cover" />
           <View style={styles.lockedHeroCopy}>
             <Text style={[styles.lockedHeroTitle, { color: colors.foreground }]}>Hero locked</Text>
             <Text style={[styles.lockedHeroSub, { color: colors.mutedForeground }]}>Same model · pose · scene</Text>
@@ -475,7 +475,7 @@ export default function AIPhotographyChatScreen() {
         >
           {(mode === 'free' ? photos : garments).map((p) => (
             <View key={p.id} style={styles.trayThumbWrap}>
-              <Image source={{ uri: p.uri }} style={styles.trayThumb} resizeMode="cover" />
+              <CachedImage source={{ uri: p.uri }} style={styles.trayThumb} contentFit="cover" />
               <TouchableOpacity
                 style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
                 onPress={() => removePhoto(p.id)}

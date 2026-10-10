@@ -6,7 +6,8 @@
  * from constants/postLimits.ts and the extra photo is blocked with a message.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT } from '@/lib/theme';
@@ -42,7 +43,7 @@ export function MediaThumb({ asset, style }: { asset: PickedAsset; style?: any }
   if (Platform.OS === 'web' && asset.kind === 'video') {
     return <View style={[{ backgroundColor: CP.surface }, style]}><WebVideoThumb uri={asset.uri} /></View>;
   }
-  return <Image source={{ uri: asset.uri }} style={[{ backgroundColor: CP.surface }, style]} resizeMode="cover" />;
+  return <CachedImage source={{ uri: asset.uri }} style={[{ backgroundColor: CP.surface }, style]} contentFit="cover" />;
 }
 
 export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], destinationOptions, onPickDestination }: {

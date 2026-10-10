@@ -19,9 +19,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, Image, Modal, Platform,
+  ActivityIndicator, Alert, Modal, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -463,7 +464,7 @@ export default function SellerDropCreate() {
             {(heroImageUrl || heroVideoUrl) ? (
               <View style={styles.heroPreviewWrap}>
                 {heroImageUrl ? (
-                  <Image source={{ uri: heroImageUrl }} style={styles.heroPreview} resizeMode="cover" />
+                  <CachedImage source={{ uri: heroImageUrl }} style={styles.heroPreview} contentFit="cover" />
                 ) : (
                   <View style={[styles.heroPreview, styles.heroVideoPlaceholder, { backgroundColor: theme.cardElevated }]}>
                     <Feather name="film" size={22} color={theme.muted} />
@@ -577,7 +578,7 @@ export default function SellerDropCreate() {
                       accessibilityState={{ checked }}
                     >
                       {product.images?.[0] ? (
-                        <Image source={{ uri: product.images[0] }} style={styles.productThumb} />
+                        <CachedImage source={{ uri: product.images[0] }} style={styles.productThumb} />
                       ) : (
                         <View style={[styles.productThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated }]}>
                           <Feather name="package" size={16} color={theme.muted} />

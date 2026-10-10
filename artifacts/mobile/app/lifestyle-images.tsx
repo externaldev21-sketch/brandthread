@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Image,
   Alert,
   ScrollView,
   TextInput,
@@ -13,6 +12,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -213,7 +213,7 @@ export default function LifestyleImagesScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trayRow}>
         {photos.map((p) => (
           <View key={p.id} style={styles.trayThumbWrap}>
-            <Image source={{ uri: p.uri }} style={styles.trayThumb} resizeMode="cover" />
+            <CachedImage source={{ uri: p.uri }} style={styles.trayThumb} contentFit="cover" />
             <TouchableOpacity
               style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
               onPress={() => removePhoto(group, p.id)}
@@ -355,10 +355,10 @@ export default function LifestyleImagesScreen() {
                 </View>
               ) : resultB64 ? (
                 <>
-                  <Image
+                  <CachedImage
                     source={{ uri: `data:image/png;base64,${resultB64}` }}
                     style={styles.resultImage}
-                    resizeMode="cover"
+                    contentFit="cover"
                   />
                   <AiGeneratedBadge />
                 </>
@@ -419,7 +419,7 @@ export default function LifestyleImagesScreen() {
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.pickerRow} onPress={() => confirmAddToProduct(item)} activeOpacity={0.82}>
                   {item.media?.[0]?.uri ? (
-                    <Image source={{ uri: item.media[0].uri }} style={styles.pickerThumb} resizeMode="cover" />
+                    <CachedImage source={{ uri: item.media[0].uri }} style={styles.pickerThumb} contentFit="cover" />
                   ) : (
                     <View style={[styles.pickerThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card }]}>
                       <Feather name="package" size={20} color={colors.mutedForeground} />

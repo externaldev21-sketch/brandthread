@@ -9,7 +9,8 @@
  * case reuses the same tile visuals at N=1.
  */
 import React from 'react';
-import { ActivityIndicator, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
@@ -118,7 +119,7 @@ function AiResultTile({
           accessibilityLabel={`View ${slot.label} full-screen`}
           accessibilityRole="button"
         >
-          <Image source={{ uri: slot.imageUri }} style={s.image} resizeMode="cover" />
+          <CachedImage source={{ uri: slot.imageUri }} style={s.image} contentFit="cover" />
           <View style={s.expandPill}>
             <Feather name="maximize-2" size={11} color="#fff" />
           </View>

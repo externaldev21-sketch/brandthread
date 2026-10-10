@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -94,7 +95,7 @@ export function BrandHero({
         <Animated.View pointerEvents="none" style={[heroStyles.compactIdentity, { opacity: compactOpacity }]}>
           <View style={[heroStyles.compactAvatar, { borderColor: theme.border, backgroundColor: theme.card }]}>
             {avatarImageUrl ? (
-              <Image source={{ uri: avatarImageUrl }} style={heroStyles.compactAvatarImage} />
+              <CachedImage source={{ uri: avatarImageUrl }} style={heroStyles.compactAvatarImage} />
             ) : (
               <Text style={[heroStyles.compactAvatarInitials, { color: theme.text }]}>{initials}</Text>
             )}
@@ -126,7 +127,7 @@ export function BrandHero({
             <View style={[heroStyles.verifiedRing, { borderColor: theme.accent }]}>
               <View style={[heroStyles.avatar, { backgroundColor: theme.card, borderColor: theme.border }]}>
                 {avatarImageUrl ? (
-                  <Image source={{ uri: avatarImageUrl }} style={heroStyles.avatarImage} accessibilityLabel={`${brandName} avatar`} />
+                  <CachedImage source={{ uri: avatarImageUrl }} style={heroStyles.avatarImage} accessibilityLabel={`${brandName} avatar`} />
                 ) : (
                   <Text style={[heroStyles.avatarInitials, { color: theme.text }]}>{initials}</Text>
                 )}
@@ -135,7 +136,7 @@ export function BrandHero({
           ) : (
             <View style={[heroStyles.avatar, { backgroundColor: theme.card, borderColor: theme.border }]}>
               {avatarImageUrl ? (
-                <Image source={{ uri: avatarImageUrl }} style={heroStyles.avatarImage} accessibilityLabel={`${brandName} avatar`} />
+                <CachedImage source={{ uri: avatarImageUrl }} style={heroStyles.avatarImage} accessibilityLabel={`${brandName} avatar`} />
               ) : (
                 <Text style={[heroStyles.avatarInitials, { color: theme.text }]}>{initials}</Text>
               )}

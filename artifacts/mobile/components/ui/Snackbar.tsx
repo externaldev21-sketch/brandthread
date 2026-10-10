@@ -11,7 +11,8 @@
  * added-to-cart toast, Apple Store centered check toast.
  */
 import React, { useEffect } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -60,7 +61,7 @@ export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction
       style={[styles.root, { bottom: bottomOffset ?? Math.max(insets.bottom, SPACING.md) + SPACING.xl }, style]}
     >
       <View style={[styles.pill, { backgroundColor: palette.elevated }]} accessibilityLiveRegion="polite">
-        {thumbnailUri && <Image source={{ uri: thumbnailUri }} style={styles.thumb} accessible={false} />}
+        {thumbnailUri && <CachedImage source={{ uri: thumbnailUri }} style={styles.thumb} accessible={false} />}
         <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, styles.message, { color: palette.foreground }]} numberOfLines={2}>{message}</Text>
         {actionLabel && onAction && (
           <PressableScale

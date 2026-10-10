@@ -6,7 +6,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList,
-  ActivityIndicator, Alert, Image, Linking, } from 'react-native';
+  ActivityIndicator, Alert, Linking, } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -212,7 +213,7 @@ export default function ShopifyImportScreen() {
                   hitSlop={item.alreadyImported ? undefined : { top: 4, bottom: 4, left: 4, right: 4 }}
                 >
                   {item.image ? (
-                    <Image source={{ uri: item.image }} style={styles.productImage} />
+                    <CachedImage source={{ uri: item.image }} style={styles.productImage} />
                   ) : (
                     <View style={[styles.productImage, { backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' }]}>
                       <Feather name="image" size={16} color={colors.mutedForeground} />

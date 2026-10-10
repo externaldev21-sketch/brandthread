@@ -19,7 +19,8 @@
  * just proactive instead of reactive.
  */
 import React, { useState } from 'react';
-import { Image, Platform, StyleSheet, Text, TextStyle } from 'react-native';
+import { Platform, StyleSheet, Text, TextStyle } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 
 /** codepoint (lowercase, hyphen-joined, no leading zeros) per quick reaction */
@@ -49,7 +50,7 @@ export function AppleEmoji({ emoji, size = 22 }: { emoji: string; size?: number 
   }
 
   return (
-    <Image
+    <CachedImage
       source={{ uri: `${APPLE_EMOJI_CDN}/${codepoint}.png` }}
       style={{ width: size, height: size }}
       onError={() => setFailed(true)}

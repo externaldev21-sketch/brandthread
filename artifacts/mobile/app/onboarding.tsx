@@ -24,7 +24,6 @@ import {
   Animated,
   Dimensions,
   Easing,
-  Image,
   Linking,
   Platform,
   ScrollView,
@@ -35,6 +34,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1815,7 +1815,7 @@ function SellerPreviewStep({
       {sampleUri ? (
         <Reveal>
           <View style={[spreview.resultCard, { borderColor: theme.border }]}>
-            <Image source={{ uri: sampleUri }} style={spreview.resultImage} resizeMode="contain" accessibilityLabel={`${brandName} AI logo sample`} />
+            <CachedImage source={{ uri: sampleUri }} style={spreview.resultImage} contentFit="contain" accessibilityLabel={`${brandName} AI logo sample`} />
             <AiGeneratedBadge position="topLeft" />
             <View style={spreview.resultCaption}>
               <Feather name="check" size={15} color={theme.text} />

@@ -16,7 +16,8 @@
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
-import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import { Animated, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
@@ -171,7 +172,7 @@ export function RightActionRail({
               uses the default. */}
           <LiveHostRing hostId={hostId} size={38} ringGap={1.5} ringWidth={2}>
             {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              <CachedImage source={{ uri: avatarUri }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
                 <Text style={styles.avatarText}>{initials}</Text>

@@ -6,7 +6,8 @@
  * shows its real progress; a failed upload keeps everything and Retry resumes.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -103,7 +104,7 @@ function SlideCoverPage({ media, onPick, onBack }: {
       <ScrollView contentContainerStyle={s.coverGrid}>
         {media.slides.map((sl, i) => (
           <Pressable key={sl.id} onPress={() => { tap(); onPick(i); }} style={[s.coverCell, i === media.coverIndex && s.coverCellOn]} accessibilityRole="button" testID={`cover-slide-${i}`}>
-            <Image source={{ uri: sl.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <CachedImage source={{ uri: sl.uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
             {i === media.coverIndex ? <View style={s.coverCheck}><Feather name="check" size={14} color={CP.black} /></View> : null}
           </Pressable>
         ))}
@@ -461,7 +462,7 @@ export function PostScreen({
               />
             </View>
             <Pressable onPress={() => { if (media && !isPost) { tap(); setPage('cover'); } }} style={[s.cover, isPost && s.coverSmall, isPost && { order: -1 } as any, { aspectRatio: ratio }]} accessibilityRole="button" accessibilityLabel="Edit cover" testID="edit-cover" disabled={!media || isPost} {...({ dataSet: { textfitIgnore: '1' } } as object)}>
-              {coverUri ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />   : coverIsVideo ? <View style={[StyleSheet.absoluteFill, { backgroundColor: CP.surface2, alignItems: 'center', justifyContent: 'center' }]}><Feather name="video" size={26} color={CP.silver} /></View> : null}
+              {coverUri ? <CachedImage source={{ uri: coverUri }} style={StyleSheet.absoluteFill} contentFit="cover" />   : coverIsVideo ? <View style={[StyleSheet.absoluteFill, { backgroundColor: CP.surface2, alignItems: 'center', justifyContent: 'center' }]}><Feather name="video" size={26} color={CP.silver} /></View> : null}
               {media && !isPost ? <Text style={s.coverLabel}>Edit cover</Text> : null}
             </Pressable>
           </View>

@@ -7,8 +7,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
-  Animated, Platform, Linking, Image, FlatList,
+  Animated, Platform, Linking, FlatList,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -355,7 +356,7 @@ function SellerGoLiveNativeScreen() {
                       style={[s.pickerRow, tagged && s.pickerRowActive]}
                     >
                       {p.imageUrl ? (
-                        <Image source={{ uri: p.imageUrl }} style={s.pickerRowThumb} />
+                        <CachedImage source={{ uri: p.imageUrl }} style={s.pickerRowThumb} />
                       ) : (
                         <View style={[s.pickerRowThumb, s.pickerRowThumbPlaceholder]}>
                           <Feather name="image" size={16} color="rgba(255,255,255,0.4)" />

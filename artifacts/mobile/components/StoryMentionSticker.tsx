@@ -6,7 +6,8 @@
  *  - ReshareCard: the original story as a rounded card with its credit row.
  */
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, ON_DARK, SP } from '@/lib/theme';
 import { withAt, type MentionStyle } from '@/lib/storyMentionSticker';
@@ -44,7 +45,7 @@ export function ReshareCard({
           <Text style={styles.cardUnavailableText}>Story unavailable</Text>
         </View>
       ) : (
-        <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <CachedImage source={{ uri: imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       )}
       {handle ? (
         <View style={styles.creditWrap}>

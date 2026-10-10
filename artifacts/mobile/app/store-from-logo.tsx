@@ -5,6 +5,7 @@ import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import * as ImagePicker from 'expo-image-picker';
@@ -294,7 +295,7 @@ export default function StoreFromLogoScreen() {
             </>
           ) : logoUri ? (
             <>
-              <Image source={{ uri: logoUri }} style={fl.logoImage} resizeMode="contain" />
+              <CachedImage source={{ uri: logoUri }} style={fl.logoImage} contentFit="contain" />
               <Text style={fl.changeText}>Tap to change</Text>
             </>
           ) : (

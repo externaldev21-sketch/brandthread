@@ -96,7 +96,7 @@ describe('Studio header: avatar + name + close (X), nothing else', () => {
  */
 describe('Studio page: seamless black background under the status bar/notch', () => {
   it('overrides the Android status bar to pure black while this page is open', () => {
-    expect(studio).toContain("import {\n  Image,\n  Modal,\n  Platform,\n  Pressable,\n  StatusBar,");
+    expect(studio).toContain("import {\n  Modal,\n  Platform,\n  Pressable,\n  StatusBar,");
     expect(studio).toContain('<StatusBar backgroundColor="#000000" barStyle="light-content" animated />');
   });
 

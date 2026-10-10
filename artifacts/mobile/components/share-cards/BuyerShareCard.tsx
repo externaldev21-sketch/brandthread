@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -22,7 +23,7 @@ export const BuyerShareCard = React.forwardRef<View, BuyerShareCardProps>(
       <ShareCardFrame ref={ref} theme={theme} qrValue={qrValue}>
         <View style={[styles.avatar, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
           {data.avatarUri ? (
-            <Image source={{ uri: data.avatarUri }} style={styles.avatarImg} />
+            <CachedImage source={{ uri: data.avatarUri }} style={styles.avatarImg} />
           ) : (
             <Text style={[styles.avatarInitials, { color: theme.text }]}>{initials}</Text>
           )}
@@ -42,7 +43,7 @@ export const BuyerShareCard = React.forwardRef<View, BuyerShareCardProps>(
           <View style={styles.thumbRow}>
             {thumbs.map(post => (
               <View key={post.id} style={[styles.thumb, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-                {post.uri ? <Image source={{ uri: post.uri }} style={styles.thumbImg} /> : null}
+                {post.uri ? <CachedImage source={{ uri: post.uri }} style={styles.thumbImg} /> : null}
               </View>
             ))}
           </View>

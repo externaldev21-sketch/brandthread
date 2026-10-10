@@ -5,6 +5,7 @@ import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, TextInput, ActivityIndicator,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -222,7 +223,7 @@ export default function StoreFromSocialScreen() {
             <View style={ss.grid}>
               {screenshots.map((uri, idx) => (
                 <View key={uri + idx} style={ss.gridWrap}>
-                  <Image source={{ uri }} style={ss.gridImg} resizeMode="cover" />
+                  <CachedImage source={{ uri }} style={ss.gridImg} contentFit="cover" />
                   <TouchableOpacity style={ss.removeBtn} onPress={() => removeScreenshot(idx)}>
                     <Feather name="x" size={10} color={FG} />
                   </TouchableOpacity>

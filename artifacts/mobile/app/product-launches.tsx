@@ -7,8 +7,9 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -159,7 +160,7 @@ export default function ProductLaunchesScreen() {
 
 function Thumb({ uri, colors }: { uri?: string | null; colors: ReturnType<typeof useColors> }) {
   return uri
-    ? <Image source={{ uri }} style={s.thumb} />
+    ? <CachedImage source={{ uri }} style={s.thumb} />
     : <View style={[s.thumb, s.thumbEmpty, { backgroundColor: colors.surface, borderColor: colors.border }]}><Feather name="image" size={16} color={colors.mutedForeground} /></View>;
 }
 

@@ -2,11 +2,13 @@ import React from 'react';
 import { Image, ImageProps } from 'expo-image';
 import { rewriteImageSource } from '@/lib/cdnUrl';
 
-const DEFAULT_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
-
 /**
  * Shared remote-image behavior: memory+disk caching prevents scroll flicker,
- * while a short fade and blurhash keep loading states visually stable.
+ * and a short fade keeps loading states visually stable. No blurhash: a
+ * failed image never leaves a blurred smear on screen. Until it loads (or if
+ * it never does) the image area is simply empty, showing whatever is behind
+ * it (the page or the tile's own background), so transparent logos stay
+ * clean too. A caller can still pass an explicit `placeholder`.
  * expo-image decodes at the rendered size (allowDownscaling), so a 56 pt
  * thumbnail never holds a full-resolution bitmap in memory. Inside FlashList
  * rows pass `recyclingKey` (e.g. the item id) so a recycled cell never shows
@@ -37,7 +39,7 @@ export function CachedImage({
       contentFit={contentFit}
       cachePolicy={cachePolicy}
       transition={transition}
-      placeholder={placeholder ?? { blurhash: DEFAULT_BLURHASH }}
+      placeholder={placeholder}
     />
   );
 }

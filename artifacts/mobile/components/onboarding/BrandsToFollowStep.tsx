@@ -6,7 +6,8 @@
  * (socialService.setSellerFollowing) — no parallel follow system.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -130,7 +131,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
               >
                 <View style={styles.cardTop}>
                   {brand.logoUrl ? (
-                    <Image source={{ uri: brand.logoUrl }} style={styles.logo} />
+                    <CachedImage source={{ uri: brand.logoUrl }} style={styles.logo} />
                   ) : (
                     <View style={[styles.logoFallback, { backgroundColor: theme.surface }]}>
                       <Text style={[styles.logoFallbackText, { color: theme.text }]}>

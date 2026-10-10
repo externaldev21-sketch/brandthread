@@ -10,9 +10,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform,
+  ActivityIndicator, Alert, Animated, Dimensions, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform,
   Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -1289,7 +1290,7 @@ export default function StoryComposer() {
             {/* Gallery thumbnail */}
             <TouchableOpacity style={styles.galleryThumb} onPress={openGallery} accessibilityLabel="Choose from camera roll" accessibilityRole="button">
               {lastGalleryUri ? (
-                <Image source={{ uri: lastGalleryUri }} style={styles.galleryThumbImg} />
+                <CachedImage source={{ uri: lastGalleryUri }} style={styles.galleryThumbImg} />
               ) : (
                 <Feather name="image" size={20} color={ON_DARK} />
               )}
@@ -1366,11 +1367,11 @@ export default function StoryComposer() {
             const cw = W / gridSpec.cols;
             const ch = H / gridSpec.rows;
             return (
-              <Image
+              <CachedImage
                 key={i}
                 source={{ uri }}
                 style={{ position: 'absolute', left: col * cw, top: row * ch, width: cw, height: ch }}
-                resizeMode="cover"
+                contentFit="cover"
               />
             );
           })}
@@ -1596,7 +1597,7 @@ export default function StoryComposer() {
       {isReshare ? (
         <LinearGradient colors={reshareGradientFromBackground(reshareBg)} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
       ) : media?.kind === 'video' ? <VideoPreview uri={media.uri} /> : media ? (
-        <Image source={{ uri: media.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <CachedImage source={{ uri: media.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
       )}

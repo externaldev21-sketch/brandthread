@@ -30,8 +30,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Image, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
+  Animated, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
@@ -413,7 +415,7 @@ function ShareBackground({ variant, avatarUrl }: { variant: BackgroundVariant; a
     return (
       <View style={StyleSheet.absoluteFill}>
         {/* The photo itself, sharp, under a solid dim so the card reads. */}
-        <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <CachedImage source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)' }]} />
       </View>
     );
@@ -459,9 +461,9 @@ function EmojiPatternBackground() {
           style={{
             position: 'absolute', left: g.left, top: g.top,
             width: 22, height: 22, opacity: 0.16, transform: [{ rotate: '-12deg' }],
-            tintColor: '#FFFFFF',
           }}
-          resizeMode="contain"
+          tintColor="#FFFFFF"
+          contentFit="contain"
         />
       ))}
     </View>

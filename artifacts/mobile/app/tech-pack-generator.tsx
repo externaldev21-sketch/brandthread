@@ -4,12 +4,12 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Image,
   Alert,
   ScrollView,
   TextInput,
   Platform,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -327,7 +327,7 @@ export default function TechPackGeneratorScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trayRow}>
               {photos.map((p) => (
                 <View key={p.id} style={styles.trayThumbWrap}>
-                  <Image source={{ uri: p.uri }} style={styles.trayThumb} resizeMode="cover" />
+                  <CachedImage source={{ uri: p.uri }} style={styles.trayThumb} contentFit="cover" />
                   <TouchableOpacity
                     style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
                     onPress={() => removePhoto(p.id)}

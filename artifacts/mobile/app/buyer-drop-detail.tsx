@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  AccessibilityInfo, ActivityIndicator, Alert, Animated, Dimensions, Image, LayoutAnimation,
+  AccessibilityInfo, ActivityIndicator, Alert, Animated, Dimensions, LayoutAnimation,
   Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -260,7 +261,7 @@ function ProductTile({
           {/* Locked: the photo stays hidden until launch (a solid tile under
               the lock), never shown blurred. */}
           {imageUri && !locked ? (
-            <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <CachedImage source={{ uri: imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={styles.productFallback}>{locked ? null : <Feather name="image" size={28} color={SUBTLE} />}</View>
           )}
@@ -478,7 +479,7 @@ export default function BuyerDropDetail() {
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}>
         <View style={styles.hero}>
           {heroUri ? (
-            heroIsVideo ? <HeroVideo uri={heroUri} /> : <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            heroIsVideo ? <HeroVideo uri={heroUri} /> : <CachedImage source={{ uri: heroUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <LinearGradient colors={['#23202A', '#050506']} style={StyleSheet.absoluteFill} />
           )}
