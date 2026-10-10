@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -55,7 +55,7 @@ export function ProfileStoriesRow({
             {(state) => (
               <>
                 <View style={[styles.circle, styles.newCircle, { borderColor: theme.border, backgroundColor: theme.cardGlass }]}>
-                  <Feather name="plus" size={20} color={theme.text} />
+                  <Icon name="plus" size={20} color={theme.text} />
                 </View>
                 <Text style={[styles.label, { color: theme.muted }]} numberOfLines={1}>{newLabel}</Text>
                 <InteractionLayer state={state as { pressed: boolean }} radius={12} theme={theme} />
@@ -80,7 +80,7 @@ export function ProfileStoriesRow({
                     saturated theme, so highlights use the same neutral
                     border every other profile chrome does. */}
                 <View style={[styles.circle, { borderColor: theme.border, backgroundColor: item.coverColor ?? theme.cardElevated }]}>
-                  {item.imageUri ? <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={item.id} /> : item.emoji ? <Text style={styles.emoji}>{item.emoji}</Text> : <Feather name="star" size={18} color={theme.text} />}
+                  {item.imageUri ? <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={item.id} /> : item.emoji ? <Text style={styles.emoji}>{item.emoji}</Text> : <Icon name="star" size={18} color={theme.text} />}
                 </View>
                 <Text style={[styles.label, { color: theme.muted }]} numberOfLines={1}>{item.label}</Text>
                 <InteractionLayer state={state as { pressed: boolean }} radius={12} theme={theme} />

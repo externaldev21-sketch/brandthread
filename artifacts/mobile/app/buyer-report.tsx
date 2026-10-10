@@ -13,7 +13,7 @@ import {
   View, Text, ScrollView, TextInput, StyleSheet, Platform,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -72,7 +72,7 @@ export default function ReportScreen() {
       <View style={s.root}>
         {header}
         <View style={s.centerState}>
-          <Feather name="alert-circle" size={36} color={theme.muted} />
+          <Icon name="alert-circle" size={36} color={theme.muted} />
           <Text style={s.doneTitle}>Nothing to report</Text>
           <Text style={s.doneBody}>This content is no longer available.</Text>
           <PrimaryButton label="Close" onPress={close} style={{ alignSelf: 'stretch', marginTop: SP.lg }} />
@@ -88,7 +88,7 @@ export default function ReportScreen() {
         <ScrollView contentContainerStyle={s.doneScroll} showsVerticalScrollIndicator={false}>
           <AnimatedEntrance>
             <View style={s.doneIcon}>
-              <Feather name="check" size={30} color={theme.onAccent} />
+              <Icon name="check" size={30} color={theme.onAccent} />
             </View>
           </AnimatedEntrance>
           <Text style={s.doneTitle}>
@@ -108,7 +108,7 @@ export default function ReportScreen() {
               { icon: 'bell' as const, text: 'Serious or repeated violations are escalated immediately.' },
             ].map((row) => (
               <View key={row.text} style={s.nextRow}>
-                <View style={s.nextIcon}><Feather name={row.icon} size={14} color={theme.text} /></View>
+                <View style={s.nextIcon}><Icon name={row.icon} size={14} color={theme.text} /></View>
                 <Text style={s.nextText}>{row.text}</Text>
               </View>
             ))}
@@ -117,7 +117,7 @@ export default function ReportScreen() {
           {ownerId ? (
             blocked ? (
               <View style={s.blockedNotice}>
-                <Feather name="slash" size={16} color={theme.text} />
+                <Icon name="slash" size={16} color={theme.text} />
                 <Text style={s.blockedNoticeText}>You blocked {ownerName}. Manage blocked accounts in Settings.</Text>
               </View>
             ) : (
@@ -160,7 +160,7 @@ export default function ReportScreen() {
       >
         <View style={s.contextCard}>
           <View style={s.contextIcon}>
-            <Feather name={TARGET_ICONS[targetType]} size={18} color={theme.text} />
+            <Icon name={TARGET_ICONS[targetType]} size={18} color={theme.text} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.contextEyebrow}>REPORTING {targetNoun.toUpperCase()}</Text>
@@ -184,13 +184,13 @@ export default function ReportScreen() {
                   style={[s.reasonRow, index > 0 && s.reasonRowDivider]}
                 >
                   <View style={s.reasonIcon}>
-                    <Feather name={option.icon} size={16} color={theme.text} />
+                    <Icon name={option.icon} size={16} color={theme.text} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.reasonLabel}>{option.label}</Text>
                     <Text style={s.reasonDesc}>{option.description}</Text>
                   </View>
-                  <Feather name="chevron-right" size={18} color={theme.subtle} />
+                  <Icon name="chevron-right" size={18} color={theme.subtle} />
                 </PressableScale>
               ))}
             </View>
@@ -200,7 +200,7 @@ export default function ReportScreen() {
             {selected ? (
               <PressableScale onPress={() => setStep('reason')} style={s.selectedReason} accessibilityLabel="Change reason">
                 <View style={s.reasonIcon}>
-                  <Feather name={selected.icon} size={16} color={theme.text} />
+                  <Icon name={selected.icon} size={16} color={theme.text} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.reasonLabel}>{selected.label}</Text>
@@ -250,7 +250,7 @@ export default function ReportScreen() {
 
             {error ? (
               <View style={s.errorCard}>
-                <Feather name="alert-circle" size={16} color={theme.error} />
+                <Icon name="alert-circle" size={16} color={theme.error} />
                 <Text style={s.errorText}>{error}</Text>
               </View>
             ) : null}

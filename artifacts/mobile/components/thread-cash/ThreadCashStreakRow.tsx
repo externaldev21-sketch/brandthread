@@ -13,7 +13,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, View, Text, StyleSheet, Pressable, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
 import { ThreadCashBillIcon } from './ThreadCashBill';
@@ -39,7 +39,7 @@ function TodayCheck() {
   }, [progress]);
   return (
     <Animated.View style={{ opacity: progress, transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }}>
-      <Feather name="check" size={16} color="#000000" /* theme-exempt: black check on the solid white circle */ />
+      <Icon name="check" size={16} color="#000000" /* theme-exempt: black check on the solid white circle */ />
     </Animated.View>
   );
 }
@@ -83,7 +83,7 @@ export function ThreadCashStreakRow({
           <Text style={[styles.subtitle, { color: theme.muted }]}>
             {streak.currentStreak} day{streak.currentStreak === 1 ? '' : 's'}
           </Text>
-          {onPress ? <Feather name="chevron-right" size={ICON.xs} color={theme.muted} /> : null}
+          {onPress ? <Icon name="chevron-right" size={ICON.xs} color={theme.muted} /> : null}
         </View>
       </View>
       <View style={styles.daysRow} accessibilityLabel={`Day ${dayInCycle} of ${totalDays} in this Thread Cash week`}>
@@ -103,7 +103,7 @@ export function ThreadCashStreakRow({
                       : [styles.circleFuture, { borderColor: theme.borderSubtle }],
                 ]}
               >
-                {claimed ? (isToday ? <TodayCheck /> : <Feather name="check" size={16} color="#000000" /* theme-exempt: black check on the solid white circle */ />) : null}
+                {claimed ? (isToday ? <TodayCheck /> : <Icon name="check" size={16} color="#000000" /* theme-exempt: black check on the solid white circle */ />) : null}
               </View>
             </View>
           );

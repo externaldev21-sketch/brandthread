@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { discoverBrands, type DiscoverBrand } from '@/services/discoverService';
@@ -15,6 +15,7 @@ import { setSellerFollowing } from '@/services/socialService';
 import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
 import { SPACE, TYPE } from './onboardingTokens';
 import { radius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
   const { theme } = useAppTheme();
@@ -90,7 +91,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
             onPress={followAll}
             accessibilityRole="button"
           >
-            <Feather name="plus" size={15} color={theme.text} />
+            <Icon name="plus" size={15} color={theme.text} />
             <Text style={[styles.followAllText, { color: theme.text }]}>
               Follow all{followedCount > 0 ? ` (${followedCount}/${brands.length})` : ''}
             </Text>
@@ -141,13 +142,13 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
                     {isPending ? (
                       <ActivityIndicator size="small" color={isFollowing ? theme.onAccent : theme.muted} />
                     ) : (
-                      <Feather name={isFollowing ? 'check' : 'plus'} size={13} color={isFollowing ? theme.onAccent : theme.muted} />
+                      <Icon name={isFollowing ? 'check' : 'plus'} size={13} color={isFollowing ? theme.onAccent : theme.muted} />
                     )}
                   </View>
                 </View>
                 <View style={styles.nameRow}>
                   <Text numberOfLines={1} style={styles.cardName}>{brand.name}</Text>
-                  {brand.verified && <Feather name="check-circle" size={11} color={theme.text} />}
+                  {brand.verified && <Icon name="check-circle" size={11} color={theme.text} />}
                 </View>
               </PressableScale>
             </Reveal>
@@ -165,7 +166,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 40,
     marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
-  followAllText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  followAllText: { fontSize: 14, fontFamily: FONT.semibold },
   loadingWrap: { paddingVertical: SPACE.xxl, alignItems: 'center' },
   emptyText: { ...TYPE.label, color: theme.muted, paddingVertical: SPACE.lg, textAlign: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SPACE.xs },
@@ -177,11 +178,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logo: { width: 36, height: 36, borderRadius: 18 },
   logoFallback: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  logoFallbackText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  logoFallbackText: { fontSize: 15, fontFamily: FONT.bold },
   followBadge: {
     width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
     backgroundColor: theme.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cardName: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.text },
+  cardName: { flexShrink: 1, fontSize: 12, fontFamily: FONT.semibold, color: theme.text },
 });

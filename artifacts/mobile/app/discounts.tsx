@@ -10,7 +10,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, ActivityIndicator, Platform,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { InlineSlider } from '@/components/InlineSlider';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -453,14 +453,14 @@ export default function DiscountsScreen() {
             <View style={[s.summaryCard, { borderColor: theme.accent + '55' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={[s.summaryCode, { color: theme.accent }]}>{code.trim() || 'YOURCODE'}</Text>
-                <Feather name="tag" size={16} color={theme.accent} />
+                <Icon name="tag" size={16} color={theme.accent} />
               </View>
               <Text style={s.summaryValue}>{summaryValueLabel}</Text>
-              <View style={s.summaryRow}><Feather name="shopping-bag" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryScopeLabel}</Text></View>
-              {minQuantity.trim() ? <View style={s.summaryRow}><Feather name="layers" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. {minQuantity.trim()} item{minQuantity.trim() === '1' ? '' : 's'}</Text></View> : null}
-              {minOrderCents ? <View style={s.summaryRow}><Feather name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatCents(minOrderCents)}</Text></View> : null}
-              <View style={s.summaryRow}><Feather name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}{firstOrderOnly ? ' · First order only' : ''}</Text></View>
-              <View style={s.summaryRow}><Feather name="calendar" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryDatesLabel}</Text></View>
+              <View style={s.summaryRow}><Icon name="shopping-bag" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryScopeLabel}</Text></View>
+              {minQuantity.trim() ? <View style={s.summaryRow}><Icon name="layers" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. {minQuantity.trim()} item{minQuantity.trim() === '1' ? '' : 's'}</Text></View> : null}
+              {minOrderCents ? <View style={s.summaryRow}><Icon name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatCents(minOrderCents)}</Text></View> : null}
+              <View style={s.summaryRow}><Icon name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}{firstOrderOnly ? ' · First order only' : ''}</Text></View>
+              <View style={s.summaryRow}><Icon name="calendar" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryDatesLabel}</Text></View>
             </View>
 
             {/* Code */}
@@ -555,7 +555,7 @@ export default function DiscountsScreen() {
                   <Text style={s.pickerRowText}>
                     {selectedProductIds.length === 0 ? 'Choose products…' : `${selectedProductIds.length} product${selectedProductIds.length === 1 ? '' : 's'} selected`}
                   </Text>
-                  <Feather name="chevron-right" size={16} color={MUTED} />
+                  <Icon name="chevron-right" size={16} color={MUTED} />
                 </TouchableOpacity>
               )}
             </View>
@@ -574,7 +574,7 @@ export default function DiscountsScreen() {
                       }}
                     >
                       <Text style={s.productName} numberOfLines={1}>{c.title}</Text>
-                      <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
+                      <Icon name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
                     </TouchableOpacity>
                   );
                 })}
@@ -703,7 +703,7 @@ export default function DiscountsScreen() {
                   }}
                 >
                   <Text style={s.productName} numberOfLines={1}>{p.name}</Text>
-                  <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
+                  <Icon name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
                 </TouchableOpacity>
               );
             })}
@@ -732,7 +732,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
         <TouchableOpacity style={{ flex: 1 }} onPress={onCopy} activeOpacity={0.7}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={s.codeText}>{d.code}</Text>
-            <Feather name="copy" size={12} color={MUTED} />
+            <Icon name="copy" size={12} color={MUTED} />
           </View>
           <Text style={[s.valueText, { color: theme.accentLight }]}>{fmtValue(d)}</Text>
           <Text style={s.metaText}>{d.appliesTo === 'entire_store' ? 'Entire store' : d.appliesTo === 'collections' ? `${d.collectionIds.length} collection${d.collectionIds.length === 1 ? '' : 's'}` : `${d.productIds.length} product${d.productIds.length === 1 ? '' : 's'}`}</Text>
@@ -750,7 +750,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
               accessibilityRole="button"
               accessibilityLabel={`Edit ${d.code}`}
             >
-              <Feather name="edit-2" size={15} color={MUTED} />
+              <Icon name="edit-2" size={15} color={MUTED} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onTogglePause}
@@ -758,7 +758,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
               accessibilityRole="button"
               accessibilityLabel={d.active ? `Pause ${d.code}` : `Resume ${d.code}`}
             >
-              <Feather name={d.active ? 'pause-circle' : 'play-circle'} size={15} color={d.active ? ORANGE : SUCCESS} />
+              <Icon name={d.active ? 'pause-circle' : 'play-circle'} size={15} color={d.active ? ORANGE : SUCCESS} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onDelete}
@@ -766,7 +766,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
               accessibilityRole="button"
               accessibilityLabel={`Delete ${d.code}`}
             >
-              <Feather name="trash-2" size={15} color={RED} />
+              <Icon name="trash-2" size={15} color={RED} />
             </TouchableOpacity>
           </View>
         </View>
@@ -774,18 +774,18 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }}>
         <View style={s.statPill}>
-          <Feather name="users" size={11} color={MUTED} />
+          <Icon name="users" size={11} color={MUTED} />
           <Text style={s.statText}>{d.usesCount} use{d.usesCount === 1 ? '' : 's'}</Text>
         </View>
         {d.maxUses != null && (
           <View style={s.statPill}>
-            <Feather name="sliders" size={11} color={MUTED} />
+            <Icon name="sliders" size={11} color={MUTED} />
             <Text style={s.statText}>Limit {d.maxUses}</Text>
           </View>
         )}
         {d.oneUsePerCustomer && (
           <View style={s.statPill}>
-            <Feather name="user-check" size={11} color={MUTED} />
+            <Icon name="user-check" size={11} color={MUTED} />
             <Text style={s.statText}>1/customer</Text>
           </View>
         )}

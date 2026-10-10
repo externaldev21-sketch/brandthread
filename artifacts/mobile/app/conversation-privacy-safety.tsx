@@ -8,7 +8,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -69,13 +69,13 @@ export default function ConversationPrivacySafetyScreen() {
       <View style={[s.list, { borderColor: theme.border }]}>
         <PressableScale rippleEnabled={false} onPress={toggleBlock} testID="privacy-safety-block">
           <View style={[s.row, { borderBottomColor: theme.border }]}>
-            <Feather name="slash" size={ICON.md} color={theme.error} style={{ width: 28 }} />
+            <Icon name="slash" size={ICON.md} color={theme.error} style={{ width: 28 }} />
             <Text style={[s.rowTitle, { color: theme.error }]}>{isBlocked ? `Unblock ${params.participantName}` : `Block ${params.participantName}`}</Text>
           </View>
         </PressableScale>
         <PressableScale rippleEnabled={false} onPress={report} testID="privacy-safety-report">
           <View style={s.row}>
-            <Feather name="alert-circle" size={ICON.md} color={theme.text} style={{ width: 28 }} />
+            <Icon name="alert-circle" size={ICON.md} color={theme.text} style={{ width: 28 }} />
             <Text style={[s.rowTitle, { color: theme.text }]}>Report {params.participantName}</Text>
           </View>
         </PressableScale>

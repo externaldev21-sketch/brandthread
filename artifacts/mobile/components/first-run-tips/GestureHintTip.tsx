@@ -12,7 +12,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { GestureGlyph } from './GestureGlyph';
@@ -67,7 +67,7 @@ export function GestureHintTip({
           <Text style={styles.title}>{title}</Text>
           {body ? <Text style={styles.body}>{body}</Text> : null}
         </View>
-        <Feather name="x" size={14} color="rgba(255,255,255,0.6)" />
+        <Icon name="x" size={14} color="rgba(255,255,255,0.6)" />
       </Pressable>
     </Animated.View>
   );

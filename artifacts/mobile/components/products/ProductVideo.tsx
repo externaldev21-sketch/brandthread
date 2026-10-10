@@ -8,7 +8,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CachedImage } from '@/components/CachedImage';
 import { useColors } from '@/hooks/useColors';
@@ -69,7 +69,7 @@ function Tile({ posterUri, length, onPress }: { posterUri: string | null; length
     >
       {posterUri ? <CachedImage source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
       <View style={s.playWrap}>
-        <View style={s.play}><Feather name="play" size={22} color={colors.foreground} style={{ marginLeft: 2 }} /></View>
+        <View style={s.play}><Icon name="play" size={22} color={colors.foreground} style={{ marginLeft: 2 }} /></View>
       </View>
       {length ? <View style={s.length}><Text style={s.lengthText}>{length}</Text></View> : null}
     </TouchableOpacity>
@@ -87,7 +87,7 @@ function PlayableTile({ video }: { video: ProductVideoInfo }) {
     <View style={s.tile}>
       <InlinePlayer uri={video.videoUrl} />
       <TouchableOpacity style={s.close} onPress={() => setPlaying(false)} accessibilityRole="button" accessibilityLabel="Close product video">
-        <Feather name="x" size={16} color={colors.foreground} />
+        <Icon name="x" size={16} color={colors.foreground} />
       </TouchableOpacity>
     </View>
   );
@@ -104,7 +104,7 @@ function InlinePlayer({ uri }: { uri: string }) {
 
 const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   divider: { height: 1, backgroundColor: c.border, marginVertical: SP.md },
-  header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, marginBottom: SP.sm },
   tile: { width: '100%', aspectRatio: 4 / 5, maxHeight: 420, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: c.card },
   playWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   play: { width: 56, height: 56, borderRadius: 28, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center' },

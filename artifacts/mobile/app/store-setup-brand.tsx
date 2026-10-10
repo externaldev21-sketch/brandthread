@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -143,7 +143,7 @@ export default function StoreSetupBrandScreen() {
             <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={styles.empty}>
-              <Feather name="image" size={22} color={theme.muted} />
+              <Icon name="image" size={22} color={theme.muted} />
               <Text style={[styles.meta, { color: theme.muted }]}>{emptyLabel}</Text>
             </View>
           )}
@@ -155,7 +155,7 @@ export default function StoreSetupBrandScreen() {
         </Pressable>
         {errors[slot] ? (
           <View style={styles.errorRow}>
-            <Feather name="x-circle" size={15} color={theme.text} />
+            <Icon name="x-circle" size={15} color={theme.text} />
             <Text style={[styles.meta, { color: theme.text, flexShrink: 1 }]}>{errors[slot]}</Text>
           </View>
         ) : null}
@@ -195,14 +195,14 @@ export default function StoreSetupBrandScreen() {
                     { backgroundColor: color, borderColor: selected ? theme.text : theme.border, borderWidth: selected ? 2 : 1 },
                   ]}
                 >
-                  {selected ? <Feather name="check" size={18} color={greyHex(dark ? 255 : 0)} /> : null}
+                  {selected ? <Icon name="check" size={18} color={greyHex(dark ? 255 : 0)} /> : null}
                 </Pressable>
               );
             })}
           </View>
           {saveError ? (
             <View style={styles.errorRow}>
-              <Feather name="x-circle" size={15} color={theme.text} />
+              <Icon name="x-circle" size={15} color={theme.text} />
               <Text style={[styles.meta, { color: theme.text, flexShrink: 1 }]}>{saveError}</Text>
             </View>
           ) : null}

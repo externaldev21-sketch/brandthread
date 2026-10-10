@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Pressable } from 'react-native';
 import { useReviewActions } from '@/lib/useReviewActions';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { CachedImage } from '@/components/CachedImage';
@@ -137,7 +137,7 @@ export default function ProductReviewsScreen() {
                       <Text style={s.name}>{item.buyerName ?? 'Brandthread buyer'}</Text>
                       {isVerifiedReview(item) && (
                         <View style={s.verifiedBadge}>
-                          <Feather name="check-circle" size={11} color={theme.accent} />
+                          <Icon name="check-circle" size={11} color={theme.accent} />
                           <Text style={[s.verifiedText, { color: theme.accent }]}>Verified buyer</Text>
                         </View>
                       )}

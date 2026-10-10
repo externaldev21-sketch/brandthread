@@ -15,7 +15,7 @@ import {
   Text,
   TouchableOpacity,
   View, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,7 +62,7 @@ function DraftRow({
     <View style={styles.row}>
       <View style={styles.rowHeading}>
         <View style={styles.draftIcon}>
-          <Feather name="edit-3" size={ICON.sm} color={ORANGE} />
+          <Icon name="edit-3" size={ICON.sm} color={ORANGE} />
         </View>
         <View style={styles.rowTitleWrap}>
           <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
@@ -83,7 +83,7 @@ function DraftRow({
           accessibilityRole="button"
           accessibilityLabel={`Resume ${name}`}
         >
-          <Feather name="play" size={13} color={BG} />
+          <Icon name="play" size={13} color={BG} />
           <Text style={styles.resumeLabel}>Resume</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -93,7 +93,7 @@ function DraftRow({
           accessibilityRole="button"
           accessibilityLabel={`Discard ${name}`}
         >
-          <Feather name="trash-2" size={13} color={RED} />
+          <Icon name="trash-2" size={13} color={RED} />
           <Text style={styles.discardLabel}>Discard</Text>
         </TouchableOpacity>
       </View>
@@ -195,7 +195,7 @@ export default function DraftsScreen() {
             accessibilityRole="radio"
             accessibilityState={{ selected: sort === 'lastSaved' }}
           >
-            <Feather name="clock" size={14} color={sort === 'lastSaved' ? colors.accentForeground : MUTED} />
+            <Icon name="clock" size={14} color={sort === 'lastSaved' ? colors.accentForeground : MUTED} />
             <Text style={[styles.sortOptionLabel, sort === 'lastSaved' && styles.sortOptionLabelActive]}>
               Last saved
             </Text>
@@ -207,7 +207,7 @@ export default function DraftsScreen() {
             accessibilityRole="radio"
             accessibilityState={{ selected: sort === 'name' }}
           >
-            <Feather name="type" size={14} color={sort === 'name' ? colors.accentForeground : MUTED} />
+            <Icon name="type" size={14} color={sort === 'name' ? colors.accentForeground : MUTED} />
             <Text style={[styles.sortOptionLabel, sort === 'name' && styles.sortOptionLabelActive]}>
               Product name
             </Text>

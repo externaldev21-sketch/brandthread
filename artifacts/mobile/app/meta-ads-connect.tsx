@@ -15,7 +15,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
@@ -224,7 +224,7 @@ export default function MetaAdsConnectScreen() {
         {step === 'not_connected' && (
           <View style={{ gap: SP.lg }}>
             <View style={[s.introCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="facebook" size={ICON.lg} color={theme.accentLight} />
+              <Icon name="facebook" size={ICON.lg} color={theme.accentLight} />
               <Text style={[s.introTitle, { color: colors.foreground }]}>Run real ads on Facebook & Instagram</Text>
               <Text style={[s.introBody, { color: colors.mutedForeground }]}>
                 Connect your Facebook & Instagram to run real ads. Meta bills your ad account directly —
@@ -298,7 +298,7 @@ export default function MetaAdsConnectScreen() {
           <View style={{ gap: SP.lg }}>
             <View style={[s.introCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[s.checkCircle, { backgroundColor: colors.success + '22' }]}>
-                <Feather name="check" size={22} color={colors.success} />
+                <Icon name="check" size={22} color={colors.success} />
               </View>
               <Text style={[s.introTitle, { color: colors.foreground }]}>Meta connected</Text>
               <SummaryRow label="Business" value={connection.businessName} colors={colors} />

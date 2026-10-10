@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -70,7 +70,7 @@ export function BrandsYouMightLikeRow() {
           style={styles.dismiss}
           testID="brands-you-might-like-dismiss"
         >
-          <Feather name="x" size={18} color={theme.muted} />
+          <Icon name="x" size={18} color={theme.muted} />
         </PressableScale>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track}>

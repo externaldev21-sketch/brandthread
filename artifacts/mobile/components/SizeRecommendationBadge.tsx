@@ -6,7 +6,7 @@
  */
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useBuyerPreferences } from '@/hooks/useBuyerPreferences';
@@ -58,15 +58,15 @@ export function SizeRecommendationBadge({
         testID="size-find-my-size"
         onPress={() => { onBeforeNavigate?.(); router.push('/buyer-my-sizes' as never); }}
       >
-        <Feather name="search" size={14} color={theme.text} />
+        <Icon name="search" size={14} color={theme.text} />
         <Text style={st.findText}>Find my size</Text>
-        <Feather name="chevron-right" size={16} color={theme.muted} />
+        <Icon name="chevron-right" size={16} color={theme.muted} />
       </TouchableOpacity>
     );
   }
   return (
     <View style={st.row} testID="size-recommendation" accessible accessibilityLabel={`${model.title}. ${model.reason}`}>
-      <Feather name="check-circle" size={16} color={theme.text} />
+      <Icon name="check-circle" size={16} color={theme.text} />
       <View style={st.textCol}>
         <Text style={st.title}>{model.title}</Text>
         <Text style={st.reason}>{model.reason}</Text>

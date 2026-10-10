@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS } from '@/lib/theme';
 import type { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -16,7 +16,7 @@ export interface SellerPaywallSocialProofProps {
 export function SellerPaywallSocialProof({ theme, text }: SellerPaywallSocialProofProps) {
   return (
     <View style={styles.row}>
-      <Feather name="users" size={13} color={theme.muted} />
+      <Icon name="users" size={13} color={theme.muted} />
       <Text style={[styles.text, { color: theme.muted }]}>{text}</Text>
     </View>
   );

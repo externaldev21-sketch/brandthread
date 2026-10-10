@@ -26,7 +26,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -153,7 +153,7 @@ export function AddressAutocompleteInput({
     <View style={styles.wrap}>
       <Text style={styles.label}>Street address</Text>
       <View style={styles.inputWrap}>
-        <Feather name="search" size={17} color={theme.muted} />
+        <Icon name="search" size={17} color={theme.muted} />
         <TextInput
           value={value}
           onChangeText={handleChangeText}
@@ -179,11 +179,11 @@ export function AddressAutocompleteInput({
               accessibilityRole="button"
               accessibilityLabel={`Use address ${suggestion.label}`}
             >
-              <Feather name="map-pin" size={16} color={theme.muted} />
+              <Icon name="map-pin" size={16} color={theme.muted} />
               <Text style={styles.suggestionText} numberOfLines={2}>{suggestion.label}</Text>
               {resolving === suggestion.placeId
                 ? <ActivityIndicator size="small" color={theme.text} />
-                : <Feather name="chevron-right" size={16} color={theme.subtle} />}
+                : <Icon name="chevron-right" size={16} color={theme.subtle} />}
             </Pressable>
           ))}
         </View>
@@ -191,7 +191,7 @@ export function AddressAutocompleteInput({
 
       {notice ? (
         <View style={styles.notice} accessibilityLiveRegion="polite" testID={`address-search-${status}`}>
-          <Feather name={notice.icon} size={16} color={theme.muted} style={styles.noticeIcon} />
+          <Icon name={notice.icon} size={16} color={theme.muted} style={styles.noticeIcon} />
           <View style={styles.noticeCopy}>
             <Text style={styles.noticeTitle}>{notice.title}</Text>
             <Text style={styles.noticeBody}>{notice.body}</Text>
@@ -212,7 +212,7 @@ export function AddressAutocompleteInput({
 
       {resolveError ? (
         <View style={styles.resolveError} accessibilityLiveRegion="polite" accessibilityRole="alert" testID="address-resolve-error">
-          <Feather name="alert-circle" size={14} color={theme.text} style={styles.noticeIcon} />
+          <Icon name="alert-circle" size={14} color={theme.text} style={styles.noticeIcon} />
           <Text style={styles.resolveErrorText}>{resolveError}</Text>
         </View>
       ) : null}

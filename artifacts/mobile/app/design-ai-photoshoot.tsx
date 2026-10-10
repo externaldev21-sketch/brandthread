@@ -16,7 +16,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, Image, FlatList,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -64,7 +64,7 @@ const PRODUCT_TILE = 92;
 // repo — using a consistent dark gradient + icon per scene, at the same
 // tile size/weight as the product and reference-photo tile rows, rather
 // than inventing per-scene stock photography.
-const SCENE_ICONS: Record<SceneStyleKind, keyof typeof Feather.glyphMap> = {
+const SCENE_ICONS: Record<SceneStyleKind, IconName> = {
   studio: 'aperture', street: 'map', luxury_interior: 'home', outdoor: 'sun',
   industrial: 'tool', minimal: 'minus-circle', runway: 'flag', night: 'moon', custom: 'edit-3',
 };
@@ -330,7 +330,7 @@ export default function AIPhotoshootScreen() {
               </>
             ) : (
               <>
-                <Feather name="check-circle" size={ICON.sm} color={FG} />
+                <Icon name="check-circle" size={ICON.sm} color={FG} />
                 <Text style={[s.progressText, { color: FG }]}>{successCount} shot{successCount !== 1 ? 's' : ''} ready</Text>
               </>
             )}
@@ -404,7 +404,7 @@ export default function AIPhotoshootScreen() {
               accessibilityRole="button"
               accessibilityLabel="Upload photos"
             >
-              <Feather name="upload" size={20} color={MUTED} />
+              <Icon name="upload" size={20} color={MUTED} />
               <Text style={s.actionTileLabel} numberOfLines={2}>Upload</Text>
             </TouchableOpacity>
             {products.length === 0 && (
@@ -414,7 +414,7 @@ export default function AIPhotoshootScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Add a product"
               >
-                <Feather name="plus-circle" size={20} color={MUTED} />
+                <Icon name="plus-circle" size={20} color={MUTED} />
                 <Text style={s.actionTileLabel} numberOfLines={2}>Add product</Text>
               </TouchableOpacity>
             )}
@@ -433,12 +433,12 @@ export default function AIPhotoshootScreen() {
                     <Image source={{ uri: thumb }} style={s.productTileImg} resizeMode="cover" />
                   ) : (
                     <View style={[s.productTileImg, s.productTileImgEmpty]}>
-                      <Feather name="package" size={ICON.md} color={SUBTLE} />
+                      <Icon name="package" size={ICON.md} color={SUBTLE} />
                     </View>
                   )}
                   {selected && (
                     <View style={s.productTileCheck}>
-                      <Feather name="check" size={12} color={BG} />
+                      <Icon name="check" size={12} color={BG} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -489,7 +489,7 @@ export default function AIPhotoshootScreen() {
                   colors={active ? ['#4a4a4a', '#1c1c1c'] : ['#2e2e2e', '#101010']}
                   style={[s.presetTileImg, active && s.presetTileImgActive]}
                 >
-                  <Feather name={SCENE_ICONS[opt.value]} size={20} color="#fff" />
+                  <Icon name={SCENE_ICONS[opt.value]} size={20} color="#fff" />
                 </LinearGradient>
                 <Text style={[s.presetTileLabel, active && s.presetTileLabelActive]} numberOfLines={1}>
                   {SCENE_TILE_LABEL[opt.value] ?? opt.label}
@@ -570,11 +570,11 @@ function ProductPickerModal({ visible, loading, products, onClose, onSelect }: {
                   <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
                 ) : (
                   <View style={[s.productThumb, s.productTileImgEmpty]}>
-                    <Feather name="package" size={ICON.md} color={SUBTLE} />
+                    <Icon name="package" size={ICON.md} color={SUBTLE} />
                   </View>
                 )}
                 <Text style={s.productName} numberOfLines={1}>{item.name}</Text>
-                <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+                <Icon name="chevron-right" size={ICON.xs} color={MUTED} />
               </TouchableOpacity>
             )}
           />

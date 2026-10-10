@@ -5,7 +5,7 @@
  */
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -40,7 +40,7 @@ export default function SetupContinueBanner({
           {nextLabel ? `Next: ${nextLabel}` : 'A few steps left to finish your store'}
         </Text>
       </View>
-      <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+      <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
     </TouchableOpacity>
   );
 }

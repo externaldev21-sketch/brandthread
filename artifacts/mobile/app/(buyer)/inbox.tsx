@@ -4,7 +4,7 @@ import {
   Alert, StyleSheet, ScrollView, RefreshControl,
   Modal, TextInput, ActivityIndicator, Platform, Animated,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -101,7 +101,7 @@ function InboxPillRow({
         accessibilityLabel="Filter messages"
         testID="inbox-filter-pill"
       >
-        <Feather name="sliders" size={15} color={theme.text} />
+        <Icon name="sliders" size={15} color={theme.text} />
       </PressableScale>
       {pills.map(pill => {
         const active = value === pill.key;
@@ -1201,7 +1201,7 @@ export default function InboxScreen() {
                 </Text>
                 {conv.isOfficial && (
                   <View style={s.officialBadgeRow} testID={`inbox-official-badge-${conv.id}`}>
-                    <Feather name="check-circle" size={12} color={theme.accent} />
+                    <Icon name="check-circle" size={12} color={theme.accent} />
                     <View style={[s.aiTag, { backgroundColor: theme.accentDim }]}>
                       <Text style={[s.aiTagText, { color: theme.accent }]}>AI</Text>
                     </View>
@@ -1368,7 +1368,7 @@ export default function InboxScreen() {
     return (
       <View style={s.inboxEmptyWrap}>
         <View style={[s.inboxEmptyBadge, { backgroundColor: theme.cardElevated }]}>
-          <Feather name="mail" size={30} color={theme.text} />
+          <Icon name="mail" size={30} color={theme.text} />
         </View>
         <Text style={[s.inboxEmptyTitle, { color: theme.text }]}>Keep it real in DMs</Text>
         <Text style={[s.inboxEmptySubtitle, { color: theme.muted }]}>
@@ -1428,7 +1428,7 @@ export default function InboxScreen() {
                 accessibilityLabel={`Dismiss suggestion for ${person.name}`}
                 testID={`inbox-suggested-dismiss-${person.userId}`}
               >
-                <Feather name="x" size={16} color={theme.subtle} />
+                <Icon name="x" size={16} color={theme.subtle} />
               </PressableScale>
             </View>
           </View>
@@ -1491,7 +1491,7 @@ export default function InboxScreen() {
                 },
               ]}
             >
-              <Feather name="search" size={16} color={theme.muted} />
+              <Icon name="search" size={16} color={theme.muted} />
               <TextInput
                 ref={messagesSearchInputRef}
                 style={[s.searchInput, { color: theme.text }, WEB_INPUT_RESET]}
@@ -1515,7 +1515,7 @@ export default function InboxScreen() {
                   accessibilityLabel="Clear search"
                   rippleEnabled={NO_RIPPLE}
                 >
-                  <Feather name="x" size={16} color={theme.muted} />
+                  <Icon name="x" size={16} color={theme.muted} />
                 </PressableScale>
               )}
             </View>
@@ -1604,7 +1604,7 @@ export default function InboxScreen() {
                     )}
                     {!myStoryId && (
                       <View style={[s.addStoryBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} pointerEvents="none">
-                        <Feather name="plus" size={12} color={theme.onAccent} />
+                        <Icon name="plus" size={12} color={theme.onAccent} />
                       </View>
                     )}
                   </View>
@@ -1683,7 +1683,7 @@ export default function InboxScreen() {
                       )}
                       {row.closeFriendsOnly && (
                         <View style={[s.closeFriendsBadge, { borderColor: theme.background }]} pointerEvents="none">
-                          <Feather name="star" size={10} color="#000000" />
+                          <Icon name="star" size={10} color="#000000" />
                         </View>
                       )}
                     </View>
@@ -1775,7 +1775,7 @@ export default function InboxScreen() {
                 accessibilityLabel="Close"
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Feather name="x" size={22} color={theme.text} />
+                <Icon name="x" size={22} color={theme.text} />
               </PressableScale>
             </View>
             <SearchBar
@@ -1862,7 +1862,7 @@ export default function InboxScreen() {
                 accessibilityLabel="Close"
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Feather name="x" size={22} color={theme.text} />
+                <Icon name="x" size={22} color={theme.text} />
               </PressableScale>
             </View>
             <Text style={[s.noteComposeHint, { color: theme.muted }]}>

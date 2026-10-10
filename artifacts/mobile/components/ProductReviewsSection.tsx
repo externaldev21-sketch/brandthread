@@ -22,7 +22,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { useReviewActions } from '@/lib/useReviewActions';
 import { useAuth } from '@clerk/expo';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -99,7 +99,7 @@ export function SellerReplyBlock({ reply, repliedAt }: { reply?: string | null; 
   return (
     <View style={[replyS.box, { backgroundColor: theme.cardElevated }]} accessibilityLabel="Seller reply">
       <View style={replyS.head}>
-        <Feather name="corner-down-right" size={12} color={theme.muted} />
+        <Icon name="corner-down-right" size={12} color={theme.muted} />
         <Text style={[replyS.label, { color: theme.text }]}>Seller reply</Text>
         {!!repliedAt && (
           <Text style={[replyS.date, { color: theme.muted }]}>
@@ -230,7 +230,7 @@ export function ProductReviewsSection({
                   <Text style={s.reviewerName}>{review.buyerName ?? 'Brandthread buyer'}</Text>
                   {isVerifiedReview(review) && (
                     <View style={s.verifiedBadge}>
-                      <Feather name="check-circle" size={11} color={theme.accent} />
+                      <Icon name="check-circle" size={11} color={theme.accent} />
                       <Text style={[s.verifiedText, { color: theme.accent }]}>Verified buyer</Text>
                     </View>
                   )}
@@ -276,7 +276,7 @@ export function ProductReviewsSection({
               accessibilityState={{ selected: viewerHelpful, disabled: !isSignedIn && !seed }}
               accessibilityLabel={`Mark helpful, ${helpfulCount} people found this helpful`}
             >
-              <Feather name="thumbs-up" size={12} color={viewerHelpful ? theme.text : MUTED} />
+              <Icon name="thumbs-up" size={12} color={viewerHelpful ? theme.text : MUTED} />
               <Text style={[s.helpfulText, viewerHelpful && { color: theme.text }]}>Helpful ({helpfulCount})</Text>
             </TouchableOpacity>
           </Pressable>
@@ -297,7 +297,7 @@ export function ProductReviewsSection({
 const s = StyleSheet.create({
   wrap: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: BORDER_SUBTLE, marginBottom: 8 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  title: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, textTransform: 'uppercase', letterSpacing: 0.8 },
+  title: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, },
   seeAll: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   summaryRow: { flexDirection: 'row', gap: 20, marginBottom: 16, alignItems: 'center' },
   avgBlock: { alignItems: 'flex-start', gap: 3 },
@@ -339,7 +339,7 @@ const replyS = StyleSheet.create({
 
 const fitS = StyleSheet.create({
   wrap: { marginBottom: 18 },
-  label: { fontSize: FS.meta, fontFamily: FONT.bold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
+  label: { fontSize: FS.meta, fontFamily: FONT.bold, color: MUTED, marginBottom: 2 },
   value: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 8 },
   track: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   dot: { flex: 1, height: 4, borderRadius: 2 },

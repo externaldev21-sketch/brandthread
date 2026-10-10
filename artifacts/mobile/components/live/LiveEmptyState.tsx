@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatUpcomingTime, formatViewerCount } from '@/lib/live/liveOrdering';
@@ -36,7 +36,7 @@ export function LiveEmptyState({
     >
       <View style={styles.hero}>
         <View style={[styles.heroIcon, { borderColor: theme.border }]}>
-          <Feather name="radio" size={26} color={theme.text} />
+          <Icon name="radio" size={26} color={theme.text} />
         </View>
         <Text style={[styles.heroTitle, { color: theme.text }]}>No one&apos;s live right now</Text>
         <Text style={[styles.heroSub, { color: theme.muted }]}>
@@ -73,7 +73,7 @@ export function LiveEmptyState({
                 accessibilityState={{ selected: u.reminderSet }}
                 accessibilityLabel={u.reminderSet ? `Reminder set for ${u.title}` : `Remind me about ${u.title}`}
               >
-                {u.reminderSet && <Feather name="bell" size={12} color={theme.text} style={{ marginRight: 4 }} />}
+                {u.reminderSet && <Icon name="bell" size={12} color={theme.text} style={{ marginRight: 4 }} />}
                 <Text style={[styles.pillText, { color: u.reminderSet ? theme.text : theme.onAccent }]}>
                   {u.reminderSet ? 'Reminder set' : 'Remind me'}
                 </Text>

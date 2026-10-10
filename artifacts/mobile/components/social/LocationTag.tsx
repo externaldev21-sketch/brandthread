@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, type StyleProp, type ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticSelection } from '@/lib/haptics';
@@ -30,7 +30,7 @@ export function LocationTag({
       style={[styles.row, style]}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <Feather name="map-pin" size={14} color={theme.muted} />
+      <Icon name="map-pin" size={14} color={theme.muted} />
       <Text style={[styles.text, { color: theme.text }]}>{location.name}</Text>
     </TouchableOpacity>
   );

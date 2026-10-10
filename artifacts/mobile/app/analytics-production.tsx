@@ -10,7 +10,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
@@ -37,7 +37,7 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
     >
       <View style={s.mfrHeader}>
         <View style={s.mfrAvatar}>
-          <Feather name="tool" size={18} color={colors.primary} />
+          <Icon name="tool" size={18} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.mfrName}>{mfr.name}</Text>
@@ -68,12 +68,12 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
       </View>
       {mfr.delayRate > 10 && (
         <View style={s.mfrWarning}>
-          <Feather name="alert-triangle" size={12} color={colors.warning} />
+          <Icon name="alert-triangle" size={12} color={colors.warning} />
           <Text style={s.mfrWarningText}>Higher-than-target delay rate</Text>
         </View>
       )}
       <View style={s.mfrFooter}>
-        <Feather name="chevron-right" size={14} color={colors.subtle} />
+        <Icon name="chevron-right" size={14} color={colors.subtle} />
       </View>
     </TouchableOpacity>
   );
@@ -172,7 +172,7 @@ export default function AnalyticsProductionScreen() {
             />
             {data.delayedJobs.value > 0 && (
               <View style={s.gaugeWarning}>
-                <Feather name="alert-circle" size={12} color={colors.destructive} />
+                <Icon name="alert-circle" size={12} color={colors.destructive} />
                 <Text style={s.gaugeWarningText}>{data.delayedJobs.value} job{data.delayedJobs.value !== 1 ? 's' : ''} delayed</Text>
               </View>
             )}

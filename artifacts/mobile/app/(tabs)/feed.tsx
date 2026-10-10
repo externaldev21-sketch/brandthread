@@ -10,7 +10,8 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useIsFocused } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
@@ -820,7 +821,7 @@ function JustDroppedRailPage({
                 <CachedImage source={{ uri: drop.heroImageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : (
                 <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-                  <Feather name="zap" size={28} color={theme.muted} />
+                  <Icon name="zap" size={28} color={theme.muted} />
                 </View>
               )}
               <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -1388,7 +1389,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
             />
           ) : (
             <View style={[StyleSheet.absoluteFill, styles.mediaPlaceholder]}>
-              <Feather name="image" size={42} color="#FFFFFF99" />
+              <Icon name="image" size={42} color="#FFFFFF99" />
             </View>
           )}
         </View>
@@ -1704,7 +1705,7 @@ function SpotlightPageImpl({
               transform: [{ scale: heartBurstScale }],
             }]}
           >
-            <Feather name="heart" size={110} color={ON_DARK} />
+            <Icon name="heart" size={110} color={ON_DARK} />
           </Animated.View>
           <HeartBurstParticles trigger={heartBurstTrigger} />
           {item.contentType === 'video' && (
@@ -1713,7 +1714,7 @@ function SpotlightPageImpl({
               style={[styles.speedPill, { opacity: speedPillOpacity, transform: [{ scale: speedPillOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}
               {...a11yHidden(true, 'no')}
             >
-              <Feather name="fast-forward" size={12} color={ON_DARK} />
+              <Icon name="fast-forward" size={12} color={ON_DARK} />
               <Text style={styles.speedPillText}>2x</Text>
             </Animated.View>
           )}
@@ -3083,7 +3084,7 @@ export default function FeedScreen({
         ListEmptyComponent={
           isCreatorFeed && !feedLoading ? (
             <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
-              <Feather name={feedError ? 'wifi-off' : 'film'} size={40} color={MUTED} />
+              <Icon name={feedError ? 'wifi-off' : 'film'} size={40} color={MUTED} />
               <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
                 {feedError ? "Couldn't load these videos" : 'No videos yet'}
               </Text>
@@ -3100,14 +3101,14 @@ export default function FeedScreen({
             </View>
           ) : searchQuery.trim() ? (
             <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-              <Feather name="search" size={32} color={theme.muted} />
+              <Icon name="search" size={32} color={theme.muted} />
               <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: theme.muted }}>
                 No results for "{searchQuery}"
               </Text>
             </View>
           ) : !feedLoading ? (
             <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
-              <Feather name="film" size={40} color={MUTED} />
+              <Icon name="film" size={40} color={MUTED} />
               <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
                 {feedTab === 'following' ? 'No posts from followed sellers yet' : 'No posts yet'}
               </Text>
@@ -3276,7 +3277,7 @@ export default function FeedScreen({
               accessibilityLabel="Back"
               testID="creator-feed-back"
             >
-              <Feather name="arrow-left" size={24} color={ON_DARK} />
+              <Icon name="arrow-left" size={24} color={ON_DARK} />
             </TouchableOpacity>
             <Text style={styles.creatorTitle} numberOfLines={1} maxFontSizeMultiplier={1.2} accessibilityRole="header">
               {creatorFeed?.title || (creatorFeed?.source === 'product' ? 'Featured in' : 'Videos')}
@@ -3292,7 +3293,7 @@ export default function FeedScreen({
                 accessibilityRole="button"
                 accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
               >
-                <Feather name="shopping-cart" size={22} color={ON_DARK} />
+                <Icon name="shopping-cart" size={22} color={ON_DARK} />
                 {cartCount > 0 && (
                   <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
                     <Text style={styles.cartCountText}>
@@ -3350,7 +3351,7 @@ export default function FeedScreen({
                 hitSlop={{ top: 4, bottom: 4, left: 10, right: topRowIconGap / 2 }}
                 testID="buyer-home-live"
               >
-                <Feather name="tv" size={24} color={ON_DARK} />
+                <Icon name="tv" size={24} color={ON_DARK} />
               </TouchableOpacity>
               <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
                 <TouchableOpacity
@@ -3365,7 +3366,7 @@ export default function FeedScreen({
                   hitSlop={{ top: 4, bottom: 4, left: topRowIconGap / 2, right: 7 }}
                   testID="buyer-home-cart-icon"
                 >
-                  <Feather name="shopping-cart" size={24} color={ON_DARK} />
+                  <Icon name="shopping-cart" size={24} color={ON_DARK} />
                   {cartCount > 0 && (
                     <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
                       <Text style={styles.cartCountText}>
@@ -3421,7 +3422,7 @@ export default function FeedScreen({
                 hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
                 testID="buyer-home-search-icon"
               >
-                <Feather name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
+                <Icon name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
             </View>
           </View>
@@ -3445,7 +3446,7 @@ export default function FeedScreen({
               activeOpacity={0.7}
               onPress={() => { setShowSearch(false); setSearchQuery(''); }}
             >
-              <Feather name="x" size={20} color={ON_DARK} />
+              <Icon name="x" size={20} color={ON_DARK} />
             </TouchableOpacity>
           </View>
         ) : (
@@ -3457,7 +3458,7 @@ export default function FeedScreen({
               onPress={() => { setHasUnread(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/buyer-notifications' as never); }}
             >
               <View style={[styles.topAvatar, { backgroundColor: SURFACE }]}>
-                <Feather name="user" size={16} color={ON_DARK} />
+                <Icon name="user" size={16} color={ON_DARK} />
               </View>
               {hasUnread && <View style={styles.unreadDot} />}
             </TouchableOpacity>
@@ -3468,7 +3469,7 @@ export default function FeedScreen({
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearch(true); }}
             >
-                <Feather name="search" size={19} color={ON_DARK} />
+                <Icon name="search" size={19} color={ON_DARK} />
             </TouchableOpacity>
 
             <Text style={styles.topTitle}>Home</Text>
@@ -3487,7 +3488,7 @@ export default function FeedScreen({
               accessibilityRole="button"
               accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
             >
-              <Feather name="shopping-cart" size={20} color={ON_DARK} />
+              <Icon name="shopping-cart" size={20} color={ON_DARK} />
               {cartCount > 0 && (
                 <View style={styles.cartCountBadge}>
                   <Text style={styles.cartCountText}>
@@ -3545,35 +3546,35 @@ export default function FeedScreen({
               accessibilityRole="button"
               accessibilityLabel="Close repost information"
             >
-              <Feather name="x" size={24} color={FG} />
+              <Icon name="x" size={24} color={FG} />
             </TouchableOpacity>
             <View style={styles.repostEducationPreview}>
               <View style={styles.repostEducationPreviewMedia}>
                 <View style={styles.repostEducationPreviewBadge}>
                   <View style={styles.repostEducationPreviewAvatar}>
-                    <Feather name="user" size={11} color="#FFFFFF" />
+                    <Icon name="user" size={11} color="#FFFFFF" />
                   </View>
                   <Text style={styles.repostEducationPreviewBadgeText}>You reposted</Text>
                 </View>
-                <Feather name="more-horizontal" size={18} color="#FFFFFF99" style={styles.repostEducationPreviewMore} />
+                <Icon name="more-horizontal" size={18} color="#FFFFFF99" style={styles.repostEducationPreviewMore} />
                 <View style={styles.repostEducationPreviewLines}>
                   <View style={styles.repostEducationPreviewLineShort} />
                   <View style={styles.repostEducationPreviewLineLong} />
                 </View>
-                <Feather name="corner-up-right" size={30} color="#FFFFFF99" style={styles.repostEducationPreviewShare} />
+                <Icon name="corner-up-right" size={30} color="#FFFFFF99" style={styles.repostEducationPreviewShare} />
               </View>
             </View>
             <Text style={styles.repostEducationTitle}>Introduce this post to others by reposting</Text>
             <View style={styles.repostEducationPoint}>
-              <Feather name="users" size={22} color={FG} />
+              <Icon name="users" size={22} color={FG} />
               <Text style={styles.repostEducationPointText}>Your repost can appear to friends in their Thread.</Text>
             </View>
             <View style={styles.repostEducationPoint}>
-              <Feather name="repeat" size={22} color={FG} />
+              <Icon name="repeat" size={22} color={FG} />
               <Text style={styles.repostEducationPointText}>Use the Repost button again at any time to remove it.</Text>
             </View>
             <View style={styles.repostEducationPrivacy}>
-              <Feather name="lock" size={15} color={MUTED} />
+              <Icon name="lock" size={15} color={MUTED} />
               <Text style={styles.repostEducationPrivacyText}>
                 Only mutual friends can see your profile on a repost.
               </Text>

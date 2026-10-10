@@ -16,7 +16,7 @@ import {
   Keyboard, ActivityIndicator, Pressable,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
@@ -69,7 +69,7 @@ const MessageBubble = memo(({ msg, accent, accentDim, accentBorder }: { msg: Cha
     <View style={[s.msgRow, isUser && s.msgRowUser]}>
       {!isUser && (
         <View style={[s.aiBadge, { backgroundColor: accentDim, borderColor: accentBorder }]}>
-          <Feather name="headphones" size={12} color={accent} />
+          <Icon name="headphones" size={12} color={accent} />
         </View>
       )}
       <View style={[
@@ -209,7 +209,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
         <View style={s.modalHeader}>
           <View style={s.headerLeft}>
             <View style={[s.headerIcon, { backgroundColor: accentDim, borderColor: accentBorder }]}>
-              <Feather name="headphones" size={16} color={accent} />
+              <Icon name="headphones" size={16} color={accent} />
             </View>
             <View>
               <Text style={s.headerTitle}>Brandthread Support</Text>
@@ -226,12 +226,12 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
               >
                 {escalating
                   ? <ActivityIndicator size="small" color={accent} />
-                  : <><Feather name="user" size={13} color={accent} /><Text style={[s.escalateBtnText, { color: accent }]}>Human</Text></>
+                  : <><Icon name="user" size={13} color={accent} /><Text style={[s.escalateBtnText, { color: accent }]}>Human</Text></>
                 }
               </TouchableOpacity>
             )}
             <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Feather name="x" size={20} color={MUTED} />
+              <Icon name="x" size={20} color={MUTED} />
             </TouchableOpacity>
           </View>
         </View>
@@ -239,7 +239,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
         {/* Escalated banner */}
         {escalated && (
           <View style={s.escalatedBanner}>
-            <Feather name="check-circle" size={14} color={SUCCESS_GRN} />
+            <Icon name="check-circle" size={14} color={SUCCESS_GRN} />
             <Text style={s.escalatedText}>Ticket submitted — reply within 2 business hours</Text>
           </View>
         )}
@@ -256,7 +256,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
           ListFooterComponent={loading ? (
             <View style={[s.msgRow]}>
               <View style={[s.aiBadge, { backgroundColor: accentDim, borderColor: accentBorder }]}>
-                <Feather name="headphones" size={12} color={accent} />
+                <Icon name="headphones" size={12} color={accent} />
               </View>
               <View style={[s.bubble, s.bubbleAI, { paddingVertical: 14 }]}>
                 <StreamingDots color={accent} />
@@ -280,7 +280,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
                   onPress={() => sendMessage(item.label)}
                   activeOpacity={0.8}
                 >
-                  <Feather name={item.icon} size={12} color={accent} />
+                  <Icon name={item.icon} size={12} color={accent} />
                   <Text style={[s.quickChipText, { color: accent }]}>{item.label}</Text>
                 </TouchableOpacity>
               )}
@@ -361,7 +361,7 @@ export default function SupportChatBubble({ bottomOffset = 0, side = 'left' }: S
         pointerEvents="box-none"
       >
         <Pressable accessibilityLabel="Contact support" accessibilityRole="button" onPress={handlePress} style={[s.fabInner, { backgroundColor: theme.secondary, shadowColor: theme.secondary }]}>
-          <Feather name="headphones" size={22} color="#000" />
+          <Icon name="headphones" size={22} color="#000" />
         </Pressable>
       </Animated.View>
 

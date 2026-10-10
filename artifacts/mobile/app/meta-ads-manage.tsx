@@ -12,7 +12,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator, RefreshControl, Modal, TextInput, Platform,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -259,7 +259,7 @@ function CampaignCard({
 
       {row.status === 'rejected' && row.rejectionReason && (
         <View style={[s.rejectBox, { backgroundColor: colors.destructive + '14', borderColor: colors.destructive }]}>
-          <Feather name="alert-triangle" size={14} color={colors.destructive} />
+          <Icon name="alert-triangle" size={14} color={colors.destructive} />
           <Text style={[s.rowSub, { color: colors.destructive, flex: 1 }]}>{row.rejectionReason}</Text>
         </View>
       )}
@@ -314,7 +314,7 @@ function ActionBtn({ label, icon, onPress, busy, colors, theme }: any) {
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      {busy ? <ActivityIndicator size="small" color={theme.accentLight} /> : <Feather name={icon} size={13} color={colors.foreground} />}
+      {busy ? <ActivityIndicator size="small" color={theme.accentLight} /> : <Icon name={icon} size={13} color={colors.foreground} />}
       <Text style={[s.actionBtnText, { color: colors.foreground }]}>{label}</Text>
     </TouchableOpacity>
   );

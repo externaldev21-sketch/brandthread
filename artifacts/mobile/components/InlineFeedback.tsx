@@ -15,6 +15,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Animated, ViewStyle, StyleProp,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
@@ -92,7 +93,7 @@ export function InlineError({ message, onRetry, style }: InlineErrorProps) {
   const ie = useMemo(() => makeErrorStyles(colors), [colors]);
   return (
     <View style={[ie.root, style]}>
-      <Feather name="alert-circle" size={14} color={colors.destructive} style={{ flexShrink: 0 }} />
+      <Icon name="alert-circle" size={14} color={colors.destructive} style={{ flexShrink: 0 }} />
       <Text style={ie.message} numberOfLines={2}>{message}</Text>
       {onRetry ? (
         <TouchableOpacity
@@ -131,7 +132,7 @@ const makeErrorStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.cre
  *   <InlineEmpty icon="search" label="No results." sub="Try a broader phrase." />
  */
 interface InlineEmptyProps {
-  icon: React.ComponentProps<typeof Feather>['name'];
+  icon: IconName;
   label: string;
   sub?: string;
   style?: StyleProp<ViewStyle>;
@@ -143,7 +144,7 @@ export function InlineEmpty({ icon, label, sub, style }: InlineEmptyProps) {
   return (
     <View style={[iem.root, style]}>
       <View style={iem.iconWrap}>
-        <Feather name={icon} size={20} color={colors.subtle} />
+        <Icon name={icon} size={20} color={colors.subtle} />
       </View>
       <Text style={iem.label}>{label}</Text>
       {sub ? <Text style={iem.sub}>{sub}</Text> : null}
@@ -180,7 +181,7 @@ export function SectionError({ message, onRetry, style }: SectionErrorProps) {
   const se = useMemo(() => makeSectionErrorStyles(colors), [colors]);
   return (
     <View style={[se.root, style]}>
-      <Feather name="wifi-off" size={13} color={colors.mutedForeground} />
+      <Icon name="wifi-off" size={13} color={colors.mutedForeground} />
       <Text style={se.message} numberOfLines={1}>{message}</Text>
       <TouchableOpacity
         onPress={onRetry}
@@ -189,7 +190,7 @@ export function SectionError({ message, onRetry, style }: SectionErrorProps) {
         accessibilityLabel={`Retry — ${message}`}
         style={se.retryBtn}
       >
-        <Feather name="refresh-cw" size={12} color={colors.mutedForeground} />
+        <Icon name="refresh-cw" size={12} color={colors.mutedForeground} />
         <Text style={se.retryText}>Retry</Text>
       </TouchableOpacity>
     </View>

@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
@@ -69,7 +69,7 @@ export function RecentlyViewedRow({ style }: { style?: object }) {
               <CachedImage source={{ uri: item.image }} style={[s.image, { backgroundColor: theme.cardElevated }]} contentFit="cover" />
             ) : (
               <View style={[s.image, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-                <Feather name="image" size={18} color={theme.muted} />
+                <Icon name="image" size={18} color={theme.muted} />
               </View>
             )}
             <Text style={[s.name, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
@@ -85,8 +85,7 @@ export function RecentlyViewedRow({ style }: { style?: object }) {
 
 const s = StyleSheet.create({
   header: {
-    fontSize: FS.sm, fontFamily: FONT.semibold, textTransform: 'uppercase',
-    letterSpacing: 0.4, marginBottom: SP.sm,
+    fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.sm,
   },
   card: { width: 104 },
   image: { width: 104, height: 104, borderRadius: RADIUS.md },

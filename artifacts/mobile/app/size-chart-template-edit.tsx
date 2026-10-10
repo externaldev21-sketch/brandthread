@@ -12,7 +12,7 @@ import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Header } from '@/components/layout';
@@ -202,7 +202,7 @@ export default function SizeChartTemplateEditScreen() {
                 {chart.columns.map((col, ci) => (
                   <TouchableOpacity key={ci} style={s.chip} onPress={() => removeColumn(ci)} accessibilityRole="button" accessibilityLabel={`Remove ${col}`}>
                     <Text style={s.chipText}>{col}</Text>
-                    <Feather name="x" size={14} color={colors.mutedForeground} />
+                    <Icon name="x" size={14} color={colors.mutedForeground} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -232,7 +232,7 @@ export default function SizeChartTemplateEditScreen() {
                       />
                     ))}
                     <TouchableOpacity style={s.trash} onPress={() => removeSize(ri)} accessibilityLabel={`Remove size ${row.size}`}>
-                      <Feather name="trash-2" size={14} color={colors.mutedForeground} />
+                      <Icon name="trash-2" size={14} color={colors.mutedForeground} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -241,11 +241,11 @@ export default function SizeChartTemplateEditScreen() {
 
             <View style={s.addRow}>
               <TextInput style={s.addInput} value={newSize} onChangeText={setNewSize} placeholder="Add a size, e.g. XXL" placeholderTextColor={colors.mutedForeground} onSubmitEditing={addSize} maxLength={20} />
-              <TouchableOpacity style={s.addBtn} onPress={addSize} accessibilityLabel="Add size"><Feather name="plus" size={ICON.sm} color={colors.foreground} /></TouchableOpacity>
+              <TouchableOpacity style={s.addBtn} onPress={addSize} accessibilityLabel="Add size"><Icon name="plus" size={ICON.sm} color={colors.foreground} /></TouchableOpacity>
             </View>
             <View style={s.addRow}>
               <TextInput style={s.addInput} value={newColumn} onChangeText={setNewColumn} placeholder="Add a measurement, e.g. Shoulder" placeholderTextColor={colors.mutedForeground} onSubmitEditing={addColumn} maxLength={40} />
-              <TouchableOpacity style={s.addBtn} onPress={addColumn} accessibilityLabel="Add measurement"><Feather name="plus" size={ICON.sm} color={colors.foreground} /></TouchableOpacity>
+              <TouchableOpacity style={s.addBtn} onPress={addColumn} accessibilityLabel="Add measurement"><Icon name="plus" size={ICON.sm} color={colors.foreground} /></TouchableOpacity>
             </View>
 
             <Text style={[s.label, { marginTop: SP.lg }]}>Notes</Text>
@@ -270,7 +270,7 @@ export default function SizeChartTemplateEditScreen() {
               <>
                 <TouchableOpacity style={s.linkRow} onPress={() => router.push(`/size-chart-template-apply?id=${id}` as never)} accessibilityRole="button">
                   <Text style={s.linkText}>Apply to products</Text>
-                  <Feather name="chevron-right" size={ICON.sm} color={colors.mutedForeground} />
+                  <Icon name="chevron-right" size={ICON.sm} color={colors.mutedForeground} />
                 </TouchableOpacity>
                 <TouchableOpacity style={s.linkRow} onPress={remove} accessibilityRole="button">
                   <Text style={[s.linkText, { color: colors.destructive }]}>Delete size chart</Text>

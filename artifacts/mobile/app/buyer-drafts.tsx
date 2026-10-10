@@ -9,7 +9,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { type IconName } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticSelection } from '@/lib/haptics';
@@ -75,7 +75,7 @@ export default function BuyerDraftsScreen() {
             error={error}
             onRetry={load}
             layout={layout}
-            icon={empty.icon as keyof typeof Feather.glyphMap}
+            icon={empty.icon as IconName}
             title={empty.title}
             testID="buyer-drafts-empty"
           />

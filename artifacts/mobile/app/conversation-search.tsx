@@ -6,7 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -67,10 +67,10 @@ export default function ConversationSearchScreen() {
           accessibilityRole="button"
           accessibilityLabel="Back"
         >
-          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+          <Icon name="arrow-left" size={ICON.md} color={theme.text} />
         </PressableScale>
         <View style={[s.searchPill, { backgroundColor: theme.cardElevated }]}>
-          <Feather name="search" size={ICON.sm} color={theme.muted} />
+          <Icon name="search" size={ICON.sm} color={theme.muted} />
           <TextInput
             style={[s.searchInput, { color: theme.text }, WEB_INPUT_RESET]}
             value={query}

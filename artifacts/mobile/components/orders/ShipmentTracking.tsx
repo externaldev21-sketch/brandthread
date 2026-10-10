@@ -22,7 +22,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { OrderStatus, TrackingStatus } from '@/services/orderTypes';
@@ -185,19 +185,19 @@ export function ShipmentMapPlaceholder({ info }: { info: ShipmentInfo }) {
       ) : null}
       {width > 0 && !delivered ? (
         <View pointerEvents="none" style={[styles.marker, { left: route.at.x - 8, top: route.at.y - 8 }]}>
-          <Feather name="package" size={16} color={theme.background} />
+          <Icon name="package" size={16} color={theme.background} />
         </View>
       ) : null}
       {width > 0 && delivered ? (
         <View pointerEvents="none" style={[styles.marker, { left: p3.x - 8, top: p3.y - 8 }]}>
-          <Feather name="check" size={16} color={theme.background} />
+          <Icon name="check" size={16} color={theme.background} />
         </View>
       ) : null}
       <View style={[styles.mapLegend, { backgroundColor: theme.cardElevated, borderColor: theme.border }]} pointerEvents="none">
         <Text style={[styles.legendText, { color: theme.muted }]} numberOfLines={1}>
           {info.sellerName}
         </Text>
-        <Feather name="arrow-right" size={11} color={theme.muted} />
+        <Icon name="arrow-right" size={11} color={theme.muted} />
         <Text style={[styles.legendText, { color: theme.text }]} numberOfLines={1}>
           {destination || 'You'}
         </Text>

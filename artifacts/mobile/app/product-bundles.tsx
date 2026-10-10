@@ -12,7 +12,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER,
@@ -36,7 +36,7 @@ function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
   return (
     <TouchableOpacity style={r.root} onPress={onPress} activeOpacity={0.7}>
       <View style={r.iconWrap}>
-        <Feather name="package" size={ICON.md} color={PURPLE_LIGHT} />
+        <Icon name="package" size={ICON.md} color={PURPLE_LIGHT} />
       </View>
       <View style={r.body}>
         <View style={r.topRow}>
@@ -53,7 +53,7 @@ function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
           {savings > 0 ? ` · saves ${formatCents(savings)}` : ''}
         </Text>
       </View>
-      <Feather name="chevron-right" size={16} color={MUTED} />
+      <Icon name="chevron-right" size={16} color={MUTED} />
     </TouchableOpacity>
   );
 }

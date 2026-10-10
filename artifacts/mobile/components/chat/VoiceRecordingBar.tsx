@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import type { VoiceRecorderPhase } from '@/hooks/useVoiceRecorder';
@@ -41,8 +41,8 @@ export function VoiceRecordingBar({
           style={[rs.lockPill, { backgroundColor: theme.cardElevated, transform: [{ translateY: dragY }] }]}
           testID="voice-lock-affordance"
         >
-          <Feather name="lock" size={14} color={theme.muted} />
-          <Feather name="chevron-up" size={12} color={theme.muted} />
+          <Icon name="lock" size={14} color={theme.muted} />
+          <Icon name="chevron-up" size={12} color={theme.muted} />
         </Animated.View>
       )}
       <Animated.View style={[rs.pill, { backgroundColor: theme.cardElevated, transform: [{ translateX: isWeb ? 0 : dragX }] }]}>
@@ -54,7 +54,7 @@ export function VoiceRecordingBar({
             accessibilityRole="button"
             accessibilityLabel="Cancel recording"
           >
-            <Feather name="trash-2" size={18} color={theme.error} />
+            <Icon name="trash-2" size={18} color={theme.error} />
           </Pressable>
         ) : (
           <Text style={[rs.hint, { color: theme.muted }]}>Slide to cancel</Text>
@@ -80,19 +80,19 @@ export function VoiceRecordingBar({
             accessibilityLabel="Send voice message"
           >
             <View style={[rs.sendBtn, { backgroundColor: theme.text }]}>
-              <Feather name="arrow-up" size={16} color={theme.onAccent} />
+              <Icon name="arrow-up" size={16} color={theme.onAccent} />
             </View>
           </Pressable>
         ) : (
           <View style={[rs.micGhost, { backgroundColor: theme.text }]}>
-            <Feather name="mic" size={14} color={theme.onAccent} />
+            <Icon name="mic" size={14} color={theme.onAccent} />
           </View>
         )}
       </Animated.View>
 
       {isWeb && phase === 'recording' && (
         <Pressable onPress={onLock} style={rs.webLockRow} testID="voice-lock-web">
-          <Feather name="lock" size={12} color={theme.muted} />
+          <Icon name="lock" size={12} color={theme.muted} />
           <Text style={[rs.webLockText, { color: theme.muted }]}>Tap to keep recording hands-free</Text>
         </Pressable>
       )}

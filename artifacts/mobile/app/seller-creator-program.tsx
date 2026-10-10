@@ -9,7 +9,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Clipboard from 'expo-clipboard';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -117,23 +117,23 @@ export default function SellerCreatorProgramScreen() {
                 />
               </View>
               <TouchableOpacity style={s.linkRow} onPress={() => router.push('/seller-creator-settings' as any)} accessibilityRole="button">
-                <Feather name="sliders" size={16} color={theme.text} />
+                <Icon name="sliders" size={16} color={theme.text} />
                 <Text style={[s.link, { color: theme.text }]}>Commission, window and payout settings</Text>
-                <Feather name="chevron-right" size={16} color={theme.muted} />
+                <Icon name="chevron-right" size={16} color={theme.muted} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.linkRow}
                 onPress={async () => { await Clipboard.setStringAsync(data.programLink); flash('Program link copied'); }}
                 accessibilityRole="button"
               >
-                <Feather name="link" size={16} color={theme.text} />
+                <Icon name="link" size={16} color={theme.text} />
                 <Text style={[s.link, { color: theme.text }]}>Copy program link</Text>
-                <Feather name="copy" size={16} color={theme.muted} />
+                <Icon name="copy" size={16} color={theme.muted} />
               </TouchableOpacity>
               <TouchableOpacity style={s.linkRow} onPress={() => router.push('/creator-program' as any)} accessibilityRole="button">
-                <Feather name="user" size={16} color={theme.text} />
+                <Icon name="user" size={16} color={theme.text} />
                 <Text style={[s.link, { color: theme.text }]}>My creator codes</Text>
-                <Feather name="chevron-right" size={16} color={theme.muted} />
+                <Icon name="chevron-right" size={16} color={theme.muted} />
               </TouchableOpacity>
             </Card>
 

@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
@@ -480,7 +480,7 @@ export default function BuyerSearchScreen() {
   //    matching accounts, per the Mobbin reference exactly. Tapping any row
   //    submits directly (no separate "fill" affordance — Instagram doesn't
   //    have one either). ──────────────────────────────────────────────────
-  type SuggestionRow = { key: string; icon: keyof typeof Feather.glyphMap; avatar?: { uri: string | null; color: string; initials: string }; title: React.ReactNode; subtitle?: string; onSubmit: () => void };
+  type SuggestionRow = { key: string; icon: IconName; avatar?: { uri: string | null; color: string; initials: string }; title: React.ReactNode; subtitle?: string; onSubmit: () => void };
   const suggestionRows = useMemo<SuggestionRow[]>(() => {
     if (!trimmedQuery) return [];
     const bold = (text: string) => {
@@ -529,7 +529,7 @@ export default function BuyerSearchScreen() {
               )
             ) : (
               <View style={[styles.suggestionAvatar, styles.suggestionIconWrap, { borderColor: theme.border }]}>
-                <Feather name={row.icon} size={16} color={muted} />
+                <Icon name={row.icon} size={16} color={muted} />
               </View>
             )}
             <View style={{ flex: 1 }}>
@@ -584,7 +584,7 @@ export default function BuyerSearchScreen() {
               accessibilityLabel={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : 'Filters'}
               testID="buyer-search-filter-button"
             >
-              <Feather name="sliders" size={14} color={fg} />
+              <Icon name="sliders" size={14} color={fg} />
               <Text style={[TYPE_SCALE.footnote, { color: fg, fontFamily: FONT.medium }]}>Filters</Text>
               {activeFilterCount > 0 && (
                 <View style={[styles.filterBadge, { backgroundColor: fg }]} testID="buyer-search-filter-badge">
@@ -665,12 +665,12 @@ export default function BuyerSearchScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           testID="buyer-search-back"
         >
-          <Feather name="chevron-left" size={26} color={fg} />
+          <Icon name="chevron-left" size={26} color={fg} />
         </TouchableOpacity>
         {/* theme-exempt: fixed dark action per spec — see profile.tsx's
             #1f1f1f store-details fill for the same intentional pattern. */}
         <View style={[styles.field, fieldFocused && styles.fieldFocused]}>
-          <Feather name="search" size={16} color="#9A9AA0" />
+          <Icon name="search" size={16} color="#9A9AA0" />
           <TextInput
             ref={inputRef}
             value={query}
@@ -694,7 +694,7 @@ export default function BuyerSearchScreen() {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 2 }}
               testID="buyer-search-clear"
             >
-              <Feather name="x-circle" size={16} color="#9A9AA0" />
+              <Icon name="x-circle" size={16} color="#9A9AA0" />
             </TouchableOpacity>
           )}
         </View>
@@ -710,7 +710,7 @@ export default function BuyerSearchScreen() {
             testID="buyer-search-add-person"
             style={styles.headerSideButton}
           >
-            <Feather name="user-plus" size={22} color={fg} />
+            <Icon name="user-plus" size={22} color={fg} />
           </TouchableOpacity>
         )}
       </View>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
@@ -25,7 +25,7 @@ export function DeadlineChip({ countdown }: { countdown: DeadlineCountdown }) {
       accessibilityLabel={countdown.kind === 'left' ? `${countdown.label} to ship` : countdown.label}
       testID="deadline-chip"
     >
-      <Feather name={countdown.kind === 'refunded' ? 'rotate-ccw' : 'clock'} size={10} color={color} />
+      <Icon name={countdown.kind === 'refunded' ? 'rotate-ccw' : 'clock'} size={10} color={color} />
       <Text style={[chipStyles.text, { color }]} numberOfLines={1}>{countdown.label}</Text>
     </View>
   );
@@ -57,7 +57,7 @@ export function SellerDeliveryBanner({ order, shipped }: { order: DeliveryOrderF
     return (
       <View style={s.box} testID="seller-auto-refunded">
         <View style={s.head}>
-          <Feather name="rotate-ccw" size={ICON.sm} color={theme.text} />
+          <Icon name="rotate-ccw" size={ICON.sm} color={theme.text} />
           <Text style={s.title}>Auto-refunded, not delivered in time</Text>
         </View>
         <Text style={s.body}>
@@ -75,7 +75,7 @@ export function SellerDeliveryBanner({ order, shipped }: { order: DeliveryOrderF
     <View style={s.box} testID="seller-ship-by-banner">
       {line ? (
         <View style={s.head}>
-          <Feather name="clock" size={ICON.sm} color={countdown?.urgent ? theme.error : theme.muted} />
+          <Icon name="clock" size={ICON.sm} color={countdown?.urgent ? theme.error : theme.muted} />
           <Text style={s.body}>{line}</Text>
         </View>
       ) : null}
@@ -157,7 +157,7 @@ export function ShipItemsSheet({
                     accessibilityState={{ checked: on }}
                     accessibilityLabel={`${item.productName}${item.variant ? `, ${item.variant}` : ''}`}
                   >
-                    <Feather name={on ? 'check-square' : 'square'} size={ICON.md} color={on ? theme.text : theme.muted} />
+                    <Icon name={on ? 'check-square' : 'square'} size={ICON.md} color={on ? theme.text : theme.muted} />
                     <View style={{ flex: 1 }}>
                       <Text style={s.itemName} numberOfLines={1}>{item.productName}</Text>
                       <Text style={s.itemMeta} numberOfLines={1}>{[item.variant, `×${item.quantity}`].filter(Boolean).join(' · ')}</Text>

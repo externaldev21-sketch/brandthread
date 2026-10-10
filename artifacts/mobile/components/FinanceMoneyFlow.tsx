@@ -1,8 +1,8 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import {
   activityLabel, buildMoneyTiles, deadlineText, dropOrdersText, dropStateLabel, isEmptySummary, signedCents,
@@ -57,7 +57,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
   if (error && !summary) {
     return (
       <View style={[styles.stateCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Feather name="cloud-off" size={18} color={colors.mutedForeground} />
+        <Icon name="cloud-off" size={18} color={colors.mutedForeground} />
         <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn't load your balances</Text>
         <Text style={[styles.stateBody, { color: colors.mutedForeground }]}>
           Your money is safe — this is only a display problem.
@@ -90,7 +90,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
             accessibilityLabel={`${tile.label}: ${tile.value}. ${tile.caption}`}
           >
             <View style={styles.tileHead}>
-              <Feather name={tile.icon} size={13} color={colors.mutedForeground} />
+              <Icon name={tile.icon} size={13} color={colors.mutedForeground} />
               <Text style={[styles.tileLabel, { color: colors.mutedForeground }]}>{tile.label}</Text>
             </View>
             <Text style={[styles.tileValue, TABULAR_NUMS, { color: toneColor(tile.tone) }]} numberOfLines={1} adjustsFontSizeToFit>
@@ -103,7 +103,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
 
       {summary.owed.amount > 0 && (
         <View style={[styles.notice, { borderColor: colors.warning, backgroundColor: colors.card }]}>
-          <Feather name="alert-circle" size={16} color={colors.warning} />
+          <Icon name="alert-circle" size={16} color={colors.warning} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.noticeTitle, { color: colors.foreground }]}>
               You owe Brandthread {formatCents(summary.owed.amount)}
@@ -117,7 +117,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
       )}
       {summary.credit.amount > 0 && (
         <View style={[styles.notice, { borderColor: colors.border, backgroundColor: colors.card }]}>
-          <Feather name="info" size={16} color={colors.mutedForeground} />
+          <Icon name="info" size={16} color={colors.mutedForeground} />
           <Text style={[styles.noticeBody, { color: colors.mutedForeground, flex: 1 }]}>
             Brandthread owes you {formatCents(summary.credit.amount)} (for example, a label you voided after it was
             charged). Support will send it to your Stripe account.
@@ -199,29 +199,29 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   tile: { flexBasis: '48%', flexGrow: 1, borderRadius: 14, borderWidth: 1, padding: 12, gap: 6, minHeight: 104 },
   tileHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tileLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium', textTransform: 'uppercase', letterSpacing: 0.4 },
-  tileValue: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  tileCaption: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 15 },
+  tileLabel: { fontSize: FS.xs, fontFamily: FONT.medium, },
+  tileValue: { fontSize: 20, fontFamily: FONT.bold },
+  tileCaption: { fontSize: 11, fontFamily: FONT.regular, lineHeight: 15 },
   skeletonLine: { height: 10, borderRadius: 5 },
   stateCard: { borderRadius: 14, borderWidth: 1, padding: 18, alignItems: 'center', gap: 8, marginBottom: 20 },
-  stateTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  stateBody: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
+  stateTitle: { fontSize: 15, fontFamily: FONT.semibold },
+  stateBody: { fontSize: 13, fontFamily: FONT.regular, lineHeight: 18 },
   retry: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },
-  retryText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  retryText: { fontSize: 13, fontFamily: FONT.semibold },
   notice: { flexDirection: 'row', gap: 10, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 16 },
-  noticeTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 2 },
-  noticeBody: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+  noticeTitle: { fontSize: 14, fontFamily: FONT.semibold, marginBottom: 2 },
+  noticeBody: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17 },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 20 },
   dropRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  dropName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  dropMeta: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  dropAmount: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  dropName: { fontSize: 14, fontFamily: FONT.semibold },
+  dropMeta: { fontSize: 11, fontFamily: FONT.regular },
+  dropAmount: { fontSize: 15, fontFamily: FONT.bold },
   pill: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
-  pillText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  pillText: { fontSize: 11, fontFamily: FONT.semibold },
   empty: { padding: 20 },
   activityRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  activityName: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  activityAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  footnote: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginBottom: 24 },
+  activityName: { fontSize: 13, fontFamily: FONT.medium },
+  activityAmount: { fontSize: 14, fontFamily: FONT.semibold },
+  footnote: { fontSize: 11, fontFamily: FONT.regular, lineHeight: 16, marginBottom: 24 },
 });

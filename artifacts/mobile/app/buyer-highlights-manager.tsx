@@ -9,7 +9,7 @@ import {
   View, Text, StyleSheet, FlatList, TextInput, Modal, Platform, Alert, Pressable,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -142,9 +142,9 @@ function HLFormModal({
                   accessibilityLabel="Select stories for this highlight"
                   testID="highlight-select-stories"
                 >
-                  <Feather name="image" size={18} color={colors.foreground} />
+                  <Icon name="image" size={18} color={colors.foreground} />
                   <Text style={[s.selectStoriesLabel, { color: colors.foreground }]}>Select stories</Text>
-                  <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+                  <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
                 </PressableScale>
               ) : null}
 
@@ -300,7 +300,7 @@ export default function BuyerHighlightsManager() {
           accessibilityRole="button"
           accessibilityLabel={`Move ${item.label} up`}
         >
-          <Feather name="chevron-up" size={16} color={colors.mutedForeground} />
+          <Icon name="chevron-up" size={16} color={colors.mutedForeground} />
         </PressableScale>
         <PressableScale
           style={[s.reorderArrow, index >= highlights.length - 1 && { opacity: 0.2 }]}
@@ -310,7 +310,7 @@ export default function BuyerHighlightsManager() {
           accessibilityRole="button"
           accessibilityLabel={`Move ${item.label} down`}
         >
-          <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+          <Icon name="chevron-down" size={16} color={colors.mutedForeground} />
         </PressableScale>
       </View>
       <View style={[s.circle, { backgroundColor: item.coverColor, overflow: 'hidden' }]}>
@@ -326,7 +326,7 @@ export default function BuyerHighlightsManager() {
         accessibilityRole="button"
         accessibilityLabel={`Edit ${item.label}`}
       >
-        <Feather name="edit-2" size={16} color={colors.mutedForeground} />
+        <Icon name="edit-2" size={16} color={colors.mutedForeground} />
       </PressableScale>
       <PressableScale
         style={s.deleteIcon}
@@ -335,7 +335,7 @@ export default function BuyerHighlightsManager() {
         accessibilityRole="button"
         accessibilityLabel={`Delete ${item.label}`}
       >
-        <Feather name="trash-2" size={16} color={colors.mutedForeground} />
+        <Icon name="trash-2" size={16} color={colors.mutedForeground} />
       </PressableScale>
     </View>
   );

@@ -16,7 +16,7 @@ import {
   TouchableWithoutFeedback, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
@@ -136,7 +136,7 @@ export function VariantPickerSheet({
         <View style={s.header}>
           <Text style={s.title}>Choose options</Text>
           <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={s.closeBtn}>
-            <Feather name="x" size={18} color={theme.text} />
+            <Icon name="x" size={18} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -150,13 +150,13 @@ export function VariantPickerSheet({
               <View style={s.productRow}>
                 {product.imageUris[0] ? (
                   <CachedImage source={{ uri: product.imageUris[0] }} style={s.thumb} contentFit="cover" />
-                ) : <View style={[s.thumb, s.thumbPlaceholder]}><Feather name="image" size={18} color={theme.subtle} /></View>}
+                ) : <View style={[s.thumb, s.thumbPlaceholder]}><Icon name="image" size={18} color={theme.subtle} /></View>}
                 <View style={{ flex: 1 }}>
                   <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
                   <Text style={s.productPrice}>{formatCents(price)}</Text>
                   {lowStock && (
                     <View style={s.lowStockRow}>
-                      <Feather name="alert-circle" size={11} color={theme.warning} />
+                      <Icon name="alert-circle" size={11} color={theme.warning} />
                       <Text style={s.lowStockText}>Only {variant!.inventoryQuantity} left</Text>
                     </View>
                   )}
@@ -194,7 +194,7 @@ export function VariantPickerSheet({
                               accessibilityState={{ selected, disabled: !available }}
                             >
                               <View style={[s.colorDot, { backgroundColor: val.colorHex }]} />
-                              {!available && <Feather name="slash" size={13} color={theme.subtle} style={s.colorSlash} />}
+                              {!available && <Icon name="slash" size={13} color={theme.subtle} style={s.colorSlash} />}
                             </TouchableOpacity>
                           );
                         }
@@ -280,7 +280,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   lowStockText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
   optionSection: { marginBottom: SP.lg },
   optionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
-  optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, textTransform: 'uppercase', letterSpacing: 0.4 },
+  optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, },
   optionSelected: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.accentLight },
   optionRequired: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.error },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

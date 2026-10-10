@@ -4,7 +4,7 @@ import {
   Modal, TextInput, Animated, Pressable,
 } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
@@ -241,7 +241,7 @@ export default function BuyerSaved() {
             <CachedImage source={{ uri: item.image }} style={styles.tileImage} />
           ) : (
             <View style={[styles.tileImage, styles.tilePlaceholder, { backgroundColor: item.accentColor || theme.accentDim }]}>
-              <Feather name={item.type === 'post' ? 'image' : item.type === 'store' ? 'home' : 'shopping-bag'} size={ICON.md} color={theme.accent} style={{ opacity: 0.8 }} />
+              <Icon name={item.type === 'post' ? 'image' : item.type === 'store' ? 'home' : 'shopping-bag'} size={ICON.md} color={theme.accent} style={{ opacity: 0.8 }} />
             </View>
           )}
           {isProduct && (
@@ -289,11 +289,11 @@ export default function BuyerSaved() {
             <CachedImage source={{ uri: item.coverImageUrl }} style={styles.tileImage} />
           ) : (
             <View style={[styles.tileImage, styles.tilePlaceholder, { backgroundColor: theme.accentDim }]}>
-              <Feather name="folder" size={ICON.lg} color={theme.accent} />
+              <Icon name="folder" size={ICON.lg} color={theme.accent} />
             </View>
           )}
           {item.isPublic ? (
-            <View style={styles.publicBadge}><Feather name="globe" size={10} color="#fff" /></View>
+            <View style={styles.publicBadge}><Icon name="globe" size={10} color="#fff" /></View>
           ) : null}
         </View>
         <View style={styles.tileInfo}>
@@ -308,7 +308,7 @@ export default function BuyerSaved() {
     return (
       <Card style={styles.collectionCard} onPress={() => setNewCollectionModal(true)} accessibilityLabel="New collection" accessibilityHint="Creates a new collection">
         <View style={[styles.tileImageWrap, styles.newCollectionSquare]}>
-          <Feather name="plus" size={ICON.lg} color={theme.accent} />
+          <Icon name="plus" size={ICON.lg} color={theme.accent} />
         </View>
         <View style={styles.tileInfo}>
           <Text style={[styles.tileTitle, { color: theme.accent }]}>New collection</Text>

@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import type * as ImagePicker from 'expo-image-picker';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -24,7 +24,7 @@ export const AVATAR_VIDEO_MAX_SECONDS = 10;
 function SourceRow({
   icon, label, destructive, onPress, last,
 }: {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   destructive?: boolean;
   onPress: () => void;
@@ -38,7 +38,7 @@ function SourceRow({
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Feather name={icon} size={22} color={destructive ? theme.error : theme.text} />
+      <Icon name={icon} size={22} color={destructive ? theme.error : theme.text} />
       <Text style={[styles.rowText, { color: destructive ? theme.error : theme.text }]}>{label}</Text>
     </Pressable>
   );

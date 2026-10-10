@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
@@ -161,13 +161,13 @@ export default function DisputesScreen() {
                     </View>
                     {due ? (
                       <View style={[styles.chip, { borderColor: colors.border }]}>
-                        <Feather name="clock" size={11} color={colors.mutedForeground} />
+                        <Icon name="clock" size={11} color={colors.mutedForeground} />
                         <Text style={[styles.chipText, { color: colors.mutedForeground }]}>{due}</Text>
                       </View>
                     ) : null}
                   </View>
                 </View>
-                <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+                <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
               </TouchableOpacity>
             );
           })

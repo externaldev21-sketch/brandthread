@@ -10,9 +10,10 @@ import {
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { FONT } from '@/lib/theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -268,7 +269,7 @@ function Calendar({ month, rangeStart, rangeEnd, onDayPress, colors, isDark }: C
                           : isToday
                           ? primary
                           : colors.foreground,
-                        fontFamily: edge ? 'Inter_700Bold' : 'Inter_400Regular',
+                        fontFamily: edge ? FONT.bold : FONT.regular,
                       },
                     ]}
                   >
@@ -294,7 +295,7 @@ const calStyles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  weekLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  weekLabel: { fontSize: 11, fontFamily: FONT.semibold },
   strip: {
     position: 'absolute',
     top: 4,
@@ -408,7 +409,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
         <View style={[styles.titleRow, { borderBottomColor: colors.border }]}>
           <Text style={[styles.title, { color: colors.foreground }]}>Select Period</Text>
           <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-            <Feather name="x" size={20} color={colors.mutedForeground} />
+            <Icon name="x" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
 
@@ -434,7 +435,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
                   <Text style={[styles.presetLabel, { color: colors.foreground }]}>{p.label}</Text>
                   <Text style={[styles.presetHint, { color: colors.mutedForeground }]}>{p.hint}</Text>
                   {active && (
-                    <Feather name="check" size={14} color={primary} style={{ marginLeft: 4 }} />
+                    <Icon name="check" size={14} color={primary} style={{ marginLeft: 4 }} />
                   )}
                 </TouchableOpacity>
               );
@@ -447,13 +448,13 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
               {/* Month navigation */}
               <View style={styles.monthNav}>
                 <TouchableOpacity onPress={prevMonth} activeOpacity={0.7} style={styles.navBtn}>
-                  <Feather name="chevron-left" size={18} color={colors.foreground} />
+                  <Icon name="chevron-left" size={18} color={colors.foreground} />
                 </TouchableOpacity>
                 <Text style={[styles.monthTitle, { color: colors.foreground }]}>
                   {MONTH_NAMES[calMonth.getMonth()]} {calMonth.getFullYear()}
                 </Text>
                 <TouchableOpacity onPress={nextMonth} activeOpacity={0.7} style={styles.navBtn}>
-                  <Feather name="chevron-right" size={18} color={colors.foreground} />
+                  <Icon name="chevron-right" size={18} color={colors.foreground} />
                 </TouchableOpacity>
               </View>
 
@@ -477,7 +478,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
         {/* Bottom bar */}
         <View style={[styles.bottomBar, { borderTopColor: colors.border, paddingBottom: bottomPad }]}>
           <View style={styles.rangeLabel}>
-            <Feather name="calendar" size={13} color={colors.mutedForeground} />
+            <Icon name="calendar" size={13} color={colors.mutedForeground} />
             <Text style={[styles.rangeLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>
               {rangeLabel}
             </Text>
@@ -524,7 +525,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
-  title: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+  title: { fontSize: 17, fontFamily: FONT.bold },
 
   // Presets
   presetSection: { borderBottomWidth: 1, paddingVertical: 6 },
@@ -544,15 +545,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radioDot: { width: 8, height: 8, borderRadius: 4 },
-  presetLabel: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium' },
-  presetHint: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  presetLabel: { flex: 1, fontSize: 15, fontFamily: FONT.medium },
+  presetHint: { fontSize: 12, fontFamily: FONT.regular },
 
   // Calendar
   calSection: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   navBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  monthTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  calHint: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 10 },
+  monthTitle: { fontSize: 16, fontFamily: FONT.semibold },
+  calHint: { fontSize: 11, fontFamily: FONT.regular, textAlign: 'center', marginTop: 10 },
 
   // Bottom
   bottomBar: {
@@ -562,7 +563,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   rangeLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rangeLabelText: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
+  rangeLabelText: { fontSize: 13, fontFamily: FONT.regular, flex: 1 },
   actions: { flexDirection: 'row', gap: 10 },
   flex1: { flex: 1 },
 });

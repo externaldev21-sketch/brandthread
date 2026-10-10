@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
@@ -21,7 +21,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ProductImportPreview } from '@/components/products/ProductImportPreview';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 
-function methodIcon(method: string): keyof typeof Feather.glyphMap {
+function methodIcon(method: string): IconName {
   if (method === 'CSV') return 'file-text';
   if (method === 'Manual') return 'list';
   return 'package';
@@ -211,7 +211,7 @@ export default function ProductImportScreen() {
         >
           <View style={s.methodRow}>
             <View style={[s.methodIconWrap, { backgroundColor: theme.accentDim }]}>
-              <Feather name="file-text" size={ICON.md} color={theme.accent} />
+              <Icon name="file-text" size={ICON.md} color={theme.accent} />
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>CSV File</Text>
@@ -259,13 +259,13 @@ export default function ProductImportScreen() {
         >
           <View style={s.methodRow}>
             <View style={[s.methodIconWrap, { backgroundColor: GOLD + '22' }]}>
-              <Feather name="shopping-bag" size={ICON.md} color={GOLD} />
+              <Icon name="shopping-bag" size={ICON.md} color={GOLD} />
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>Transfer from Shopify</Text>
               <Text style={s.methodDesc}>Copy your public products in a few minutes</Text>
             </View>
-            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+            <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
           </View>
         </GradientCard>
 
@@ -282,7 +282,7 @@ export default function ProductImportScreen() {
           >
             <View style={[s.methodRow, !providers.etsy.enabled && { opacity: 0.6 }]}>
               <View style={[s.methodIconWrap, { backgroundColor: theme.secondaryDim }]}>
-                <Feather name="tag" size={ICON.md} color={theme.secondary} />
+                <Icon name="tag" size={ICON.md} color={theme.secondary} />
               </View>
               <View style={s.methodInfo}>
                 <Text style={s.methodTitle}>Import from Etsy</Text>
@@ -309,7 +309,7 @@ export default function ProductImportScreen() {
         >
           <View style={s.methodRow}>
             <View style={[s.methodIconWrap, { backgroundColor: theme.secondaryDim }]}>
-              <Feather name="list" size={ICON.md} color={theme.secondary} />
+              <Icon name="list" size={ICON.md} color={theme.secondary} />
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>Manual bulk entry</Text>
@@ -361,7 +361,7 @@ export default function ProductImportScreen() {
           <BrandthreadCard key={run.id} style={s.historyCard}>
             <View style={s.historyRow}>
               <View style={[s.historyIconWrap, { backgroundColor: theme.accentDim }]}>
-                <Feather name={run.source === 'etsy_api' ? 'tag' : 'file-text'} size={ICON.sm} color={theme.accent} />
+                <Icon name={run.source === 'etsy_api' ? 'tag' : 'file-text'} size={ICON.sm} color={theme.accent} />
               </View>
               <View style={s.historyInfo}>
                 <Text style={s.historyLabel} numberOfLines={1}>
@@ -393,7 +393,7 @@ export default function ProductImportScreen() {
               accessibilityRole="button"
               accessibilityLabel="Close paste CSV data"
             >
-              <Feather name="x" size={18} color={FG} />
+              <Icon name="x" size={18} color={FG} />
             </TouchableOpacity>
           </View>
           <Text style={{ fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginBottom: 4 }}>

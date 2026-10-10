@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { CachedImage } from '@/components/CachedImage';
@@ -45,7 +45,7 @@ export function LiveProductsSheet({
             <Text style={[styles.sub, { color: theme.muted }]}>{products.length} {products.length === 1 ? 'piece' : 'pieces'} from {hostName}</Text>
           </View>
           <Pressable onPress={onClose} style={[styles.close, { backgroundColor: theme.cardElevated }]} accessibilityRole="button" accessibilityLabel="Close" hitSlop={6}>
-            <Feather name="x" size={18} color={theme.text} />
+            <Icon name="x" size={18} color={theme.text} />
           </Pressable>
         </View>
         <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: SP.sm }}>
@@ -55,7 +55,7 @@ export function LiveProductsSheet({
                 const applied = appliedCode?.toUpperCase() === c.code.toUpperCase();
                 return (
                   <View key={c.id} style={[styles.row, { borderColor: theme.border }]}>
-                    <Feather name="tag" size={18} color={theme.text} style={{ marginHorizontal: 8 }} />
+                    <Icon name="tag" size={18} color={theme.text} style={{ marginHorizontal: 8 }} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.name, { color: theme.text }]}>{c.code}</Text>
                       <Text style={[styles.sub, { color: theme.muted }]}>
@@ -82,7 +82,7 @@ export function LiveProductsSheet({
               <View key={p.productId} style={[styles.row, { borderColor: live ? theme.text : theme.border }]}>
                 <Text style={[styles.index, { color: theme.muted }, TABULAR_NUMS]}>{i + 1}</Text>
                 <View style={[styles.thumb, { backgroundColor: theme.cardElevated }]}>
-                  {p.imageUri ? <CachedImage source={{ uri: p.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Feather name="shopping-bag" size={18} color={theme.muted} />}
+                  {p.imageUri ? <CachedImage source={{ uri: p.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Icon name="shopping-bag" size={18} color={theme.muted} />}
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   {live && (

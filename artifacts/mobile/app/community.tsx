@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, PressableScale, SearchBar } from '@/components/BrandthreadUI';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -197,7 +197,7 @@ export default function CommunityScreen() {
                 ) : null}
               </View>
               {c.unreadCount > 0 && !c.muted ? <View style={[styles.unreadDot, { backgroundColor: colors.foreground }]} /> : null}
-              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+              <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
             </PressableScale>
           ))}
           {joinedMine.length > MINE_COLLAPSED ? (
@@ -218,12 +218,12 @@ export default function CommunityScreen() {
           accessibilityLabel="Create a group"
         >
           <View style={[styles.createIcon, { backgroundColor: colors.secondary }]}>
-            <Feather name="plus" size={20} color={colors.foreground} />
+            <Icon name="plus" size={20} color={colors.foreground} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.mineName, { color: colors.foreground }]}>Create a group</Text>
           </View>
-          <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
         </PressableScale>
       ) : null}
     </View>

@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Share, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@clerk/expo';
@@ -211,7 +211,7 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
 
       {error ? (
         <View style={s.errorRow} accessibilityRole="alert">
-          <Feather name="alert-circle" size={16} color={ck.text} />
+          <Icon name="alert-circle" size={16} color={ck.text} />
           <Text style={s.error}>{error}</Text>
         </View>
       ) : null}

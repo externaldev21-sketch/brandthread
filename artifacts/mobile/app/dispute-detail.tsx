@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -369,7 +369,7 @@ export default function DisputeDetailScreen() {
           style={styles.alertCard}
         >
           <View style={styles.alertHeader}>
-            <Feather name="alert-octagon" size={ICON.md} color={RED} />
+            <Icon name="alert-octagon" size={ICON.md} color={RED} />
             <Text style={styles.alertType}>{disputeTypeLabel(dispute.type)}</Text>
           </View>
           <Text style={styles.alertClaim}>Customer claim: {dispute.customerClaim.slice(0, 120)}{dispute.customerClaim.length > 120 ? '…' : ''}</Text>
@@ -379,7 +379,7 @@ export default function DisputeDetailScreen() {
           </View>
           {dispute.evidenceDeadline && (
             <View style={styles.deadlineRow}>
-              <Feather name="clock" size={ICON.xs} color={deadlineColor} />
+              <Icon name="clock" size={ICON.xs} color={deadlineColor} />
               <Text style={[styles.deadlineText, { color: deadlineColor }]}>
                 Evidence due {fmtDate(dispute.evidenceDeadline)}
                 {deadlineDays !== null && deadlineDays >= 0
@@ -478,7 +478,7 @@ export default function DisputeDetailScreen() {
                       style={[styles.chip, evidenceType === et.key && styles.chipActive]}
                       onPress={() => setEvidenceType(et.key)}
                     >
-                      <Feather
+                      <Icon
                         name={et.icon as any}
                         size={ICON.xs}
                         color={evidenceType === et.key ? PURPLE : MUTED}
@@ -543,7 +543,7 @@ export default function DisputeDetailScreen() {
               status === 'lost' && { borderColor: RED + '55', backgroundColor: RED_DIM },
               status === 'closed' && { borderColor: BORDER },
             ]}>
-              <Feather
+              <Icon
                 name={status === 'won' ? 'check-circle' : status === 'lost' ? 'x-circle' : 'minus-circle'}
                 size={ICON.md}
                 color={status === 'won' ? SUCCESS : status === 'lost' ? RED : MUTED}
@@ -577,7 +577,7 @@ export default function DisputeDetailScreen() {
 
           {dispute.internalNotes.map((note, i) => (
             <View key={i} style={styles.noteItem}>
-              <Feather name="edit-2" size={ICON.xs} color={SUBTLE} />
+              <Icon name="edit-2" size={ICON.xs} color={SUBTLE} />
               <Text style={styles.noteText}>{note}</Text>
             </View>
           ))}

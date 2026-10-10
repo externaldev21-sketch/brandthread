@@ -20,7 +20,7 @@ import {
   AccessibilityInfo,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
@@ -92,7 +92,7 @@ function ColorSwatch({ color, selected, onPress }: {
       testID={`color-swatch-${color.replace('#', '')}`}
     >
       {selected && (
-        <Feather
+        <Icon
           name="check"
           size={11}
           color={color === '#ffffff' || color === '#ffcc00' || color === '#ffee99' ? '#000' : '#fff'}
@@ -182,12 +182,12 @@ export function TextOverlayEditor({
     ? (color === '#ffffff' ? '#000000' : color)
     : color;
 
-  const alignIcon: Record<TextOverlayAlign, keyof typeof Feather.glyphMap> = {
+  const alignIcon: Record<TextOverlayAlign, IconName> = {
     left: 'align-left',
     center: 'align-center',
     right: 'align-right',
   };
-  const bgIcon: Record<TextOverlayBgStyle, keyof typeof Feather.glyphMap> = {
+  const bgIcon: Record<TextOverlayBgStyle, IconName> = {
     none: 'type',
     semi: 'square',
     solid: 'sidebar',
@@ -285,7 +285,7 @@ export function TextOverlayEditor({
               accessibilityRole="button"
               testID="text-overlay-align"
             >
-              <Feather name={alignIcon[align]} size={22} color={theme.text} />
+              <Icon name={alignIcon[align]} size={22} color={theme.text} />
             </TouchableOpacity>
 
             {/* Background style toggle */}
@@ -297,7 +297,7 @@ export function TextOverlayEditor({
               accessibilityRole="button"
               testID="text-overlay-bgstyle"
             >
-              <Feather name={bgIcon[bgStyle]} size={22} color={theme.text} />
+              <Icon name={bgIcon[bgStyle]} size={22} color={theme.text} />
             </TouchableOpacity>
 
             {/* Font style horizontal scroll */}

@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
@@ -60,7 +60,7 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
     >
       <View style={s.rankBadge}><Text style={s.rankText}>{rank}</Text></View>
       <View style={s.prodThumb}>
-        <Feather name="package" size={18} color={colors.primary} />
+        <Icon name="package" size={18} color={colors.primary} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.prodName} numberOfLines={1}>{p.name}</Text>
@@ -82,7 +82,7 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
         </View>
         {typeof p.refundRate === 'number' && p.refundRate > 3 && (
           <View style={s.refundWarn}>
-            <Feather name="alert-triangle" size={10} color={colors.destructive} />
+            <Icon name="alert-triangle" size={10} color={colors.destructive} />
             <Text style={s.refundWarnText}>{p.refundRate.toFixed(1)}% refunds</Text>
           </View>
         )}

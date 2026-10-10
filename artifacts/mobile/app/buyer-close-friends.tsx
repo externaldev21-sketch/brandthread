@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, Pressable, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -121,7 +121,7 @@ export default function BuyerCloseFriends() {
             hitSlop={8}
           >
             <View style={[s.radio, isCF && s.radioActive]}>
-              {isCF && <Feather name="star" size={14} color={theme.onAccent} />}
+              {isCF && <Icon name="star" size={14} color={theme.onAccent} />}
             </View>
           </Pressable>
         )}
@@ -135,7 +135,7 @@ export default function BuyerCloseFriends() {
 
       {/* Info banner */}
       <View style={s.banner}>
-        <Feather name="star" size={16} color={colors.primary} />
+        <Icon name="star" size={16} color={colors.primary} />
         <Text style={s.bannerText}>
           Only you can see this list. People aren't notified when you add or remove them.
         </Text>
@@ -143,7 +143,7 @@ export default function BuyerCloseFriends() {
 
       {/* Search */}
       <View style={s.searchWrap}>
-        <Feather name="search" size={16} color={colors.mutedForeground} />
+        <Icon name="search" size={16} color={colors.mutedForeground} />
         <TextInput
           style={[s.searchInput, WEB_INPUT_RESET]}
           value={query}

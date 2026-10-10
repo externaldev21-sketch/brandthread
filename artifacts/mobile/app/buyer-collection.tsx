@@ -10,7 +10,7 @@ import {
   View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, Dimensions,
   Modal, TextInput, ActivityIndicator, Share,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -182,7 +182,7 @@ export default function BuyerCollection() {
             <CachedImage source={{ uri: item.image }} style={styles.tileImage} />
           ) : (
             <View style={[styles.tileImage, styles.tilePlaceholder, { backgroundColor: item.accentColor || theme.accentDim }]}>
-              <Feather name="shopping-bag" size={22} color={theme.accent} />
+              <Icon name="shopping-bag" size={22} color={theme.accent} />
             </View>
           )}
         </View>

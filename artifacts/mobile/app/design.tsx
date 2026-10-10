@@ -29,7 +29,7 @@ import {
   Alert, ActivityIndicator, FlatList, Modal, TextInput,
   Dimensions, Pressable, Linking, } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -189,7 +189,7 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
             {/* Brandthread icon block — white rounded-rect, like screenshot 1 icon box */}
             <View style={rm.iconBlock}>
               <View style={rm.iconInner}>
-                <Feather name="layers" size={44} color={BG} />
+                <Icon name="layers" size={44} color={BG} />
               </View>
             </View>
 
@@ -244,7 +244,7 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
             <Text style={rm.progressSub}>Projects added to your Design Studio</Text>
             {/* Large success circle with checkmark — matches screenshot 2 */}
             <View style={[rm.circleMark, rm.circleBlue]}>
-              <Feather name="check" size={36} color={BG} />
+              <Icon name="check" size={36} color={BG} />
             </View>
             <TouchableOpacity
               style={[rm.darkBtn, rm.doneBtn]}
@@ -267,7 +267,7 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
               {errorMsg || 'Your original projects were not changed.'}
             </Text>
             <View style={rm.circleMark}>
-              <Feather name="alert-triangle" size={32} color={MUTED} />
+              <Icon name="alert-triangle" size={32} color={MUTED} />
             </View>
             <View style={[rm.promptActions, { marginTop: SP.xl }]}>
               <TouchableOpacity
@@ -424,7 +424,7 @@ type NewCanvasTab = 'presets' | 'custom' | 'clipboard';
 type ColorProfile = 'sRGB' | 'P3';
 type SizeUnit = 'px' | 'in';
 
-const SCREEN_QUICK_CHOICES: { label: string; width: number; height: number; desc: string; icon: keyof typeof Feather.glyphMap }[] = [
+const SCREEN_QUICK_CHOICES: { label: string; width: number; height: number; desc: string; icon: IconName }[] = [
   { label: 'Screen',  width: 1170, height: 2532, desc: 'iPhone 14 Pro',   icon: 'smartphone' },
   { label: 'Tablet',  width: 2048, height: 2732, desc: 'iPad Pro 12.9"',  icon: 'tablet' },
   { label: 'Desktop', width: 2560, height: 1600, desc: '13" MacBook',    icon: 'monitor' },
@@ -627,12 +627,12 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                       accessibilityRole="button"
                       testID={`preset-${qc.label.toLowerCase()}`}
                     >
-                      <View style={sh.presetIcon}><Feather name={qc.icon} size={ICON.md} color={MUTED} /></View>
+                      <View style={sh.presetIcon}><Icon name={qc.icon} size={ICON.md} color={MUTED} /></View>
                       <View style={sh.presetInfo}>
                         <Text style={sh.presetLbl}>{qc.label}</Text>
                         <Text style={sh.presetDim}>{qc.width} × {qc.height} — {qc.desc}</Text>
                       </View>
-                      {creating ? <ActivityIndicator size="small" color={MUTED} /> : <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
+                      {creating ? <ActivityIndicator size="small" color={MUTED} /> : <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />}
                     </TouchableOpacity>
                   ))}
                   <Text style={[sh.sectionHd, { marginTop: SP.lg }]}>Seller presets</Text>
@@ -646,7 +646,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                       testID={`preset-${preset.id}`}
                     >
                       <View style={[sh.presetIcon, { backgroundColor: CARD_ELEVATED }]}>
-                        <Feather
+                        <Icon
                           name={preset.id === 'logo_sticker' ? 'star' : preset.id === 'tshirt_print' ? 'layers' : preset.id.startsWith('ig') ? 'instagram' : 'image'}
                           size={ICON.md} color={FG}
                         />
@@ -655,7 +655,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                         <Text style={sh.presetLbl}>{preset.label}</Text>
                         <Text style={sh.presetDim}>{preset.description}</Text>
                       </View>
-                      {creating ? <ActivityIndicator size="small" color={MUTED} /> : <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
+                      {creating ? <ActivityIndicator size="small" color={MUTED} /> : <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />}
                     </TouchableOpacity>
                   ))}
                 </>
@@ -739,7 +739,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                   {clipState === 'has_image' && (
                     <>
                       <View style={sh.clipRow}>
-                        <Feather name="image" size={ICON.lg} color={FG} />
+                        <Icon name="image" size={ICON.lg} color={FG} />
                         <View style={{ flex: 1 }}>
                           <Text style={sh.clipTitle}>Image found</Text>
                           <Text style={sh.clipSub}>A new canvas will be created with it as the base layer.</Text>
@@ -754,7 +754,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                   {clipState === 'has_text' && (
                     <>
                       <View style={sh.clipRow}>
-                        <Feather name="file-text" size={ICON.lg} color={FG} />
+                        <Icon name="file-text" size={ICON.lg} color={FG} />
                         <View style={{ flex: 1 }}>
                           <Text style={sh.clipTitle}>Brandthread project found</Text>
                           <Text style={sh.clipSub}>Clipboard contains a Brandthread project JSON.</Text>
@@ -768,7 +768,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                   )}
                   {clipState === 'empty' && (
                     <View style={sh.clipCenter}>
-                      <Feather name="clipboard" size={ICON.xxl} color={SUBTLE} />
+                      <Icon name="clipboard" size={ICON.xxl} color={SUBTLE} />
                       <Text style={[sh.clipMsg, { marginTop: SP.md }]}>Clipboard is empty</Text>
                       <Text style={[sh.clipSub, { textAlign: 'center', marginTop: SP.xs }]}>
                         Copy an image or a Brandthread project JSON, then return here.
@@ -777,7 +777,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                   )}
                   {clipState === 'unsupported' && (
                     <View style={sh.clipCenter}>
-                      <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
+                      <Icon name="alert-circle" size={ICON.xxl} color={MUTED} />
                       <Text style={[sh.clipMsg, { marginTop: SP.md }]}>Clipboard access unavailable</Text>
                       <Text style={[sh.clipSub, { textAlign: 'center', marginTop: SP.xs }]}>
                         Use Photo import or choose a preset instead.
@@ -955,7 +955,7 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
           onPress={onClose} hitSlop={HIT}
           accessibilityLabel="Close preview" accessibilityRole="button" testID="preview-close"
         >
-          <Feather name="x" size={ICON.lg} color={FG} />
+          <Icon name="x" size={ICON.lg} color={FG} />
         </TouchableOpacity>
 
         <View style={pv.artWrap}>
@@ -983,7 +983,7 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
             activeOpacity={0.8}
             accessibilityLabel="Download cloud master" accessibilityRole="button" testID="preview-cloud-master"
           >
-            {masterLoading ? <ActivityIndicator color={FG} /> : <Feather name="download" size={ICON.md} color={FG} />}
+            {masterLoading ? <ActivityIndicator color={FG} /> : <Icon name="download" size={ICON.md} color={FG} />}
             <Text style={[pv.btnLbl, { color: FG }]}>Cloud Master</Text>
           </TouchableOpacity>
 
@@ -992,7 +992,7 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
             onPress={onEdit} activeOpacity={0.8}
             accessibilityLabel="Open canvas editor" accessibilityRole="button" testID="preview-open-canvas"
           >
-            <Feather name="edit-2" size={ICON.md} color={BG} />
+            <Icon name="edit-2" size={ICON.md} color={BG} />
             <Text style={pv.btnLbl}>Open Canvas</Text>
           </TouchableOpacity>
         </View>
@@ -1065,9 +1065,9 @@ function RecentlyDeletedSection({ expanded, onToggle, onDataChanged, refreshToke
         accessibilityLabel={expanded ? 'Collapse recently deleted' : 'Expand recently deleted'}
         accessibilityRole="button" testID="deleted-toggle"
       >
-        <Feather name="trash-2" size={ICON.sm} color={MUTED} />
+        <Icon name="trash-2" size={ICON.sm} color={MUTED} />
         <Text style={dl.headerLbl}>Recently Deleted</Text>
-        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={SUBTLE} />
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={SUBTLE} />
       </TouchableOpacity>
 
       {expanded && (
@@ -1093,7 +1093,7 @@ function RecentlyDeletedSection({ expanded, onToggle, onDataChanged, refreshToke
                     style={dl.deleteBtn} onPress={() => handlePermanentDelete(p)} hitSlop={HIT}
                     accessibilityLabel={`Permanently delete ${p.name}`} accessibilityRole="button" testID={`perm-delete-${p.id}`}
                   >
-                    <Feather name="x" size={ICON.sm} color={RED} />
+                    <Icon name="x" size={ICON.sm} color={RED} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -1168,7 +1168,7 @@ function GridItem({ project, selected, selectionMode, onPress, onLongPress, onNa
         {/* Selection check badge — bottom-left over the thumbnail */}
         {selectionMode && (
           <View style={[g.checkbox, selected && g.checkboxOn]}>
-            {selected && <Feather name="check" size={10} color={BG} />}
+            {selected && <Icon name="check" size={10} color={BG} />}
           </View>
         )}
 
@@ -1229,11 +1229,11 @@ function StackGridItem({ projects, selected, selectionMode, onPress, onLongPress
       >
         {selectionMode && (
           <View style={[g.checkbox, selected && g.checkboxOn]}>
-            {selected && <Feather name="check" size={10} color={BG} />}
+            {selected && <Icon name="check" size={10} color={BG} />}
           </View>
         )}
         <View style={g.stackCountBadge}>
-          <Feather name="layers" size={10} color={FG} />
+          <Icon name="layers" size={10} color={FG} />
           <Text style={g.stackCountText}>{projects.length}</Text>
         </View>
         <View style={g.thumb}>
@@ -1326,7 +1326,7 @@ function MoreOptionsSheet({ visible, count, onClose, onStack, onPreview, onShare
   const { modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout } = useSheetTransition(visible, onClose);
   if (!modalVisible) return null;
 
-  const ROWS: { key: string; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; disabled?: boolean; destructive?: boolean }[] = [
+  const ROWS: { key: string; icon: IconName; label: string; onPress: () => void; disabled?: boolean; destructive?: boolean }[] = [
     { key: 'stack', icon: 'layers', label: 'Stack', onPress: onStack, disabled: count < 2 },
     { key: 'preview', icon: 'eye', label: 'Preview', onPress: onPreview, disabled: count !== 1 },
     { key: 'share', icon: 'share', label: sharing ? 'Sharing…' : 'Share', onPress: onShare, disabled: count !== 1 || sharing },
@@ -1355,7 +1355,7 @@ function MoreOptionsSheet({ visible, count, onClose, onStack, onPreview, onShare
             accessibilityRole="button"
             testID={`more-options-${row.key}`}
           >
-            <Feather name={row.icon} size={ICON.md} color={row.destructive ? RED : FG} />
+            <Icon name={row.icon} size={ICON.md} color={row.destructive ? RED : FG} />
             <Text style={[mo.rowLbl, row.destructive && { color: RED }]}>{row.label}</Text>
           </TouchableOpacity>
         ))}
@@ -1427,7 +1427,7 @@ function StackContentsSheet({ visible, projects, onClose, onOpen, onRemove }: St
                 accessibilityRole="button"
                 testID={`stack-remove-${item.id}`}
               >
-                <Feather name="x-circle" size={ICON.md} color={MUTED} />
+                <Icon name="x-circle" size={ICON.md} color={MUTED} />
               </TouchableOpacity>
             </View>
           )}
@@ -1892,7 +1892,7 @@ export default function DesignGalleryScreen() {
               style={s.plusBtn}
               accessibilityLabel="Exit selection mode" accessibilityRole="button" testID="header-cancel-select"
             >
-              <Feather name="x" size={ICON.xl} color={FG} />
+              <Icon name="x" size={ICON.xl} color={FG} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -1904,7 +1904,7 @@ export default function DesignGalleryScreen() {
               style={s.plusBtn}
               accessibilityLabel="New canvas" accessibilityRole="button" testID="header-new-canvas"
             >
-              <Feather name="plus" size={ICON.xl} color={FG} />
+              <Icon name="plus" size={ICON.xl} color={FG} />
             </TouchableOpacity>
           )}
         </View>
@@ -1925,11 +1925,11 @@ export default function DesignGalleryScreen() {
           accessibilityRole="button"
           testID="recovery-entry"
         >
-          <Feather name="refresh-cw" size={ICON.sm} color={MUTED} />
+          <Icon name="refresh-cw" size={ICON.sm} color={MUTED} />
           <Text style={s.recoveryRowText}>
             {recoverableCount} design{recoverableCount !== 1 ? 's' : ''} available to recover
           </Text>
-          <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
+          <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />
         </TouchableOpacity>
       )}
 

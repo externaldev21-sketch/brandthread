@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -379,13 +379,13 @@ export default function SubscriptionScreen() {
                   <View style={styles.featureList}>
                      {plan.features.map((feature) => (
                        <View key={feature} style={styles.featureRow}>
-                         <Feather name="check" size={14} color={SUCCESS} />
+                         <Icon name="check" size={14} color={SUCCESS} />
                          <Text style={styles.featureText}>{feature}</Text>
                        </View>
                      ))}
                      {plan.notIncluded.map((feature) => (
                        <View key={feature} style={styles.featureRow}>
-                         <Feather name="x" size={14} color={SUBTLE} />
+                         <Icon name="x" size={14} color={SUBTLE} />
                          <Text style={[styles.featureText, styles.featureTextDim]}>{feature}</Text>
                       </View>
                     ))}
@@ -409,7 +409,7 @@ export default function SubscriptionScreen() {
             <View style={styles.growthComparison}>
               <View style={styles.growthComparisonHeader}>
                 <View style={styles.growthComparisonIcon}>
-                  <Feather name="layers" size={18} color={PURPLE_LIGHT} />
+                  <Icon name="layers" size={18} color={PURPLE_LIGHT} />
                 </View>
                 <View style={styles.growthComparisonHeading}>
                   <Text style={styles.growthComparisonTitle}>What’s included in your plan</Text>
@@ -422,7 +422,7 @@ export default function SubscriptionScreen() {
               {growthStudioTools.map((tool) => (
                 <View key={tool.id} style={styles.growthFeatureRow}>
                   <View style={[styles.growthToolIcon, { backgroundColor: tool.accentDim }]}>
-                    <Feather name={tool.icon} size={16} color={tool.accent} />
+                    <Icon name={tool.icon} size={16} color={tool.accent} />
                   </View>
                   <View style={styles.growthFeatureLabels}>
                     <Text style={styles.growthFeatureTitle}>{tool.title}</Text>
@@ -432,7 +432,7 @@ export default function SubscriptionScreen() {
                     styles.growthFeatureStatus,
                     { backgroundColor: hasGrowthAccess ? `${SUCCESS}18` : `${SUBTLE}12` },
                   ]}>
-                    <Feather
+                    <Icon
                       name={hasGrowthAccess ? 'check' : 'lock'}
                       size={11}
                       color={hasGrowthAccess ? SUCCESS : SUBTLE}
@@ -455,7 +455,7 @@ export default function SubscriptionScreen() {
                     styles.growthPerkIcon,
                     { backgroundColor: hasGrowthAccess ? `${SUCCESS}18` : `${SUBTLE}12` },
                   ]}>
-                    <Feather
+                    <Icon
                       name={hasGrowthAccess ? 'check' : 'lock'}
                       size={11}
                       color={hasGrowthAccess ? SUCCESS : SUBTLE}
@@ -514,7 +514,7 @@ export default function SubscriptionScreen() {
                   {isSubscriptionPaymentRecoveryRequired(currentPlan.status) && (
                     <View style={styles.pastDueAlert} testID="seller-subscription-past-due-alert">
                       <View style={styles.pastDueIcon}>
-                        <Feather name="alert-circle" size={18} color={RED} />
+                        <Icon name="alert-circle" size={18} color={RED} />
                       </View>
                       <View style={styles.pastDueCopy}>
                         <Text style={styles.pastDueTitle}>Payment failed</Text>
@@ -559,9 +559,9 @@ export default function SubscriptionScreen() {
 
                   {!isReadOnly && !isSellerPreview && (
                     <TouchableOpacity testID="seller-subscription-manage-billing" style={styles.manageBillingBtn} onPress={handleOpenPortal}>
-                     <Feather name="external-link" size={16} color={PURPLE} />
+                     <Icon name="external-link" size={16} color={PURPLE} />
                       <Text style={styles.manageBillingText}>{Platform.OS === 'web' ? 'Manage billing & invoices' : 'Manage subscription'}</Text>
-                     <Feather name="chevron-right" size={16} color={MUTED} />
+                     <Icon name="chevron-right" size={16} color={MUTED} />
                    </TouchableOpacity>
                  )}
               </>

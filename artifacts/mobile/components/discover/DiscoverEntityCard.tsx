@@ -11,7 +11,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -39,7 +39,7 @@ export function DiscoverEntityCard({
   /** Person-style fallback: colored circle + initials instead of an icon. */
   initials?: string;
   avatarColor?: string;
-  fallbackIcon?: React.ComponentProps<typeof Feather>['name'];
+  fallbackIcon?: IconName;
   onPress: () => void;
   followInitial?: FollowState;
 }) {
@@ -59,12 +59,12 @@ export function DiscoverEntityCard({
           </View>
         ) : (
           <View style={[styles.image, styles.imageAlign, styles.fallback]}>
-            <Feather name={fallbackIcon} size={22} color={theme.muted} />
+            <Icon name={fallbackIcon} size={22} color={theme.muted} />
           </View>
         )}
         <View style={styles.nameRow}>
           <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{name}</Text>
-          {verified && <Feather name="check-circle" size={14} color={ON_DARK} />}
+          {verified && <Icon name="check-circle" size={14} color={ON_DARK} />}
         </View>
         <Text style={[styles.subline, { color: theme.muted }]} numberOfLines={1}>{subline ?? ' '}</Text>
       </PressableScale>

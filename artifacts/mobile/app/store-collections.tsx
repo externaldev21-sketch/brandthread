@@ -6,7 +6,7 @@ import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, Image, ActivityIndicator,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -385,7 +385,7 @@ export default function StoreCollectionsScreen() {
               <Image source={{ uri: form.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             ) : (
               <>
-                <Feather name="image" size={ICON.lg} color={MUTED} />
+                <Icon name="image" size={ICON.lg} color={MUTED} />
                 <Text style={styles.coverPlaceholderText}>No cover image</Text>
               </>
             )}
@@ -410,7 +410,7 @@ export default function StoreCollectionsScreen() {
               }
             }}
           >
-            <Feather name="upload" size={ICON.sm} color={PURPLE} />
+            <Icon name="upload" size={ICON.sm} color={PURPLE} />
             <Text style={styles.uploadBtnText}>{form.coverImage ? 'Change cover' : 'Upload Cover'}</Text>
           </TouchableOpacity>
         </View>
@@ -488,12 +488,12 @@ export default function StoreCollectionsScreen() {
                   style={styles.removeBtn}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Feather name="x" size={ICON.sm} color={RED} />
+                  <Icon name="x" size={ICON.sm} color={RED} />
                 </TouchableOpacity>
               </View>
             ))}
             <TouchableOpacity style={styles.addConditionBtn} onPress={addCondition}>
-              <Feather name="plus" size={ICON.sm} color={PURPLE} />
+              <Icon name="plus" size={ICON.sm} color={PURPLE} />
               <Text style={styles.addConditionText}>+ Add Condition</Text>
             </TouchableOpacity>
           </View>
@@ -506,7 +506,7 @@ export default function StoreCollectionsScreen() {
             onPress={() => setFormField('seoExpanded', !form.seoExpanded)}
           >
             <Text style={styles.fieldLabel}>SEO</Text>
-            <Feather
+            <Icon
               name={form.seoExpanded ? 'chevron-up' : 'chevron-down'}
               size={ICON.sm}
               color={MUTED}

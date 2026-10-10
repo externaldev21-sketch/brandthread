@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet, Modal, FlatList } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -48,7 +48,7 @@ export function ThemePickerSheet({
               testID="theme-tile-default"
             >
               <View style={[s.tile, { backgroundColor: theme.background, borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth }]}>
-                {!currentThemeId && <Feather name="check" size={ICON_SIZE} color={theme.text} />}
+                {!currentThemeId && <Icon name="check" size={ICON_SIZE} color={theme.text} />}
               </View>
               <Text style={[s.tileLabel, { color: theme.muted }]} numberOfLines={2}>Default</Text>
             </PressableScale>
@@ -60,7 +60,7 @@ export function ThemePickerSheet({
               testID={`theme-tile-${item.id}`}
             >
               <View style={[s.tile, { backgroundColor: item.swatch }]}>
-                {currentThemeId === item.id && <Feather name="check" size={ICON_SIZE} color={item.sentText} />}
+                {currentThemeId === item.id && <Icon name="check" size={ICON_SIZE} color={item.sentText} />}
               </View>
               <Text style={[s.tileLabel, { color: theme.muted }]} numberOfLines={2}>{item.name}</Text>
             </PressableScale>

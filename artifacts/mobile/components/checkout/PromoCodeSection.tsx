@@ -6,7 +6,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui';
 import type { CheckoutDiscount } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -52,7 +52,7 @@ export function PromoCodeSection({
     <CheckoutSection title={title} testID={`checkout-promo${idSuffix}`}>
       {applied.map(discount => (
         <View key={discount.code} style={styles.applied} testID="checkout-promo-applied">
-          <Feather name="check-circle" size={18} color={ck.text} />
+          <Icon name="check-circle" size={18} color={ck.text} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.appliedCode}>{discount.code} applied</Text>
             {discount.description ? <Text style={styles.appliedDesc} numberOfLines={2}>{discount.description}</Text> : null}

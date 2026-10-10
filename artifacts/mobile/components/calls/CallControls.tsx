@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -67,7 +67,7 @@ export function CallScreenShell({ children, topLeft, topRight, style }: CallScre
 
 export function TopBarIconButton({
   name, onPress, accessibilityLabel,
-}: { name: keyof typeof Feather.glyphMap; onPress: () => void; accessibilityLabel: string }) {
+}: { name: IconName; onPress: () => void; accessibilityLabel: string }) {
   const { theme } = useAppTheme();
   return (
     <PressableScale
@@ -78,7 +78,7 @@ export function TopBarIconButton({
       noMinHeight
       style={styles.topBarBtn}
     >
-      <Feather name={name} size={24} color={theme.text} />
+      <Icon name={name} size={24} color={theme.text} />
     </PressableScale>
   );
 }
@@ -100,7 +100,7 @@ export function ControlCapsule({ children }: { children: React.ReactNode }) {
 }
 
 export interface ControlButtonProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   onPress: () => void;
   accessibilityLabel: string;
   /** Toggled-on visual state (e.g. camera off, muted) — a tinted/filled circle. */
@@ -127,7 +127,7 @@ export function ControlButton({ icon, onPress, accessibilityLabel, active, dange
         !active && !danger && { borderWidth: 1, borderColor: theme.borderSubtle },
       ]}
     >
-      <Feather name={icon} size={22} color={iconColor} />
+      <Icon name={icon} size={22} color={iconColor} />
     </PressableScale>
   );
 }
@@ -135,7 +135,7 @@ export function ControlButton({ icon, onPress, accessibilityLabel, active, dange
 // ─── Large circular buttons (incoming accept/decline, ended-call rating) ─────
 
 export interface BigCircleButtonProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   accessibilityLabel?: string;
@@ -163,7 +163,7 @@ export function BigCircleButton({
           !danger && !filled && { borderWidth: 1, borderColor: theme.borderSubtle },
         ]}
       >
-        <Feather name={icon} size={28} color={iconColor} />
+        <Icon name={icon} size={28} color={iconColor} />
       </PressableScale>
       <Text style={[TYPE_SCALE.footnote, { color: theme.muted }]}>{label}</Text>
     </View>

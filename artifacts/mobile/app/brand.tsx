@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Image, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { radius } from '@/constants/radii';
 
@@ -135,7 +135,7 @@ export default function BrandScreen() {
       {/* AI Name Generator */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <Feather name="cpu" size={16} color={colors.primary} />
+          <Icon name="cpu" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Brand Name Generator</Text>
           <View style={[styles.aiBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
@@ -154,7 +154,7 @@ export default function BrandScreen() {
           activeOpacity={0.8}
           disabled={isGenerating}
         >
-          <Feather name={isGenerating ? 'loader' : 'zap'} size={16} color={colors.primaryForeground} />
+          <Icon name={isGenerating ? 'loader' : 'zap'} size={16} color={colors.primaryForeground} />
           <Text style={[styles.generateText, { color: colors.primaryForeground }]}>
             {isGenerating ? 'Generating…' : 'Generate Names'}
           </Text>
@@ -179,7 +179,7 @@ export default function BrandScreen() {
       {/* AI Logo Generator */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <Feather name="aperture" size={16} color={colors.primary} />
+          <Icon name="aperture" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Logo Generator</Text>
           <View style={[styles.aiBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
@@ -211,7 +211,7 @@ export default function BrandScreen() {
           activeOpacity={0.85}
           disabled={logoGenerating}
         >
-          <Feather name={logoGenerating ? 'loader' : 'aperture'} size={16} color={colors.primaryForeground} />
+          <Icon name={logoGenerating ? 'loader' : 'aperture'} size={16} color={colors.primaryForeground} />
           <Text style={[styles.generateText, { color: colors.primaryForeground }]}>
             {logoGenerating ? 'Generating…' : `Generate Logo for "${nameInput || 'Your Brand'}"`}
           </Text>
@@ -239,7 +239,7 @@ export default function BrandScreen() {
                     <AiGeneratedBadge position="topLeft" />
                     {isSelected && (
                       <View style={[styles.logoCheckBadge, { backgroundColor: colors.primary }]}>
-                        <Feather name="check" size={10} color={colors.primaryForeground} />
+                        <Icon name="check" size={10} color={colors.primaryForeground} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -252,7 +252,7 @@ export default function BrandScreen() {
                 activeOpacity={0.8}
                 onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)}
               >
-                <Feather name="download" size={15} color={colors.success} />
+                <Icon name="download" size={15} color={colors.success} />
                 <Text style={[styles.generateText, { color: colors.success }]}>Use this logo</Text>
               </TouchableOpacity>
             )}
@@ -263,7 +263,7 @@ export default function BrandScreen() {
       {/* Setup Checklist */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <Feather name="check-square" size={16} color={colors.primary} />
+          <Icon name="check-square" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Business Setup</Text>
           <Text style={[styles.checklistProgress, { color: colors.mutedForeground }]}>{doneCount}/{totalCount}</Text>
         </View>
@@ -277,7 +277,7 @@ export default function BrandScreen() {
               style={[styles.checkRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
             >
               <View style={[styles.checkBox, { backgroundColor: done ? theme.accentDim : colors.secondary, borderColor: done ? colors.success : colors.border }]}>
-                {done && <Feather name="check" size={12} color={colors.success} />}
+                {done && <Icon name="check" size={12} color={colors.success} />}
               </View>
               <Text style={[styles.checkLabel, { color: done ? colors.mutedForeground : colors.foreground }]}>{label}</Text>
             </TouchableOpacity>
@@ -288,7 +288,7 @@ export default function BrandScreen() {
       {/* Domain */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <Feather name="globe" size={16} color={colors.primary} />
+          <Icon name="globe" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Domain & Trademark</Text>
         </View>
         <View style={[styles.domainRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
@@ -309,43 +309,43 @@ export default function BrandScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
+  backText: { fontSize: 15, fontFamily: FONT.medium },
+  pageTitle: { fontSize: 28, fontFamily: FONT.bold, marginBottom: 4 },
+  pageSubtitle: { fontSize: 13, fontFamily: FONT.regular, marginBottom: 20 },
   profileCard: { flexDirection: 'row', alignItems: 'center', gap: 16, borderRadius: 16, padding: 20, borderWidth: 1, marginBottom: 20 },
   logoCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  logoText: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  brandName: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  brandStyle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  logoText: { fontSize: 20, fontFamily: FONT.bold },
+  brandName: { fontSize: 18, fontFamily: FONT.bold },
+  brandStyle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   completeBadge: { marginLeft: 'auto', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
-  completeText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  completeText: { fontSize: 14, fontFamily: FONT.bold },
   card: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  cardTitle: { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  cardTitle: { flex: 1, fontSize: 15, fontFamily: FONT.semibold },
   aiBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  aiText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold' },
-  input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 10 },
+  aiText: { fontSize: FS.xs, fontFamily: FONT.bold },
+  input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: FONT.regular, marginBottom: 10 },
   generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, padding: 13 },
-  generateText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  generateText: { fontSize: 14, fontFamily: FONT.semibold },
   suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   namePill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
-  namePillText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  namePillText: { fontSize: 13, fontFamily: FONT.medium },
   styleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   styleChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
-  styleText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
-  subLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+  styleText: { fontSize: 12, fontFamily: FONT.medium },
+  subLabel: { fontSize: 11, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
   logoGrid: { flexDirection: 'row', gap: 10 },
   logoCard: { flex: 1, borderRadius: 14, overflow: 'hidden', position: 'relative' },
   logoImage: { width: '100%', aspectRatio: 1, borderRadius: 12 },
   logoCheckBadge: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   checkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, gap: 12 },
   checkBox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  checkLabel: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  checklistProgress: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  checkLabel: { fontSize: 14, fontFamily: FONT.regular },
+  checklistProgress: { fontSize: 13, fontFamily: FONT.medium },
   domainRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 10 },
-  domainText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  domainText: { flex: 1, fontSize: 14, fontFamily: FONT.regular },
   availBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  availText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  availText: { fontSize: 11, fontFamily: FONT.semibold },
   connectBtn: { borderRadius: 10, padding: 13, alignItems: 'center' },
-  connectText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  connectText: { fontSize: 14, fontFamily: FONT.semibold },
 });

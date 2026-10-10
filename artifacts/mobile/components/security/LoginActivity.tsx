@@ -7,7 +7,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -52,7 +52,7 @@ function lastActiveLabel(iso: string): string {
   return `Active ${new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
 }
 
-function deviceIcon(session: AccountSession): keyof typeof Feather.glyphMap {
+function deviceIcon(session: AccountSession): IconName {
   const device = session.device.toLowerCase();
   if (device.includes('ipad') || device.includes('tablet')) return 'tablet';
   if (session.isMobile || device.includes('iphone') || device.includes('android')) return 'smartphone';
@@ -183,7 +183,7 @@ export default function LoginActivity() {
   const SessionRow = ({ session, isLast }: { session: AccountSession; isLast: boolean }) => (
     <View style={[s.row, !isLast && s.rowDivider]}>
       <View style={[s.iconWrap, session.current && s.iconWrapCurrent]}>
-        <Feather name={deviceIcon(session)} size={18} color={session.current ? theme.onAccent : theme.text} />
+        <Icon name={deviceIcon(session)} size={18} color={session.current ? theme.onAccent : theme.text} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={s.nameRow}>
@@ -245,7 +245,7 @@ export default function LoginActivity() {
           <Text style={s.sectionLabel}>{others.length ? `OTHER DEVICES (${others.length})` : 'OTHER DEVICES'}</Text>
           {others.length === 0 ? (
             <View style={s.emptyCard}>
-              <Feather name="shield" size={18} color={theme.text} />
+              <Icon name="shield" size={18} color={theme.text} />
               <Text style={s.emptyText}>You’re only signed in on this device.</Text>
             </View>
           ) : (
@@ -280,9 +280,9 @@ export default function LoginActivity() {
           />
 
           <PressableScale onPress={() => router.push('/login-methods' as never)} style={s.linkRow} accessibilityRole="button">
-            <Feather name="key" size={16} color={theme.text} />
+            <Icon name="key" size={16} color={theme.text} />
             <Text style={s.linkText}>Password and two-factor authentication</Text>
-            <Feather name="chevron-right" size={16} color={theme.subtle} />
+            <Icon name="chevron-right" size={16} color={theme.subtle} />
           </PressableScale>
         </ScrollView>
       )}

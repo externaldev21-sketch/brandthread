@@ -5,7 +5,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Linking, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -77,7 +77,7 @@ export default function AppLockSettingsScreen() {
         <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }}>
           <View style={s.hero}>
             <View style={s.heroIcon}>
-              <Feather name={label === 'Passcode' ? 'hash' : 'lock'} size={24} color={theme.text} />
+              <Icon name={label === 'Passcode' ? 'hash' : 'lock'} size={24} color={theme.text} />
             </View>
             <Text style={s.heroTitle}>Lock Brandthread with {label}</Text>
             <Text style={s.heroBody}>
@@ -88,12 +88,12 @@ export default function AppLockSettingsScreen() {
 
           {!device?.supported ? (
             <View style={s.notice}>
-              <Feather name="smartphone" size={16} color={theme.text} />
+              <Icon name="smartphone" size={16} color={theme.text} />
               <Text style={s.noticeText}>App Lock is available in the Brandthread iOS and Android apps.</Text>
             </View>
           ) : !device.hasDeviceSecurity ? (
             <View style={s.notice}>
-              <Feather name="alert-triangle" size={16} color={theme.warning} />
+              <Icon name="alert-triangle" size={16} color={theme.warning} />
               <View style={{ flex: 1 }}>
                 <Text style={s.noticeText}>
                   Set up a device passcode{Platform.OS === 'ios' ? ', Face ID or Touch ID' : ' or fingerprint'} first, then come back to turn on App Lock.
@@ -124,7 +124,7 @@ export default function AppLockSettingsScreen() {
 
           {message ? (
             <View style={[s.notice, { borderColor: theme.error + '55' }]}>
-              <Feather name="alert-circle" size={16} color={theme.error} />
+              <Icon name="alert-circle" size={16} color={theme.error} />
               <Text style={s.noticeText}>{message}</Text>
             </View>
           ) : null}

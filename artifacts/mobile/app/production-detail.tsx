@@ -9,7 +9,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deriveCardState, formatMoney, formatTimestamp, localTimeLabel, orderStatusLabel, orderTypeLabel } from '@workspace/manufacturer-flow';
@@ -163,7 +163,7 @@ export default function ProductionDetailScreen() {
       >
         <View style={styles.card} testID="tracker-summary">
           <View style={styles.summaryTop}>
-            <View style={styles.icon}><Feather name={order.orderType === 'bulk' ? 'package' : 'scissors'} size={20} color={FG} /></View>
+            <View style={styles.icon}><Icon name={order.orderType === 'bulk' ? 'package' : 'scissors'} size={20} color={FG} /></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>{order.title}</Text>
               <Text style={styles.muted}>{data.manufacturer?.businessName ?? 'Manufacturer'} · {order.quantity.toLocaleString('en-US')} {order.quantity === 1 ? 'piece' : 'pieces'}</Text>
@@ -183,7 +183,7 @@ export default function ProductionDetailScreen() {
             <Text style={styles.muted}>{state.detail}</Text>
             {state.actions.some((action) => action.kind === 'pay') && (
               <TouchableOpacity style={[styles.primary, { backgroundColor: theme.accent }]} onPress={() => void pay(order)} disabled={paying} testID="tracker-pay">
-                {paying ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Feather name="lock" size={15} color={theme.onAccent} />}
+                {paying ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Icon name="lock" size={15} color={theme.onAccent} />}
                 <Text style={[styles.primaryText, { color: theme.onAccent }]}>{paying ? 'Opening secure checkout…' : `Pay ${formatMoney(order.priceCents, order.currency)}`}</Text>
               </TouchableOpacity>
             )}
@@ -221,12 +221,12 @@ export default function ProductionDetailScreen() {
             <View style={{ flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap', marginTop: SP.xs }}>
               {data.tracking.url && (
                 <TouchableOpacity style={styles.secondary} onPress={() => void Linking.openURL(data.tracking.url!)} testID="tracker-track">
-                  <Feather name="external-link" size={14} color={FG} /><Text style={styles.secondaryText}>Track with carrier</Text>
+                  <Icon name="external-link" size={14} color={FG} /><Text style={styles.secondaryText}>Track with carrier</Text>
                 </TouchableOpacity>
               )}
               {order.status === 'shipped' && (
                 <TouchableOpacity style={[styles.primarySmall, { backgroundColor: theme.accent }]} onPress={confirmReceived} disabled={busy !== null} testID="tracker-received">
-                  {busy === 'confirm' ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Feather name="check" size={14} color={theme.onAccent} />}
+                  {busy === 'confirm' ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Icon name="check" size={14} color={theme.onAccent} />}
                   <Text style={[styles.primaryText, { color: theme.onAccent }]}>I received it</Text>
                 </TouchableOpacity>
               )}

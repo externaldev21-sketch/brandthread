@@ -12,7 +12,7 @@
  */
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -22,7 +22,7 @@ import { hapticLight } from '@/lib/haptics';
 function Row({
   icon, label, onPress, theme,
 }: {
-  icon: React.ComponentProps<typeof Feather>['name'];
+  icon: IconName;
   label: string;
   onPress: () => void;
   theme: ReturnType<typeof useAppTheme>['theme'];
@@ -34,7 +34,7 @@ function Row({
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Feather name={icon} size={19} color={theme.text} style={styles.rowIcon} />
+      <Icon name={icon} size={19} color={theme.text} style={styles.rowIcon} />
       <Text style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
     </Pressable>
   );
@@ -43,7 +43,7 @@ function Row({
 function ToggleRow({
   icon, label, value, onToggle, theme,
 }: {
-  icon: React.ComponentProps<typeof Feather>['name'];
+  icon: IconName;
   label: string;
   value: boolean;
   onToggle: () => void;
@@ -57,7 +57,7 @@ function ToggleRow({
       accessibilityState={{ checked: value }}
       accessibilityLabel={label}
     >
-      <Feather name={icon} size={19} color={theme.text} style={styles.rowIcon} />
+      <Icon name={icon} size={19} color={theme.text} style={styles.rowIcon} />
       <Text style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
       <View style={[styles.switchTrack, { backgroundColor: value ? theme.text : theme.cardElevated, borderColor: theme.border }]}>
         <View style={[styles.switchThumb, { backgroundColor: value ? theme.background : theme.muted, alignSelf: value ? 'flex-end' : 'flex-start' }]} />

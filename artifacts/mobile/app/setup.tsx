@@ -11,7 +11,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Animated, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -79,7 +79,7 @@ function TaskCard({
           style={[ts.check, task.completed && ts.checkDone]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          {task.completed && <Feather name="check" size={ICON.sm} color={colors.primaryForeground} />}
+          {task.completed && <Icon name="check" size={ICON.sm} color={colors.primaryForeground} />}
         </TouchableOpacity>
 
         {/* Center: content */}
@@ -236,7 +236,7 @@ export default function SetupScreen() {
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
               <View style={s.doneIcon}>
-                <Feather name="check-circle" size={ICON.lg} color={theme.text} />
+                <Icon name="check-circle" size={ICON.lg} color={theme.text} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.title, { fontSize: FS.md }]}>Your store is ready!</Text>

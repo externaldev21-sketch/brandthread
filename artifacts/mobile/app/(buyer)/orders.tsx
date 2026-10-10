@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -148,7 +148,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
               <Image key={i} source={{ uri: item.imageUri }} style={styles.thumb} resizeMode="cover" accessibilityLabel={item.productName} />
             ) : (
               <View key={i} style={[styles.thumb, styles.thumbFallback]}>
-                <Feather name="image" size={16} color={theme.subtle} />
+                <Icon name="image" size={16} color={theme.subtle} />
               </View>
             )
           ))}
@@ -191,7 +191,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
 
       {order.status === 'cancelled' && !autoRefunded && (
         <View style={styles.cancellationBanner}>
-          <Feather name="x-circle" size={ICON.sm} color={theme.error} />
+          <Icon name="x-circle" size={ICON.sm} color={theme.error} />
           <View style={styles.cancellationCopy}>
             <Text style={styles.cancellationLabel}>Order cancelled</Text>
             <Text style={styles.cancellationReason} numberOfLines={1}>
@@ -204,7 +204,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
       {/* Tracking info */}
       {order.trackingStatus && !isTerminalStatus && !order.delivery && (
         <View style={styles.trackingRow}>
-          <Feather name="truck" size={ICON.xs} color={theme.secondary} />
+          <Icon name="truck" size={ICON.xs} color={theme.secondary} />
           <Text style={styles.trackingText}>
             {trackingLabel(order.trackingStatus)}
             {order.estimatedDelivery ? ` → Est. ${fmtDate(order.estimatedDelivery)}` : ''}
@@ -224,7 +224,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
             activeOpacity={0.8}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
           >
-            <Feather name="map-pin" size={12} color={theme.secondary} />
+            <Icon name="map-pin" size={12} color={theme.secondary} />
             <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>
           </TouchableOpacity>
         )}
@@ -237,7 +237,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
             accessibilityLabel="Reorder"
             onPress={() => onReorder(order.id)}
           >
-            <Feather name="repeat" size={12} color={theme.accentLight} />
+            <Icon name="repeat" size={12} color={theme.accentLight} />
             <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>{reordering ? 'Adding…' : 'Reorder'}</Text>
           </TouchableOpacity>
         )}

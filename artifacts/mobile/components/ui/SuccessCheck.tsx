@@ -30,7 +30,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticSuccessAction } from '@/lib/haptics';
 
@@ -63,7 +63,7 @@ function FilledSuccessCheck({ size, iconSize, haptic, testID }: { size: number; 
   return (
     <RNAnimated.View style={[styles.wrap, { transform: [{ scale }] }]} testID={testID}>
       <View style={[styles.circle, { width: size, height: size, borderRadius: size / 2, backgroundColor: theme.accent }]}>
-        <Feather name="check" size={iconSize} color={theme.onAccent} />
+        <Icon name="check" size={iconSize} color={theme.onAccent} />
       </View>
     </RNAnimated.View>
   );

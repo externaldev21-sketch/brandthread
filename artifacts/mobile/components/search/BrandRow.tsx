@@ -1,6 +1,6 @@
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
@@ -43,12 +43,12 @@ export function BrandRow({ brand, onPress }: { brand: SearchBrandRow; onPress: (
     >
       <Animated.View style={[styles.rowInner, { transform: [{ scale }] }]}>
         <View style={[styles.avatar, { backgroundColor: brand.color }]}>
-          <Feather name="shopping-bag" size={18} color="#FFFFFF" />
+          <Icon name="shopping-bag" size={18} color="#FFFFFF" />
         </View>
         <View style={{ flex: 1 }}>
           <View style={styles.nameRow}>
             <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{brand.name}</Text>
-            {brand.verified && <Feather name="check-circle" size={13} color={theme.text} style={{ marginTop: 1 }} />}
+            {brand.verified && <Icon name="check-circle" size={13} color={theme.text} style={{ marginTop: 1 }} />}
           </View>
           <Text style={[styles.sub, { color: theme.muted }]} numberOfLines={1}>
             {brand.handle}{brand.followersLabel ? ` · ${brand.followersLabel}` : ''}

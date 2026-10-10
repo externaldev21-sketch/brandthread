@@ -34,7 +34,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -274,7 +274,7 @@ export default function BuyerReturnRequestScreen() {
         {header}
         <View style={s.successWrap} testID="return-request-submitted">
           <View style={s.successIcon}>
-            <Feather name="check" size={32} color="#FFFFFF" />
+            <Icon name="check" size={32} color="#FFFFFF" />
           </View>
           <Text style={s.successTitle}>Return requested</Text>
           <Text style={s.successSub}>
@@ -317,7 +317,7 @@ export default function BuyerReturnRequestScreen() {
                 {item.imageUri ? (
                   <Image source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : (
-                  <Feather name="package" size={16} color={theme.subtle} />
+                  <Icon name="package" size={16} color={theme.subtle} />
                 )}
               </View>
               <View style={{ flex: 1 }}>
@@ -371,13 +371,13 @@ export default function BuyerReturnRequestScreen() {
                   accessibilityLabel={`Remove photo ${idx + 1}`}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Feather name="x" size={12} color="#FFFFFF" />
+                  <Icon name="x" size={12} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
             ))}
             {evidencePhotos.length < MAX_PHOTOS ? (
               <TouchableOpacity style={s.addPhotoBtn} onPress={pickEvidence} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Add photos">
-                <Feather name="camera" size={18} color={theme.text} />
+                <Icon name="camera" size={18} color={theme.text} />
                 <Text style={s.addPhotoText}>Add photo</Text>
               </TouchableOpacity>
             ) : null}
@@ -387,7 +387,7 @@ export default function BuyerReturnRequestScreen() {
 
         <Section title="Refund">
           <View style={s.summaryRow}>
-            <Feather name="credit-card" size={ICON.sm} color={theme.muted} />
+            <Icon name="credit-card" size={ICON.sm} color={theme.muted} />
             <View style={{ flex: 1 }}>
               <Text style={s.summaryTitle}>Refund to your original payment</Text>
               <Text style={s.summarySub}>Up to {formatCents(itemsTotal)} for these items. The seller confirms the amount.</Text>
@@ -395,7 +395,7 @@ export default function BuyerReturnRequestScreen() {
           </View>
           {returnDeadline ? (
             <View style={[s.summaryRow, { marginTop: SP.sm }]}>
-              <Feather name="calendar" size={ICON.sm} color={theme.muted} />
+              <Icon name="calendar" size={ICON.sm} color={theme.muted} />
               <Text style={[s.summarySub, { flex: 1, marginTop: 0 }]}>30-day return window · request by {fmtDate(returnDeadline)}</Text>
             </View>
           ) : null}
@@ -409,7 +409,7 @@ export default function BuyerReturnRequestScreen() {
       <View style={[s.bottomBar, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
         {submitError ? (
           <View style={s.submitError} accessibilityRole="alert" accessibilityLiveRegion="polite" testID="return-submit-error">
-            <Feather name="alert-circle" size={14} color={theme.text} />
+            <Icon name="alert-circle" size={14} color={theme.text} />
             <Text style={s.submitErrorText}>{submitError}</Text>
           </View>
         ) : null}

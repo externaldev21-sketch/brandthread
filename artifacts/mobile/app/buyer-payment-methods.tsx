@@ -7,7 +7,7 @@ import {
   View, Text, ScrollView, StyleSheet,
   ActivityIndicator, Alert,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useApi } from '@/lib/api';
@@ -191,7 +191,7 @@ export default function BuyerPaymentMethodsScreen() {
           )}
 
           <View style={s.securityNote}>
-            <Feather name="lock" size={14} color={palette.mutedForeground} style={{ marginTop: 1 }} />
+            <Icon name="lock" size={14} color={palette.mutedForeground} style={{ marginTop: 1 }} />
             <Text style={s.securityNoteText}>
               Your payment information is encrypted and stored securely by Stripe. Brandthread cannot access your full card details.
             </Text>

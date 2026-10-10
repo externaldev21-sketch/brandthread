@@ -15,7 +15,7 @@ import {
   Alert, Animated, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View,
   type LayoutChangeEvent,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -206,7 +206,7 @@ export function CoverCoachmarkSheet({ visible, onAdd, onLater }: { visible: bool
       <View style={s.coachArt} pointerEvents="none">
         <ProfileThread height={120} color={theme.text} style={s.coachThread} />
         <View style={[s.coachIcon, { borderColor: theme.border, backgroundColor: theme.background }]}>
-          <Feather name="film" size={26} color={theme.text} />
+          <Icon name="film" size={26} color={theme.text} />
         </View>
       </View>
       <Text style={s.coachTitle} accessibilityRole="header">Make your profile move</Text>
@@ -366,7 +366,7 @@ export function CoverHeroAffordance({
       {(state) => (
         <>
           <InteractionLayer state={state as { pressed: boolean }} radius={radius.md} theme={theme} />
-          <Feather name={busy ? 'loader' : hasCover ? 'film' : 'plus'} size={15} color={theme.text} />
+          <Icon name={busy ? 'loader' : hasCover ? 'film' : 'plus'} size={15} color={theme.text} />
           <Text style={s.affordanceText} numberOfLines={1}>{label}</Text>
         </>
       )}

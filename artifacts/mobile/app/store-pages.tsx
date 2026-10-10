@@ -5,7 +5,7 @@ import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -342,7 +342,7 @@ export default function StorePagesScreen() {
             onPress={() => setFormField('seoExpanded', !form.seoExpanded)}
           >
             <Text style={styles.fieldLabel}>SEO</Text>
-            <Feather
+            <Icon
               name={form.seoExpanded ? 'chevron-up' : 'chevron-down'}
               size={ICON.sm}
               color={MUTED}

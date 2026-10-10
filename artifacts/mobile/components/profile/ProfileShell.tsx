@@ -35,7 +35,7 @@ import {
   type ListRenderItem,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -85,7 +85,7 @@ export interface ProfileIdentity {
   roleLabel: string;
   /** `headerVariant="video"` only: more chips stacked directly under the
    *  role chip, same height and style (e.g. the owner's plan chip). */
-  extraChips?: Array<{ label: string; icon?: keyof typeof Feather.glyphMap }>;
+  extraChips?: Array<{ label: string; icon?: IconName }>;
   pronouns?: string | null;
 }
 
@@ -98,7 +98,7 @@ export interface ProfileShellProps<T> {
     onPress?: () => void;
     accessibilityLabel?: string;
     /** Small corner badge on the avatar (e.g. "plus" to add a story). */
-    badgeIcon?: keyof typeof Feather.glyphMap;
+    badgeIcon?: IconName;
     /**
      * This profile's user id for the LIVE ring: while they are live, the
      * avatar wears a red LIVE ring and tapping it opens their stream.
@@ -343,7 +343,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       </View>
       {avatar?.badgeIcon ? (
         <View style={styles.avatarBadge}>
-          <Feather name={avatar.badgeIcon} size={12} color={theme.onAccent} />
+          <Icon name={avatar.badgeIcon} size={12} color={theme.onAccent} />
         </View>
       ) : null}
     </View>
@@ -394,7 +394,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         </LiveAvatarRing>
       )}
       name={identity.name}
-      nameAccessory={identity.verified ? <Feather name="check-circle" size={16} color={ON_DARK} accessibilityLabel="Verified" /> : null}
+      nameAccessory={identity.verified ? <Icon name="check-circle" size={16} color={ON_DARK} accessibilityLabel="Verified" /> : null}
       handle={identity.handle ?? null}
       chips={[
         <ProfileChip key="role" size="sm" label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />,
@@ -462,7 +462,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
             {identity.verified ? (
               <Text>
                 {'\u00A0'}
-                <Feather name="check-circle" size={26} color={ON_DARK} accessibilityLabel="Verified" />
+                <Icon name="check-circle" size={26} color={ON_DARK} accessibilityLabel="Verified" />
               </Text>
             ) : null}
           </Text>
@@ -553,7 +553,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
                   )}
                 </View>
                 <Text style={styles.compactName} numberOfLines={1}>{identity.name}</Text>
-                {identity.verified ? <Feather name="check-circle" size={15} color={ON_DARK} /> : null}
+                {identity.verified ? <Icon name="check-circle" size={15} color={ON_DARK} /> : null}
               </>
             ) : null}
           </View>
@@ -692,13 +692,13 @@ export function ProfileMeta({
               accessibilityLabel={`Open ${website}`}
               style={metaStyles.link}
             >
-              <Feather name="link" size={12} color={theme.accent} />
+              <Icon name="link" size={12} color={theme.accent} />
               <Text style={[metaStyles.linkText, { color: theme.accent }]} numberOfLines={1}>{website.replace(/^https?:\/\//, '')}</Text>
             </PressableScale>
           ) : null}
           {location ? (
             <View style={metaStyles.link}>
-              <Feather name="map-pin" size={12} color={theme.muted} />
+              <Icon name="map-pin" size={12} color={theme.muted} />
               <Text style={[metaStyles.linkText, { color: theme.muted }]} numberOfLines={1}>{location}</Text>
             </View>
           ) : null}

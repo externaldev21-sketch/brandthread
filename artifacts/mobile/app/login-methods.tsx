@@ -7,7 +7,8 @@ import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useUser } from '@clerk/expo';
@@ -72,14 +73,14 @@ export default function LoginMethods() {
       id: 'email',
       label: 'Email address',
       sublabel: email || 'No email set',
-      icon: <Feather name="mail" size={20} color={email ? colors.foreground : colors.subtle} />,
+      icon: <Icon name="mail" size={20} color={email ? colors.foreground : colors.subtle} />,
       connected: !!email,
     },
     {
       id: 'password',
       label: 'Password',
       sublabel: hasPassword ? 'Enabled — you can sign in with your password' : 'Not set',
-      icon: <Feather name="lock" size={20} color={hasPassword ? colors.foreground : colors.subtle} />,
+      icon: <Icon name="lock" size={20} color={hasPassword ? colors.foreground : colors.subtle} />,
       connected: hasPassword,
     },
     {
@@ -303,7 +304,7 @@ export default function LoginMethods() {
                   {method.connected ? (
                     <View style={s.connectedActions}>
                       <View style={s.activeBadge}>
-                        <Feather name="check" size={11} color={colors.success} />
+                        <Icon name="check" size={11} color={colors.success} />
                         <Text style={s.activeBadgeText}>Active</Text>
                       </View>
                       {isOAuth && externalAccount && (
@@ -394,7 +395,7 @@ export default function LoginMethods() {
                 s.iconWrap,
                 twoFactorEnabled && [s.iconWrapActive, { backgroundColor: colors.accent, borderColor: colors.primary }],
               ]}>
-                <Feather name="shield" size={20} color={twoFactorEnabled ? colors.primary : colors.subtle} />
+                <Icon name="shield" size={20} color={twoFactorEnabled ? colors.primary : colors.subtle} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={s.methodLabel}>Authenticator app (TOTP)</Text>
@@ -421,13 +422,13 @@ export default function LoginMethods() {
                 >
                   <View style={s.row}>
                     <View style={s.iconWrap}>
-                      <Feather name="key" size={20} color={colors.subtle} />
+                      <Icon name="key" size={20} color={colors.subtle} />
                     </View>
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text style={s.methodLabel}>Backup codes</Text>
                       <Text style={s.methodSub}>One-time codes for when you can't use your app</Text>
                     </View>
-                    <Feather name="chevron-right" size={16} color={colors.subtle} />
+                    <Icon name="chevron-right" size={16} color={colors.subtle} />
                   </View>
                 </PressableScale>
               </>
@@ -436,7 +437,7 @@ export default function LoginMethods() {
 
           {/* Info note */}
           <View style={s.note}>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginTop: 1 }} />
+            <Icon name="info" size={14} color={colors.mutedForeground} style={{ marginTop: 1 }} />
             <Text style={s.noteText}>
               Tap <Text style={{ color: colors.foreground }}>Connect</Text> on Google or Apple to link
               that account for faster future sign-ins. Your primary email is used for
@@ -522,7 +523,7 @@ export default function LoginMethods() {
 
             {passwordSetupError ? (
               <View style={s.passwordErrorBox}>
-                <Feather name="alert-circle" size={14} color={colors.destructive} />
+                <Icon name="alert-circle" size={14} color={colors.destructive} />
                 <Text testID="password-setup-error" style={s.passwordErrorText}>
                   {passwordSetupError}
                 </Text>

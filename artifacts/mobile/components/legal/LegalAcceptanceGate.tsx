@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -112,7 +112,7 @@ export default function LegalAcceptanceGate() {
       <View style={[styles.content, isWebShell && styles.contentWebShell, { paddingTop: headerTopInset + SP.lg, paddingBottom: insets.bottom + SP.md }]}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: SP.lg }} showsVerticalScrollIndicator={false}>
           <View style={[styles.icon, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Feather name="file-text" size={22} color={theme.text} />
+            <Icon name="file-text" size={22} color={theme.text} />
           </View>
           <Text style={[styles.title, { color: theme.text }]}>
             {previouslyAgreed ? 'We’ve updated our terms' : 'Before you continue'}
@@ -134,7 +134,7 @@ export default function LegalAcceptanceGate() {
                   accessibilityRole="link"
                 >
                   <Text style={[styles.docTitle, { color: theme.text }]}>{doc.title}</Text>
-                  <Feather name="chevron-right" size={16} color={theme.subtle} />
+                  <Icon name="chevron-right" size={16} color={theme.subtle} />
                 </PressableScale>
               );
             })}

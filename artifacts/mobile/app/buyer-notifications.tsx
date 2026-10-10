@@ -6,7 +6,7 @@ import {
   Alert, StyleSheet,
 } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -439,7 +439,7 @@ export default function BuyerNotifications() {
             </View>
           ) : (
             <View style={[styles.iconCircle, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-              <Feather name={iconName as any} size={ICON.md} color={iconColor} />
+              <Icon name={iconName as any} size={ICON.md} color={iconColor} />
             </View>
           )}
 
@@ -467,7 +467,7 @@ export default function BuyerNotifications() {
           {!notif.isRead ? (
             <View style={[styles.unreadDot, { backgroundColor: theme.accent }]} />
           ) : notif.cta ? (
-            <Feather name="chevron-right" size={ICON.sm} color={theme.subtle} />
+            <Icon name="chevron-right" size={ICON.sm} color={theme.subtle} />
           ) : null}
         </PressableScale>
       </SwipeActionRow>
@@ -527,7 +527,7 @@ export default function BuyerNotifications() {
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
             />
-            <Feather name="chevron-left" size={14} color={theme.muted} />
+            <Icon name="chevron-left" size={14} color={theme.muted} />
           </View>
         )}
         {filterEdges.right && (
@@ -538,7 +538,7 @@ export default function BuyerNotifications() {
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
             />
-            <Feather name="chevron-right" size={14} color={theme.muted} />
+            <Icon name="chevron-right" size={14} color={theme.muted} />
           </View>
         )}
       </View>

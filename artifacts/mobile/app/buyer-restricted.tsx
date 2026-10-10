@@ -8,7 +8,7 @@ import {
   View, Text, FlatList, StyleSheet,
   TextInput, Modal, Pressable,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -66,7 +66,7 @@ export default function RestrictedAccountsScreen() {
 
       {restricted.length > 0 && (
         <View style={styles.search}>
-          <Feather name="search" size={16} color={theme.muted} />
+          <Icon name="search" size={16} color={theme.muted} />
           <TextInput
             style={[styles.searchInput, WEB_INPUT_RESET]}
             value={query}

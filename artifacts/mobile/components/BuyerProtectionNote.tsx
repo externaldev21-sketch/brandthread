@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LEGAL_DOCUMENTS } from '@/content/legal';
@@ -51,11 +51,11 @@ export function BuyerProtectionNote({
         accessibilityRole="link"
         accessibilityLabel={`${BUYER_PROTECTION_TITLE}. Read the ${terms.title}`}
       >
-        <Feather name="shield" size={15} color={theme.muted} />
+        <Icon name="shield" size={15} color={theme.muted} />
         <Text style={[styles.flatText, { color: theme.muted }]} numberOfLines={1}>
           {BUYER_PROTECTION_TITLE} · {BUYER_PROTECTION_STATUS}
         </Text>
-        <Feather name="chevron-right" size={14} color={theme.muted} />
+        <Icon name="chevron-right" size={14} color={theme.muted} />
       </TouchableOpacity>
     );
   }
@@ -68,7 +68,7 @@ export function BuyerProtectionNote({
     >
       <View style={styles.head}>
         <View style={[styles.icon, { backgroundColor: theme.accentDim }]}>
-          <Feather name="shield" size={15} color={theme.accent} />
+          <Icon name="shield" size={15} color={theme.accent} />
         </View>
         <View style={styles.headCopy}>
           <Text style={[styles.title, { color: theme.text }]}>{BUYER_PROTECTION_TITLE}</Text>
@@ -86,7 +86,7 @@ export function BuyerProtectionNote({
         style={styles.link}
       >
         <Text style={[styles.linkText, { color: theme.accent }]}>{terms.title}</Text>
-        <Feather name="chevron-right" size={14} color={theme.accent} />
+        <Icon name="chevron-right" size={14} color={theme.accent} />
       </TouchableOpacity>
     </View>
   );

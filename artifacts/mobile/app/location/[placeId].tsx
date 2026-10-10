@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -143,7 +143,7 @@ export default function LocationScreen() {
     <View>
       <View style={styles.hero}>
         <View style={[styles.badge, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-          <Feather name="map-pin" size={28} color={theme.text} />
+          <Icon name="map-pin" size={28} color={theme.text} />
         </View>
         <View style={styles.heroText}>
           <Text style={styles.title} accessibilityRole="header">{title}</Text>

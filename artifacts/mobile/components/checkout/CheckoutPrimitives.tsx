@@ -16,7 +16,7 @@ import {
   FlatList, Modal, Platform, StyleSheet, Text, TextInput, View,
   type StyleProp, type TextInputProps, type ViewStyle,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
@@ -50,7 +50,7 @@ function makeStyles(ck: CheckoutColors) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       marginBottom: SP.sm + 4, minHeight: 18,
     },
-    label: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, textTransform: 'uppercase', color: ck.muted },
+    label: { fontFamily: FONT.semibold, fontSize: FS.xs, color: ck.muted },
     radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
     radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: ck.text },
     option: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.sm + 6, minHeight: 52 },
@@ -166,7 +166,7 @@ function FieldMessage({ error, hint }: { error?: string; hint?: string }) {
   if (error) {
     return (
       <View style={styles.messageRow} accessibilityLiveRegion="polite">
-        <Feather name="alert-circle" size={12} color={ck.text} />
+        <Icon name="alert-circle" size={12} color={ck.text} />
         <Text style={styles.fieldError}>{error}</Text>
       </View>
     );
@@ -255,7 +255,7 @@ export function PickerField({
         <Text style={[styles.pickerText, { color: selected ? ck.text : ck.subtle }]} numberOfLines={1}>
           {selected?.label ?? placeholder ?? 'Select'}
         </Text>
-        <Feather name="chevron-down" size={16} color={ck.muted} />
+        <Icon name="chevron-down" size={16} color={ck.muted} />
       </PressableScale>
       <FieldMessage error={visibleError} />
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>

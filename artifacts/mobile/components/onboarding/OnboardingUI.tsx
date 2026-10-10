@@ -31,11 +31,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { identityOrNone } from '@/lib/animationUtils';
 import { MOTION, PRESS_SCALE, RADIUS, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
 import { radius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 // ─── Reveal ───────────────────────────────────────────────────────────────────
 
@@ -343,13 +344,13 @@ export const FloatingInput = forwardRef<TextInput, FloatingInputProps>(function 
         />
         {right ?? (valid && !error ? (
           <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(160)} style={styles.fieldAccessory}>
-            <Feather name="check" size={16} color={theme.text} />
+            <Icon name="check" size={16} color={theme.text} />
           </Animated.View>
         ) : null)}
       </Animated.View>
       {message ? (
         <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(160)} style={styles.messageRow}>
-          {error ? <Feather name="alert-circle" size={12} color={theme.error} /> : null}
+          {error ? <Icon name="alert-circle" size={12} color={theme.error} /> : null}
           <Text style={[TYPE.caption, { color: error ? theme.error : theme.muted, flex: 1 }]}>{message}</Text>
         </Animated.View>
       ) : null}
@@ -368,7 +369,7 @@ export function RevealToggle({ shown, onToggle }: { shown: boolean; onToggle: ()
       accessibilityRole="button"
       accessibilityLabel={shown ? 'Hide password' : 'Show password'}
     >
-      <Feather name={shown ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
+      <Icon name={shown ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
     </Pressable>
   );
 }
@@ -460,7 +461,7 @@ const styles = StyleSheet.create({
   },
   pillDisabled: { backgroundColor: 'rgba(255,255,255,0.06)' },
   pillRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  pillText: { fontSize: 16, lineHeight: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.1 },
+  pillText: { fontSize: 16, lineHeight: 20, fontFamily: FONT.bold, letterSpacing: -0.1 },
 
   fieldWrap: { marginBottom: SPACE.sm },
   field: {
@@ -477,7 +478,7 @@ const styles = StyleSheet.create({
     top: 20,
     fontSize: 16,
     lineHeight: 20,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: FONT.medium,
     transformOrigin: 'left center',
   },
   fieldInput: {
@@ -487,7 +488,7 @@ const styles = StyleSheet.create({
     paddingTop: 22,
     paddingBottom: 6,
     fontSize: 16,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: FONT.medium,
     // The field frame is the focus indicator; drop the browser's rectangle.
     outlineWidth: 0,
   },
@@ -504,7 +505,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  codeChar: { fontSize: 26, fontFamily: 'Inter_700Bold' },
+  codeChar: { fontSize: 26, fontFamily: FONT.bold },
   codeHiddenInput: { ...StyleSheet.absoluteFill, opacity: 0.011, color: 'transparent' },
 
   stitch: { flexDirection: 'row', gap: 5, height: 2, overflow: 'hidden' },

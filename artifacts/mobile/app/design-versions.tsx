@@ -10,7 +10,7 @@ import {
   Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
@@ -113,7 +113,7 @@ export default function DesignVersionsScreen() {
           style={styles.actionBtn}
           activeOpacity={0.8}
         >
-          <Feather name="eye" size={14} color={CYAN} />
+          <Icon name="eye" size={14} color={CYAN} />
           <Text style={[styles.actionText, { color: CYAN }]}>Preview</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -122,7 +122,7 @@ export default function DesignVersionsScreen() {
           activeOpacity={0.8}
           disabled={restoring === item.id}
         >
-          <Feather name="rotate-ccw" size={14} color={PURPLE_LIGHT} />
+          <Icon name="rotate-ccw" size={14} color={PURPLE_LIGHT} />
           <Text style={[styles.actionText, { color: PURPLE_LIGHT }]}>Restore</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -130,7 +130,7 @@ export default function DesignVersionsScreen() {
           style={styles.actionBtn}
           activeOpacity={0.8}
         >
-          <Feather name="copy" size={14} color={ORANGE} />
+          <Icon name="copy" size={14} color={ORANGE} />
           <Text style={[styles.actionText, { color: ORANGE }]}>Duplicate</Text>
         </TouchableOpacity>
       </View>
@@ -164,7 +164,7 @@ export default function DesignVersionsScreen() {
           ListFooterComponent={
             versions.length > 0 ? (
               <View style={styles.autosaveNote}>
-                <Feather name="info" size={12} color={SUBTLE} />
+                <Icon name="info" size={12} color={SUBTLE} />
                 <Text style={styles.autosaveText}>
                   Auto-saves are created every 30 seconds while editing.
                 </Text>

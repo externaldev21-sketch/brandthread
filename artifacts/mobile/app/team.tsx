@@ -3,7 +3,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -281,7 +281,7 @@ export default function TeamScreen() {
           >
             {isRegenerating
               ? <ActivityIndicator size="small" color={colors.primary} />
-              : <Feather name={isExpired ? 'refresh-cw' : 'link'} size={13} color={isExpired ? colors.warning : colors.mutedForeground} />}
+              : <Icon name={isExpired ? 'refresh-cw' : 'link'} size={13} color={isExpired ? colors.warning : colors.mutedForeground} />}
           </TouchableOpacity>
         )}
         {isExpired && currentRole === 'owner' && (
@@ -294,7 +294,7 @@ export default function TeamScreen() {
           >
             {isDismissing
               ? <ActivityIndicator size="small" color={colors.destructive} />
-              : <Feather name="x" size={14} color={colors.destructive} />}
+              : <Icon name="x" size={14} color={colors.destructive} />}
           </TouchableOpacity>
         )}
         <Badge
@@ -319,7 +319,7 @@ export default function TeamScreen() {
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Staff Accounts</Text>
         <TouchableOpacity onPress={openInvite} style={[styles.addBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
-          <Feather name="user-plus" size={14} color={colors.primaryForeground} />
+          <Icon name="user-plus" size={14} color={colors.primaryForeground} />
           <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>Invite</Text>
         </TouchableOpacity>
       </View>
@@ -330,7 +330,7 @@ export default function TeamScreen() {
         ) : loadError ? (
           <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
             <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-              <Feather name="alert-triangle" size={22} color={colors.mutedForeground} />
+              <Icon name="alert-triangle" size={22} color={colors.mutedForeground} />
             </View>
             <Text style={{ color: colors.foreground, fontSize: 14, fontFamily: FONT.semibold, textAlign: 'center' }}>Couldn't load your team</Text>
             <TouchableOpacity
@@ -345,7 +345,7 @@ export default function TeamScreen() {
         ) : currentMembers.length === 0 ? (
           <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
             <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-              <Feather name="user-plus" size={22} color={colors.mutedForeground} />
+              <Icon name="user-plus" size={22} color={colors.mutedForeground} />
             </View>
             <Text style={{ color: colors.foreground, fontSize: 14, fontFamily: FONT.semibold, textAlign: 'center' }}>No team members yet</Text>
             <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: 'center' }}>Invite someone to help you run your store.</Text>
@@ -373,12 +373,12 @@ export default function TeamScreen() {
             accessibilityLabel={`${showExpired ? 'Hide' : 'Show'} ${expiredInvites.length} expired invite${expiredInvites.length === 1 ? '' : 's'}`}
           >
             <View style={styles.expiredTitleRow}>
-              <Feather name="clock" size={15} color={colors.warning} />
+              <Icon name="clock" size={15} color={colors.warning} />
               <Text style={[styles.expiredTitle, { color: colors.foreground }]}>
                 Expired invites ({expiredInvites.length})
               </Text>
             </View>
-            <Feather name={showExpired ? 'chevron-up' : 'chevron-down'} size={17} color={colors.mutedForeground} />
+            <Icon name={showExpired ? 'chevron-up' : 'chevron-down'} size={17} color={colors.mutedForeground} />
           </TouchableOpacity>
           {showExpired && expiredInvites.map((member, index) => renderMemberRow(member, currentMembers.length + index))}
         </View>
@@ -478,7 +478,7 @@ export default function TeamScreen() {
               </View>
               <View style={styles.modalActions}>
                 <TouchableOpacity onPress={() => setInviteVisible(false)} activeOpacity={0.7} style={styles.modalCancel}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 14, fontFamily: 'Inter_500Medium' }}>Cancel</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 14, fontFamily: FONT.medium }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleInvite}
@@ -495,7 +495,7 @@ export default function TeamScreen() {
           ) : (
             <>
               <View style={[styles.successIcon, { backgroundColor: colors.success + '22' }]}>
-                <Feather name="check" size={22} color={colors.success} />
+                <Icon name="check" size={22} color={colors.success} />
               </View>
               <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: 'center' }]}>Invite created</Text>
               <Text style={[styles.modalSub, { color: colors.mutedForeground, textAlign: 'center' }]}>
@@ -512,7 +512,7 @@ export default function TeamScreen() {
                   activeOpacity={0.8}
                   style={[styles.addBtn, { backgroundColor: colors.secondary }]}
                 >
-                  <Feather name="share-2" size={14} color={colors.foreground} />
+                  <Icon name="share-2" size={14} color={colors.foreground} />
                   <Text style={[styles.addBtnText, { color: colors.foreground }]}>Share</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -520,7 +520,7 @@ export default function TeamScreen() {
                   activeOpacity={0.8}
                   style={[styles.addBtn, { backgroundColor: colors.secondary }]}
                 >
-                  <Feather name="copy" size={14} color={colors.foreground} />
+                  <Icon name="copy" size={14} color={colors.foreground} />
                   <Text style={[styles.addBtnText, { color: colors.foreground }]}>Copy Link</Text>
                 </TouchableOpacity>
                 <View style={{ flex: 1 }} />
@@ -544,49 +544,49 @@ export default function TeamScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  addBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  addBtnText: { fontSize: 13, fontFamily: FONT.semibold },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   memberRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   memberLeft: { position: 'relative' },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  avatarText: { fontSize: 14, fontFamily: FONT.bold },
   onlineDot: { width: 10, height: 10, borderRadius: 5, position: 'absolute', bottom: 0, right: 0, borderWidth: 2 },
   memberInfo: { flex: 1 },
-  memberName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  memberAccess: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  memberName: { fontSize: 14, fontFamily: FONT.semibold },
+  memberAccess: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   linkBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dismissBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   expiredSection: { borderRadius: 14, borderWidth: 1, marginBottom: 24, overflow: 'hidden' },
   expiredHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
   expiredTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  expiredTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  expiredTitle: { fontSize: 14, fontFamily: FONT.semibold },
   workflowRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  workflowLabel: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  workflowVal: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  workflowLabel: { fontSize: 14, fontFamily: FONT.regular },
+  workflowVal: { fontSize: 13, fontFamily: FONT.medium },
   logRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   logDot: { width: 6, height: 6, borderRadius: 3 },
   logInfo: { flex: 1 },
-  logAction: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  logMeta: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  logAction: { fontSize: 13, fontFamily: FONT.medium },
+  logMeta: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   loadMoreBtn: { padding: 14, alignItems: 'center', borderTopWidth: 1 },
-  loadMoreText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  loadMoreText: { fontSize: 13, fontFamily: FONT.semibold },
   secRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  secLabel: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  secSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  inviteInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 14 },
+  secLabel: { fontSize: 14, fontFamily: FONT.medium },
+  secSub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
+  inviteInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: FONT.regular, marginTop: 14 },
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
   modalCard: { borderRadius: 16, borderWidth: 1, padding: 20 },
-  modalTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
-  modalSub: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 6, lineHeight: 18 },
+  modalTitle: { fontSize: 17, fontFamily: FONT.semibold },
+  modalSub: { fontSize: 13, fontFamily: FONT.regular, marginTop: 6, lineHeight: 18 },
   roleRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
   rolePill: { flex: 1, borderWidth: 1.5, borderRadius: 12, padding: 12 },
   roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
   rolePillWrap: { width: '47%', borderWidth: 1.5, borderRadius: 12, padding: 12 },
-  rolePillTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  rolePillSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  rolePillTitle: { fontSize: 14, fontFamily: FONT.semibold },
+  rolePillSub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   modalActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },
   modalCancel: { paddingHorizontal: 8, paddingVertical: 7, marginRight: 'auto' },
   successIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 10 },

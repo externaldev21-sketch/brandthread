@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
@@ -134,7 +134,7 @@ export default function AnalyticsCustomersScreen() {
       <Card>
         {topCustomers.length === 0 ? (
           <View style={s.customerEmpty}>
-            <Feather name="users" size={22} color={colors.mutedForeground} />
+            <Icon name="users" size={22} color={colors.mutedForeground} />
             <Text style={s.customerEmptyText}>No customer orders yet</Text>
           </View>
         ) : (
@@ -153,7 +153,7 @@ export default function AnalyticsCustomersScreen() {
                 </View>
                 <View style={s.customerSpend}>
                   <Text style={s.customerSpendValue}>{formatCents(customer.totalCents)}</Text>
-                  {customer.customerId ? <Feather name="chevron-right" size={16} color={colors.mutedForeground} /> : null}
+                  {customer.customerId ? <Icon name="chevron-right" size={16} color={colors.mutedForeground} /> : null}
                 </View>
               </>
             );

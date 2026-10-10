@@ -1,0 +1,577 @@
+{
+  "app/(buyer)/cart.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/(buyer)/inbox.tsx": {
+    "uppercase": 2,
+    "letterSpacing": 3
+  },
+  "app/(buyer)/orders.tsx": {
+    "letterSpacing": 1
+  },
+  "app/(tabs)/analytics.tsx": {
+    "letterSpacing": 1
+  },
+  "app/(tabs)/following.tsx": {
+    "uppercase": 1
+  },
+  "app/(tabs)/marketing.tsx": {
+    "letterSpacing": 1
+  },
+  "app/(tabs)/more.tsx": {
+    "letterSpacing": 2
+  },
+  "app/(tabs)/orders.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 6
+  },
+  "app/account-type-settings.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/admin-invites.tsx": {
+    "letterSpacing": 1
+  },
+  "app/admin-reports.tsx": {
+    "letterSpacing": 1
+  },
+  "app/ai-brain.tsx": {
+    "letterSpacing": 1
+  },
+  "app/ai-settings.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/analytics-marketing.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/analytics-profit.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/appearance.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/biometric-unlock.tsx": {
+    "letterSpacing": 1
+  },
+  "app/brand.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-blocked.tsx": {
+    "letterSpacing": 1
+  },
+  "app/buyer-collection.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-download-data.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-drop-detail.tsx": {
+    "letterSpacing": 11
+  },
+  "app/buyer-gift-cards.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-highlights-manager.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-invite.tsx": {
+    "uppercase": 2,
+    "letterSpacing": 3
+  },
+  "app/buyer-live.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 3
+  },
+  "app/buyer-notifications.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-order-detail.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 5
+  },
+  "app/buyer-payment-methods.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-post-comments.tsx": {
+    "feather": 1
+  },
+  "app/buyer-problem-report.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-product-detail.tsx": {
+    "uppercase": 4,
+    "letterSpacing": 6
+  },
+  "app/buyer-qr-code.tsx": {
+    "letterSpacing": 1
+  },
+  "app/buyer-refund-request.tsx": {
+    "uppercase": 2,
+    "letterSpacing": 2
+  },
+  "app/buyer-report.tsx": {
+    "letterSpacing": 2
+  },
+  "app/buyer-return-request.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-saved.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-search.tsx": {
+    "letterSpacing": 1
+  },
+  "app/buyer-story-create.tsx": {
+    "letterSpacing": 1
+  },
+  "app/buyer-your-activity.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/camera-capture.tsx": {
+    "letterSpacing": 1
+  },
+  "app/creator-program.tsx": {
+    "letterSpacing": 1
+  },
+  "app/customer-orders.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/delete-account.tsx": {
+    "letterSpacing": 2
+  },
+  "app/design-brand-assets.tsx": {
+    "letterSpacing": 1
+  },
+  "app/design-campaign.tsx": {
+    "letterSpacing": 1
+  },
+  "app/design-canvas.tsx": {
+    "feather": 1,
+    "uppercase": 3,
+    "letterSpacing": 3
+  },
+  "app/design-garment.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/design-prompt-edit.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/design-templates.tsx": {
+    "letterSpacing": 1
+  },
+  "app/discounts.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 3
+  },
+  "app/drafts.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/email-campaign-compose.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/fees.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/forgot-password.tsx": {
+    "letterSpacing": 2
+  },
+  "app/freelancer-apply.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/freelancer-profile.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/gift-card-buy.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 2
+  },
+  "app/gift-cards-manage.tsx": {
+    "letterSpacing": 1
+  },
+  "app/help.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/integrations/klaviyo.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/integrations/shopify-fulfillment.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/invite-manufacturer.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/languages.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/live-cohost.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/live-feed.tsx": {
+    "letterSpacing": 1
+  },
+  "app/live-moderation.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/locations.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/login-methods.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 3
+  },
+  "app/loyalty.tsx": {
+    "uppercase": 3,
+    "letterSpacing": 3
+  },
+  "app/manufacturer-compare.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/manufacturer-hub.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/manufacturer-product.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/muted-words.tsx": {
+    "letterSpacing": 1
+  },
+  "app/onboarding.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/payments.tsx": {
+    "letterSpacing": 2
+  },
+  "app/payout-detail.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/payout-schedule.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/payouts.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/product-bundle-edit.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/product-bundles.tsx": {
+    "letterSpacing": 1
+  },
+  "app/product-launches.tsx": {
+    "letterSpacing": 2
+  },
+  "app/product-size-chart.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/product-variants.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/production-detail.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/profile-products.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/quote-compare.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/quote-detail.tsx": {
+    "uppercase": 1
+  },
+  "app/quote-request.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/request-sample.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/return-detail.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 2
+  },
+  "app/rfq-post.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/sales.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/sample-detail.tsx": {
+    "uppercase": 2
+  },
+  "app/security.tsx": {
+    "letterSpacing": 1
+  },
+  "app/seller-creator-detail.tsx": {
+    "letterSpacing": 1
+  },
+  "app/seller-data-export.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/seller-drop-create.tsx": {
+    "letterSpacing": 1
+  },
+  "app/seller-drop-preview.tsx": {
+    "letterSpacing": 3
+  },
+  "app/seller-go-live.tsx": {
+    "letterSpacing": 1
+  },
+  "app/seller-live.tsx": {
+    "letterSpacing": 2
+  },
+  "app/seller-questions.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/seller-reviews.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/seller-settings.tsx": {
+    "letterSpacing": 1
+  },
+  "app/seller-verification.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/shipping.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/shopify-import.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/sign-in.tsx": {
+    "letterSpacing": 1
+  },
+  "app/size-chart-template-edit.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/size-chart-templates.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/store-ai-improve.tsx": {
+    "uppercase": 2,
+    "letterSpacing": 2
+  },
+  "app/store-builder.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 6
+  },
+  "app/store-domain.tsx": {
+    "uppercase": 1
+  },
+  "app/store-editor.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/store-from-logo.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/store-from-moodboard.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/store-generate.tsx": {
+    "letterSpacing": 1
+  },
+  "app/store-publish.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/store-theme-picker.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 3
+  },
+  "app/subscription.tsx": {
+    "uppercase": 2,
+    "letterSpacing": 3
+  },
+  "app/u/[username].tsx": {
+    "letterSpacing": 1
+  },
+  "app/vacation-mode.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "components/BrandDropsCard.tsx": {
+    "letterSpacing": 1
+  },
+  "components/BrandthreadUI.tsx": {
+    "letterSpacing": 2
+  },
+  "components/CommerceSignal.tsx": {
+    "letterSpacing": 2
+  },
+  "components/EngagementButton.tsx": {
+    "feather": 1
+  },
+  "components/FeedGestureGuide.tsx": {
+    "letterSpacing": 1
+  },
+  "components/InlineFeedback.tsx": {
+    "feather": 1
+  },
+  "components/SellerStudioRadialMenu.tsx": {
+    "feather": 1
+  },
+  "components/ShareProfileSheet.tsx": {
+    "letterSpacing": 1
+  },
+  "components/StudioMenuHints.tsx": {
+    "feather": 1
+  },
+  "components/analytics/AnalyticsReportsList.tsx": {
+    "letterSpacing": 1
+  },
+  "components/buyer-feed/CaptionBlock.tsx": {
+    "feather": 1
+  },
+  "components/buyer-feed/FeedTopBar.tsx": {
+    "letterSpacing": 1
+  },
+  "components/community/CommunityAvatar.tsx": {
+    "feather": 1
+  },
+  "components/create-post/ModeBar.tsx": {
+    "letterSpacing": 1
+  },
+  "components/design-studio/ColorPicker.tsx": {
+    "uppercase": 2,
+    "letterSpacing": 2
+  },
+  "components/discover/DiscoverPager.tsx": {
+    "letterSpacing": 1
+  },
+  "components/first-run-tips/AnchoredCardTip.tsx": {
+    "letterSpacing": 1
+  },
+  "components/first-run-tips/FullScreenGuideTip.tsx": {
+    "letterSpacing": 1
+  },
+  "components/first-run-tips/SpotlightTip.tsx": {
+    "letterSpacing": 1
+  },
+  "components/layout/EmptyState.tsx": {
+    "feather": 1
+  },
+  "components/layout/EmptyStateBadge.tsx": {
+    "feather": 1
+  },
+  "components/live/CohostStage.tsx": {
+    "letterSpacing": 1
+  },
+  "components/live/LiveAvatarRing.tsx": {
+    "letterSpacing": 1
+  },
+  "components/live/LiveEmptyState.tsx": {
+    "letterSpacing": 1
+  },
+  "components/live/LiveOverlays.tsx": {
+    "letterSpacing": 3
+  },
+  "components/live/LiveProductsSheet.tsx": {
+    "letterSpacing": 1
+  },
+  "components/manufacturer/OrderCardBubble.tsx": {
+    "letterSpacing": 1
+  },
+  "components/manufacturer/RfqChatCards.tsx": {
+    "letterSpacing": 1
+  },
+  "components/onboarding/SellerPlanRecommendationStep.tsx": {
+    "letterSpacing": 3
+  },
+  "components/onboarding/onboardingTokens.ts": {
+    "letterSpacing": 1
+  },
+  "components/paywall/SellerPaywallHeadline.tsx": {
+    "letterSpacing": 1
+  },
+  "components/paywall/SellerPaywallOneTimeOffer.tsx": {
+    "letterSpacing": 1
+  },
+  "components/paywall/SellerPlanSelector.tsx": {
+    "letterSpacing": 1
+  },
+  "components/search/TrendingTags.tsx": {
+    "letterSpacing": 1
+  },
+  "components/security/LoginActivity.tsx": {
+    "letterSpacing": 1
+  },
+  "components/settings/SettingsKit.tsx": {
+    "letterSpacing": 1
+  },
+  "components/share-cards/ShareCardFrame.tsx": {
+    "letterSpacing": 1
+  },
+  "components/social/StoryStickers.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "components/splash/AppIntroSplash.tsx": {
+    "letterSpacing": 1
+  },
+  "components/ui/Icon.tsx": {
+    "feather": 1
+  },
+  "components/ui/IconFillTransition.tsx": {
+    "feather": 1
+  },
+  "lib/featherNames.ts": {
+    "feather": 1
+  }
+}

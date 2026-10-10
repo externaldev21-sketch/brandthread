@@ -23,7 +23,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ExpoLinking from 'expo-linking';
@@ -177,7 +177,7 @@ function LivePage({
                 hand off to the existing Agora viewer until a vendor-backed
                 renderer is plugged into the provider. */}
             <Pressable onPress={onOpenRtcPlayer} style={styles.rtcBtn} accessibilityRole="button" accessibilityLabel="Open live video player">
-              <Feather name="play" size={16} color="#000" />
+              <Icon name="play" size={16} color="#000" />
               <Text style={styles.rtcBtnText}>Watch live video</Text>
             </Pressable>
           </View>
@@ -203,7 +203,7 @@ function LivePage({
           onOpenHost={onOpenHost}
         />
         <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
-          <Feather name="x" size={22} color="#fff" />
+          <Icon name="x" size={22} color="#fff" />
         </Pressable>
       </View>
       <Text style={[styles.title, { top: topInset + 68 }]} numberOfLines={1}>{stream.title}</Text>
@@ -422,7 +422,7 @@ export default function LiveScreen() {
             onOpenCreator={id => openHost(id)}
           />
           <Pressable onPress={close} style={[styles.emptyClose, { top: topInset + 8 }]} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" testID="live-close">
-            <Feather name="x" size={22} color="#888" />
+            <Icon name="x" size={22} color="#888" />
           </Pressable>
         </>
       ) : ready ? (

@@ -9,7 +9,7 @@ import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
@@ -22,7 +22,7 @@ import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/prof
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { SP } from '@/lib/theme';
+import { SP, FONT } from '@/lib/theme';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia } from '@/components/profile/ProfileCover';
@@ -87,7 +87,7 @@ function GenderPicker({
               onPress={() => { onSelect(option); onClose(); }}
             >
               <Text style={[styles.pickerRowText, { color: theme.text }, current === option && { color: theme.accent }]}>{option}</Text>
-              {current === option && <Feather name="check" size={16} color={theme.accent} />}
+              {current === option && <Icon name="check" size={16} color={theme.accent} />}
             </TouchableOpacity>
           ))}
         </TouchableOpacity>
@@ -507,7 +507,7 @@ export default function BuyerEditProfileScreen() {
         />
 
         <Animated.View pointerEvents="none" style={[styles.toast, { opacity: toastOpacity, backgroundColor: theme.success }]}>
-          <Feather name="check-circle" size={14} color={theme.onAccent} />
+          <Icon name="check-circle" size={14} color={theme.onAccent} />
           <Text style={[styles.toastText, { color: theme.onAccent }]}>{toast.message}</Text>
         </Animated.View>
 
@@ -525,7 +525,7 @@ export default function BuyerEditProfileScreen() {
                 )}
                 {!avatarUploading && (
                   <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-                    <Feather name="camera" size={13} color={theme.onAccent} />
+                    <Icon name="camera" size={13} color={theme.onAccent} />
                   </View>
                 )}
               </View>
@@ -614,9 +614,9 @@ export default function BuyerEditProfileScreen() {
                   returnKeyType="done"
                 />
                 {usernameStatus === 'checking' && <ActivityIndicator size="small" color={theme.accent} style={{ marginLeft: 6 }} />}
-                {usernameStatus === 'ok' && <Feather name="check-circle" size={17} color={theme.success} style={{ marginLeft: 6 }} />}
-                {usernameStatus === 'taken' && <Feather name="x-circle" size={17} color={theme.error} style={{ marginLeft: 6 }} />}
-                {usernameStatus === 'invalid' && <Feather name="alert-circle" size={17} color={theme.warning} style={{ marginLeft: 6 }} />}
+                {usernameStatus === 'ok' && <Icon name="check-circle" size={17} color={theme.success} style={{ marginLeft: 6 }} />}
+                {usernameStatus === 'taken' && <Icon name="x-circle" size={17} color={theme.error} style={{ marginLeft: 6 }} />}
+                {usernameStatus === 'invalid' && <Icon name="alert-circle" size={17} color={theme.warning} style={{ marginLeft: 6 }} />}
               </View>
               {(usernameError || errors.username || fields.username.length > 0) && (
                 <Text style={[
@@ -681,7 +681,7 @@ export default function BuyerEditProfileScreen() {
             >
               <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Gender</Text>
               <Text style={[styles.chevronLabel, { color: theme.muted }]}>{extra.gender || 'Add'}</Text>
-              <Feather name="chevron-right" size={17} color={theme.muted} />
+              <Icon name="chevron-right" size={17} color={theme.muted} />
             </TouchableOpacity>
             <Divider theme={theme} />
             <View style={styles.row}>
@@ -762,15 +762,15 @@ export default function BuyerEditProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  saveText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  sectionLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', paddingHorizontal: 20, paddingTop: 16 },
-  sectionHint: { fontSize: 12.5, fontFamily: 'Inter_400Regular', paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },
+  saveText: { fontSize: 15, fontFamily: FONT.semibold },
+  sectionLabel: { fontSize: 13, fontFamily: FONT.semibold, paddingHorizontal: 20, paddingTop: 16 },
+  sectionHint: { fontSize: 12.5, fontFamily: FONT.regular, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },
   card: { marginHorizontal: 14, marginTop: 8, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 12 },
-  rowLabel: { fontSize: 15, fontFamily: 'Inter_400Regular', width: 90 },
-  rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  rowInput: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', padding: 0, textAlign: 'right' },
-  chevronLabel: { fontSize: 13.5, fontFamily: 'Inter_400Regular' },
+  rowLabel: { fontSize: 15, fontFamily: FONT.regular, width: 90 },
+  rowHint: { fontSize: 12, fontFamily: FONT.regular, marginTop: 3 },
+  rowInput: { flex: 1, fontSize: 15, fontFamily: FONT.regular, padding: 0, textAlign: 'right' },
+  chevronLabel: { fontSize: 13.5, fontFamily: FONT.regular },
   avatarSection: { alignItems: 'center', paddingVertical: 20, gap: 10 },
   avatarWrap: { width: 96, height: 96, borderRadius: 48 },
   cameraBadge: {
@@ -781,30 +781,30 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 48,
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 4, // theme-exempt: scrim over avatar media
   },
-  avatarOverlayText: { color: '#FFF', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  editPhotoLink: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  avatarOverlayText: { color: '#FFF', fontSize: 12, fontFamily: FONT.semibold },
+  editPhotoLink: { fontSize: 14, fontFamily: FONT.medium },
   coverSection: { alignItems: 'center', gap: 4, paddingBottom: 12 },
-  coverHint: { fontSize: 12.5, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 20 },
+  coverHint: { fontSize: 12.5, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: 20 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  errorText: { fontSize: 12.5, fontFamily: 'Inter_400Regular' },
-  retryLink: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold' },
-  inlineError: { fontSize: 11.5, fontFamily: 'Inter_400Regular', paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
-  charCounter: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'right', marginTop: 4 },
-  previewLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8 },
+  errorText: { fontSize: 12.5, fontFamily: FONT.regular },
+  retryLink: { fontSize: 12.5, fontFamily: FONT.semibold },
+  inlineError: { fontSize: 11.5, fontFamily: FONT.regular, paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
+  charCounter: { fontSize: 11, fontFamily: FONT.regular, textAlign: 'right', marginTop: 4 },
+  previewLabel: { fontSize: 12, fontFamily: FONT.medium, marginBottom: 8 },
   previewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
   previewEmoji: { fontSize: 14 },
-  previewText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  usernameHint: { fontSize: 11.5, fontFamily: 'Inter_400Regular', paddingHorizontal: 16, paddingBottom: 10, paddingTop: 0, marginTop: -6 },
+  previewText: { fontSize: 12, fontFamily: FONT.semibold },
+  usernameHint: { fontSize: 11.5, fontFamily: FONT.regular, paddingHorizontal: 16, paddingBottom: 10, paddingTop: 0, marginTop: -6 },
   toast: {
     position: 'absolute', top: 56, alignSelf: 'center', zIndex: 99,
     flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 24,
     paddingHorizontal: 16, paddingVertical: 9,
   },
-  toastText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  toastText: { fontSize: 13, fontFamily: FONT.semibold },
   pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
   pickerSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8, paddingHorizontal: 16 },
   pickerHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  pickerTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, paddingVertical: 8, marginBottom: 4 },
+  pickerTitle: { fontFamily: FONT.semibold, fontSize: 15, paddingVertical: 8, marginBottom: 4 },
   pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 4, borderRadius: 14 },
-  pickerRowText: { fontFamily: 'Inter_500Medium', fontSize: 15 },
+  pickerRowText: { fontFamily: FONT.medium, fontSize: 15 },
 });

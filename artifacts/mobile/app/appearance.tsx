@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -96,7 +96,7 @@ export default function AppearanceScreen() {
                 />
                 {selected && (
                   <View style={[styles.themeCardCheck, { backgroundColor: option.accent }]}>
-                    <Feather name="check" size={11} color={option.onAccent} />
+                    <Icon name="check" size={11} color={option.onAccent} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -142,7 +142,7 @@ export default function AppearanceScreen() {
                   />
                   {selected && (
                     <View style={[styles.selectedBadge, { backgroundColor: option.accent, borderColor: theme.background }]}>
-                      <Feather name="check" size={11} color={option.onAccent} />
+                      <Icon name="check" size={11} color={option.onAccent} />
                     </View>
                   )}
                 </View>

@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP } from '@/lib/theme';
@@ -10,7 +10,7 @@ const ACTION_WIDTH = 72;
 export interface InboxSwipeAction {
   key: string;
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   color: string;
   textColor: string;
   onPress: () => void | Promise<void>;
@@ -93,7 +93,7 @@ export default function InboxSwipeRow({ children, actions, rowId, disabled = fal
             accessibilityRole="button"
             accessibilityLabel={action.accessibilityLabel ?? action.label}
           >
-            <Feather name={action.icon} size={17} color={action.textColor} />
+            <Icon name={action.icon} size={17} color={action.textColor} />
             <Text style={[styles.actionText, { color: action.textColor }]} numberOfLines={1}>
               {action.label}
             </Text>

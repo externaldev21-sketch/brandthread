@@ -3,7 +3,7 @@
  */
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Share, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File, Paths } from 'expo-file-system';
@@ -17,7 +17,7 @@ import { useApi } from '@/lib/api';
 type IncludeKey = 'products' | 'orders' | 'customers';
 type Format = 'json' | 'csv';
 
-const INCLUDE_OPTIONS: { key: IncludeKey; label: string; icon: keyof typeof Feather.glyphMap; desc: string }[] = [
+const INCLUDE_OPTIONS: { key: IncludeKey; label: string; icon: IconName; desc: string }[] = [
   { key: 'products',  label: 'Products',  icon: 'package',      desc: 'All product listings, variants, and pricing' },
   { key: 'orders',    label: 'Orders',    icon: 'shopping-bag', desc: 'Order history, status, and fulfillment data' },
   { key: 'customers', label: 'Customers', icon: 'users',        desc: 'Customer contacts and purchase history' },
@@ -103,14 +103,14 @@ export default function SellerDataExportScreen() {
                 activeOpacity={0.8}
               >
                 <View style={[styles.optIcon, { backgroundColor: checked ? theme.accentDim : theme.surface }]}>
-                  <Feather name={opt.icon} size={16} color={checked ? theme.accentLight : theme.muted} />
+                  <Icon name={opt.icon} size={16} color={checked ? theme.accentLight : theme.muted} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.optLabel}>{opt.label}</Text>
                   <Text style={styles.optDesc}>{opt.desc}</Text>
                 </View>
                 <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-                  {checked && <Feather name="check" size={13} color={theme.onAccent} />}
+                  {checked && <Icon name="check" size={13} color={theme.onAccent} />}
                 </View>
               </TouchableOpacity>
             );
@@ -127,7 +127,7 @@ export default function SellerDataExportScreen() {
               onPress={() => setFormat(f)}
               activeOpacity={0.8}
             >
-              <Feather
+              <Icon
                 name={f === 'json' ? 'code' : 'file-text'}
                 size={16}
                 color={format === f ? theme.accentLight : theme.muted}
@@ -144,7 +144,7 @@ export default function SellerDataExportScreen() {
 
         {/* Privacy note */}
         <View style={styles.noteCard}>
-          <Feather name="shield" size={14} color={theme.muted} />
+          <Icon name="shield" size={14} color={theme.muted} />
           <Text style={styles.noteText}>
             Exports contain only your own seller data. Customer PII is included — store securely and handle per your privacy policy.
           </Text>
@@ -163,7 +163,7 @@ export default function SellerDataExportScreen() {
         {result && (
           <View style={styles.resultCard}>
             <View style={styles.resultHeader}>
-              <Feather name="check-circle" size={18} color={theme.success} />
+              <Icon name="check-circle" size={18} color={theme.success} />
               <Text style={styles.resultTitle}>Export ready!</Text>
             </View>
             <Text style={styles.resultDate}>
@@ -189,30 +189,30 @@ export default function SellerDataExportScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border },
-  headerTitle:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: theme.text },
+  headerTitle:  { fontSize: 17, fontFamily: FONT.bold, color: theme.text },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
-  sectionLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -8 },
+  sectionLabel: { fontSize: 12, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -8 },
   card:         { backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.border },
   optRow:       { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   optIcon:      { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  optLabel:     { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: theme.text },
-  optDesc:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 2 },
+  optLabel:     { fontSize: 14, fontFamily: FONT.semibold, color: theme.text },
+  optDesc:      { fontSize: 11, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   checkbox:     { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { backgroundColor: theme.accent, borderColor: theme.accent },
   formatRow:    { flexDirection: 'row', gap: 10 },
   formatBtn:    { flex: 1, backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 14, alignItems: 'center', gap: 6 },
   formatBtnActive: { borderColor: theme.accent, backgroundColor: theme.accentDim },
-  formatLabel:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: theme.muted },
+  formatLabel:  { fontSize: 14, fontFamily: FONT.bold, color: theme.muted },
   formatLabelActive: { color: theme.accentLight },
-  formatDesc:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: theme.muted },
+  formatDesc:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   noteCard:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: theme.surface, borderRadius: 10, padding: 12 },
-  noteText:     { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 18 },
+  noteText:     { flex: 1, fontSize: 12, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
   resultCard:   { backgroundColor: theme.success + '1A', borderRadius: 14, borderWidth: 1, borderColor: theme.success + '4D', padding: 16, gap: 8 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  resultTitle:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.text },
-  resultDate:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted },
+  resultTitle:  { fontSize: 15, fontFamily: FONT.bold, color: theme.text },
+  resultDate:   { fontSize: 12, fontFamily: FONT.regular, color: theme.muted },
   countsRow:    { flexDirection: 'row', gap: 10, marginTop: 4 },
   countChip:    { flex: 1, backgroundColor: theme.surface, borderRadius: 8, padding: 10, alignItems: 'center', gap: 2 },
-  countVal:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
-  countLabel:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: theme.muted },
+  countVal:     { fontSize: 16, fontFamily: FONT.bold, color: theme.text },
+  countLabel:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
 });

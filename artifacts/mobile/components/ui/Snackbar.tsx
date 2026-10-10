@@ -13,7 +13,7 @@
 import React, { useEffect } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { identityOrNone } from '@/lib/animationUtils';
@@ -74,7 +74,7 @@ export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction
         )}
         {onDismiss && !actionLabel && (
           <PressableScale onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Dismiss" style={styles.actionHit}>
-            <Feather name="x" size={16} color={palette.foreground} />
+            <Icon name="x" size={16} color={palette.foreground} />
           </PressableScale>
         )}
       </View>

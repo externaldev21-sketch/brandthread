@@ -1,7 +1,7 @@
 import React from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -32,7 +32,7 @@ export default function NotFoundScreen() {
       <ScreenHeader title="Not found" onBack={goHome} />
       <View style={[styles.container, { paddingBottom: insets.bottom + SPACING.xl }]}>
         <View style={[styles.iconCircle, { borderColor: theme.accent + '40' }]}>
-          <Feather name="compass" size={26} color={colors.mutedForeground} />
+          <Icon name="compass" size={26} color={colors.mutedForeground} />
         </View>
         <Text style={[TYPE_SCALE.title2, { fontFamily: FONT.semibold, color: colors.foreground, textAlign: 'center' }]}>
           This screen doesn&apos;t exist

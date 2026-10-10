@@ -8,7 +8,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
@@ -44,16 +44,16 @@ function ratioOf(media: MediaDraft | null): number {
 // ─── Small pieces ─────────────────────────────────────────────────────────────
 
 function OptionRow({ icon, label, value, onPress, testID }: {
-  icon: keyof typeof Feather.glyphMap; label: string; value?: string; onPress: () => void; testID?: string;
+  icon: IconName; label: string; value?: string; onPress: () => void; testID?: string;
 }) {
   return (
     <Pressable onPress={() => { tap(); onPress(); }} style={s.row} accessibilityRole="button" testID={testID}>
-      <Feather name={icon} size={22} color={CP.white} />
+      <Icon name={icon} size={22} color={CP.white} />
       <View style={{ flex: 1 }}>
         <Text style={s.rowLabel}>{label}</Text>
         {value ? <Text style={s.rowValue}>{value}</Text> : null}
       </View>
-      <Feather name="chevron-right" size={20} color={CP.silverDim} />
+      <Icon name="chevron-right" size={20} color={CP.silverDim} />
     </Pressable>
   );
 }
@@ -103,7 +103,7 @@ function SlideCoverPage({ media, onPick, onBack }: {
         {media.slides.map((sl, i) => (
           <Pressable key={sl.id} onPress={() => { tap(); onPick(i); }} style={[s.coverCell, i === media.coverIndex && s.coverCellOn]} accessibilityRole="button" testID={`cover-slide-${i}`}>
             <Image source={{ uri: sl.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-            {i === media.coverIndex ? <View style={s.coverCheck}><Feather name="check" size={14} color={CP.black} /></View> : null}
+            {i === media.coverIndex ? <View style={s.coverCheck}><Icon name="check" size={14} color={CP.black} /></View> : null}
           </Pressable>
         ))}
       </ScrollView>
@@ -126,7 +126,7 @@ function ProductsPage({ tags, onChange, onBack }: { tags: PostProductTag[]; onCh
   return (
     <SubPage title="Tag products" onBack={onBack} testID="products-page">
       <View style={s.search}>
-        <Feather name="search" size={18} color={CP.silverDim} />
+        <Icon name="search" size={18} color={CP.silverDim} />
         <TextInput value={query} onChangeText={setQuery} placeholder="Search your products" placeholderTextColor={CP.silverDim} style={s.searchInput} testID="products-search" />
       </View>
       {note ? <Text style={[s.hintCenter, { color: CP.white }]}>{note}</Text> : null}
@@ -156,7 +156,7 @@ function ProductsPage({ tags, onChange, onBack }: { tags: PostProductTag[]; onCh
                   <Text style={s.rowLabel} numberOfLines={1}>{p.name}</Text>
                   <Text style={s.rowValue}>{formatCents(p.pricing.priceCents)}</Text>
                 </View>
-                <View style={[s.check, on && s.checkOn]}>{on ? <Feather name="check" size={14} color={CP.black} /> : null}</View>
+                <View style={[s.check, on && s.checkOn]}>{on ? <Icon name="check" size={14} color={CP.black} /> : null}</View>
               </Pressable>
             );
           })}
@@ -182,7 +182,7 @@ function VisibilityPage({ visibility, noun, onChange, onBack }: {
             <Text style={s.rowValue}>{o.body}</Text>
           </View>
           <View style={[s.check, (visibility.isPublic ?? true) === o.id && s.checkOn]}>
-            {(visibility.isPublic ?? true) === o.id ? <Feather name="check" size={14} color={CP.black} /> : null}
+            {(visibility.isPublic ?? true) === o.id ? <Icon name="check" size={14} color={CP.black} /> : null}
           </View>
         </Pressable>
       ))}
@@ -242,9 +242,9 @@ function SchedulePage({ value, onChange, onBack }: { value: string | null; onCha
       <View style={s.timeRow}>
         {[{ v: hour, set: (n: number) => setHour((n + 24) % 24), label: 'hour' }, { v: minute, set: (n: number) => setMinute((n + 60) % 60), label: 'minute', step: 5 }].map((c) => (
           <View key={c.label} style={s.stepper}>
-            <Pressable onPress={() => { tap(); c.set(c.v + (c.step ?? 1)); setError(null); }} accessibilityLabel={`Increase ${c.label}`} hitSlop={8}><Feather name="chevron-up" size={24} color={CP.white} /></Pressable>
+            <Pressable onPress={() => { tap(); c.set(c.v + (c.step ?? 1)); setError(null); }} accessibilityLabel={`Increase ${c.label}`} hitSlop={8}><Icon name="chevron-up" size={24} color={CP.white} /></Pressable>
             <Text style={s.stepValue}>{pad(c.v)}</Text>
-            <Pressable onPress={() => { tap(); c.set(c.v - (c.step ?? 1)); setError(null); }} accessibilityLabel={`Decrease ${c.label}`} hitSlop={8}><Feather name="chevron-down" size={24} color={CP.white} /></Pressable>
+            <Pressable onPress={() => { tap(); c.set(c.v - (c.step ?? 1)); setError(null); }} accessibilityLabel={`Decrease ${c.label}`} hitSlop={8}><Icon name="chevron-down" size={24} color={CP.white} /></Pressable>
           </View>
         ))}
       </View>
@@ -288,7 +288,7 @@ function TagPeoplePage({ caption, onCaption, onBack }: { caption: string; onCapt
   return (
     <SubPage title="Tag people" onBack={onBack} testID="people-page">
       <View style={s.search}>
-        <Feather name="search" size={18} color={CP.silverDim} />
+        <Icon name="search" size={18} color={CP.silverDim} />
         <TextInput value={q} onChangeText={setQ} placeholder="Search people" placeholderTextColor={CP.silverDim} style={s.searchInput} testID="people-search" autoCapitalize="none" />
       </View>
       {loading ? <ActivityIndicator color={CP.white} style={{ marginTop: 24 }} /> : people.length === 0 ? (
@@ -307,7 +307,7 @@ function TagPeoplePage({ caption, onCaption, onBack }: { caption: string; onCapt
                   <Text style={s.rowLabel} numberOfLines={1}>{p.name}</Text>
                   <Text style={s.rowValue}>{p.handle}</Text>
                 </View>
-                <View style={[s.check, on && s.checkOn]}>{on ? <Feather name="check" size={14} color={CP.black} /> : null}</View>
+                <View style={[s.check, on && s.checkOn]}>{on ? <Icon name="check" size={14} color={CP.black} /> : null}</View>
               </Pressable>
             );
           })}
@@ -460,7 +460,7 @@ export function PostScreen({
               />
             </View>
             <Pressable onPress={() => { if (media && !isPost) { tap(); setPage('cover'); } }} style={[s.cover, isPost && s.coverSmall, isPost && { order: -1 } as any, { aspectRatio: ratio }]} accessibilityRole="button" accessibilityLabel="Edit cover" testID="edit-cover" disabled={!media || isPost} {...({ dataSet: { textfitIgnore: '1' } } as object)}>
-              {coverUri ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />   : coverIsVideo ? <View style={[StyleSheet.absoluteFill, { backgroundColor: CP.surface2, alignItems: 'center', justifyContent: 'center' }]}><Feather name="video" size={26} color={CP.silver} /></View> : null}
+              {coverUri ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />   : coverIsVideo ? <View style={[StyleSheet.absoluteFill, { backgroundColor: CP.surface2, alignItems: 'center', justifyContent: 'center' }]}><Icon name="video" size={26} color={CP.silver} /></View> : null}
               {media && !isPost ? <Text style={s.coverLabel}>Edit cover</Text> : null}
             </Pressable>
           </View>

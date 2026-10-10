@@ -5,7 +5,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -133,7 +133,7 @@ export default function ManufacturerCompareScreen() {
                       );
                     })}
                     <TouchableOpacity style={s.quoteBtn} onPress={() => router.push(`/quote-request?manufacturerId=${m.id}` as never)}>
-                      <Feather name="file-text" size={13} color={theme.onAccent} />
+                      <Icon name="file-text" size={13} color={theme.onAccent} />
                       <Text style={s.quoteBtnText}>Request quote</Text>
                     </TouchableOpacity>
                   </View>

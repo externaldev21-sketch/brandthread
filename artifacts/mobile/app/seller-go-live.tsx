@@ -14,7 +14,7 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -178,11 +178,11 @@ function SellerGoLiveNativeScreen() {
     return (
       <View style={[s.permRoot, { paddingTop: headerTopInset, paddingBottom: insets.bottom + 24 }]}>
         <TouchableOpacity onPress={() => goBackOr(router)} style={[s.closeBtn, { top: headerTopInset + 8 }]} accessibilityLabel="Close">
-          <Feather name="x" size={22} color={FG} />
+          <Icon name="x" size={22} color={FG} />
         </TouchableOpacity>
         <View style={s.permBox}>
           <View style={s.permIconWrap}>
-            <Feather name="camera-off" size={30} color="rgba(255,255,255,0.7)" />
+            <Icon name="camera-off" size={30} color="rgba(255,255,255,0.7)" />
           </View>
           <Text style={s.permTitle}>Camera & microphone access needed</Text>
           <Text style={s.permSub}>
@@ -232,16 +232,16 @@ function SellerGoLiveNativeScreen() {
       {/* Top bar */}
       <View style={[s.topBar, { paddingTop: headerTopInset + 8 }]}>
         <TouchableOpacity onPress={() => goBackOr(router)} style={s.iconBtn} accessibilityLabel="Close">
-          <Feather name="x" size={20} color={FG} />
+          <Icon name="x" size={20} color={FG} />
         </TouchableOpacity>
         <View style={s.topRight}>
           {facing === 'back' && (
             <TouchableOpacity onPress={toggleTorch} style={s.iconBtn} accessibilityLabel={torch ? 'Turn flash off' : 'Turn flash on'}>
-              <Feather name={torch ? 'zap' : 'zap-off'} size={19} color={torch ? '#FBBF24' : FG} />
+              <Icon name={torch ? 'zap' : 'zap-off'} size={19} color={torch ? '#FBBF24' : FG} />
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={flipCamera} style={s.iconBtn} accessibilityLabel="Flip camera">
-            <Feather name="refresh-cw" size={19} color={FG} />
+            <Icon name="refresh-cw" size={19} color={FG} />
           </TouchableOpacity>
         </View>
       </View>
@@ -277,13 +277,13 @@ function SellerGoLiveNativeScreen() {
             activeOpacity={0.8}
             accessibilityLabel="Feature products"
           >
-            <Feather name="shopping-bag" size={15} color={FG} />
+            <Icon name="shopping-bag" size={15} color={FG} />
             <Text style={s.featureProductsText}>
               {featuredProducts.length > 0
                 ? `${featuredProducts.length} product${featuredProducts.length === 1 ? '' : 's'} featured`
                 : 'Feature products'}
             </Text>
-            <Feather name="chevron-right" size={15} color="rgba(255,255,255,0.6)" />
+            <Icon name="chevron-right" size={15} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -292,9 +292,9 @@ function SellerGoLiveNativeScreen() {
             activeOpacity={0.8}
             accessibilityLabel="Schedule a live"
           >
-            <Feather name="calendar" size={15} color={FG} />
+            <Icon name="calendar" size={15} color={FG} />
             <Text style={s.featureProductsText}>Schedule for later</Text>
-            <Feather name="chevron-right" size={15} color="rgba(255,255,255,0.6)" />
+            <Icon name="chevron-right" size={15} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
 
           <Animated.View style={{ transform: [{ scale: goLiveScale }] }}>
@@ -325,7 +325,7 @@ function SellerGoLiveNativeScreen() {
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>Feature products</Text>
               <TouchableOpacity onPress={() => setShowProductPicker(false)} accessibilityLabel="Done">
-                <Feather name="x" size={22} color={FG} />
+                <Icon name="x" size={22} color={FG} />
               </TouchableOpacity>
             </View>
             {productsLoading ? (
@@ -357,7 +357,7 @@ function SellerGoLiveNativeScreen() {
                         <Image source={{ uri: p.imageUrl }} style={s.pickerRowThumb} />
                       ) : (
                         <View style={[s.pickerRowThumb, s.pickerRowThumbPlaceholder]}>
-                          <Feather name="image" size={16} color="rgba(255,255,255,0.4)" />
+                          <Icon name="image" size={16} color="rgba(255,255,255,0.4)" />
                         </View>
                       )}
                       <View style={{ flex: 1 }}>
@@ -365,7 +365,7 @@ function SellerGoLiveNativeScreen() {
                         <Text style={s.pickerRowPrice}>${((p.priceCents ?? 0) / 100).toFixed(2)}</Text>
                       </View>
                       <View style={[s.checkbox, tagged && s.checkboxActive]}>
-                        {tagged && <Feather name="check" size={13} color="#000" />}
+                        {tagged && <Icon name="check" size={13} color="#000" />}
                       </View>
                     </TouchableOpacity>
                   );

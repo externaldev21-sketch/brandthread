@@ -18,7 +18,7 @@ import {
   ActivityIndicator, TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -380,7 +380,7 @@ export default function MetaAdsSetupScreen() {
       >
         {rejectionReason && (
           <View style={[s.rejectBanner, { backgroundColor: colors.destructive + '14', borderColor: colors.destructive }]}>
-            <Feather name="alert-triangle" size={16} color={colors.destructive} />
+            <Icon name="alert-triangle" size={16} color={colors.destructive} />
             <View style={{ flex: 1 }}>
               <Text style={[s.rejectTitle, { color: colors.destructive }]}>Meta rejected this campaign</Text>
               <Text style={[s.helper, { color: colors.mutedForeground }]}>{rejectionReason}</Text>
@@ -426,7 +426,7 @@ export default function MetaAdsSetupScreen() {
               <Image source={{ uri: creativeImage }} style={s.creativeImg} contentFit="cover" />
             ) : (
               <View style={s.creativeEmpty}>
-                <Feather name="image" size={ICON.lg} color={colors.mutedForeground} />
+                <Icon name="image" size={ICON.lg} color={colors.mutedForeground} />
                 <Text style={[s.helper, { color: colors.mutedForeground, marginTop: SP.xs }]}>Pick a source above to see your creative</Text>
               </View>
             )}
@@ -500,7 +500,7 @@ export default function MetaAdsSetupScreen() {
           </View>
           {estimatedReach && (
             <View style={[s.reachCard, { backgroundColor: colors.success + '14', borderColor: colors.success }]}>
-              <Feather name="trending-up" size={16} color={colors.success} />
+              <Icon name="trending-up" size={16} color={colors.success} />
               <Text style={[s.helper, { color: colors.foreground }]}>Estimated reach: {formatReachRange(estimatedReach.low, estimatedReach.high)}</Text>
             </View>
           )}
@@ -533,7 +533,7 @@ export default function MetaAdsSetupScreen() {
           ) : (
             <BrandthreadCard>
               <View style={{ flexDirection: 'row', gap: SP.sm, alignItems: 'center' }}>
-                <Feather name="eye" size={16} color={colors.mutedForeground} />
+                <Icon name="eye" size={16} color={colors.mutedForeground} />
                 <Text style={[s.helper, { color: colors.mutedForeground, flex: 1 }]}>
                   {saving ? 'Building your preview…' : 'Fill in the sections above to see a live preview here.'}
                 </Text>
@@ -544,7 +544,7 @@ export default function MetaAdsSetupScreen() {
 
         {launchError && (
           <View style={[s.rejectBanner, { backgroundColor: colors.destructive + '14', borderColor: colors.destructive }]}>
-            <Feather name="alert-circle" size={16} color={colors.destructive} />
+            <Icon name="alert-circle" size={16} color={colors.destructive} />
             <Text style={[s.helper, { color: colors.destructive, flex: 1 }]}>{launchError}</Text>
           </View>
         )}
@@ -604,12 +604,12 @@ function PickRow({ label, sub, icon, selected, onPress, colors, theme }: any) {
   return (
     <BrandthreadCard onPress={onPress} style={selected ? { borderColor: theme.accent } : undefined}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
-        {icon && <Feather name={icon} size={ICON.md} color={selected ? theme.accentLight : colors.mutedForeground} />}
+        {icon && <Icon name={icon} size={ICON.md} color={selected ? theme.accentLight : colors.mutedForeground} />}
         <View style={{ flex: 1 }}>
           <Text style={[s.rowLabel, { color: colors.foreground }]}>{label}</Text>
           {!!sub && <Text style={[s.helper, { color: colors.mutedForeground }]}>{sub}</Text>}
         </View>
-        {selected && <Feather name="check" size={16} color={theme.accentLight} />}
+        {selected && <Icon name="check" size={16} color={theme.accentLight} />}
       </View>
     </BrandthreadCard>
   );
@@ -630,11 +630,11 @@ function Stepper({ label, value, min, max, onChange, colors, theme }: any) {
       <Text style={[s.helper, { color: colors.mutedForeground }]}>{label}</Text>
       <View style={[s.stepperRow, { borderColor: colors.border, backgroundColor: colors.elevated }]}>
         <TouchableOpacity onPress={() => onChange(Math.max(min, value - 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="minus" size={14} color={colors.foreground} />
+          <Icon name="minus" size={14} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[s.rowLabel, { color: colors.foreground }]}>{value >= 65 ? '65+' : value}</Text>
         <TouchableOpacity onPress={() => onChange(Math.min(max, value + 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="plus" size={14} color={colors.foreground} />
+          <Icon name="plus" size={14} color={colors.foreground} />
         </TouchableOpacity>
       </View>
     </View>

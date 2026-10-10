@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
@@ -128,7 +128,7 @@ export function FilterSheet({
       <Text style={[TYPE_SCALE.body, { flex: 1, color: theme.text, fontFamily: selected ? FONT.semibold : FONT.regular }]}>{label}</Text>
       {count !== undefined ? <Text style={[TYPE_SCALE.footnote, { color: theme.muted, marginRight: SPACING.sm, minWidth: 28, textAlign: 'right' }]}>{count}</Text> : null}
       <View style={styles.checkSlot}>
-        {selected ? <Feather name="check" size={18} color={theme.text} /> : null}
+        {selected ? <Icon name="check" size={18} color={theme.text} /> : null}
       </View>
     </PressableScale>
   );

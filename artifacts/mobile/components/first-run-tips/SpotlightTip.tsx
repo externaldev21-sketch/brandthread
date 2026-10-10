@@ -12,7 +12,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import type { TargetRect } from './types';
 
@@ -95,7 +95,7 @@ export function SpotlightTip({ visible, onDismiss, target, title, body, reduceMo
               : { bottom: screenH - hole.y + SP.md },
           ]}
         >
-          <Feather name={captionBelow ? 'arrow-up' : 'arrow-down'} size={18} color="#FFFFFF" style={styles.arrow} />
+          <Icon name={captionBelow ? 'arrow-up' : 'arrow-down'} size={18} color="#FFFFFF" style={styles.arrow} />
           <Text style={styles.title}>{title}</Text>
           {body ? <Text style={styles.body}>{body}</Text> : null}
           <Text style={styles.dismissHint}>Tap anywhere to continue</Text>

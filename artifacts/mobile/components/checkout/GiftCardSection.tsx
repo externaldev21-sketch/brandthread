@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
@@ -73,7 +73,7 @@ export function GiftCardSection({
     <CheckoutSection title="Gift card" testID="checkout-gift-card">
       {Object.entries(applied).map(([sellerId, card]) => (
         <View key={sellerId} style={styles.row} testID="checkout-gift-card-applied">
-          <Feather name="check-circle" size={18} color={ck.text} />
+          <Icon name="check-circle" size={18} color={ck.text} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.title}>{giftCardMask({ last4: card.last4 })} applied</Text>
             <Text style={styles.sub} numberOfLines={2}>
@@ -86,7 +86,7 @@ export function GiftCardSection({
 
       {offered.map(card => (
         <View key={card.id} style={styles.row}>
-          <Feather name="gift" size={18} color={ck.muted} />
+          <Icon name="gift" size={18} color={ck.muted} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.title}>{card.storeName || sellerName(card.sellerId)} {giftCardMask(card)}</Text>
             <Text style={styles.sub}>{formatCents(card.balanceCents)} balance</Text>

@@ -11,12 +11,12 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { hapticLight } from '@/lib/haptics';
 
 export interface SwipeAction {
   key: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   color: string;
   iconColor: string;
   accessibilityLabel: string;
@@ -164,7 +164,7 @@ export default function SwipeableActions({
               accessibilityRole="button"
               accessibilityLabel={action.accessibilityLabel}
             >
-              <Feather name={action.icon} size={18} color={action.iconColor} />
+              <Icon name={action.icon} size={18} color={action.iconColor} />
             </Pressable>
           ))}
         </View>

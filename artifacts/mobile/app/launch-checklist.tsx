@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -72,10 +72,10 @@ export default function LaunchChecklistScreen() {
                     style={s.rowHead}
                   >
                     <View style={[s.check, step.done ? s.checkDone : s.checkOpen]}>
-                      {step.done && <Feather name="check" size={ICON.xs} color={theme.onAccent} />}
+                      {step.done && <Icon name="check" size={ICON.xs} color={theme.onAccent} />}
                     </View>
                     <Text style={[s.rowTitle, step.done && s.rowTitleDone]}>{meta.title}</Text>
-                    <Feather name={expanded ? 'chevron-up' : 'chevron-right'} size={ICON.sm} color={theme.muted} />
+                    <Icon name={expanded ? 'chevron-up' : 'chevron-right'} size={ICON.sm} color={theme.muted} />
                   </PressableScale>
                   {expanded && (
                     <View style={s.rowBody}>

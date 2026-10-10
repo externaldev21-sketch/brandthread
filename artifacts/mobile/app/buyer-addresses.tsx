@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -237,7 +237,7 @@ export default function BuyerAddressesScreen() {
                 accessibilityState={{ checked: isDefault, disabled: isDefault }}
               >
                 <View style={[styles.checkbox, isDefault && styles.checkboxActive]}>
-                  {isDefault && <Feather name="check" size={14} color={theme.onAccent} />}
+                  {isDefault && <Icon name="check" size={14} color={theme.onAccent} />}
                 </View>
                 <Text style={styles.defaultToggleText}>Set as default address</Text>
               </TouchableOpacity>

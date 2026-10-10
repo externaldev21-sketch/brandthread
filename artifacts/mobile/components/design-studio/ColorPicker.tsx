@@ -10,7 +10,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, PanResponder, ScrollView } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import {
   BG, SURFACE, CARD_ELEVATED, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -22,7 +22,7 @@ import {
 import { radius } from '@/constants/radii';
 
 export type ColorPickerTab = 'disc' | 'classic' | 'harmony' | 'value' | 'palettes';
-const TABS: { key: ColorPickerTab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+const TABS: { key: ColorPickerTab; label: string; icon: IconName }[] = [
   { key: 'disc', label: 'Disc', icon: 'circle' },
   { key: 'classic', label: 'Classic', icon: 'square' },
   { key: 'harmony', label: 'Harmony', icon: 'share-2' },
@@ -356,10 +356,10 @@ export default function ColorPicker(props: ColorPickerProps) {
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => onSaveToPalette(p.id, color)} testID={`palette-add-current-${p.id}`}>
-                      <Feather name="plus-circle" size={ICON.xs} color={SUBTLE} />
+                      <Icon name="plus-circle" size={ICON.xs} color={SUBTLE} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => onDeletePalette(p.id)} testID={`palette-delete-${p.id}`}>
-                      <Feather name="trash-2" size={ICON.xs} color={SUBTLE} />
+                      <Icon name="trash-2" size={ICON.xs} color={SUBTLE} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -416,7 +416,7 @@ export default function ColorPicker(props: ColorPickerProps) {
             onPress={() => setTab(t.key)}
             testID={`color-tab-${t.key}`}
           >
-            <Feather name={t.icon} size={ICON.sm} color={tab === t.key ? FG : MUTED} />
+            <Icon name={t.icon} size={ICON.sm} color={tab === t.key ? FG : MUTED} />
             <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}

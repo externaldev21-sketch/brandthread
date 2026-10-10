@@ -17,7 +17,7 @@ import {
   Animated, Easing, Linking, Platform, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -41,11 +41,11 @@ export interface OrderSuccessData {
   paymentMethodLabel?: string; // e.g. "Visa •• 4242" or "Apple Pay"
 }
 
-function DetailRow({ icon, label, value }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string }) {
+function DetailRow({ icon, label, value }: { icon: IconName; label: string; value: string }) {
   const { theme } = useAppTheme();
   return (
     <View style={s.detailRow}>
-      <Feather name={icon} size={15} color={theme.muted} style={{ width: 20 }} />
+      <Icon name={icon} size={15} color={theme.muted} style={{ width: 20 }} />
       {/* AppText, not a raw Text with an ad hoc color — this is exactly the
           "fine print" case the shared-Text conventions target (see
           components/ui/AppText.tsx): a solid muted color instead of a
@@ -141,12 +141,12 @@ export function OrderSuccessSheet({
       <View style={[s.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + SP.md }]}>
         <View style={s.handle} />
         <TouchableOpacity onPress={onContinue} style={s.closeBtn} accessibilityRole="button" accessibilityLabel="Close">
-          <Feather name="x" size={16} color={theme.text} />
+          <Icon name="x" size={16} color={theme.text} />
         </TouchableOpacity>
 
         <Animated.View style={[s.checkWrap, !checkSettled.value && { transform: [{ scale: checkScale }] }]}>
           <View style={[s.checkCircle, { backgroundColor: theme.accent }]}>
-            <Feather name="check" size={38} color={theme.onAccent} />
+            <Icon name="check" size={38} color={theme.onAccent} />
           </View>
         </Animated.View>
 
@@ -187,10 +187,10 @@ export function OrderSuccessSheet({
               accessibilityLabel="Open in Maps"
             >
               <View style={[s.mapIconCircle, { backgroundColor: theme.accentDim }]}>
-                <Feather name="map" size={18} color={theme.accent} />
+                <Icon name="map" size={18} color={theme.accent} />
               </View>
               <Text style={[s.mapText, { color: theme.text }]} numberOfLines={2}>{order.fullShippingAddress}</Text>
-              <Feather name="external-link" size={14} color={theme.muted} />
+              <Icon name="external-link" size={14} color={theme.muted} />
             </TouchableOpacity>
           </Animated.View>
         )}

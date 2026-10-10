@@ -14,7 +14,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { randomUUID } from 'expo-crypto';
@@ -124,7 +124,7 @@ export function LiveThreadCashSheet({
             <Text style={[styles.sub, { color: theme.muted }]}>To {brandName}</Text>
           </View>
           <Pressable onPress={onClose} style={[styles.close, { backgroundColor: theme.cardElevated }]} accessibilityRole="button" accessibilityLabel="Close" hitSlop={6}>
-            <Feather name="x" size={18} color={theme.text} />
+            <Icon name="x" size={18} color={theme.text} />
           </Pressable>
         </View>
 

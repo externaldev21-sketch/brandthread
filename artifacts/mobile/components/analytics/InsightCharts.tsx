@@ -7,7 +7,7 @@
  */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import Svg, { Defs, LinearGradient, Line, Path, Stop, Text as SvgText, Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -145,7 +145,7 @@ function niceMax(v: number): number {
 
 /** Numbered list row with a thumbnail — "1  [thumb]  Title / meta  value". */
 export function RankedRow({ rank, thumbnailUrl, icon, title, subtitle, value, valueLabel, onPress, testID }: {
-  rank: number; thumbnailUrl?: string | null; icon?: keyof typeof Feather.glyphMap; title: string; subtitle?: string;
+  rank: number; thumbnailUrl?: string | null; icon?: IconName; title: string; subtitle?: string;
   value: string; valueLabel?: string; onPress?: () => void; testID?: string;
 }) {
   const colors = useColors();
@@ -156,7 +156,7 @@ export function RankedRow({ rank, thumbnailUrl, icon, title, subtitle, value, va
       <View style={s.thumb}>
         {thumbnailUrl
           ? <CachedImage source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} />
-          : <Feather name={icon ?? 'image'} size={18} color={colors.mutedForeground} />}
+          : <Icon name={icon ?? 'image'} size={18} color={colors.mutedForeground} />}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={s.title} numberOfLines={2}>{title}</Text>
@@ -166,7 +166,7 @@ export function RankedRow({ rank, thumbnailUrl, icon, title, subtitle, value, va
         <Text style={s.value}>{value}</Text>
         {!!valueLabel && <Text style={s.subtitle}>{valueLabel}</Text>}
       </View>
-      {!!onPress && <Feather name="chevron-right" size={16} color={colors.mutedForeground} />}
+      {!!onPress && <Icon name="chevron-right" size={16} color={colors.mutedForeground} />}
     </>
   );
   if (!onPress) return <View style={s.row} testID={testID}>{body}</View>;

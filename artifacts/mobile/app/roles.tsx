@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { Alert } from 'react-native';
+import { FONT } from '@/lib/theme';
 
 // Fallback role data if API not connected
 const DEFAULT_ROLES = [
@@ -44,7 +45,7 @@ export default function RolesScreen() {
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               accessibilityLabel="Invite a team member"
             >
-              <Feather name="plus" size={17} color={colors.foreground} />
+              <Icon name="plus" size={17} color={colors.foreground} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
@@ -58,7 +59,7 @@ export default function RolesScreen() {
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               accessibilityLabel="About roles"
             >
-              <Feather name="more-horizontal" size={17} color={colors.foreground} />
+              <Icon name="more-horizontal" size={17} color={colors.foreground} />
             </TouchableOpacity>
           </View>
         }
@@ -71,10 +72,10 @@ export default function RolesScreen() {
           </View>
           <View style={{ flex: 1 }} />
           <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
-            <Feather name="search" size={16} color={colors.mutedForeground} />
+            <Icon name="search" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
           <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
-            <Feather name="sliders" size={16} color={colors.mutedForeground} />
+            <Icon name="sliders" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
 
@@ -95,7 +96,7 @@ export default function RolesScreen() {
                   {role.group} · {role.staffCount ?? 0} staff{role.pendingCount ? ` · ${role.pendingCount} invited` : ''}
                 </Text>
               </View>
-              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+              <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           ))}
         </View>
@@ -116,12 +117,12 @@ const styles = StyleSheet.create({
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 14 },
   allPill: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  allPillText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  allPillText: { fontSize: 13, fontFamily: FONT.semibold },
   iconBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   listWrap: { paddingHorizontal: 20 },
   roleRow: { paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  roleName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  roleSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  roleName: { fontSize: 14, fontFamily: FONT.semibold },
+  roleSub: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   footerNote: { paddingVertical: 18, alignItems: 'center', marginTop: 4 },
-  footerText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  footerText: { fontSize: 13, fontFamily: FONT.regular },
 });

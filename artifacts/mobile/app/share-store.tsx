@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -18,6 +18,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { FONT } from '@/lib/theme';
 
 const BASE_URL = 'https://brandthread.app/store';
 
@@ -113,13 +114,13 @@ export default function ShareStoreScreen() {
           activeOpacity={0.85}
           onPress={copyLink}
         >
-          <Feather name={copied ? 'check' : 'copy'} size={17} color={colors.primaryForeground} />
+          <Icon name={copied ? 'check' : 'copy'} size={17} color={colors.primaryForeground} />
           <Text style={[s.copyBtnText, { color: colors.primaryForeground }]}>{copied ? 'Link copied' : 'Copy link'}</Text>
         </TouchableOpacity>
 
         {/* Share button */}
         <TouchableOpacity style={[s.shareBtn, { borderColor: colors.border }]} activeOpacity={0.8} onPress={shareLink}>
-          <Feather name="share-2" size={17} color={colors.foreground} />
+          <Icon name="share-2" size={17} color={colors.foreground} />
           <Text style={[s.shareBtnText, { color: colors.foreground }]}>Share via…</Text>
         </TouchableOpacity>
 
@@ -141,17 +142,17 @@ const s = StyleSheet.create({
   qrCard:      { width: '100%', borderRadius: 24, borderWidth: 1, alignItems: 'center', padding: 28, marginBottom: 20 },
   storeBadge:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28, alignSelf: 'flex-start' },
   storeLogoBox:{ width: 42, height: 42, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  storeName:   { fontSize: 15, fontFamily: 'Inter_700Bold', maxWidth: 180 },
-  storeHandle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 1 },
+  storeName:   { fontSize: 15, fontFamily: FONT.bold, maxWidth: 180 },
+  storeHandle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 1 },
 
   qrWrapper:   { padding: 16, backgroundColor: '#FFFFFF', borderRadius: 16, marginBottom: 20 },
-  urlLabel:    { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center' },
+  urlLabel:    { fontSize: 12, fontFamily: FONT.medium, textAlign: 'center' },
 
   copyBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, paddingVertical: 16, marginBottom: 12 },
-  copyBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  copyBtnText: { fontSize: 15, fontFamily: FONT.bold },
 
   shareBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, borderWidth: 1, paddingVertical: 16, marginBottom: 24 },
-  shareBtnText:{ fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  shareBtnText:{ fontSize: 15, fontFamily: FONT.semibold },
 
-  hint:        { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 18, paddingHorizontal: 16 },
+  hint:        { fontSize: 12, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 18, paddingHorizontal: 16 },
 });

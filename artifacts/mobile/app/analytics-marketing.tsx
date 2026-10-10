@@ -10,7 +10,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
@@ -46,7 +46,7 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const typeColor = c.type === 'email' ? colors.primary : c.type === 'sms' ? colors.success : c.type === 'push' ? colors.info : colors.warning;
-  const typeIcon: keyof typeof Feather.glyphMap = c.type === 'email' ? 'mail' : c.type === 'sms' ? 'message-square' : c.type === 'push' ? 'bell' : 'zap';
+  const typeIcon: IconName = c.type === 'email' ? 'mail' : c.type === 'sms' ? 'message-square' : c.type === 'push' ? 'bell' : 'zap';
   return (
     <TouchableOpacity
       onPress={() => { Haptics.selectionAsync(); router.navigate('/(tabs)/marketing' as never); }}
@@ -54,7 +54,7 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
       activeOpacity={0.8}
     >
       <View style={[s.rowIcon, { backgroundColor: typeColor + '22' }]}>
-        <Feather name={typeIcon} size={14} color={typeColor} />
+        <Icon name={typeIcon} size={14} color={typeColor} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.rowTitle} numberOfLines={1}>{c.name}</Text>
@@ -162,7 +162,7 @@ export default function AnalyticsMarketingScreen() {
             <Text style={s.heroValue}>{data.marketingRevenue.formatted}</Text>
             {typeof data.marketingRevenue.changePct === 'number' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <Feather name="trending-up" size={12} color={colors.success} />
+                <Icon name="trending-up" size={12} color={colors.success} />
                 <Text style={s.heroChange}>+{data.marketingRevenue.changePct.toFixed(1)}% vs prev period</Text>
               </View>
             )}
@@ -178,7 +178,7 @@ export default function AnalyticsMarketingScreen() {
             <RevenueBar label="Influencers" valueCents={data.influencerRevenue.value} totalCents={totalMarketing} color={colors.warning} />
             <RevenueBar label="Referrals"  valueCents={data.referralRevenue.value}   totalCents={totalMarketing} color={colors.info} />
             <View style={s.recoveredRow}>
-              <Feather name="refresh-cw" size={13} color={colors.success} />
+              <Icon name="refresh-cw" size={13} color={colors.success} />
               <Text style={s.recoveredText}>Abandoned cart recovered:</Text>
               <Text style={[s.recoveredAmount, { color: colors.success }]}>{data.abandonedCheckoutRecovered.formatted}</Text>
             </View>

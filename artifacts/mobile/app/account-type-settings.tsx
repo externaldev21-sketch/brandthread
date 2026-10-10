@@ -8,7 +8,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
@@ -35,7 +35,7 @@ export default function AccountTypeSettingsScreen() {
   const [selectedType, setSelectedType] = useState<AccountType | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const accountInfo: Record<AccountType, { icon: keyof typeof Feather.glyphMap; color: string; title: string; bullets: string[] }> = {
+  const accountInfo: Record<AccountType, { icon: IconName; color: string; title: string; bullets: string[] }> = {
     seller: {
       icon: 'shopping-bag',
       color: colors.primary,
@@ -129,7 +129,7 @@ export default function AccountTypeSettingsScreen() {
           {/* Current badge */}
           {currentType && (
             <View style={s.currentBadge}>
-              <Feather name={accountInfo[currentType].icon} size={ICON.sm} color={accountInfo[currentType].color} />
+              <Icon name={accountInfo[currentType].icon} size={ICON.sm} color={accountInfo[currentType].color} />
               <Text style={[s.currentBadgeText, { color: accountInfo[currentType].color }]}>
                 Current: {accountInfo[currentType].title}
               </Text>
@@ -152,7 +152,7 @@ export default function AccountTypeSettingsScreen() {
               >
                 <View style={s.typeCardTop}>
                   <View style={[s.typeIconWrap, { backgroundColor: info.color + '22' }]}>
-                    <Feather name={info.icon} size={ICON.md} color={info.color} />
+                    <Icon name={info.icon} size={ICON.md} color={info.color} />
                   </View>
                   <View style={{ flex: 1, marginLeft: SP.sm }}>
                     <Text style={s.typeTitle}>{info.title}</Text>
@@ -167,7 +167,7 @@ export default function AccountTypeSettingsScreen() {
                 <View style={s.typeCardBullets}>
                   {info.bullets.map((b) => (
                     <View key={b} style={s.bulletRow}>
-                      <Feather name="check" size={12} color={info.color} style={{ marginRight: 8, marginTop: 2 }} />
+                      <Icon name="check" size={12} color={info.color} style={{ marginRight: 8, marginTop: 2 }} />
                       <Text style={s.bulletText}>{b}</Text>
                     </View>
                   ))}

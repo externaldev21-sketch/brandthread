@@ -11,10 +11,11 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'rea
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
+import { FONT } from '@/lib/theme';
 
 export const PENDING_INVITE_KEY = 'bt:pendingTeamInvite';
 
@@ -108,7 +109,7 @@ export default function TeamInviteScreen() {
         ) : invite?.expired ? (
           <>
             <View style={[styles.icon, { backgroundColor: colors.warning + '22' }]}>
-              <Feather name="clock" size={26} color={colors.warning} />
+              <Icon name="clock" size={26} color={colors.warning} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite link expired</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
@@ -121,7 +122,7 @@ export default function TeamInviteScreen() {
         ) : error ? (
           <>
             <View style={[styles.icon, { backgroundColor: colors.destructive + '22' }]}>
-              <Feather name="x-circle" size={26} color={colors.destructive} />
+              <Icon name="x-circle" size={26} color={colors.destructive} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite not available</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>{error}</Text>
@@ -132,7 +133,7 @@ export default function TeamInviteScreen() {
         ) : accepted ? (
           <>
             <View style={[styles.icon, { backgroundColor: colors.success + '22' }]}>
-              <Feather name="check-circle" size={26} color={colors.success} />
+              <Icon name="check-circle" size={26} color={colors.success} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>You're on the team!</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
@@ -145,7 +146,7 @@ export default function TeamInviteScreen() {
         ) : invite?.alreadyAccepted ? (
           <>
             <View style={[styles.icon, { backgroundColor: colors.primary + '22' }]}>
-              <Feather name="info" size={26} color={colors.primary} />
+              <Icon name="info" size={26} color={colors.primary} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite already accepted</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
@@ -158,15 +159,15 @@ export default function TeamInviteScreen() {
         ) : (
           <>
             <View style={[styles.icon, { backgroundColor: colors.primary + '22' }]}>
-              <Feather name="users" size={26} color={colors.primary} />
+              <Icon name="users" size={26} color={colors.primary} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Join {brand}</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-              You've been invited to join the team as <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{roleLabel}</Text>
+              You've been invited to join the team as <Text style={{ color: colors.foreground, fontFamily: FONT.semibold }}>{roleLabel}</Text>
               {ROLE_DESC[invite?.role] ? ` — ${ROLE_DESC[invite.role].toLowerCase()}` : ''}.
             </Text>
             <View style={[styles.inviteMeta, { borderColor: colors.border }]}>
-              <Feather name="mail" size={13} color={colors.mutedForeground} />
+              <Icon name="mail" size={13} color={colors.mutedForeground} />
               <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Invite sent to {invite?.email}</Text>
             </View>
             {!isLoaded ? (
@@ -198,10 +199,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 24 },
   card: { borderRadius: 18, borderWidth: 1, padding: 24, alignItems: 'center' },
   icon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  title: { fontSize: 20, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  sub: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  title: { fontSize: 20, fontFamily: FONT.bold, textAlign: 'center' },
+  sub: { fontSize: 14, fontFamily: FONT.regular, textAlign: 'center', marginTop: 8, lineHeight: 20 },
   inviteMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 16 },
   btn: { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, marginTop: 18, alignSelf: 'stretch', alignItems: 'center' },
-  btnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  hint: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 10, textAlign: 'center' },
+  btnText: { fontSize: 14, fontFamily: FONT.semibold },
+  hint: { fontSize: 12, fontFamily: FONT.regular, marginTop: 10, textAlign: 'center' },
 });

@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
@@ -98,7 +98,7 @@ export default function LiveCohostScreen() {
   const header = (
     <View>
       <View style={s.searchWrap}>
-        <Feather name="search" size={16} color={theme.muted} />
+        <Icon name="search" size={16} color={theme.muted} />
         <TextInput
           value={query}
           onChangeText={setQuery}

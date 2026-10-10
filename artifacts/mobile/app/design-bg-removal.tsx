@@ -20,7 +20,7 @@ import Animated, {
   Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming,
 } from 'react-native-reanimated';
 import { useAuth } from '@clerk/expo';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -95,15 +95,15 @@ function DropZone({ onPress }: { onPress: () => void }) {
         <Animated.View pointerEvents="none" style={[s.sheen, sheenStyle]}>
           <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.10)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
-        <Animated.View pointerEvents="none" style={[s.twinkle, { top: '18%', left: '16%' }, t1]}><Feather name="star" size={10} color={FG} /></Animated.View>
-        <Animated.View pointerEvents="none" style={[s.twinkle, { top: '30%', right: '14%' }, t2]}><Feather name="star" size={14} color={SILVER} /></Animated.View>
-        <Animated.View pointerEvents="none" style={[s.twinkle, { bottom: '20%', left: '22%' }, t2]}><Feather name="star" size={8} color={SILVER} /></Animated.View>
-        <Animated.View pointerEvents="none" style={[s.twinkle, { bottom: '26%', right: '20%' }, t1]}><Feather name="star" size={11} color={FG} /></Animated.View>
+        <Animated.View pointerEvents="none" style={[s.twinkle, { top: '18%', left: '16%' }, t1]}><Icon name="star" size={10} color={FG} /></Animated.View>
+        <Animated.View pointerEvents="none" style={[s.twinkle, { top: '30%', right: '14%' }, t2]}><Icon name="star" size={14} color={SILVER} /></Animated.View>
+        <Animated.View pointerEvents="none" style={[s.twinkle, { bottom: '20%', left: '22%' }, t2]}><Icon name="star" size={8} color={SILVER} /></Animated.View>
+        <Animated.View pointerEvents="none" style={[s.twinkle, { bottom: '26%', right: '20%' }, t1]}><Icon name="star" size={11} color={FG} /></Animated.View>
         <View style={s.dropCenter}>
           <Animated.View style={[s.dropRing, ringStyle]} />
           <Animated.View style={[s.dropRing, ring2Style]} />
           <View style={s.dropIcon}>
-            <Feather name="upload" size={ICON.xl} color={FG} />
+            <Icon name="upload" size={ICON.xl} color={FG} />
           </View>
         </View>
       </View>
@@ -470,7 +470,7 @@ export default function DesignBgRemovalScreen() {
             contentContainerStyle={s.strip}
             ListHeaderComponent={
               <PressableScale onPress={pickPhoto} style={[s.tile, s.tilePlus]} accessibilityRole="button" accessibilityLabel="Add photo" testID="bg-removal-add-photo" disabled={stripLocked}>
-                <Feather name="plus" size={ICON.lg} color={FG} />
+                <Icon name="plus" size={ICON.lg} color={FG} />
               </PressableScale>
             }
             renderItem={({ item }) => (
@@ -500,11 +500,11 @@ export default function DesignBgRemovalScreen() {
             </View>
             <View style={s.grid}>
               <Pressable onPress={() => setRefining(true)} style={({ pressed }) => [s.cell, s.cellOutline, pressed && s.pressed]} accessibilityRole="button" accessibilityLabel="Refine" testID="bg-removal-refine">
-                <Feather name="edit-3" size={ICON.sm} color={FG} />
+                <Icon name="edit-3" size={ICON.sm} color={FG} />
                 <Text style={s.cellText}>Refine</Text>
               </Pressable>
               <Pressable onPress={handleSave} style={({ pressed }) => [s.cell, s.cellSolid, saving && s.dim, pressed && s.pressed]} accessibilityRole="button" accessibilityLabel="Save" testID="bg-removal-save">
-                <Feather name={saved ? 'check' : 'download'} size={ICON.sm} color={BG} />
+                <Icon name={saved ? 'check' : 'download'} size={ICON.sm} color={BG} />
                 <Text style={[s.cellText, { color: BG }]}>{saved ? 'Saved' : 'Save'}</Text>
               </Pressable>
             </View>
@@ -543,18 +543,18 @@ function Pill({ label, onPress, disabled, testID }: { label: string; onPress: ()
   );
 }
 
-function CornerBtn({ icon, label, disabled, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; disabled?: boolean; onPress: () => void }) {
+function CornerBtn({ icon, label, disabled, onPress }: { icon: IconName; label: string; disabled?: boolean; onPress: () => void }) {
   return (
     <PressableScale onPress={() => { if (!disabled) onPress(); }} style={[s.cornerBtn, disabled && s.cornerDisabled]} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled }} testID={`bg-removal-${label.toLowerCase()}`}>
-      <Feather name={icon} size={ICON.sm} color={FG} />
+      <Icon name={icon} size={ICON.sm} color={FG} />
     </PressableScale>
   );
 }
 
-function ToolBtn({ icon, label, active, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; active: boolean; onPress: () => void }) {
+function ToolBtn({ icon, label, active, onPress }: { icon: IconName; label: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [s.cell, active ? s.cellSolid : s.cellOutline, pressed && s.pressed]} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: active }}>
-      <Feather name={icon} size={ICON.sm} color={active ? BG : FG} />
+      <Icon name={icon} size={ICON.sm} color={active ? BG : FG} />
       <Text style={[s.cellText, active && { color: BG }]}>{label}</Text>
     </Pressable>
   );
@@ -575,7 +575,7 @@ function Swatch({ kind, label, active, onPress }: { kind: Backdrop; label: strin
         {kind === 'blur' && (
           <>
             <LinearGradient colors={['#6E6E6E', '#D8D8D8', '#4A4A4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-            <View style={s.swatchIcon}><Feather name="droplet" size={12} color={FG} /></View>
+            <View style={s.swatchIcon}><Icon name="droplet" size={12} color={FG} /></View>
           </>
         )}
       </View>

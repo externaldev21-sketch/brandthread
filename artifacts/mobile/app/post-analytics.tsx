@@ -11,7 +11,7 @@ import {
   ActivityIndicator, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PostAnalyticsResponse, useApi } from '@/lib/api';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -259,7 +259,7 @@ export default function PostAnalyticsScreen() {
 
         {(!metrics.views.tracked || !metrics.retention.tracked) && (
           <View style={styles.availabilityNote}>
-            <Feather name="info" size={18} color={colors.primary} />
+            <Icon name="info" size={18} color={colors.primary} />
             <Text style={styles.unavailableText}>
               Unavailable metrics are labeled “Not tracked.” Brandthread never estimates post performance.
             </Text>
@@ -273,12 +273,12 @@ export default function PostAnalyticsScreen() {
             onPress={() => router.push(('/boost?targetType=post&targetId=' + encodeURIComponent(post.id)) as never)}
           >
             <LinearGradient colors={colors.gradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.quickActionGradient}>
-              <Feather name="zap" size={18} color={colors.primaryForeground} />
+              <Icon name="zap" size={18} color={colors.primaryForeground} />
               <Text style={styles.quickActionText}>Boost Post</Text>
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionShare} activeOpacity={0.85} onPress={() => goBackOr(router)}>
-             <Feather name="arrow-left" size={18} color={colors.primaryForeground} />
+             <Icon name="arrow-left" size={18} color={colors.primaryForeground} />
             <Text style={styles.quickActionText}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -295,12 +295,12 @@ export default function PostAnalyticsScreen() {
       {/* ─── Fixed Header ──────────────────────────────────────────────────── * /}
       <View style={[styles.header, { paddingTop: headerTopInset }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
-          <Feather name="arrow-left" size={20} color={colors.text} />
+          <Icon name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Post Analytics</Text>
         <TouchableOpacity style={styles.rangePill} onPress={cycleRange}>
           <Text style={styles.rangePillText}>{activeRange}</Text>
-          <Feather name="chevron-down" size={12} color={colors.mutedForeground} style={{ marginLeft: 2 }} />
+          <Icon name="chevron-down" size={12} color={colors.mutedForeground} style={{ marginLeft: 2 }} />
         </TouchableOpacity>
       </View>
 
@@ -431,7 +431,7 @@ export default function PostAnalyticsScreen() {
         <SectionTitle title="Peak Engagement Hour" />
         <View style={[styles.card, styles.peakHourCard]}>
           <View style={styles.peakHourLeft}>
-            <Feather name="clock" size={20} color={colors.success} />
+            <Icon name="clock" size={20} color={colors.success} />
             <Text style={styles.peakHourTime}>{formatPeakHour(analytics.peakHour)}</Text>
           </View>
           <Text style={styles.peakHourSub}>Most viewers are active at this hour</Text>
@@ -446,12 +446,12 @@ export default function PostAnalyticsScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.quickActionGradient}
             >
-              <Feather name="zap" size={18} color={colors.primaryForeground} />
+              <Icon name="zap" size={18} color={colors.primaryForeground} />
               <Text style={styles.quickActionText}>Boost Post</Text>
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionShare} activeOpacity={0.85}>
-              <Feather name="share-2" size={18} color={colors.primaryForeground} />
+              <Icon name="share-2" size={18} color={colors.primaryForeground} />
             <Text style={styles.quickActionText}>Share Results</Text>
           </TouchableOpacity>
         </View>
@@ -464,7 +464,7 @@ export default function PostAnalyticsScreen() {
 // ─── Hero Card ─────────────────────────────────────────────────────────────────
 
 interface HeroCardProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   iconColor: string;
   label: string;
   value: string;
@@ -475,7 +475,7 @@ function HeroCard({ icon, iconColor, label, value }: HeroCardProps) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.heroCard}>
-      <Feather name={icon} size={16} color={iconColor} />
+      <Icon name={icon} size={16} color={iconColor} />
       <Text style={styles.heroValue}>{value}</Text>
       <Text style={styles.heroLabel}>{label}</Text>
     </View>

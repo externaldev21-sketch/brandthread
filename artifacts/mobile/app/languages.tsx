@@ -7,7 +7,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator
 import { useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { SUCCESS, SUCCESS_DIM, FONT, FS, RADIUS } from '@/lib/theme';
@@ -80,7 +80,7 @@ export default function LanguagesScreen() {
           <View style={s.section}>
             <View style={[s.currentCard, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
               <View style={[s.currentIcon, { backgroundColor: colors.accent }]}>
-                <Feather name="globe" size={20} color={colors.primary} />
+                <Icon name="globe" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.currentLabel, { color: colors.primary }]}>Store language</Text>
@@ -130,9 +130,9 @@ export default function LanguagesScreen() {
                     {isSaving ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : isSelected ? (
-                      <Feather name="check" size={20} color={colors.primary} />
+                      <Icon name="check" size={20} color={colors.primary} />
                     ) : (
-                      <Feather name="circle" size={18} color={colors.mutedForeground} />
+                      <Icon name="circle" size={18} color={colors.mutedForeground} />
                     )}
                   </TouchableOpacity>
                 );

@@ -3,9 +3,10 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking } 
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HapticSwitch } from '@/components/BrandthreadUI';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
+import { FONT } from '@/lib/theme';
 
 const STRIPE_TAX_REGISTRATIONS_URL = 'https://dashboard.stripe.com/tax/registrations';
 
@@ -122,7 +123,7 @@ export default function TaxesDutiesScreen() {
           </View>
 
           <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
-            <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
+            <Icon name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
             <Text style={[styles.infoText, { color: colors.foreground }]}>
               This calculates and collects tax — it is not proof of nexus, registration, or filing compliance. Product tax codes, registrations, and the checkout address determine the actual taxability; Brandthread does not apply a local rate table or override Stripe's result.
             </Text>
@@ -165,7 +166,7 @@ export default function TaxesDutiesScreen() {
             </TouchableOpacity>
           </View>
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <Icon name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available directly in-app yet</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -181,7 +182,7 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax-inclusive pricing</Text>
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="tag" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <Icon name="tag" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -200,7 +201,7 @@ export default function TaxesDutiesScreen() {
             Delivered Duty Paid (DDP) collects import duties from the buyer at checkout and remits them for you. Delivered At Place (DAP) leaves the buyer responsible for customs duties on delivery.
           </Text>
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <Icon name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -216,14 +217,14 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <View style={styles.rowStart}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Registrations and filing</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+            <Icon name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
             Brandthread does not determine where you have nexus, register you, or file returns. Review marketplace-facilitator treatment and state obligations with a qualified accountant.
           </Text>
 
           <View style={[styles.reportCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="bar-chart-2" size={17} color={colors.foreground} style={styles.rowIcon} />
+            <Icon name="bar-chart-2" size={17} color={colors.foreground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>1099-K preparation</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
@@ -256,23 +257,23 @@ export default function TaxesDutiesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
-  sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 6, marginBottom: 14, lineHeight: 17 },
+  sectionTitle: { fontSize: 15, fontFamily: FONT.semibold },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 6, marginBottom: 14, lineHeight: 17 },
   rowStart: { flexDirection: 'row', alignItems: 'center' },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   divider: { height: 10 },
   manageBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  manageBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  rowLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  rowDescription: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2, lineHeight: 17 },
+  manageBtnText: { fontSize: 13, fontFamily: FONT.semibold },
+  rowLabel: { fontSize: 14, fontFamily: FONT.semibold },
+  rowDescription: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2, lineHeight: 17 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 12 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 2 },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 12, fontFamily: 'Inter_400Regular', flex: 1 },
+  statusText: { fontSize: 12, fontFamily: FONT.regular, flex: 1 },
   reportCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 14 },
   unavailableCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 4 },
-  disclaimer: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginTop: 10, paddingHorizontal: 4 },
+  disclaimer: { fontSize: 11, fontFamily: FONT.regular, lineHeight: 16, marginTop: 10, paddingHorizontal: 4 },
   rowIcon: { width: 20 },
   infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginTop: 12 },
-  infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
+  infoText: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, flex: 1 },
 });

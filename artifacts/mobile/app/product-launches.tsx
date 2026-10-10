@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
@@ -136,7 +136,7 @@ export default function ProductLaunchesScreen() {
               >
                 <Thumb uri={p.images?.[0]} colors={colors} />
                 <Text style={[s.name, { color: colors.foreground, flex: 1 }]} numberOfLines={2}>{p.name}</Text>
-                <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -160,7 +160,7 @@ export default function ProductLaunchesScreen() {
 function Thumb({ uri, colors }: { uri?: string | null; colors: ReturnType<typeof useColors> }) {
   return uri
     ? <Image source={{ uri }} style={s.thumb} />
-    : <View style={[s.thumb, s.thumbEmpty, { backgroundColor: colors.surface, borderColor: colors.border }]}><Feather name="image" size={16} color={colors.mutedForeground} /></View>;
+    : <View style={[s.thumb, s.thumbEmpty, { backgroundColor: colors.surface, borderColor: colors.border }]}><Icon name="image" size={16} color={colors.mutedForeground} /></View>;
 }
 
 function LaunchRow({ launch, onPress }: { launch: Launch; onPress: () => void }) {
@@ -178,13 +178,13 @@ function LaunchRow({ launch, onPress }: { launch: Launch; onPress: () => void })
         <Text style={[s.name, { color: colors.foreground }]} numberOfLines={2}>{launch.name}</Text>
         <Text style={[s.meta, { color: colors.mutedForeground }]}>{done ? 'Launched' : 'Launches'} {whenLabel(launch.launchAt)}</Text>
         <View style={s.metaRow}>
-          <Feather name="bell" size={12} color={colors.mutedForeground} />
+          <Icon name="bell" size={12} color={colors.mutedForeground} />
           <Text style={[s.meta, { color: colors.mutedForeground }]}>
             {launch.alertCount} {launch.alertCount === 1 ? 'person' : 'people'} waiting{launch.notifyFollowers ? ' · followers notified' : ''}
           </Text>
         </View>
       </View>
-      {!done && <Feather name="chevron-right" size={16} color={colors.mutedForeground} />}
+      {!done && <Icon name="chevron-right" size={16} color={colors.mutedForeground} />}
     </TouchableOpacity>
   );
 }
@@ -259,7 +259,7 @@ function LaunchEditor({
           {filtered.map((z) => (
             <TouchableOpacity key={z} style={[s.zoneRow, { borderColor: colors.border }]} onPress={() => { setZone(z); setZoneOpen(false); setZoneFilter(''); }}>
               <Text style={[s.name, { color: colors.foreground }]}>{z}</Text>
-              {z === zone && <Feather name="check" size={16} color={colors.foreground} />}
+              {z === zone && <Icon name="check" size={16} color={colors.foreground} />}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -280,9 +280,9 @@ function LaunchEditor({
           onPress={() => setZoneOpen(true)}
           accessibilityLabel={`Timezone ${zone}`}
         >
-          <Feather name="globe" size={14} color={colors.mutedForeground} />
+          <Icon name="globe" size={14} color={colors.mutedForeground} />
           <Text style={[s.name, { color: colors.foreground, flex: 1 }]}>{zone}</Text>
-          <Feather name="chevron-down" size={14} color={colors.mutedForeground} />
+          <Icon name="chevron-down" size={14} color={colors.mutedForeground} />
         </TouchableOpacity>
 
         <View style={[s.switchRow, { borderColor: colors.border }]}>

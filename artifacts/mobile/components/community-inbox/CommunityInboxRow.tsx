@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 
 import { PressableScale } from '@/components/BrandthreadUI';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
@@ -88,7 +88,7 @@ export function CommunityInboxRow({ community, onPress, onToggleMute, horizontal
             <Text style={[styles.time, { color: theme.muted }]} numberOfLines={1}>{timeAgo(community.lastMessageTs)}</Text>
           ) : null}
           <View style={styles.badgeRow}>
-            {p.showMutedGlyph ? <Feather name="bell-off" size={13} color={theme.subtle} testID={`inbox-community-muted-${community.id}`} /> : null}
+            {p.showMutedGlyph ? <Icon name="bell-off" size={13} color={theme.subtle} testID={`inbox-community-muted-${community.id}`} /> : null}
             {p.loud ? (
               <View style={[styles.badge, { backgroundColor: theme.accent }]} testID={`inbox-community-badge-${community.id}`}>
                 <Text style={[styles.badgeText, { color: theme.onAccent }]}>{p.countLabel}</Text>

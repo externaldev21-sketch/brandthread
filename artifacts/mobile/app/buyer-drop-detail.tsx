@@ -5,7 +5,7 @@ import {
   Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -189,7 +189,7 @@ function Countdown({
           <Text style={styles.liveTitle}>LIVE NOW</Text>
           <Text style={styles.liveSub}>Limited release · while stock lasts</Text>
         </View>
-        <Feather name="zap" size={22} color={ON_DARK} />
+        <Icon name="zap" size={22} color={ON_DARK} />
       </View>
     );
   }
@@ -208,7 +208,7 @@ function Countdown({
       <View style={[styles.timerRule, { backgroundColor: theme.accent }]} />
       {viewerHasEarlyAccess && !!earlyAccessMinutes && (
         <View style={styles.earlyAccessRow}>
-          <Feather name="star" size={12} color={theme.accent} />
+          <Icon name="star" size={12} color={theme.accent} />
           <Text style={[styles.earlyAccessText, { color: theme.accent }]}>
             Early access — you get in {earlyAccessMinutes} min before everyone else
           </Text>
@@ -259,7 +259,7 @@ function ProductTile({
           {imageUri ? (
             <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={locked ? 22 : 0} />
           ) : (
-            <View style={styles.productFallback}><Feather name="image" size={28} color={SUBTLE} /></View>
+            <View style={styles.productFallback}><Icon name="image" size={28} color={SUBTLE} /></View>
           )}
           {soldOut && (
             <View style={StyleSheet.absoluteFill}>
@@ -271,7 +271,7 @@ function ProductTile({
           {locked && (
             <View style={styles.lockOverlay}>
               <View style={styles.lockBadge}>
-                <Feather name="lock" size={18} color={ON_DARK} />
+                <Icon name="lock" size={18} color={ON_DARK} />
               </View>
             </View>
           )}
@@ -442,7 +442,7 @@ export default function BuyerDropDetail() {
   if (!drop) {
     return (
       <View style={[styles.center, { paddingHorizontal: 32, gap: 16 }]}>
-        <Feather name="alert-triangle" size={32} color={theme.muted} />
+        <Icon name="alert-triangle" size={32} color={theme.muted} />
         <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: 17, textAlign: 'center' }}>
           {loadError ? "Couldn't load this drop." : "This drop isn't available."}
         </Text>
@@ -490,18 +490,18 @@ export default function BuyerDropDetail() {
 
           <View style={[styles.heroHeader, { paddingTop: headerTopInset + SP.sm }]}>
             <TouchableOpacity style={styles.roundButton} onPress={() => goBackOr(router)} hitSlop={4} accessibilityLabel="Go back">
-              <Feather name="arrow-left" size={21} color={ON_DARK} />
+              <Icon name="arrow-left" size={21} color={ON_DARK} />
             </TouchableOpacity>
             <View style={styles.heroBadge}>
               <Text style={styles.heroBadgeText}>{showRecap ? 'DROP ENDED' : (isLive ? 'LIVE DROP' : 'UPCOMING')}</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <TouchableOpacity style={styles.roundButton} onPress={handleShare} hitSlop={4} accessibilityLabel="Share this drop">
-                <Feather name="share" size={18} color={ON_DARK} />
+                <Icon name="share" size={18} color={ON_DARK} />
               </TouchableOpacity>
               {!showRecap && (
                 <TouchableOpacity style={styles.roundButton} onPress={toggleNotification} hitSlop={4} accessibilityLabel="Toggle drop alert">
-                  <Feather name={subscribed ? 'bell-off' : 'bell'} size={19} color={ON_DARK} />
+                  <Icon name={subscribed ? 'bell-off' : 'bell'} size={19} color={ON_DARK} />
                 </TouchableOpacity>
               )}
             </View>
@@ -520,7 +520,7 @@ export default function BuyerDropDetail() {
               <View>
                 <View style={styles.brandNameRow}>
                   <Text style={styles.brandName}>{sellerName}</Text>
-                  {drop.seller?.verified && <Feather name="check-circle" size={14} color={theme.secondary} />}
+                  {drop.seller?.verified && <Icon name="check-circle" size={14} color={theme.secondary} />}
                 </View>
                 <Text style={styles.dropType}>{drop.type === 'pre-order' ? 'PRE-ORDER EDITION' : 'READY TO SHIP'}</Text>
               </View>
@@ -530,7 +530,7 @@ export default function BuyerDropDetail() {
 
             {showRecap ? (
               <View style={styles.livePanel}>
-                <Feather name="check-circle" size={20} color={SUCCESS} />
+                <Icon name="check-circle" size={20} color={SUCCESS} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.liveTitle}>{drop.orderCount ?? 0} pieces claimed</Text>
                   <Text style={styles.liveSub}>This drop has ended</Text>
@@ -570,7 +570,7 @@ export default function BuyerDropDetail() {
                   >
                     {notifyLoading ? <ActivityIndicator color={subscribed ? ON_DARK : theme.onAccent} /> : (
                       <>
-                        <Feather name={subscribed ? 'check' : 'bell'} size={18} color={subscribed ? ON_DARK : theme.onAccent} />
+                        <Icon name={subscribed ? 'check' : 'bell'} size={18} color={subscribed ? ON_DARK : theme.onAccent} />
                         <Text style={[styles.primaryButtonText, !subscribed && { color: theme.onAccent }]}>
                           {subscribed ? 'You’ll be notified' : 'Notify me'}
                         </Text>
@@ -583,7 +583,7 @@ export default function BuyerDropDetail() {
                     onPress={() => scrollRef.current?.scrollTo({ y: HERO_H - 24, animated: true })}
                     testID="shop-live-drop-button"
                   >
-                    <Feather name="shopping-bag" size={18} color={theme.onAccent} />
+                    <Icon name="shopping-bag" size={18} color={theme.onAccent} />
                     <Text style={[styles.primaryButtonText, { color: theme.onAccent }]}>Shop the drop</Text>
                   </TouchableOpacity>
                 )}

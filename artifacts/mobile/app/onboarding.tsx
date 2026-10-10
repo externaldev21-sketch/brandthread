@@ -45,7 +45,8 @@ import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
 import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { ONBOARDING_KEY, ONBOARDING_OWNER_KEY } from './_layout';
@@ -111,6 +112,7 @@ import {
 } from '@/components/onboarding/OnboardingUI';
 import { MOTION, RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 import { radius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -268,14 +270,14 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
     >
       <Text style={ssc.emoji}>{emoji}</Text>
       <Text style={[ssc.chipText, selected && { color: theme.text }]}>{label}</Text>
-      {selected && <Feather name="check" size={13} color={theme.text} />}
+      {selected && <Icon name="check" size={13} color={theme.text} />}
     </PressableScale>
   );
 }
 const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   emoji:    { fontSize: 16 },
-  chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chipText: { fontSize: 15, fontFamily: FONT.medium, color: theme.muted },
 });
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -289,13 +291,13 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
     >
       <Text style={[sc.chipText, selected && { color: theme.text }]}>{label}</Text>
-      {selected && <Feather name="check" size={13} color={theme.text} />}
+      {selected && <Icon name="check" size={13} color={theme.text} />}
     </PressableScale>
   );
 }
 const createSc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  chipText:   { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chipText:   { fontSize: 15, fontFamily: FONT.medium, color: theme.muted },
 });
 
 /** Big tappable option row — one of a few answers to the screen's question. */
@@ -323,7 +325,7 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
 const createSr = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   row:     { backgroundColor: theme.card, borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, paddingHorizontal: 18, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', gap: SPACE.md, overflow: 'hidden' },
   stitch:  { position: 'absolute', top: 10, left: 18 },
-  label:   { fontSize: 17, lineHeight: 22, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2 },
+  label:   { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold, color: theme.text, marginBottom: 2 },
   labelOn: { color: theme.text },
   sub:     { ...TYPE.body, color: theme.muted },
   circle:  { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -340,7 +342,7 @@ function InlineError({ message }: { message: string }) {
   const { theme } = useAppTheme();
   return (
     <Reveal style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACE.sm }}>
-      <Feather name="alert-circle" size={14} color={theme.error} />
+      <Icon name="alert-circle" size={14} color={theme.error} />
       <Text style={[TYPE.label, { color: theme.error, flex: 1 }]}>{message}</Text>
     </Reveal>
   );
@@ -407,7 +409,7 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
                 <View style={sl.stepRail}>
                   <View style={[sl.stepIcon, isDone && sl.stepIconDone, isActive && { borderColor: theme.text }]}>
                     {isDone ? (
-                      <Feather name="check" size={13} color={theme.background} />
+                      <Icon name="check" size={13} color={theme.background} />
                     ) : isActive ? (
                       <ActivityIndicator size="small" color={theme.text} />
                     ) : (
@@ -455,7 +457,7 @@ const createSl = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   stepIconDone:   { backgroundColor: FG, borderColor: FG },
   stepDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)' },
   stepLabel:      { ...TYPE.body, lineHeight: 28, color: MUTED },
-  stepLabelActive:{ color: FG, fontFamily: 'Inter_600SemiBold' },
+  stepLabelActive:{ color: FG, fontFamily: FONT.semibold },
   });
 };
 
@@ -488,7 +490,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
           <ThreadDraw height={120} color={theme.text} delay={120} duration={1100} style={sn.heroThread} />
           <Reveal>
             <View style={[sn.bellBg, { backgroundColor: theme.background, borderColor: theme.border, shadowColor: theme.text }]}>
-              <Feather name="bell" size={30} color={theme.text} />
+              <Icon name="bell" size={30} color={theme.text} />
             </View>
           </Reveal>
         </View>
@@ -596,7 +598,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
           ).map((f, i) => (
             <Reveal key={f} delay={copyDelay} index={i + 3}>
               <View style={ss.featureRow}>
-                <Feather name="check" size={15} color={theme.text} />
+                <Icon name="check" size={15} color={theme.text} />
                 <Text style={ss.featureText}>{f}</Text>
               </View>
             </Reveal>
@@ -618,7 +620,7 @@ const createSs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   body:       { flex: 1, justifyContent: 'center' },
   hero:       { alignItems: 'center', marginBottom: SPACE.xl },
   brandBadge: { alignSelf: 'flex-start', borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 6, marginTop: SPACE.sm, borderWidth: 1 },
-  brandBadgeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  brandBadgeText: { fontSize: 13, fontFamily: FONT.semibold },
   desc:       { ...TYPE.body, color: MUTED, marginTop: SPACE.sm, marginBottom: SPACE.lg },
   features:   { gap: SPACE.sm },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
@@ -901,7 +903,7 @@ function BuyerAuthStep({
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={sba.scroll} keyboardShouldPersistTaps="handled">
           <TouchableOpacity onPress={() => { setPhase('choose'); setError(''); }} style={sba.backToChoose} activeOpacity={0.7}>
-            <Feather name="arrow-left" size={16} color={MUTED} />
+            <Icon name="arrow-left" size={16} color={MUTED} />
             <Text style={sba.backToChooseText}>Back</Text>
           </TouchableOpacity>
           <Text style={sba.headline}>Create your account</Text>
@@ -986,7 +988,7 @@ function BuyerAuthStep({
                 autoComplete="new-password"
               />
               <TouchableOpacity accessibilityLabel={showPw ? 'Hide password' : 'Show password'} accessibilityRole="button" style={sba.eyeBtn} onPress={() => setShowPw(v => !v)}>
-                <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
+                <Icon name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
               </TouchableOpacity>
             </View>
             {password.length > 0 && password.length < 8 && (
@@ -1054,7 +1056,7 @@ function BuyerAuthStep({
                   <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
                 </View>
                 <Text style={sba.bigRowText}>Continue with Apple</Text>
-                <Feather name="chevron-right" size={16} color={MUTED2} />
+                <Icon name="chevron-right" size={16} color={MUTED2} />
               </>
             )}
           </TouchableOpacity>
@@ -1074,11 +1076,11 @@ function BuyerAuthStep({
               <>
                 <View style={sba.bigRowIcon}>
                   <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text>
+                    <Text style={{ fontFamily: FONT.bold, fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text>
                   </View>
                 </View>
                 <Text style={sba.bigRowText}>Continue with Google</Text>
-                <Feather name="chevron-right" size={16} color={MUTED2} />
+                <Icon name="chevron-right" size={16} color={MUTED2} />
               </>
             )}
           </TouchableOpacity>
@@ -1092,10 +1094,10 @@ function BuyerAuthStep({
           disabled={!!oauthLoading || loading}
         >
           <View style={sba.bigRowIcon}>
-            <Feather name="mail" size={20} color={MUTED} />
+            <Icon name="mail" size={20} color={MUTED} />
           </View>
           <Text style={sba.bigRowText}>Use email</Text>
-          <Feather name="chevron-right" size={16} color={MUTED2} />
+          <Icon name="chevron-right" size={16} color={MUTED2} />
         </TouchableOpacity>
 
         <LegalContinueNotice style={{ marginTop: 12 }} />
@@ -1367,7 +1369,7 @@ function SharedAuthStep({
           <StepSub>An account already exists with this email.</StepSub>
           <Reveal index={2}>
             <View style={[ssa.existingEmailChip, { borderColor: theme.border }]}>
-              <Feather name="mail" size={13} color={theme.muted} />
+              <Icon name="mail" size={13} color={theme.muted} />
               <Text style={[ssa.existingEmailText, { color: theme.text }]}>{email}</Text>
             </View>
           </Reveal>
@@ -1405,7 +1407,7 @@ function SharedAuthStep({
             <PrimaryButton label={loading ? 'Verifying…' : 'Verify email'} onPress={handleVerify} disabled={!canVerify} loading={loading} />
           </Reveal>
           <TouchableOpacity style={ssa.resendBtn} onPress={() => signUp.verifications.sendEmailCode()}>
-            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.text, fontFamily: 'Inter_600SemiBold' }}>Resend</Text></Text>
+            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Resend</Text></Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1622,8 +1624,8 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
   chooseScroll: { flexGrow: 1, paddingVertical: 24, gap: 0 },
-  chooseHeadline: { fontSize: 36, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1.2, marginBottom: 8 },
-  chooseSub: { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 22, marginBottom: 32 },
+  chooseHeadline: { fontSize: 36, fontFamily: FONT.bold, color: FG, letterSpacing: -1.2, marginBottom: 8 },
+  chooseSub: { fontSize: 15, fontFamily: FONT.regular, color: MUTED, lineHeight: 22, marginBottom: 32 },
   bigRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
@@ -1631,54 +1633,54 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   appleRow: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
   bigRowIcon: { width: 28, alignItems: 'center' },
-  bigRowText: { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
+  bigRowText: { flex: 1, fontSize: 15, fontFamily: FONT.semibold, color: FG },
   signInLink: { paddingVertical: 16, alignItems: 'center' },
-  signInLinkText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
+  signInLinkText: { fontSize: 14, fontFamily: FONT.regular, color: MUTED },
   backToChoose: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
-  backToChooseText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
-  headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 4 },
-  sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
+  backToChooseText: { fontSize: 14, fontFamily: FONT.medium, color: MUTED },
+  headline:  { fontSize: 28, fontFamily: FONT.bold, color: FG, letterSpacing: -0.5, marginBottom: 4 },
+  sub:       { fontSize: 14, fontFamily: FONT.regular, color: MUTED, marginBottom: 20 },
   inputWrap: { marginBottom: 12 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
-  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
-  codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: 'Inter_700Bold' },
+  label:     { fontSize: 12, fontFamily: FONT.semibold, color: MUTED, marginBottom: 5 },
+  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: FONT.regular, color: FG },
+  codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: FONT.bold },
   pwRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12 },
   pwInput:   { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
   eyeBtn:    { paddingHorizontal: 14 },
-  hint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
-  error:     { color: ERR, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 10 },
+  hint:      { fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginTop: 4 },
+  error:     { color: ERR, fontSize: 13, fontFamily: FONT.regular, marginBottom: 10 },
   resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 6 },
-  resendText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
-  legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
+  resendText:{ fontSize: 14, fontFamily: FONT.regular, color: MUTED },
+  legal:     { fontSize: 12, fontFamily: FONT.regular, color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
   existingEmailChip: {
     alignSelf: 'flex-start',
     borderRadius: 20, borderWidth: 1,
     paddingHorizontal: 14, paddingVertical: 6, marginBottom: 16,
   },
-  existingEmailText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  existingEmailText: { fontSize: 13, fontFamily: FONT.semibold },
   existingCard: {
     borderRadius: 12, borderWidth: 1,
     padding: 16, marginBottom: 20,
   },
   existingCardTitle: {
-    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, lineHeight: 23,
+    fontSize: 17, fontFamily: FONT.bold, color: FG, marginBottom: 6, lineHeight: 23,
   },
   existingCardSub: {
-    fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20,
+    fontSize: 14, fontFamily: FONT.regular, color: MUTED, lineHeight: 20,
   },
   existingSignInBtn:  { marginBottom: 9, borderRadius: 12, overflow: 'hidden' },
   existingSignInGrad: { paddingVertical: 16, alignItems: 'center', borderRadius: 12 },
-  existingSignInText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  existingSignInText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   existingDiffBtn: {
     borderRadius: 12, paddingVertical: 15, alignItems: 'center',
     borderWidth: 1, borderColor: BORDER,
   },
-  existingDiffText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  existingDiffText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   sessionBtn:     { marginTop: 8, marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
   sessionBtnGrad: { paddingVertical: 16, alignItems: 'center', paddingHorizontal: 20 },
-  sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  sessionBtnText: { fontSize: 15, fontFamily: FONT.bold, color: FG },
   continueBtn:    { paddingVertical: 14, alignItems: 'center' },
-  continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
+  continueBtnText:{ fontSize: 14, fontFamily: FONT.medium, color: MUTED },
   });
 };
 
@@ -1699,19 +1701,19 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   divText:   { ...TYPE.label, color: MUTED },
   oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
   appleBtn:  { borderColor: BORDER },
-  oauthText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: FG },
+  oauthText: { fontSize: 16, fontFamily: FONT.semibold, color: FG },
   existingEmailChip: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14, paddingVertical: 8, marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
-  existingEmailText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  existingEmailText: { fontSize: 14, fontFamily: FONT.semibold },
   existingCard: {
     borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth,
     padding: SPACE.md + 2,
   },
   existingCardTitle: {
-    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, lineHeight: 23,
+    fontSize: 17, fontFamily: FONT.bold, color: FG, marginBottom: 6, lineHeight: 23,
   },
   existingCardSub: {
     ...TYPE.body, color: MUTED,
@@ -1786,7 +1788,7 @@ function SellerPreviewStep({
                 </LinearGradient>
                 <View style={spreview.themeNameRow}>
                   <Text numberOfLines={1} style={spreview.themeName}>{preset.name}</Text>
-                  {selected ? <Feather name="check" size={13} color={theme.text} /> : null}
+                  {selected ? <Icon name="check" size={13} color={theme.text} /> : null}
                 </View>
               </PressableScale>
             );
@@ -1801,7 +1803,7 @@ function SellerPreviewStep({
             <Text style={spreview.sectionLabel}>One free AI sample</Text>
             <Text style={spreview.sampleSub}>See your brand name as a logo. This calls the real generator.</Text>
           </View>
-          <Feather name="zap" size={18} color={theme.text} />
+          <Icon name="zap" size={18} color={theme.text} />
         </View>
         <View style={spreview.styleRow}>
           {LOGO_SAMPLE_STYLES.map((style) => (
@@ -1816,7 +1818,7 @@ function SellerPreviewStep({
             <Image source={{ uri: sampleUri }} style={spreview.resultImage} resizeMode="contain" accessibilityLabel={`${brandName} AI logo sample`} />
             <AiGeneratedBadge position="topLeft" />
             <View style={spreview.resultCaption}>
-              <Feather name="check" size={15} color={theme.text} />
+              <Icon name="check" size={15} color={theme.text} />
               <Text style={spreview.resultText}>Your real AI sample is ready.</Text>
             </View>
           </View>
@@ -1826,7 +1828,7 @@ function SellerPreviewStep({
           <PillButton
             testID="onboarding-generate-sample"
             label="Generate free sample"
-            icon={<Feather name="image" size={18} color={theme.onAccent} />}
+            icon={<Icon name="image" size={18} color={theme.onAccent} />}
             onPress={() => { void handleGenerate(); }}
             loading={generating}
           />
@@ -1834,7 +1836,7 @@ function SellerPreviewStep({
       )}
       {sampleError ? (
         <View style={spreview.errorBox}>
-          <Feather name="alert-circle" size={14} color={theme.error} />
+          <Icon name="alert-circle" size={14} color={theme.error} />
           <Text style={spreview.errorText}>{sampleError}</Text>
           <TouchableOpacity onPress={() => { void handleGenerate(); }} disabled={generating || !!sampleUri}>
             <Text style={[spreview.retryText, { color: theme.text }]}>Retry</Text>
@@ -1864,7 +1866,7 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   themeDot: { width: 16, height: 16, borderRadius: 8 },
   themeLine: { width: 36, height: 3, borderRadius: 2 },
   themeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 8 },
-  themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
+  themeName: { flex: 1, fontSize: 12, fontFamily: FONT.semibold, color: FG },
   hint: { ...TYPE.caption, color: MUTED2, marginTop: SPACE.xs },
   sampleHeader: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: SPACE.sm },
   sampleSub: { ...TYPE.caption, color: MUTED, paddingRight: 18, marginTop: -4 },
@@ -1872,10 +1874,10 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   resultCard: { borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: SPACE.sm },
   resultImage: { width: '100%', height: 180 },
   resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, backgroundColor: 'rgba(0,0,0,0.86)' },
-  resultText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
+  resultText: { fontSize: 13, fontFamily: FONT.semibold, color: FG },
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: SPACE.xs, marginTop: SPACE.xs, padding: SPACE.sm, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: ERR },
   errorText: { flex: 1, fontSize: 12, lineHeight: 17, color: ERR },
-  retryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  retryText: { fontSize: 13, fontFamily: FONT.bold },
   continueWrap: { marginTop: SPACE.md },
   });
 };
@@ -2888,7 +2890,7 @@ export default function OnboardingScreen() {
               accessibilityLabel="Go back"
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Feather name="chevron-left" size={20} color={FG} />
+              <Icon name="chevron-left" size={20} color={FG} />
             </PressableScale>
           )}
 

@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReanimatedAnimated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -296,7 +296,7 @@ function QtyControl({
         accessibilityState={{ disabled: qty <= 1 }}
         style={qtyS.btn}
       >
-        <Feather name="minus" size={14} color={qty <= 1 ? theme.subtle : theme.text} />
+        <Icon name="minus" size={14} color={qty <= 1 ? theme.subtle : theme.text} />
       </TouchableOpacity>
       <Text style={qtyS.val}>{qty}</Text>
       <TouchableOpacity
@@ -308,7 +308,7 @@ function QtyControl({
         accessibilityState={{ disabled: qty >= max }}
         style={qtyS.btn}
       >
-        <Feather name="plus" size={14} color={qty >= max ? theme.subtle : theme.text} />
+        <Icon name="plus" size={14} color={qty >= max ? theme.subtle : theme.text} />
       </TouchableOpacity>
     </View>
   );
@@ -1004,7 +1004,7 @@ export function ShopProductSheet({
                 accessibilityRole="button"
                 accessibilityLabel="Back to products list"
               >
-                <Feather name="chevron-left" size={18} color={theme.text} />
+                <Icon name="chevron-left" size={18} color={theme.text} />
               </TouchableOpacity>
             )}
             <View style={ss.headerBrandCol}>
@@ -1016,7 +1016,7 @@ export function ShopProductSheet({
                   {selection.postCreatorName ? `Shop with ${selection.postCreatorName}` : 'Shop the post'}
                 </Text>
                 {selection.postCreatorVerified && (
-                  <Feather name="check-circle" size={13} color={theme.text} style={ss.headerBrandVerified} />
+                  <Icon name="check-circle" size={13} color={theme.text} style={ss.headerBrandVerified} />
                 )}
               </View>
               {hasMultipleTags && (
@@ -1030,7 +1030,7 @@ export function ShopProductSheet({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Close"
           >
-            <Feather name="x" size={17} color={theme.text} />
+            <Icon name="x" size={17} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -1086,13 +1086,13 @@ export function ShopProductSheet({
 
         {sheetStep === 'detail' && phase === 'error' && (
           <View style={ss.centerBox}>
-            <Feather name="alert-circle" size={ICON.lg} color={theme.error} />
+            <Icon name="alert-circle" size={ICON.lg} color={theme.error} />
             <Text style={ss.errorText}>{errorMsg || 'Could not load product.'}</Text>
             <TouchableOpacity
               onPress={() => loadProduct(activeTagIdx)}
               style={[ss.retryBtn, { borderColor: accent }]}
             >
-              <Feather name="refresh-cw" size={14} color={accent} />
+              <Icon name="refresh-cw" size={14} color={accent} />
               <Text style={[ss.retryText, { color: accent }]}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -1118,7 +1118,7 @@ export function ShopProductSheet({
               accent={accent}
             />
             <View style={[ss.statusBanner, { backgroundColor: `${theme.error}26` }]}>
-              <Feather name="alert-triangle" size={14} color={theme.error} />
+              <Icon name="alert-triangle" size={14} color={theme.error} />
               <Text style={[ss.statusText, { color: theme.error }]}>This product is no longer available</Text>
             </View>
           </View>
@@ -1180,7 +1180,7 @@ export function ShopProductSheet({
             {/* One grey info line: shipping estimate + this product's real
                 return policy (item 7), positioned under the size chips. */}
             <View style={ss.infoLine}>
-              <Feather name="truck" size={12} color={theme.subtle} />
+              <Icon name="truck" size={12} color={theme.subtle} />
               <Text style={ss.infoLineText} numberOfLines={2}>
                 {SHIPPING_ESTIMATE_COPY} · {product.refundPolicy || DEFAULT_RETURNS_COPY}
               </Text>
@@ -1235,7 +1235,7 @@ export function ShopProductSheet({
                 mirror was removed instead of this one. */}
             {!!variantError && (
               <View style={ss.variantError} accessibilityRole="alert" accessibilityLiveRegion="polite">
-                <Feather name="alert-circle" size={13} color={theme.error} />
+                <Icon name="alert-circle" size={13} color={theme.error} />
                 <Text style={ss.variantErrorText}>{variantError}</Text>
               </View>
             )}
@@ -1255,7 +1255,7 @@ export function ShopProductSheet({
 
             <TouchableOpacity onPress={handleViewDetail} style={ss.viewDetailBtn}>
               <Text style={ss.viewDetailText}>View full product details</Text>
-              <Feather name="chevron-right" size={13} color={theme.muted} />
+              <Icon name="chevron-right" size={13} color={theme.muted} />
             </TouchableOpacity>
 
             {/* Spacer so content never sits behind the sticky action bar below */}
@@ -1292,7 +1292,7 @@ export function ShopProductSheet({
                   <ActivityIndicator color={theme.text} size="small" />
                 ) : (
                   <>
-                    <Feather name="shopping-cart" size={17} color={theme.text} />
+                    <Icon name="shopping-cart" size={17} color={theme.text} />
                     <Text style={ss.addBtnText}>{phase === 'added' ? 'View cart' : 'Add to cart'}</Text>
                   </>
                 )}
@@ -1321,11 +1321,11 @@ export function ShopProductSheet({
         {sheetStep === 'detail' && phase === 'sold_out' && product && (
           <View>
             <View style={[ss.statusBanner, { backgroundColor: `${theme.warning}22` }]}>
-              <Feather name="clock" size={14} color={theme.warning} />
+              <Icon name="clock" size={14} color={theme.warning} />
               <Text style={[ss.statusText, { color: theme.warning }]}>Sold out — check back soon</Text>
             </View>
             <TouchableOpacity onPress={handleViewDetail} style={[ss.addBtn, { marginHorizontal: 16, marginBottom: 8 }]}>
-              <Feather name="eye" size={17} color={theme.text} />
+              <Icon name="eye" size={17} color={theme.text} />
               <Text style={ss.addBtnText}>View product</Text>
             </TouchableOpacity>
           </View>
@@ -1386,7 +1386,7 @@ export function ShopProductSheet({
             <Image source={{ uri: product.imageUris[0] }} style={ss.cartFlyImage} />
           ) : (
             <View style={[ss.cartFlyFallback, { backgroundColor: theme.accent }]}>
-              <Feather name="shopping-bag" size={21} color={theme.onAccent} />
+              <Icon name="shopping-bag" size={21} color={theme.onAccent} />
             </View>
           )}
         </Animated.View>
@@ -1406,7 +1406,7 @@ export function ShopProductSheet({
             accessibilityRole="button"
             accessibilityLabel="Added to cart. View cart"
           >
-            <Feather name="check" size={15} color={theme.onAccent} />
+            <Icon name="check" size={15} color={theme.onAccent} />
             <Text style={[ss.addedToastText, { color: theme.onAccent }]}>Added to cart</Text>
             <Text style={[ss.addedToastDivider, { color: theme.onAccent }]}>·</Text>
             <Text style={[ss.addedToastView, { color: theme.onAccent }]}>View</Text>
@@ -1476,7 +1476,7 @@ function ProductHeader({
             />
           ) : (
             <View style={[ss.productImage, ss.productImagePlaceholder]}>
-              <Feather name="image" size={22} color={theme.subtle} />
+              <Icon name="image" size={22} color={theme.subtle} />
             </View>
           )}
           {product.isPreOrder && (
@@ -1510,7 +1510,7 @@ function ProductHeader({
         {onViewDetail && (
           <View style={ss.viewDetailInline}>
             <Text style={ss.viewDetailInlineText}>View details</Text>
-            <Feather name="chevron-right" size={12} color={theme.muted} />
+            <Icon name="chevron-right" size={12} color={theme.muted} />
           </View>
         )}
       </View>
@@ -1543,12 +1543,12 @@ function SellerRow({ product }: { product: BuyerProduct }) {
             plain card surface (as opposed to CaptionBlock.tsx's ON_DARK
             white, which is for a badge over a playing video). */}
         {product.sellerVerified && (
-          <Feather name="check-circle" size={13} color={theme.text} style={ss.sellerRowVerified} />
+          <Icon name="check-circle" size={13} color={theme.text} style={ss.sellerRowVerified} />
         )}
       </View>
       <View style={ss.sellerViewStore}>
         <Text style={ss.sellerViewStoreText}>View store</Text>
-        <Feather name="chevron-right" size={14} color={theme.muted} />
+        <Icon name="chevron-right" size={14} color={theme.muted} />
       </View>
     </TouchableOpacity>
   );
@@ -1602,7 +1602,7 @@ function ProductListRow({
             <CachedImage source={{ uri: imageUri }} style={ss.listRowThumb} contentFit="cover" />
           ) : (
             <View style={[ss.listRowThumb, ss.listRowThumbSkeleton]}>
-              <Feather name="image" size={18} color={theme.subtle} />
+              <Icon name="image" size={18} color={theme.subtle} />
             </View>
           )}
         </View>
@@ -1613,7 +1613,7 @@ function ProductListRow({
             <View style={ss.listRowSellerRow}>
               <Text style={ss.listRowSellerText} numberOfLines={1}>{product.sellerName}</Text>
               {product.sellerVerified && (
-                <Feather name="check-circle" size={11} color={theme.text} />
+                <Icon name="check-circle" size={11} color={theme.text} />
               )}
             </View>
           )}
@@ -1637,9 +1637,9 @@ function ProductListRow({
         {adding ? (
           <ActivityIndicator size="small" color={theme.text} />
         ) : added ? (
-          <Feather name="check" size={16} color={theme.onAccent} />
+          <Icon name="check" size={16} color={theme.onAccent} />
         ) : (
-          <Feather name="shopping-cart" size={16} color={theme.text} />
+          <Icon name="shopping-cart" size={16} color={theme.text} />
         )}
       </TouchableOpacity>
     </View>
@@ -1692,7 +1692,7 @@ function FullScreenImageViewer({
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityLabel="Close"
         >
-          <Feather name="x" size={20} color={ON_DARK} />
+          <Icon name="x" size={20} color={ON_DARK} />
         </TouchableOpacity>
         {imageUris.length > 1 && (
           <View style={ss.fullScreenCounter} pointerEvents="none">
@@ -1732,7 +1732,7 @@ function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
           <CachedImage source={{ uri: images[0] }} style={StyleSheet.absoluteFill} contentFit="contain" />
         ) : (
           <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
-            <Feather name="image" size={28} color={theme.subtle} />
+            <Icon name="image" size={28} color={theme.subtle} />
           </View>
         )}
       </View>
@@ -1764,7 +1764,7 @@ function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
                   <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
                 ) : (
                   <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
-                    <Feather name="image" size={28} color={theme.subtle} />
+                    <Icon name="image" size={28} color={theme.subtle} />
                   </View>
                 )}
               </View>
@@ -1805,7 +1805,7 @@ function TrustCue({ icon, label }: { icon: string; label: string }) {
   const ss = useMemo(() => makeSheetStyles(theme), [theme]);
   return (
     <View style={ss.trustCue}>
-      <Feather name={icon as any} size={11} color={theme.muted} />
+      <Icon name={icon as any} size={11} color={theme.muted} />
       <Text style={ss.trustCueText}>{label}</Text>
     </View>
   );
@@ -2145,8 +2145,6 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: theme.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   descriptionText: {
     fontSize: FS.sm,

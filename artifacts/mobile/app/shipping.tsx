@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/Badge';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
-import { FS, SP, RADIUS } from '@/lib/theme';
+import { FS, SP, RADIUS, FONT } from '@/lib/theme';
 import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
 import { parseDecimalToCents } from '@/lib/money';
 import { HapticSwitch } from '@/components/BrandthreadUI';
@@ -462,7 +462,7 @@ export default function ShippingScreen() {
       {activeShipments.length === 0 ? (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.emptySection}>
-            <Feather name="truck" size={20} color={colors.mutedForeground} />
+            <Icon name="truck" size={20} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No active shipments</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Buy a label on an order to start tracking.</Text>
           </View>
@@ -505,7 +505,7 @@ export default function ShippingScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {sellerReturns.length === 0 ? (
           <View style={styles.emptySection}>
-            <Feather name="rotate-ccw" size={20} color={colors.mutedForeground} />
+            <Icon name="rotate-ccw" size={20} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No return requests</Text>
           </View>
         ) : (
@@ -528,7 +528,7 @@ export default function ShippingScreen() {
                 {r.notes ? <Text style={[styles.returnReason, { color: colors.mutedForeground }]} numberOfLines={2}>{r.notes}</Text> : null}
               </View>
               <Badge label={returnStatusLabel(r.status as ReturnStatusKey)} variant={returnBadge(r.status) as any} />
-              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+              <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           ))
         )}
@@ -556,7 +556,7 @@ export default function ShippingScreen() {
                 style={[styles.countryInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
               />
               <TouchableOpacity onPress={saveShipFrom} disabled={savingShipFrom} style={[styles.smallBtn, { backgroundColor: colors.primary }]}>
-                {savingShipFrom ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="check" size={14} color={colors.primaryForeground} />}
+                {savingShipFrom ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Icon name="check" size={14} color={colors.primaryForeground} />}
               </TouchableOpacity>
             </View>
           ) : (
@@ -565,7 +565,7 @@ export default function ShippingScreen() {
               style={[styles.countryPill, { borderColor: colors.border }]}
             >
               <Text style={[styles.countryPillText, { color: colors.foreground }]}>{shipFromCountry}</Text>
-              <Feather name="edit-2" size={12} color={colors.mutedForeground} />
+              <Icon name="edit-2" size={12} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
@@ -579,7 +579,7 @@ export default function ShippingScreen() {
           activeOpacity={0.75}
           style={[styles.addRateBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
         >
-          <Feather name="plus" size={14} color={colors.primary} />
+          <Icon name="plus" size={14} color={colors.primary} />
           <Text style={[styles.addRateBtnText, { color: colors.primary }]}>Add Zone</Text>
         </TouchableOpacity>
       </View>
@@ -594,7 +594,7 @@ export default function ShippingScreen() {
       ) : zones.length === 0 ? (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.emptySection}>
-            <Feather name="globe" size={20} color={colors.mutedForeground} />
+            <Icon name="globe" size={20} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No shipping zones yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Add a Domestic zone to start, then Rest of World for everywhere else.</Text>
           </View>
@@ -642,15 +642,15 @@ export default function ShippingScreen() {
 
             <View style={styles.zoneActions}>
               <TouchableOpacity onPress={() => toggleZoneActive(zone)} style={[styles.zoneActionBtn, { borderColor: colors.border }]}>
-                <Feather name={zone.active ? 'eye-off' : 'eye'} size={13} color={colors.foreground} />
+                <Icon name={zone.active ? 'eye-off' : 'eye'} size={13} color={colors.foreground} />
                 <Text style={[styles.zoneActionText, { color: colors.foreground }]}>{zone.active ? 'Deactivate' : 'Activate'}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => openEditZone(zone)} style={[styles.zoneActionBtn, { borderColor: colors.border }]}>
-                <Feather name="edit-2" size={13} color={colors.foreground} />
+                <Icon name="edit-2" size={13} color={colors.foreground} />
                 <Text style={[styles.zoneActionText, { color: colors.foreground }]}>Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDeleteZone(zone)} style={[styles.zoneActionBtn, { borderColor: colors.border }]}>
-                <Feather name="trash-2" size={13} color={colors.destructive} />
+                <Icon name="trash-2" size={13} color={colors.destructive} />
                 <Text style={[styles.zoneActionText, { color: colors.destructive }]}>Delete</Text>
               </TouchableOpacity>
             </View>
@@ -689,7 +689,7 @@ export default function ShippingScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Legacy Flat Rate</Text>
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.emptySection}>
-              <Feather name="info" size={16} color={colors.mutedForeground} />
+              <Icon name="info" size={16} color={colors.mutedForeground} />
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
                 Your Shipping Zones above are now used at checkout instead of this old flat rate.
               </Text>
@@ -706,7 +706,7 @@ export default function ShippingScreen() {
           activeOpacity={0.75}
           style={[styles.addRateBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
         >
-          <Feather name="plus" size={14} color={colors.primary} />
+          <Icon name="plus" size={14} color={colors.primary} />
           <Text style={[styles.addRateBtnText, { color: colors.primary }]}>Add Package</Text>
         </TouchableOpacity>
       </View>
@@ -716,7 +716,7 @@ export default function ShippingScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 24 }]}>
         {presets.length === 0 ? (
           <View style={styles.emptySection}>
-            <Feather name="package" size={20} color={colors.mutedForeground} />
+            <Icon name="package" size={20} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No saved packages yet</Text>
           </View>
         ) : (
@@ -729,10 +729,10 @@ export default function ShippingScreen() {
                 </Text>
               </View>
               <TouchableOpacity onPress={() => openEditPreset(preset)} style={styles.presetIconBtn}>
-                <Feather name="edit-2" size={14} color={colors.mutedForeground} />
+                <Icon name="edit-2" size={14} color={colors.mutedForeground} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDeletePreset(preset)} style={styles.presetIconBtn}>
-                <Feather name="trash-2" size={14} color={colors.destructive} />
+                <Icon name="trash-2" size={14} color={colors.destructive} />
               </TouchableOpacity>
             </View>
           ))
@@ -852,12 +852,12 @@ export default function ShippingScreen() {
                     />
                   </View>
                   <TouchableOpacity onPress={() => removeTier(i)} disabled={zoneForm.weightTiers.length <= 1} style={styles.tierRemoveBtn}>
-                    <Feather name="x" size={16} color={zoneForm.weightTiers.length <= 1 ? colors.border : colors.destructive} />
+                    <Icon name="x" size={16} color={zoneForm.weightTiers.length <= 1 ? colors.border : colors.destructive} />
                   </TouchableOpacity>
                 </View>
               ))}
               <TouchableOpacity onPress={addTier} style={[styles.addTierBtn, { borderColor: colors.border }]}>
-                <Feather name="plus" size={13} color={colors.foreground} />
+                <Icon name="plus" size={13} color={colors.foreground} />
                 <Text style={[styles.zoneActionText, { color: colors.foreground }]}>Add tier</Text>
               </TouchableOpacity>
             </View>
@@ -1053,83 +1053,83 @@ const styles = StyleSheet.create({
   },
   sheetBtnText: { fontSize: FS.md, fontWeight: '600' },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
+  backText: { fontSize: 15, fontFamily: FONT.medium },
+  pageTitle: { fontSize: 28, fontFamily: FONT.bold, marginBottom: 4 },
+  pageSubtitle: { fontSize: 13, fontFamily: FONT.regular, marginBottom: 20 },
   statsRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
   stat: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 3 },
-  statVal: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
+  statVal: { fontSize: 18, fontFamily: FONT.bold },
+  statLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   actionsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   action: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 6 },
-  actionLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: -6, marginBottom: 12, lineHeight: 17 },
+  actionLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: -6, marginBottom: 12, lineHeight: 17 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 },
   addRateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
-  addRateBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  addRateBtnText: { fontSize: 12, fontFamily: FONT.semibold },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   emptySection: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, flexWrap: 'wrap' },
-  emptyText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  emptyText: { fontSize: 13, fontFamily: FONT.regular },
   shipCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 10 },
   shipHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
-  shipId: { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  shipCustomer: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
-  shipCarrier: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  shipId: { fontSize: 12, fontFamily: FONT.bold },
+  shipCustomer: { fontSize: 15, fontFamily: FONT.semibold, marginTop: 2 },
+  shipCarrier: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   progressBar: { height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 10 },
   progressFill: { height: '100%', borderRadius: 2 },
   shipSteps: { flexDirection: 'row', justifyContent: 'space-between' },
   stepItem: { alignItems: 'center', gap: 4 },
   stepDot: { width: 8, height: 8, borderRadius: 4 },
-  stepLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
+  stepLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
   returnRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   returnInfo: { flex: 1, gap: 2 },
-  returnId: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  returnItem: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  returnReason: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  rateName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  rateSub: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  rateAmount: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  returnId: { fontSize: 11, fontFamily: FONT.bold },
+  returnItem: { fontSize: 13, fontFamily: FONT.medium },
+  returnReason: { fontSize: 11, fontFamily: FONT.regular },
+  rateName: { fontSize: 13, fontFamily: FONT.semibold },
+  rateSub: { fontSize: 11, fontFamily: FONT.regular },
+  rateAmount: { fontSize: 14, fontFamily: FONT.bold },
   shipFromRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rowLabelStrong: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  rowLabelStrong: { fontSize: 13, fontFamily: FONT.semibold },
   countryPill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8 },
-  countryPillText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  countryInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, width: 60, fontSize: 13, fontFamily: 'Inter_700Bold', textAlign: 'center' },
+  countryPillText: { fontSize: 13, fontFamily: FONT.bold },
+  countryInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, width: 60, fontSize: 13, fontFamily: FONT.bold, textAlign: 'center' },
   smallBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   zoneCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10 },
   zoneHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-  zoneName: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  zoneName: { fontSize: 15, fontFamily: FONT.semibold },
   zoneMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
-  zoneMetaText: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  zoneMetaText: { fontSize: 11, fontFamily: FONT.regular },
   zoneActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   zoneActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
-  zoneActionText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  zoneActionText: { fontSize: 12, fontFamily: FONT.semibold },
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
   tableHeaderRow: { borderBottomWidth: 1 },
-  tableHeaderText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.4 },
-  tableCellText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  tableHeaderText: { fontSize: 10, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  tableCellText: { fontSize: 12, fontFamily: FONT.medium },
   presetRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 8 },
   presetIconBtn: { padding: 6 },
   segmentRow: { flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' },
   segment: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  segmentText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  segmentText: { fontSize: 12, fontFamily: FONT.semibold },
   tierRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 8, borderBottomWidth: 1, paddingBottom: 8 },
   tierField: { flex: 1 },
-  tierLabel: { fontSize: 10, fontFamily: 'Inter_500Medium', marginBottom: 4 },
+  tierLabel: { fontSize: 10, fontFamily: FONT.medium, marginBottom: 4 },
   tierInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 8, fontSize: 12 },
   tierRemoveBtn: { padding: 8 },
   addTierBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginTop: 8, alignSelf: 'flex-start' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   suggestionChip: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 5 },
-  suggestionChipText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+  suggestionChipText: { fontSize: 11, fontFamily: FONT.medium },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: SP.sm },
   dimsRow: { flexDirection: 'row', gap: 8 },
   warehouseCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 10 },
   warehouseHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  warehouseName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  warehouseLoc: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  warehouseStock: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  warehouseName: { fontSize: 14, fontFamily: FONT.semibold },
+  warehouseLoc: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
+  warehouseStock: { fontSize: 14, fontFamily: FONT.semibold },
   capacityBar: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 6 },
   capacityFill: { height: '100%', borderRadius: 3 },
-  capacityLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  capacityLabel: { fontSize: 11, fontFamily: FONT.regular },
 });

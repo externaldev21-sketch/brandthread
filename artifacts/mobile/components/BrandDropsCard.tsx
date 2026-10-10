@@ -11,7 +11,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -82,7 +82,7 @@ export function BrandDropsCard({ sellerId, sellerName }: BrandDropsCardProps) {
       testID="brand-drops-card"
     >
       <View style={[styles.iconWrap, { backgroundColor: drop.isLive ? `${theme.accent}22` : theme.card }]}>
-        <Feather name="zap" size={17} color={drop.isLive ? theme.accent : theme.muted} />
+        <Icon name="zap" size={17} color={drop.isLive ? theme.accent : theme.muted} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.eyebrow, { color: drop.isLive ? theme.accent : theme.muted }]}>
@@ -90,7 +90,7 @@ export function BrandDropsCard({ sellerId, sellerName }: BrandDropsCardProps) {
         </Text>
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{drop.name}</Text>
       </View>
-      <Feather name="chevron-right" size={18} color={theme.muted} />
+      <Icon name="chevron-right" size={18} color={theme.muted} />
     </TouchableOpacity>
   );
 }

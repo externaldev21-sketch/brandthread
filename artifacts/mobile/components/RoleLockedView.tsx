@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -27,7 +27,7 @@ export function RoleLockedView({ screenTitle, currentRole }: Props) {
     <View style={styles.root}>
       <View style={styles.card}>
         <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
-          <Feather name="lock" size={28} color={theme.accent} />
+          <Icon name="lock" size={28} color={theme.accent} />
         </View>
         <Text style={styles.title}>Owner access required</Text>
         <Text style={styles.body}>
@@ -36,7 +36,7 @@ export function RoleLockedView({ screenTitle, currentRole }: Props) {
         </Text>
         {currentRole ? (
           <View style={styles.rolePill}>
-            <Feather name="user" size={12} color={theme.muted} />
+            <Icon name="user" size={12} color={theme.muted} />
             <Text style={styles.roleText}>Your role: {roleLabel(currentRole)}</Text>
           </View>
         ) : null}

@@ -23,6 +23,7 @@
 import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import Svg, { Circle, Ellipse, G, Line, Path, Polygon, Polyline, Rect } from 'react-native-svg';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -67,7 +68,7 @@ export function EmptyStateGlyph({
 }) {
   const icon = EMPTY_STATE_ICONS[name];
   if (!icon) {
-    return <Feather name={name as keyof typeof Feather.glyphMap} size={size} color={color} testID="empty-state-glyph-font" />;
+    return <Icon name={name as IconName} size={size} color={color} testID="empty-state-glyph-font" />;
   }
   const gridStroke = (strokeWidth * 24) / size;
   return (

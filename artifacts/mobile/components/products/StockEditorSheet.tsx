@@ -12,7 +12,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
@@ -140,7 +140,7 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
                   accessibilityLabel={`Decrease ${row.title} stock`}
                   disabled={row.qty <= 0}
                 >
-                  <Feather name="minus" size={ICON.sm} color={row.qty <= 0 ? theme.subtle : theme.text} />
+                  <Icon name="minus" size={ICON.sm} color={row.qty <= 0 ? theme.subtle : theme.text} />
                 </PressableScale>
                 <TextInput
                   value={row.draft}
@@ -157,7 +157,7 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
                   onPress={() => { hapticLight(); void applyDelta(row, 1, `Increase ${row.title}`); }}
                   accessibilityLabel={`Increase ${row.title} stock`}
                 >
-                  <Feather name="plus" size={ICON.sm} color={theme.text} />
+                  <Icon name="plus" size={ICON.sm} color={theme.text} />
                 </PressableScale>
               </View>
             </View>

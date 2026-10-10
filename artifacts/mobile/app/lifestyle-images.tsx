@@ -18,7 +18,7 @@ import { useColors } from '@/hooks/useColors';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
@@ -27,6 +27,7 @@ import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
 import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { getProducts, updateProduct } from '@/services/productService';
 import { Product, ProductMedia } from '@/services/productTypes';
+import { FONT } from '@/lib/theme';
 
 interface Photo {
   id: string;
@@ -217,7 +218,7 @@ export default function LifestyleImagesScreen() {
               onPress={() => removePhoto(group, p.id)}
               activeOpacity={0.8}
             >
-              <Feather name="x" size={11} color="#FFF" />
+              <Icon name="x" size={11} color="#FFF" />
             </TouchableOpacity>
           </View>
         ))}
@@ -227,7 +228,7 @@ export default function LifestyleImagesScreen() {
             activeOpacity={0.8}
             style={[styles.addTile, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
-            <Feather name="plus" size={20} color={colors.primary} />
+            <Icon name="plus" size={20} color={colors.primary} />
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -270,7 +271,7 @@ export default function LifestyleImagesScreen() {
                 activeOpacity={0.8}
                 style={[styles.dropzone, { backgroundColor: colors.card, borderColor: colors.border }]}
               >
-                <Feather name="image" size={26} color={colors.primary} />
+                <Icon name="image" size={26} color={colors.primary} />
                 <Text style={[styles.dropzoneTitle, { color: colors.foreground }]}>Add reference photos</Text>
               </TouchableOpacity>
             ) : (
@@ -286,7 +287,7 @@ export default function LifestyleImagesScreen() {
               <Text style={[styles.primaryBtnText, { color: referencePhotos.length > 0 ? colors.primaryForeground : colors.mutedForeground }]}>
                 Next: add your product
               </Text>
-              <Feather name="arrow-right" size={16} color={referencePhotos.length > 0 ? colors.primaryForeground : colors.mutedForeground} />
+              <Icon name="arrow-right" size={16} color={referencePhotos.length > 0 ? colors.primaryForeground : colors.mutedForeground} />
             </TouchableOpacity>
           </>
         )}
@@ -303,7 +304,7 @@ export default function LifestyleImagesScreen() {
                 activeOpacity={0.8}
                 style={[styles.dropzone, { backgroundColor: colors.card, borderColor: colors.border }]}
               >
-                <Feather name="shopping-bag" size={26} color={colors.primary} />
+                <Icon name="shopping-bag" size={26} color={colors.primary} />
                 <Text style={[styles.dropzoneTitle, { color: colors.foreground }]}>Add product photos</Text>
               </TouchableOpacity>
             ) : (
@@ -327,7 +328,7 @@ export default function LifestyleImagesScreen() {
               disabled={productPhotos.length === 0}
               style={[styles.primaryBtn, { backgroundColor: productPhotos.length > 0 ? colors.primary : colors.secondary, marginTop: 20 }]}
             >
-              <Feather name="zap" size={16} color={productPhotos.length > 0 ? colors.primaryForeground : colors.mutedForeground} />
+              <Icon name="zap" size={16} color={productPhotos.length > 0 ? colors.primaryForeground : colors.mutedForeground} />
               <Text style={[styles.primaryBtnText, { color: productPhotos.length > 0 ? colors.primaryForeground : colors.mutedForeground }]}>
                 Generate lifestyle photo
               </Text>
@@ -361,7 +362,7 @@ export default function LifestyleImagesScreen() {
                   <AiGeneratedBadge />
                 </>
               ) : (
-                <Feather name="alert-circle" size={28} color={colors.mutedForeground} />
+                <Icon name="alert-circle" size={28} color={colors.mutedForeground} />
               )}
             </View>
 
@@ -370,13 +371,13 @@ export default function LifestyleImagesScreen() {
                 {resultB64 && (
                   <>
                     <TouchableOpacity onPress={handleSaveToPhotos} disabled={saving} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
-                      <Feather name="download" size={16} color={colors.primaryForeground} />
+                      <Icon name="download" size={16} color={colors.primaryForeground} />
                       <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>
                         {saving ? 'Saving…' : 'Save to photos'}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={handleAddToProduct} disabled={loadingPickerProducts} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
-                      <Feather name="package" size={16} color={colors.foreground} />
+                      <Icon name="package" size={16} color={colors.foreground} />
                       <Text style={[styles.primaryBtnText, { color: colors.foreground }]}>
                         {loadingPickerProducts ? 'Loading products…' : 'Add to product'}
                       </Text>
@@ -420,13 +421,13 @@ export default function LifestyleImagesScreen() {
                     <Image source={{ uri: item.media[0].uri }} style={styles.pickerThumb} resizeMode="cover" />
                   ) : (
                     <View style={[styles.pickerThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card }]}>
-                      <Feather name="package" size={20} color={colors.mutedForeground} />
+                      <Icon name="package" size={20} color={colors.mutedForeground} />
                     </View>
                   )}
-                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 14 }} numberOfLines={1}>
+                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: FONT.semibold, fontSize: 14 }} numberOfLines={1}>
                     {item.name}
                   </Text>
-                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                  <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
                 </TouchableOpacity>
               )}
             />
@@ -447,13 +448,13 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 10, height: 10, borderRadius: 5 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 8 },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14, lineHeight: 17 },
+  sectionTitle: { fontSize: 16, fontFamily: FONT.bold, marginBottom: 4 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
   dropzone: {
     borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center',
     justifyContent: 'center', paddingVertical: 40, gap: 10,
   },
-  dropzoneTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  dropzoneTitle: { fontSize: 14, fontFamily: FONT.semibold },
   trayRow: { gap: 10, paddingVertical: 4 },
   trayThumbWrap: { position: 'relative' },
   trayThumb: { width: 72, height: 72, borderRadius: 12 },
@@ -465,18 +466,18 @@ const styles = StyleSheet.create({
     width: 72, height: 72, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center',
   },
-  inputLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 20, marginBottom: 8 },
+  inputLabel: { fontSize: 12, fontFamily: FONT.semibold, marginTop: 20, marginBottom: 8 },
   input: {
-    borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular',
+    borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: FONT.regular,
     minHeight: 72, textAlignVertical: 'top',
   },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: 14, paddingVertical: 15,
   },
-  primaryBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  primaryBtnText: { fontSize: 14, fontFamily: FONT.semibold },
   secondaryBtn: { alignItems: 'center', paddingVertical: 10 },
-  secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  secondaryBtnText: { fontSize: 13, fontFamily: FONT.regular },
   resultFrame: {
     aspectRatio: 1, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },

@@ -10,7 +10,7 @@ import {
   FlatList,
 } from 'react-native';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
@@ -135,7 +135,7 @@ function DropCard({ drop, onPress }: { drop: DropItem; onPress: () => void }) {
           style={[c.shopBtn, { backgroundColor: color }]}
           onPress={() => { hapticPrimaryAction(); onPress(); }}
         >
-          <Feather name="shopping-bag" size={14} color="#FFF" />
+          <Icon name="shopping-bag" size={14} color="#FFF" />
           <Text style={[TYPE_SCALE.callout, c.shopBtnText]}>{live ? 'Shop drop' : 'View drop'}</Text>
         </PressableScale>
       </View>
@@ -294,7 +294,7 @@ export default function FollowingScreen() {
         </View>
       ) : drops.length === 0 ? (
         <View style={s.centeredWrap}>
-          <Feather name="heart" size={36} color={palette.mutedForeground} style={{ marginBottom: SPACING.sm }} />
+          <Icon name="heart" size={36} color={palette.mutedForeground} style={{ marginBottom: SPACING.sm }} />
           <Text style={[TYPE_SCALE.headline, s.emptyTitle, { color: palette.foreground }]}>No drops yet</Text>
           <Text style={[TYPE_SCALE.body, s.emptyBody, { color: palette.mutedForeground }]}>
             Follow sellers to see their latest drops here.{'\n'}New drops from sellers you follow will appear when they go live.

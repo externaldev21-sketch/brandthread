@@ -4,12 +4,12 @@ import {
   ActivityIndicator, Alert, Linking,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -103,7 +103,7 @@ export default function KlaviyoIntegrationScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}22` }]}>
-            <Feather name="zap" size={22} color={colors.primary} />
+            <Icon name="zap" size={22} color={colors.primary} />
           </View>
           <Text style={[styles.heroTitle, { color: colors.foreground }]}>Klaviyo: Email Marketing & SMS</Text>
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
@@ -149,7 +149,7 @@ export default function KlaviyoIntegrationScreen() {
               disabled={syncing}
               activeOpacity={0.8}
             >
-              {syncing ? <ActivityIndicator size="small" color={colors.foreground} /> : <Feather name="refresh-cw" size={15} color={colors.foreground} />}
+              {syncing ? <ActivityIndicator size="small" color={colors.foreground} /> : <Icon name="refresh-cw" size={15} color={colors.foreground} />}
               <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
             </TouchableOpacity>
 
@@ -181,7 +181,7 @@ export default function KlaviyoIntegrationScreen() {
               disabled={connecting}
               activeOpacity={0.85}
             >
-              {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="link" size={16} color={colors.primaryForeground} />}
+              {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Icon name="link" size={16} color={colors.primaryForeground} />}
               <Text style={[styles.connectBtnText, { color: colors.primaryForeground }]}>{connecting ? 'Connecting…' : 'Connect Klaviyo'}</Text>
             </TouchableOpacity>
 
@@ -191,14 +191,14 @@ export default function KlaviyoIntegrationScreen() {
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Feather name="external-link" size={13} color={colors.primary} />
+              <Icon name="external-link" size={13} color={colors.primary} />
               <Text style={[styles.helpText, { color: colors.primary }]}>Where do I find my Private API Key?</Text>
             </TouchableOpacity>
           </View>
         )}
 
         <View style={styles.infoBlock}>
-          <Feather name="shield" size={14} color={colors.mutedForeground} />
+          <Icon name="shield" size={14} color={colors.mutedForeground} />
           <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
             Your key is stored securely and only used to sync subscriber data from your Klaviyo account. We never post on your behalf.
           </Text>
@@ -212,30 +212,30 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   hero: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: 'center', marginBottom: 20, gap: 8 },
   heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  heroTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  heroSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
+  heroTitle: { fontSize: 17, fontFamily: FONT.bold, textAlign: 'center' },
+  heroSub: { fontSize: 13, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 19 },
 
   section: { borderRadius: 14, borderWidth: 1, padding: 18 },
-  label: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 14 },
+  label: { fontSize: 12, fontFamily: FONT.medium, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: FONT.regular, marginBottom: 14 },
   connectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 14 },
-  connectBtnText: { fontSize: FS.base, fontFamily: 'Inter_600SemiBold' },
+  connectBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
   helpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 },
-  helpText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  helpText: { fontSize: 12, fontFamily: FONT.medium },
 
   connectedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  connectedText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  connectedText: { fontSize: 14, fontFamily: FONT.semibold },
   statsRow: { flexDirection: 'row', marginBottom: 12 },
   statBox: { flex: 1, alignItems: 'center', gap: 3 },
-  statVal: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  syncedText: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 16 },
+  statVal: { fontSize: 20, fontFamily: FONT.bold },
+  statLabel: { fontSize: 11, fontFamily: FONT.regular },
+  syncedText: { fontSize: 11, fontFamily: FONT.regular, textAlign: 'center', marginBottom: 16 },
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingVertical: 12, marginBottom: 10 },
-  secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  secondaryBtnText: { fontSize: 13, fontFamily: FONT.semibold },
   disconnectBtn: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingVertical: 8 },
-  disconnectText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  disconnectText: { fontSize: 13, fontFamily: FONT.medium },
 
   infoBlock: { flexDirection: 'row', gap: 8, marginTop: 20, paddingHorizontal: 4 },
-  infoText: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16 },
+  infoText: { flex: 1, fontSize: 11, fontFamily: FONT.regular, lineHeight: 16 },
 });

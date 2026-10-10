@@ -9,7 +9,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -18,7 +18,7 @@ import type { AiResultSlot } from './AiResultTypes';
 const { width: SW, height: SH } = Dimensions.get('window');
 
 export interface AiResultViewerAction {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   onPress: (item: AiResultSlot) => void;
   loading?: (item: AiResultSlot) => boolean;
@@ -71,7 +71,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
         <View style={[s.topBar, { paddingTop: insets.top + SP.sm }]}>
           <Glass variant="regular" radius={RADIUS.pill} style={s.glassBtn}>
             <TouchableOpacity onPress={onClose} accessibilityLabel="Close" style={s.glassBtnInner}>
-              <Feather name="x" size={ICON.md} color="#fff" />
+              <Icon name="x" size={ICON.md} color="#fff" />
             </TouchableOpacity>
           </Glass>
           <Text style={s.counter}>{index + 1} / {items.length}</Text>
@@ -102,7 +102,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
                   accessibilityLabel={a.label}
                   disabled={loading}
                 >
-                  {loading ? <ActivityIndicator size="small" color="#fff" /> : <Feather name={a.icon} size={ICON.md} color="#fff" />}
+                  {loading ? <ActivityIndicator size="small" color="#fff" /> : <Icon name={a.icon} size={ICON.md} color="#fff" />}
                   <Text style={s.actionBarLabel}>{a.label}</Text>
                 </TouchableOpacity>
               );

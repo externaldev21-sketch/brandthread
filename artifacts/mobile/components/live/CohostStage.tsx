@@ -9,7 +9,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { useUser } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -110,7 +110,7 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
         <Camera canvas={{ uid: 0, renderMode: 1 }} style={StyleSheet.absoluteFill} />
       ) : (
         <View style={[StyleSheet.absoluteFill, s.placeholder]}>
-          <Feather name="video" size={48} color={theme.muted} />
+          <Icon name="video" size={48} color={theme.muted} />
           <Text style={s.placeholderText}>Camera preview available on device</Text>
         </View>
       )}
@@ -122,7 +122,7 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
             <Text style={s.livePillText}>LIVE</Text>
           </View>
           <View style={s.countPill}>
-            <Feather name="eye" size={13} color={theme.text} />
+            <Icon name="eye" size={13} color={theme.text} />
             <Text style={s.countText}>{viewerCount.toLocaleString()}</Text>
           </View>
         </View>

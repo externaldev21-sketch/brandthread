@@ -28,7 +28,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Alert, View, Text, StyleSheet, Pressable } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth, useClerk, useSessionList } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -225,7 +225,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={() => setShowAddAccount(false)}
             >
-              <Feather name="chevron-left" size={22} color={colors.mutedForeground} />
+              <Icon name="chevron-left" size={22} color={colors.mutedForeground} />
             </Pressable>
             <Text style={s.headerTitle}>Add account</Text>
             <Pressable
@@ -234,7 +234,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={handleClose}
             >
-              <Feather name="x" size={22} color={colors.mutedForeground} />
+              <Icon name="x" size={22} color={colors.mutedForeground} />
             </Pressable>
           </View>
           <View style={s.list}>
@@ -262,7 +262,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={handleClose}
             >
-              <Feather name="x" size={22} color={colors.mutedForeground} />
+              <Icon name="x" size={22} color={colors.mutedForeground} />
             </Pressable>
           </View>
 
@@ -279,12 +279,12 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
                 right={
                   <View style={s.rowRight}>
                     {switchingId === account.id || loggingOutId === account.id ? (
-                      <Feather name="loader" size={18} color={colors.mutedForeground} />
+                      <Icon name="loader" size={18} color={colors.mutedForeground} />
                     ) : (
                       <>
                         {account.current && (
                           <View style={[s.checkBadge, { backgroundColor: colors.primary }]}>
-                            <Feather name="check" size={13} color={colors.primaryForeground} />
+                            <Icon name="check" size={13} color={colors.primaryForeground} />
                           </View>
                         )}
                         {!isPreview && (
@@ -296,7 +296,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
                             onPress={() => handleLogOut(account)}
                             style={s.logOutBtn}
                           >
-                            <Feather name="log-out" size={16} color={colors.mutedForeground} />
+                            <Icon name="log-out" size={16} color={colors.mutedForeground} />
                           </Pressable>
                         )}
                       </>

@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
@@ -135,7 +135,7 @@ export default function SellerPushBroadcastScreen() {
 
               {sent ? (
                 <View style={[styles.banner, { borderColor: c.border }]}>
-                  <Feather name="check-circle" size={18} color={c.success} />
+                  <Icon name="check-circle" size={18} color={c.success} />
                   <Text style={[styles.note, { color: c.foreground, flex: 1 }]}>
                     Sent to {sent.delivery.sent} followers. Your next push opens {formatNextSend(sent.nextSendAt)}.
                   </Text>

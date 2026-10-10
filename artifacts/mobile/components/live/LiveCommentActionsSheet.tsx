@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -33,7 +33,7 @@ export function LiveCommentActionsSheet({
   const insets = useSafeAreaInsets();
   if (!comment) return null;
 
-  const rows: Array<{ action: CommentAction; icon: React.ComponentProps<typeof Feather>['name']; label: string }> = [
+  const rows: Array<{ action: CommentAction; icon: IconName; label: string }> = [
     pinned
       ? { action: 'unpin', icon: 'bookmark', label: 'Unpin comment' }
       : { action: 'pin', icon: 'bookmark', label: 'Pin comment' },
@@ -59,7 +59,7 @@ export function LiveCommentActionsSheet({
             accessibilityRole="button"
             accessibilityLabel={r.label}
           >
-            <Feather name={r.icon} size={19} color={theme.text} style={styles.rowIcon} />
+            <Icon name={r.icon} size={19} color={theme.text} style={styles.rowIcon} />
             <Text style={[styles.rowLabel, { color: theme.text }]}>{r.label}</Text>
           </Pressable>
         ))}

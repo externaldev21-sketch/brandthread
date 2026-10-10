@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { BottomSheet } from '@/components/ui';
@@ -166,7 +166,7 @@ export function CompleteTheFit({ productId }: { productId: string }) {
                   {item.image ? (
                     <CachedImage source={{ uri: item.image }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={item.image} />
                   ) : (
-                    <View style={s.thumbEmpty}><Feather name="image" size={24} color={colors.mutedForeground} /></View>
+                    <View style={s.thumbEmpty}><Icon name="image" size={24} color={colors.mutedForeground} /></View>
                   )}
                 </View>
               </TouchableOpacity>
@@ -178,7 +178,7 @@ export function CompleteTheFit({ productId }: { productId: string }) {
                   accessibilityLabel={added ? `${item.name} added to bag` : `Add ${item.name} to bag`}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
-                  <Feather name={added ? 'check' : 'plus'} size={16} color={added ? colors.primaryForeground : colors.foreground} />
+                  <Icon name={added ? 'check' : 'plus'} size={16} color={added ? colors.primaryForeground : colors.foreground} />
                 </TouchableOpacity>
               ) : null}
               <Text style={s.name} numberOfLines={2}>{item.name}</Text>
@@ -213,7 +213,7 @@ export function CompleteTheFit({ productId }: { productId: string }) {
 
 const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   divider: { height: 1, backgroundColor: c.border, marginVertical: SP.md },
-  header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, marginBottom: SP.sm },
   card: { width: 140 },
   thumb: { width: 140, height: 180, backgroundColor: c.card, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm },
   thumbEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },

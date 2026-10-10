@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -93,7 +93,7 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       ) : (
         <>
           {state.isFollowing && (
-            <Feather name="check" size={14} color={isPrimary ? theme.onAccent : theme.text} style={styles.icon} />
+            <Icon name="check" size={14} color={isPrimary ? theme.onAccent : theme.text} style={styles.icon} />
           )}
           <Text style={[styles.label, { color: isPrimary ? theme.onAccent : theme.text }]}>{label}</Text>
         </>

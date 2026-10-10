@@ -29,7 +29,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, PanResponder, Pressable,
   Animated, Image as RNImage, Dimensions, ScrollView,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import {
   BG, SURFACE, CARD_ELEVATED, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON,
@@ -214,7 +214,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                     onPress={() => { onToggleLocked(layer.id); closeSwipe(layer.id); }}
                     testID={`layer-swipe-lock-${layer.id}`}
                   >
-                    <Feather name={layer.locked ? 'unlock' : 'lock'} size={ICON.xs} color={FG} />
+                    <Icon name={layer.locked ? 'unlock' : 'lock'} size={ICON.xs} color={FG} />
                     <Text style={s.swipeBtnText}>{layer.locked ? 'Unlock' : 'Lock'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -222,7 +222,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                     onPress={() => { onDuplicateLayer(layer.id); closeSwipe(layer.id); }}
                     testID={`layer-swipe-duplicate-${layer.id}`}
                   >
-                    <Feather name="copy" size={ICON.xs} color={FG} />
+                    <Icon name="copy" size={ICON.xs} color={FG} />
                     <Text style={s.swipeBtnText}>Duplicate</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -230,7 +230,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                     onPress={() => { onDeleteLayer(layer.id); closeSwipe(layer.id); }}
                     testID={`layer-swipe-delete-${layer.id}`}
                   >
-                    <Feather name="trash-2" size={ICON.xs} color={FG} />
+                    <Icon name="trash-2" size={ICON.xs} color={FG} />
                     <Text style={s.swipeBtnText}>Delete</Text>
                   </TouchableOpacity>
                 </View>
@@ -244,7 +244,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                   testID={`layer-row-${layer.id}`}
                 >
                   <View {...dragResponder.panHandlers} style={s.dragHandle} testID={`layer-drag-handle-${layer.id}`}>
-                    <Feather name="menu" size={ICON.xs} color={isSelected ? BG : SUBTLE} />
+                    <Icon name="menu" size={ICON.xs} color={isSelected ? BG : SUBTLE} />
                   </View>
 
                   <View style={s.thumb}>
@@ -253,7 +253,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                     ) : layer.type === 'text' ? (
                       <Text style={[s.thumbGlyph, { color: isSelected ? BG : MUTED }]}>Aa</Text>
                     ) : (
-                      <Feather
+                      <Icon
                         name={layer.type === 'shape' ? 'square' : 'edit-3'}
                         size={ICON.sm}
                         color={isSelected ? BG : MUTED}
@@ -290,7 +290,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                   >
                     {layer.visible && (
                       <View testID={`layer-visibility-check-${layer.id}`}>
-                        <Feather name="check" size={12} color={isSelected ? FG : BG} />
+                        <Icon name="check" size={12} color={isSelected ? FG : BG} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -367,7 +367,7 @@ export default function LayersPanel(props: LayersPanelProps) {
           >
             {canvasBackgroundVisible && (
               <View testID="layer-visibility-check-background">
-                <Feather name="check" size={12} color={BG} />
+                <Icon name="check" size={12} color={BG} />
               </View>
             )}
           </TouchableOpacity>

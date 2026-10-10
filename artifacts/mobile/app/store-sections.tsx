@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -124,7 +124,7 @@ export default function StoreSectionsScreen() {
                 >
                   <View style={styles.cardRow}>
                     <View style={styles.iconWrap}>
-                      <Feather name={item.icon as any} size={ICON.md} color={PURPLE} />
+                      <Icon name={item.icon as any} size={ICON.md} color={PURPLE} />
                     </View>
                     <View style={styles.cardCenter}>
                       <Text style={styles.sectionName}>{sectionLabel}</Text>
@@ -136,7 +136,7 @@ export default function StoreSectionsScreen() {
                       disabled={isAdding}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     >
-                      <Feather name="plus" size={ICON.xs} color={isAdding ? MUTED : PURPLE} />
+                      <Icon name="plus" size={ICON.xs} color={isAdding ? MUTED : PURPLE} />
                       <Text style={[styles.addBtnText, isAdding && { color: MUTED }]}>
                         {isAdding ? '…' : 'Add'}
                       </Text>

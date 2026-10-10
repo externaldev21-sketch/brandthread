@@ -9,7 +9,7 @@
  */
 import React, { useMemo } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -17,7 +17,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 export interface ProfileMenuItem {
   key: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   destructive?: boolean;
@@ -51,7 +51,7 @@ export function ProfileMenuSheet({
               accessibilityLabel={item.label}
               testID={`${testID}-${item.key}`}
             >
-              <Feather name={item.icon} size={20} color={item.destructive ? theme.error : theme.text} />
+              <Icon name={item.icon} size={20} color={item.destructive ? theme.error : theme.text} />
               <Text style={[styles.label, { color: item.destructive ? theme.error : theme.text }]}>{item.label}</Text>
             </PressableScale>
           ))}

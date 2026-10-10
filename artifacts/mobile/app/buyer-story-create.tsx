@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -1120,7 +1120,7 @@ export default function StoryComposer() {
           <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} flash={flash} mode={isRecording ? 'video' : 'picture'} />
         ) : (
           <View style={[styles.root, styles.webFallback]}>
-            <Feather name="camera-off" size={40} color={ON_DARK} />
+            <Icon name="camera-off" size={40} color={ON_DARK} />
             <Text style={styles.webFallbackText}>
               {IS_WEB ? 'Allow camera access in your browser to capture a story here, or choose from your library.' : 'Allow camera access to post a story.'}
             </Text>
@@ -1144,7 +1144,7 @@ export default function StoryComposer() {
         {/* Top bar — never under the notch */}
         <View style={[styles.camTopBar, { paddingTop: topInset + SP.sm }]}>
           <TouchableOpacity style={styles.camIconBtn} onPress={closeAll} accessibilityLabel="Close" accessibilityRole="button">
-            <Feather name="x" size={22} color={ON_DARK} />
+            <Icon name="x" size={22} color={ON_DARK} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.camIconBtn}
@@ -1152,7 +1152,7 @@ export default function StoryComposer() {
             accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'}
             accessibilityRole="button"
           >
-            <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={22} color={flash === 'on' ? '#FBBF24' : ON_DARK} />
+            <Icon name={flash === 'off' ? 'zap-off' : 'zap'} size={22} color={flash === 'on' ? '#FBBF24' : ON_DARK} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.camIconBtn}
@@ -1160,7 +1160,7 @@ export default function StoryComposer() {
             accessibilityLabel="Story settings"
             accessibilityRole="button"
           >
-            <Feather name="settings" size={22} color={ON_DARK} />
+            <Icon name="settings" size={22} color={ON_DARK} />
           </TouchableOpacity>
         </View>
 
@@ -1183,7 +1183,7 @@ export default function StoryComposer() {
             accessibilityRole="button"
             accessibilityState={{ selected: boomerangOn }}
           >
-            <Feather name="repeat" size={20} color={boomerangOn ? theme.accent : ON_DARK} />
+            <Icon name="repeat" size={20} color={boomerangOn ? theme.accent : ON_DARK} />
             {railExpanded && <Text style={[styles.railLabel, boomerangOn && { color: theme.accent }]}>Boomerang</Text>}
           </TouchableOpacity>
 
@@ -1194,7 +1194,7 @@ export default function StoryComposer() {
             accessibilityRole="button"
             accessibilityState={{ selected: !!gridSpec }}
           >
-            <Feather name="grid" size={20} color={gridSpec ? theme.accent : ON_DARK} />
+            <Icon name="grid" size={20} color={gridSpec ? theme.accent : ON_DARK} />
             {railExpanded && <Text style={[styles.railLabel, gridSpec && { color: theme.accent }]}>Layout</Text>}
           </TouchableOpacity>
 
@@ -1205,7 +1205,7 @@ export default function StoryComposer() {
             accessibilityRole="button"
             accessibilityState={{ selected: handsFree }}
           >
-            <Feather name="video" size={20} color={handsFree ? theme.accent : ON_DARK} />
+            <Icon name="video" size={20} color={handsFree ? theme.accent : ON_DARK} />
             {railExpanded && <Text style={[styles.railLabel, handsFree && { color: theme.accent }]}>Hands-free</Text>}
           </TouchableOpacity>
 
@@ -1215,7 +1215,7 @@ export default function StoryComposer() {
             accessibilityLabel={railExpanded ? 'Collapse tools' : 'Expand tools'}
             accessibilityRole="button"
           >
-            <Feather name={railExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={ON_DARK} />
+            <Icon name={railExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={ON_DARK} />
           </TouchableOpacity>
 
           {gridPopoverOpen && (
@@ -1232,9 +1232,9 @@ export default function StoryComposer() {
         {/* "Change grid" pill — shown once a layout is active, like Instagram's own label under the rail */}
         {gridSpec && (
           <TouchableOpacity style={[styles.changeGridPill, { top: topInset + 90 + 190 }]} onPress={() => setGridPopoverOpen(true)} accessibilityRole="button" accessibilityLabel="Change grid">
-            <Feather name="grid" size={14} color={ON_DARK} />
+            <Icon name="grid" size={14} color={ON_DARK} />
             <Text style={styles.changeGridText}>Change grid</Text>
-            <Feather name="chevron-down" size={14} color={ON_DARK} />
+            <Icon name="chevron-down" size={14} color={ON_DARK} />
           </TouchableOpacity>
         )}
 
@@ -1290,7 +1290,7 @@ export default function StoryComposer() {
               {lastGalleryUri ? (
                 <Image source={{ uri: lastGalleryUri }} style={styles.galleryThumbImg} />
               ) : (
-                <Feather name="image" size={20} color={ON_DARK} />
+                <Icon name="image" size={20} color={ON_DARK} />
               )}
             </TouchableOpacity>
 
@@ -1317,7 +1317,7 @@ export default function StoryComposer() {
                 {compositing ? (
                   <ActivityIndicator color="#000" />
                 ) : gridSpec ? (
-                  <Feather name="grid" size={22} color="#000" />
+                  <Icon name="grid" size={22} color="#000" />
                 ) : (
                   <View style={[styles.shutterInner, isRecording && { backgroundColor: '#F87171' }]} />
                 )}
@@ -1339,7 +1339,7 @@ export default function StoryComposer() {
               accessibilityLabel="Flip camera"
               accessibilityRole="button"
             >
-              <Feather name="refresh-cw" size={28} color={isRecording ? 'rgba(255,255,255,0.35)' : ON_DARK} />
+              <Icon name="refresh-cw" size={28} color={isRecording ? 'rgba(255,255,255,0.35)' : ON_DARK} />
             </TouchableOpacity>
           </View>
 
@@ -1411,7 +1411,7 @@ export default function StoryComposer() {
               accessibilityState={{ checked: closeFriendsOnly }}
             >
               <View style={[styles.shareRowAvatar, { backgroundColor: 'transparent' }]}>
-                <Feather name="star" size={20} color={ON_DARK} />
+                <Icon name="star" size={20} color={ON_DARK} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.shareRowTitle}>Close Friends</Text>
@@ -1437,7 +1437,7 @@ export default function StoryComposer() {
               </TouchableOpacity>
             </View>
             <View style={styles.alsoShareSearchWrap}>
-              <Feather name="search" size={16} color={MUTED} />
+              <Icon name="search" size={16} color={MUTED} />
               <TextInput
                 style={[styles.alsoShareSearchInput, WEB_INPUT_RESET]}
                 placeholder="Search"
@@ -1502,7 +1502,7 @@ export default function StoryComposer() {
 
         <View style={[styles.camTopBar, { paddingTop: topInset + SP.sm }]}>
           <TouchableOpacity style={styles.camIconBtn} onPress={() => setStep('camera')} accessibilityLabel="Back to camera" accessibilityRole="button">
-            <Feather name="arrow-left" size={22} color={swatch.id === 'off-white' ? '#000' : ON_DARK} />
+            <Icon name="arrow-left" size={22} color={swatch.id === 'off-white' ? '#000' : ON_DARK} />
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
           <Button
@@ -1548,7 +1548,7 @@ export default function StoryComposer() {
             accessibilityLabel={`Text alignment: ${createAlign}`}
             accessibilityRole="button"
           >
-            <Feather name={createAlign === 'left' ? 'align-left' : createAlign === 'right' ? 'align-right' : 'align-center'} size={20} color={ON_DARK} />
+            <Icon name={createAlign === 'left' ? 'align-left' : createAlign === 'right' ? 'align-right' : 'align-center'} size={20} color={ON_DARK} />
           </TouchableOpacity>
           {TEXT_COLORS.map((c) => (
             <PressableScale
@@ -1644,7 +1644,7 @@ export default function StoryComposer() {
           accessibilityLabel="Back"
           accessibilityRole="button"
         >
-          <Feather name="x" size={22} color={ON_DARK} />
+          <Icon name="x" size={22} color={ON_DARK} />
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
         {/* Right-side tool row */}
@@ -1669,10 +1669,10 @@ export default function StoryComposer() {
             <Text style={styles.aaIcon}>Aa</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.camIconBtn} onPress={() => { hapticLight(); setStickerSheetOpen(true); }} accessibilityLabel="Add sticker" accessibilityRole="button">
-            <Feather name="smile" size={20} color={ON_DARK} />
+            <Icon name="smile" size={20} color={ON_DARK} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.camIconBtn} onPress={() => { hapticLight(); setDrawOpen((v) => !v); }} accessibilityLabel="Draw" accessibilityRole="button">
-            <Feather name="edit-2" size={20} color={drawOpen ? theme.accent : ON_DARK} />
+            <Icon name="edit-2" size={20} color={drawOpen ? theme.accent : ON_DARK} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.camIconBtn}
@@ -1680,7 +1680,7 @@ export default function StoryComposer() {
             accessibilityLabel="More tools"
             accessibilityRole="button"
           >
-            <Feather name="more-horizontal" size={20} color={ON_DARK} />
+            <Icon name="more-horizontal" size={20} color={ON_DARK} />
           </TouchableOpacity>
         </View>
       </View>
@@ -1699,7 +1699,7 @@ export default function StoryComposer() {
             </TouchableOpacity>
           ))}
           <TouchableOpacity style={styles.drawUndo} disabled={!strokes.length} onPress={() => setStrokes((p) => p.slice(0, -1))} accessibilityLabel="Undo last stroke" accessibilityRole="button">
-            <Feather name="rotate-ccw" size={16} color={strokes.length ? ON_DARK : 'rgba(255,255,255,0.3)'} />
+            <Icon name="rotate-ccw" size={16} color={strokes.length ? ON_DARK : 'rgba(255,255,255,0.3)'} />
           </TouchableOpacity>
         </View>
       ) : null}
@@ -1714,7 +1714,7 @@ export default function StoryComposer() {
             accessibilityLabel={`Tagged people, ${mentionOverlays.length}`}
             testID="story-tagged-chip"
           >
-            <Feather name="at-sign" size={14} color={ON_DARK} />
+            <Icon name="at-sign" size={14} color={ON_DARK} />
             <Text style={styles.taggedChipText}>{mentionOverlays.length}</Text>
           </TouchableOpacity>
           {selectedMention ? (
@@ -1723,7 +1723,7 @@ export default function StoryComposer() {
                 {selectedMention.mentionHandle} · {selectedMention.mentionStyle ?? 'classic'}
               </Text>
               <View style={styles.mentionOpacityRow}>
-                <Feather name="droplet" size={14} color={MUTED} />
+                <Icon name="droplet" size={14} color={MUTED} />
                 <View style={{ flex: 1, paddingHorizontal: 8 }}>
                   <InlineSlider
                     value={Math.round(clampMentionOpacity(selectedMention.opacity) * 100)}
@@ -1746,7 +1746,7 @@ export default function StoryComposer() {
         <View style={[styles.editBottom, { paddingBottom: insets.bottom + SP.md }]}>
           {reshareUnavailable ? (
             <View style={styles.reshareUnavailable} testID="reshare-unavailable">
-              <Feather name="slash" size={16} color={ON_DARK} />
+              <Icon name="slash" size={16} color={ON_DARK} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.reshareUnavailableTitle}>Story unavailable</Text>
                 <Text style={styles.reshareUnavailableSub}>This story expired or you can no longer share it.</Text>
@@ -1777,7 +1777,7 @@ export default function StoryComposer() {
                   accessibilityLabel="Share to Close Friends"
                   testID="reshare-close-friends"
                 >
-                  <Feather name="star" size={14} color={ON_DARK} />
+                  <Icon name="star" size={14} color={ON_DARK} />
                   <Text style={styles.reshareActionLabel}>Close Friends</Text>
                 </PressableScale>
               </View>
@@ -1809,7 +1809,7 @@ export default function StoryComposer() {
             accessibilityLabel="Toggle Close Friends only"
             accessibilityState={{ selected: closeFriendsOnly }}
           >
-            <Feather name="star" size={13} color={closeFriendsOnly ? '#000' : 'rgba(255,255,255,0.6)'} />
+            <Icon name="star" size={13} color={closeFriendsOnly ? '#000' : 'rgba(255,255,255,0.6)'} />
             <Text style={[styles.closeFriendsLabel, closeFriendsOnly && { color: '#000' }]}>Close Friends</Text>
           </TouchableOpacity>
           <PressableScale
@@ -1819,7 +1819,7 @@ export default function StoryComposer() {
             accessibilityRole="button"
             accessibilityLabel={isPosting ? 'Posting story' : 'Send story'}
           >
-            {isPosting ? <Feather name="loader" size={20} color="#000" /> : <Feather name="arrow-up" size={20} color="#000" />}
+            {isPosting ? <Icon name="loader" size={20} color="#000" /> : <Icon name="arrow-up" size={20} color="#000" />}
           </PressableScale>
         </View>
       </View>
@@ -1835,7 +1835,7 @@ export default function StoryComposer() {
         >
           <View style={[styles.textToolTop, { paddingTop: topInset + SP.sm }]}>
             <TouchableOpacity onPress={() => setTextToolOpen(false)} accessibilityLabel="Close" accessibilityRole="button">
-              <Feather name="x" size={22} color={ON_DARK} />
+              <Icon name="x" size={22} color={ON_DARK} />
             </TouchableOpacity>
             <TouchableOpacity onPress={commitTextOverlay} accessibilityLabel="Done" accessibilityRole="button">
               <Text style={styles.textToolDone}>Done</Text>
@@ -1902,7 +1902,7 @@ export default function StoryComposer() {
                 <Text style={styles.textToolChipGlyph}>//A</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.textToolChip} onPress={() => setTextEffectSheetOpen(true)} accessibilityLabel="Text effect" accessibilityRole="button">
-                <Feather name="zap" size={16} color={ON_DARK} />
+                <Icon name="zap" size={16} color={ON_DARK} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.textToolChip}
@@ -1910,7 +1910,7 @@ export default function StoryComposer() {
                 accessibilityLabel={`Alignment ${textDraftAlign}`}
                 accessibilityRole="button"
               >
-                <Feather name={textDraftAlign === 'left' ? 'align-left' : textDraftAlign === 'right' ? 'align-right' : 'align-center'} size={18} color={ON_DARK} />
+                <Icon name={textDraftAlign === 'left' ? 'align-left' : textDraftAlign === 'right' ? 'align-right' : 'align-center'} size={18} color={ON_DARK} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.textToolChip, textDraftBgStyle !== 'none' && { backgroundColor: theme.accentDim }]}
@@ -1941,7 +1941,7 @@ export default function StoryComposer() {
                 accessibilityRole="button"
                 accessibilityLabel="Add mention"
               >
-                <Feather name="at-sign" size={14} color={ON_DARK} />
+                <Icon name="at-sign" size={14} color={ON_DARK} />
                 <Text style={styles.textAccessoryLabel}>Mention</Text>
               </TouchableOpacity>
               <View style={styles.textAccessoryDivider} />
@@ -1951,7 +1951,7 @@ export default function StoryComposer() {
                 accessibilityRole="button"
                 accessibilityLabel="Add location"
               >
-                <Feather name="map-pin" size={14} color={ON_DARK} />
+                <Icon name="map-pin" size={14} color={ON_DARK} />
                 <Text style={styles.textAccessoryLabel}>Location</Text>
               </TouchableOpacity>
             </View>
@@ -2130,7 +2130,7 @@ export default function StoryComposer() {
                   accessibilityLabel={`Tag ${p.name}`}
                 >
                   <Text style={styles.productRowText}>{p.name}</Text>
-                  <Feather name="chevron-right" size={16} color={MUTED} />
+                  <Icon name="chevron-right" size={16} color={MUTED} />
                 </PressableScale>
               ))}
             </ScrollView>
@@ -2230,10 +2230,10 @@ export default function StoryComposer() {
 }
 
 // ─── Sticker tile ────────────────────────────────────────────────────────────
-function StickerTile({ icon, label, onPress, custom }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; custom?: React.ReactNode }) {
+function StickerTile({ icon, label, onPress, custom }: { icon: IconName; label: string; onPress: () => void; custom?: React.ReactNode }) {
   return (
     <PressableScale style={styles.stickerTile} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
-      {custom ?? <Feather name={icon} size={22} color={ON_DARK} />}
+      {custom ?? <Icon name={icon} size={22} color={ON_DARK} />}
       <Text style={styles.stickerTileLabel}>{label}</Text>
     </PressableScale>
   );
@@ -2265,9 +2265,9 @@ function renderOverlayContent(ov: StoryOverlay, ctx?: { creditHandle?: string; o
     case 'reshare_card':
       return <ReshareCard imageUri={ov.cardImageUri} radius={ov.cardRadius} handle={ctx?.creditHandle} onCreditPress={ctx?.onCreditPress} />;
     case 'location':
-      return <View style={styles.pillChip}><Feather name="map-pin" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.locationLabel}</Text></View>;
+      return <View style={styles.pillChip}><Icon name="map-pin" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.locationLabel}</Text></View>;
     case 'time':
-      return <View style={styles.pillChip}><Feather name="clock" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.text}</Text></View>;
+      return <View style={styles.pillChip}><Icon name="clock" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.text}</Text></View>;
     case 'question':
       return <QuestionSticker prompt={ov.questionPrompt ?? ''} mode="editor" />;
     case 'poll':
@@ -2275,9 +2275,9 @@ function renderOverlayContent(ov: StoryOverlay, ctx?: { creditHandle?: string; o
     case 'countdown':
       return <CountdownSticker name={ov.dropName ?? 'Drop'} releaseAt={ov.dropReleaseAt ?? null} mode="editor" />;
     case 'link':
-      return <View style={styles.pillChip}><Feather name="link-2" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.linkText || ov.linkUrl}</Text></View>;
+      return <View style={styles.pillChip}><Icon name="link-2" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.linkText || ov.linkUrl}</Text></View>;
     case 'shop':
-      return <View style={styles.pillChip}><Feather name="external-link" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.shopLabel || ov.shopUrl}</Text></View>;
+      return <View style={styles.pillChip}><Icon name="external-link" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.shopLabel || ov.shopUrl}</Text></View>;
     case 'product':
       return <ProductSticker name={ov.productName ?? 'Product'} imageUrl={ov.productImageUri} priceCents={ov.productPriceCents} mode="editor" />;
     case 'threadcash':

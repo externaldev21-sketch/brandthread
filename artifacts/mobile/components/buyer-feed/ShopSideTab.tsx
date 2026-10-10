@@ -46,7 +46,7 @@ import ReanimatedAnimated, {
   Extrapolation,
   interpolate,
 } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { Glass } from '@/components/ui/Glass';
@@ -218,7 +218,7 @@ export function ShopTagPill({
           pointerEvents={expanded ? 'none' : 'auto'}
           style={[styles.collapsed, collapsedStyle]}
         >
-          <Feather name="shopping-bag" size={13} color={ON_DARK} />
+          <Icon name="shopping-bag" size={13} color={ON_DARK} />
           <Text style={styles.label}>Shop</Text>
         </ReanimatedAnimated.View>
         <ReanimatedAnimated.View
@@ -229,7 +229,7 @@ export function ShopTagPill({
             {tag.imageUri ? (
               <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
             ) : (
-              <Feather name="shopping-bag" size={13} color="#111111" />
+              <Icon name="shopping-bag" size={13} color="#111111" />
             )}
           </View>
           <Text style={styles.name} numberOfLines={1}>{tag.productName}</Text>
@@ -238,7 +238,7 @@ export function ShopTagPill({
           </Text>
           {/* Purely decorative — the whole expanded strip is one tap
               target (the TouchableOpacity above), see the module comment. */}
-          <Feather name="chevron-right" size={12} color={ON_DARK} pointerEvents="none" />
+          <Icon name="chevron-right" size={12} color={ON_DARK} pointerEvents="none" />
         </ReanimatedAnimated.View>
       </TouchableOpacity>
     </ReanimatedAnimated.View>

@@ -4,7 +4,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, Alert, Modal, TextInput, Platform } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -271,7 +271,7 @@ export default function StoreBuilderScreen() {
             activeOpacity={0.75}
             style={{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: SP.sm }}
           >
-            <Feather name="arrow-left" size={ICON.sm} color={theme.onAccent} />
+            <Icon name="arrow-left" size={ICON.sm} color={theme.onAccent} />
           </TouchableOpacity>
           <Text style={s.headerSubtitle}>Store Builder</Text>
           <Text style={s.headerHeading}>Build your brand's home.</Text>
@@ -300,7 +300,7 @@ export default function StoreBuilderScreen() {
                     </Text>
                   </View>
                 </View>
-                <Feather
+                <Icon
                   name={store.publishStatus === 'published' ? 'check-circle' : 'edit-2'}
                   size={ICON.lg}
                   color={store.publishStatus === 'published' ? SUCCESS : MUTED}
@@ -367,7 +367,7 @@ export default function StoreBuilderScreen() {
                 <View style={s.threadThemeFeatures}>
                   {['Black, white & grayscale', 'Full-bleed campaigns', 'Minimal product cards'].map(feature => (
                     <View key={feature} style={s.threadThemeFeature}>
-                      <Feather name="check" size={13} color={FG} />
+                      <Icon name="check" size={13} color={FG} />
                       <Text style={s.threadThemeFeatureText}>{feature}</Text>
                     </View>
                   ))}
@@ -398,7 +398,7 @@ export default function StoreBuilderScreen() {
                 <Text style={s.shopifyTitle}>Transfer Shopify Store to Brandthread</Text>
                 <Text style={s.shopifyDesc}>Copy your public products and collections, then build them into Thread Theme.</Text>
               </View>
-              <Feather name="arrow-right" size={ICON.md} color={FG} />
+              <Icon name="arrow-right" size={ICON.md} color={FG} />
             </BrandthreadCard>
           </View>
 
@@ -417,7 +417,7 @@ export default function StoreBuilderScreen() {
                   activeOpacity={0.75}
                 >
                   <View style={s.mgmtIconWrap}>
-                    <Feather name={icon} size={ICON.md} color={PURPLE_LIGHT} />
+                    <Icon name={icon} size={ICON.md} color={PURPLE_LIGHT} />
                   </View>
                   <Text style={s.mgmtLabel}>{label}</Text>
                 </TouchableOpacity>
@@ -435,7 +435,7 @@ export default function StoreBuilderScreen() {
                   activeOpacity={0.75}
                 >
                   <View style={s.mgmtIconWrap}>
-                    <Feather name={icon} size={ICON.md} color={PURPLE_LIGHT} />
+                    <Icon name={icon} size={ICON.md} color={PURPLE_LIGHT} />
                   </View>
                   <Text style={s.mgmtLabel}>{label}</Text>
                 </TouchableOpacity>
@@ -453,7 +453,7 @@ export default function StoreBuilderScreen() {
                   activeOpacity={0.75}
                 >
                   <View style={s.mgmtIconWrap}>
-                    <Feather name={icon} size={ICON.md} color={PURPLE_LIGHT} />
+                    <Icon name={icon} size={ICON.md} color={PURPLE_LIGHT} />
                   </View>
                   <Text style={s.mgmtLabel}>{label}</Text>
                 </TouchableOpacity>
@@ -466,7 +466,7 @@ export default function StoreBuilderScreen() {
             <GradientCard colors={GRAD_CARD_GLOW} glow>
               <View style={s.aiImproveRow}>
                 <View style={s.aiImproveIconWrap}>
-                  <Feather name="zap" size={ICON.lg} color={GOLD} />
+                  <Icon name="zap" size={ICON.lg} color={GOLD} />
                   {suggestionCount > 0 && (
                     <View style={s.suggestionBadge}>
                       <Text style={s.suggestionBadgeText}>{suggestionCount}</Text>
@@ -535,7 +535,7 @@ export default function StoreBuilderScreen() {
                 )}
                 {importJob.status === 'failed' && (
                   <>
-                    <View style={[s.resultIcon, { backgroundColor: RED_DIM }]}><Feather name="alert-circle" size={ICON.lg} color={RED} /></View>
+                    <View style={[s.resultIcon, { backgroundColor: RED_DIM }]}><Icon name="alert-circle" size={ICON.lg} color={RED} /></View>
                     <Text style={s.progressTitle}>Transfer stopped</Text>
                     <Text style={s.importError}>{importJob.errorMessage || 'We could not import this store.'}</Text>
                     <SecondaryButton label="Try another URL" onPress={() => { setImportJob(null); setImportError(''); }} />
@@ -543,7 +543,7 @@ export default function StoreBuilderScreen() {
                 )}
                 {(importJob.status === 'complete' || importJob.status === 'needs_continuation') && (
                   <>
-                    <View style={[s.resultIcon, { backgroundColor: SUCCESS_DIM }]}><Feather name="check" size={ICON.lg} color={SUCCESS} /></View>
+                    <View style={[s.resultIcon, { backgroundColor: SUCCESS_DIM }]}><Icon name="check" size={ICON.lg} color={SUCCESS} /></View>
                     <Text style={s.progressTitle}>{importJob.importedCount} products transferred</Text>
                     <Text style={s.progressDesc}>
                       {importJob.failedCount > 0 ? `${importJob.failedCount} products could not be converted. ` : ''}

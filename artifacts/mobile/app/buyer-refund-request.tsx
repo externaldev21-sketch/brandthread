@@ -9,7 +9,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -117,7 +117,7 @@ export default function BuyerRefundRequestScreen() {
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <ScreenHeader title="Request Refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-          <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
+          <View style={s.successIcon}><Icon name="check" size={32} color={ON_DARK} /></View>
           <Text style={s.successTitle}>Refund Request Submitted</Text>
           <Text style={s.successSub}>Your request is under review. Refunds are not automatic — the seller or payment provider must confirm.</Text>
           <Text style={s.successNote}>Refund updates will appear here.</Text>
@@ -147,7 +147,7 @@ export default function BuyerRefundRequestScreen() {
             <Text style={s.sectionTitle}>Order Items</Text>
             {order.lineItems.map((item, idx) => (
               <View key={idx} style={[s.itemRow, idx > 0 && s.itemBorder]}>
-                <Feather name="package" size={14} color={MUTED} />
+                <Icon name="package" size={14} color={MUTED} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.itemName}>{item.productName}</Text>
                   <Text style={s.itemVariant}>{item.variant} · ×{item.quantity}</Text>
@@ -192,7 +192,7 @@ export default function BuyerRefundRequestScreen() {
           onPress={pickEvidence}
           activeOpacity={0.8}
         >
-          <Feather name="camera" size={16} color={PURPLE_LIGHT} />
+          <Icon name="camera" size={16} color={PURPLE_LIGHT} />
           <Text style={[s.evidenceNoteText, { color: PURPLE_LIGHT }]}>
             Add photo evidence ({evidencePhotos.length}/5)
           </Text>
@@ -207,7 +207,7 @@ export default function BuyerRefundRequestScreen() {
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
                   >
-                    <Feather name="x" size={10} color="#fff" />
+                    <Icon name="x" size={10} color="#fff" />
                   </TouchableOpacity>
                 </View>
               ))}

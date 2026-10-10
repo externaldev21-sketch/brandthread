@@ -13,7 +13,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,6 +21,7 @@ import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
 import { getEntitlementRejection } from '@/lib/entitlementError';
+import { FONT } from '@/lib/theme';
 
 interface Photo {
   id: string;
@@ -312,7 +313,7 @@ export default function TechPackGeneratorScreen() {
               <Text style={[styles.primaryBtnText, { color: canGoNextFromInfo ? colors.primaryForeground : colors.mutedForeground }]}>
                 Next: add photos
               </Text>
-              <Feather name="arrow-right" size={16} color={canGoNextFromInfo ? colors.primaryForeground : colors.mutedForeground} />
+              <Icon name="arrow-right" size={16} color={canGoNextFromInfo ? colors.primaryForeground : colors.mutedForeground} />
             </TouchableOpacity>
           </>
         )}
@@ -332,7 +333,7 @@ export default function TechPackGeneratorScreen() {
                     onPress={() => removePhoto(p.id)}
                     activeOpacity={0.8}
                   >
-                    <Feather name="x" size={11} color="#FFF" />
+                    <Icon name="x" size={11} color="#FFF" />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -342,7 +343,7 @@ export default function TechPackGeneratorScreen() {
                   activeOpacity={0.8}
                   style={[styles.addTile, { backgroundColor: colors.card, borderColor: colors.border }]}
                 >
-                  <Feather name="plus" size={20} color={colors.primary} />
+                  <Icon name="plus" size={20} color={colors.primary} />
                 </TouchableOpacity>
               )}
             </ScrollView>
@@ -360,7 +361,7 @@ export default function TechPackGeneratorScreen() {
                 <Text style={[styles.primaryBtnText, { color: canGoNextFromPhotos ? colors.primaryForeground : colors.mutedForeground }]}>
                   Next: size chart
                 </Text>
-                <Feather name="arrow-right" size={16} color={canGoNextFromPhotos ? colors.primaryForeground : colors.mutedForeground} />
+                <Icon name="arrow-right" size={16} color={canGoNextFromPhotos ? colors.primaryForeground : colors.mutedForeground} />
               </TouchableOpacity>
             </View>
           </>
@@ -385,12 +386,12 @@ export default function TechPackGeneratorScreen() {
                         style={[styles.sizeInput, { color: colors.foreground, borderColor: colors.border }]}
                       />
                       <TouchableOpacity onPress={() => removeSize(size)} style={{ marginLeft: 4 }}>
-                        <Feather name="x" size={12} color={colors.mutedForeground} />
+                        <Icon name="x" size={12} color={colors.mutedForeground} />
                       </TouchableOpacity>
                     </View>
                   ))}
                   <TouchableOpacity onPress={addSize} style={[styles.tableCell, styles.addColBtn, { borderColor: colors.border }]}>
-                    <Feather name="plus" size={14} color={colors.primary} />
+                    <Icon name="plus" size={14} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
 
@@ -417,7 +418,7 @@ export default function TechPackGeneratorScreen() {
                       </View>
                     ))}
                     <TouchableOpacity onPress={() => removeRow(i)} style={[styles.tableCell, styles.addColBtn]}>
-                      <Feather name="trash-2" size={13} color={colors.destructive} />
+                      <Icon name="trash-2" size={13} color={colors.destructive} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -425,8 +426,8 @@ export default function TechPackGeneratorScreen() {
             </ScrollView>
 
             <TouchableOpacity onPress={addRow} activeOpacity={0.8} style={[styles.addRowBtn, { borderColor: colors.border }]}>
-              <Feather name="plus" size={14} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>Add measurement point</Text>
+              <Icon name="plus" size={14} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontFamily: FONT.semibold, fontSize: 12 }}>Add measurement point</Text>
             </TouchableOpacity>
 
             <View style={styles.navRow}>
@@ -435,7 +436,7 @@ export default function TechPackGeneratorScreen() {
               </TouchableOpacity>
               <TouchableOpacity onPress={goNext} activeOpacity={0.85} style={[styles.primaryBtn, { flex: 1, backgroundColor: colors.primary }]}>
                 <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Next: details</Text>
-                <Feather name="arrow-right" size={16} color={colors.primaryForeground} />
+                <Icon name="arrow-right" size={16} color={colors.primaryForeground} />
               </TouchableOpacity>
             </View>
           </>
@@ -470,7 +471,7 @@ export default function TechPackGeneratorScreen() {
             />
 
             <TouchableOpacity onPress={generate} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 20 }]}>
-              <Feather name="file-text" size={16} color={colors.primaryForeground} />
+              <Icon name="file-text" size={16} color={colors.primaryForeground} />
               <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Generate tech pack</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={goBack} activeOpacity={0.7} style={styles.secondaryBtn}>
@@ -493,14 +494,14 @@ export default function TechPackGeneratorScreen() {
                 </View>
               ) : pdfBase64 ? (
                 <>
-                  <Feather name="file-text" size={36} color={colors.primary} />
+                  <Icon name="file-text" size={36} color={colors.primary} />
                   <Text style={[styles.resultFilename, { color: colors.foreground }]}>{pdfFilename}</Text>
                   <Text style={[styles.resultSubtitle, { color: colors.mutedForeground }]}>
                     Full spec sheet with photos, materials, size chart, and care instructions.
                   </Text>
                 </>
               ) : (
-                <Feather name="alert-circle" size={28} color={colors.mutedForeground} />
+                <Icon name="alert-circle" size={28} color={colors.mutedForeground} />
               )}
             </View>
 
@@ -508,14 +509,14 @@ export default function TechPackGeneratorScreen() {
               <View style={{ gap: 12, marginTop: 20 }}>
                 {pdfBase64 && (
                   <TouchableOpacity onPress={shareTechPack} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
-                    <Feather name="share" size={16} color={colors.primaryForeground} />
+                    <Icon name="share" size={16} color={colors.primaryForeground} />
                     <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Send to manufacturer</Text>
                   </TouchableOpacity>
                 )}
                 {!pdfBase64 && (
                   <>
                     <TouchableOpacity onPress={generate} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
-                      <Feather name="refresh-cw" size={16} color={colors.primaryForeground} />
+                      <Icon name="refresh-cw" size={16} color={colors.primaryForeground} />
                       <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Try again</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setStep('details')} activeOpacity={0.7} style={styles.secondaryBtn}>
@@ -576,19 +577,19 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 8, height: 8, borderRadius: 4 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 6 },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14, lineHeight: 17 },
+  sectionTitle: { fontSize: 16, fontFamily: FONT.bold, marginBottom: 4 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
   row2: { flexDirection: 'row', gap: 12 },
-  inputLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
-  input: { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  inputLabel: { fontSize: 12, fontFamily: FONT.semibold, marginBottom: 6 },
+  input: { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: FONT.regular },
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: 14, paddingVertical: 15,
   },
-  primaryBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  primaryBtnText: { fontSize: 14, fontFamily: FONT.semibold },
   secondaryBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 16 },
-  secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  secondaryBtnText: { fontSize: 13, fontFamily: FONT.regular },
   navRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
   trayRow: { gap: 10, paddingVertical: 4 },
   trayThumbWrap: { position: 'relative' },
@@ -606,9 +607,9 @@ const styles = StyleSheet.create({
   tableCell: { width: 84, paddingVertical: 4, paddingRight: 6, flexDirection: 'row', alignItems: 'center' },
   tableFirstCol: { width: 110 },
   addColBtn: { width: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 8, borderStyle: 'dashed' },
-  sizeInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: 'Inter_600SemiBold', flex: 1 },
-  pointInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: 'Inter_400Regular', width: '100%' },
-  valueInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: 'Inter_400Regular', width: '100%' },
+  sizeInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: FONT.semibold, flex: 1 },
+  pointInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: FONT.regular, width: '100%' },
+  valueInput: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, fontSize: 12, fontFamily: FONT.regular, width: '100%' },
   addRowBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
     borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, marginTop: 12,
@@ -617,8 +618,8 @@ const styles = StyleSheet.create({
     borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 40, paddingHorizontal: 20, gap: 8,
   },
-  resultFilename: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
-  resultSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  resultFilename: { fontSize: 14, fontFamily: FONT.semibold, marginTop: 4 },
+  resultSubtitle: { fontSize: 12, fontFamily: FONT.regular, textAlign: 'center' },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 8, height: 8, borderRadius: 4, opacity: 0.6 },
 });

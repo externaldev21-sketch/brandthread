@@ -10,7 +10,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ActivityIndicator, ScrollView, Share,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -149,7 +149,7 @@ export default function BuyerInviteScreen() {
             <PressableScale style={styles.codeRow} onPress={copyCode} accessibilityLabel="Copy invite code">
               <Text style={styles.codeText}>{invite?.code ?? '------'}</Text>
               <View style={styles.copyPill}>
-                <Feather name="copy" size={14} color={theme.text} />
+                <Icon name="copy" size={14} color={theme.text} />
                 <Text style={styles.copyPillText}>Copy</Text>
               </View>
             </PressableScale>

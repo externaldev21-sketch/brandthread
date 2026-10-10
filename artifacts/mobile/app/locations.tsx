@@ -11,7 +11,7 @@ import { useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
@@ -174,7 +174,7 @@ export default function LocationsScreen() {
             {/* Location list */}
             {filtered.length === 0 ? (
               <View style={[s.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Feather name="map-pin" size={28} color={colors.mutedForeground} style={{ marginBottom: 10 }} />
+                <Icon name="map-pin" size={28} color={colors.mutedForeground} style={{ marginBottom: 10 }} />
                 <Text style={[s.emptyText, { color: colors.mutedForeground }]}>
                   {activeTab === 'All' ? 'No locations yet. Add your first location.' : `No ${activeTab.toLowerCase()} locations.`}
                 </Text>
@@ -212,10 +212,10 @@ export default function LocationsScreen() {
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => openEdit(loc)} style={s.iconAction} activeOpacity={0.7}>
-                        <Feather name="edit-2" size={15} color={colors.mutedForeground} />
+                        <Icon name="edit-2" size={15} color={colors.mutedForeground} />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleDelete(loc)} style={s.iconAction} activeOpacity={0.7}>
-                        <Feather name="trash-2" size={15} color={colors.mutedForeground} />
+                        <Icon name="trash-2" size={15} color={colors.mutedForeground} />
                       </TouchableOpacity>
                     </View>
                   </View>

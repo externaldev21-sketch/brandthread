@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS } from '@/lib/theme';
 import type { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -18,7 +18,7 @@ export function SellerPaywallBullets({ theme, bullets }: SellerPaywallBulletsPro
     <View style={styles.list}>
       {bullets.map((bullet) => (
         <View key={bullet} style={styles.row}>
-          <Feather name="check" size={15} color={theme.text} style={{ marginTop: 2 }} />
+          <Icon name="check" size={15} color={theme.text} style={{ marginTop: 2 }} />
           <Text style={[styles.text, { color: theme.text }]}>{bullet}</Text>
         </View>
       ))}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -43,7 +43,7 @@ export default function CreateButton({ onPress, label = 'Create', compact, testI
         style={StyleSheet.absoluteFill}
       />
       <View style={[StyleSheet.absoluteFill, styles.tint]} />
-      <Feather name="plus" size={compact ? 16 : 18} color={theme.text} />
+      <Icon name="plus" size={compact ? 16 : 18} color={theme.text} />
       {!compact && <Text style={styles.label}>{label}</Text>}
     </Pressable>
   );

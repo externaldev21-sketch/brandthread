@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   GRAD_CARD_GLOW,
@@ -183,7 +183,7 @@ export default function StoreAiImproveScreen() {
                     style={ai.previewBtn}
                     onPress={() => Alert.alert('Preview', sug.previewChange ?? '')}
                   >
-                    <Feather name="eye" size={ICON.xs} color={MUTED} />
+                    <Icon name="eye" size={ICON.xs} color={MUTED} />
                     <Text style={ai.previewBtnText}>Preview</Text>
                   </TouchableOpacity>
                 )}
@@ -201,7 +201,7 @@ export default function StoreAiImproveScreen() {
             {applied.map(sug => (
               <BrandthreadCard key={sug.id} style={ai.appliedCard}>
                 <View style={ai.appliedRow}>
-                  <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
+                  <Icon name="check-circle" size={ICON.sm} color={SUCCESS} />
                   <Text style={ai.appliedTitle} numberOfLines={1}>{sug.title}</Text>
                   <StatusBadge label={sug.category} variant={categoryVariant(sug.category)} small />
                 </View>
@@ -215,7 +215,7 @@ export default function StoreAiImproveScreen() {
           <>
             <TouchableOpacity style={ai.dismissedToggle} onPress={() => setShowDismissed(v => !v)}>
               <Text style={ai.dismissedToggleText}>{showDismissed ? 'Hide' : 'Show'} dismissed ({dismissed.length})</Text>
-              <Feather name={showDismissed ? 'chevron-up' : 'chevron-down'} size={ICON.xs} color={MUTED} />
+              <Icon name={showDismissed ? 'chevron-up' : 'chevron-down'} size={ICON.xs} color={MUTED} />
             </TouchableOpacity>
             {showDismissed && dismissed.map(sug => (
               <BrandthreadCard key={sug.id} style={[ai.sugCard, ai.dismissedCard]}>

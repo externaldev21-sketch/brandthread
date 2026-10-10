@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, StickyFooter } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
@@ -185,7 +185,7 @@ function CartItemRow({
         accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${item.productName} for checkout`}
       >
         <View style={[ir.checkboxBox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
-          {selected && <Feather name="check" size={12} color={theme.onAccent} />}
+          {selected && <Icon name="check" size={12} color={theme.onAccent} />}
         </View>
       </PressableScale>
 
@@ -198,7 +198,7 @@ function CartItemRow({
       <View style={ir.img}>
         {item.imageUri
           ? <CachedImage source={{ uri: item.imageUri }} style={ir.productImage} contentFit="contain" recyclingKey={item.imageUri} />
-          : <Feather name="image" size={ICON.md} color={theme.muted} />}
+          : <Icon name="image" size={ICON.md} color={theme.muted} />}
       </View>
 
       <View style={ir.col}>
@@ -220,12 +220,12 @@ function CartItemRow({
           accessibilityLabel={`Change options for ${item.productName}. Current: ${item.variantTitle}`}
         >
           <Text style={ir.variant}>{item.variantTitle}</Text>
-          <Feather name="edit-2" size={12} color={theme.muted} />
+          <Icon name="edit-2" size={12} color={theme.muted} />
         </PressableScale>
 
         {item.isPreOrder && (
           <View style={ir.preOrderBadge}>
-            <Feather name="clock" size={10} color={theme.secondary} />
+            <Icon name="clock" size={10} color={theme.secondary} />
             <Text style={[ir.preOrderText, { color: theme.secondary }]}>
               Pre-order{item.preOrderEstShipDate ? ` · est. ${new Date(item.preOrderEstShipDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : ''}
             </Text>
@@ -235,7 +235,7 @@ function CartItemRow({
         {/* Unavailable warning — prominent, backed by CartItem.isAvailable */}
         {!item.isAvailable && (
           <View style={ir.unavailBadge} accessibilityRole="alert">
-             <Feather name="alert-circle" size={11} color={theme.error} />
+             <Icon name="alert-circle" size={11} color={theme.error} />
             <Text style={ir.unavailText}>{item.unavailableReason ?? 'Unavailable — remove or save for later'}</Text>
           </View>
         )}
@@ -243,7 +243,7 @@ function CartItemRow({
         {/* Low stock warning — inline, only when actually available */}
         {isLowStock && (
           <View style={[ir.stockWarnRow, isCriticalStock && ir.stockWarnCritical]}>
-             <Feather name="alert-triangle" size={10} color={theme.warning} />
+             <Icon name="alert-triangle" size={10} color={theme.warning} />
             <Text style={[ir.stockWarn, isCriticalStock && ir.stockWarnCriticalText]}>
               {isCriticalStock ? 'Last one left!' : `Only ${item.maxQuantity} left`}
             </Text>
@@ -419,7 +419,7 @@ function SellerGroup({
           <Text style={sg.sellerName}>{group.sellerName}</Text>
           <Text style={sg.sellerHandle}>{group.sellerHandle}</Text>
         </View>
-        <Feather name="chevron-right" size={18} color={theme.muted} />
+        <Icon name="chevron-right" size={18} color={theme.muted} />
       </PressableScale>
 
       {/* Items */}
@@ -443,12 +443,12 @@ function SellerGroup({
       {/* Group footer */}
       <View style={sg.footer}>
         <View style={sg.footerRow}>
-        <Feather name="truck" size={12} color={theme.muted} />
+        <Icon name="truck" size={12} color={theme.muted} />
           <Text style={sg.footerText}>{group.fulfillmentEstimate}</Text>
         </View>
         {group.hasPreOrder && (
           <View style={sg.footerRow}>
-            <Feather name="clock" size={12} color={theme.secondary} />
+            <Icon name="clock" size={12} color={theme.secondary} />
             <Text style={[sg.footerText, { color: theme.secondary }]}>Contains pre-order items</Text>
           </View>
         )}
@@ -540,7 +540,7 @@ function SavedItemRow({ item, onMove, onRemove }: {
   return (
     <View style={si.root}>
       <View style={si.img}>
-        <Feather name="bookmark" size={ICON.md} color={theme.muted} />
+        <Icon name="bookmark" size={ICON.md} color={theme.muted} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={si.name} numberOfLines={1}>{item.productName}</Text>
@@ -610,7 +610,7 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
       <Text style={sum.note}>Shipping and tax are estimated. Final amount calculated at checkout.</Text>
       {hasPreOrder && (
         <View style={sum.preOrderNote}>
-          <Feather name="clock" size={12} color={theme.secondary} />
+          <Icon name="clock" size={12} color={theme.secondary} />
           <Text style={[sum.preOrderNoteText, { color: theme.secondary }]}>Pre-order items will ship after production. Items may ship separately.</Text>
         </View>
       )}
@@ -1092,7 +1092,7 @@ export default function CartScreen() {
               accessibilityState={{ checked: allSelected }}
             >
               <View style={[s.selectAllBox, allSelected && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
-                {allSelected && <Feather name="check" size={12} color={theme.onAccent} />}
+                {allSelected && <Icon name="check" size={12} color={theme.onAccent} />}
               </View>
               <Text style={s.selectAllText}>
                 {allSelected ? 'All items selected' : `${selectedItems.length} of ${cart.items.length} selected`}
@@ -1143,7 +1143,7 @@ export default function CartScreen() {
               <>
               {groups.length > 1 && (
                 <View style={s.multiSellerNotice}>
-                  <Feather name="layers" size={15} color={theme.muted} style={{ marginTop: 2 }} />
+                  <Icon name="layers" size={15} color={theme.muted} style={{ marginTop: 2 }} />
                   <Text style={[s.multiSellerText, { color: theme.muted }]}>Items from {groups.length} sellers ship separately, each with its own delivery estimate.</Text>
                 </View>
               )}
@@ -1151,7 +1151,7 @@ export default function CartScreen() {
               <View style={s.loyaltyCard}>
                 <View style={s.loyaltyHeading}>
                   <View style={s.loyaltyIcon}>
-                    <Feather name="gift" size={15} color={theme.text} />
+                    <Icon name="gift" size={15} color={theme.text} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.loyaltyTitle}>Use points</Text>
@@ -1170,7 +1170,7 @@ export default function CartScreen() {
                          −{fmtPrice(loyaltyRedemption.discountCents)} at secure checkout
                       </Text>
                     </View>
-                    <Feather name="check-circle" size={19} color={theme.success} />
+                    <Icon name="check-circle" size={19} color={theme.success} />
                   </View>
                 ) : (
                   <>

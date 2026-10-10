@@ -7,7 +7,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { weeklyEquivalentFor } from '@/lib/sellerPlansDisplay';
@@ -104,7 +104,7 @@ export function SellerPlanSelector({
 
             {isCurrent && (
               <View style={styles.currentRow}>
-                <Feather name="check-circle" size={13} color={inverted ? theme.background : theme.success} />
+                <Icon name="check-circle" size={13} color={inverted ? theme.background : theme.success} />
                 <Text style={[styles.currentRowText, inverted && styles.mutedOnInverted]}>Current plan</Text>
               </View>
             )}
@@ -113,7 +113,7 @@ export function SellerPlanSelector({
               <View style={styles.featureList}>
                 {plan.features.slice(0, 4).map((f) => (
                   <View key={f} style={styles.featureRow}>
-                    <Feather name="check" size={13} color={inverted ? theme.background : theme.text} style={{ marginTop: 2 }} />
+                    <Icon name="check" size={13} color={inverted ? theme.background : theme.text} style={{ marginTop: 2 }} />
                     <Text style={[styles.featureText, inverted && styles.textOnInverted]}>{f}</Text>
                   </View>
                 ))}
@@ -121,7 +121,7 @@ export function SellerPlanSelector({
             )}
 
             <View style={styles.radioRow}>
-              <Feather
+              <Icon
                 name={isSelected ? 'check-circle' : 'circle'}
                 size={18}
                 color={inverted ? theme.background : (isSelected ? theme.text : theme.muted)}
@@ -141,7 +141,7 @@ export function SellerPlanSelector({
           testID="seller-plans-view-all"
         >
           <Text style={styles.viewAllText}>View all plans</Text>
-          <Feather name="chevron-down" size={14} color={theme.muted} />
+          <Icon name="chevron-down" size={14} color={theme.muted} />
         </TouchableOpacity>
       )}
     </View>

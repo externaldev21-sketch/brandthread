@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
@@ -42,8 +42,8 @@ export function StoreSetupField({ label, prefix, status, ...inputProps }: Props)
       </View>
       <View style={styles.statusRow} accessibilityLiveRegion="polite">
         {status.kind === 'checking' ? <ActivityIndicator size="small" color={theme.muted} /> : null}
-        {status.kind === 'ok' ? <Feather name="check-circle" size={15} color={theme.success} /> : null}
-        {status.kind === 'error' ? <Feather name="x-circle" size={15} color={theme.text} /> : null}
+        {status.kind === 'ok' ? <Icon name="check-circle" size={15} color={theme.success} /> : null}
+        {status.kind === 'error' ? <Icon name="x-circle" size={15} color={theme.text} /> : null}
         {status.kind === 'checking' ? <Text style={[styles.status, { color: theme.muted }]}>Checking</Text> : null}
         {status.kind === 'ok' ? <Text style={[styles.status, { color: theme.success }]}>{status.message}</Text> : null}
         {status.kind === 'error' ? <Text style={[styles.status, { color: theme.text }]}>{status.message}</Text> : null}

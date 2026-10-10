@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Linking, Alert, ActivityIndicator, Modal,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
@@ -34,7 +34,7 @@ const FAQS: Faq[] = [
   { q: 'How do I delete my account?', a: 'Go to Settings → Account → Delete Account. Your account is hidden right away and permanently deleted after 30 days. Sign back in during those 30 days to restore it. Order, payment and tax records are kept, without your personal details, for as long as the law requires.', category: 'Account' },
 ];
 
-const CATEGORIES: { key: Category; icon: keyof typeof Feather.glyphMap }[] = [
+const CATEGORIES: { key: Category; icon: IconName }[] = [
   { key: 'General', icon: 'compass' },
   { key: 'Billing', icon: 'credit-card' },
   { key: 'Account', icon: 'user' },
@@ -154,7 +154,7 @@ export default function HelpScreen() {
                       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveCategory(c.key); }}
                     >
                       <View style={[s.categoryIconWrap, { backgroundColor: theme.accent + '18' }]}>
-                        <Feather name={c.icon} size={ICON.md} color={theme.accent} />
+                        <Icon name={c.icon} size={ICON.md} color={theme.accent} />
                       </View>
                       <Text style={s.categoryLabel}>{c.key}</Text>
                       <Text style={s.categoryCount}>{count > 0 ? `${count} article${count === 1 ? '' : 's'}` : 'Contact us'}</Text>
@@ -212,15 +212,15 @@ export default function HelpScreen() {
         {/* Contact shortcuts */}
         <View style={s.contactRow}>
           <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('mailto:support@brandthread.app')} activeOpacity={0.8}>
-            <Feather name="mail" size={ICON.md} color={theme.accent} />
+            <Icon name="mail" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Email Us</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.contactBtn} onPress={scrollToContact} activeOpacity={0.8}>
-            <Feather name="message-circle" size={ICON.md} color={theme.accent} />
+            <Icon name="message-circle" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Live Chat</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('https://brandthread.app/help')} activeOpacity={0.8}>
-            <Feather name="book-open" size={ICON.md} color={theme.accent} />
+            <Icon name="book-open" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Full Docs</Text>
           </TouchableOpacity>
         </View>
@@ -229,14 +229,14 @@ export default function HelpScreen() {
         <View onLayout={(e) => setContactY(e.nativeEvent.layout.y)}>
           <BrandthreadCard style={[s.ticketSection, { backgroundColor: theme.accentDim, borderColor: `${theme.accent}33` }]}>
             <View style={s.ticketHeader}>
-              <Feather name="life-buoy" size={ICON.md} color={theme.accent} />
+              <Icon name="life-buoy" size={ICON.md} color={theme.accent} />
               <Text style={s.ticketTitle}>Still stuck? Send us a message</Text>
             </View>
             <Text style={s.ticketSub}>We typically respond within 2 hours on business days.</Text>
 
             {submitted ? (
               <View style={s.submittedBadge}>
-                <Feather name="check-circle" size={ICON.sm} color={theme.success} />
+                <Icon name="check-circle" size={ICON.sm} color={theme.success} />
                 <Text style={s.submittedText}>Got it! We'll be in touch shortly.</Text>
                 <TouchableOpacity onPress={() => setSubmitted(false)}>
                   <Text style={s.sendAnotherText}>Send another</Text>

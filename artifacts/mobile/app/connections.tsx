@@ -27,7 +27,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -321,7 +321,7 @@ export default function ConnectionsScreen() {
         </PressableScale>
 
         {isMe ? (
-          <Feather name="chevron-right" size={16} color={theme.muted} />
+          <Icon name="chevron-right" size={16} color={theme.muted} />
         ) : tab === 'followers' && isOwnList ? (
           <RemovePill onPress={() => openRemoveSheet(item)} theme={theme} />
         ) : tab === 'followers' ? (
@@ -383,7 +383,7 @@ export default function ConnectionsScreen() {
             <Text style={styles.sortLabel}>Sort by</Text>
             <View style={styles.sortValueRow}>
               <Text style={styles.sortValue}>{SORT_OPTIONS.find((o) => o.id === sort)?.label ?? 'Default'}</Text>
-              <Feather name="chevron-down" size={14} color={theme.muted} />
+              <Icon name="chevron-down" size={14} color={theme.muted} />
             </View>
           </PressableScale>
         ) : null}

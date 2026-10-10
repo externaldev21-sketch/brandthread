@@ -18,7 +18,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, Text, Alert, StyleSheet, Modal, Pressable, Platform, Share } from 'react-native';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -399,7 +399,7 @@ export default function BuyerOtherProfileScreen() {
               accessibilityLabel="Send Thread Cash"
               style={[styles.chip, { borderColor: `${theme.accent}66`, backgroundColor: theme.cardGlass }]}
             >
-              <Feather name="dollar-sign" size={11} color={theme.accent} />
+              <Icon name="dollar-sign" size={11} color={theme.accent} />
               <Text style={[styles.chipText, { color: theme.accent }]}>Thread Cash</Text>
             </PressableScale>
           )}
@@ -407,7 +407,7 @@ export default function BuyerOtherProfileScreen() {
       ) : null}
       {previewAsVisitor ? (
         <View style={styles.blockedBanner} testID="buyer-profile-visitor-preview">
-          <Feather name="eye" size={16} color={theme.text} />
+          <Icon name="eye" size={16} color={theme.text} />
           <Text style={styles.blockedBannerText}>You’re viewing your profile as a visitor</Text>
           <Pressable onPress={goBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Exit visitor view" testID="buyer-profile-exit-preview">
             <Text style={styles.blockedBannerAction}>Exit</Text>
@@ -422,7 +422,7 @@ export default function BuyerOtherProfileScreen() {
           accessibilityLabel={`Unblock ${displayName}`}
           style={styles.blockedBanner}
         >
-          <Feather name="slash" size={16} color={theme.text} />
+          <Icon name="slash" size={16} color={theme.text} />
           <Text style={styles.blockedBannerText}>
             You blocked {displayName}. You won’t see each other’s posts, comments or messages.
           </Text>
@@ -602,7 +602,7 @@ export default function BuyerOtherProfileScreen() {
   );
 }
 
-function MoreRow({ icon, label, onPress, destructive }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; destructive?: boolean }) {
+function MoreRow({ icon, label, onPress, destructive }: { icon: IconName; label: string; onPress: () => void; destructive?: boolean }) {
   const { theme } = useAppTheme();
   const color = destructive ? theme.error : theme.text;
   return (
@@ -610,7 +610,7 @@ function MoreRow({ icon, label, onPress, destructive }: { icon: keyof typeof Fea
       {(state) => (
         <>
           <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.sm} theme={theme} />
-          <Feather name={icon} size={20} color={color} />
+          <Icon name={icon} size={20} color={color} />
           <Text style={[moreRowStyles.text, { color }]}>{label}</Text>
         </>
       )}

@@ -6,7 +6,7 @@ import {
   StyleSheet, Alert, ActivityIndicator, Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Clipboard from 'expo-clipboard';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
@@ -178,7 +178,7 @@ export default function StorePublishScreen() {
                 backgroundColor: validation.errors.length > 0 ? RED_DIM : SUCCESS_DIM,
                 borderColor: validation.errors.length > 0 ? RED : SUCCESS,
               }]}>
-                <Feather
+                <Icon
                   name={validation.errors.length > 0 ? 'x-circle' : 'check-circle'}
                   size={ICON.md}
                   color={validation.errors.length > 0 ? RED : SUCCESS}
@@ -202,9 +202,9 @@ export default function StorePublishScreen() {
                         if (route) router.push(ERROR_ROUTES[route] as never);
                       }}
                     >
-                      <Feather name="x-circle" size={ICON.sm} color={RED} />
+                      <Icon name="x-circle" size={ICON.sm} color={RED} />
                       <Text style={[pub.issueText, { color: RED }]} numberOfLines={2}>{err}</Text>
-                      <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+                      <Icon name="chevron-right" size={ICON.xs} color={MUTED} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -215,7 +215,7 @@ export default function StorePublishScreen() {
                   <Text style={pub.issueTitle}>Warnings</Text>
                   {validation.warnings.map((w, i) => (
                     <View key={i} style={pub.issueRow}>
-                      <Feather name="alert-triangle" size={ICON.sm} color={ORANGE} />
+                      <Icon name="alert-triangle" size={ICON.sm} color={ORANGE} />
                       <Text style={[pub.issueText, { color: ORANGE }]}>{w}</Text>
                     </View>
                   ))}
@@ -227,7 +227,7 @@ export default function StorePublishScreen() {
                   <Text style={pub.issueTitle}>Recommendations</Text>
                   {validation.recommendations.map((r, i) => (
                     <View key={i} style={pub.issueRow}>
-                      <Feather name="info" size={ICON.sm} color={BLUE} />
+                      <Icon name="info" size={ICON.sm} color={BLUE} />
                       <Text style={[pub.issueText, { color: BLUE }]}>{r}</Text>
                     </View>
                   ))}
@@ -238,7 +238,7 @@ export default function StorePublishScreen() {
         </BrandthreadCard>
 
         <TouchableOpacity style={pub.revalidateBtn} onPress={doValidate}>
-          <Feather name="refresh-cw" size={ICON.xs} color={MUTED} />
+          <Icon name="refresh-cw" size={ICON.xs} color={MUTED} />
           <Text style={pub.revalidateText}>Validate Again</Text>
         </TouchableOpacity>
 
@@ -271,7 +271,7 @@ export default function StorePublishScreen() {
           <BrandthreadCard style={pub.card}>
             <View style={pub.successBlock}>
               <View style={[pub.successIcon, { backgroundColor: SUCCESS_DIM }]}>
-                <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
+                <Icon name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
               <Text style={pub.successTitle}>Your store is live!</Text>
               <Text style={pub.successUrl}>https://{storeUrl}.brandthread.app</Text>

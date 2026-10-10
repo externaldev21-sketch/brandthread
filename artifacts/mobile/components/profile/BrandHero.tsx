@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, RADIUS, SP, TYPE } from '@/lib/theme';
@@ -145,7 +145,7 @@ export function BrandHero({
         <View style={heroStyles.nameRow}>
           <Text style={[heroStyles.brandName, { color: theme.text }]} numberOfLines={1}>{brandName}</Text>
           {verified && (
-            <Feather name="check-circle" size={16} color={theme.accent} style={{ marginLeft: 6 }} accessibilityLabel="Verified" accessibilityRole="image" />
+            <Icon name="check-circle" size={16} color={theme.accent} style={{ marginLeft: 6 }} accessibilityLabel="Verified" accessibilityRole="image" />
           )}
         </View>
         {!!username && <Text style={[heroStyles.username, { color: theme.muted }]}>@{username}</Text>}

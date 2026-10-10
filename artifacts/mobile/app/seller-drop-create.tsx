@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -141,7 +141,7 @@ function DateTimeChipPicker({
         ))}
       </ScrollView>
       <TouchableOpacity onPress={() => setCustomOpen(v => !v)} style={styles.customToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Feather name={showCustom ? 'chevron-up' : 'chevron-down'} size={13} color={theme.muted} />
+        <Icon name={showCustom ? 'chevron-up' : 'chevron-down'} size={13} color={theme.muted} />
         <Text style={[styles.customToggleText, { color: theme.muted }]}>Enter an exact date & time</Text>
       </TouchableOpacity>
       {showCustom && (
@@ -465,7 +465,7 @@ export default function SellerDropCreate() {
                   <Image source={{ uri: heroImageUrl }} style={styles.heroPreview} resizeMode="cover" />
                 ) : (
                   <View style={[styles.heroPreview, styles.heroVideoPlaceholder, { backgroundColor: theme.cardElevated }]}>
-                    <Feather name="film" size={22} color={theme.muted} />
+                    <Icon name="film" size={22} color={theme.muted} />
                     <Text style={{ color: theme.muted, fontSize: FS.xs, marginTop: 6 }}>Video selected</Text>
                   </View>
                 )}
@@ -473,7 +473,7 @@ export default function SellerDropCreate() {
                   style={[styles.heroRemoveBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
                   onPress={() => { setHeroImageUrl(null); setHeroVideoUrl(null); }}
                 >
-                  <Feather name="x" size={14} color={theme.text} />
+                  <Icon name="x" size={14} color={theme.text} />
                 </TouchableOpacity>
               </View>
             ) : (
@@ -483,7 +483,7 @@ export default function SellerDropCreate() {
                   onPress={() => pickHero('image')}
                   disabled={heroUploading}
                 >
-                  <Feather name="image" size={18} color={theme.text} />
+                  <Icon name="image" size={18} color={theme.text} />
                   <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Add photo</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -491,7 +491,7 @@ export default function SellerDropCreate() {
                   onPress={() => pickHero('video')}
                   disabled={heroUploading}
                 >
-                  <Feather name="film" size={18} color={theme.text} />
+                  <Icon name="film" size={18} color={theme.text} />
                   <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Add video</Text>
                 </TouchableOpacity>
               </View>
@@ -512,9 +512,9 @@ export default function SellerDropCreate() {
               style={[styles.tzButton, { borderColor: theme.border, backgroundColor: theme.card }]}
               onPress={() => setTzPickerOpen(true)}
             >
-              <Feather name="globe" size={14} color={theme.muted} />
+              <Icon name="globe" size={14} color={theme.muted} />
               <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }} numberOfLines={1}>{timezone}</Text>
-              <Feather name="chevron-down" size={14} color={theme.muted} />
+              <Icon name="chevron-down" size={14} color={theme.muted} />
             </TouchableOpacity>
             <Text style={[styles.hint, { color: theme.muted }]}>
               This is the wall-clock time in the timezone above — buyers see it converted to their own countdown.
@@ -579,14 +579,14 @@ export default function SellerDropCreate() {
                         <Image source={{ uri: product.images[0] }} style={styles.productThumb} />
                       ) : (
                         <View style={[styles.productThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated }]}>
-                          <Feather name="package" size={16} color={theme.muted} />
+                          <Icon name="package" size={16} color={theme.muted} />
                         </View>
                       )}
                       <Text style={{ flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }} numberOfLines={1}>
                         {product.name}
                       </Text>
                       <View style={[styles.checkbox, { borderColor: checked ? theme.accent : theme.border, backgroundColor: checked ? theme.accent : 'transparent' }]}>
-                        {checked && <Feather name="check" size={12} color={theme.onAccent} />}
+                        {checked && <Icon name="check" size={12} color={theme.onAccent} />}
                       </View>
                     </TouchableOpacity>
                   );
@@ -616,7 +616,7 @@ export default function SellerDropCreate() {
                 style={[styles.secondaryBtn, { borderColor: theme.border }]}
                 onPress={() => router.push((`/seller-drop-preview?dropId=${encodeURIComponent(dropId)}`) as never)}
               >
-                <Feather name="eye" size={16} color={theme.text} />
+                <Icon name="eye" size={16} color={theme.text} />
                 <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Preview</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -626,7 +626,7 @@ export default function SellerDropCreate() {
               >
                 {cancelling ? <ActivityIndicator color="#FF3B30" /> : (
                   <>
-                    <Feather name="x-circle" size={16} color="#FF3B30" />
+                    <Icon name="x-circle" size={16} color="#FF3B30" />
                     <Text style={{ color: '#FF3B30', fontFamily: FONT.semibold, fontSize: FS.sm }}>Cancel drop</Text>
                   </>
                 )}
@@ -641,7 +641,7 @@ export default function SellerDropCreate() {
           <View style={styles.tzHeader}>
             <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg }}>Choose timezone</Text>
             <TouchableOpacity onPress={() => setTzPickerOpen(false)}>
-              <Feather name="x" size={22} color={theme.text} />
+              <Icon name="x" size={22} color={theme.text} />
             </TouchableOpacity>
           </View>
           <TextInput
@@ -659,7 +659,7 @@ export default function SellerDropCreate() {
                 onPress={() => { setTimezone(z); setTzPickerOpen(false); setTzFilter(''); }}
               >
                 <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }}>{z}</Text>
-                {z === timezone && <Feather name="check" size={16} color={theme.accent} />}
+                {z === timezone && <Icon name="check" size={16} color={theme.accent} />}
               </TouchableOpacity>
             ))}
           </ScrollView>

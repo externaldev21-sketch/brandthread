@@ -42,7 +42,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -115,17 +115,17 @@ function MediaThumb({
     <View style={[mt.wrap, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`media-thumb-${index}`}>
       <Image source={{ uri }} style={mt.img} contentFit="cover" />
       {isVideo && (
-        <View style={mt.videoBadge}><Feather name="play" size={10} color="#fff" /></View>
+        <View style={mt.videoBadge}><Icon name="play" size={10} color="#fff" /></View>
       )}
       <TouchableOpacity style={mt.removeBtn} onPress={onRemove} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} testID={`media-remove-${index}`}>
-        <Feather name="x" size={12} color="#fff" />
+        <Icon name="x" size={12} color="#fff" />
       </TouchableOpacity>
       <View style={mt.reorderRow}>
         <TouchableOpacity style={[mt.reorderBtn, !canMoveLeft && { opacity: 0.3 }]} onPress={onMoveLeft} disabled={!canMoveLeft}>
-          <Feather name="chevron-left" size={11} color="#fff" />
+          <Icon name="chevron-left" size={11} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity style={[mt.reorderBtn, !canMoveRight && { opacity: 0.3 }]} onPress={onMoveRight} disabled={!canMoveRight}>
-          <Feather name="chevron-right" size={11} color="#fff" />
+          <Icon name="chevron-right" size={11} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -162,20 +162,20 @@ function AdPreviewCard({
         <Image source={{ uri: mediaUri }} style={pv.media} contentFit="cover" />
       ) : (
         <View style={[pv.media, pv.mediaEmpty, { backgroundColor: colors.elevated }]}>
-          <Feather name="image" size={ICON.lg} color={colors.mutedForeground} />
+          <Icon name="image" size={ICON.lg} color={colors.mutedForeground} />
           <Text style={[pv.emptyText, { color: colors.mutedForeground }]}>Add media to see your ad preview</Text>
         </View>
       )}
 
       {isVideo && mediaUri && (
         <View style={pv.videoBadge}>
-          <Feather name="play" size={12} color="#fff" />
+          <Icon name="play" size={12} color="#fff" />
         </View>
       )}
 
       <View style={pv.sponsoredWrap}>
         <View style={pv.sponsoredPill}>
-          <Feather name="zap" size={10} color="#fff" />
+          <Icon name="zap" size={10} color="#fff" />
           <Text style={pv.sponsoredText}>Sponsored</Text>
         </View>
       </View>
@@ -669,7 +669,7 @@ export default function CreateAdScreen() {
         {renderHeader()}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl, gap: SP.md }}>
           <View style={[styles.successIcon, { backgroundColor: colors.success + '22' }]}>
-            <Feather name="check" size={32} color={colors.success} />
+            <Icon name="check" size={32} color={colors.success} />
           </View>
           <Text style={[styles.stageHeading, { color: colors.foreground }]}>Your ad is live</Text>
           <Text style={[styles.stageSub, { textAlign: 'center', color: colors.mutedForeground }]}>
@@ -694,7 +694,7 @@ export default function CreateAdScreen() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {renderHeader()}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl, gap: SP.md }}>
-          <Feather name={isAuthError ? 'lock' : 'alert-circle'} size={36} color={colors.destructive} />
+          <Icon name={isAuthError ? 'lock' : 'alert-circle'} size={36} color={colors.destructive} />
           <Text style={[styles.stageHeading, { color: colors.foreground }]}>{isAuthError ? 'Sign in required' : 'Something went wrong'}</Text>
           <Text style={[styles.stageSub, { textAlign: 'center', color: colors.mutedForeground }]}>{initError}</Text>
           <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => { setInitError(null); goBackOr(router); }}>
@@ -754,7 +754,7 @@ export default function CreateAdScreen() {
                 accessibilityLabel="Add photos"
                 testID="pick-photos-btn"
               >
-                <Feather name="image" size={ICON.md} color={theme.accentLight} />
+                <Icon name="image" size={ICON.md} color={theme.accentLight} />
                 <Text style={[styles.pickerCardTitle, { color: colors.foreground }]}>Photos</Text>
               </TouchableOpacity>
             )}
@@ -767,7 +767,7 @@ export default function CreateAdScreen() {
                 accessibilityLabel="Add video"
                 testID="pick-video-btn"
               >
-                <Feather name="video" size={ICON.md} color={theme.accentLight} />
+                <Icon name="video" size={ICON.md} color={theme.accentLight} />
                 <Text style={[styles.pickerCardTitle, { color: colors.foreground }]}>Video</Text>
               </TouchableOpacity>
             )}
@@ -795,7 +795,7 @@ export default function CreateAdScreen() {
                   onPress={() => pickMedia('photos')}
                   testID="add-more-photos-btn"
                 >
-                  <Feather name="plus" size={20} color={colors.mutedForeground} />
+                  <Icon name="plus" size={20} color={colors.mutedForeground} />
                 </TouchableOpacity>
               )}
             </View>
@@ -803,7 +803,7 @@ export default function CreateAdScreen() {
 
           {localPaths.length > 0 && (
             <View style={[styles.infoBox, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
-              <Feather name="lock" size={13} color={colors.mutedForeground} />
+              <Icon name="lock" size={13} color={colors.mutedForeground} />
               <Text style={[styles.infoBoxText, { color: colors.mutedForeground }]}>Media is kept private until your campaign is verified and activated.</Text>
             </View>
           )}
@@ -865,7 +865,7 @@ export default function CreateAdScreen() {
                   accessibilityLabel={opt.label}
                   testID={`cta-${opt.kind}`}
                 >
-                  {active && <Feather name="check" size={13} color={theme.accentLight} />}
+                  {active && <Icon name="check" size={13} color={theme.accentLight} />}
                   <Text style={[styles.ctaChipText, { color: active ? colors.foreground : colors.mutedForeground }]}>{opt.label}</Text>
                 </TouchableOpacity>
               );
@@ -899,7 +899,7 @@ export default function CreateAdScreen() {
                   })}
                   {products.length === 0 && (
                     <View style={[styles.infoBox, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
-                      <Feather name="alert-circle" size={13} color={colors.mutedForeground} />
+                      <Icon name="alert-circle" size={13} color={colors.mutedForeground} />
                       <Text style={[styles.infoBoxText, { color: colors.mutedForeground }]}>No products found. Add products to your store first.</Text>
                     </View>
                   )}
@@ -912,7 +912,7 @@ export default function CreateAdScreen() {
         {/* 5 — Audience & reach (read-only — no audience targeting exists server-side) */}
         <Section title="Audience & reach" colors={colors}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm }}>
-            <Feather name="users" size={16} color={colors.success} />
+            <Icon name="users" size={16} color={colors.success} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
               <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
@@ -964,7 +964,7 @@ export default function CreateAdScreen() {
           </View>
 
           <View style={[styles.reachCard, { backgroundColor: colors.success + '14', borderColor: colors.success }]} testID="estimated-reach">
-            <Feather name="trending-up" size={16} color={colors.success} />
+            <Icon name="trending-up" size={16} color={colors.success} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.reachLabel, { color: colors.success }]}>Estimated reach</Text>
               <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
@@ -997,7 +997,7 @@ export default function CreateAdScreen() {
           accessibilityLabel="Run as a Meta ad, Facebook and Instagram"
           testID="run-as-meta-ad-btn"
         >
-          <Feather name="facebook" size={14} color={colors.mutedForeground} />
+          <Icon name="facebook" size={14} color={colors.mutedForeground} />
           <Text style={[styles.metaAdsLinkText, { color: colors.mutedForeground }]}>Run as a Meta ad (Facebook & Instagram)</Text>
         </TouchableOpacity>
         <View style={{ flexDirection: 'row' }}>
@@ -1013,7 +1013,7 @@ export default function CreateAdScreen() {
               <ActivityIndicator color={theme.onAccent} size="small" />
             ) : (
               <>
-                <Feather name="zap" size={18} color={theme.onAccent} />
+                <Icon name="zap" size={18} color={theme.onAccent} />
                 <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Launch · ${budgetDollars}</Text>
               </>
             )}

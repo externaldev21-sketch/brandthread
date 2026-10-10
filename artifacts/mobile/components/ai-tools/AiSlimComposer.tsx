@@ -13,14 +13,14 @@
 import React, { useState } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { CARD, FG, SUBTLE, BORDER, FONT, FS } from '@/lib/theme';
 
 interface AiSlimComposerProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder: string;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
   accessibilityLabel?: string;
 }
 
@@ -32,7 +32,7 @@ export function AiSlimComposer({ value, onChangeText, placeholder, icon = 'edit-
         <BlurView pointerEvents="none" intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
       )}
       <View pointerEvents="none" style={s.tint} />
-      <Feather name={icon} size={15} color={SUBTLE} style={s.icon} />
+      <Icon name={icon} size={15} color={SUBTLE} style={s.icon} />
       <TextInput
         style={s.input}
         value={value}

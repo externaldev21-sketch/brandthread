@@ -11,7 +11,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Easing } from 'react-native';
 import { useEffect, useRef } from 'react';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -47,7 +47,7 @@ export function AnalyticsHeader({
         accessibilityLabel="Go back"
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Feather name="arrow-left" size={20} color={colors.foreground} />
+        <Icon name="arrow-left" size={20} color={colors.foreground} />
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
         <Text style={s.title} numberOfLines={1}>{title}</Text>
@@ -178,7 +178,7 @@ export function TrendChip({ changePct, invert = false, size = 'sm' }: { changePc
   const iconSize = size === 'md' ? 12 : 10;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-      {pct !== 0 && <Feather name={up ? 'arrow-up-right' : 'arrow-down-right'} size={iconSize} color={color} />}
+      {pct !== 0 && <Icon name={up ? 'arrow-up-right' : 'arrow-down-right'} size={iconSize} color={color} />}
       <Text style={{ fontSize: size === 'md' ? FS.xs + 1 : FS.xs, fontFamily: FONT.semibold, color }}>
         {up ? '+' : ''}{pct.toFixed(1)}%
       </Text>
@@ -244,7 +244,7 @@ export function StatRow({
   label, value, changePct, invert = false, isDeduction = false, icon, iconColor,
 }: {
   label: string; value: string; changePct?: number; invert?: boolean; isDeduction?: boolean;
-  icon?: keyof typeof Feather.glyphMap; iconColor?: string;
+  icon?: IconName; iconColor?: string;
 }) {
   const colors = useColors();
   const s = useMemo(() => rowStyles(colors), [colors]);
@@ -252,7 +252,7 @@ export function StatRow({
     <View style={s.row}>
       {icon && (
         <View style={[s.icon, { backgroundColor: (iconColor ?? colors.primary) + '22' }]}>
-          <Feather name={icon} size={14} color={iconColor ?? colors.primary} />
+          <Icon name={icon} size={14} color={iconColor ?? colors.primary} />
         </View>
       )}
       <Text style={s.label} numberOfLines={1}>{label}</Text>

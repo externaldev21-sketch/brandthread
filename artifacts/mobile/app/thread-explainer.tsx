@@ -25,7 +25,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
@@ -165,7 +165,7 @@ export default function ThreadExplainerScreen() {
             {THREAD_FEATURES.map((feature, i) => (
               <View key={feature.title} style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
                 <View style={[styles.featureIconWrap, { backgroundColor: theme.accentDim, borderColor: theme.accentDim }]}>
-                  <Feather name={feature.icon} size={22} color={theme.accentLight} />
+                  <Icon name={feature.icon} size={22} color={theme.accentLight} />
                 </View>
                 <View style={styles.featureContent}>
                   <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
@@ -202,7 +202,7 @@ export default function ThreadExplainerScreen() {
             style={styles.ctaBtnInner}
           >
             <Text style={[styles.ctaBtnText, getOnAccentTextStyle(theme)]}>Enter the Thread</Text>
-            <Feather name="arrow-right" size={18} color={theme.onAccent} />
+            <Icon name="arrow-right" size={18} color={theme.onAccent} />
           </LinearGradient>
         </TouchableOpacity>
       </Animated.View>

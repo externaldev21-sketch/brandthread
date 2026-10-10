@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -30,12 +30,12 @@ export function GiveawayProfileCard({ sellerId, enabled = true }: { sellerId: st
   return (
     <PressableScale onPress={() => router.push(`/giveaway?code=${encodeURIComponent(g.shareCode)}` as never)} accessibilityRole="button" accessibilityLabel={`Giveaway: ${g.title}`}>
       <View style={[styles.card, { borderColor: c.border, backgroundColor: c.card }]}>
-        <Feather name="gift" size={20} color={c.foreground} />
+        <Icon name="gift" size={20} color={c.foreground} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: c.foreground }]}>{g.title}</Text>
           <Text style={[styles.sub, { color: c.mutedForeground }]}>{g.prizeText} · {timeLeft(g.endsAt)}</Text>
         </View>
-        <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+        <Icon name="chevron-right" size={16} color={c.mutedForeground} />
       </View>
     </PressableScale>
   );

@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { FONT, FS, SP } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 
@@ -29,7 +29,7 @@ export function GiftCardFace({
     >
       <View style={styles.top}>
         <Text style={styles.store} numberOfLines={1}>{storeName}</Text>
-        <Feather name="gift" size={18} color={CARD_MUTED} />
+        <Icon name="gift" size={18} color={CARD_MUTED} />
       </View>
       <View>
         <Text style={[styles.amount, compact && styles.amountCompact]} numberOfLines={1}>{amountText}</Text>

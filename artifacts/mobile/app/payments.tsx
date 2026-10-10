@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
@@ -14,7 +14,7 @@ import {
   getInitialDropBroadcastStates,
   type DropBroadcastState,
 } from '@/lib/dropBroadcastState';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { ListRow } from '@/components/ui/ListRow';
@@ -108,7 +108,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
       <View style={styles.dropTop}>
         {/* Type badge */}
         <View style={[styles.typeBadge, { backgroundColor: typeBg, borderColor: typeBorder }]}>
-          <Feather
+          <Icon
             name={isPreOrder ? 'clock' : 'package'}
             size={11}
             color={typeColor}
@@ -150,7 +150,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
         <View style={styles.preOrderExtra}>
           <View style={styles.progressHeader}>
             <View style={styles.progressLabelRow}>
-              <Feather name="tool" size={12} color={colors.mutedForeground} />
+              <Icon name="tool" size={12} color={colors.mutedForeground} />
               <Text style={[styles.progressLabel, { color: colors.mutedForeground }]}>
                 Manufacturing progress
               </Text>
@@ -163,7 +163,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
             <View style={[styles.progressFill, { width: `${drop.mfgProgress * 100}%`, backgroundColor: primary }]} />
           </View>
           <View style={styles.shipRow}>
-            <Feather name="truck" size={12} color={colors.mutedForeground} />
+            <Icon name="truck" size={12} color={colors.mutedForeground} />
             <Text style={[styles.shipText, { color: colors.mutedForeground }]}>
               Ships {drop.releaseDate} · Funds release 3 days after delivery
             </Text>
@@ -174,7 +174,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
       {/* Pre Made: note */}
       {!isPreOrder && drop.status !== 'paid' && (
         <View style={styles.premadeNote}>
-          <Feather name="info" size={12} color={colors.mutedForeground} />
+          <Icon name="info" size={12} color={colors.mutedForeground} />
           <Text style={[styles.premadeNoteText, { color: colors.mutedForeground }]}>
             Inventory ships within 24–48 hrs · Payout 2–3 business days after fulfillment
           </Text>
@@ -186,14 +186,14 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
         <View style={[styles.broadcastWrap, { borderTopColor: colors.border }]}>
           {notificationScheduled ? (
             <View style={[styles.scheduledNotice, { backgroundColor: `${colors.success}1A`, borderColor: `${colors.success}40` }]}>
-              <Feather name="clock" size={14} color={colors.success} />
+              <Icon name="clock" size={14} color={colors.success} />
               <Text style={[styles.scheduledNoticeText, { color: colors.success }]}>
                 Notification scheduled for {fmtDate(drop.scheduledBroadcastAt ?? drop.releaseAt!)}
               </Text>
             </View>
           ) : broadcastPreview?.followers === 0 && broadcastState === 'idle' && !hasFutureLaunch ? (
             <View style={styles.zeroAudience}>
-              <Feather name="users" size={14} color={colors.mutedForeground} />
+              <Icon name="users" size={14} color={colors.mutedForeground} />
               <Text style={[styles.zeroAudienceText, { color: colors.mutedForeground }]}>
                 0 followers — grow your audience first
               </Text>
@@ -202,7 +202,7 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
             <View style={styles.broadcastRow}>
               {broadcastPreview && (
                 <View style={[styles.followerPill, { backgroundColor: colors.accent, borderColor: colors.border }]}>
-                  <Feather name="users" size={12} color={primary} />
+                  <Icon name="users" size={12} color={primary} />
                   <Text style={[styles.followerPillText, { color: colors.foreground }]}>
                     {broadcastPreview.followers} follower{broadcastPreview.followers === 1 ? '' : 's'}
                   </Text>
@@ -223,9 +223,9 @@ function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBr
                 {broadcastState === 'loading' ? (
                   <ActivityIndicator size="small" color={primary} />
                 ) : broadcastState === 'sent' || broadcastState === 'already_sent' ? (
-                  <Feather name="check-circle" size={14} color={colors.success} />
+                  <Icon name="check-circle" size={14} color={colors.success} />
                 ) : (
-                  <Feather name="bell" size={14} color={primary} />
+                  <Icon name="bell" size={14} color={primary} />
                 )}
                 <Text style={[
                   styles.broadcastBtnText,
@@ -271,7 +271,7 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
       ]}
       pointerEvents="none"
     >
-      <Feather name="check-circle" size={14} color={colors.success} />
+      <Icon name="check-circle" size={14} color={colors.success} />
       <Text style={[toastStyles.text, { color: colors.success }]}>{message}</Text>
     </Animated.View>
   );
@@ -285,7 +285,7 @@ const toastStyles = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 10,
     shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
   },
-  text: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  text: { fontSize: 13, fontFamily: FONT.semibold },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -450,7 +450,7 @@ export default function PaymentsScreen() {
         {/* ── Next payout banner ── */}
         {nextPayout && (
           <View style={[styles.banner, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
-            <Feather name="info" size={14} color={colors.primary} />
+            <Icon name="info" size={14} color={colors.primary} />
             <Text style={[styles.bannerText, { color: colors.foreground }]}>
                Next payout on {nextPayout.payoutDate} · {formatCents(nextPayout.totalCollectedCents)} from {nextPayout.name}
             </Text>
@@ -466,7 +466,7 @@ export default function PaymentsScreen() {
           {/* Payout account row — no real payout-account API is wired here yet, so this
               never fabricates a bank account or status; it offers to add one instead. */}
           <View style={[styles.listRow, { borderTopWidth: 0 }]}>
-            <Feather name="home" size={16} color={colors.mutedForeground} />
+            <Icon name="home" size={16} color={colors.mutedForeground} />
             <View style={styles.payoutInfo}>
               <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>Payout account</Text>
               <Text style={[styles.payoutAccount, { color: colors.foreground }]}>
@@ -484,9 +484,9 @@ export default function PaymentsScreen() {
             activeOpacity={0.7}
             onPress={() => router.push('/payouts' as never)}
           >
-            <Feather name="list" size={16} color={colors.mutedForeground} />
+            <Icon name="list" size={16} color={colors.mutedForeground} />
             <Text style={[styles.listRowLabel, { color: colors.foreground, flex: 1 }]}>View payouts</Text>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
 
           {bnpl?.available ? (
@@ -523,7 +523,7 @@ export default function PaymentsScreen() {
                   <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preOrderDrops.length}</Text>
                 </View>
                 <View style={[styles.preOrderNote, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
-                  <Feather name="clock" size={13} color={primary} />
+                  <Icon name="clock" size={13} color={primary} />
                   <Text style={[styles.preOrderNoteText, { color: primary }]}>
                     Funds collected upfront and held until each drop ships
                   </Text>
@@ -549,7 +549,7 @@ export default function PaymentsScreen() {
                   <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preMadeDrops.length}</Text>
                 </View>
                 <View style={[styles.preOrderNote, { backgroundColor: `${colors.success}17`, borderColor: `${colors.success}33` }]}>
-                  <Feather name="package" size={13} color={colors.success} />
+                  <Icon name="package" size={13} color={colors.success} />
                   <Text style={[styles.preOrderNoteText, { color: colors.success }]}>
                     Standard payout 2–3 business days after order fulfillment
                   </Text>
@@ -581,39 +581,39 @@ const styles = StyleSheet.create({
 
   // Banner
   banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 20 },
-  bannerText: { fontSize: 12, fontFamily: 'Inter_500Medium', flex: 1, lineHeight: 17 },
+  bannerText: { fontSize: 12, fontFamily: FONT.medium, flex: 1, lineHeight: 17 },
 
   // Card header row (title + Manage button)
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  cardTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  cardTitle: { fontSize: 17, fontFamily: FONT.semibold },
   manageBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
-  manageBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  manageBtnText: { fontSize: 12, fontFamily: FONT.semibold },
 
   // Status row
   statusRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   statusItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  statusText: { fontSize: 12, fontFamily: FONT.medium },
   statusDivider: { width: 1, height: 16 },
 
   // Generic list row (used inside cards)
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderTopWidth: 1 },
-  listRowLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  listRowLabel: { fontSize: 13, fontFamily: FONT.medium },
   chipRow: { flexDirection: 'row', gap: 4 },
   chip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  chipText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+  chipText: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.3 },
 
   payoutInfo: { flex: 1 },
-  payoutLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium', marginBottom: 3, letterSpacing: 0.3 },
-  payoutAccount: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  viewPayoutsLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  payoutLabel: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 3, letterSpacing: 0.3 },
+  payoutAccount: { fontSize: 12, fontFamily: FONT.semibold },
+  viewPayoutsLink: { fontSize: 12, fontFamily: FONT.semibold },
 
 
   // Additional providers
-  groupTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 28, marginBottom: 4 },
-  groupSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 12, lineHeight: 17 },
+  groupTitle: { fontSize: 15, fontFamily: FONT.semibold, marginTop: 28, marginBottom: 4 },
+  groupSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 12, lineHeight: 17 },
   addProviderBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 14, borderStyle: 'dashed' },
-  addProviderText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  addProviderText: { fontSize: 13, fontFamily: FONT.semibold },
 
   // Payment configuration rows
   configRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
@@ -621,55 +621,55 @@ const styles = StyleSheet.create({
   // Section headers
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   sectionDot: { width: 8, height: 8, borderRadius: 4 },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', flex: 1 },
-  sectionCount: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, flex: 1 },
+  sectionCount: { fontSize: 13, fontFamily: FONT.regular },
 
   // Note banners
   preOrderNote: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 12 },
-  preOrderNoteText: { fontSize: 12, fontFamily: 'Inter_500Medium', flex: 1 },
+  preOrderNoteText: { fontSize: 12, fontFamily: FONT.medium, flex: 1 },
 
   // Drop card
   dropCard: { borderRadius: 16, borderWidth: 1, padding: 16 },
   dropTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
-  typeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  dropName: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 14 },
+  typeText: { fontSize: 11, fontFamily: FONT.semibold },
+  dropName: { fontSize: 15, fontFamily: FONT.semibold, marginBottom: 14 },
   dropStats: { flexDirection: 'row', alignItems: 'center' },
   dropStat: { flex: 1, alignItems: 'center' },
-  dropStatVal: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 2 },
-  dropStatLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
+  dropStatVal: { fontSize: 14, fontFamily: FONT.bold, marginBottom: 2 },
+  dropStatLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   dropDivider: { width: 1, height: 28 },
 
   // Pre Order progress
   preOrderExtra: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: 'transparent' },
   progressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   progressLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  progressLabel: { fontSize: 11, fontFamily: 'Inter_500Medium' },
-  progressPct: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  progressLabel: { fontSize: 11, fontFamily: FONT.medium },
+  progressPct: { fontSize: 12, fontFamily: FONT.bold },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 10 },
   progressFill: { height: 6, borderRadius: 3 },
   shipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
-  shipText: { fontSize: 11, fontFamily: 'Inter_400Regular', flex: 1, lineHeight: 16 },
+  shipText: { fontSize: 11, fontFamily: FONT.regular, flex: 1, lineHeight: 16 },
 
   // Pre Made note
   premadeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'transparent' },
-  premadeNoteText: { fontSize: 11, fontFamily: 'Inter_400Regular', flex: 1, lineHeight: 16 },
+  premadeNoteText: { fontSize: 11, fontFamily: FONT.regular, flex: 1, lineHeight: 16 },
 
   // Broadcast button
   broadcastWrap: { marginTop: 14, paddingTop: 14, borderTopWidth: 1 },
   broadcastRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   followerPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 8 },
-  followerPillText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  followerPillText: { fontSize: 11, fontFamily: FONT.semibold },
   zeroAudience: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 9 },
-  zeroAudienceText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  zeroAudienceText: { fontSize: 12, fontFamily: FONT.medium },
   broadcastBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 7, borderRadius: 10, borderWidth: 1,
     paddingVertical: 10, paddingHorizontal: 14,
   },
-  broadcastBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  broadcastBtnText: { fontSize: 13, fontFamily: FONT.semibold },
   scheduledNotice: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 10, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14 },
-  scheduledNoticeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  scheduledNoticeText: { fontSize: 13, fontFamily: FONT.semibold },
 
   // Shared card container
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },

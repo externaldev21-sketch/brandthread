@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
@@ -123,7 +123,7 @@ function ReorderSheet({
             <Text style={styles.heading}>Not added</Text>
             {outcome.unavailable.map((item, i) => (
               <View key={`${item.title}-${i}`} style={styles.row}>
-                <Feather name="slash" size={16} color={colors.mutedForeground} />
+                <Icon name="slash" size={16} color={colors.mutedForeground} />
                 <View style={styles.rowCopy}>
                   <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.rowNote}>{unavailableReasonLabel(item.reason)}</Text>
@@ -138,7 +138,7 @@ function ReorderSheet({
             <Text style={styles.heading}>Price changed</Text>
             {outcome.priceChanges.map((change, i) => (
               <View key={`${change.title}-${i}`} style={styles.row}>
-                <Feather name="tag" size={16} color={colors.mutedForeground} />
+                <Icon name="tag" size={16} color={colors.mutedForeground} />
                 <View style={styles.rowCopy}>
                   <Text style={styles.rowTitle} numberOfLines={1}>{change.title}</Text>
                   <Text style={styles.rowNote}>{priceChangeNote(change)}</Text>
@@ -153,7 +153,7 @@ function ReorderSheet({
             <Text style={styles.heading}>Fewer than before</Text>
             {outcome.reducedQuantityTitles.map((title, i) => (
               <View key={`${title}-${i}`} style={styles.row}>
-                <Feather name="minus-circle" size={16} color={colors.mutedForeground} />
+                <Icon name="minus-circle" size={16} color={colors.mutedForeground} />
                 <View style={styles.rowCopy}>
                   <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
                   <Text style={styles.rowNote}>Only what is left in stock was added</Text>

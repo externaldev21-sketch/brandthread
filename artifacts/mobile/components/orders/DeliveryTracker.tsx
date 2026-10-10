@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
@@ -21,12 +21,12 @@ import { PrimaryButton } from '@/components/BrandthreadUI';
 /** One-line labels that fit five equal columns at 393px without wrapping or ellipsis. */
 const SHORT_STEP_LABEL: Partial<Record<DeliveryStep['key'], string>> = { out_for_delivery: 'Delivering' };
 
-function ActionButton({ label, icon, onPress }: { label: string; icon: keyof typeof Feather.glyphMap; onPress: () => void }) {
+function ActionButton({ label, icon, onPress }: { label: string; icon: IconName; onPress: () => void }) {
   const { theme } = useAppTheme();
   const s = useMemo(() => styles(theme), [theme]);
   return (
     <TouchableOpacity style={s.actionBtn} onPress={onPress} accessibilityRole="button" accessibilityLabel={label} activeOpacity={0.8}>
-      <Feather name={icon} size={ICON.sm} color={theme.text} />
+      <Icon name={icon} size={ICON.sm} color={theme.text} />
       <Text style={s.actionBtnText}>{label}</Text>
     </TouchableOpacity>
   );
@@ -47,7 +47,7 @@ function StepBar({ steps }: { steps: DeliveryStep[] }) {
             <View style={s.dotRow}>
               <View style={[s.line, i === 0 && s.lineHidden, prevReached && reached && { backgroundColor: theme.text }]} />
               <View style={[s.dot, reached && { backgroundColor: theme.text, borderColor: theme.text }, current && s.dotCurrent]}>
-                {done ? <Feather name="check" size={10} color={theme.background} /> : null}
+                {done ? <Icon name="check" size={10} color={theme.background} /> : null}
               </View>
               <View style={[s.line, i === steps.length - 1 && s.lineHidden, done && steps[i + 1]?.state !== 'upcoming' && { backgroundColor: theme.text }]} />
             </View>
@@ -107,7 +107,7 @@ export function DeliveryTrackerCard({
 
       {delivery.disputePaused ? (
         <View style={s.note}>
-          <Feather name="pause-circle" size={ICON.sm} color={theme.muted} />
+          <Icon name="pause-circle" size={ICON.sm} color={theme.muted} />
           <Text style={s.noteText}>Dispute open — auto-refund paused until it is resolved.</Text>
         </View>
       ) : null}
@@ -174,7 +174,7 @@ export function AutoRefundCard({ autoRefund }: { autoRefund: NonNullable<BuyerDe
   return (
     <View style={s.card} testID="order-auto-refund">
       <View style={s.refundHead}>
-        <Feather name="rotate-ccw" size={ICON.md} color={theme.text} />
+        <Icon name="rotate-ccw" size={ICON.md} color={theme.text} />
         <Text style={s.refundTitle}>{autoRefund.label}</Text>
       </View>
       <Text style={s.refundAmount}>{autoRefund.partial ? 'Partial refund' : 'Full refund'}</Text>

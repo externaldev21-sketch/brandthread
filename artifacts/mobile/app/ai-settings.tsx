@@ -12,7 +12,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, SP } from '../lib/theme';
 import { AISettings } from '../services/aiTypes';
@@ -125,7 +125,7 @@ function NavRow({
   return (
     <Pressable style={s.row} onPress={onPress}>
       <Text style={s.label}>{label}</Text>
-      <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+      <Icon name="chevron-right" size={17} color={colors.mutedForeground} />
     </Pressable>
   );
 }

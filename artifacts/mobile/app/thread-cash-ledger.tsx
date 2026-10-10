@@ -9,7 +9,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -29,7 +29,7 @@ const EMPTY: ThreadCashLedger = {
   balanceCents: 0, expiryDays: null, expiringSoon: { totalCents: 0, nextExpiresAt: null, buckets: [] }, rows: [], hasMore: false,
 };
 
-const ICONS: Record<string, React.ComponentProps<typeof Feather>['name']> = {
+const ICONS: Record<string, IconName> = {
   daily_checkin: 'check-circle', streak_bonus: 'zap', redemption: 'shopping-bag', checkout_spend: 'shopping-bag',
   refund_credit: 'rotate-ccw', redemption_cancelled: 'rotate-ccw', expiry: 'clock', send_sent: 'arrow-up-right',
   send_received: 'arrow-down-left', send_cancelled: 'corner-up-left', send_expired: 'corner-up-left',
@@ -88,7 +88,7 @@ export default function ThreadCashLedgerScreen() {
     return (
       <View key={row.id} style={[styles.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.borderSubtle }]}>
         <View style={[styles.icon, { backgroundColor: theme.cardElevated }]}>
-          <Feather name={ICONS[row.source] ?? 'dollar-sign'} size={16} color={credit ? theme.success : theme.muted} />
+          <Icon name={ICONS[row.source] ?? 'dollar-sign'} size={16} color={credit ? theme.success : theme.muted} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[styles.label, { color: theme.text }]} numberOfLines={1}>{ledgerLabel(row.source)}</Text>
@@ -151,7 +151,7 @@ export default function ThreadCashLedgerScreen() {
                 {soon.buckets.map((b, i) => (
                   <View key={b.expiresAt} style={[styles.row, i < soon.buckets.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.borderSubtle }]}>
                     <View style={[styles.icon, { backgroundColor: theme.cardElevated }]}>
-                      <Feather name="clock" size={16} color={theme.muted} />
+                      <Icon name="clock" size={16} color={theme.muted} />
                     </View>
                     <Text style={[styles.label, { color: theme.text, flex: 1 }]}>Expires {formatExpiryDate(b.expiresAt)}</Text>
                     <Text style={[styles.amount, TABULAR_NUMS, { color: theme.text }]}>{formatCents(b.amountCents)}</Text>

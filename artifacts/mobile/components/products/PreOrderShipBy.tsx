@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
@@ -47,7 +47,7 @@ export function PreOrderShipBy({ productId, isPreOrder }: { productId?: string; 
       testID="preorder-ship-by"
     >
       <View style={s.row}>
-        <Feather name="calendar" size={ICON.sm} color={colors.foreground} />
+        <Icon name="calendar" size={ICON.sm} color={colors.foreground} />
         <Text style={[s.title, { color: colors.foreground }]}>Ships by {fmt(terms.shipBy)}</Text>
       </View>
       <Text style={[s.days, { color: colors.mutedForeground }]}>{daysText}</Text>

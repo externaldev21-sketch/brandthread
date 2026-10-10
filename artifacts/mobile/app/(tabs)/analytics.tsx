@@ -15,7 +15,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { GRID_MAX_WIDTH, SP, FONT, FS, RADIUS } from '@/lib/theme';
 import { ResponsiveContainer } from '@/components/layout';

@@ -22,7 +22,7 @@ import {
   Modal, FlatList,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
@@ -364,7 +364,7 @@ export default function MockupToModelScreen() {
           )}
           {allDone && successCount > 0 && (
             <View style={s.progressBar}>
-              <Feather name="check-circle" size={ICON.sm} color={FG} />
+              <Icon name="check-circle" size={ICON.sm} color={FG} />
               <Text style={[s.progressText, { color: FG }]}>
                 {successCount} photo{successCount !== 1 ? 's' : ''} ready
                 {failCount > 0 ? ` · ${failCount} failed` : ''}
@@ -439,14 +439,14 @@ export default function MockupToModelScreen() {
                       <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
                     ) : (
                       <View style={[s.productThumb, s.productThumbEmpty]}>
-                        <Feather name="package" size={ICON.md} color={SUBTLE} />
+                        <Icon name="package" size={ICON.md} color={SUBTLE} />
                       </View>
                     )}
                     <View style={{ flex: 1 }}>
                       <Text style={s.productName} numberOfLines={1}>{item.name}</Text>
                       <Text style={s.productStatus}>{item.status}</Text>
                     </View>
-                    <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+                    <Icon name="chevron-right" size={ICON.xs} color={MUTED} />
                   </TouchableOpacity>
                 )}
               />
@@ -489,10 +489,10 @@ export default function MockupToModelScreen() {
               accessibilityLabel="Remove garment mockup"
               accessibilityRole="button"
             >
-              <Feather name="x" size={14} color="#fff" />
+              <Icon name="x" size={14} color="#fff" />
             </TouchableOpacity>
             <View style={s.uploadOverlay} pointerEvents="none">
-              <Feather name="edit-2" size={ICON.md} color="#fff" />
+              <Icon name="edit-2" size={ICON.md} color="#fff" />
             </View>
           </View>
         ) : (
@@ -503,7 +503,7 @@ export default function MockupToModelScreen() {
             accessibilityRole="button"
           >
             <View style={s.uploadIconCircle}>
-              <Feather name="upload" size={ICON.xl} color={FG} />
+              <Icon name="upload" size={ICON.xl} color={FG} />
             </View>
             <Text style={s.uploadZoneTitle}>Upload garment mockup</Text>
             <Text style={s.uploadZoneSub}>JPEG, PNG or WEBP · max 8 MB</Text>
@@ -536,7 +536,7 @@ export default function MockupToModelScreen() {
             accessibilityLabel="Add reference model images"
             accessibilityRole="button"
           >
-            <Feather name="image" size={ICON.lg} color={FG} />
+            <Icon name="image" size={ICON.lg} color={FG} />
             <Text style={s.refPickerBtnText}>Add reference photos</Text>
             <Text style={s.refPickerBtnSub}>Select 1–4 images · multi-select supported</Text>
           </TouchableOpacity>

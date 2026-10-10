@@ -14,7 +14,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -49,7 +49,7 @@ export function CallLogBubble({ entry, onCallBack }: CallLogBubbleProps) {
 
   const title = isMissed ? 'Missed call' : callLabel(entry.mode);
   const subtitle = isEnded ? `${callLabel(entry.mode)} ended` : formatCallTime(entry.startedAt);
-  const icon: keyof typeof Feather.glyphMap = isMissed ? 'phone-missed' : 'phone';
+  const icon: IconName = isMissed ? 'phone-missed' : 'phone';
 
   return (
     <PressableScale
@@ -59,7 +59,7 @@ export function CallLogBubble({ entry, onCallBack }: CallLogBubbleProps) {
       accessibilityLabel={`${title}, ${isEnded ? subtitle : `at ${subtitle}`}. Double tap to call back.`}
     >
       <View style={[styles.iconCircle, { backgroundColor: theme.cardElevated }]}>
-        <Feather name={icon} size={16} color={theme.text} />
+        <Icon name={icon} size={16} color={theme.text} />
       </View>
       <View style={styles.textCol}>
         {/* No numberOfLines here: title/subtitle are always short, fixed,

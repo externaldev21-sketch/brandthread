@@ -1,7 +1,7 @@
 /** Seller email audience: counts, recent signups, CSV export, remove. Route: /email-audience */
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File, Paths } from 'expo-file-system';
@@ -100,7 +100,7 @@ export default function EmailAudienceScreen() {
                   </View>
                   {(s.status === 'subscribed' || s.status === 'pending') && (
                     <PressableScale onPress={() => remove(s.id, s.email)} accessibilityRole="button" accessibilityLabel={`Remove ${s.email}`} style={st.iconBtn}>
-                      <Feather name="trash-2" size={ICON.sm} color={c.mutedForeground} />
+                      <Icon name="trash-2" size={ICON.sm} color={c.mutedForeground} />
                     </PressableScale>
                   )}
                 </View>

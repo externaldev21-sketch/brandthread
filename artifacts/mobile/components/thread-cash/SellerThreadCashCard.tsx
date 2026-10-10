@@ -10,7 +10,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -91,7 +91,7 @@ export function SellerThreadCashCard({
         accessibilityLabel="Cash out Thread Cash"
         testID="seller-thread-cash-cash-out-button"
       >
-        <Feather
+        <Icon
           name="arrow-down-circle"
           size={16}
           color={(loading || error || !balanceCents) ? theme.muted : theme.onAccent}

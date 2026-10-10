@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import type { OrderStatus, TrackingStatus } from '@/services/orderTypes';
@@ -28,7 +28,7 @@ import { radius } from '@/constants/radii';
 
 type StepKey = 'placed' | 'confirmed' | 'shipped' | 'out_for_delivery' | 'delivered';
 
-const STEPS: { key: StepKey; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+const STEPS: { key: StepKey; label: string; icon: IconName }[] = [
   { key: 'placed', label: 'Order placed', icon: 'shopping-bag' },
   { key: 'confirmed', label: 'Confirmed', icon: 'clipboard' },
   { key: 'shipped', label: 'Shipped', icon: 'package' },
@@ -36,7 +36,7 @@ const STEPS: { key: StepKey; label: string; icon: keyof typeof Feather.glyphMap 
   { key: 'delivered', label: 'Delivered', icon: 'check-circle' },
 ];
 
-const EXCEPTION_COPY: Record<'cancelled' | 'refunded' | 'disputed' | 'returned_to_sender' | 'exception', { label: string; icon: keyof typeof Feather.glyphMap }> = {
+const EXCEPTION_COPY: Record<'cancelled' | 'refunded' | 'disputed' | 'returned_to_sender' | 'exception', { label: string; icon: IconName }> = {
   cancelled: { label: 'Order cancelled', icon: 'x-circle' },
   refunded: { label: 'Order refunded', icon: 'rotate-ccw' },
   disputed: { label: 'Order disputed', icon: 'alert-triangle' },
@@ -136,7 +136,7 @@ export function OrderProgressTimeline({
     const c = exceptionKey === 'refunded' ? theme.accent : theme.error;
     return (
       <View style={[styles.exceptionWrap, { backgroundColor: theme.surface, borderColor: c }]}>
-        <Feather name={copy.icon} size={ICON.md} color={c} />
+        <Icon name={copy.icon} size={ICON.md} color={c} />
         <Text style={[styles.exceptionLabel, { color: c }]}>{copy.label}</Text>
       </View>
     );
@@ -168,7 +168,7 @@ export function OrderProgressTimeline({
                   },
                 ]}
               >
-                <Feather
+                <Icon
                   name={done ? 'check' : step.icon}
                   size={13}
                   color={done ? theme.background : active ? theme.text : theme.muted}
@@ -199,11 +199,11 @@ export function OrderProgressTimeline({
                   accessibilityRole="button"
                   accessibilityLabel={`Track package with ${trackingCarrier ?? 'carrier'}, tracking number ${trackingNumber}`}
                 >
-                  <Feather name="truck" size={ICON.xs} color={theme.text} />
+                  <Icon name="truck" size={ICON.xs} color={theme.text} />
                   <Text style={[styles.trackChipText, { color: theme.text }]} numberOfLines={1}>
                     {trackingCarrier ? `${trackingCarrier} · ` : ''}{trackingNumber}
                   </Text>
-                  <Feather name="external-link" size={ICON.xs} color={theme.muted} />
+                  <Icon name="external-link" size={ICON.xs} color={theme.muted} />
                 </TouchableOpacity>
               ) : null}
             </View>

@@ -7,7 +7,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Linking } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -179,7 +179,7 @@ function humanOrderStatus(status: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
-function attachmentIcon(type: MsgAttachment['type']): keyof typeof Feather.glyphMap {
+function attachmentIcon(type: MsgAttachment['type']): IconName {
   switch (type) {
     case 'product': return 'shopping-bag';
     case 'order':   return 'package';
@@ -948,7 +948,7 @@ export default function SellerConversationScreen() {
           onPress={() => { if (att.uri && !att.meta?.uploading) setViewerVideoUri(att.uri); }}
         >
           {att.uri ? <CachedImage source={{ uri: att.uri }} style={s.videoThumbImg} recyclingKey={att.uri} /> : null}
-          <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
+          <View style={s.videoPlayOverlay}><Icon name="play-circle" size={36} color="#fff" /></View>
           {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
         </PressableScale>
       );
@@ -1006,13 +1006,13 @@ export default function SellerConversationScreen() {
           }
         }}
       >
-        <Feather name={attachmentIcon(att.type)} size={ICON.sm} color={PURPLE} />
+        <Icon name={attachmentIcon(att.type)} size={ICON.sm} color={PURPLE} />
         <View style={{ flex: 1, marginLeft: SP.sm }}>
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
         {att.type === 'post' && (
-          <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+          <Icon name="chevron-right" size={ICON.sm} color={MUTED} />
         )}
       </PressableScale>
     );
@@ -1464,8 +1464,8 @@ export default function SellerConversationScreen() {
                 </Text>
                 {isOwn && msg.status !== 'failed' && (
                   <View style={s.receiptChecks}>
-                    <Feather name="check" size={11} color={isRead ? ON_DARK : `${ON_DARK}B0`} />
-                    {isRead && <Feather name="check" size={11} color={ON_DARK} style={{ marginLeft: -7 }} />}
+                    <Icon name="check" size={11} color={isRead ? ON_DARK : `${ON_DARK}B0`} />
+                    {isRead && <Icon name="check" size={11} color={ON_DARK} style={{ marginLeft: -7 }} />}
                   </View>
                 )}
               </View>
@@ -1540,7 +1540,7 @@ export default function SellerConversationScreen() {
           ) : isUploading ? (
             <UploadRing size={22} color={PURPLE} trackColor={BORDER} />
           ) : (
-            <Feather name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
+            <Icon name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
           )}
           <View style={{ flex: 1, marginLeft: SP.sm }}>
             <Text style={s.pendingAttachTitle} numberOfLines={1}>
@@ -1557,7 +1557,7 @@ export default function SellerConversationScreen() {
             accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
             testID="seller-conversation-selected-attachment-remove"
           >
-            <Feather name="x" size={ICON.sm} color={MUTED} />
+            <Icon name="x" size={ICON.sm} color={MUTED} />
           </PressableScale>
         </View>
         );
@@ -1595,7 +1595,7 @@ export default function SellerConversationScreen() {
             accessibilityRole="button"
             accessibilityLabel="Back"
           >
-            <Feather name="arrow-left" size={ICON.lg} color={FG} />
+            <Icon name="arrow-left" size={ICON.lg} color={FG} />
           </PressableScale>
           {/* PressableScale forwards `style` only to its inner Animated.View,
               never to the outer Pressable node that actually participates in
@@ -1647,7 +1647,7 @@ export default function SellerConversationScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Voice call"
               >
-                <Feather name="phone" size={ICON.lg} color={MUTED} />
+                <Icon name="phone" size={ICON.lg} color={MUTED} />
               </PressableScale>
               <PressableScale
                 style={s.headerCallBtn}
@@ -1656,7 +1656,7 @@ export default function SellerConversationScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Video call"
               >
-                <Feather name="video" size={ICON.lg} color={MUTED} />
+                <Icon name="video" size={ICON.lg} color={MUTED} />
               </PressableScale>
             </>
           )}
@@ -1669,7 +1669,7 @@ export default function SellerConversationScreen() {
               accessibilityRole="button"
               accessibilityLabel={`${displayName} — orders and cart`}
             >
-              <Feather name="clipboard" size={ICON.lg} color={MUTED} />
+              <Icon name="clipboard" size={ICON.lg} color={MUTED} />
             </PressableScale>
           ) : null}
           {other ? (
@@ -1686,7 +1686,7 @@ export default function SellerConversationScreen() {
               accessibilityRole="button"
               accessibilityLabel="Conversation options"
             >
-              <Feather name="more-horizontal" size={ICON.lg} color={FG} />
+              <Icon name="more-horizontal" size={ICON.lg} color={FG} />
             </PressableScale>
           ) : null}
         </View>
@@ -1731,7 +1731,7 @@ export default function SellerConversationScreen() {
       {/* Order context card */}
       {conv?.contextOrderNumber ? (
         <View style={s.orderCard}>
-          <Feather name="package" size={ICON.md} color={PURPLE} />
+          <Icon name="package" size={ICON.md} color={PURPLE} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
             <Text style={s.orderNumber}>{conv.contextOrderNumber}</Text>
             {conv.contextProductName ? (
@@ -1787,7 +1787,7 @@ export default function SellerConversationScreen() {
           which only the recipient gets. */}
       {isRequestSender && !messagingBlocked && (
         <View style={s.sentRequestBanner} testID="seller-conversation-sent-request-banner">
-          <Feather name="clock" size={ICON.sm} color={MUTED} />
+          <Icon name="clock" size={ICON.sm} color={MUTED} />
           <Text style={s.sentRequestBannerText}>
             Sent as a message request — {displayName} hasn't accepted it yet
           </Text>
@@ -1861,7 +1861,7 @@ export default function SellerConversationScreen() {
             >
               {isUploading
                 ? <ActivityIndicator size="small" color="#000000" />
-                : <Feather name="camera" size={18} color="#000000" />
+                : <Icon name="camera" size={18} color="#000000" />
               }
             </PressableScale>
           }
@@ -1875,7 +1875,7 @@ export default function SellerConversationScreen() {
               accessibilityRole="button"
               accessibilityLabel="Attach"
             >
-              <Feather name="paperclip" size={20} color={pendingAttachment ? PURPLE : MUTED} />
+              <Icon name="paperclip" size={20} color={pendingAttachment ? PURPLE : MUTED} />
             </PressableScale>
 
             {/* Voice — tap-to-toggle on every platform (see docs/dm-flows.md) */}
@@ -1888,7 +1888,7 @@ export default function SellerConversationScreen() {
               accessibilityRole="button"
               accessibilityLabel="Record voice message"
             >
-              <Feather name="mic" size={20} color={MUTED} />
+              <Icon name="mic" size={20} color={MUTED} />
             </PressableScale>
 
             {/* Item 72 — same Thread Cash entry point as
@@ -1985,14 +1985,14 @@ export default function SellerConversationScreen() {
           <View style={s.sheetHandle} />
           <Text style={s.sheetTitle}>Add to message</Text>
           <PressableScale style={s.sheetOption} onPress={handlePickPhoto}>
-            <View style={s.sheetOptionIcon}><Feather name="image" size={ICON.md} color={PURPLE} /></View>
+            <View style={s.sheetOptionIcon}><Icon name="image" size={ICON.md} color={PURPLE} /></View>
             <View>
               <Text style={s.sheetOptionLabel}>Photos</Text>
               <Text style={s.sheetOptionDesc}>Up to 15 at once</Text>
             </View>
           </PressableScale>
           <PressableScale style={s.sheetOption} onPress={handlePickVideo}>
-            <View style={s.sheetOptionIcon}><Feather name="video" size={ICON.md} color={PURPLE} /></View>
+            <View style={s.sheetOptionIcon}><Icon name="video" size={ICON.md} color={PURPLE} /></View>
             <View>
               <Text style={s.sheetOptionLabel}>Video clip</Text>
               <Text style={s.sheetOptionDesc}>Under 1 minute</Text>
@@ -2027,19 +2027,19 @@ export default function SellerConversationScreen() {
             }}
           >
             <View style={s.sheetOptionIcon}>
-              <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
+              <Icon name="shopping-bag" size={ICON.md} color={PURPLE} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.sheetOptionLabel}>Attach a product</Text>
               <Text style={s.sheetOptionDesc}>Share a product card from your store</Text>
             </View>
-            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+            <Icon name="chevron-right" size={ICON.sm} color={MUTED} />
           </PressableScale>
 
           {conv?.contextOrderId ? (
             <PressableScale style={s.sheetOption} onPress={attachLinkedOrder}>
               <View style={s.sheetOptionIcon}>
-                <Feather name="package" size={ICON.md} color={PURPLE} />
+                <Icon name="package" size={ICON.md} color={PURPLE} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.sheetOptionLabel}>Attach linked order</Text>
@@ -2047,19 +2047,19 @@ export default function SellerConversationScreen() {
                   {conv.contextOrderNumber ?? 'Order'}{conv.contextProductName ? ` · ${conv.contextProductName}` : ''}
                 </Text>
               </View>
-              <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+              <Icon name="chevron-right" size={ICON.sm} color={MUTED} />
             </PressableScale>
           ) : null}
 
           <PressableScale style={s.sheetOption} onPress={openQuickReplies} testID="seller-conversation-quick-replies-row">
             <View style={s.sheetOptionIcon}>
-              <Feather name="message-square" size={ICON.md} color={PURPLE} />
+              <Icon name="message-square" size={ICON.md} color={PURPLE} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.sheetOptionLabel}>Quick replies</Text>
               <Text style={s.sheetOptionDesc}>Insert a saved reply</Text>
             </View>
-            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+            <Icon name="chevron-right" size={ICON.sm} color={MUTED} />
           </PressableScale>
 
           <PressableScale
@@ -2088,7 +2088,7 @@ export default function SellerConversationScreen() {
           <View style={s.productSheetHeader}>
             <Text style={s.sheetTitle}>Quick replies</Text>
             <PressableScale onPress={() => setShowQuickReplies(false)} accessibilityLabel="Close">
-              <Feather name="x" size={ICON.md} color={MUTED} />
+              <Icon name="x" size={ICON.md} color={MUTED} />
             </PressableScale>
           </View>
 
@@ -2096,7 +2096,7 @@ export default function SellerConversationScreen() {
             <View style={s.centerFill}><ActivityIndicator color={PURPLE} /></View>
           ) : quickReplies.length === 0 ? (
             <View style={s.emptyState}>
-              <Feather name="message-square" size={32} color={MUTED} />
+              <Icon name="message-square" size={32} color={MUTED} />
               <Text style={s.emptyText}>No quick replies yet</Text>
             </View>
           ) : (
@@ -2147,7 +2147,7 @@ export default function SellerConversationScreen() {
           <View style={s.productSheetHeader}>
             <Text style={s.sheetTitle}>Choose a product</Text>
             <PressableScale accessibilityLabel="Close" onPress={() => setShowProductPicker(false)}>
-              <Feather name="x" size={ICON.md} color={MUTED} />
+              <Icon name="x" size={ICON.md} color={MUTED} />
             </PressableScale>
           </View>
 
@@ -2155,7 +2155,7 @@ export default function SellerConversationScreen() {
             <View style={s.centerFill}><ActivityIndicator color={PURPLE} /></View>
           ) : products.length === 0 ? (
             <View style={s.emptyState}>
-              <Feather name="shopping-bag" size={32} color={MUTED} />
+              <Icon name="shopping-bag" size={32} color={MUTED} />
               <Text style={s.emptyText}>No products found</Text>
             </View>
           ) : (
@@ -2168,7 +2168,7 @@ export default function SellerConversationScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={s.productIcon}>
-                    <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
+                    <Icon name="shopping-bag" size={ICON.md} color={PURPLE} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
@@ -2176,7 +2176,7 @@ export default function SellerConversationScreen() {
                       <Text style={s.productPrice}>{formatPrice(product)}</Text>
                     ) : null}
                   </View>
-                  <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+                  <Icon name="chevron-right" size={ICON.sm} color={MUTED} />
                 </PressableScale>
               ))}
             </ScrollView>
@@ -2221,7 +2221,7 @@ export default function SellerConversationScreen() {
               <Text style={s.buyerContextSubtitle}>Orders with you</Text>
             </View>
             <PressableScale onPress={() => setShowBuyerContext(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close">
-              <Feather name="x" size={ICON.md} color={MUTED} />
+              <Icon name="x" size={ICON.md} color={MUTED} />
             </PressableScale>
           </View>
 
@@ -2234,7 +2234,7 @@ export default function SellerConversationScreen() {
               </View>
             ) : buyerOrdersError ? (
               <View style={s.emptyState}>
-                <Feather name="alert-circle" size={28} color={MUTED} />
+                <Icon name="alert-circle" size={28} color={MUTED} />
                 <Text style={s.emptyText}>Couldn't load {displayName}'s orders</Text>
                 <PressableScale style={s.buyerContextRetry} onPress={() => void loadBuyerOrders()} accessibilityRole="button" accessibilityLabel="Retry">
                   <Text style={s.buyerContextRetryText}>Retry</Text>
@@ -2242,7 +2242,7 @@ export default function SellerConversationScreen() {
               </View>
             ) : (buyerOrders?.length ?? 0) === 0 ? (
               <View style={s.emptyState}>
-                <Feather name="package" size={28} color={MUTED} />
+                <Icon name="package" size={28} color={MUTED} />
                 <Text style={s.emptyText}>No other orders from {displayName} yet</Text>
               </View>
             ) : (
@@ -2264,7 +2264,7 @@ export default function SellerConversationScreen() {
                     }}
                   >
                     <View style={s.orderMsgCardIconCircle}>
-                      <Feather name="package" size={ICON.md} color={PURPLE} />
+                      <Icon name="package" size={ICON.md} color={PURPLE} />
                     </View>
                     <View style={{ flex: 1, marginLeft: SP.sm }}>
                       <Text style={s.attachTitle} numberOfLines={1}>{row.orderNumber}</Text>
@@ -2276,7 +2276,7 @@ export default function SellerConversationScreen() {
                       </View>
                     </View>
                     <Text style={s.buyerContextOrderTotal}>{formatCents(row.totalCents)}</Text>
-                    <Feather name="chevron-right" size={ICON.xs} color={MUTED} style={{ marginLeft: SP.xs }} />
+                    <Icon name="chevron-right" size={ICON.xs} color={MUTED} style={{ marginLeft: SP.xs }} />
                   </PressableScale>
                 );
               })
@@ -2294,7 +2294,7 @@ export default function SellerConversationScreen() {
                 70/71) when a Mobbin precedent didn't map onto real,
                 queryable Brandthread data. */}
             <View style={s.buyerContextCartNote}>
-              <Feather name="shopping-cart" size={16} color={SUBTLE} />
+              <Icon name="shopping-cart" size={16} color={SUBTLE} />
               <Text style={s.buyerContextCartNoteText}>
                 Cart contents are private to the buyer — Brandthread doesn't give sellers visibility into what's in someone's cart before checkout.
               </Text>

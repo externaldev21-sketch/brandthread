@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
@@ -31,7 +31,7 @@ export default function CheckoutScreen() {
         <View style={styles.section}>
           <TouchableOpacity onPress={cycleMode} activeOpacity={0.7} style={[styles.selectBox, { borderColor: colors.border, marginBottom: 12 }]}>
             <Text style={[styles.selectValue, { color: colors.foreground }]}>{CHECKOUT_MODES[modeIndex]}</Text>
-            <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+            <Icon name="chevron-down" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
 
@@ -40,7 +40,7 @@ export default function CheckoutScreen() {
         <View style={styles.section}>
           <View style={styles.rowStart}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tipping</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+            <Icon name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
             Customers can choose between 3 presets or enter a custom amount
@@ -56,7 +56,7 @@ export default function CheckoutScreen() {
                 { borderColor: tipping ? colors.primary : colors.border, backgroundColor: tipping ? colors.primary : 'transparent' },
               ]}
             >
-              {tipping && <Feather name="check" size={12} color={colors.primaryForeground} />}
+              {tipping && <Icon name="check" size={12} color={colors.primaryForeground} />}
             </View>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Show tipping options at checkout</Text>
           </TouchableOpacity>
@@ -77,7 +77,7 @@ export default function CheckoutScreen() {
                 { borderColor: postPurchaseFeatures ? colors.primary : colors.border, backgroundColor: postPurchaseFeatures ? colors.primary : 'transparent' },
               ]}
             >
-              {postPurchaseFeatures && <Feather name="check" size={12} color={colors.primaryForeground} />}
+              {postPurchaseFeatures && <Icon name="check" size={12} color={colors.primaryForeground} />}
             </View>
             <Text style={[styles.radioLabel, { color: colors.foreground }]}>Add extra features after checkout</Text>
           </TouchableOpacity>

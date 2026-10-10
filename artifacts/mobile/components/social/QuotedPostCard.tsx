@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { RADII } from '@/constants/radii';
 import { FONT, FS } from '@/lib/theme';
@@ -32,7 +32,7 @@ export function QuotedPostCard({ quotedPost, onPress, testID = 'quoted-post-card
   if ('unavailable' in quotedPost) {
     return (
       <View style={[styles.card, styles.unavailable]} testID={`${testID}-unavailable`} accessibilityLabel="This post is unavailable">
-        <Feather name="slash" size={18} color={theme.muted} />
+        <Icon name="slash" size={18} color={theme.muted} />
         <Text style={styles.unavailableText}>This post is unavailable</Text>
       </View>
     );
@@ -45,7 +45,7 @@ export function QuotedPostCard({ quotedPost, onPress, testID = 'quoted-post-card
         <Image source={{ uri: quotedPost.thumbnailUrl }} style={styles.thumb} accessibilityIgnoresInvertColors />
       ) : (
         <View style={[styles.thumb, styles.thumbEmpty]}>
-          <Feather name={quotedPost.mediaType === 'video' ? 'video' : 'image'} size={20} color={theme.muted} />
+          <Icon name={quotedPost.mediaType === 'video' ? 'video' : 'image'} size={20} color={theme.muted} />
         </View>
       )}
       <View style={styles.text}>

@@ -17,7 +17,7 @@ import {
   RefreshControl, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -97,7 +97,7 @@ function SystemLine({ msg }: { msg: ApiMessage }) {
   return (
     <View style={bub.systemWrap} testID={`system-message-${msg.id}`}>
       <View style={bub.systemPill}>
-        <Feather name="info" size={12} color={theme.subtle} />
+        <Icon name="info" size={12} color={theme.subtle} />
         <Text style={bub.systemText}>{msg.content}</Text>
       </View>
       <Text style={bub.systemTime}>{fmtTime(msg.sentAt)}</Text>
@@ -127,7 +127,7 @@ function MessageBubble({ msg, accent, onAccent, onOpenImage }: { msg: ApiMessage
         )}
         {files.map((uri) => (
           <View key={uri} style={[bub.file, mine && { alignSelf: 'flex-end' }]}>
-            <Feather name="file-text" size={14} color={theme.text} />
+            <Icon name="file-text" size={14} color={theme.text} />
             <Text style={bub.fileText}>Attachment</Text>
           </View>
         ))}
@@ -341,16 +341,16 @@ export default function ManufacturerMessagesScreen() {
         <View style={{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' }}>
           {manufacturerId ? (
             <TouchableOpacity onPress={() => router.push({ pathname: '/manufacturer-profile', params: { id: manufacturerId } } as never)} style={s.headerBtn} accessibilityLabel="View manufacturer profile">
-              <Feather name="info" size={16} color={theme.text} />
+              <Icon name="info" size={16} color={theme.text} />
             </TouchableOpacity>
           ) : null}
           {callingEnabled ? (
             <>
           <TouchableOpacity onPress={() => startCall('voice')} accessibilityRole="button" accessibilityLabel={'Start voice call'} testID="manufacturer-voice-call" style={s.headerBtn}>
-            <Feather name="phone" size={16} color={theme.text} />
+            <Icon name="phone" size={16} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => startCall('video')} accessibilityRole="button" accessibilityLabel={'Start video call'} testID="manufacturer-video-call" style={s.headerBtn}>
-            <Feather name="video" size={16} color={theme.text} />
+            <Icon name="video" size={16} color={theme.text} />
           </TouchableOpacity>
             </>
           ) : null}
@@ -428,7 +428,7 @@ export default function ManufacturerMessagesScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} tintColor={theme.text} onRefresh={() => { if (!threadId) return; setRefreshing(true); void loadMessages(threadId); }} />}
         ListEmptyComponent={
           <View style={[s.emptyWrap, INVERTED && { transform: [{ scaleY: -1 }] }]} testID="thread-empty">
-            <Feather name="message-circle" size={28} color={theme.subtle} />
+            <Icon name="message-circle" size={28} color={theme.subtle} />
             <Text style={s.emptyTitle}>Start the conversation</Text>
             <Text style={s.emptyText}>Share your designs, references and target price. When {mfrName} is ready, they'll send a sample card you can pay right here.</Text>
           </View>
@@ -451,7 +451,7 @@ export default function ManufacturerMessagesScreen() {
               <View key={`${asset.uri}-${index}`} style={s.previewTile}>
                 <Image source={{ uri: asset.uri }} style={s.previewImage} />
                 <TouchableOpacity style={s.previewRemove} onPress={() => setPending((current) => current.filter((_, i) => i !== index))} accessibilityLabel="Remove photo">
-                  <Feather name="x" size={12} color={theme.text} />
+                  <Icon name="x" size={12} color={theme.text} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -460,7 +460,7 @@ export default function ManufacturerMessagesScreen() {
         }
         leftAccessory={
           <TouchableOpacity onPress={() => setAttachOpen(true)} style={s.iconBtn} accessibilityLabel="Add photos" testID="button-attach">
-            <Feather name="image" size={18} color="#000000" />
+            <Icon name="image" size={18} color="#000000" />
           </TouchableOpacity>
         }
       />
@@ -476,9 +476,9 @@ export default function ManufacturerMessagesScreen() {
               { key: 'library', icon: 'image', label: 'Choose from camera roll', hint: `Up to ${MAX_PHOTOS} at once` },
             ] as const).map((option) => (
               <TouchableOpacity key={option.key} style={s.sheetRow} onPress={() => void pickPhotos(option.key)} testID={`attach-${option.key}`}>
-                <View style={s.sheetIcon}><Feather name={option.icon} size={18} color={theme.text} /></View>
+                <View style={s.sheetIcon}><Icon name={option.icon} size={18} color={theme.text} /></View>
                 <View style={{ flex: 1 }}><Text style={s.sheetLabel}>{option.label}</Text><Text style={s.sheetHint}>{option.hint}</Text></View>
-                <Feather name="chevron-right" size={16} color={theme.subtle} />
+                <Icon name="chevron-right" size={16} color={theme.subtle} />
               </TouchableOpacity>
             ))}
           </Pressable>
@@ -489,7 +489,7 @@ export default function ManufacturerMessagesScreen() {
       <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
         <Pressable style={s.viewer} onPress={() => setViewer(null)} accessibilityLabel="Close photo">
           {viewer ? <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} resizeMode="contain" /> : null}
-          <View style={[s.viewerClose, { top: headerTopInset + SP.sm }]}><Feather name="x" size={22} color="#fff" /></View>
+          <View style={[s.viewerClose, { top: headerTopInset + SP.sm }]}><Icon name="x" size={22} color="#fff" /></View>
         </Pressable>
       </Modal>
     </KeyboardAvoidingView>

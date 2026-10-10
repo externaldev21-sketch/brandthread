@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import type { OrderStatus } from '@/services/orderTypes';
@@ -25,7 +25,7 @@ const STAGE_LABEL: Record<OrderStatus, string> = {
   disputed: 'Disputed',
 };
 
-const STAGE_ICON: Record<OrderStatus, keyof typeof Feather.glyphMap> = {
+const STAGE_ICON: Record<OrderStatus, IconName> = {
   new: 'shopping-bag',
   processing: 'loader',
   ready_to_ship: 'package',
@@ -64,7 +64,7 @@ export function OrderStatusTimeline({
     const c = status === 'refunded' ? theme.accent : theme.error;
     return (
       <View style={[styles.exceptionWrap, { backgroundColor: theme.surface, borderColor: c }]}>
-        <Feather name={STAGE_ICON[status]} size={ICON.md} color={c} />
+        <Icon name={STAGE_ICON[status]} size={ICON.md} color={c} />
         <Text style={[styles.exceptionLabel, { color: c }]}>{STAGE_LABEL[status]}</Text>
       </View>
     );
@@ -90,7 +90,7 @@ export function OrderStatusTimeline({
                   },
                 ]}
               >
-                {done ? <Feather name="check" size={compact ? 10 : 12} color={theme.onAccent} /> : null}
+                {done ? <Icon name="check" size={compact ? 10 : 12} color={theme.onAccent} /> : null}
               </Animated.View>
               {!compact ? (
                 <Text

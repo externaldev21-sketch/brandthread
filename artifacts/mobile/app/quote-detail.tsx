@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -361,13 +361,13 @@ export default function QuoteDetailScreen() {
             {!!quote.validUntil && <Text style={s.validUntil}>Valid until {formatDate(quote.validUntil)}</Text>}
             {isExpiringSoon && !isExpired && (
               <View style={s.warningBanner}>
-                <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />
+                <Icon name="alert-triangle" size={ICON.xs} color={ORANGE} />
                 <Text style={s.warningText}>Expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''} — act soon!</Text>
               </View>
             )}
             {isExpired && (
               <View style={s.errorBanner}>
-                <Feather name="x-circle" size={ICON.xs} color={RED} />
+                <Icon name="x-circle" size={ICON.xs} color={RED} />
                 <Text style={s.errorBannerText}>This quote has expired</Text>
               </View>
             )}
@@ -443,7 +443,7 @@ export default function QuoteDetailScreen() {
             <>
               <BrandthreadCard style={[s.section, s.successCard]} elevated>
                 <View style={s.successRow}>
-                  <Feather name="check-circle" size={ICON.lg} color={SUCCESS} />
+                  <Icon name="check-circle" size={ICON.lg} color={SUCCESS} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.successTitle}>Quote Accepted</Text>
                     <Text style={s.successSub}>You've accepted this quote. Start by ordering a prototype sample.</Text>
@@ -471,7 +471,7 @@ export default function QuoteDetailScreen() {
           {isReadOnly && (
             <BrandthreadCard style={[s.section, s.readOnlyCard]}>
               <View style={s.readOnlyRow}>
-                <Feather name="info" size={ICON.md} color={MUTED} />
+                <Icon name="info" size={ICON.md} color={MUTED} />
                 <Text style={s.readOnlyText}>
                   This quote is {statusLabel(quote.status).toLowerCase()} and no further actions are available.
                 </Text>

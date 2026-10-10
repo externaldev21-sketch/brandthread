@@ -1,12 +1,13 @@
 import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
+import { FONT } from '@/lib/theme';
 
 interface FeatureCardProps {
   title: string;
   subtitle?: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   onPress?: () => void;
   accent?: boolean;
   badge?: string;
@@ -28,7 +29,7 @@ export function FeatureCard({ title, subtitle, icon, onPress, accent = false, ba
       ]}
     >
       <View style={[styles.iconWrap, { backgroundColor: accent ? colors.muted : colors.secondary }]}>
-        <Feather name={icon} size={20} color={accent ? colors.primary : colors.mutedForeground} />
+        <Icon name={icon} size={20} color={accent ? colors.primary : colors.mutedForeground} />
       </View>
       <View style={styles.content}>
         <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
@@ -43,7 +44,7 @@ export function FeatureCard({ title, subtitle, icon, onPress, accent = false, ba
           <Text style={[styles.badgeText, { color: colors.primary }]}>{badge}</Text>
         </View>
       )}
-      <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
     </TouchableOpacity>
   );
 }
@@ -65,12 +66,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: { flex: 1 },
-  title: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  subtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  title: { fontSize: 14, fontFamily: FONT.semibold },
+  subtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  badgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  badgeText: { fontSize: 11, fontFamily: FONT.semibold },
 });

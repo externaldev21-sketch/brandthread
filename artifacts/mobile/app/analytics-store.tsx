@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
@@ -174,7 +174,7 @@ export default function AnalyticsStoreScreen() {
                     <Text style={s.secPurchases}>{sec.purchasesInfluenced}</Text>
                     <Text style={s.secPurchasesLabel}>purchases</Text>
                   </View>
-                  <Feather name="chevron-right" size={14} color={colors.subtle} style={{ marginLeft: SP.sm }} />
+                  <Icon name="chevron-right" size={14} color={colors.subtle} style={{ marginLeft: SP.sm }} />
                 </TouchableOpacity>
               </View>
             ))}

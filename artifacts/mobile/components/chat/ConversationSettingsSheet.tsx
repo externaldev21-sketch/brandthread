@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -114,7 +114,7 @@ export function ConversationSettingsSheet({
   };
 
   const row = (
-    icon: keyof typeof Feather.glyphMap,
+    icon: IconName,
     label: string,
     detail: string,
     onPress: () => void,
@@ -130,12 +130,12 @@ export function ConversationSettingsSheet({
       accessibilityState={{ disabled: disabled || busy }}
       style={[styles.row, { borderColor: theme.border, opacity: disabled ? 0.5 : 1 }]}
     >
-      <Feather name={icon} size={19} color={destructive ? theme.error : theme.text} />
+      <Icon name={icon} size={19} color={destructive ? theme.error : theme.text} />
       <View style={styles.rowCopy}>
         <Text style={[styles.label, { color: destructive ? theme.error : theme.text }]}>{label}</Text>
         <Text style={[styles.detail, { color: theme.muted }]}>{detail}</Text>
       </View>
-      <Feather name="chevron-right" size={17} color={theme.muted} />
+      <Icon name="chevron-right" size={17} color={theme.muted} />
     </PressableScale>
   );
 
@@ -151,7 +151,7 @@ export function ConversationSettingsSheet({
               <Text style={[styles.subtitle, { color: theme.muted }]} numberOfLines={1}>{counterpart.name}</Text>
             </View>
             <PressableScale onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={styles.close}>
-              <Feather name="x" size={20} color={theme.text} />
+              <Icon name="x" size={20} color={theme.text} />
             </PressableScale>
           </View>
 
