@@ -24,11 +24,11 @@
  * number or CVC, so a buggy client can't leak one into our logs or database.
  */
 import { and, eq, isNull } from "drizzle-orm";
-import { flatRateShipping } from "../defaultShipping";
 import type Stripe from "stripe";
 import {
   db, productVariants, products, shippingRates, shippingZones, shippingZoneWeightTiers, users,
 } from "@workspace/db";
+import { flatRateShipping } from "../defaultShipping";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../shippingZones";
 import { getSellerVacationStatus } from "../sellerAvailability";
 import { validateDiscountCode, DiscountValidationError } from "../discounts";
