@@ -38,7 +38,7 @@ import {
   type ViewToken,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useSegments } from 'expo-router';
 import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -49,7 +49,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
-import { useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useBuyerTabBarTopInset, useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FollowPill } from '@/components/search/PersonRow';
 import { ThemedRefreshControl } from '@/components/ui';
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -574,6 +574,14 @@ export default function ActivityCenterScreen() {
   // zone, like iOS, and are visible (softly, through blur) right up to the
   // bar instead of stopping in an empty reserved gap above it.
   const screenPadding = useScreenPadding({ withTabBarInset: false });
+  // Rows still scroll in under the glass while scrolling, but the END of
+  // the list must clear the bar (nothing ends under it). Inside the buyer
+  // tabs the bar floats over this screen, so pad by the shared clearance;
+  // the seller-side root route already gets that clearance from the root
+  // layout's scene margin, so it keeps the small safe-area padding.
+  const inBuyerTabs = (useSegments() as string[])[0] === '(buyer)';
+  const tabBarClearance = useTabBarClearance();
+  const listBottomPad = inBuyerTabs ? tabBarClearance : screenPadding.bottom + SP.xl;
   const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>(true, false);
   const router = useRouter();
   const { role } = useRole();
@@ -1331,7 +1339,7 @@ export default function ActivityCenterScreen() {
           ListFooterComponent={listFooter}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: screenPadding.bottom + SP.xl },
+            { paddingBottom: listBottomPad },
             sections.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}

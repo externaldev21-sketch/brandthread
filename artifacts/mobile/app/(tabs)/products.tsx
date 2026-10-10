@@ -21,7 +21,7 @@ import { PrimaryButton, FilterChip, PressableScale, useUndoToast } from '@/compo
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useTabBarClearance, useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
 import { StockEditorSheet } from '@/components/products/StockEditorSheet';
 import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct } from '@/services/productService';
@@ -436,6 +436,7 @@ export default function ProductsScreen() {
   const router = useRouter();
   const { showUndo } = useUndoToast();
   const tabBar = useTabBarMetrics();
+  const tabBarClearance = useTabBarClearance(2); // seller bar: Studio + AI side circles
   const { width: screenWidth } = useBreakpoint();
   const gridColumns = useGridColumns({ phone: 2, tablet: 3, tabletLandscape: 4 });
   const gridGutter = useCenteredGridPadding();
@@ -875,7 +876,7 @@ export default function ProductsScreen() {
           ListHeaderComponent={ListHeader}
           ListFooterComponent={ListFooter}
           ListEmptyComponent={ListEmpty}
-          contentContainerStyle={{ paddingHorizontal: gridGutter - gridGap / 2, paddingBottom: tabBar.occupiedHeight + SP.xl }}
+          contentContainerStyle={{ paddingHorizontal: gridGutter - gridGap / 2, paddingBottom: tabBarClearance + SP.md }}
           showsVerticalScrollIndicator={false}
           refreshing={refreshing}
           onRefresh={handleRefresh}

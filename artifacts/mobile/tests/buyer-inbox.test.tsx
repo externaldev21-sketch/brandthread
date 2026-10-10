@@ -147,6 +147,7 @@ vi.mock('@clerk/expo', () => ({
 
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
   useBuyerTabBarInset: () => 0,
+  useTabBarClearance: () => 0,
 }));
 
 vi.mock('@/components/BrandthreadUI', () => ({

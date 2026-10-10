@@ -29,7 +29,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { BrandsYouMightLikeRow } from '@/components/discover/BrandsYouMightLikeRow';
-import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useApi } from '@/hooks/useApi';
@@ -102,7 +102,7 @@ function mapToEditorialTile(prefix: string, row: LiveProduct, i: number): Editor
 
 export default function DiscoverScreen() {
   const listRef = useScrollReset<FlatList<any>>(true, false);
-  const barInset = useBuyerTabBarInset();
+  const tabBarClearance = useTabBarClearance();
   const router = useRouter();
   const { openReport } = useReportSheet();
   const api = useApi();
@@ -330,7 +330,7 @@ export default function DiscoverScreen() {
           }}
           onTilePress={(post, idx) => openViewer(post, idx, forYouPosts)}
           onTileLongPress={setSafetyMenuPost}
-          contentContainerStyle={{ paddingBottom: barInset + SP.md }}
+          contentContainerStyle={{ paddingBottom: tabBarClearance }}
           ListHeaderComponent={header as never}
           ListFooterExtra={<RecentlyViewedRow style={{ paddingHorizontal: SP.md, marginTop: SP.lg }} />}
         />
@@ -351,7 +351,7 @@ export default function DiscoverScreen() {
           }}
           onTilePress={(post, idx) => openViewer(post, idx, fitsPosts)}
           onTileLongPress={setSafetyMenuPost}
-          contentContainerStyle={{ paddingBottom: barInset + SP.md }}
+          contentContainerStyle={{ paddingBottom: tabBarClearance }}
           ListHeaderComponent={header as never}
         />
       )}
@@ -363,7 +363,7 @@ export default function DiscoverScreen() {
           keyExtractor={(b) => b.id}
           numColumns={2}
           columnWrapperStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}
-          contentContainerStyle={{ gap: SP.sm, paddingBottom: barInset + SP.md }}
+          contentContainerStyle={{ gap: SP.sm, paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => <DiscoverBrandCard brand={item} />}
@@ -386,7 +386,7 @@ export default function DiscoverScreen() {
           keyExtractor={(p) => p.userId}
           numColumns={2}
           columnWrapperStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}
-          contentContainerStyle={{ gap: SP.sm, paddingBottom: barInset + SP.md }}
+          contentContainerStyle={{ gap: SP.sm, paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => <DiscoverPersonCard person={item} />}
@@ -407,7 +407,7 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           data={drops}
           keyExtractor={(d) => d.id}
-          contentContainerStyle={{ paddingTop: SP.md, paddingBottom: barInset + SP.md }}
+          contentContainerStyle={{ paddingTop: SP.md, paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => <DiscoverDropRow drop={item} />}
