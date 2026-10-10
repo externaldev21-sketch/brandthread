@@ -70,16 +70,21 @@ function capOf(v: unknown): number | null | undefined {
   return Number.isSafeInteger(v) && (v as number) >= 0 ? (v as number) : undefined;
 }
 
-function parseLimits(raw: unknown): PlanTierLimits | null {
-  if (!isObj(raw)) return null;
-  const activeProducts = capOf('activeProducts' in raw ? raw.activeProducts : raw.products);
+/**
+ * One plan's limits, in the shape GET /api/config/seller-plans sends
+ * (Revenue P0, #766): `productLimit`, `staffSeats`, `aiCreditsMonthly` and
+ * `features.emailSendsMonthly`. Null means unlimited.
+ */
+function parseLimits(plan: Record<string, unknown>): PlanTierLimits | null {
+  const features = isObj(plan.features) ? plan.features : {};
+  const activeProducts = capOf(plan.productLimit);
   if (activeProducts === undefined) return null; // the headline is required
   const limits: PlanTierLimits = { activeProducts };
-  const seats = capOf('staffSeats' in raw ? raw.staffSeats : raw.teamSeats);
+  const seats = capOf(plan.staffSeats);
   if (seats !== undefined) limits.staffSeats = seats;
-  const ai = capOf(raw.aiCreditsPerMonth);
-  if (typeof ai === 'number') limits.aiCreditsPerMonth = ai; // never unlimited
-  const emails = capOf(raw.marketingEmailsPerMonth);
+  const ai = capOf(plan.aiCreditsMonthly);
+  if (typeof ai === 'number') limits.aiCreditsPerMonth = ai; // never shown as unlimited
+  const emails = capOf(features.emailSendsMonthly);
   if (emails !== undefined) limits.marketingEmailsPerMonth = emails;
   return limits;
 }
@@ -88,9 +93,14 @@ function parseFeatures(raw: unknown): PlanTierFeatures {
   if (!isObj(raw)) return {};
   const out: PlanTierFeatures = {};
   if (raw.analytics === 'basic' || raw.analytics === 'advanced' || raw.analytics === 'full') out.analytics = raw.analytics as AnalyticsLevel;
+  if (typeof raw.analyticsExport === 'boolean') out.analyticsExport = raw.analyticsExport;
   if (raw.payoutSpeed === 'standard' || raw.payoutSpeed === 'faster') out.payoutSpeed = raw.payoutSpeed as PayoutSpeed;
-  for (const key of ['liveSelling', 'dropsPreorders', 'boostSlots', 'customDomain', 'manufacturerHub', 'prioritySupport'] as const) {
-    if (typeof raw[key] === 'boolean') out[key] = raw[key] as boolean;
+  const flags: [keyof PlanTierFeatures, string][] = [
+    ['liveSelling', 'liveSelling'], ['dropsPreorders', 'dropsEscrow'], ['boostSlots', 'boostFeatured'],
+    ['customDomain', 'customDomain'], ['manufacturerHub', 'manufacturerHub'], ['prioritySupport', 'prioritySupport'],
+  ];
+  for (const [key, wire] of flags) {
+    if (typeof raw[wire] === 'boolean') (out as Record<string, unknown>)[key] = raw[wire];
   }
   return out;
 }
@@ -101,7 +111,7 @@ function parseTiers(rawPlans: unknown, prices: SellerPlanConfig['plans']): PlanT
   const tiers: PlanTier[] = [];
   for (const plan of SELLER_PLANS) {
     const raw = list.find((p) => isObj(p) && p.id === plan.id) as Record<string, unknown> | undefined;
-    const limits = raw ? parseLimits(raw.limits) : null;
+    const limits = raw ? parseLimits(raw) : null;
     if (!raw || !limits) {
       return FALLBACK_TIERS.map((t) => ({ ...t, amountCents: prices.find((p) => p.id === t.id)?.amountCents ?? 0 }));
     }

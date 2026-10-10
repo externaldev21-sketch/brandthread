@@ -5,17 +5,23 @@ vi.mock('@/lib/api', () => ({ useApi: () => ({}) }));
 import { compareRows, keyDifferences, nextTierForProducts, productCapCopy, productHeadline, type PlanTier } from './planTiers';
 import { DEFAULT_SELLER_PLAN_CONFIG, parseSellerPlanConfig } from './sellerPlanConfig';
 
+// The shape GET /api/config/seller-plans sends (Revenue P0, #766).
+const wire = (id: string, amountCents: number, productLimit: number | null, staffSeats: number | null, aiCreditsMonthly: number, emailSendsMonthly: number | null, tier: 0 | 1 | 2) => ({
+  id, name: id.charAt(0).toUpperCase() + id.slice(1), amountCents, interval: 'month', productLimit, staffSeats, aiCreditsMonthly,
+  features: {
+    analytics: (['basic', 'advanced', 'full'] as const)[tier], analyticsExport: tier === 2, liveSelling: tier > 0, dropsEscrow: tier > 0,
+    emailSendsMonthly, boostFeatured: tier > 0, customDomain: tier > 0, manufacturerHub: tier > 0,
+    payoutSpeed: tier === 2 ? 'faster' : 'standard', prioritySupport: tier === 2,
+  },
+});
 const serverPlans = {
   trialDays: 7,
   reminderDaysBefore: 2,
   commissionPercent: 5,
   plans: [
-    { id: 'starter', name: 'Starter', amountCents: 1999, limits: { activeProducts: 10, staffSeats: 1, aiCreditsPerMonth: 100, marketingEmailsPerMonth: 0 },
-      features: { analytics: 'basic', liveSelling: false, dropsPreorders: false, boostSlots: false, customDomain: false, manufacturerHub: false, payoutSpeed: 'standard', prioritySupport: false } },
-    { id: 'growth', name: 'Growth', amountCents: 4900, limits: { activeProducts: 50, staffSeats: 3, aiCreditsPerMonth: 500, marketingEmailsPerMonth: 5000 },
-      features: { analytics: 'advanced', liveSelling: true, dropsPreorders: true, boostSlots: true, customDomain: true, manufacturerHub: true, payoutSpeed: 'standard', prioritySupport: false } },
-    { id: 'pro', name: 'Pro', amountCents: 12900, limits: { activeProducts: null, staffSeats: null, aiCreditsPerMonth: 2000, marketingEmailsPerMonth: 25000 },
-      features: { analytics: 'full', liveSelling: true, dropsPreorders: true, boostSlots: true, customDomain: true, manufacturerHub: true, payoutSpeed: 'faster', prioritySupport: true } },
+    wire('starter', 1999, 10, 1, 100, 0, 0),
+    wire('growth', 4900, 50, 3, 500, 5000, 1),
+    wire('pro', 12900, null, null, 2000, 25000, 2),
   ],
 };
 
@@ -38,7 +44,7 @@ describe('plan cards come only from the shared config', () => {
   });
 
   it("changing the config changes the cards (Dev's 5 / 15 / unlimited)", () => {
-    const alt = parseSellerPlanConfig({ ...serverPlans, plans: serverPlans.plans.map((p, i) => ({ ...p, limits: { ...p.limits, activeProducts: [5, 15, null][i] } })) });
+    const alt = parseSellerPlanConfig({ ...serverPlans, plans: serverPlans.plans.map((p, i) => ({ ...p, productLimit: [5, 15, null][i] })) });
     expect(alt.tiers.map((t) => productHeadline(t.limits))).toEqual(['List up to 5 products', 'List up to 15 products', 'Unlimited products']);
   });
 
@@ -46,10 +52,10 @@ describe('plan cards come only from the shared config', () => {
     expect(keyDifferences(starter, null)).toEqual(['1 staff seat', 'Basic analytics', '100 AI credits a month']);
     expect(keyDifferences(growth, starter)).toEqual([
       '3 staff seats', 'Advanced analytics', '500 AI credits a month',
-      'Live selling, drops and pre-orders and custom domain', 'Manufacturer Hub and Boost slots',
+      'Live selling, drops and pre-orders, custom domain', 'Manufacturer Hub, boost slots',
     ]);
     expect(keyDifferences(pro, growth)).toEqual([
-      'Unlimited staff seats', 'Full analytics and export', '2,000 AI credits a month', 'Priority support and faster payouts',
+      'Unlimited staff seats', 'Full analytics and export', '2,000 AI credits a month', 'Priority support, faster payouts',
     ]);
     for (const [tier, below] of [[starter, null], [growth, starter], [pro, growth]] as const) {
       expect(keyDifferences(tier, below).length).toBeLessThanOrEqual(5);
@@ -75,7 +81,7 @@ describe('plan cards come only from the shared config', () => {
   });
 
   it('never invents a value the server did not send (AI credits never become "unlimited")', () => {
-    const partial = parseSellerPlanConfig({ ...serverPlans, plans: serverPlans.plans.map((p) => ({ id: p.id, amountCents: p.amountCents, limits: { products: p.limits.activeProducts, teamSeats: p.limits.staffSeats, aiCreditsPerMonth: null } })) });
+    const partial = parseSellerPlanConfig({ ...serverPlans, plans: serverPlans.plans.map((p) => ({ id: p.id, amountCents: p.amountCents, productLimit: p.productLimit, staffSeats: p.staffSeats, aiCreditsMonthly: null })) });
     expect(partial.tiers[0].limits).toEqual({ activeProducts: 10, staffSeats: 1 });
     expect(keyDifferences(partial.tiers[0], null)).toEqual(['1 staff seat']);
     expect(compareRows(partial.tiers, null).map((r) => r.label)).toEqual(['Active products', 'Staff seats']);

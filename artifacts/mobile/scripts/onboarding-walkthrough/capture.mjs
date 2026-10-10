@@ -366,7 +366,8 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir, demo })
         const text = await page.getByTestId(`onboarding-plan-${id}-headline`).innerText();
         if (text !== headline) throw new Error(`Plan ${id} headline: ${text}`);
       }
-      await page.getByTestId('onboarding-plan-scroll').evaluate((el) => el.scrollTo(0, el.scrollHeight)).catch(() => {});
+      await page.mouse.move(195, 400);
+      await page.mouse.wheel(0, 1200);
       await page.waitForTimeout(300);
       await shot('plan-scrolled');
       await page.getByTestId('onboarding-plan-compare').click();

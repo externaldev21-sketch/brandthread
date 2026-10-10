@@ -22,15 +22,6 @@ describe("shared seller plan config", () => {
     expect(cfg.plans.find((p) => p.id === "growth")!.amountCents).toBe(7900);
   });
 
-  it("each plan carries its name and active-product cap (the plan card headline) from PLAN_CATALOGUE", async () => {
-    const m = await load({});
-    const cfg = m.publicSellerPlanConfig();
-    for (const plan of cfg.plans) {
-      expect(plan.name).toBe(plan.id.charAt(0).toUpperCase() + plan.id.slice(1));
-      expect(plan.limits.activeProducts).toBe(m.PLAN_CATALOGUE[plan.id].limits.products);
-    }
-  });
-
   it("prices and trial come from env without a code change, and bad values fall back", async () => {
     const m = await load({ SELLER_TRIAL_DAYS: "14", SELLER_PLAN_GROWTH_CENTS: "6900", SELLER_CHECKOUT_MODE: "web" });
     expect(m.TRIAL_DAYS).toBe(14);

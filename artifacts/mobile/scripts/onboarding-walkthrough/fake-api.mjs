@@ -188,15 +188,17 @@ export function createFakeOnboardingApi({ demo = false } = {}) {
     }
     if (get && p === '/config/seller-plans') {
       // Dev's tier decision in the shape GET /api/config/seller-plans sends
-      // (prices, product caps, features; AI credits left out until set).
-      const f = (tier) => ({
-        analytics: ['basic', 'advanced', 'full'][tier], liveSelling: tier > 0, dropsPreorders: tier > 0, boostSlots: tier > 0,
-        customDomain: tier > 0, manufacturerHub: tier > 0, payoutSpeed: tier === 2 ? 'faster' : 'standard', prioritySupport: tier === 2,
+      // (Revenue P0, #766). AI credits are left out until the catalogue sets them.
+      const plan = (id, amountCents, productLimit, staffSeats, tier) => ({
+        id, name: id.charAt(0).toUpperCase() + id.slice(1), amountCents, interval: 'month', productLimit, staffSeats,
+        features: {
+          analytics: ['basic', 'advanced', 'full'][tier], analyticsExport: tier === 2, liveSelling: tier > 0, dropsEscrow: tier > 0,
+          boostFeatured: tier > 0, customDomain: tier > 0, manufacturerHub: tier > 0,
+          payoutSpeed: tier === 2 ? 'faster' : 'standard', prioritySupport: tier === 2,
+        },
       });
-      return { status: 200, body: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', plans: [
-        { id: 'starter', name: 'Starter', amountCents: 1999, interval: 'month', commissionPercent: 5, limits: { activeProducts: 10, staffSeats: 1 }, features: f(0) },
-        { id: 'growth', name: 'Growth', amountCents: 4900, interval: 'month', commissionPercent: 5, limits: { activeProducts: 50, staffSeats: 3 }, features: f(1) },
-        { id: 'pro', name: 'Pro', amountCents: 12900, interval: 'month', commissionPercent: 5, limits: { activeProducts: null, staffSeats: null }, features: f(2) },
+      return { status: 200, body: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', commissionPercent: 5, plans: [
+        plan('starter', 1999, 10, 1, 0), plan('growth', 4900, 50, 3, 1), plan('pro', 12900, null, null, 2),
       ] } };
     }
     if (get && p === '/seller/subscription/status') {

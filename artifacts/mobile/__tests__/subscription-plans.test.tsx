@@ -31,6 +31,7 @@ vi.mock('react-native', () => {
     ActivityIndicator:  nativeComponent('ActivityIndicator'),
     Alert:              { alert: alertMock },
     AppState:           { addEventListener: vi.fn(() => ({ remove: removeMock })) },
+    Dimensions:         { get: () => ({ width: 390, height: 844 }) },
     Linking:            { openURL: vi.fn() },
     Platform:           { OS: 'web', select: (obj: any) => obj.web ?? obj.default },
     Pressable:          nativeComponent('Pressable'),

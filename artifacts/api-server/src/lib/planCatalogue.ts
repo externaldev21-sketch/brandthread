@@ -90,15 +90,7 @@ export interface PublicSellerPlanConfig {
   reminderDaysBefore: number;
   checkoutMode: SellerCheckoutMode;
   currency: "usd";
-  plans: {
-    id: SellerPlanId;
-    /** Short display name ("Growth"). */
-    name: string;
-    amountCents: number;
-    interval: "month";
-    /** The plan card's headline. null = unlimited. More limits are added here as the config grows. */
-    limits: { activeProducts: number | null };
-  }[];
+  plans: { id: SellerPlanId; amountCents: number; interval: "month" }[];
 }
 
 export function publicSellerPlanConfig(): PublicSellerPlanConfig {
@@ -107,12 +99,6 @@ export function publicSellerPlanConfig(): PublicSellerPlanConfig {
     reminderDaysBefore: TRIAL_REMINDER_DAYS_BEFORE,
     checkoutMode: SELLER_CHECKOUT_MODE,
     currency: "usd",
-    plans: PLAN_IDS.map((id) => ({
-      id,
-      name: id.charAt(0).toUpperCase() + id.slice(1),
-      amountCents: PLAN_CATALOGUE[id].amountCents,
-      interval: "month" as const,
-      limits: { activeProducts: PLAN_CATALOGUE[id].limits.products },
-    })),
+    plans: PLAN_IDS.map((id) => ({ id, amountCents: PLAN_CATALOGUE[id].amountCents, interval: "month" as const })),
   };
 }

@@ -25,6 +25,7 @@ export interface PlanTierLimits {
 
 export interface PlanTierFeatures {
   analytics?: AnalyticsLevel;
+  analyticsExport?: boolean;
   liveSelling?: boolean;
   dropsPreorders?: boolean;
   boostSlots?: boolean;
@@ -61,8 +62,13 @@ function seatsLine(seats: number | null): string {
 const ANALYTICS_LINE: Record<AnalyticsLevel, string> = {
   basic: 'Basic analytics',
   advanced: 'Advanced analytics',
-  full: 'Full analytics and export',
+  full: 'Full analytics',
 };
+
+function analyticsLine(f: PlanTierFeatures): string | null {
+  if (!f.analytics) return null;
+  return `${ANALYTICS_LINE[f.analytics]}${f.analyticsExport ? ' and export' : ''}`;
+}
 
 function aiLine(credits: number): string {
   return `${plural(credits, 'AI credit', 'AI credits')} a month`;
@@ -74,12 +80,12 @@ const UNLOCK_LABELS: { key: keyof PlanTierFeatures; label: string }[] = [
   { key: 'dropsPreorders', label: 'drops and pre-orders' },
   { key: 'customDomain', label: 'custom domain' },
   { key: 'manufacturerHub', label: 'Manufacturer Hub' },
-  { key: 'boostSlots', label: 'Boost slots' },
-  { key: 'prioritySupport', label: 'Priority support' },
+  { key: 'boostSlots', label: 'boost slots' },
+  { key: 'prioritySupport', label: 'priority support' },
 ];
 
 function joinLabels(labels: string[]): string {
-  const text = labels.length <= 1 ? labels.join('') : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+  const text = labels.join(', ');
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
@@ -90,7 +96,8 @@ function joinLabels(labels: string[]): string {
 export function keyDifferences(tier: PlanTier, below: PlanTier | null): string[] {
   const lines: string[] = [];
   if (tier.limits.staffSeats !== undefined) lines.push(seatsLine(tier.limits.staffSeats));
-  if (tier.features.analytics) lines.push(ANALYTICS_LINE[tier.features.analytics]);
+  const analytics = analyticsLine(tier.features);
+  if (analytics) lines.push(analytics);
   if (tier.limits.aiCreditsPerMonth !== undefined) lines.push(aiLine(tier.limits.aiCreditsPerMonth));
   const unlocked = UNLOCK_LABELS
     .filter(({ key }) => tier.features[key] === true && (!below || below.features[key] !== true))
@@ -125,11 +132,12 @@ function flag(value: boolean | undefined): Cell {
 
 /** Every difference, one row each, in tier order (the "Compare all features" sheet). */
 export function compareRows(tiers: PlanTier[], commissionPercent: number | null): CompareRow[] {
-  const analytics = { basic: 'Basic', advanced: 'Advanced', full: 'Full + export' } as const;
+  const analytics = { basic: 'Basic', advanced: 'Advanced', full: 'Full' } as const;
+  const analyticsCell = (f: PlanTierFeatures): Cell => (f.analytics ? `${analytics[f.analytics]}${f.analyticsExport ? ' + export' : ''}` : HIDDEN);
   const candidates: { label: string; cells: Cell[] }[] = [
     { label: 'Active products', cells: tiers.map((t) => limitValue(t.limits.activeProducts)) },
     { label: 'Staff seats', cells: tiers.map((t) => limitValue(t.limits.staffSeats)) },
-    { label: 'Analytics', cells: tiers.map((t) => (t.features.analytics ? analytics[t.features.analytics] : HIDDEN)) },
+    { label: 'Analytics', cells: tiers.map((t) => analyticsCell(t.features)) },
     { label: 'AI credits a month', cells: tiers.map((t) => limitValue(t.limits.aiCreditsPerMonth)) },
     { label: 'Live selling', cells: tiers.map((t) => flag(t.features.liveSelling)) },
     { label: 'Drops and pre-orders with escrow', cells: tiers.map((t) => flag(t.features.dropsPreorders)) },

@@ -4,7 +4,7 @@
  * compareRows); a row the config doesn't define isn't shown.
  */
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BottomSheet, Icon } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { FONT, TEXT } from '@/lib/theme';
@@ -27,8 +27,10 @@ export function CompareFeaturesSheet({
 }) {
   const palette = useColors();
   const rows = compareRows(tiers, commissionPercent);
+  const { height } = Dimensions.get('window');
   return (
     <BottomSheet visible={visible} onClose={onClose} testID="plan-compare-sheet">
+      <View style={styles.body}>
       <Text accessibilityRole="header" style={[styles.title, { color: palette.foreground }]}>Compare all features</Text>
       <View style={[styles.row, styles.headRow, { borderBottomColor: palette.border }]}>
         <View style={styles.labelCol} />
@@ -36,7 +38,7 @@ export function CompareFeaturesSheet({
           <Text key={t.id} style={[styles.headCell, { color: palette.foreground }]}>{t.name}</Text>
         ))}
       </View>
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ maxHeight: Math.max(240, height * 0.55) }} showsVerticalScrollIndicator={false}>
         {rows.map((row) => (
           <View key={row.label} testID={`plan-compare-row-${row.label}`} style={[styles.row, { borderBottomColor: palette.border }]}>
             <Text style={[styles.labelCol, styles.label, { color: palette.mutedForeground }]}>{row.label}</Text>
@@ -48,13 +50,14 @@ export function CompareFeaturesSheet({
           </View>
         ))}
       </ScrollView>
+      </View>
     </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
   title: { ...TEXT.headline, marginBottom: SPACING.sm },
-  scroll: { maxHeight: 460 },
+  body: { paddingHorizontal: SPACING.md },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   headRow: { paddingTop: 0 },
   labelCol: { flex: 1.6, paddingRight: SPACING.xs },
