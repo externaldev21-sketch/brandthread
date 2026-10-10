@@ -26,6 +26,10 @@ export const STORE_SITE_THEMES: readonly StoreSiteTheme[] = [
 
 export const DEFAULT_STORE_SITE_THEME = "black";
 
+/** A QR code must stay dark-on-light to scan, whatever the app or site theme. */
+export const QR_LIGHT = "#FFFFFF";
+export const QR_DARK = "#000000";
+
 export type ButtonStyle = "rounded" | "square";
 export type StoreSiteFont = "system" | "serif" | "mono";
 

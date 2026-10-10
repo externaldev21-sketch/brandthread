@@ -35,15 +35,12 @@ import { displayStoreLink } from '@/lib/storeShare';
 import { SHARE_TARGETS, shareTargetUrls, type ShareTargetKey } from '@/lib/shareTargets';
 import { useIsWebShell, WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 import { RADII } from '@/constants/radii';
+import { FILL_ELEVATED } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { QR_DARK, QR_LIGHT } from '@/lib/storeSiteDesign';
 
 const QRCode = React.lazy(() => import('react-native-qrcode-svg'));
 
-// Solid sheet surface (BRANDTHREAD_DESIGN.md addendum: inputs and sheets #1C1C1E).
-const SHEET_BG = '#1C1C1E';
-const CIRCLE_BG = '#2C2C2E';
-const FG = '#FFFFFF';
-const SILVER = '#C0C0C0';
-const HAIRLINE = 'rgba(255,255,255,0.12)';
 
 const TARGET_ICON: Record<ShareTargetKey, { brand?: string; icon?: 'message-circle' | 'more-horizontal' }> = {
   messages: { icon: 'message-circle' },
@@ -76,6 +73,7 @@ interface ContentProps {
 
 /** The sheet's body; the /share-store page renders the same thing. */
 export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previewHeight = 248, active = true }: ContentProps) {
+  const { theme } = useAppTheme();
   const router = useRouter();
   const link = useStoreLink();
   const { site } = useStoreSite(active);
@@ -122,7 +120,7 @@ export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previe
     // No username, no link — never an invented one.
     return (
       <View style={s.noLink} testID="share-store-no-username">
-        <Text style={s.noLinkTitle}>Pick a username to get your store link</Text>
+        <Text style={[s.noLinkTitle, { color: theme.text }]}>Pick a username to get your store link</Text>
         <Button label="Set username" onPress={() => { onLeave?.(); router.push('/edit-profile' as never); }} fullWidth />
       </View>
     );
@@ -131,15 +129,15 @@ export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previe
     <View testID="share-store-content">
       {site ? (
         <View style={s.previewWrap}>
-          <View style={s.previewFrame}>
+          <View style={[s.previewFrame, { borderColor: theme.borderSubtle }]}>
             <StoreSiteThumbnail site={site} width={previewWidth} height={previewHeight} radius={14} maxProducts={4} testID="share-store-preview" />
           </View>
         </View>
       ) : <View style={{ height: previewHeight + 4 }} />}
 
       <Pressable onPress={copy} style={s.linkRow} accessibilityRole="button" accessibilityLabel={`Copy ${displayStoreLink(link.url)}`} testID="share-store-link">
-        <Text style={s.linkText} numberOfLines={1} ellipsizeMode="middle">{displayStoreLink(link.url)}</Text>
-        <Icon name="copy" size={15} color={SILVER} />
+        <Text style={[s.linkText, { color: theme.text }]} numberOfLines={1} ellipsizeMode="middle">{displayStoreLink(link.url)}</Text>
+        <Icon name="copy" size={15} color={theme.muted} />
       </Pressable>
 
       <Button label="Copy link" onPress={copy} fullWidth style={s.copyBtn} testID="share-store-copy" />
@@ -149,25 +147,25 @@ export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previe
           const ic = TARGET_ICON[t.key];
           return (
             <Pressable key={t.key} onPress={() => { void shareTo(t.key); }} style={s.target} accessibilityRole="button" accessibilityLabel={t.key === 'more' ? 'More sharing options' : `Share to ${t.label}`} testID={`share-store-target-${t.key}`}>
-              <View style={s.circle}>
+              <View style={[s.circle, { backgroundColor: theme.background }]}>
                 {ic.brand
-                  ? <FontAwesome6 name={ic.brand as never} brand size={22} color={FG} />
-                  : <Icon name={ic.icon!} size={22} color={FG} />}
+                  ? <FontAwesome6 name={ic.brand as never} brand size={22} color={theme.text} />
+                  : <Icon name={ic.icon!} size={22} color={theme.text} />}
               </View>
-              <Text style={s.targetLabel} numberOfLines={1}>{t.label}</Text>
+              <Text style={[s.targetLabel, { color: theme.muted }]} numberOfLines={1}>{t.label}</Text>
             </Pressable>
           );
         })}
       </ScrollView>
 
-      <View style={s.divider} />
+      <View style={[s.divider, { backgroundColor: theme.borderSubtle }]} />
       <ListRow icon="grid" title="QR code" chevron={!showQr} onPress={() => setShowQr((v) => !v)} testID="share-store-qr-row" />
       {showQr && (
         <View style={s.qrWrap} testID="share-store-qr">
-          <View style={s.qrTile} accessible accessibilityRole="image" accessibilityLabel="Store QR code">
+          <View style={[s.qrTile, { backgroundColor: QR_LIGHT }]} accessible accessibilityRole="image" accessibilityLabel="Store QR code">
             <React.Suspense fallback={<View style={{ width: 168, height: 168 }} />}>
-              {/* theme-exempt: a QR must stay dark-on-white to scan. */}
-              <QRCode value={link.url} size={168} backgroundColor="#FFFFFF" color="#000000" />
+              {/* A QR must stay dark-on-light to scan, whatever the app theme. */}
+              <QRCode value={link.url} size={168} backgroundColor={QR_LIGHT} color={QR_DARK} />
             </React.Suspense>
           </View>
           <Button label={link.saved ? 'Saved' : 'Save QR code'} variant="tertiary" onPress={() => { void link.saveQr(); }} testID="share-store-save-qr" />
@@ -179,11 +177,12 @@ export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previe
 
 /** Floating confirmation ("Link copied") shown at the top of the screen. */
 export function ShareStoreToast({ message, top }: { message: string | null; top: number }) {
+  const { theme } = useAppTheme();
   if (!message) return null;
   return (
-    <View style={[s.toast, { top }]} pointerEvents="none" accessibilityLiveRegion="polite" testID="share-store-toast">
-      <Icon name="check-circle" size={17} color={FG} />
-      <Text style={s.toastText}>{message}</Text>
+    <View style={[s.toast, { top, borderColor: theme.borderSubtle }]} pointerEvents="none" accessibilityLiveRegion="polite" testID="share-store-toast">
+      <Icon name="check-circle" size={17} color={theme.text} />
+      <Text style={[s.toastText, { color: theme.text }]}>{message}</Text>
     </View>
   );
 }
@@ -201,6 +200,7 @@ export function useToast(): [string | null, (message: string) => void] {
 }
 
 export function ShareStoreSheet({ visible, onClose, onClosed }: Props) {
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const isWebShell = useIsWebShell();
   const [toast, flash] = useToast();
@@ -210,7 +210,7 @@ export function ShareStoreSheet({ visible, onClose, onClosed }: Props) {
     <Modal visible={modalVisible} transparent animationType="none" onRequestClose={onClose} testID="share-store-sheet">
       <View style={s.root}>
         <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
-          <Pressable style={[StyleSheet.absoluteFill, s.backdrop]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
+          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: theme.background, opacity: 0.6 }]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
         </Animated.View>
         <GestureDetector gesture={panGesture}>
           <Animated.View
@@ -218,12 +218,12 @@ export function ShareStoreSheet({ visible, onClose, onClosed }: Props) {
             style={[s.sheet, isWebShell && s.sheetWeb, { paddingBottom: Math.max(insets.bottom, 16) }, sheetStyle]}
             accessibilityViewIsModal
           >
-            <View style={s.grabberWrap}><View style={s.grabber} /></View>
+            <View style={s.grabberWrap}><View style={[s.grabber, { backgroundColor: theme.subtle }]} /></View>
             <View style={s.header}>
               <View style={s.headerSide} />
-              <Text style={s.title} accessibilityRole="header">Share your store</Text>
-              <Pressable onPress={onClose} style={[s.headerSide, s.close]} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close" testID="share-store-close">
-                <Icon name="x" size={17} color={FG} />
+              <Text style={[s.title, { color: theme.text }]} accessibilityRole="header">Share your store</Text>
+              <Pressable onPress={onClose} style={[s.headerSide, s.close, { backgroundColor: theme.background }]} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close" testID="share-store-close">
+                <Icon name="x" size={17} color={theme.text} />
               </Pressable>
             </View>
             <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={s.body}>
@@ -238,34 +238,34 @@ export function ShareStoreSheet({ visible, onClose, onClosed }: Props) {
 }
 const s = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { backgroundColor: SHEET_BG, borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet, maxHeight: '92%' },
+  // Solid sheet surface (BRANDTHREAD_DESIGN.md addendum: inputs and sheets #1C1C1E).
+  sheet: { backgroundColor: FILL_ELEVATED, borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet, maxHeight: '92%' },
   sheetWeb: { width: '100%', maxWidth: WEB_SHELL_MAX_WIDTH, alignSelf: 'center' },
   grabberWrap: { alignItems: 'center', paddingTop: 6, paddingBottom: 2 },
-  grabber: { width: 36, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
+  grabber: { width: 36, height: 5, borderRadius: 3, opacity: 0.5 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 44 },
   headerSide: { width: 30, height: 30 },
-  close: { borderRadius: 15, backgroundColor: CIRCLE_BG, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, textAlign: 'center', color: FG, fontSize: 17, fontWeight: '600' },
+  close: { borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  title: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600' },
   body: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   previewWrap: { alignItems: 'center' },
-  previewFrame: { borderRadius: 16, borderWidth: 1, borderColor: HAIRLINE, padding: 1 },
+  previewFrame: { borderRadius: 16, borderWidth: 1, padding: 1 },
   linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: 12, paddingHorizontal: 8 },
-  linkText: { color: FG, fontSize: 17, fontWeight: '600', flexShrink: 1 },
+  linkText: { fontSize: 17, fontWeight: '600', flexShrink: 1 },
   copyBtn: { marginTop: 8 },
   targetsScroll: { marginTop: 20, marginHorizontal: -16 },
   targets: { paddingHorizontal: 12, gap: 4 },
   target: { width: 68, alignItems: 'center' },
-  circle: { width: 56, height: 56, borderRadius: 28, backgroundColor: CIRCLE_BG, alignItems: 'center', justifyContent: 'center' },
-  targetLabel: { color: SILVER, fontSize: 12, marginTop: 6 },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: HAIRLINE, marginTop: 20, marginBottom: 4 },
+  circle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  targetLabel: { fontSize: 12, marginTop: 6 },
+  divider: { height: StyleSheet.hairlineWidth, marginTop: 20, marginBottom: 4 },
   qrWrap: { alignItems: 'center', paddingVertical: 12, gap: 4 },
-  qrTile: { padding: 12, backgroundColor: '#FFFFFF', borderRadius: 12 },
+  qrTile: { padding: 12, borderRadius: 12 },
   noLink: { paddingVertical: 24, gap: 16 },
-  noLinkTitle: { color: FG, fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  noLinkTitle: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
   toast: {
     position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: CIRCLE_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
+    backgroundColor: FILL_ELEVATED, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
   },
-  toastText: { color: FG, fontSize: 15, fontWeight: '600' },
+  toastText: { fontSize: 15, fontWeight: '600' },
 });

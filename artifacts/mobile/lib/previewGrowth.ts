@@ -5,7 +5,6 @@
  */
 import { isPreviewDemoMode } from './devPreview';
 import { PREVIEW_SELLER_IDENTITY } from './previewIdentity';
-import { getPreviewSellerProducts } from './previewSellerProducts';
 import type {
   BioLink, BioPage, BioPageInput, BioStats, GrowthDestinations, LinkDetail, NewLinkInput, PixelIds, TrackedLink,
 } from '@/services/growthTypes';
@@ -65,6 +64,8 @@ export const previewGrowth = {
     // The one preview identity (lib/previewIdentity); demo=1 adds a bio,
     // socials, links and the preview catalog's products.
     const siteUrl = `https://brandthread.app/@${PREVIEW_SELLER_IDENTITY.username}`;
+    // Loaded lazily: the preview catalog pulls in bundled images (expo-asset).
+    const catalog = demo() ? (await import('./previewSellerProducts')).getPreviewSellerProducts() : [];
     return (bio ??= {
       exists: false, slug: null, url: siteUrl, published: true,
       displayName: PREVIEW_SELLER_IDENTITY.brandName, bio: demo() ? PREVIEW_SELLER_IDENTITY.bio : '', avatarUrl: null,
@@ -77,10 +78,10 @@ export const previewGrowth = {
       ] : [],
       siteUrl, username: PREVIEW_SELLER_IDENTITY.username, logoUrl: null, bannerUrl: null, showBanner: true,
       siteTheme: 'black', buttonStyle: 'rounded', font: 'system',
-      products: demo() ? getPreviewSellerProducts().slice(0, 6).map((p) => ({
+      products: catalog.slice(0, 6).map((p) => ({
         id: p.id, name: p.name, image: p.media?.[0]?.uri ?? null,
         priceLabel: `$${((p.pricing?.priceCents ?? 0) / 100).toFixed(2)}`,
-      })) : [],
+      })),
     });
   },
   async saveBio(i: BioPageInput): Promise<BioPage> {
