@@ -20,6 +20,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ProductImportPreview } from '@/components/products/ProductImportPreview';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
+import { createdProductIds, publishProducts } from '@/lib/bulkPublish';
 
 function methodIcon(method: string): IconName {
   if (method === 'CSV') return 'file-text';
@@ -59,6 +60,8 @@ export default function ProductImportScreen() {
   const [runs, setRuns] = useState<ImportRun[]>([]);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [result, setResult] = useState<ImportCommitResult | null>(null);
+  const [published, setPublished] = useState<number | null>(null);
+  const [publishingImport, setPublishingImport] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -100,6 +103,21 @@ export default function ProductImportScreen() {
     }
   }
 
+  // "Publish N products" on the import result: the drafts it created go live.
+  async function publishCreated() {
+    if (!result || publishingImport) return;
+    setPublishingImport(true);
+    setReviewError(null);
+    try {
+      const { published: n, alreadyLive } = await publishProducts(api, createdProductIds(result.results));
+      setPublished(n + alreadyLive);
+    } catch (error) {
+      setReviewError(messageOf(error));
+    } finally {
+      setPublishingImport(false);
+    }
+  }
+
   async function commitReview() {
     if (!pending) return;
     setReviewBusy(true);
@@ -109,6 +127,7 @@ export default function ProductImportScreen() {
         ? await api.productImport.commitCsv(pending.text, pending.filename)
         : await api.productImport.etsyCommit();
       setResult(res);
+      setPublished(null);
       void loadProviders();
     } catch (error) {
       setReviewError(messageOf(error));
@@ -445,6 +464,9 @@ export default function ProductImportScreen() {
         onClose={() => setReviewOpen(false)}
         onCommit={() => { void commitReview(); }}
         onViewProducts={() => { setReviewOpen(false); router.push('/(tabs)/products' as never); }}
+        onPublishCreated={() => { void publishCreated(); }}
+        publishing={publishingImport}
+        published={published}
       />
     </View>
   );

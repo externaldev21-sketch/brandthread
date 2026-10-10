@@ -21,6 +21,7 @@ import { recordDelivery } from "../lib/delivery/deliveryState";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { capApplicationFee, checkoutFeeBasis } from "../lib/money/loyaltyFunding";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
+import { flatRateShipping } from "../lib/defaultShipping";
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import { notifyBuyerOrderCancelled, notifySellerOrderCancelledByBuyer } from "../lib/orderNotifications";
 import { withItemProductIds } from "../lib/orderItemProducts";
@@ -1008,11 +1009,8 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         .from(shippingRates)
         .where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true)))
         .limit(1);
-      shippingCents = !configuredShippingRate ||
-        (configuredShippingRate.freeAboveCents != null && afterBundlesCents >= configuredShippingRate.freeAboveCents)
-        ? 0
-        : configuredShippingRate.flatRateCents;
-      shippingLineName = configuredShippingRate?.name ?? "Shipping";
+      // No rate configured → the standard rate (lib/defaultShipping.ts), not free.
+      ({ cents: shippingCents, name: shippingLineName } = flatRateShipping(configuredShippingRate, afterBundlesCents));
     }
     if (shippingCents > 0) {
       lineItems.push({

@@ -33,8 +33,9 @@ router.get("/", async (req, res): Promise<void> => {
     }).from(users).where(eq(users.clerkId, clerkId)).limit(1),
     db.select({ status: storefronts.status }).from(storefronts)
       .where(eq(storefronts.ownerId, clerkId)).limit(1),
+    // Only products buyers can see count (drafts and archived don't).
     db.select({ n: sql<number>`count(*)::int` }).from(products)
-      .where(and(eq(products.ownerId, clerkId), isNull(products.deletedAt))),
+      .where(and(eq(products.ownerId, clerkId), eq(products.status, "active"), isNull(products.deletedAt))),
     db.select({ n: sql<number>`count(*)::int` }).from(shippingZones)
       .where(eq(shippingZones.sellerId, clerkId)),
     db.select({ n: sql<number>`count(*)::int` }).from(shippingRates)
