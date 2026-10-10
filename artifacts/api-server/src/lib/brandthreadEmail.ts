@@ -431,6 +431,33 @@ export async function sendPayoutEmail(options: {
   });
 }
 
+export async function sendReviewRequestEmail(options: {
+  to: string;
+  orderId: string;
+  orderNumber: string;
+  productName?: string | null;
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const what = options.productName?.trim() || `order ${options.orderNumber}`;
+  const html = renderBrandthreadEmail({
+    preheader: `Rate ${what}.`,
+    eyebrow: "Your review",
+    title: "How was your order?",
+    subtitle: `Rate ${what} and help other shoppers decide.`,
+    bodyHtml: "",
+    cta: {
+      label: "Leave a review",
+      url: `https://brandthread.app/buyer-order-detail?id=${encodeURIComponent(options.orderId)}&review=1`,
+    },
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `How was your Brandthread order ${options.orderNumber}?`,
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
 export async function sendAbandonedCartEmail(options: {
   to: string;
   items: EmailLineItem[];

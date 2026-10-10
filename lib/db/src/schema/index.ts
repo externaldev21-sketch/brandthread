@@ -2629,3 +2629,4 @@ export * from './comments';
 export * from './hashtags';
 export * from './captions';
 export * from './places';
+export * from './reviewRequests';
