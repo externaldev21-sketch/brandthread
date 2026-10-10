@@ -33,17 +33,23 @@ describe('step order', () => {
     expect(BUYER_STEPS.slice(-3)).toEqual(['STYLE', 'SIZES', 'BRANDS']);
   });
 
-  it('seller follows Shopify: questions and location before the account, store preview last', () => {
+  it('seller follows Shopify: questions and location before the account, store preview, then plan', () => {
     expect(stepsFor('seller', signedOutEmail)).toEqual([
       'WELCOME', 'ACCOUNT_TYPE', 'STAGE', 'GOALS', 'LOCATION',
       'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
-      'NAME', 'BRAND_NAME', 'USERNAME', 'BUILDING',
+      'NAME', 'BRAND_NAME', 'USERNAME', 'BUILDING', 'PLAN',
     ]);
   });
 
-  it('has no payout, plan or notification step during sign-up', () => {
+  it('the plan comes right after the store preview, and only sellers see it', () => {
+    expect(SELLER_STEPS.indexOf('PLAN')).toBe(SELLER_STEPS.indexOf('BUILDING') + 1);
+    expect(BUYER_STEPS).not.toContain('PLAN');
+    expect(isStepSkippable('PLAN')).toBe(false);
+  });
+
+  it('has no payout or notification step during sign-up', () => {
     for (const id of [...BUYER_STEPS, ...SELLER_STEPS] as string[]) {
-      expect(['PAYOUTS', 'PLAN', 'NOTIFICATIONS']).not.toContain(id);
+      expect(['PAYOUTS', 'NOTIFICATIONS']).not.toContain(id);
     }
   });
 
@@ -96,7 +102,7 @@ describe('navigation', () => {
     expect(a).toBeGreaterThan(0);
     expect(b).toBeGreaterThan(a);
     expect(c).toBeGreaterThan(b);
-    expect(progressFraction('seller', 'BUILDING', signedOutEmail)).toBe(1);
+    expect(progressFraction('seller', 'PLAN', signedOutEmail)).toBe(1);
   });
 });
 
@@ -118,7 +124,8 @@ describe('draft migration', () => {
     // v8 seller: 4 BrandName, 5 BrandStage, 6 Goals, 7 Plan … 10 Success
     expect(restoreDraftStepId('seller', { version: 8, step: 4 })).toBe('BRAND_NAME');
     expect(restoreDraftStepId('seller', { version: 8, step: 5 })).toBe('STAGE');
-    expect(restoreDraftStepId('seller', { version: 8, step: 7 })).toBe('BUILDING');
+    expect(restoreDraftStepId('seller', { version: 8, step: 7 })).toBe('PLAN');
+    expect(restoreDraftStepId('seller', { version: 8, step: 9 })).toBe('BUILDING');
   });
 
   it('v7 and older drafts still migrate (v7 buyer Brands was index 5)', () => {

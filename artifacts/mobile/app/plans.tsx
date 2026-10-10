@@ -7,7 +7,8 @@
  *   Pro     $199/mo  — everything in Growth + unlimited team, advanced analytics, white-glove
  *
  * Platform commission on sales depends on the plan (GET /seller/subscription/perks).
- * Every new subscription starts with a 5-day free trial (card required upfront).
+ * Every new subscription starts with a free trial (card required upfront); its
+ * length comes from the shared plan config (lib/sellerPlanConfig.ts, 7 days).
  *
  * The recommended tier is personalized based on the seller's brand-stage answer from onboarding.
  *
@@ -59,6 +60,7 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { track } from '@/lib/analytics';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
 import { displayPriceFor } from '@/lib/sellerPlansDisplay';
+import { useSellerPlanConfig } from '@/lib/sellerPlanConfig';
 import { commissionSummary, wantsProHighlight, DEMO_PERKS, type PerksResponse } from '@/lib/proPerks';
 import { isPreviewDemoMode, isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
@@ -117,6 +119,7 @@ export default function PlansScreen() {
   }, []);
   const { currentRole } = useTeamRole();
   const { available: revenueCatAvailable, packages, purchase, restore } = useRevenueCat();
+  const { trialDays } = useSellerPlanConfig();
 
   const [loadingId,         setLoadingId]         = useState<string | null>(null);
   const [awaitingReturn,    setAwaitingReturn]    = useState(false);
@@ -216,7 +219,7 @@ export default function PlansScreen() {
               } else {
                 setCurrentPlanId(status.plan ?? null);
                 setAwaitingReturn(false);
-                Alert.alert('Plan updated', `You're now on the ${capitalize(status.plan)} plan — enjoy your 5-day free trial!`);
+                Alert.alert('Plan updated', `You're now on the ${capitalize(status.plan)} plan — enjoy your ${trialDays}-day free trial.`);
               }
               return;
             }
@@ -559,6 +562,7 @@ export default function PlansScreen() {
         getPricing={getPricing}
         selectedPlan={selectedPlan}
         hasRealTrialOffer={hasRealTrialOffer}
+        trialDays={trialDays}
         onStartTrial={handleExitDrawerStartTrial}
         loading={loadingId === selectedPlan.id}
         ctaDisabled={selectedCtaDisabled}

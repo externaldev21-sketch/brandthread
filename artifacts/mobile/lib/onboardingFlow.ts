@@ -9,8 +9,9 @@
  *  - SELLER copies Shopify's onboarding
  *    (https://mobbin.com/flows/5d834cad-e1a4-4893-a1bf-e50ac56090ab):
  *    question screens (stage, goals) → location → the same account fields,
- *    one per screen → brand name → username → "Building your store" preview.
- *    Plan, trial and payouts happen later from the seller dashboard.
+ *    one per screen → brand name → username → "Building your store" preview
+ *    → plan + free trial (value before plan; no way into seller tools without
+ *    a trial or a paid plan). Payouts happen later from the dashboard.
  *
  * Steps are addressed by id, not index. Which account steps appear depends on
  * how the person signs up (email adds CODE + PASSWORD; Apple/Google skip
@@ -45,7 +46,8 @@ export type StepId =
   | 'SIZES'
   | 'BRANDS'
   // seller finish
-  | 'BUILDING';
+  | 'BUILDING'
+  | 'PLAN';
 
 /** Steps that exist only before the account is created. */
 export const ACCOUNT_STEPS: readonly StepId[] = ['EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS'];
@@ -64,7 +66,7 @@ export const SELLER_STEPS: readonly StepId[] = [
   'STAGE', 'GOALS', 'LOCATION',
   'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
   'NAME', 'BRAND_NAME', 'USERNAME',
-  'BUILDING',
+  'BUILDING', 'PLAN',
 ];
 
 /** Steps the person may pass without answering (Shopify "Skip", Instagram "Skip"). */
@@ -184,8 +186,9 @@ export function restoreDraftStepId(
   const version = typeof draft.version === 'number' ? draft.version : undefined;
   const v8Index = restoreLegacyDraftStep(flow, index, version);
   const v8Id = (flow === 'buyer' ? V8_BUYER : V8_SELLER)[v8Index] ?? 'ACCOUNT_TYPE';
-  // Old finishing screens (loading, notifications, success, plan) resume on
-  // the last real question of the new flow.
+  // Old finishing screens (loading, notifications, success) resume on the
+  // last real step of the new flow; the old plan step maps to the new one.
+  if (v8Id === 'PLAN') return 'PLAN';
   return V8_TO_V9[v8Id] ?? (flow === 'buyer' ? 'BRANDS' : 'BUILDING');
 }
 

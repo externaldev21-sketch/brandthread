@@ -37,6 +37,9 @@ export function createFakeOnboardingApi({ demo = false } = {}) {
   /** @type {any} */
   let dbUser = null;
   const calls = [];
+  // Becomes 'trialing' once a checkout session is opened (Stripe would do
+  // this through its webhook after the card is added).
+  let subscriptionStatus = 'none';
 
   function ensureUser(name, clerkId) {
     if (!dbUser) {
@@ -177,8 +180,19 @@ export function createFakeOnboardingApi({ demo = false } = {}) {
     }
     if (get && p === '/orders') return { status: 200, body: [] };
     if (get && p === '/conversations') return { status: 200, body: [] };
+    if (p === '/seller/subscription/checkout' && method === 'POST') {
+      subscriptionStatus = 'trialing';
+      const user = ensureUser();
+      user.subscriptionPlanId = body?.planId ?? null;
+      return { status: 200, body: { url: 'https://checkout.stripe.test/c/pay/stub' } };
+    }
+    if (get && p === '/config/seller-plans') {
+      return { status: 200, body: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', plans: [
+        { id: 'starter', amountCents: 2900, interval: 'month' }, { id: 'growth', amountCents: 7900, interval: 'month' }, { id: 'pro', amountCents: 19900, interval: 'month' },
+      ] } };
+    }
     if (get && p === '/seller/subscription/status') {
-      return { status: 200, body: { plan: 'starter', status: 'trialing', trialEnd: null, trialStartAt: null, trialEndAt: null, trialBanner: null, renewsOn: null, amountCents: 0, paymentMethodLabel: null, effectiveProvider: 'stripe' } };
+      return { status: 200, body: { plan: dbUser?.subscriptionPlanId ?? 'starter', status: subscriptionStatus, trialEnd: null, trialStartAt: null, trialEndAt: null, trialBanner: null, renewsOn: null, amountCents: 0, paymentMethodLabel: null, effectiveProvider: 'stripe' } };
     }
     if (get && p === '/team/context') return { status: 200, body: { role: 'owner', storeOwnerId: dbUser?.clerkId ?? null, teamMembershipId: null } };
     if (get && p === '/team/my-memberships') return { status: 200, body: { memberships: [] } };

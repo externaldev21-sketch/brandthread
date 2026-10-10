@@ -285,7 +285,7 @@ export function BuildingStoreStep({
       </ScrollView>
       {!building && !buildError ? (
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
-          <Button label="Go to dashboard" onPress={onDone} loading={finishing} disabled={generating} fullWidth testID="onboarding-building-done" />
+          <Button label="Next" onPress={onDone} loading={finishing} disabled={generating} fullWidth testID="onboarding-building-done" />
         </View>
       ) : null}
     </View>
