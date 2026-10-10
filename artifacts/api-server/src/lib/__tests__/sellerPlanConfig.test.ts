@@ -59,6 +59,9 @@ describe("shared seller plan config", () => {
       ["growth", "Growth", 50, 3],
       ["pro", "Pro", null, null],
     ]);
+    // The commission shown is the one checkout charges (lib/planPerks.ts).
+    const { platformFeeBpsForPlan } = await import("../planPerks");
+    for (const p of cfg.plans) expect(p.commissionPercent).toBe(platformFeeBpsForPlan(p.id) / 100);
   });
 
   it("tier gates follow Dev's spec", async () => {
@@ -123,7 +126,7 @@ describe("shared seller plan config", () => {
   it("Stripe Checkout uses the shared trial length", async () => {
     const { readFileSync } = await import("node:fs");
     const route = readFileSync(new URL("../../routes/subscription.ts", import.meta.url), "utf8");
-    expect(route).toContain("trial_period_days: TRIAL_DAYS,");
+    expect(route).toContain("trial_period_days: TRIAL_DAYS }");
     expect(route).not.toContain("trial_period_days: 5");
   });
 });

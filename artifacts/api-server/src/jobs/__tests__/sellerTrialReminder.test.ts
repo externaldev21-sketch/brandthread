@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTrialReminderMessage,
+  currentTrialOf,
   isDayFourOfFive,
+  nativeTrialWindow,
   isPendingTrialReminderDeliverable,
   isReminderWindowOpen,
   isTrialReminderDay,
@@ -30,21 +32,16 @@ describe("seller trial reminder day", () => {
     expect(isReminderWindowOpen(start, end, new Date("2026-01-05T12:00:00.000Z"))).toBe(true);
   });
 
-  it("uses measured usage when available and truthful plan entitlements otherwise", () => {
-    const used = buildTrialReminderMessage({
-      productsUsed: 3,
-      ordersUsed: 7,
-      plan: "growth",
-      trialEndsAt: end,
-    });
-    expect(used.body).toContain("3 products");
-    expect(used.body).toContain("7 orders");
-    expect(used.body).toContain("unlimited products");
-    expect(used.title).toContain("Jan 6, 2026");
+  it("says what is charged and when, and that cancelling before then costs nothing", () => {
+    const used = buildTrialReminderMessage({ productsUsed: 3, ordersUsed: 7, plan: "growth", trialEndsAt: end });
+    expect(used.title).toBe("Your free trial ends Jan 6");
+    expect(used.body).toBe("You've built 3 products and 7 orders so far. Your Growth plan starts on Jan 6 at $49/month. Cancel anytime before then and you won't be charged.");
+    expect(used.entitledFeatures).toContain("up to 50 live products");
 
-    const entitled = buildTrialReminderMessage({ plan: "starter", trialEndsAt: end });
-    expect(entitled.body).toContain("up to 25 products");
-    expect(entitled.body).not.toContain("already built");
+    const fresh = buildTrialReminderMessage({ plan: "starter", trialEndsAt: end });
+    expect(fresh.body).toBe("Your Starter plan starts on Jan 6 at $19.99/month. Cancel anytime before then and you won't be charged.");
+    expect(fresh.entitledFeatures).toContain("up to 10 live products");
+    expect(buildTrialReminderMessage({ plan: "pro", trialEndsAt: end }).entitledFeatures).toContain("unlimited products");
   });
 
   it("drains a late day-four failure on day five but suppresses cancelled or opted-out trials", () => {
@@ -59,5 +56,31 @@ describe("seller trial reminder day", () => {
     expect(isPendingTrialReminderDeliverable({ ...base, sellerStatus: "trialing" })).toBe(true);
     expect(isPendingTrialReminderDeliverable({ ...base, sellerStatus: "canceled" })).toBe(false);
     expect(isPendingTrialReminderDeliverable({ ...base, sellerStatus: "trialing", subscriptionPreference: false })).toBe(false);
+    // Cancelled during the trial: it won't be charged, so no reminder.
+    expect(isPendingTrialReminderDeliverable({ ...base, sellerStatus: "trialing", cancelAtPeriodEnd: true })).toBe(false);
+  });
+
+  it("covers App Store / Play trials: window from the trial end, store link to cancel", () => {
+    expect(nativeTrialWindow({ trialEndsAt: end7, expiresAt: null })).toEqual({ start: start7, end: end7 });
+    expect(nativeTrialWindow({ trialEndsAt: null, expiresAt: null })).toBeNull();
+
+    const apple = currentTrialOf({
+      stripeStatus: "canceled", stripeTrialStartedAt: null, stripeTrialEndsAt: null, stripeCancelAtPeriodEnd: false,
+      native: { status: "trial", trialEndsAt: end7, expiresAt: end7, providerData: { items: [{ store: "app_store", auto_renewal_status: "will_renew" }] } },
+    });
+    expect(apple).toMatchObject({ status: "trialing", start: start7, end: end7, cancelAtPeriodEnd: false, manageUrl: "https://apps.apple.com/account/subscriptions" });
+    expect(isTrialReminderDay(apple.start!, apple.end!, new Date("2026-01-05T12:00:00.000Z"))).toBe(true);
+
+    const cancelledInStore = currentTrialOf({
+      stripeStatus: null, stripeTrialStartedAt: null, stripeTrialEndsAt: null, stripeCancelAtPeriodEnd: null,
+      native: { status: "trial", trialEndsAt: end7, expiresAt: end7, providerData: { items: [{ store: "play_store", auto_renewal_status: "will_not_renew" }] } },
+    });
+    expect(cancelledInStore.cancelAtPeriodEnd).toBe(true);
+
+    const web = currentTrialOf({
+      stripeStatus: "trialing", stripeTrialStartedAt: start7, stripeTrialEndsAt: end7, stripeCancelAtPeriodEnd: true, native: null,
+    });
+    expect(web).toMatchObject({ status: "trialing", cancelAtPeriodEnd: true });
+    expect(web.manageUrl).toMatch(/\/subscription$/);
   });
 });

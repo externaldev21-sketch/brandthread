@@ -2928,6 +2928,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           /** True after an in-app cancel: the plan ends on renewsOn. */
           cancelAtPeriodEnd?: boolean;
           effectiveProvider: 'stripe' | 'revenuecat' | 'none';
+          /** Cancelled: nothing more is charged; access runs until accessEndsAt. */
+          cancelAtPeriodEnd?: boolean;
+          accessEndsAt?: string | null;
+          /** Where to manage / cancel: the store page for an in-app purchase. */
+          manageUrl?: string | null;
+          /** Whether checkout would include the free trial (one per person, device and card). */
+          trialEligible?: boolean;
         }>('/api/seller/subscription/status'),
         /** What each plan includes (price, commission, AI credits, advanced analytics) plus the caller's plan. */
         perks: () => get<import('./proPerks').PerksResponse>('/api/seller/subscription/perks'),
@@ -2957,7 +2964,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           post<{ url: string }>('/api/seller/subscription/portal', {}),
         /** Cancel at the end of the paid period (Stripe plans only). */
         cancel: (feedback?: { reason?: string; comment?: string }) =>
-          post<{ status: string; cancelAtPeriodEnd: boolean; endsAt: string | null }>('/api/seller/subscription/cancel', feedback ?? {}),
+          post<{ status: string; cancelAtPeriodEnd: boolean; endsAt: string | null; inTrial: boolean; accessEndsAt: string | null }>('/api/seller/subscription/cancel', feedback ?? {}),
         /** Undo a pending cancellation. */
         resume: () =>
           post<{ status: string; cancelAtPeriodEnd: boolean; endsAt: string | null }>('/api/seller/subscription/resume', {}),
