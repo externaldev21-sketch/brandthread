@@ -17,6 +17,8 @@ const GUEST_TOP_LEVEL = new Set([
   'buyer-product-detail',
   'bundle-detail',
   'thread-product-detail', // alias of buyer-product-detail (feed/search/discover tiles)
+  'buyer-category', // public: api.publicDiscovery.categoryProducts
+  'buyer-trending', // public: api.publicDiscovery.trendingProducts / trendingBrands
   'buyer-checkout', // guest checkout exists (api.guest.checkout)
   'thread-checkout', // alias of buyer-checkout (cart + Shop sheet "Buy now")
   'checkout-return', // Stripe hosted Checkout's return page

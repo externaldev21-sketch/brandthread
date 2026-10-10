@@ -29,6 +29,15 @@ function targetResponse(identifier: string, data: Record<string, unknown>) {
 }
 
 describe('notification response navigation', () => {
+  it('opens the review sheet for a post-delivery review request', () => {
+    const router = { push: vi.fn() };
+    const handle = createNotificationResponseHandler(router);
+    handle(targetResponse('rr-1', { type: 'review_request', targetType: 'buyer_order', targetId: 'o 1' }));
+    handle(targetResponse('od-1', { type: 'order_delivered', targetType: 'order', targetId: 'o2' }));
+    expect(router.push).toHaveBeenNthCalledWith(1, '/buyer-order-detail?id=o%201&review=1');
+    expect(router.push).toHaveBeenNthCalledWith(2, '/buyer-order-detail?id=o2');
+  });
+
   it('routes both warm and cold taps to Subscription only once', () => {
     const router = { push: vi.fn() };
     const handledResponseIds = new Set<string>();

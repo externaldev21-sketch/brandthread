@@ -6,7 +6,7 @@ describe('guest browse routes (5.1.1(v))', () => {
   it('lets a guest open feed, discover, search, stores, products, drops and profiles', () => {
     for (const segs of [
       ['(buyer)'], ['(buyer)', 'index'], ['(buyer)', 'feed'], ['(buyer)', 'discover'], ['(buyer)', 'search'], ['(buyer)', 'cart'],
-      ['buyer-product-detail'], ['seller-profile'], ['store', 'product', '[productId]'], ['drops', '[dropId]'], ['u', '[username]'], ['c', '[collectionId]'],
+      ['buyer-product-detail'], ['thread-product-detail'], ['buyer-category'], ['buyer-trending'], ['seller-profile'], ['store', 'product', '[productId]'], ['drops', '[dropId]'], ['u', '[username]'], ['c', '[collectionId]'],
     ]) {
       expect(isGuestBrowseRoute(segs)).toBe(true);
     }

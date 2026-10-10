@@ -1,5 +1,5 @@
 import type * as Notifications from 'expo-notifications';
-import { activityHref, isBuyerOrderNotification } from './activity';
+import { activityHref, buyerOrderHref, isBuyerOrderNotification } from './activity';
 import { signalIncomingCall } from './calls/incomingCallSignal';
 
 export type NotificationRouter = {
