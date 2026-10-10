@@ -1,0 +1,65 @@
+[
+  {
+    "name": "buyer-settings-demo",
+    "target": "/buyer-settings",
+    "landed": "/buyer-settings?bt_preview=buyer&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "buyer-settings-fresh",
+    "target": "/buyer-settings",
+    "landed": "/buyer-settings?bt_preview=buyer",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "buyer-profile-menu-tap",
+    "target": "/profile",
+    "landed": "/buyer-settings",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-buyer-settings-menu",
+    "target": "/buyer-settings-menu",
+    "landed": "/buyer-settings?bt_preview=buyer&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-buyer-login-activity",
+    "target": "/buyer-login-activity",
+    "landed": "/login-activity?bt_preview=buyer",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "seller-settings-demo",
+    "target": "/seller-settings",
+    "landed": "/seller-settings?bt_preview=seller&demo=1",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "seller-settings-fresh",
+    "target": "/seller-settings",
+    "landed": "/seller-settings?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "redirect-customer-events",
+    "target": "/customer-events",
+    "landed": "/store-pixels?bt_preview=seller",
+    "ok": true,
+    "notFound": false
+  },
+  {
+    "name": "settings-role-redirect-buyer",
+    "target": "/settings",
+    "landed": "/buyer-settings",
+    "ok": true,
+    "notFound": false
+  }
+]

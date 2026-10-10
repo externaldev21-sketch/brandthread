@@ -10,7 +10,6 @@ describe('root Stack registration', () => {
     expect(names.length).toBeGreaterThan(0);
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
     expect(duplicates).toEqual([]);
-    expect(names).toContain('analytics-advanced');
-    expect(names).toContain('analytics-cohorts');
+    expect(names).toContain('analytics-reports');
   });
 });

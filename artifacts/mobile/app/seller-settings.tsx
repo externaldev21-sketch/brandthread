@@ -27,7 +27,7 @@ import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
-import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
+import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem, settingsGroupsFor } from '@/services/settingsCatalog';
 import { ConfirmSheet } from '@/components/settings/SettingsKit';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -75,21 +75,11 @@ export default function SellerSettingsScreen() {
   const profileInitials = getInitials(profileName, 'BT');
   const tabBarInset = useTabBarMetrics(2).occupiedHeight;
 
-  const groups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const visible = SELLER_SETTINGS_CATALOG
-      .map((group) => ({ ...group, items: group.items.filter((item) => !item.requiresModerator || isModerator) }))
-      .filter((group) => group.items.length > 0);
-    if (!q) return visible;
-    return visible
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) =>
-          `${item.label} ${item.description} ${item.aliases.join(' ')}`.toLowerCase().includes(q),
-        ),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [query, isModerator]);
+  // Search-only rows (one level down, e.g. Compare plans) appear only when searching.
+  const groups = useMemo(
+    () => settingsGroupsFor(SELLER_SETTINGS_CATALOG, query, (item) => !item.requiresModerator || isModerator),
+    [query, isModerator],
+  );
 
   async function openAccountScope() {
     setScopeVisible(true);

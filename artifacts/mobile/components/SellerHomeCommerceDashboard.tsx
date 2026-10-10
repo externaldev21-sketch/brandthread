@@ -940,8 +940,8 @@ export default function SellerHomeCommerceDashboard({
                     periodLabel={range !== 'all' ? PERIOD_LABEL[range] : null}
                     trafficSources={data.trafficSources}
                     theme={theme}
-                    onSeeAll={() => nav('/analytics-store')}
-                    onOpenSource={() => nav('/analytics-store')}
+                    onSeeAll={() => nav('/(tabs)/analytics')}
+                    onOpenSource={() => nav('/(tabs)/analytics')}
                     onShareStore={() => nav('/share-store')}
                   />
                 </View>
