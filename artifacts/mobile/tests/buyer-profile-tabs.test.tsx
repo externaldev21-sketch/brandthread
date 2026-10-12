@@ -125,6 +125,7 @@ vi.mock('react-native', () => {
       loop: () => ({ start: () => {}, stop: () => {} }),
     },
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
     AccessibilityInfo: {
       isReduceMotionEnabled: () => Promise.resolve(false),
       addEventListener: () => ({ remove: () => {} }),
@@ -234,6 +235,7 @@ vi.mock('@/services/socialService', () => ({
   archivePost: vi.fn(),
   deletePost: vi.fn(),
   subscribeSocial: subscribeSocialMock,
+  getNotesForTray: vi.fn(async () => []),
 }));
 
 vi.mock('@/lib/api', () => ({
@@ -738,19 +740,26 @@ describe('buyer profile — Instagram layout', () => {
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-cover-affordance')).toHaveLength(0);
   });
 
-  it('plays the profile video behind the identity and fades to the exact page background at the stats row', async () => {
-    apiMock.social.profile.mockResolvedValue({ followersCount: 7, followingCount: 3, coverVideoUrl: 'https://x/cover.mp4', coverPosterUrl: 'https://x/poster.jpg' });
-    renderer = await renderScreen();
-    await act(async () => {
-      renderer!.root.findByProps({ testID: 'profile-identity-stack' }).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
+  it('with a profile banner (the cover video) shows the TikTok banner header; the pencil opens Edit profile', async () => {
+    apiMock.social.profile.mockResolvedValue({
+      followersCount: 7, followingCount: 3, coverVideoUrl: 'https://x/cover.mp4', coverPosterUrl: 'https://x/poster.jpg',
+      profileBanner: { type: 'video', url: 'https://x/cover.mp4', posterUrl: 'https://x/poster.jpg', gifUrl: null },
     });
-    const hero = renderer.root.findByProps({ testID: 'profile-video-hero' });
-    expect(flat(hero.props.style)).toMatchObject({ position: 'absolute', top: 0, height: 320 });
-    const fade = renderer.root.findAll((node) => node.props.testID === 'profile-video-fade')[0];
-    const colors = fade.props.colors as string[];
-    expect(colors[0]).toBe('#07070F00');
-    expect(colors[colors.length - 1]).toBe('#07070F');
-    expect(flat(fade.props.style)).toMatchObject({ bottom: 0, height: 128 });
+    renderer = await renderScreen();
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-header')).not.toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-video')).not.toHaveLength(0);
+    // The Instagram video header is replaced, not stacked.
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-identity-stack')).toHaveLength(0);
+    await act(async () => { renderer!.root.findByProps({ testID: 'profile-banner-edit' }).props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
+  });
+
+  it('with no banner keeps today\'s header exactly (no banner header)', async () => {
+    apiMock.social.profile.mockResolvedValue({ followersCount: 7, followingCount: 3, coverVideoUrl: null, coverPosterUrl: null, profileBanner: null });
+    renderer = await renderScreen();
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-header')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-identity-stack')).not.toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-video-hero')).toHaveLength(0);
   });
 
   it('wires the highlights row: "New" opens the create form, a highlight opens itself in the manager', async () => {

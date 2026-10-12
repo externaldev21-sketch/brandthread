@@ -25,8 +25,9 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isBuyerDevPreview } from '@/lib/devPreview';
-import { CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia } from '@/components/profile/ProfileCover';
-import { COVER_MAX_SECONDS } from '@/components/profile/profileCoverRules';
+import { EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
 const BIO_MAX = 150;
@@ -132,10 +133,11 @@ export default function BuyerEditProfileScreen() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [genderPickerOpen, setGenderPickerOpen] = useState(false);
   const { open: openAvatarSheet, sheet: avatarSheet } = useImageSourceSheet();
-  // Profile video (the looping video behind the profile header) — the same
-  // pick → trim → upload flow the profile screen uses.
-  const [serverCover, setServerCover] = useState<CoverMedia>({ videoUrl: null, posterUrl: null });
-  const coverFlow = useProfileCover({ own: false, cover: serverCover, userId });
+  // Profile banner (TikTok): image or looping muted video, edited from the
+  // banner preview at the top of this screen.
+  const [serverBanner, setServerBanner] = useState<ProfileBanner | null>(null);
+  const shownBanner = useProfileBannerState({ server: serverBanner, ownerId: userId, own: true });
+  const bannerFlow = useProfileBanner({ banner: shownBanner, userId });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof CoreFields, string>>>({});
 
@@ -337,15 +339,15 @@ export default function BuyerEditProfileScreen() {
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
-  // Current profile video, so the entry reads "Add" vs "Change".
+  // Current profile banner for the preview at the top.
   useEffect(() => {
     if (!userId || preview) return;
     let alive = true;
     api.social.profile(userId)
       .then((data: any) => {
-        if (alive && data) setServerCover({ videoUrl: data.coverVideoUrl ?? null, posterUrl: data.coverPosterUrl ?? null });
+        if (alive && data) setServerBanner(resolveProfileBanner(data));
       })
-      .catch(() => { /* the entry still offers "Add profile video" */ });
+      .catch(() => { /* the preview stays empty; "Edit banner" still works */ });
     return () => { alive = false; };
   }, [api, preview, userId]);
 
@@ -512,9 +514,15 @@ export default function BuyerEditProfileScreen() {
         </Animated.View>
 
         <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
-          {/* Avatar */}
-          <View style={styles.avatarSection}>
-            <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={avatarUploading}>
+          {/* Banner (TikTok): preview + "Edit banner", avatar overlapping its bottom edge */}
+          <EditProfileBanner
+            banner={bannerFlow.banner}
+            busy={bannerFlow.busy}
+            onEditBanner={bannerFlow.openSheet}
+            onEditAvatar={pickAvatar}
+            avatarDisabled={avatarUploading}
+            avatarLabel={avatarUploading ? `Uploading… ${avatarProgress}%` : 'Edit photo or avatar'}
+            avatar={(
               <View style={styles.avatarWrap}>
                 <Avatar uri={avatarUri} name={fields.name} size={96} />
                 {avatarUploading && (
@@ -529,43 +537,16 @@ export default function BuyerEditProfileScreen() {
                   </View>
                 )}
               </View>
-            </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar} disabled={avatarUploading}>
-              <Text style={[styles.editPhotoLink, { color: theme.accentLight }]}>
-                {avatarUploading ? `Uploading… ${avatarProgress}%` : 'Change profile photo or video'}
-              </Text>
-            </TouchableOpacity>
-            {avatarError && (
-              <View style={styles.retryRow}>
-                <Text style={[styles.errorText, { color: theme.error }]}>{avatarError}</Text>
-                <TouchableOpacity onPress={pickAvatar}>
-                  <Text style={[styles.retryLink, { color: theme.accentLight }]}>Retry</Text>
-                </TouchableOpacity>
-              </View>
             )}
-          </View>
-
-          {/* Profile video */}
-          <View style={styles.coverSection}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={coverFlow.hasCover ? coverFlow.openManage : coverFlow.startAdd}
-              disabled={!!coverFlow.busy}
-              accessibilityRole="button"
-              testID="edit-profile-video"
-            >
-              <Text style={[styles.editPhotoLink, { color: theme.accentLight }]}>
-                {coverFlow.busy === 'uploading'
-                  ? 'Uploading profile video…'
-                  : coverFlow.busy === 'removing'
-                    ? 'Removing profile video…'
-                    : coverFlow.hasCover ? 'Change profile video' : 'Add profile video'}
-              </Text>
-            </TouchableOpacity>
-            <Text style={[styles.coverHint, { color: theme.muted }]}>
-              Up to {COVER_MAX_SECONDS} seconds. Plays muted on a loop behind your profile.
-            </Text>
-          </View>
+          />
+          {avatarError && (
+            <View style={[styles.retryRow, { alignSelf: 'center', paddingBottom: 12 }]}>
+              <Text style={[styles.errorText, { color: theme.error }]}>{avatarError}</Text>
+              <TouchableOpacity onPress={pickAvatar}>
+                <Text style={[styles.retryLink, { color: theme.accentLight }]}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Core fields */}
           <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -752,8 +733,7 @@ export default function BuyerEditProfileScreen() {
           onClose={() => setGenderPickerOpen(false)}
           theme={theme}
         />
-        <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
-        <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
+        {bannerFlow.sheet}
         {avatarSheet}
       </View>
     </KeyboardAvoidingView>
@@ -771,7 +751,6 @@ const styles = StyleSheet.create({
   rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
   rowInput: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', padding: 0, textAlign: 'right' },
   chevronLabel: { fontSize: 13.5, fontFamily: 'Inter_400Regular' },
-  avatarSection: { alignItems: 'center', paddingVertical: 20, gap: 10 },
   avatarWrap: { width: 96, height: 96, borderRadius: 48 },
   cameraBadge: {
     position: 'absolute', right: -2, bottom: -2, width: 30, height: 30, borderRadius: 15,
@@ -782,9 +761,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 4, // theme-exempt: scrim over avatar media
   },
   avatarOverlayText: { color: '#FFF', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  editPhotoLink: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  coverSection: { alignItems: 'center', gap: 4, paddingBottom: 12 },
-  coverHint: { fontSize: 12.5, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 20 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
   errorText: { fontSize: 12.5, fontFamily: 'Inter_400Regular' },
   retryLink: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold' },
