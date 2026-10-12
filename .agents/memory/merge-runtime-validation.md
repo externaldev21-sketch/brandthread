@@ -8,3 +8,9 @@ After resolving an upstream merge, check every tracked runtime source for confli
 **Why:** Typechecking passed while conflict markers remained in the separate JavaScript browser-hosting server. The runtime-server tests caught an error the TypeScript projects could not see.
 
 **How to apply:** Scan tracked JavaScript and TypeScript sources after all merges, syntax-check changed JavaScript entry points, and distinguish those results from mobile and API typechecks.
+
+Make failed validation stop a batch shell command before it can stage or commit.
+
+**Why:** A shell continued past a failing conflict-marker check and committed a partly resolved file; the overall command still reported success because its final command succeeded.
+
+**How to apply:** Use `set -e` or explicit success chaining for validation and commit commands. Check both unstaged and staged diffs, and inspect every conflict block rather than relying on truncated search output.
