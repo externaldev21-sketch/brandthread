@@ -1,9 +1,11 @@
 /**
- * Store setup — logo (1:1), banner (3:1) and a monochrome accent. Each image
- * is picked, framed in the shared MediaCropper (same pan/zoom crop used by
+ * Store setup — logo (1:1), banner and a monochrome accent. The logo is
+ * picked, framed in the shared MediaCropper (same pan/zoom crop used by
  * create post and products, with the zoom slider and wheel on web), then
- * uploaded through the existing /api/seller/profile/{logo,banner}/upload
- * endpoints. The accent is saved on Done via PUT /api/seller/profile/accent.
+ * uploaded through /api/seller/profile/logo/upload. The banner is the one
+ * profile banner (GIF or ≤10s video, also the storefront cover): the tile
+ * opens the same "Edit banner" sheet as Edit profile. The accent is saved on
+ * Done via PUT /api/seller/profile/accent.
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -28,6 +30,10 @@ import { MediaCropper } from '@/components/media/MediaCropper';
 import { useImageSourceSheet } from '@/components/profile/ImageSourceSheet';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { StoreSetupScreen } from '@/components/store-setup/StoreSetupScreen';
+import { useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+import { BannerMedia } from '@/components/profile/ProfileBannerHeader';
+import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
 type Slot = 'logo' | 'banner';
 
@@ -39,7 +45,7 @@ const SLOT_CONFIG: Record<Slot, { aspect: [number, number]; ratio: number; maxWi
 export default function StoreSetupBrandScreen() {
   const router = useRouter();
   const api = useApi();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const { theme } = useAppTheme();
   const topInset = useHeaderTopInset();
   const preview = isSellerDevPreview();
@@ -54,13 +60,18 @@ export default function StoreSetupBrandScreen() {
   const [crop, setCrop] = useState<{ slot: Slot; uri: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // One banner: the profile banner is the storefront cover.
+  const [serverBanner, setServerBanner] = useState<ProfileBanner | null>(null);
+  const shownBanner = useProfileBannerState({ server: serverBanner, ownerId: userId, own: true });
+  const bannerFlow = useProfileBanner({ banner: shownBanner, userId });
 
   useEffect(() => {
     if (preview) return;
     let cancelled = false;
     api.seller.getProfile().then((profile) => {
       if (cancelled) return;
-      setUris((prev) => ({ logo: prev.logo ?? profile.logoUrl ?? null, banner: prev.banner ?? profile.bannerUrl ?? null }));
+      setUris((prev) => ({ ...prev, logo: prev.logo ?? profile.logoUrl ?? null }));
+      setServerBanner(resolveProfileBanner(profile as any));
       setAccent(profile.storeAccentColor ?? null);
       setSavedAccent(profile.storeAccentColor ?? null);
     }).catch(() => {});
@@ -69,6 +80,7 @@ export default function StoreSetupBrandScreen() {
   }, []);
 
   async function pick(slot: Slot) {
+    if (slot === 'banner') { bannerFlow.openSheet(); return; }
     const asset = await openImageSheet({ aspect: SLOT_CONFIG[slot].aspect, skipNativeEdit: true });
     if (asset) setCrop({ slot, uri: asset.uri });
   }
@@ -102,7 +114,7 @@ export default function StoreSetupBrandScreen() {
     }
   }
 
-  const uploading = progress.logo !== null || progress.banner !== null;
+  const uploading = progress.logo !== null || !!bannerFlow.busy;
   const canFinish = !!uris.logo && !uploading && !saving;
 
   async function finish() {
@@ -123,23 +135,27 @@ export default function StoreSetupBrandScreen() {
   }
 
   function renderSlot(slot: Slot, label: string, emptyLabel: string, tileStyle: object) {
-    const uri = uris[slot];
-    const busy = progress[slot] !== null;
+    const isBanner = slot === 'banner';
+    const uri = isBanner ? null : uris[slot];
+    const busy = isBanner ? !!bannerFlow.busy : progress[slot] !== null;
+    const hasMedia = isBanner ? !!bannerFlow.banner : !!uri;
     return (
       <View style={styles.group}>
         <View style={styles.labelRow}>
           <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
-          {busy ? <Text style={[styles.meta, { color: theme.muted }]}>{`Uploading ${progress[slot]}%`}</Text> : null}
+          {busy && !isBanner ? <Text style={[styles.meta, { color: theme.muted }]}>{`Uploading ${progress[slot]}%`}</Text> : null}
         </View>
         <Pressable
           onPress={() => { hapticSelection(); void pick(slot); }}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel={uri ? `Change ${label.toLowerCase()}` : emptyLabel}
+          accessibilityLabel={hasMedia ? `Change ${label.toLowerCase()}` : emptyLabel}
           testID={`store-setup-${slot}`}
           style={[styles.tile, tileStyle, { borderColor: theme.border, backgroundColor: theme.background }]}
         >
-          {uri ? (
+          {isBanner && bannerFlow.banner ? (
+            <BannerMedia banner={bannerFlow.banner} active posterOnly={false} height={120} />
+          ) : uri ? (
             <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={styles.empty}>
@@ -209,6 +225,7 @@ export default function StoreSetupBrandScreen() {
         </View>
       </StoreSetupScreen>
       {imageSourceSheet}
+      {bannerFlow.sheet}
       {crop ? (
         <MediaCropper
           visible

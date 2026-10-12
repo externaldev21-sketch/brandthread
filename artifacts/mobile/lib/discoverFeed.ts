@@ -23,6 +23,7 @@ import { getBlockedUsers, getMutedUsers } from '@/services/socialService';
 import { isPreviewCatalogEnabled } from '@/lib/previewCatalog';
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 import { getPreviewDiscoverPosts, getPreviewBrandCards, getPreviewDiscoverPeople, getPreviewDrops } from '@/lib/previewDiscover';
+import { bannerStill, resolveProfileBanner } from '@/components/profile/profileBannerRules';
 
 export type DiscoverPostMedia = 'photo' | 'video' | 'slideshow';
 
@@ -223,7 +224,8 @@ export async function composeDiscoverBrands({ api, isSignedIn }: { api: any; isS
             id: f.userId,
             name: data.profile.displayName ?? data.profile.brandName ?? f.name ?? 'Brand',
             verified: !!data.profile.verified,
-            imageUri: (data.products ?? [])[0]?.images?.[0],
+            // The brand's banner still (one banner = its storefront cover), else its newest product.
+            imageUri: bannerStill(resolveProfileBanner(data.profile as any)) ?? (data.products ?? [])[0]?.images?.[0],
             followersLabel: 'Following',
           });
         } catch {

@@ -207,7 +207,7 @@ export function ProfileVideoAffordance({
       disabled={!!busy}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint={hasVideo ? 'Change or remove your profile video' : 'Pick or record a video up to 25 seconds to play behind your profile'}
+      accessibilityHint={hasVideo ? 'Change or remove your profile video' : 'Pick or record a video up to 10 seconds to play behind your profile'}
       testID="profile-cover-affordance"
       hitSlop={10}
       style={({ pressed }) => [

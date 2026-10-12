@@ -76,17 +76,20 @@ function HeroVideo({ uri, posterUri, active }: { uri: string; posterUri: string 
     else player.pause();
   }, [active, player]);
 
+  // The poster stays underneath the player: shown until the first frame,
+  // and through any gap (loop restart, resume, a clip that can't decode), so
+  // the hero is never a blank/black frame.
   return (
     <>
+      {posterUri ? (
+        <CachedImage source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={0} />
+      ) : null}
       <VideoView
         player={player}
         style={[StyleSheet.absoluteFill, styles.fill, !started && posterUri ? styles.hidden : null]}
         contentFit="cover"
         nativeControls={false}
       />
-      {!started && posterUri ? (
-        <CachedImage source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      ) : null}
     </>
   );
 }
