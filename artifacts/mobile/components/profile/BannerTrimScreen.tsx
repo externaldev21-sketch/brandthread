@@ -16,7 +16,7 @@
  * Next hands the chosen { start, duration } to the crop screen.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -41,6 +41,38 @@ const cancelFrame = (id: unknown) => {
   if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(id as number);
   else clearTimeout(id as ReturnType<typeof setTimeout>);
 };
+
+/** Web: expo-video can't make thumbnails there, so draw frames from a hidden <video>. */
+async function webFilmstrip(uri: string, times: number[]): Promise<Array<{ uri: string }>> {
+  if (typeof document === 'undefined') return [];
+  const video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.crossOrigin = 'anonymous';
+  video.src = uri;
+  await new Promise<void>((resolve, reject) => {
+    video.onloadeddata = () => resolve();
+    video.onerror = () => reject(new Error('Could not read the video'));
+  });
+  const height = 120;
+  const width = Math.max(1, Math.round((video.videoWidth / Math.max(1, video.videoHeight)) * height));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  const frames: Array<{ uri: string }> = [];
+  for (const time of times) {
+    await new Promise<void>((resolve) => {
+      video.onseeked = () => resolve();
+      video.currentTime = Math.min(time, Math.max(0, video.duration - 0.05));
+    });
+    context?.drawImage(video, 0, 0, width, height);
+    frames.push({ uri: canvas.toDataURL('image/jpeg', 0.7) });
+  }
+  video.removeAttribute('src');
+  return frames;
+}
 
 export function BannerTrimScreen({
   source, onCancel, onConfirm,
@@ -89,7 +121,9 @@ function TrimEditor({
     let cancelled = false;
     const generate = async () => {
       try {
-        const frames = await player.generateThumbnailsAsync(times, { maxWidth: 160, maxHeight: 160 } as never);
+        const frames = Platform.OS === 'web'
+          ? await webFilmstrip(uri, times)
+          : await player.generateThumbnailsAsync(times, { maxWidth: 160, maxHeight: 160 } as never);
         if (!cancelled) setThumbs(frames as unknown[]);
       } catch {
         if (!cancelled) setThumbs([]);
@@ -98,7 +132,7 @@ function TrimEditor({
     if (player.status === 'readyToPlay') { void generate(); return () => { cancelled = true; }; }
     const sub = player.addListener('statusChange', ({ status }) => { if (status === 'readyToPlay') void generate(); });
     return () => { cancelled = true; sub.remove(); };
-  }, [player, times]);
+  }, [player, times, uri]);
 
   // Loop the window and drive the playhead every frame (no re-render per frame).
   useEffect(() => {
@@ -232,7 +266,7 @@ function TrimEditor({
                 const thumb = thumbs?.[index];
                 return thumb
                   ? <Image key={time} source={thumb as never} style={[styles.frame, { width: stripWidth / times.length }]} contentFit="cover" transition={0} />
-                  : <View key={time} style={[styles.frame, { width: stripWidth / times.length, borderColor: theme.background }]} />;
+                  : <View key={time} style={[styles.frame, { width: stripWidth / times.length, borderColor: theme.background, backgroundColor: theme.cardElevated }]} />;
               })}
             </View>
             <Animated.View pointerEvents="none" style={[styles.dim, styles.dimLeft, dimLeftStyle]} />
