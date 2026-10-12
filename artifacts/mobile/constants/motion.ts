@@ -93,3 +93,17 @@ export const MOTION = {
   screenPushEasingBezier: SCREEN_PUSH_EASING_BEZIER,
   fadeMs: FADE_MS,
 } as const;
+
+/**
+ * The one spring (BRANDTHREAD_DESIGN.md, "Motion"): the seller tab bar's own
+ * pill glide (`INDICATOR_SPRING` in components/tab-bar/TabBarParts.tsx),
+ * shared so every new or restyled motion moves with the same feel. Works
+ * as-is with Reanimated's `withSpring(to, SPRING)`; use `springTo` for RN
+ * `Animated` values.
+ */
+export const SPRING = { mass: 1, stiffness: 220, damping: 20, overshootClamping: true } as const;
+
+/** `SPRING` for an RN `Animated.Value`. */
+export function springTo(value: Animated.Value, toValue: number) {
+  return Animated.spring(value, { toValue, ...SPRING, useNativeDriver: Platform.OS !== 'web' });
+}

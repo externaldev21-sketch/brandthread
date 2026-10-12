@@ -156,6 +156,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Store details', description: 'Manage your brand setup and general preferences', aliases: ['general', 'brand setup', 'business details'], icon: 'briefcase', route: '/general-settings', audience: 'seller' },
       { label: 'Store settings', description: 'Storefront identity, localization, and checkout', aliases: ['store', 'storefront', 'shop', 'checkout'], icon: 'home', route: '/store-settings', audience: 'seller' },
+      { label: 'Store website', description: 'Your store link, design, links and socials', aliases: ['website', 'link in bio', 'store link', 'customize', 'design'], icon: 'globe', route: '/my-store', audience: 'seller' },
       { label: 'Store Builder', description: 'Customize your storefront layout', aliases: ['builder', 'layout', 'storefront'], icon: 'layout', route: '/store-builder', audience: 'seller' },
       { label: 'Storefront theme', description: 'Colors and presentation of your public store', aliases: ['storefront theme', 'colors'], icon: 'droplet', route: '/store-theme-picker', audience: 'seller' },
       { label: 'Brand Assets', description: 'Manage your logos, colors, fonts, and saved brand assets', aliases: ['brand kit', 'logos', 'fonts', 'colors'], icon: 'layers', route: '/design-brand-assets', audience: 'seller', requiresGrowth: true },

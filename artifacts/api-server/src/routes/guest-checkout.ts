@@ -55,6 +55,9 @@ const guestCheckoutSchema = z.object({
   shippingAddress: shippingAddressSchema,
   clientIdempotencyKey: z.string().trim().min(8).max(160),
   dropId: requestPrimitives.uuid.nullable().optional(),
+  // "embedded": Stripe's payment form mounts on the page that asked (the
+  // store's own checkout page). Default "hosted" redirects to Stripe.
+  uiMode: z.enum(["hosted", "embedded"]).optional(),
 }).passthrough();
 const guestVerifyParamsSchema = z.object({ sessionId: requestPrimitives.id });
 const guestVerifyBodySchema = z.object({
@@ -104,6 +107,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
   try {
     const stripe = requireStripe();
     const { items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress, clientIdempotencyKey, dropId } = req.body ?? {};
+    const embedded = req.body?.uiMode === "embedded";
     const email = typeof contactEmail === "string" ? contactEmail.trim().toLowerCase() : "";
     if (!emailPattern.test(email)) return res.status(400).json({ error: "A valid contactEmail is required" });
     const phone = typeof contactPhone === "string" ? contactPhone.trim() : "";
@@ -201,7 +205,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
           return res.status(409).json({ error: "Checkout idempotency key cannot be reused" });
         }
         const stripeSession = await stripe.checkout.sessions.retrieve(existing.stripeSessionId);
-        return res.json({ sessionId: existing.stripeSessionId, url: stripeSession.url, guestAccessToken: accessToken });
+        return res.json({
+          sessionId: existing.stripeSessionId, url: stripeSession.url, guestAccessToken: accessToken,
+          ...(stripeSession.client_secret ? { clientSecret: stripeSession.client_secret } : {}),
+        });
       }
     }
     const subtotalCents = cartItems.reduce((n, item) => n + item.priceCents * item.quantity, 0);
@@ -285,6 +292,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
             sessionId: winner.stripeSessionId,
             url: stripeSession.url,
             guestAccessToken: winnerAccessToken,
+            ...(stripeSession.client_secret ? { clientSecret: stripeSession.client_secret } : {}),
           });
         }
         return void res.status(409).json({ error: "Checkout is still being prepared. Please try again." });
@@ -294,6 +302,26 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     checkoutId = checkout.id;
     const validDropId = chargePlan.dropId ?? undefined;
     stripeStarted = true;
+    // Embedded: the buyer already typed their address on the store's page, so
+    // it goes on a Stripe customer (Stripe Tax uses it) instead of being asked
+    // for twice; the order keeps this checkout's address snapshot.
+    const embeddedCustomer = embedded
+      ? await stripe.customers.create({
+          email,
+          name: shippingAddressValue.name,
+          phone,
+          shipping: {
+            name: shippingAddressValue.name,
+            phone: shippingAddressValue.phone,
+            address: {
+              line1: shippingAddressValue.street, line2: shippingAddressValue.line2 ?? undefined,
+              city: shippingAddressValue.city, state: shippingAddressValue.state,
+              postal_code: shippingAddressValue.zip, country: shippingAddressValue.country,
+            },
+          },
+          metadata: { csRef: checkout.id, guest: "true" },
+        }, key ? { idempotencyKey: `guest_cus_${key}` } : {})
+      : null;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
@@ -301,9 +329,13 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         enabled: true,
         liability: { type: "account", account: seller.stripeAccountId },
       },
-      shipping_address_collection: { allowed_countries: [shippingAddressValue.country] },
-      success_url: successUrl, cancel_url: cancelUrl,
-      customer_email: email,
+      ...(embeddedCustomer
+        ? { ui_mode: "embedded_page" as const, return_url: successUrl, customer: embeddedCustomer.id }
+        : {
+            shipping_address_collection: { allowed_countries: [shippingAddressValue.country] },
+            success_url: successUrl, cancel_url: cancelUrl,
+            customer_email: email,
+          }),
       metadata: { csRef: checkout.id, guest: "true", ...(validDropId ? { dropId: validDropId } : {}) },
       payment_intent_data: {
         ...money.paymentIntentData,
@@ -319,7 +351,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       checkoutSessionId: checkout.id, stripeSessionId: session.id, sellerId, attribution: req.body?.attribution,
     });
     // This is the sole response containing this token. It is not logged or stored raw.
-    return void res.status(201).json({ sessionId: session.id, url: session.url, guestAccessToken: accessToken });
+    return void res.status(201).json({
+      sessionId: session.id, url: session.url, guestAccessToken: accessToken,
+      ...(session.client_secret ? { clientSecret: session.client_secret } : {}),
+    });
   } catch (error: any) {
     if (!stripeStarted && checkoutId) await db.delete(checkoutSessions).where(eq(checkoutSessions.id, checkoutId));
     if (error.type === "StripeCardError" || error.code === "card_declined") return res.status(402).json({ error: mapStripeError(error) });

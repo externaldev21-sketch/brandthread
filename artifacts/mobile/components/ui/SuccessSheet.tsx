@@ -32,11 +32,13 @@ export interface SuccessSheetProps {
   subtitle?: string;
   primaryAction: SuccessSheetAction;
   secondaryAction?: SuccessSheetAction;
+  /** A third, text-only action under the two buttons (e.g. "Done" when the second is "Share store"). */
+  tertiaryAction?: SuccessSheetAction;
   testID?: string;
 }
 
 export function SuccessSheet({
-  visible, onClose, title, subtitle, primaryAction, secondaryAction, testID,
+  visible, onClose, title, subtitle, primaryAction, secondaryAction, tertiaryAction, testID,
 }: SuccessSheetProps) {
   const { theme } = useAppTheme();
   return (
@@ -62,6 +64,9 @@ export function SuccessSheet({
               fullWidth
               style={styles.secondaryBtn}
             />
+          ) : null}
+          {tertiaryAction ? (
+            <Button label={tertiaryAction.label} onPress={tertiaryAction.onPress} variant={tertiaryAction.variant ?? 'tertiary'} fullWidth />
           ) : null}
         </View>
       </View>

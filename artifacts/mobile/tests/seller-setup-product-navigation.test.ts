@@ -13,7 +13,8 @@ const setupDestinations = [
   ['connect_payments', '/payouts', 'app/payouts.tsx'],
   ['first_product', '/add-product', 'app/add-product.tsx'],
   ['shipping_rates', '/shipping', 'app/shipping.tsx'],
-  ['customize_store', '/store-builder', 'app/store-builder.tsx'],
+  // "Customize your store" opens the simple store website (My store).
+  ['customize_store', '/my-store', 'app/my-store.tsx'],
   ['connect_domain', '/store-domain', 'app/store-domain.tsx'],
   ['publish_store', '/store-publish', 'app/store-publish.tsx'],
   ['first_post', '/create-post', 'app/create-post.tsx'],
@@ -67,18 +68,21 @@ describe('seller setup destination navigation', () => {
     // "Product published!" moved from a native Alert to the shared
     // SuccessSheet (components/ui/SuccessSheet.tsx) — its secondary action
     // still returns to the seller-setup origin via leaveProductFlow.
-    expect(addProduct).toContain("secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}");
+    // Done is the second button, or a text button under "Share store" after a first publish.
+    expect(addProduct).toContain("{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }");
     expect(createPost).toContain('leaveSetupFlow(router, params.from);');
     expect(createPost).toContain('onDiscard={leave}');
   });
 
-  it('routes all nine completion signals through the behavioral completion boundary', () => {
+  it('routes every completion signal through the behavioral completion boundary', () => {
     const completionSignals = [
       ['app/seller-verification.tsx', "data?.verificationStatus === 'verified'", "completeSetupTaskWhen('verify_account'"],
       ['app/payouts.tsx', 'normalized?.connected && normalized.chargesEnabled && normalized.payoutsEnabled', "'connect_payments'"],
       ['app/add-product.tsx', '() => api.products.create(serverCreatePayload)', "'first_product'"],
       ['app/shipping.tsx', '() => api.shippingZones.create(payload)', "'shipping_rates'"],
       ['app/store-builder.tsx', "() => applyTheme(THREAD_THEME_ID, 'light')", "'customize_store'"],
+      ['app/store-product.tsx', 'await publishBlock(block.id)', "completeSetupTaskWhen('customize_store', true)"],
+      ['app/my-store.tsx', 'await saveBio({ siteTheme: key })', "completeSetupTaskWhen('customize_store', true)"],
       ['app/store-domain.tsx', "verificationStatus === 'verified'", "'connect_domain'"],
       ['app/store-publish.tsx', 'result.success', "'publish_store'"],
       ['app/create-post.tsx', "completeSetupTaskAfter('first_post', run)", "'first_post'"],

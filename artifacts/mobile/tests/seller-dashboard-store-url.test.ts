@@ -13,15 +13,23 @@ const dashboard = readFileSync(resolve(process.cwd(), 'components/SellerHomeComm
  * store is published.
  */
 describe('Dashboard: store URL + copy icon row next to the title', () => {
-  it('uses the existing public-store-URL builder, not a new one', () => {
-    expect(dashboard).toContain("import { buildCanonicalProfileUrl } from '@/lib/shareProfile';");
-    expect(dashboard).toContain('setStoreUrl(buildCanonicalProfileUrl(profile.username));');
+  it('uses the one store link (brandthread.app/@username via hooks/useStoreLink), not a new builder', () => {
+    expect(dashboard).toContain("import { useStoreLink } from '@/hooks/useStoreLink';");
+    expect(dashboard).toContain('const storeUrl = storeLink.url;');
+    expect(dashboard).not.toContain('buildCanonicalProfileUrl');
   });
 
-  it('shows the URL unconditionally once fetched — no "published" gate', () => {
-    const fetchBlock = dashboard.slice(dashboard.indexOf('api.seller.getProfile().then((profile) => {', dashboard.indexOf('const [storeUrl, setStoreUrl]')), dashboard.indexOf('}).catch(() => {});', dashboard.indexOf('const [storeUrl, setStoreUrl]')));
-    expect(fetchBlock).not.toContain('published');
-    expect(fetchBlock).not.toContain('storeIsLive');
+  it('shows the URL unconditionally once loaded — no "published" gate', () => {
+    const block = dashboard.slice(dashboard.indexOf('const storeLink = useStoreLink();'), dashboard.indexOf('const handleCopyStoreUrl'));
+    expect(block).not.toContain('published');
+    expect(block).not.toContain('storeIsLive');
+  });
+
+  it('has a Share store control top-right, next to the bell (two header icons)', () => {
+    const top = dashboard.slice(dashboard.indexOf('style={styles.topBar}'), dashboard.indexOf('<ActivityBellButton') + 40);
+    expect(top).toContain('testID="seller-dashboard-share-store"');
+    expect(top).toContain('accessibilityLabel="Share store"');
+    expect(top).toContain("navigateOrShareStore('/share-store', nav)");
   });
 
   it('copying fires a light haptic, writes to the clipboard, and flips a checkmark for ~1.2s — no toast', () => {

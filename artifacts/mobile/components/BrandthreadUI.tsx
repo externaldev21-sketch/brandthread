@@ -13,7 +13,6 @@ import {
   SwitchProps, PressableProps, LayoutChangeEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
 import Svg, { Line as SvgLine } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -22,9 +21,9 @@ import {
   SURFACE_GLASS, CARD_GLASS, CARD_ELEVATED_GLASS, SKELETON_GLASS,
   BORDER, BORDER_ACTIVE, BORDER_FOCUS,
   FG, MUTED, SUBTLE,
-  SUCCESS, SUCCESS_DIM, GREEN_BRIGHT,
+  SUCCESS, SUCCESS_DIM,
   BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
+  FONT, FS, SP, RADIUS, COMP, ICON, ANIM, FILL_ELEVATED,
   SHADOW, SHADOW_SM,
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
@@ -43,6 +42,7 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusedAnimationLoop } from '@/lib/useFocusedAnimationLoop';
 import { radius } from '@/constants/radii';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -346,11 +346,11 @@ export function BrandthreadHeader({
         {onBack && (
           <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onBack(); }}
-            style={[hdrS.back, { backgroundColor: colors.card, borderColor: colors.border }]}
+            style={[hdrS.back, { backgroundColor: colors.card }]}
             accessibilityLabel="Back"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
+            <Icon name="arrow-left" size={ICON.md} color={colors.foreground} />
           </PressableScale>
         )}
         <View>
@@ -374,7 +374,7 @@ const hdrS = StyleSheet.create({
                 paddingHorizontal: SP.md, paddingVertical: SP.sm, minHeight: COMP.headerH },
   left:       { flexDirection: 'row', alignItems: 'center', gap: SP.sm, flex: 1 },
   back:       { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-                borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+                alignItems: 'center', justifyContent: 'center' },
   title:      { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
   subtitle:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
   gradTitleWrap: { borderRadius: 0 },
@@ -398,8 +398,7 @@ export function BrandthreadCard({ children, style, onPress, glow = false, elevat
   const s: ViewStyle = {
     backgroundColor: elevated ? colors.elevated : colors.card,
     borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    // No border: cards sit on black (BRANDTHREAD_DESIGN.md, "Surfaces").
     padding: SP.md,
     ...(glow ? { ...SHADOW, shadowColor: theme.accent } : {}),
   };
@@ -432,7 +431,7 @@ export function GradientCard({ children, style, onPress, colors, glow = false }:
       colors={cardColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[gcS.card, { borderColor: palette.border }, glow && { ...SHADOW, shadowColor: theme.accent } as ViewStyle, style]}
+      style={[gcS.card, glow && { ...SHADOW, shadowColor: theme.accent } as ViewStyle, style]}
     >
       {children}
     </LinearGradient>
@@ -448,7 +447,7 @@ export function GradientCard({ children, style, onPress, colors, glow = false }:
 }
 
 const gcS = StyleSheet.create({
-  card: { borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER_ACTIVE, padding: SP.md, overflow: 'hidden' },
+  card: { borderRadius: RADIUS.lg, padding: SP.md, overflow: 'hidden' },
 });
 
 // ─── PrimaryButton ────────────────────────────────────────────────────────────
@@ -456,7 +455,7 @@ const gcS = StyleSheet.create({
 interface PrimaryButtonProps {
   label: string;
   onPress: () => void;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
   loading?: boolean;
   disabled?: boolean;
   small?: boolean;
@@ -501,7 +500,7 @@ export function PrimaryButton({
           <ActivityIndicator color={disabled ? palette.mutedForeground : foreground} size="small" />
         ) : (
           <>
-            {icon && <Feather name={icon} size={ICON.sm} color={disabled ? palette.mutedForeground : foreground} />}
+            {icon && <Icon name={icon} size={ICON.sm} color={disabled ? palette.mutedForeground : foreground} />}
             <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
           </>
         )}
@@ -529,7 +528,7 @@ const pbS = StyleSheet.create({
 interface SecondaryButtonProps {
   label: string;
   onPress: () => void;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
   disabled?: boolean;
   small?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -551,7 +550,7 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
       accessibilityState={{ disabled: !!disabled }}
       style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? 0.5 : 1 }, style]}
     >
-      {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
+      {icon && <Icon name={icon} size={ICON.sm} color={resolvedAccent} />}
       <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]} numberOfLines={1}>{label}</Text>
     </PressableScale>
   );
@@ -568,7 +567,7 @@ const sbS = StyleSheet.create({
 interface TertiaryButtonProps {
   label: string;
   onPress: () => void;
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconName;
   disabled?: boolean;
   small?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -590,7 +589,7 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
       accessibilityState={{ disabled: !!disabled }}
       style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: BUTTON_INNER_PADDING_X, opacity: disabled ? 0.4 : 1 }, style]}
     >
-      {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
+      {icon && <Icon name={icon} size={ICON.sm} color={resolvedAccent} />}
       <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent }} numberOfLines={1}>{label}</Text>
     </PressableScale>
   );
@@ -599,7 +598,7 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
 // ─── IconButton ───────────────────────────────────────────────────────────────
 
 interface IconButtonProps {
-  name: keyof typeof Feather.glyphMap;
+  name: IconName;
   onPress: () => void;
   color?: string;
   size?: number;
@@ -619,10 +618,10 @@ export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, b
       onPress={() => { hapticLight(); onPress(); }}
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
-      style={[ibS.root, { backgroundColor: palette.card, borderColor: palette.border }, style]}
+      style={[ibS.root, { backgroundColor: palette.card }, style]}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <Feather name={name} size={size} color={color} />
+      <Icon name={name} size={size} color={color} />
       {badge && (
         <View style={[ibS.badge, { backgroundColor: theme.accent }]}>
           {badgeCount !== undefined && badgeCount > 0
@@ -636,7 +635,7 @@ export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, b
 
 const ibS = StyleSheet.create({
   root:      { width: COMP.iconBtn, height: COMP.iconBtn, borderRadius: RADIUS.sm, backgroundColor: CARD,
-               borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+               alignItems: 'center', justifyContent: 'center' },
   badge:     { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
   badgeText: { fontSize: FS.xs, fontFamily: FONT.bold, textAlign: 'center' },
 });
@@ -657,8 +656,8 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
   const { theme } = useAppTheme();
   const palette = useColors();
   return (
-    <View style={[srS.root, { backgroundColor: palette.card }, focused && srS.focused, style]}>
-      <Feather name="search" size={ICON.sm} color={focused ? theme.accentLight : palette.mutedForeground} />
+    <View style={[srS.root, focused && srS.focused, style]}>
+      <Icon name="search" size={ICON.sm} color={focused ? theme.accentLight : palette.mutedForeground} />
       <TextInput
         style={[srS.input, { color: palette.foreground }, WEB_INPUT_RESET]}
         value={value}
@@ -678,7 +677,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
           accessibilityHint="Removes the current search text"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Feather name="x" size={ICON.sm} color={palette.mutedForeground} />
+          <Icon name="x" size={ICON.sm} color={palette.mutedForeground} />
         </PressableScale>
       )}
     </View>
@@ -686,13 +685,15 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
 }
 
 const srS = StyleSheet.create({
-  root:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
+  // The one solid near-black fill inputs may use (Dev's addendum to
+  // BRANDTHREAD_DESIGN.md).
+  root:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: FILL_ELEVATED,
              borderRadius: RADIUS.md, borderWidth: 0,
              paddingHorizontal: SP.md, height: COMP.inputH - 4 },
   // Focused state stays the same pill as unfocused — no border/box appears,
   // at rest or on focus (borderWidth is 0 above, not just transparent).
-  // Only a very subtle fill change signals focus.
-  focused: { backgroundColor: 'rgba(255,255,255,0.10)' },
+  // Only a subtle (still solid) fill change signals focus.
+  focused: { backgroundColor: '#2C2C2E' },
   input:   { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
 });
 
@@ -775,10 +776,10 @@ const stS = StyleSheet.create({
 // ─── EmptyState ───────────────────────────────────────────────────────────────
 
 interface EmptyStateProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   title: string;
   description?: string;
-  action?: { label: string; onPress: () => void; icon?: keyof typeof Feather.glyphMap };
+  action?: { label: string; onPress: () => void; icon?: IconName };
   secondaryAction?: { label: string; onPress: () => void };
   style?: StyleProp<ViewStyle>;
   /** Drops the illustration for tight spaces, e.g. above an open keyboard. */
@@ -823,7 +824,7 @@ export function EmptyState({
           noMinHeight
           testID={testID ? `${testID}-action` : undefined}
         >
-          {action.icon && <Feather name={action.icon} size={ICON.sm} color={theme.background} />}
+          {action.icon && <Icon name={action.icon} size={ICON.sm} color={theme.background} />}
           <Text style={[esS.pillLabel, { color: theme.background }]} numberOfLines={1}>{action.label}</Text>
         </PressableScale>
       )}
@@ -867,7 +868,7 @@ export function BrandedLoader({ label = 'Stitching things together…', style }:
     <View style={[brLoaderS.root, style]}>
       <Animated.View style={[brLoaderS.mark, { backgroundColor: theme.accentDim, borderColor: theme.accent + '70', opacity: pulse, transform: [{ scale: pulse }] }]}>
         <View style={[brLoaderS.thread, { borderColor: theme.accentLight }]} />
-        <Feather name="scissors" size={22} color={theme.accentLight} />
+        <Icon name="scissors" size={22} color={theme.accentLight} />
       </Animated.View>
       <Text style={[brLoaderS.label, { color: theme.muted }]}>{label}</Text>
     </View>
@@ -922,7 +923,8 @@ const shS = StyleSheet.create({
   // pushing the sibling action off screen — RN/web flexbox items default to
   // minWidth:auto, which otherwise forces the row wider than the container.
   titleWrap: { flex: 1, minWidth: 0, marginRight: SP.sm },
-  title:  { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  // Sentence case, 17 semibold, white, left-aligned (BRANDTHREAD_DESIGN.md).
+  title:  { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold, color: FG },
   action: { fontSize: FS.sm, fontFamily: FONT.medium, flexShrink: 0 },
 });
 
@@ -931,7 +933,7 @@ const shS = StyleSheet.create({
 interface StatCardProps {
   label: string;
   value: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   change?: string;
   positive?: boolean;
   accent?: string;
@@ -944,13 +946,13 @@ export function StatCard({ label, value, icon, change, positive, accent, style }
   return (
     <BrandthreadCard style={[scS.root, style]}>
       <View style={[scS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
-        <Feather name={icon} size={ICON.sm} color={resolvedAccent} />
+        <Icon name={icon} size={ICON.sm} color={resolvedAccent} />
       </View>
       <Text style={[scS.value, { color: theme.text }]}>{value}</Text>
       <Text style={[scS.label, { color: theme.muted }]}>{label}</Text>
       {change && (
         <View style={scS.changeRow}>
-          <Feather name={positive ? 'trending-up' : 'trending-down'} size={10} color={positive ? SUCCESS : RED} />
+          <Icon name={positive ? 'trending-up' : 'trending-down'} size={10} color={positive ? SUCCESS : RED} />
           <Text style={[scS.change, { color: positive ? SUCCESS : RED }]}>{change}</Text>
         </View>
       )}
@@ -970,7 +972,7 @@ const scS = StyleSheet.create({
 // ─── QuickActionCard ──────────────────────────────────────────────────────────
 
 interface QuickActionCardProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   accent?: string;
@@ -984,11 +986,11 @@ export function QuickActionCard({ icon, label, onPress, accent, badge, style }: 
   return (
     <PressableScale
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
-      style={[qaS.root, { backgroundColor: theme.card, borderColor: theme.border }, style]}
+      style={[qaS.root, { backgroundColor: theme.card }, style]}
       testID={`quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
       <View style={[qaS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
-        <Feather name={icon} size={ICON.md} color={resolvedAccent} />
+        <Icon name={icon} size={ICON.md} color={resolvedAccent} />
         {badge && <View style={[qaS.dot, { backgroundColor: theme.accent }]} />}
       </View>
       <Text
@@ -1005,7 +1007,7 @@ export function QuickActionCard({ icon, label, onPress, accent, badge, style }: 
 
 const qaS = StyleSheet.create({
   root:    { width: '100%', minWidth: 0, alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
-             borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+             borderRadius: RADIUS.md,
              paddingHorizontal: 4, paddingVertical: 14 },
   iconWrap:{ width: 44, height: 44, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   dot:     { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4 },
@@ -1049,7 +1051,7 @@ export function LockBadge({ locked, style }: LockBadgeProps) {
   if (!locked) return null;
   return (
     <View style={[lbS.root, { backgroundColor: theme.accent }, style]}>
-      <Feather name="lock" size={9} color={theme.onAccent} />
+      <Icon name="lock" size={9} color={theme.onAccent} />
       <Text style={[lbS.text, { color: theme.onAccent }]}>PRO</Text>
     </View>
   );
@@ -1096,7 +1098,7 @@ export function FormInput({
   return (
     <View style={[fiS.wrap, style]}>
       {label && <Text style={[fiS.label, { color: theme.muted }]}>{label}</Text>}
-      <View style={[fiS.inputRow, { backgroundColor: theme.card, borderColor: theme.border }, focused && [fiS.focusedRow, { borderColor: theme.accent }], !!error && { borderColor: theme.error }, multiline && fiS.multilineRow]}>
+      <View style={[fiS.inputRow, focused && [fiS.focusedRow, { borderColor: theme.accent }], !!error && { borderColor: theme.error }, multiline && fiS.multilineRow]}>
         <TextInput
           style={[fiS.input, { color: theme.text }, multiline && fiS.multilineInput, WEB_INPUT_RESET]}
           value={value}
@@ -1125,10 +1127,12 @@ export function FormInput({
 
 const fiS = StyleSheet.create({
   wrap:         { gap: SP.sm },
-  label:        { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 0.2 },
+  label:        { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   note:         { fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 18 },
-  inputRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
-                  borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+  // Solid near-black fill, no resting border (Dev's addendum); the border
+  // only appears for focus/error.
+  inputRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: FILL_ELEVATED,
+                  borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'transparent',
                   paddingHorizontal: SP.md, minHeight: COMP.inputH },
   focusedRow:   { borderColor: BORDER_FOCUS },
   multilineRow: { alignItems: 'flex-start', paddingVertical: SP.sm, minHeight: 100 },
@@ -1184,7 +1188,7 @@ const pcS = StyleSheet.create({
 // ─── NavigationCard ───────────────────────────────────────────────────────────
 
 interface NavigationCardProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   description?: string;
   onPress: () => void;
@@ -1202,10 +1206,10 @@ export function NavigationCard({ icon, label, description, onPress, accent, badg
       onPress={() => { hapticLight(); onPress(); }}
       accessibilityLabel={description ? `${label}. ${description}` : label}
       accessibilityHint="Opens this section"
-      style={[ncS.root, { backgroundColor: theme.card, borderColor: theme.border }, style]}
+      style={[ncS.root, { backgroundColor: theme.card }, style]}
     >
       <View style={[ncS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
-        <Feather name={icon} size={ICON.md} color={resolvedAccent} />
+        <Icon name={icon} size={ICON.md} color={resolvedAccent} />
       </View>
       <View style={ncS.body}>
         <View style={ncS.labelRow}>
@@ -1218,15 +1222,14 @@ export function NavigationCard({ icon, label, description, onPress, accent, badg
         </View>
         {description && <Text style={[ncS.desc, { color: theme.muted }]} numberOfLines={1}>{description}</Text>}
       </View>
-      {right ?? <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
+      {right ?? <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />}
     </PressableScale>
   );
 }
 
 const ncS = StyleSheet.create({
   root:       { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: 13,
-                paddingHorizontal: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md,
-                borderWidth: 1, borderColor: BORDER },
+                paddingHorizontal: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md },
   iconWrap:   { width: 40, height: 40, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   body:       { flex: 1 },
   labelRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
@@ -1494,7 +1497,7 @@ export function BrandedLoadingState({ message, style }: { message?: string; styl
           end={{ x: 1, y: 1 }}
           style={blS.iconWrap}
         >
-          <Feather name="loader" size={ICON.md} color={theme.onAccent} />
+          <Icon name="loader" size={ICON.md} color={theme.onAccent} />
         </LinearGradient>
       </Animated.View>
       {message && <Text style={[blS.msg, { color: colors.mutedForeground }]}>{message}</Text>}
@@ -1526,7 +1529,7 @@ export function Toast({ message, visible, variant = 'success' }: ToastProps) {
   const color = statusColors[variant];
   return (
     <Animated.View accessibilityLiveRegion={variant === 'error' ? 'assertive' : 'polite'} style={[toS.root, { opacity, backgroundColor: palette.card, borderColor: color + '44' }]}>
-      <Feather name={variant === 'success' ? 'check-circle' : variant === 'error' ? 'alert-circle' : 'info'} size={ICON.sm} color={color} />
+      <Icon name={variant === 'success' ? 'check-circle' : variant === 'error' ? 'alert-circle' : 'info'} size={ICON.sm} color={color} />
       <Text style={[toS.text, { color }]}>{message}</Text>
     </Animated.View>
   );
@@ -1604,6 +1607,5 @@ const tdS = StyleSheet.create({
   row:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm,
            marginVertical: SP.xs, paddingHorizontal: SP.md },
   solo:  { marginVertical: SP.xs, paddingHorizontal: SP.md },
-  label: { fontSize: FS.xs, fontFamily: FONT.medium, letterSpacing: 0.8,
-           textTransform: 'uppercase', opacity: 0.7 },
+  label: { fontSize: FS.xs, fontFamily: FONT.medium, opacity: 0.7 },
 });

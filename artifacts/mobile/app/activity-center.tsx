@@ -26,6 +26,7 @@
  * the classic notifications list.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { navigateOrShareStore } from '@/lib/shareStoreSheet';
 import {
   ActivityIndicator,
   Alert,
@@ -889,7 +890,8 @@ export default function ActivityCenterScreen() {
   const chipEmpty = activityChipEmpty(chip, role);
   const emptyActionHref = chipEmpty.action?.href;
   const handleEmptyAction = useCallback(() => {
-    if (emptyActionHref) router.push(emptyActionHref as never);
+    // "Share your store" opens the Share store sheet; other actions navigate.
+    if (emptyActionHref) navigateOrShareStore(emptyActionHref, (href) => router.push(href as never));
   }, [emptyActionHref, router]);
   const emptyStateProps = {
     icon: chipEmpty.icon as any,

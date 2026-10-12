@@ -161,6 +161,7 @@ import affiliatePublicRouter from "./affiliate-public";
 import affiliateCreatorRouter from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
 import growthRouter from "./growth";
+import storeBlocksRouter from "./storeBlocks";
 import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
 import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 
@@ -397,6 +398,8 @@ router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
 // Seller growth tools: tracked UTM links, link-in-bio, store pixels.
 router.use("/growth",              tc, growthRouter);
+// My Store: the product blocks on brandthread.app/@handle.
+router.use("/store-blocks",        tc, storeBlocksRouter);
 router.use("/gift-cards",          giftCardsRouter); // buyer + seller (own auth/permission checks); no tc
 
 export default router;

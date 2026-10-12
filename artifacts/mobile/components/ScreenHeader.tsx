@@ -1,7 +1,6 @@
 import React from 'react';
 import { Animated, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -9,9 +8,10 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 export interface ScreenHeaderAction {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   onPress: () => void;
   accessibilityLabel: string;
   badge?: boolean;
@@ -108,7 +108,7 @@ export function ScreenHeader({
               accessibilityHint={`Returns from ${title}`}
               testID={backTestID ?? 'screen-header-back'}
             >
-              <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
+              <Icon name="arrow-left" size={ICON.md} color={colors.foreground} />
             </PressableScale>
           ) : <View style={{ width: COMP.iconBtn }} />
         )}
@@ -139,7 +139,7 @@ export function ScreenHeader({
               accessibilityRole="button"
               accessibilityLabel={action.accessibilityLabel}
             >
-              <Feather name={action.icon} size={ICON.sm} color={colors.foreground} />
+              <Icon name={action.icon} size={ICON.sm} color={colors.foreground} />
               {action.badge && <View style={[styles.actionDot, { backgroundColor: colors.primary, borderColor: colors.background }]} />}
             </PressableScale>
           ))}
@@ -156,7 +156,7 @@ export function ScreenHeader({
                   accessibilityHint={`Dismisses ${title}`}
                   testID={backTestID ?? 'screen-header-back'}
                 >
-                  <Feather name="x" size={ICON.md} color={colors.foreground} />
+                  <Icon name="x" size={ICON.md} color={colors.foreground} />
                 </PressableScale>
               ) : <View style={{ width: COMP.iconBtn }} />}
             </>

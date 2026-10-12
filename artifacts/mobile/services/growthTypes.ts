@@ -36,10 +36,26 @@ export interface BioPage {
   showShopButton: boolean; shopButtonLabel: string; featuredProductIds: string[];
   socials: Record<string, string>; theme: 'mono' | 'dark'; accentColor: string | null; storeAccentColor: string | null;
   links: BioLink[];
+  // ── Store website (brandthread.app/@username) ──────────────────────────
+  /** brandthread.app/@username, or null without a username. Absent on older servers. */
+  siteUrl?: string | null;
+  username?: string | null;
+  /** Store logo / banner (the seller's identity images), signed for display. */
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  showBanner?: boolean;
+  siteTheme?: string;
+  buttonStyle?: 'rounded' | 'square';
+  font?: 'system' | 'serif' | 'mono';
+  /** The product tiles the site shows, in its order. */
+  products?: StoreSiteProductTile[];
 }
 
+export interface StoreSiteProductTile { id: string; name: string; image: string | null; priceLabel: string }
+
 export type BioPageInput = Partial<Pick<BioPage,
-  'displayName' | 'bio' | 'avatarUrl' | 'showShopButton' | 'shopButtonLabel' | 'featuredProductIds' | 'socials' | 'theme' | 'accentColor' | 'published'>>;
+  'displayName' | 'bio' | 'avatarUrl' | 'showShopButton' | 'shopButtonLabel' | 'featuredProductIds' | 'socials' | 'theme' | 'accentColor' | 'published'
+  | 'siteTheme' | 'buttonStyle' | 'font' | 'showBanner'>>;
 
 export interface BioStats {
   days: number; views: number; clicks: number; shopClicks: number; productClicks: number; clickThroughRate: number;

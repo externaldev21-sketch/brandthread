@@ -9,18 +9,20 @@ const appPath = (relativePath: string) => resolve(process.cwd(), 'app', relative
 const compPath = (relativePath: string) => resolve(process.cwd(), 'components', relativePath);
 
 describe('glass surfaces and translucency', () => {
-  it('defines translucent glass tokens in theme.ts', () => {
-    expect(CARD_GLASS).toContain('rgba');
-    expect(CARD_ELEVATED_GLASS).toContain('rgba');
-    expect(SURFACE_GLASS).toContain('rgba');
+  // BRANDTHREAD_DESIGN.md: surfaces are opaque black; real blur is kept only
+  // for floating controls (and the tab bars below), never a card fill.
+  it('keeps the legacy glass surface tokens opaque black', () => {
+    expect(CARD_GLASS).toBe('#000000');
+    expect(CARD_ELEVATED_GLASS).toBe('#000000');
+    expect(SURFACE_GLASS).toBe('#000000');
     expect(SKELETON_GLASS).toContain('rgba');
   });
 
-  it('mirrors translucent treatments in colors.ts', () => {
-    expect(colors.dark.card).toContain('rgba');
-    expect(colors.dark.input).toContain('rgba');
-    expect(colors.dark.secondary).toContain('rgba');
-    expect(colors.dark.muted).toContain('rgba');
+  it('mirrors the opaque surfaces in colors.ts', () => {
+    expect(colors.dark.card).toBe('#000000');
+    expect(colors.dark.input).toBe('#000000');
+    expect(colors.dark.secondary).toBe('#000000');
+    expect(colors.dark.muted).toBe('#000000');
   });
 
   it('uses glass tokens for LoadingSkeletons', () => {

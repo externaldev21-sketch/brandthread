@@ -213,7 +213,7 @@ export function CompleteTheFit({ productId }: { productId: string }) {
 
 const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   divider: { height: 1, backgroundColor: c.border, marginVertical: SP.md },
-  header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, marginBottom: SP.sm },
   card: { width: 140 },
   thumb: { width: 140, height: 180, backgroundColor: c.card, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm },
   thumbEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },

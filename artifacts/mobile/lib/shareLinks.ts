@@ -33,8 +33,14 @@ export function buildPostUrl(postId: string | null | undefined): string | null {
   return postId && ID_RE.test(postId) ? `${SHARE_ORIGIN}/p/${postId}` : null;
 }
 
+/**
+ * A store's link. Sellers' stores live at brandthread.app/@username (the
+ * store website); a handle that can't be a username keeps the older
+ * /store/<handle> path, which still resolves.
+ */
 export function buildStoreUrl(handle: string | null | undefined): string | null {
   const h = (handle ?? '').trim().replace(/^@/, '');
+  if (/^[A-Za-z0-9_]{3,30}$/.test(h)) return `${SHARE_ORIGIN}/@${h.toLowerCase()}`;
   return HANDLE_RE.test(h) ? `${SHARE_ORIGIN}/store/${encodeURIComponent(h.toLowerCase())}` : null;
 }
 
@@ -114,6 +120,13 @@ export function parseShareLink(raw: string | null | undefined): ShareLinkTarget 
   if (head === 'store' && a && a !== 'product' && parts.length === 2 && HANDLE_RE.test(a)) {
     const handle = a.toLowerCase();
     return { kind: 'store', handle, href: `/u/${q(handle)}` };
+  }
+  // Store website: /@handle and its product pages /@handle/p/<id>.
+  if (head.startsWith('@') && /^[a-z0-9_]{3,30}$/i.test(head.slice(1))) {
+    const handle = head.slice(1).toLowerCase();
+    if (parts.length === 1) return { kind: 'store', handle, href: `/u/${q(handle)}` };
+    if (a === 'p' && parts.length === 3 && ID_RE.test(b)) return { kind: 'product', id: b, href: `/product-detail?id=${q(b)}` };
+    return null;
   }
   if (head === 'c' && parts.length === 2) return { kind: 'collection', id: a, href: `/c/${q(a)}` };
   if (head === 'drops' && parts.length === 2) return { kind: 'drop', id: a, href: `/drops/${q(a)}` };

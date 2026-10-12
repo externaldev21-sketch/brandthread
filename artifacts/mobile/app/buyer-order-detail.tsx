@@ -197,7 +197,7 @@ const row = StyleSheet.create({
   root:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.xs },
   label: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
   value: { fontSize: FS.sm, fontFamily: FONT.semibold, flex: 1, textAlign: 'right' },
-  mono:  { fontFamily: 'Inter_400Regular', letterSpacing: 0.5, fontSize: FS.xs },
+  mono:  { fontFamily: FONT.regular, letterSpacing: 0.5, fontSize: FS.xs },
 });
 
 // ─── Star Rating component ────────────────────────────────────────────────────
@@ -1396,7 +1396,7 @@ const makeStyles = (theme: AppThemePreset) => {
     paymentNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm, textAlign: 'center' },
 
     // Tracking
-    trackingNumberDisplay: { fontSize: FS.base, fontFamily: 'Inter_400Regular', color: theme.text, letterSpacing: 1 },
+    trackingNumberDisplay: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.text, letterSpacing: 1 },
     carrierChip: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
     carrierChipText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
     estDeliveryRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },

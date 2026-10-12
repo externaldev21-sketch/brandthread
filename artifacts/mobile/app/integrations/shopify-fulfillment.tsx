@@ -14,7 +14,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/hooks/useApi';
 import { BrandthreadCard, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
-import { COMP, FS } from '@/lib/theme';
+import { COMP, FS, FONT } from '@/lib/theme';
 
 export default function ShopifyFulfillmentScreen() {
   const colors = useColors();
@@ -168,15 +168,15 @@ export default function ShopifyFulfillmentScreen() {
 const styles = StyleSheet.create({
   rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, minHeight: COMP.minTouchTarget },
   iconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { fontSize: FS.base, fontFamily: 'Inter_600SemiBold' },
-  cardSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  label: { fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 6, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  cardTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
+  cardSub: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
+  label: { fontSize: 11, fontFamily: FONT.medium, marginTop: 6, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: FONT.regular },
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   stepBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  stepBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  explainerStep: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
-  footNote: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginTop: 4, fontStyle: 'italic' },
+  stepBadgeText: { fontSize: 11, fontFamily: FONT.bold },
+  explainerStep: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
+  footNote: { fontSize: 11, fontFamily: FONT.regular, lineHeight: 16, marginTop: 4, fontStyle: 'italic' },
   disconnectBtn: { alignItems: 'center', justifyContent: 'center', minHeight: COMP.minTouchTarget, paddingVertical: 16 },
-  disconnectText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  disconnectText: { fontSize: 13, fontFamily: FONT.medium },
 });

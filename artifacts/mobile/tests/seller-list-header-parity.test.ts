@@ -64,7 +64,7 @@ describe('Title dropdown replaces the Alert.alert title menu', () => {
 
   it('the shared header only renders the chevron/dropdown when a titleMenu is actually passed', () => {
     expect(headerSource).toMatch(/hasMenu\s*=\s*!!titleMenu/);
-    expect(headerSource).toContain("Feather name=\"chevron-down\"");
+    expect(headerSource).toContain("Icon name=\"chevron-down\"");
     // The chevron branch must be conditional on hasMenu, not unconditional.
     const chevronIndex = headerSource.indexOf('chevron-down');
     const beforeChevron = headerSource.slice(0, chevronIndex);
