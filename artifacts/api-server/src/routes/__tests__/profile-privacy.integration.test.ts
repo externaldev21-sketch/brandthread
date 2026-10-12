@@ -233,7 +233,7 @@ describe("buyer profile — what a visitor can read", () => {
     expectPublicOnly(body);
     const allowed = new Set([
       "userId", "name", "username", "displayName", "bio", "avatarUrl", "accountType", "initials", "color", "handle",
-      "coverVideoUrl", "coverPosterUrl", "followersCount", "followingCount", "likesCount", "postsCount", "isFollowing",
+      "coverVideoUrl", "coverPosterUrl", "profileBanner", "followersCount", "followingCount", "likesCount", "postsCount", "isFollowing",
       "isFollowedBy", "isMutual", "iBlockedThem",
     ]);
     expect(Object.keys(body).filter((k) => !allowed.has(k))).toEqual([]);

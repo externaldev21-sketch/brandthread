@@ -37,6 +37,9 @@ import { connectionsHref, productDetailHref, profileProductsHref, profileVideosH
 import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
+import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { useProfileBannerState } from '@/components/profile/useProfileBanner';
+import { useProfileNote } from '@/components/profile/useProfileNote';
 import {
   ProfileChip, ProfileEditMessagesRow, ShopPill, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
@@ -155,6 +158,9 @@ export default function ProfileScreen() {
     cover: { videoUrl: profile?.coverVideoUrl ?? null, posterUrl: profile?.coverPosterUrl ?? null },
     userId,
   });
+  const [serverBanner, setServerBanner] = useState<ProfileBanner | null>(null);
+  const banner = useProfileBannerState({ server: serverBanner, ownerId: userId, own: true });
+  const bannerNote = useProfileNote({ userId, own: true, enabled: !!banner });
   const tagged = useTaggedPosts(userId, activeTab === 'Tagged' && !!userId && !isSellerDevPreview());
   const [socialCounts, setSocialCounts] = useState<SocialCounts>({ followers: 0, following: 0, likes: 0 });
   const [productsCount, setProductsCount] = useState<number | null>(null);
@@ -224,6 +230,7 @@ export default function ProfileScreen() {
     try {
       const data = await api.seller.getProfile();
       if (requestUserRef.current !== requestUser) return;
+      setServerBanner(resolveProfileBanner(data as any));
       setProfile({
         brandName:          data.brandName   ?? null,
         displayName:        data.displayName ?? null,
@@ -645,7 +652,16 @@ export default function ProfileScreen() {
         }}
         // The profile video plays behind the header; none set → plain background.
         hero={{ videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }}
-        topLeft={accountSwitcher}
+        // TikTok-style banner (image or video) — replaces the header when set.
+        banner={banner}
+        bannerNote={bannerNote}
+        topLeft={banner ? (
+          <>
+            {/* Banner layout (TikTok): the edit pencil leads the top bar. */}
+            <ProfileTopBarIcon name="edit-2" onPress={() => nav('/edit-profile')} accessibilityLabel="Edit profile" testID="profile-banner-edit" />
+            {accountSwitcher}
+          </>
+        ) : accountSwitcher}
         topRight={(
           <ProfileTopBarIconRow>
             <ProfileTopBarIcon name="bell"
