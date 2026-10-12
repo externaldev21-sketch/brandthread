@@ -8,12 +8,18 @@
  *   "Edit banner" → native action sheet: Choose GIF · Choose video ·
  *                  Remove banner (only when one is set) · Cancel
  *                  (iOS: Choose GIF → Photo Library / Files)
- *   video > 10s  → trim screen to pick the 10s window (never a hard cut)
- *   pick         → crop / position screen at the banner's aspect ratio
- *                  (pinch + drag), Cancel / Save along the bottom
+ *   video > 10s  → trim screen (TikTok's editor: filmstrip of the whole
+ *                  clip, a 10s window slid along it, looping preview,
+ *                  scrub) — any length, never a hard cut
+ *   pick         → crop / position screen: the exact banner frame over the
+ *                  whole picture, drag to reposition + pinch,
+ *                  Cancel · Crop · Save along the bottom
  *   Save         → GIF (≤15MB): converted server-side to a looping MP4,
  *                  original kept as the fallback; video: muted, trimmed +
  *                  cropped server-side. Both loop forever.
+ *
+ * A trimmed (long) clip goes up through the chunked, resumable upload and
+ * is rendered server-side from storage; short clips post directly.
  *
  * Storage + limits are the profile cover's (server: routes/profile-cover.ts):
  * the banner IS the cover, so one change per 24h, moderation and cleanup of
@@ -38,11 +44,12 @@ import { FONT, ON_DARK, SP } from '@/lib/theme';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
-import { CoverTrimSheet } from './ProfileCover';
+import { BannerTrimScreen } from './BannerTrimScreen';
+import { useProfileLayout } from './profileLayout';
 import { pickerDurationSeconds } from './profileCoverRules';
-import { BannerMedia, BannerPlaceholder } from './ProfileBannerHeader';
+import { BannerBottomFade, BannerMedia, BannerPlaceholder } from './ProfileBannerHeader';
 import {
-  BANNER_GIF_MAX_BYTES, bannerAspect, bannerNeedsTrim, bannerSheetOptions, isGifAsset,
+  BANNER_GIF_MAX_BYTES, bannerHeight, bannerNeedsTrim, bannerSheetOptions, isGifAsset,
   type BannerSheetAction, type ProfileBanner,
 } from './profileBannerRules';
 
@@ -221,7 +228,11 @@ export function useProfileBanner({ banner, userId }: { banner: ProfileBanner | n
         const saved = await api.profileCover.uploadGif(source.uri, rect);
         apply(saved.profileBanner);
       } else {
-        const saved = await api.profileCover.upload(source.uri, source.mimeType, source.trim ?? null, rect);
+        // A window of a longer clip: send the whole source through the
+        // chunked upload (any length / size) and render it server-side.
+        const saved = source.trim
+          ? await api.profileCover.uploadLong(source.uri, source.mimeType, source.trim, rect)
+          : await api.profileCover.upload(source.uri, source.mimeType, null, rect);
         apply(saved.profileBanner ?? { type: 'video', url: saved.coverVideoUrl, posterUrl: saved.coverPosterUrl });
       }
     } catch (error) {
@@ -238,7 +249,7 @@ export function useProfileBanner({ banner, userId }: { banner: ProfileBanner | n
     sheet: (
       <>
         <BannerActionSheet visible={sheetOpen} hasBanner={!!current} onChoose={choose} onClose={() => setSheetOpen(false)} />
-        <CoverTrimSheet
+        <BannerTrimScreen
           source={trimSource}
           onCancel={() => setTrimSource(null)}
           onConfirm={(trim) => {
@@ -346,9 +357,12 @@ export function BannerCropScreen({
   const window = useWindowDimensions();
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
 
-  // The frame is the banner exactly as it renders on this screen.
-  const frameWidth = Math.min(window.width, 480);
-  const frameHeight = Math.round(frameWidth / bannerAspect(window.width, window.height));
+  // The frame IS the profile banner on this device: same width as the
+  // profile column, same height (bannerHeight), same cover fit — so what is
+  // framed here is exactly what the profile shows.
+  const { columnWidth } = useProfileLayout();
+  const frameWidth = Math.min(window.width, columnWidth);
+  const frameHeight = bannerHeight(window.height);
 
   useEffect(() => {
     if (!source) { setSize(null); return; }
@@ -375,6 +389,7 @@ export function BannerCropScreen({
   const renderWidth = size ? size.width * base : frameWidth;
   const renderHeight = size ? size.height * base : frameHeight;
   const [gesturing, setGesturing] = useState(false);
+  const canMove = !!size && (renderWidth > frameWidth + 1 || renderHeight > frameHeight + 1);
 
   function clamp(nextScale: number, x: number, y: number) {
     'worklet';
@@ -427,12 +442,11 @@ export function BannerCropScreen({
   return (
     <Modal visible animationType="slide" onRequestClose={onCancel} presentationStyle="fullScreen">
       <GestureHandlerRootView style={[styles.cropRoot, { backgroundColor: theme.background, paddingTop: topInset, paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-        <View style={styles.cropHeader} testID="banner-crop">
-          <Text style={[styles.cropTitle, { color: theme.text }]} accessibilityRole="header">Crop</Text>
-        </View>
-        <View style={styles.cropStage}>
-          <GestureDetector gesture={gesture}>
-            <View style={[styles.cropFrame, { width: frameWidth, height: frameHeight }]} testID="banner-crop-frame">
+        {/* TikTok's crop: the whole picture stays visible, dimmed outside the
+            banner frame; drag (and pinch) anywhere to move it under the frame. */}
+        <GestureDetector gesture={gesture}>
+          <View style={styles.cropStage} testID="banner-crop">
+            <View style={{ width: frameWidth, height: frameHeight }} testID="banner-crop-frame">
               {size ? (
                 <Animated.View
                   style={[
@@ -447,6 +461,14 @@ export function BannerCropScreen({
               ) : (
                 <ActivityIndicator color={theme.text} style={StyleSheet.absoluteFill} />
               )}
+              {/* Outside the frame: dimmed, so the banner's edges are unmistakable. */}
+              <View pointerEvents="none" style={[styles.cropDim, { bottom: frameHeight, height: 2000, left: -1000, right: -1000 }]} />
+              <View pointerEvents="none" style={[styles.cropDim, { top: frameHeight, height: 2000, left: -1000, right: -1000 }]} />
+              <View pointerEvents="none" style={[styles.cropDim, { top: 0, height: frameHeight, right: frameWidth, width: 1000 }]} />
+              <View pointerEvents="none" style={[styles.cropDim, { top: 0, height: frameHeight, left: frameWidth, width: 1000 }]} />
+              {/* The profile's own bottom fade, so the framing is exactly what shows. */}
+              <BannerBottomFade height={frameHeight} testID="banner-crop-fade" />
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.cropFrameBorder]} />
               {gesturing ? (
                 <View style={StyleSheet.absoluteFill} pointerEvents="none">
                   {[1, 2].map((i) => <View key={`v${i}`} style={[styles.gridV, { left: (frameWidth / 3) * i }]} />)}
@@ -454,25 +476,26 @@ export function BannerCropScreen({
                 </View>
               ) : null}
             </View>
-          </GestureDetector>
+          </View>
+        </GestureDetector>
+        <View style={styles.cropHint} testID="banner-crop-hint">
+          <Feather name="move" size={15} color={theme.text} />
+          <Text style={[styles.cropHintText, { color: theme.text }]}>{canMove ? 'Drag to reposition' : 'Pinch to zoom, then drag to reposition'}</Text>
         </View>
-        <View style={styles.cropActions}>
-          <Pressable
-            onPress={onCancel}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.cropButton, { borderColor: theme.border, backgroundColor: theme.background }, pressed && styles.pressed]}
-            testID="banner-crop-cancel"
-          >
-            <Text style={[styles.cropButtonText, { color: theme.text }]}>Cancel</Text>
+        <View style={styles.cropBar}>
+          <Pressable onPress={onCancel} hitSlop={10} accessibilityRole="button" style={styles.cropBarSide} testID="banner-crop-cancel">
+            <Text style={[styles.cropBarText, { color: theme.text }]}>Cancel</Text>
           </Pressable>
+          <Text style={[styles.cropTitle, { color: theme.text }]} accessibilityRole="header">Crop</Text>
           <Pressable
             onPress={save}
             disabled={!size}
+            hitSlop={10}
             accessibilityRole="button"
-            style={({ pressed }) => [styles.cropButton, { borderColor: theme.text, backgroundColor: theme.text }, (pressed || !size) && styles.pressed]}
+            style={({ pressed }) => [styles.cropBarSide, styles.cropBarRight, (pressed || !size) && styles.pressed]}
             testID="banner-crop-save"
           >
-            <Text style={[styles.cropButtonText, { color: theme.background }]}>Save</Text>
+            <Text style={[styles.cropBarText, styles.cropBarStrong, { color: theme.text }]}>Save</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>
@@ -503,7 +526,10 @@ export function EditProfileBanner({
     <View style={styles.editRoot} testID="edit-profile-banner">
       <View style={[styles.editBanner, { backgroundColor: theme.cardElevated }]}>
         {banner ? (
-          <BannerMedia banner={banner} active posterOnly={false} height={EDIT_BANNER_HEIGHT} />
+          <>
+            <BannerMedia banner={banner} active posterOnly={false} height={EDIT_BANNER_HEIGHT} />
+            <BannerBottomFade height={EDIT_BANNER_HEIGHT} testID="edit-banner-fade" />
+          </>
         ) : null}
         {/* No banner yet: the whole area is a subtle dark "Add banner" placeholder. */}
         {!banner && !busy ? (
@@ -551,15 +577,19 @@ const styles = StyleSheet.create({
   sheetCancel: { fontFamily: FONT.semibold },
 
   cropRoot: { flex: 1 },
-  cropHeader: { height: 52, alignItems: 'center', justifyContent: 'center' },
   cropTitle: { fontFamily: FONT.semibold, fontSize: 17 },
-  cropStage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  cropFrame: { overflow: 'hidden', backgroundColor: '#000000' }, // theme-exempt: media backdrop
+  cropStage: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  cropDim: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.62)' }, // theme-exempt: outside-the-frame dim (TikTok crop)
+  cropFrameBorder: { borderWidth: 1, borderColor: ON_DARK },
+  cropHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: SP.md },
+  cropHintText: { fontFamily: FONT.semibold, fontSize: 14 },
+  cropBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, minHeight: 52 },
+  cropBarSide: { flex: 1, minHeight: 44, justifyContent: 'center' },
+  cropBarRight: { alignItems: 'flex-end' },
+  cropBarText: { fontFamily: FONT.regular, fontSize: 17 },
+  cropBarStrong: { fontFamily: FONT.semibold },
   gridV: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth, backgroundColor: ON_DARK },
   gridH: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: ON_DARK },
-  cropActions: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md },
-  cropButton: { flex: 1, height: 48, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  cropButtonText: { fontFamily: FONT.semibold, fontSize: 16 },
 
   editRoot: { alignItems: 'center', paddingBottom: SP.md },
   editBanner: { width: '100%', height: EDIT_BANNER_HEIGHT, overflow: 'hidden', justifyContent: 'center' },

@@ -9,8 +9,8 @@
  *   │                   (On your…) │    looping forever; poster frame first,
  *   │  Display Name           ◉+  │    paused off-screen / in background)
  *   │  @handle                     │
- *   │  12 Following  3K Followers  │ ← dark bottom gradient for legibility
- *   └──────────────────────────────┘
+ *   │  12 Following  3K Followers  │ ← bottom ~42% fades into the page
+ *   └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘   background: no visible edge
  *     bio · links · chips · tabs · grid continue below, unchanged
  *
  * Text sits on a solid dark gradient (no blur, no translucent overlay).
@@ -25,7 +25,35 @@ import { FONT, ON_DARK, ON_DARK_MUTED, SP } from '@/lib/theme';
 import { hapticSelection } from '@/lib/haptics';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import type { ProfileStat } from './ProfileControls';
-import { bannerHeroMedia, type ProfileBanner } from './profileBannerRules';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { BANNER_FADE_FRACTION, bannerFadeStops, bannerHeroMedia, type ProfileBanner } from './profileBannerRules';
+
+/**
+ * The banner's bottom edge easing into the page background (TikTok /
+ * Spotify artist header) — profile, storefront cover, Edit profile preview
+ * and the crop frame all use this one fade, so what you frame is what shows.
+ */
+export function BannerBottomFade({
+  height, fraction = BANNER_FADE_FRACTION, color, testID,
+}: {
+  height: number;
+  fraction?: number;
+  /** What the banner fades into (default: the page background). */
+  color?: string;
+  testID?: string;
+}) {
+  const { theme } = useAppTheme();
+  const { colors, locations } = bannerFadeStops(color ?? theme.background);
+  return (
+    <LinearGradient
+      pointerEvents="none"
+      colors={colors as unknown as [string, string, ...string[]]}
+      locations={locations as unknown as [number, number, ...number[]]}
+      style={[styles.bottomScrim, { height: Math.round(height * fraction) }]}
+      testID={testID ?? 'banner-bottom-fade'}
+    />
+  );
+}
 
 /** False while the app is in the background — banner playback pauses then (battery). */
 export function useAppActive(): boolean {
@@ -200,11 +228,12 @@ export function ProfileBannerHeader({
           locations={[0, 0.5, 1]}
           style={[styles.topScrim, { height: topPad + 72 }]}
         />
+        {/* Soft legibility shade behind the name / stats, then the fade into the page. */}
         <LinearGradient
-          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.82)']} // theme-exempt: legibility scrim over banner media
-          locations={[0, 0.55, 1]}
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.28)']} // theme-exempt: legibility shade over banner media
           style={[styles.bottomScrim, { height: Math.round(height * 0.6) }]}
         />
+        <BannerBottomFade height={height} />
       </View>
 
       {topBar ? <View style={[styles.topBar, { paddingTop: topPad + 6 }]}>{topBar}</View> : null}
@@ -270,6 +299,9 @@ export function ProfileBannerHeader({
 /** Room the name / handle / stats block + avatar take at the banner's bottom. */
 const IDENTITY_BLOCK_HEIGHT = 172;
 
+/** Keeps the name / handle readable over a bright frame above the fade. */
+const TEXT_SHADOW = { textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 } as const; // theme-exempt: legibility over banner media
+
 const styles = StyleSheet.create({
   placeholderSlot: { position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
   placeholderPrompt: { alignItems: 'center', gap: 8, paddingHorizontal: SP.md, paddingVertical: SP.sm },
@@ -292,11 +324,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.md, paddingBottom: SP.md,
   },
   identity: { flex: 1, minWidth: 0, marginRight: SP.md },
-  name: { fontFamily: FONT.bold, fontSize: 26, lineHeight: 31, letterSpacing: -0.4, color: ON_DARK },
-  handle: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20, color: ON_DARK_MUTED, marginTop: 2 },
+  name: { fontFamily: FONT.bold, fontSize: 26, lineHeight: 31, letterSpacing: -0.4, color: ON_DARK, ...TEXT_SHADOW },
+  handle: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20, color: ON_DARK_MUTED, marginTop: 2, ...TEXT_SHADOW },
   stats: { flexDirection: 'row', alignItems: 'flex-end', gap: 20, marginTop: 12 },
   stat: { alignItems: 'flex-start', minHeight: 40, justifyContent: 'flex-end' },
-  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, color: ON_DARK, fontVariant: ['tabular-nums'] },
+  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, color: ON_DARK, fontVariant: ['tabular-nums'], ...TEXT_SHADOW },
   statLabel: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 17, color: ON_DARK_MUTED },
   pressed: { opacity: 0.6 },
   avatarColumn: { alignItems: 'center' },

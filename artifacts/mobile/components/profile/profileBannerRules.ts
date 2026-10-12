@@ -113,3 +113,69 @@ export const BANNER_STATUS_BAR_SLACK = 8;
 export function bannerCoversStatusBar(scrollOffset: number): boolean {
   return scrollOffset < BANNER_STATUS_BAR_SLACK;
 }
+
+/**
+ * Bottom fade (TikTok / Spotify artist header): the banner's bottom ~42%
+ * eases into the page background so there's no visible edge. An eased
+ * (not linear) ramp avoids the band a two-stop gradient leaves; the last
+ * stop is the page colour, fully opaque.
+ */
+export const BANNER_FADE_FRACTION = 0.42;
+const FADE_EASE: Array<[number, number]> = [
+  [0, 0], [0.081, 0.013], [0.155, 0.049], [0.225, 0.104], [0.29, 0.175], [0.353, 0.259],
+  [0.412, 0.352], [0.471, 0.45], [0.529, 0.55], [0.588, 0.648], [0.647, 0.741], [0.71, 0.825],
+  [0.775, 0.896], [0.845, 0.951], [0.919, 0.987], [1, 1],
+];
+
+/** Gradient stops for the bottom fade into `background` (a #rgb / #rrggbb colour; anything else fades to black). */
+export function bannerFadeStops(background: string): { colors: string[]; locations: number[] } {
+  let hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(background.trim())?.[1] ?? '000000';
+  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return {
+    colors: FADE_EASE.map(([, alpha]) => `rgba(${r},${g},${b},${alpha})`),
+    locations: FADE_EASE.map(([at]) => at),
+  };
+}
+
+// ─── Trim screen (TikTok editor: filmstrip + sliding 10s window) ─────────────
+
+/** The window can't shrink below a comfortable drag target on very long clips. */
+export const TRIM_WINDOW_MIN_WIDTH = 44;
+
+/**
+ * Geometry of the fixed 10s window over a filmstrip that spans the whole
+ * clip. Exact (window width = 10s of strip) until the clip is so long the
+ * window would be thinner than a finger; then the window keeps its minimum
+ * width and its left edge still maps linearly onto start ∈ [0, total − 10].
+ */
+export function trimWindowLayout(stripWidth: number, totalSeconds: number, windowSeconds = BANNER_MAX_SECONDS) {
+  const total = Math.max(totalSeconds, 0.001);
+  const length = Math.min(windowSeconds, total);
+  const width = Math.min(stripWidth, Math.max(TRIM_WINDOW_MIN_WIDTH, (stripWidth * length) / total));
+  const maxLeft = Math.max(0, stripWidth - width);
+  const maxStart = Math.max(0, total - length);
+  return {
+    width,
+    maxLeft,
+    length,
+    startForLeft: (left: number) => (maxLeft > 0 ? (Math.min(maxLeft, Math.max(0, left)) / maxLeft) * maxStart : 0),
+    leftForStart: (start: number) => (maxStart > 0 ? (Math.min(maxStart, Math.max(0, start)) / maxStart) * maxLeft : 0),
+  };
+}
+
+/** `count` evenly spaced frame times across the whole clip (cell centres). */
+export function filmstripTimes(totalSeconds: number, count: number): number[] {
+  if (!(totalSeconds > 0) || count <= 0) return [];
+  return Array.from({ length: count }, (_, i) => Math.round(((i + 0.5) * totalSeconds / count) * 100) / 100);
+}
+
+/** 00:07, 01:12, 1:02:05 — the editor's clock. */
+export function formatTrimClock(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(whole / 3600);
+  const m = Math.floor((whole % 3600) / 60);
+  const s = whole % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}

@@ -5,6 +5,8 @@
  *          raw video body → { coverVideoUrl, coverPosterUrl, coverVideoUpdatedAt, profileBanner }
  * POST   /api/profile/cover-gif?cropX=&cropY=&cropW=&cropH=     raw image/gif body (≤15MB)
  *          → { coverVideoUrl, coverPosterUrl, coverGifUrl, coverVideoUpdatedAt, profileBanner }
+ * POST   /api/profile/cover-video/from-upload  { objectPath, trimStart, trimDuration, cropX… }
+ *          any-length clip already sent through the chunked post upload → same as above
  * DELETE /api/profile/cover-video                            → { coverVideoUrl: null, … }
  * GET    /api/profile/cover-video                            → own cover + change-limit status
  * GET    /api/profile/cover-coachmark                        → { seen }
@@ -34,7 +36,7 @@
  * cover follows the same standard — `cover_video_moderation_status` mirrors
  * posts.moderation_status and a hidden cover is never served or returned.
  */
-import express, { Router, type Request } from "express";
+import express, { Router, type Request, type Response } from "express";
 import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
@@ -82,6 +84,35 @@ export interface CoverStorage {
   trySetObjectEntityAclPolicy(path: string, policy: { owner: string; visibility: "public" | "private" }): Promise<unknown>;
   deleteObjectEntity(path: string): Promise<void>;
 }
+
+/** A finished chunked upload (`/api/posts/uploads`) to render a long clip from. */
+export interface CoverUploadSource {
+  /** Download `objectPath` to `destination` if `owner` owns it; null when missing or not theirs. */
+  download(objectPath: string, owner: string, destination: string): Promise<{ contentType: string; size: number } | null>;
+  remove(objectPath: string): Promise<void>;
+}
+
+/** Hard ceiling for a long source (the chunked upload's own limit is 1GB). */
+export const COVER_SOURCE_MAX_BYTES = 1024 * 1024 * 1024;
+
+export const objectStorageCoverUploads: CoverUploadSource = {
+  async download(objectPath, owner, destination) {
+    const objectStorage = new ObjectStorageService();
+    let file;
+    try { file = await objectStorage.getObjectEntityFile(objectPath); } catch { return null; }
+    const allowed = await objectStorage.canAccessObjectEntity({ userId: owner, objectFile: file, requestedPermission: ObjectPermission.WRITE });
+    if (!allowed) return null;
+    const [metadata] = await file.getMetadata();
+    const size = Number(metadata.size ?? 0);
+    if (!Number.isFinite(size) || size <= 0 || size > COVER_SOURCE_MAX_BYTES) return null;
+    // Stream to disk: a long clip can be hundreds of MB.
+    await file.download({ destination });
+    return { contentType: String(metadata.contentType ?? "").split(";")[0].toLowerCase(), size };
+  },
+  async remove(objectPath) {
+    await new ObjectStorageService().deleteObjectEntity(objectPath);
+  },
+};
 
 const exec = promisify(execFile);
 
@@ -180,9 +211,91 @@ function coverObjectPaths(row: { coverVideoUrl?: string | null; coverPosterUrl?:
 export function createProfileCoverRouter({
   processor = ffmpegCoverProcessor,
   storage = new ObjectStorageService() as unknown as CoverStorage,
+  uploads = objectStorageCoverUploads,
   now = () => new Date(),
-}: { processor?: CoverMediaProcessor; storage?: CoverStorage; now?: () => Date } = {}) {
+}: { processor?: CoverMediaProcessor; storage?: CoverStorage; uploads?: CoverUploadSource; now?: () => Date } = {}) {
   const router = Router();
+
+  /**
+   * Shared tail of both video routes: the source is on disk at `input`.
+   * Enforces ≤10s (source without a trim, and always the rendered file),
+   * renders the trimmed + cropped silent loop and poster, screens it, stores
+   * both publicly and swaps them in under the 24h window guard.
+   */
+  async function saveVideoCover(
+    req: Request,
+    res: Response,
+    { clerkId, row, dir, input, trim, crop }: {
+      clerkId: string;
+      row: NonNullable<Awaited<ReturnType<typeof loadCover>>>;
+      dir: string;
+      input: string;
+      trim: TrimRequest;
+      crop: CropRequest | undefined;
+    },
+  ) {
+    const created: string[] = [];
+    try {
+      // Without a trim, the source itself must already be ≤10s (the
+      // client's trim screen sends the chosen window for longer clips).
+      if (!trim) {
+        const sourceError = coverDurationError(await processor.probeDuration(input));
+        if (sourceError) return res.status(400).json({ error: sourceError, code: "cover_too_long" });
+      }
+
+      const output = join(dir, "cover.mp4");
+      const poster = join(dir, "poster.jpg");
+      await processor.render(input, output, poster, trim, crop);
+      // Re-validate what will actually be served.
+      const renderedError = coverDurationError(await processor.probeDuration(output));
+      if (renderedError) return res.status(400).json({ error: renderedError, code: "cover_too_long" });
+      const rendered = await fs.readFile(output);
+
+      // Automatic frame screening (off when the AI integration env is
+      // missing) of what will be served. Profile videos have no held state,
+      // so flagged ones are refused; a screening outage never blocks the upload.
+      const screened = await screenVideo({ buffer: rendered });
+      if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
+        void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: "cover_video", verdict: { ...screened, verdict: "reject" } }));
+        return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
+      }
+
+      const videoPath = await storage.createObjectEntityFromBuffer(rendered, "video/mp4");
+      created.push(videoPath);
+      const posterPath = await storage.createObjectEntityFromBuffer(await fs.readFile(poster), "image/jpeg");
+      created.push(posterPath);
+      await Promise.all(created.map((path) => storage.trySetObjectEntityAclPolicy(path, { owner: clerkId, visibility: "public" })));
+
+      const updatedAt = now();
+      const coverVideoUrl = coverMediaUrl(req, videoPath);
+      const coverPosterUrl = coverMediaUrl(req, posterPath);
+      // Guard the window again inside the write so two racing uploads can't
+      // both land within the same 24h.
+      const windowStart = new Date(updatedAt.getTime() - 24 * 60 * 60 * 1000);
+      const updated = await db.update(users)
+        .set({ coverVideoUrl, coverPosterUrl, coverImageUrl: null, coverMediaType: "video", coverVideoUpdatedAt: updatedAt, coverVideoModerationStatus: "visible" })
+        .where(sql`${users.clerkId} = ${clerkId} AND (${users.coverVideoUpdatedAt} IS NULL OR ${users.coverVideoUpdatedAt} <= ${windowStart})`)
+        .returning({ id: users.id });
+      if (updated.length === 0) {
+        await Promise.all(created.map((path) => storage.deleteObjectEntity(path).catch(() => {})));
+        const again = checkCoverChangeAllowed((await loadCover(clerkId))?.coverVideoUpdatedAt, now());
+        return res.status(429).json(again.allowed ? { error: "Please try again", code: "cover_change_rate_limited" } : limitResponse(again));
+      }
+
+      // The previous cover's objects are no longer referenced.
+      for (const oldPath of coverObjectPaths(row)) await storage.deleteObjectEntity(oldPath).catch(() => {});
+      return res.status(201).json({
+        coverVideoUrl,
+        coverPosterUrl,
+        coverVideoUpdatedAt: updatedAt.toISOString(),
+        profileBanner: { type: "video", url: coverVideoUrl, posterUrl: coverPosterUrl },
+      });
+    } catch (err) {
+      await Promise.all(created.map((path) => storage.deleteObjectEntity(path).catch(() => {})));
+      req.log?.error?.({ err, clerkId }, "Could not save profile cover video");
+      return res.status(500).json({ error: "Cover video could not be saved" });
+    }
+  }
 
   router.get("/cover-video", requireAuth, async (req, res) => {
     const clerkId = (req as any).clerkUserId as string;
@@ -225,73 +338,57 @@ export function createProfileCoverRouter({
       if (!isSupportedVideo(contentType, bytes)) return res.status(400).json({ error: "Invalid video file" });
 
       const dir = await fs.mkdtemp(join(tmpdir(), "bt-cover-"));
-      const created: string[] = [];
       try {
         const input = join(dir, contentType === "video/webm" ? "source.webm" : "source.mp4");
         await fs.writeFile(input, bytes);
-
-        // Without a trim, the source itself must already be ≤10s (the
-        // client's trim screen sends the chosen window for longer clips).
-        if (!trim) {
-          const sourceError = coverDurationError(await processor.probeDuration(input));
-          if (sourceError) return res.status(400).json({ error: sourceError, code: "cover_too_long" });
-        }
-
-        const output = join(dir, "cover.mp4");
-        const poster = join(dir, "poster.jpg");
-        await processor.render(input, output, poster, trim, crop);
-        // Re-validate what will actually be served.
-        const renderedError = coverDurationError(await processor.probeDuration(output));
-        if (renderedError) return res.status(400).json({ error: renderedError, code: "cover_too_long" });
-
-        // Automatic frame screening (off when the AI integration env is
-        // missing). Profile videos have no held state, so flagged ones are
-        // refused; a screening outage never blocks the upload.
-        const screened = await screenVideo({ buffer: bytes });
-        if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
-          void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: "cover_video", verdict: { ...screened, verdict: "reject" } }));
-          return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
-        }
-
-        const videoPath = await storage.createObjectEntityFromBuffer(await fs.readFile(output), "video/mp4");
-        created.push(videoPath);
-        const posterPath = await storage.createObjectEntityFromBuffer(await fs.readFile(poster), "image/jpeg");
-        created.push(posterPath);
-        await Promise.all(created.map((path) => storage.trySetObjectEntityAclPolicy(path, { owner: clerkId, visibility: "public" })));
-
-        const updatedAt = now();
-        const coverVideoUrl = coverMediaUrl(req, videoPath);
-        const coverPosterUrl = coverMediaUrl(req, posterPath);
-        // Guard the window again inside the write so two racing uploads can't
-        // both land within the same 24h.
-        const windowStart = new Date(updatedAt.getTime() - 24 * 60 * 60 * 1000);
-        const updated = await db.update(users)
-          .set({ coverVideoUrl, coverPosterUrl, coverImageUrl: null, coverMediaType: "video", coverVideoUpdatedAt: updatedAt, coverVideoModerationStatus: "visible" })
-          .where(sql`${users.clerkId} = ${clerkId} AND (${users.coverVideoUpdatedAt} IS NULL OR ${users.coverVideoUpdatedAt} <= ${windowStart})`)
-          .returning({ id: users.id });
-        if (updated.length === 0) {
-          await Promise.all(created.map((path) => storage.deleteObjectEntity(path).catch(() => {})));
-          const again = checkCoverChangeAllowed((await loadCover(clerkId))?.coverVideoUpdatedAt, now());
-          return res.status(429).json(again.allowed ? { error: "Please try again", code: "cover_change_rate_limited" } : limitResponse(again));
-        }
-
-        // The previous cover's objects are no longer referenced.
-        for (const oldPath of coverObjectPaths(row)) await storage.deleteObjectEntity(oldPath).catch(() => {});
-        return res.status(201).json({
-          coverVideoUrl,
-          coverPosterUrl,
-          coverVideoUpdatedAt: updatedAt.toISOString(),
-          profileBanner: { type: "video", url: coverVideoUrl, posterUrl: coverPosterUrl },
-        });
-      } catch (err) {
-        await Promise.all(created.map((path) => storage.deleteObjectEntity(path).catch(() => {})));
-        req.log?.error?.({ err, clerkId }, "Could not save profile cover video");
-        return res.status(500).json({ error: "Cover video could not be saved" });
+        return await saveVideoCover(req, res, { clerkId, row, dir, input, trim, crop });
       } finally {
         await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
       }
     },
   );
+
+  // Any-length clip (the trim screen's 10s window of a long video): the
+  // source goes up through the chunked post upload (/api/posts/uploads,
+  // private, owned by the uploader) and is rendered here from storage, so the
+  // phone never has to send one huge request body. The source object is
+  // deleted once the banner is saved (or refused).
+  router.post("/cover-video/from-upload", requireAuth, express.json(), async (req, res) => {
+    const clerkId = (req as any).clerkUserId as string;
+    const objectPath = typeof req.body?.objectPath === "string" ? req.body.objectPath : "";
+    if (!/^\/objects\/uploads\/[A-Za-z0-9._-]+$/.test(objectPath)) return res.status(400).json({ error: "Upload not found" });
+    const row = await loadCover(clerkId);
+    if (!row) return res.status(404).json({ error: "Account not found" });
+
+    const check = checkCoverChangeAllowed(row.coverVideoUpdatedAt, now());
+    if (!check.allowed) return res.status(429).json(limitResponse(check));
+
+    const trim = parseTrim(req.body?.trimStart, req.body?.trimDuration);
+    if (trim && "error" in trim) return res.status(400).json({ error: trim.error });
+    const crop = parseCrop(req.body?.cropX, req.body?.cropY, req.body?.cropW, req.body?.cropH);
+    if (crop && "error" in crop) return res.status(400).json({ error: crop.error });
+
+    const dir = await fs.mkdtemp(join(tmpdir(), "bt-cover-long-"));
+    let owned = false;
+    try {
+      const input = join(dir, "source");
+      const fetched = await uploads.download(objectPath, clerkId, input);
+      if (!fetched) return res.status(404).json({ error: "Upload not found" });
+      owned = true;
+      const handle = await fs.open(input, "r");
+      const head = Buffer.alloc(16);
+      await handle.read(head, 0, 16, 0).catch(() => undefined);
+      await handle.close();
+      if (!isSupportedVideo(fetched.contentType, head)) return res.status(400).json({ error: "Invalid video file" });
+      return await saveVideoCover(req, res, { clerkId, row, dir, input, trim, crop });
+    } catch (err) {
+      req.log?.error?.({ err, clerkId }, "Could not read the uploaded cover source");
+      return res.status(500).json({ error: "Cover video could not be saved" });
+    } finally {
+      if (owned) await uploads.remove(objectPath).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
 
   // GIF banner — same 24h window, storage, ACL and moderation path as the
   // video. Converted to a looping silent MP4 (+ poster); the original GIF is

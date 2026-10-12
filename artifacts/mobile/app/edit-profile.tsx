@@ -27,6 +27,7 @@ import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { Avatar } from '@/components/ui/Avatar';
 import { EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+import { BannerBottomFade } from '@/components/profile/ProfileBannerHeader';
 import { bannerStill, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
@@ -509,7 +510,10 @@ export default function EditProfileScreen() {
           <View style={styles.previewBannerWrap}>
             {/* One banner: the storefront cover is the profile banner's still frame. */}
             {bannerStill(bannerFlow.banner) ? (
-              <Image source={{ uri: bannerStill(bannerFlow.banner) as string }} style={styles.previewBanner} />
+              <>
+                <Image source={{ uri: bannerStill(bannerFlow.banner) as string }} style={styles.previewBanner} />
+                <BannerBottomFade height={88} fraction={0.6} color={theme.card} testID="storefront-preview-fade" />
+              </>
             ) : (
               <LinearGradient colors={theme.heroGradient as any} style={styles.previewBanner} />
             )}

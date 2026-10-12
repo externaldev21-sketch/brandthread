@@ -2103,6 +2103,28 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           getToken,
           getCacheScope,
         ),
+      /**
+       * Any-length clip: the whole source goes up through the chunked,
+       * resumable post upload, then the server renders the chosen 10s
+       * window + crop from storage (and deletes the source).
+       */
+      uploadLong: async (
+        uri: string,
+        mimeType: string | null | undefined,
+        trim: { start: number; duration: number } | null,
+        crop?: ProfileBannerCrop | null,
+        onProgress?: (fraction: number) => void,
+      ) => {
+        const { objectPath } = await uploadVideoChunked({ uri, mimeType }, getToken, { onProgress });
+        return post<{ coverVideoUrl: string; coverPosterUrl: string; coverVideoUpdatedAt: string; profileBanner?: ProfileBanner | null }>(
+          '/api/profile/cover-video/from-upload',
+          {
+            objectPath,
+            ...(trim ? { trimStart: trim.start, trimDuration: trim.duration } : {}),
+            ...(crop ? { cropX: crop.x, cropY: crop.y, cropW: crop.width, cropH: crop.height } : {}),
+          },
+        );
+      },
       /** GIF profile banner (raw image/gif body, ≤15MB); converted server-side to a looping MP4. */
       uploadGif: (uri: string, crop?: ProfileBannerCrop | null) =>
         uploadVideo<{ coverVideoUrl: string | null; coverPosterUrl: string | null; coverGifUrl: string; coverVideoUpdatedAt: string; profileBanner: ProfileBanner }>(

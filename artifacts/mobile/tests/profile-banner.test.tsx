@@ -13,6 +13,7 @@ const { apiMock, actionSheetMock, pickerMock, docPickerMock, alertMock, emitMock
   apiMock: {
     profileCover: {
       upload: vi.fn(),
+      uploadLong: vi.fn(),
       uploadGif: vi.fn(),
       remove: vi.fn(),
       coachmark: vi.fn(async () => ({ seen: true, hasCover: false })),
@@ -59,9 +60,14 @@ vi.mock('react-native', () => {
 vi.mock('expo-image-picker', () => pickerMock);
 vi.mock('expo-document-picker', () => docPickerMock);
 vi.mock('expo-video', () => ({
-  useVideoPlayer: () => ({ play: vi.fn(), pause: vi.fn(), currentTime: 0, addListener: () => ({ remove() {} }) }),
+  // One player per mount (as expo-video's hook returns), not a new object per render.
+  useVideoPlayer: () => React.useState(() => ({
+    play: vi.fn(), pause: vi.fn(), currentTime: 0, status: 'readyToPlay', addListener: () => ({ remove() {} }),
+    generateThumbnailsAsync: vi.fn(async (times: number[]) => times.map((time) => ({ requestedTime: time }))),
+  }))[0],
   VideoView: (props: any) => React.createElement('VideoView', props),
 }));
+vi.mock('expo-image', () => ({ Image: (props: any) => React.createElement('ExpoImage', props) }));
 vi.mock('expo-linear-gradient', () => ({ LinearGradient: (props: any) => React.createElement('LinearGradient', props) }));
 vi.mock('expo-router', () => ({ useFocusEffect: (fn: () => void) => React.useEffect(fn, [fn]) }));
 vi.mock('react-native-gesture-handler', () => {
@@ -101,7 +107,8 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 }));
 
 import {
-  bannerAspect, bannerCoversStatusBar, bannerHeight, bannerHeroMedia, bannerNeedsTrim, bannerSheetOptions, bannerStill, isGifAsset, resolveProfileBanner,
+  bannerAspect, bannerCoversStatusBar, bannerFadeStops, bannerHeight, bannerHeroMedia, bannerNeedsTrim, bannerSheetOptions, bannerStill, filmstripTimes,
+  formatTrimClock, isGifAsset, resolveProfileBanner, trimWindowLayout, BANNER_FADE_FRACTION, TRIM_WINDOW_MIN_WIDTH,
 } from '@/components/profile/profileBannerRules';
 import { coverQuery } from '@/lib/profileBannerApi';
 import { bannerCropRect, BannerActionSheet, EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
@@ -219,6 +226,7 @@ describe('"Edit banner" flow', () => {
     actionSheetMock.mockReset();
     pickerMock.launchImageLibraryAsync.mockReset();
     apiMock.profileCover.upload.mockReset();
+    apiMock.profileCover.uploadLong.mockReset();
     apiMock.profileCover.uploadGif.mockReset();
     apiMock.profileCover.remove.mockReset();
     docPickerMock.getDocumentAsync.mockReset();
@@ -290,24 +298,34 @@ describe('"Edit banner" flow', () => {
     renderer.unmount();
   });
 
-  it('Choose video over 10s → trim screen picks the 10s window → crop → uploads with that window (no hard cut)', async () => {
-    pickerMock.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://long.mp4', mimeType: 'video/mp4', width: 1080, height: 1920, duration: 42000 }] });
-    apiMock.profileCover.upload.mockResolvedValue({ coverVideoUrl: VIDEO.url, coverPosterUrl: VIDEO.posterUrl, profileBanner: VIDEO });
+  it('Choose a 72s vertical video → trim screen (filmstrip of the whole clip) picks the 10s window → crop → chunked upload of that window', async () => {
+    pickerMock.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://long.mp4', mimeType: 'video/mp4', width: 1080, height: 1920, duration: 72000 }] });
+    apiMock.profileCover.uploadLong.mockResolvedValue({ coverVideoUrl: VIDEO.url, coverPosterUrl: VIDEO.posterUrl, profileBanner: VIDEO });
     const renderer = await mount(null);
     act(() => { flow!.openSheet(); });
     await act(async () => { actionSheetMock.mock.calls[0][1](1); await flush(); });
     expect(pickerMock.launchImageLibraryAsync).toHaveBeenCalledWith(expect.objectContaining({ mediaTypes: ['videos'] }));
     // Trim screen first; nothing uploaded yet.
-    expect(byTestId(renderer, 'cover-trim')).toHaveLength(1);
+    expect(byTestId(renderer, 'banner-trim')).toHaveLength(1);
     expect(byTestId(renderer, 'banner-crop')).toHaveLength(0);
-    // The chosen window (here 12s–22s) is what gets uploaded.
-    const trimSheet = renderer.root.findAll((node) => typeof node.props.onConfirm === 'function' && node.props.source)[0];
-    await act(async () => { trimSheet.props.onConfirm({ start: 12, duration: 10 }); await flush(); });
+    // The filmstrip spans the whole 72s clip; the window starts at 0:00.
+    expect(renderer.root.findAll((node) => (node.type as unknown) === 'ExpoImage')).toHaveLength(9);
+    expect(byTestId(renderer, 'banner-trim-range')[0].props.children).toBe('00:00 – 00:10');
+    expect(byTestId(renderer, 'banner-trim-clock')[0].props.children[1].props.children).toBe(' / 01:12');
+    // The chosen window (here 41s–51s) is what gets uploaded.
+    const trimScreen = renderer.root.findAll((node) => typeof node.props.onConfirm === 'function' && node.props.source)[0];
+    await act(async () => { trimScreen.props.onConfirm({ start: 41, duration: 10 }); await flush(); });
     expect(byTestId(renderer, 'banner-crop')).toHaveLength(1);
+    // Vertical clip in the banner frame: it can be dragged up / down.
+    expect(byTestId(renderer, 'banner-crop-hint')[0].findByType('Text' as never).props.children).toBe('Drag to reposition');
     await act(async () => { byTestId(renderer, 'banner-crop-save')[0].props.onPress(); await flush(); });
-    const [uri, mime, trim, crop] = apiMock.profileCover.upload.mock.calls[0];
-    expect([uri, mime, trim]).toEqual(['file://long.mp4', 'video/mp4', { start: 12, duration: 10 }]);
+    expect(apiMock.profileCover.upload).not.toHaveBeenCalled();
+    const [uri, mime, trim, crop] = apiMock.profileCover.uploadLong.mock.calls[0];
+    expect([uri, mime, trim]).toEqual(['file://long.mp4', 'video/mp4', { start: 41, duration: 10 }]);
     expect(crop.width).toBeCloseTo(1, 5);
+    // 9:16 source, 390×380 frame, centred: the middle 380/693 of the height.
+    expect(crop.height).toBeCloseTo(380 / (390 * 1920 / 1080), 3);
+    expect(crop.y).toBeCloseTo((1 - crop.height) / 2, 3);
     expect(flow!.banner).toEqual(VIDEO);
     renderer.unmount();
   });
@@ -318,9 +336,10 @@ describe('"Edit banner" flow', () => {
     const renderer = await mount(null);
     act(() => { flow!.openSheet(); });
     await act(async () => { actionSheetMock.mock.calls[0][1](1); await flush(); });
-    expect(byTestId(renderer, 'cover-trim')).toHaveLength(0);
+    expect(byTestId(renderer, 'banner-trim')).toHaveLength(0);
     await act(async () => { byTestId(renderer, 'banner-crop-save')[0].props.onPress(); await flush(); });
     expect(apiMock.profileCover.upload.mock.calls[0][2]).toBeNull();
+    expect(apiMock.profileCover.uploadLong).not.toHaveBeenCalled();
     renderer.unmount();
   });
 
@@ -502,6 +521,69 @@ describe('empty banner placeholder (owners)', () => {
     });
     expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Edit banner' && typeof node.type === 'string')).toHaveLength(1);
     expect(byTestId(renderer, 'edit-banner-button-add')).toHaveLength(0);
+    renderer.unmount();
+  });
+});
+
+describe('trim: any length, a 10s window slid along the whole clip', () => {
+  it('the window is exactly 10s of the strip, and its left edge maps onto the start', () => {
+    const layout = trimWindowLayout(358, 60);
+    expect(layout.width).toBeCloseTo(358 / 6, 5);
+    expect(layout.length).toBe(10);
+    expect(layout.startForLeft(0)).toBe(0);
+    expect(layout.startForLeft(layout.maxLeft)).toBeCloseTo(50, 5);
+    expect(layout.startForLeft(layout.leftForStart(23.4))).toBeCloseTo(23.4, 5);
+    // Dragging past either end clamps.
+    expect(layout.startForLeft(-40)).toBe(0);
+    expect(layout.startForLeft(9999)).toBeCloseTo(50, 5);
+  });
+
+  it('a very long clip keeps a finger-sized window that still reaches the very end', () => {
+    const layout = trimWindowLayout(358, 600);
+    expect(layout.width).toBe(TRIM_WINDOW_MIN_WIDTH);
+    expect(layout.startForLeft(layout.maxLeft)).toBeCloseTo(590, 5);
+  });
+
+  it('filmstrip frames are spread across the whole clip; the clock reads mm:ss', () => {
+    expect(filmstripTimes(72, 9)).toEqual([4, 12, 20, 28, 36, 44, 52, 60, 68]);
+    expect(filmstripTimes(0, 9)).toEqual([]);
+    expect(formatTrimClock(7.9)).toBe('00:07');
+    expect(formatTrimClock(72)).toBe('01:12');
+    expect(formatTrimClock(3725)).toBe('1:02:05');
+  });
+});
+
+describe('bottom fade into the page', () => {
+  it('eases from clear to the page colour, fully opaque at the bottom', () => {
+    const { colors, locations } = bannerFadeStops('#000000');
+    expect(colors[0]).toBe('rgba(0,0,0,0)');
+    expect(colors[colors.length - 1]).toBe('rgba(0,0,0,1)');
+    expect(locations[0]).toBe(0);
+    expect(locations[locations.length - 1]).toBe(1);
+    expect(colors).toHaveLength(locations.length);
+    expect(bannerFadeStops('#fff').colors.at(-1)).toBe('rgba(255,255,255,1)');
+    expect(BANNER_FADE_FRACTION).toBeGreaterThanOrEqual(0.35);
+    expect(BANNER_FADE_FRACTION).toBeLessThanOrEqual(0.45);
+  });
+
+  it('the profile banner, the Edit profile preview and the crop frame all fade into the page background', () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        <ProfileBannerHeader banner={VIDEO} height={380} active posterOnly={false} topPad={47} avatar={<React.Fragment />} name="N" stats={[]} />,
+      );
+    });
+    const fade = renderer.root.findAll((node) => node.props.testID === 'banner-bottom-fade')[0];
+    expect(fade.props.colors.at(-1)).toBe('rgba(0,0,0,1)');
+    expect(fade.props.style[1].height).toBe(Math.round(380 * BANNER_FADE_FRACTION));
+    // The subtle top gradient stays.
+    expect(renderer.root.findAll((node) => (node.type as unknown) === 'LinearGradient' && node.props.colors?.[0] === 'rgba(0,0,0,0.5)')).toHaveLength(1);
+    renderer.unmount();
+
+    act(() => {
+      renderer = create(<EditProfileBanner banner={VIDEO} busy={null} onEditBanner={() => {}} avatar={<React.Fragment />} onEditAvatar={() => {}} />);
+    });
+    expect(renderer.root.findAll((node) => node.props.testID === 'edit-banner-fade')).not.toHaveLength(0);
     renderer.unmount();
   });
 });
