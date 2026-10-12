@@ -301,7 +301,7 @@ label{display:grid;gap:6px;font-size:13px;color:${theme.muted}}
 input,select{width:100%;min-height:48px;padding:12px 14px;border:1px solid ${theme.line};border-radius:12px;background:${theme.card};color:${theme.fg};font:16px ${SYSTEM_FONT};-webkit-appearance:none;appearance:none}
 select{background-image:linear-gradient(45deg,transparent 50%,${theme.muted} 50%),linear-gradient(135deg,${theme.muted} 50%,transparent 50%);background-position:calc(100% - 20px) 21px,calc(100% - 15px) 21px;background-size:5px 5px;background-repeat:no-repeat;padding-right:36px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.err{margin:0;color:#FF453A;font-size:15px}
+.err{margin:0;color:${theme.fg};font-size:15px;font-weight:600}
 .go{margin-top:8px}
 #pay{margin-top:24px;min-height:200px}`;
 }
