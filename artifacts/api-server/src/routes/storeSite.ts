@@ -2,32 +2,34 @@
  * The seller's store website — public, unauthenticated, mounted at the site
  * root next to /u/:username and /bio/:slug (see app.ts):
  *
- *   GET /@:handle                 store website (logo, name, bio, socials, products, links)
- *   GET /@:handle/p/:productId    product page with Buy
- *   GET /@:handle/go/:linkId      click-tracked redirect for a link button
- *   GET /@:handle/og.png          link-preview card (og:image)
+ *   GET /@:handle                      the store: profile, socials, product blocks
+ *   GET /@:handle/c/:productId         checkout page for a block, on the store
+ *   GET /@:handle/c/:productId/done    confirmation after payment
+ *   GET /@:handle/p/:productId         older product links → the block's checkout
+ *   GET /@:handle/go/:linkId           click-tracked redirect for older link buttons
+ *   GET /@:handle/og.png               link-preview card (og:image)
  *
- * The handle is the seller's @username. Content comes from the seller's
- * link-in-bio row (bio_pages + bio_links) when there is one, otherwise from
- * their profile, so every seller with a username has a working link from day
- * one. Visits and clicks land in bio_events like the /bio pages.
+ * The handle is the seller's @username. The profile comes from the seller's
+ * link-in-bio row (bio_pages) when there is one, otherwise from their profile;
+ * the blocks from store_blocks (lib/growth/storeBlockData), so every seller
+ * with a username has a working store from day one. Visits and clicks land
+ * in bio_events like the /bio pages.
  */
 import crypto from "node:crypto";
 import type { Request, Response } from "express";
-import { db, bioPages, bioLinks, products, productVariants, users } from "@workspace/db";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { db, bioPages, bioLinks, users } from "@workspace/db";
+import { and, eq, sql } from "drizzle-orm";
 import { normalizeSocials } from "../lib/growth/bioValidation";
 import { logBioEvent } from "./growthPublic";
-import { buildDestinationUrl } from "../lib/growth/utm";
 import { storeSiteUrl } from "../lib/growth/destinations";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { getWebOrigin } from "../lib/webOrigin";
+import { normalizeStoreHandle, storeSiteTheme } from "../lib/growth/storeSiteDesign";
 import {
-  MAX_STORE_SITE_LINKS, MAX_STORE_SITE_PRODUCTS, buttonStyleOf, fontOf, normalizeStoreHandle, storeSiteTheme,
-} from "../lib/growth/storeSiteDesign";
-import {
-  STORE_SITE_CSP, renderStoreSite, renderStoreSiteProduct, storeSiteBuyHref, type StoreSiteModel,
+  STORE_DONE_CSP, STORE_SITE_CSP, renderStoreCheckout, renderStoreCheckoutDone, renderStoreSite, storeCheckoutCsp,
+  type StoreSiteBlock, type StoreSiteModel,
 } from "../lib/growth/storeSitePage";
+import { publicStoreBlocks, type StoreBlockRecord } from "../lib/growth/storeBlockData";
+import { blockButtonText, priceLabel, shipByLabel } from "../lib/growth/storeBlocks";
 import { renderStoreSiteOg } from "../lib/growth/storeSiteOg";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -36,6 +38,15 @@ const objectStorage = new ObjectStorageService();
 const IMAGE_URL_TTL_SEC = 24 * 60 * 60;
 
 export const usd = (cents: number) => `$${(Math.max(0, cents) / 100).toFixed(2)}`;
+
+/**
+ * Stripe publishable key for embedded payment on the checkout page. Without
+ * it the page continues on Stripe's hosted checkout (same order flow).
+ */
+export function stripePublishableKey(): string | null {
+  const k = process.env.STRIPE_PUBLISHABLE_KEY?.trim();
+  return k && /^pk_(live|test)_[A-Za-z0-9]{8,200}$/.test(k) ? k : null;
+}
 
 /** An image reference a browser can load: https URLs as-is, private /objects/ paths signed. */
 export async function publicImage(ref: unknown): Promise<string | null> {
@@ -57,10 +68,7 @@ type LoadedSite = {
   displayName: string;
   bio: string;
   logoRef: string | null;
-  bannerRef: string | null;
   theme: ReturnType<typeof storeSiteTheme>;
-  buttonStyle: ReturnType<typeof buttonStyleOf>;
-  font: ReturnType<typeof fontOf>;
   socials: Record<string, string>;
   featuredIds: string[];
   updatedAt: Date | null;
@@ -92,52 +100,52 @@ export async function loadStoreSite(rawHandle: unknown): Promise<LoadedSite | nu
     // Store logo first (Design editor uploads it), then the older link-in-bio
     // photo, then the profile photo.
     logoRef: u.logoUrl || page?.avatarUrl || u.profileImageUrl || u.avatarUrl || null,
-    bannerRef: page && !page.showBanner ? null : u.bannerUrl || null,
     theme: storeSiteTheme(page?.theme),
-    buttonStyle: buttonStyleOf(page?.buttonStyle),
-    font: fontOf(page?.font),
     socials: page ? page.socials ?? {} : normalizeSocials(u.socialLinks ?? {}),
     featuredIds: (page?.featuredProductIds ?? []).filter((id) => UUID_RE.test(id)),
     updatedAt: page?.updatedAt ?? null,
   };
 }
 
-type SiteProduct = { id: string; name: string; description: string | null; images: string[]; priceCents: number | null };
-
-/** The product tiles the site shows, as the site shows them (for in-app previews). */
-export async function siteProductTiles(sellerId: string, featuredIds: string[]) {
-  const rows = await loadSiteProducts(sellerId, featuredIds.filter((id) => UUID_RE.test(id)));
-  return Promise.all(rows.map(async (p) => ({
-    id: p.id, name: p.name, image: await publicImage(p.images[0]), priceLabel: p.priceCents == null ? "" : usd(p.priceCents),
-  })));
+/** What a block can't do right now (shown instead of its button), or null. */
+function unavailableLabel(b: StoreBlockRecord): string | null {
+  if (!b.open) return "Pre-orders closed";
+  if (b.stock <= 0 || b.priceCents == null) return "Sold out";
+  return null;
 }
 
-/** Active products, featured ones first in the seller's order, then newest. */
-export async function loadSiteProducts(sellerId: string, featuredIds: string[]): Promise<SiteProduct[]> {
-  const rows = await db.select({ id: products.id, name: products.name, description: products.description, images: products.images })
-    .from(products)
-    .where(and(eq(products.ownerId, sellerId), eq(products.status, "active"), isNull(products.deletedAt)))
-    .orderBy(desc(products.createdAt))
-    .limit(200);
-  const rank = new Map(featuredIds.map((id, i) => [id.toLowerCase(), i]));
-  const ordered = [...rows].sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity)).slice(0, MAX_STORE_SITE_PRODUCTS);
-  const prices = ordered.length
-    ? await db.select({ productId: productVariants.productId, min: sql<number>`min(${productVariants.priceCents})::int` })
-      .from(productVariants).where(inArray(productVariants.productId, ordered.map((r) => r.id))).groupBy(productVariants.productId)
-    : [];
-  const priceOf = new Map(prices.map((p) => [p.productId, p.min]));
-  return ordered.map((r) => ({
-    id: r.id, name: r.name, description: r.description,
-    images: Array.isArray(r.images) ? r.images.filter((x): x is string => typeof x === "string") : [],
-    priceCents: priceOf.get(r.id) ?? null,
-  }));
+/** The product blocks as the in-app previews show them. */
+export async function siteProductTiles(sellerId: string, featuredIds: string[]) {
+  const blocks = await publicStoreBlocks(sellerId, featuredIds.filter((id) => UUID_RE.test(id)));
+  return Promise.all(blocks.map(async (b) => ({
+    id: b.productId, name: b.title || b.product.name, image: await publicImage(b.thumbImage ?? b.product.images[0]),
+    priceLabel: b.priceCents == null ? "" : usd(b.priceCents),
+  })));
 }
 
 /** Cache-buster for og:image so a redesign shows a fresh card. */
 function ogVersion(site: LoadedSite, productIds: string[]): string {
   return crypto.createHash("sha1")
-    .update(`${site.updatedAt?.getTime() ?? 0}|${site.logoRef ?? ""}|${site.displayName}|${productIds.slice(0, 3).join(",")}`)
+    .update(`${site.updatedAt?.getTime() ?? 0}|${site.logoRef ?? ""}|${site.displayName}|${site.theme.key}|${productIds.slice(0, 3).join(",")}`)
     .digest("hex").slice(0, 10);
+}
+
+/** utm_* / l (tracked link) from the store URL, carried onto checkout links. */
+function attributionQuery(req: Request): string {
+  const q = new URLSearchParams();
+  for (const k of ["utm_source", "utm_medium", "utm_campaign", "l"]) {
+    const v = req.query[k];
+    if (typeof v === "string" && /^[\w.-]{1,80}$/.test(v)) q.set(k, v);
+  }
+  const str = q.toString();
+  return str ? `?${str}` : "";
+}
+
+function sendHtml(res: Response, csp: string, html: string): void {
+  res.set("Cache-Control", "no-cache");
+  res.set("Content-Security-Policy", csp);
+  res.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.type("html").send(html);
 }
 
 export async function storeSiteHandler(req: Request, res: Response): Promise<void> {
@@ -150,82 +158,120 @@ export async function storeSiteHandler(req: Request, res: Response): Promise<voi
       res.redirect(301, `/@${site.handle}`);
       return;
     }
-    const [rows, links, logoUrl, bannerUrl] = await Promise.all([
-      loadSiteProducts(site.sellerId, site.featuredIds),
-      db.select({ id: bioLinks.id, title: bioLinks.title }).from(bioLinks)
-        .where(and(eq(bioLinks.sellerId, site.sellerId), eq(bioLinks.enabled, true)))
-        .orderBy(asc(bioLinks.position), asc(bioLinks.createdAt)).limit(MAX_STORE_SITE_LINKS),
-      publicImage(site.logoRef),
-      publicImage(site.bannerRef),
-    ]);
-    const productsOut = await Promise.all(rows.map(async (p) => ({
-      id: p.id, name: p.name, href: `/@${site.handle}/p/${p.id}`,
-      image: await publicImage(p.images[0]), priceLabel: p.priceCents == null ? "" : usd(p.priceCents),
+    const [blocks, logoUrl] = await Promise.all([publicStoreBlocks(site.sellerId, site.featuredIds), publicImage(site.logoRef)]);
+    const query = attributionQuery(req);
+    const blocksOut: StoreSiteBlock[] = await Promise.all(blocks.map(async (b) => ({
+      href: `/@${site.handle}/c/${b.productId}${query}`,
+      kind: b.kind,
+      style: b.style,
+      image: await publicImage(b.thumbImage ?? b.product.images[0]),
+      title: b.title || b.product.name,
+      subtitle: b.subtitle,
+      priceLabel: priceLabel(b.priceCents),
+      compareAtLabel: priceLabel(b.compareAtPriceCents),
+      shipByLabel: b.kind === "preorder" ? shipByLabel(b.shipBy) : "",
+      buttonText: blockButtonText(b.kind, b.buttonText),
+      unavailableLabel: unavailableLabel(b),
     })));
     const model: StoreSiteModel = {
       handle: site.handle,
       displayName: site.displayName,
       bio: site.bio,
       logoUrl,
-      bannerUrl,
       theme: site.theme,
-      buttonStyle: site.buttonStyle,
-      font: site.font,
       socials: Object.entries(site.socials).map(([key, href]) => ({ key, href })),
-      products: productsOut,
-      links: links.map((l) => ({ href: `/@${site.handle}/go/${l.id}`, title: l.title })),
+      blocks: blocksOut,
       canonicalUrl: canonical,
-      ogImageUrl: `${canonical}/og.png?v=${ogVersion(site, rows.map((r) => r.id))}`,
+      ogImageUrl: `${canonical}/og.png?v=${ogVersion(site, blocks.map((b) => b.productId))}`,
     };
     await logBioEvent(req, site.sellerId, "view", "view", {}, 1);
-    res.set("Cache-Control", "no-cache");
-    res.set("Content-Security-Policy", STORE_SITE_CSP);
-    res.set("Referrer-Policy", "strict-origin-when-cross-origin");
-    res.type("html").send(renderStoreSite(model));
+    sendHtml(res, STORE_SITE_CSP, renderStoreSite(model));
   } catch (err) {
     req.log?.error({ err }, "store site render failed");
     res.status(500).send("Store temporarily unavailable");
   }
 }
 
-const SITE_UTM = { source: "brandthread_site", medium: "link_in_bio", campaign: null, term: null, content: null } as const;
+/** The site and the visible block for a product on it, or null. */
+async function loadBlockPage(req: Request): Promise<{ site: LoadedSite; block: StoreBlockRecord } | null> {
+  const site = await loadStoreSite(req.params.handle);
+  const productId = req.params.productId;
+  if (!site || typeof productId !== "string" || !UUID_RE.test(productId)) return null;
+  const blocks = await publicStoreBlocks(site.sellerId, site.featuredIds);
+  const block = blocks.find((b) => b.productId === productId.toLowerCase());
+  return block ? { site, block } : null;
+}
 
+export async function storeSiteCheckoutHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const found = await loadBlockPage(req);
+    if (!found) return notFound(res);
+    const { site, block } = found;
+    const storePath = `/@${site.handle}`;
+    const [logoUrl, image] = await Promise.all([
+      publicImage(site.logoRef),
+      publicImage(block.checkoutImage ?? block.thumbImage ?? block.product.images[0]),
+    ]);
+    const pk = stripePublishableKey();
+    await logBioEvent(req, site.sellerId, "product", `p:${block.productId}`, { ref: block.productId });
+    sendHtml(res, storeCheckoutCsp(!!pk), renderStoreCheckout({
+      site: { handle: site.handle, displayName: site.displayName, logoUrl, theme: site.theme, canonicalUrl: storeSiteUrl(site.handle) },
+      storePath,
+      productId: block.productId,
+      kind: block.kind,
+      title: block.title || block.product.name,
+      image,
+      description: block.description || block.product.description,
+      priceLabel: priceLabel(block.priceCents),
+      compareAtLabel: priceLabel(block.compareAtPriceCents),
+      shipByLabel: block.kind === "preorder" ? shipByLabel(block.shipBy) : "",
+      variants: block.variants.map((v) => ({ id: v.id, label: v.label, priceLabel: priceLabel(v.priceCents), soldOut: v.stock <= 0 })),
+      unavailableLabel: unavailableLabel(block),
+      stripePublishableKey: pk,
+      donePath: `${storePath}/c/${block.productId}/done`,
+      canonicalUrl: `${storeSiteUrl(site.handle)}/c/${block.productId}`,
+    }));
+  } catch (err) {
+    req.log?.error({ err }, "store checkout render failed");
+    res.status(500).send("Checkout temporarily unavailable");
+  }
+}
+
+export async function storeSiteCheckoutDoneHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const found = await loadBlockPage(req);
+    if (!found) return notFound(res);
+    const { site, block } = found;
+    const [logoUrl, image] = await Promise.all([
+      publicImage(site.logoRef),
+      publicImage(block.thumbImage ?? block.product.images[0]),
+    ]);
+    res.set("Cache-Control", "no-store");
+    res.set("Content-Security-Policy", STORE_DONE_CSP);
+    res.set("Referrer-Policy", "no-referrer");
+    res.type("html").send(renderStoreCheckoutDone({
+      site: { handle: site.handle, displayName: site.displayName, logoUrl, theme: site.theme, canonicalUrl: storeSiteUrl(site.handle) },
+      storePath: `/@${site.handle}`,
+      title: block.title || block.product.name,
+      image,
+      shipByLabel: block.kind === "preorder" ? shipByLabel(block.shipBy) : "",
+    }));
+  } catch (err) {
+    req.log?.error({ err }, "store checkout done render failed");
+    res.status(500).send("Store temporarily unavailable");
+  }
+}
+
+/** Product links from the first store website open the product's checkout on the store. */
 export async function storeSiteProductHandler(req: Request, res: Response): Promise<void> {
   try {
     const site = await loadStoreSite(req.params.handle);
-    const productId = req.params.productId;
-    if (!site || typeof productId !== "string" || !UUID_RE.test(productId)) return notFound(res);
-    const [p] = await db.select({ id: products.id, name: products.name, description: products.description, images: products.images })
-      .from(products)
-      .where(and(eq(products.id, productId), eq(products.ownerId, site.sellerId), eq(products.status, "active"), isNull(products.deletedAt)))
-      .limit(1);
-    if (!p) return notFound(res);
-    const [[price], logoUrl, images] = await Promise.all([
-      db.select({ min: sql<number | null>`min(${productVariants.priceCents})::int` }).from(productVariants).where(eq(productVariants.productId, p.id)),
-      publicImage(site.logoRef),
-      Promise.all((Array.isArray(p.images) ? p.images : []).slice(0, 8).map(publicImage)),
-    ]);
-    const canonical = `${storeSiteUrl(site.handle)}/p/${p.id}`;
-    const webCheckout = buildDestinationUrl(`${getWebOrigin()}/store/product/${p.id}`, { ...SITE_UTM });
-    await logBioEvent(req, site.sellerId, "product", `p:${p.id}`, { ref: p.id });
-    res.set("Cache-Control", "no-cache");
-    res.set("Content-Security-Policy", STORE_SITE_CSP);
-    res.set("Referrer-Policy", "strict-origin-when-cross-origin");
-    res.type("html").send(renderStoreSiteProduct({
-      site: {
-        handle: site.handle, displayName: site.displayName, logoUrl, theme: site.theme,
-        buttonStyle: site.buttonStyle, font: site.font, canonicalUrl: storeSiteUrl(site.handle),
-      },
-      product: {
-        name: p.name, description: (p.description ?? "").trim(),
-        images: images.filter((x): x is string => !!x),
-        priceLabel: price?.min == null ? "" : usd(price.min),
-      },
-      buyHref: storeSiteBuyHref(req.get("user-agent"), webCheckout, p.id),
-      canonicalUrl: canonical,
-    }));
+    if (!site) return notFound(res);
+    const found = await loadBlockPage(req);
+    res.set("Cache-Control", "no-store");
+    res.redirect(301, found ? `/@${site.handle}/c/${found.block.productId}` : `/@${site.handle}`);
   } catch (err) {
-    req.log?.error({ err }, "store site product render failed");
+    req.log?.error({ err }, "store site product redirect failed");
     res.status(500).send("Product temporarily unavailable");
   }
 }
@@ -258,15 +304,15 @@ export async function storeSiteOgHandler(req: Request, res: Response): Promise<v
   try {
     const site = await loadStoreSite(req.params.handle);
     if (!site) { res.status(404).end(); return; }
-    const rows = await loadSiteProducts(site.sellerId, site.featuredIds);
-    const key = `${site.handle}:${ogVersion(site, rows.map((r) => r.id))}:${site.theme.key}`;
+    const blocks = await publicStoreBlocks(site.sellerId, site.featuredIds);
+    const key = `${site.handle}:${ogVersion(site, blocks.map((b) => b.productId))}`;
     const hit = ogCache.get(key);
     let png = hit && Date.now() - hit.at < OG_TTL_MS ? hit.png : null;
     if (!png) {
-      const withImages = rows.filter((r) => r.images.length).slice(0, 3);
+      const withImages = blocks.filter((b) => b.thumbImage ?? b.product.images[0]).slice(0, 3);
       const [logoUrl, ...productImages] = await Promise.all([
         publicImage(site.logoRef),
-        ...withImages.map((r) => publicImage(r.images[0])),
+        ...withImages.map((b) => publicImage(b.thumbImage ?? b.product.images[0])),
       ]);
       png = await renderStoreSiteOg({
         handle: site.handle,

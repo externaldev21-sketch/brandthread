@@ -38,7 +38,6 @@ import { RADII } from '@/constants/radii';
 import { FILL_ELEVATED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { QR_DARK, QR_LIGHT } from '@/lib/storeSiteDesign';
-import { updateStoreSiteFlags } from '@/lib/storeSiteFlags';
 
 const QRCode = React.lazy(() => import('react-native-qrcode-svg'));
 
@@ -84,7 +83,6 @@ export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previe
     if (!link.url) return;
     await link.copy(); // haptic + clipboard (hooks/useStoreLink)
     onToast('Link copied');
-    void updateStoreSiteFlags(link.username, { linkShared: true }); // My store checklist
   }, [onToast, link]);
 
   const systemShare = useCallback(async () => {
@@ -104,7 +102,6 @@ export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previe
     if (!link.url) return;
     const target = SHARE_TARGETS.find((t) => t.key === key)!;
     const urls = shareTargetUrls(key, link.url, Platform.OS);
-    void updateStoreSiteFlags(link.username, { linkShared: true }); // My store checklist
     if (!urls.length) { await systemShare(); return; }
     hapticLight();
     if (target.copyFirst) { await link.copy(); onToast('Link copied'); }
@@ -133,7 +130,7 @@ export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previe
       {site ? (
         <View style={s.previewWrap}>
           <View style={[s.previewFrame, { borderColor: theme.borderSubtle }]}>
-            <StoreSiteThumbnail site={site} width={previewWidth} height={previewHeight} radius={14} maxProducts={4} testID="share-store-preview" />
+            <StoreSiteThumbnail site={site} width={previewWidth} height={previewHeight} radius={14} maxBlocks={3} testID="share-store-preview" />
           </View>
         </View>
       ) : <View style={{ height: previewHeight + 4 }} />}

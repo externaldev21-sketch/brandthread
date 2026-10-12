@@ -429,7 +429,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         )}
         note={bannerNote}
         name={identity.name}
-        nameAccessory={identity.verified ? <Feather name="check-circle" size={18} color={ON_DARK} accessibilityLabel="Verified" /> : null}
+        nameAccessory={identity.verified ? <Icon name="check-circle" size={18} color={ON_DARK} accessibilityLabel="Verified" /> : null}
         handle={identity.handle ?? null}
         stats={stats}
         statsLoading={statsLoading}

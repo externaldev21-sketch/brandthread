@@ -75,9 +75,9 @@ const DEFAULT_TASKS: Omit<SetupTask, 'completed' | 'skipped'>[] = [
   {
     id: 'customize_store',
     label: 'Customize your storefront',
-    description: 'Your logo, theme and font on your store website',
+    description: 'Your products, profile and theme on your store',
     icon: 'layout',
-    // The simple store website (My store); Store Builder stays in Settings.
+    // My Store (Stan Store style); Store Builder stays in Settings.
     route: '/my-store',
   },
   {

@@ -505,7 +505,7 @@ export default function EditProfileScreen() {
               )}
               {!uploading.avatar && (
                 <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-                  <Feather name="camera" size={12} color={theme.onAccent} />
+                  <Icon name="camera" size={12} color={theme.onAccent} />
                 </View>
               )}
             </View>

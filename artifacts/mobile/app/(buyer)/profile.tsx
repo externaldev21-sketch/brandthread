@@ -869,7 +869,7 @@ export default function ProfileScreen() {
   const accountSwitcherNode = (
     <ProfileAccountSwitcher
       label={displayHandle || displayName}
-      onPress={() => { hapticLight(); setAccountSwitcherOpen(true); }}
+      onPress={() => { haptics.light(); setAccountSwitcherOpen(true); }}
       overMedia={hasCover || !!banner}
       accessibilityLabel="Switch account"
       testID="buyer-profile-account-switcher"
@@ -888,7 +888,7 @@ export default function ProfileScreen() {
       <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
       <ProfileTopBarIcon
         name="more-horizontal"
-        onPress={() => { hapticLight(); setMenuOpen(true); }}
+        onPress={(event) => { setMenuAnchor(anchorFromEvent(event)); setMenuOpen(true); }}
         accessibilityLabel="Profile options"
         testID="buyer-profile-more"
       />
@@ -910,14 +910,14 @@ export default function ProfileScreen() {
       hasActiveStory={hasActiveStory}
       accessibilityLabel={hasActiveStory ? 'View your story' : 'Create a story'}
       onPress={() => {
-        hapticSelection();
+        haptics.selection();
         if (hasActiveStory) {
           router.push({ pathname: '/buyer-story-viewer' as any, params: { storyId: myStoryIds[0], allStoryIds: myStoryIds.join(',') } });
         } else {
           router.push('/buyer-story-create' as any);
         }
       }}
-      onPressBadge={() => { hapticSelection(); router.push('/buyer-story-create' as any); }}
+      onPressBadge={() => { haptics.selection(); router.push('/buyer-story-create' as any); }}
       onLongPress={() => { haptics.selection(); setAccountSwitcherOpen(true); }}
     />
   );

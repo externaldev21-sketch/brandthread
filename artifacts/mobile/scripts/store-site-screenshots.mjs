@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
- * Store website (My store, Design editor, Settings, Share store sheet,
- * Dashboard header) — 390×844 screenshots in a fresh account
- * (`?bt_preview=seller`) and the demo dataset (`&demo=1`), with taps to open
- * each sheet, plus the shared text-fit audit.
+ * My Store (Stan Store style): My Store with its live preview, the Add Product
+ * type picker, the Pre-made catalog picker, Design presets, the product
+ * editor's three steps (new pre-made, new pre-order, an existing pre-order),
+ * the profile editor and the Share store sheet — 390×844 screenshots in a
+ * fresh account (`?bt_preview=seller`) and the demo dataset (`&demo=1`), plus
+ * the shared text-fit audit.
  *
  *   node scripts/store-site-screenshots.mjs --build=<web export> --out=<dir> [--modes=fresh,demo] [--only=a,b]
  */
@@ -24,34 +26,69 @@ const tap = (id) => async (page) => {
   await page.locator(`[data-testid="${id}"]`).first().click();
   await page.waitForTimeout(900);
 };
+const tapLabel = (label) => async (page) => {
+  await page.locator(`[aria-label="${label}"]`).first().click();
+  await page.waitForTimeout(900);
+};
+const type = (id, text) => async (page) => {
+  const el = page.locator(`[data-testid="${id}"]`).first();
+  await el.click();
+  await el.fill(text);
+  // Web only: focusing a low field makes the browser scroll clipped
+  // (overflow: hidden) app containers, shifting the screen up and pulling the
+  // slid-away tab bar into the shot. Native never does this; undo it.
+  await page.evaluate(unclip);
+  await page.waitForTimeout(300);
+};
+function unclip() {
+  window.scrollTo(0, 0);
+  for (const el of document.querySelectorAll('*')) {
+    if (el.scrollTop && getComputedStyle(el).overflowY === 'hidden') el.scrollTop = 0;
+  }
+}
+const flip = (id) => async (page) => {
+  await page.locator(`[data-testid="${id}"] [role="switch"], [data-testid="${id}"] input[type="checkbox"]`).first().click({ force: true });
+  await page.evaluate(unclip);
+  await page.waitForTimeout(600);
+};
+const scrollDown = async (page) => { await page.mouse.move(195, 600); await page.mouse.wheel(0, 1500); await page.waitForTimeout(500); };
+const scrollTo = (id) => async (page) => {
+  await page.locator(`[data-testid="${id}"]`).first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+};
 
-/** name → route + taps to run before the shot. */
+const COAT = '/store-product?id=pv-block-preview-product-3';
+const NEW_PREMADE = [type('store-product-title', 'Linen overshirt'), type('store-product-subtitle', 'Washed linen, boxy fit.'), type('store-product-price', '88')];
+const NEW_PREORDER = [type('store-product-title', 'Field jacket'), type('store-product-subtitle', 'Waxed cotton. Made to order.'), type('store-product-price', '165')];
+
+/** name → route + taps to run before the shot; demoOnly shots need the demo store. */
 const SHOTS = [
-  { name: 'dashboard-header', route: '/' },
-  { name: 'dashboard-share-sheet', route: '/', steps: [tap('seller-dashboard-share-store')] },
-  { name: 'share-sheet-qr', route: '/', steps: [tap('seller-dashboard-share-store'), tap('share-store-qr-row')] },
-  { name: 'share-sheet-copied', route: '/', steps: [tap('seller-dashboard-share-store'), tap('share-store-link')] },
-  { name: 'share-store-page', route: '/share-store' },
   { name: 'my-store', route: '/my-store' },
   { name: 'my-store-link-copied', route: '/my-store', steps: [tap('my-store-link')] },
-  { name: 'my-store-checklist-closed', route: '/my-store', steps: [tap('my-store-checklist-close')] },
-  { name: 'store-design', route: '/store-design' },
-  { name: 'store-design-theme', route: '/store-design', steps: [tap('store-design-tool-theme')] },
-  { name: 'store-design-theme-bone', route: '/store-design', steps: [tap('store-design-tool-theme'), tap('store-design-theme-bone')] },
-  { name: 'store-design-header', route: '/store-design', steps: [tap('store-design-tool-header')] },
-  { name: 'store-design-style-buttons', route: '/store-design', steps: [tap('store-design-tool-style'), tap('store-design-buttons-square')] },
-  { name: 'store-design-style-font', route: '/store-design', steps: [tap('store-design-tool-style'), async (p) => { await p.getByText('Font', { exact: true }).first().click(); await p.waitForTimeout(500); }, tap('store-design-font-serif')] },
-  { name: 'store-design-undo', route: '/store-design', steps: [tap('store-design-tool-theme'), tap('store-design-theme-white'), tap('store-design-theme-navy'), tap('store-design-undo')] },
-  { name: 'store-site-settings', route: '/store-site-settings' },
-  { name: 'store-site-settings-add-link', route: '/store-site-settings', steps: [tap('store-settings-add-link')] },
+  { name: 'add-product-types', route: '/my-store', steps: [tap('my-store-add-product')] },
+  { name: 'add-product-premade', route: '/my-store', steps: [tap('my-store-add-product'), tap('my-store-type-premade')] },
+  { name: 'design-presets', route: '/my-store', steps: [tapLabel('Edit design')] },
+  { name: 'design-white', route: '/my-store', steps: [tapLabel('Edit design'), tap('my-store-theme-white')] },
+  { name: 'editor-new-premade-thumbnail', route: '/store-product?new=premade', steps: NEW_PREMADE },
+  { name: 'editor-new-premade-checkout', route: '/store-product?new=premade', steps: [...NEW_PREMADE, tap('store-product-next')] },
+  { name: 'editor-new-premade-publish', route: '/store-product?new=premade', steps: [...NEW_PREMADE, tap('store-product-next'), tap('store-product-next')] },
+  { name: 'editor-new-preorder-thumbnail', route: '/store-product?new=preorder', steps: NEW_PREORDER },
+  { name: 'editor-new-preorder-checkout', route: '/store-product?new=preorder', steps: [...NEW_PREORDER, tap('store-product-next'), scrollDown, flip('store-product-cap-toggle'), type('store-product-cap', '50'), scrollDown] },
+  { name: 'editor-new-preorder-ship-date', route: '/store-product?new=preorder', steps: [...NEW_PREORDER, tap('store-product-next'), tap('store-product-ship-by')] },
+  { name: 'editor-preorder-thumbnail', route: COAT, demoOnly: true },
+  { name: 'editor-preorder-checkout', route: COAT, demoOnly: true, steps: [tap('store-product-next')] },
+  { name: 'editor-preorder-checkout-details', route: COAT, demoOnly: true, steps: [tap('store-product-next'), scrollTo('store-product-field-3')] },
+  { name: 'editor-preorder-publish', route: COAT, demoOnly: true, steps: [tap('store-product-next'), tap('store-product-next')] },
+  { name: 'editor-button-style', route: COAT, demoOnly: true, steps: [async (p) => { await p.getByText('Button', { exact: true }).first().click(); await p.waitForTimeout(500); }] },
+  { name: 'store-profile', route: '/store-profile' },
+  { name: 'dashboard-share-sheet', route: '/', steps: [tap('seller-dashboard-share-store')] },
 ];
 
 const SCREEN_MARKER = {
   '/': 'seller-dashboard-share-store',
-  '/share-store': 'share-store-screen',
   '/my-store': 'my-store-screen',
-  '/store-design': 'store-design-screen',
-  '/store-site-settings': 'store-site-settings',
+  '/store-product': 'store-product-screen',
+  '/store-profile': 'store-profile-screen',
 };
 
 let issues = 0;
@@ -60,6 +97,7 @@ async function capture(browser, origin, mode, shots) {
   const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
   const extra = mode === 'demo' ? '&demo=1' : '';
   for (const shot of shots) {
+    if (shot.demoOnly && mode !== 'demo') continue;
     // A fresh context per shot: sheets and in-memory preview data start clean.
     const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images: {} });
     page.on('pageerror', (e) => console.log(`  [pageerror ${mode}/${shot.name}]`, e.message.slice(0, 160)));

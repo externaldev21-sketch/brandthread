@@ -75,6 +75,8 @@ export function buildGuestCheckoutSessionParams(input: {
   dropId: string | null;
   /** One-time coupon for the guest's discount code, if any. */
   couponId: string | null;
+  /** Embedded checkout mounts on the store page; hosted remains the default. */
+  uiMode?: "hosted" | "embedded";
   /** paymentIntentMoney(...).paymentIntentData */
   paymentIntentData: Record<string, unknown>;
 }): Stripe.Checkout.SessionCreateParams {
@@ -88,8 +90,9 @@ export function buildGuestCheckoutSessionParams(input: {
     },
     ...(input.customerId ? { customer: input.customerId } : { customer_email: input.email }),
     ...(input.couponId ? { discounts: [{ coupon: input.couponId }] } : {}),
-    success_url: input.successUrl,
-    cancel_url: input.cancelUrl,
+    ...(input.uiMode === "embedded"
+      ? { ui_mode: "embedded_page" as const, return_url: input.successUrl }
+      : { success_url: input.successUrl, cancel_url: input.cancelUrl }),
     metadata: { csRef: input.checkoutId, guest: "true", ...(input.dropId ? { dropId: input.dropId } : {}) },
     payment_intent_data: {
       ...(input.paymentIntentData as Stripe.Checkout.SessionCreateParams.PaymentIntentData),
