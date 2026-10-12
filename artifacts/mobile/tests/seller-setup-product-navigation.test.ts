@@ -74,14 +74,15 @@ describe('seller setup destination navigation', () => {
     expect(createPost).toContain('onDiscard={leave}');
   });
 
-  it('routes all nine completion signals through the behavioral completion boundary', () => {
+  it('routes every completion signal through the behavioral completion boundary', () => {
     const completionSignals = [
       ['app/seller-verification.tsx', "data?.verificationStatus === 'verified'", "completeSetupTaskWhen('verify_account'"],
       ['app/payouts.tsx', 'normalized?.connected && normalized.chargesEnabled && normalized.payoutsEnabled', "'connect_payments'"],
       ['app/add-product.tsx', '() => api.products.create(serverCreatePayload)', "'first_product'"],
       ['app/shipping.tsx', '() => api.shippingZones.create(payload)', "'shipping_rates'"],
       ['app/store-builder.tsx', "() => applyTheme(THREAD_THEME_ID, 'light')", "'customize_store'"],
-      ['app/store-design.tsx', 'await saveBio({', "completeSetupTaskWhen('customize_store', true)"],
+      ['app/store-product.tsx', 'await publishBlock(block.id)', "completeSetupTaskWhen('customize_store', true)"],
+      ['app/my-store.tsx', 'await saveBio({ siteTheme: key })', "completeSetupTaskWhen('customize_store', true)"],
       ['app/store-domain.tsx', "verificationStatus === 'verified'", "'connect_domain'"],
       ['app/store-publish.tsx', 'result.success', "'publish_store'"],
       ['app/create-post.tsx', "completeSetupTaskAfter('first_post', run)", "'first_post'"],
