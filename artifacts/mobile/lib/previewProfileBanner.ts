@@ -6,6 +6,7 @@
  * and without `banner=` the preview keeps the no-banner header.
  */
 import { isPreviewDemoMode } from '@/lib/devPreview';
+import { demoRunwayVideoUri } from '@/lib/demoMedia';
 import type { ProfileBanner } from '@/lib/profileBannerApi';
 
 function assetUri(module: number): string {
@@ -34,10 +35,8 @@ export function previewProfileBanner(variant: 'own' | 'other' = 'own', searchOve
   const poster = variant === 'own'
     ? assetUri(require('../assets/videos/fashion_runway_03.jpg'))
     : assetUri(require('../assets/videos/fashion_runway_07.jpg'));
-  const video = variant === 'own'
-    ? assetUri(require('../assets/videos/fashion_runway_03.mp4'))
-    : assetUri(require('../assets/videos/fashion_runway_07.mp4'));
   /* eslint-enable @typescript-eslint/no-require-imports */
+  const video = demoRunwayVideoUri(variant === 'own' ? 3 : 7);
   if (!video) return null;
   // A GIF banner plays the MP4 the server converts it to, like production.
   return kind === 'gif'

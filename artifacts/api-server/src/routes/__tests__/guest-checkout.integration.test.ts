@@ -269,8 +269,9 @@ describe("guest checkout", () => {
       email,
       shipping: { name: "Guest Buyer", address: { line1: "123 Test Street", line2: "Apt 4", city: "Portland", state: "OR", postal_code: "97205", country: "US" } },
     });
-    expect(fakeStripe.customerCreates.at(-1).options).toEqual({ idempotencyKey: `guest_cus_guest-embedded-${suffix}` });
     const [stored] = await db.select().from(checkoutSessions).where(eq(checkoutSessions.stripeSessionId, first.body.sessionId)).limit(1);
+    // Preserve the existing server-checkout-scoped customer key in both modes.
+    expect(fakeStripe.customerCreates.at(-1).options).toEqual({ idempotencyKey: `guest_cust_${stored.id}` });
     expect(stored.shippingAddress).toMatchObject({ street: "123 Test Street", zip: "97205" });
 
     // A retry hands back the same embedded session.

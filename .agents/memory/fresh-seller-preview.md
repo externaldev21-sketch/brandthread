@@ -17,6 +17,12 @@ The first-product card begins with its title, then explanatory text, then its bu
 
 **How to apply:** Preserve this content order when importing future Dashboard styling; do not reserve blank space for the removed tile.
 
+Optional demo media must not introduce unresolved static asset dependencies into ordinary builds.
+
+**Why:** Metro resolves static asset imports even when their runtime demo gate is false; absent sample videos blocked every screen after a profile-banner merge.
+
+**How to apply:** Check that demo helpers imported by the route tree build with the available asset set. Runtime opt-in alone does not isolate demo dependencies.
+
 A development host or preview-role flag does not establish that the caller is signed out. A real authenticated session must use its actual account data.
 
 **Why:** Combining an older unconditional preview rejection with a newer signed-out policy blocked authenticated requests before their token could be checked.

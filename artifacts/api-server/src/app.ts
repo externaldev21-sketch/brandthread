@@ -171,6 +171,16 @@ app.use(express.json({ limit: "45mb" }));
 app.use(express.urlencoded({ extended: true, limit: "45mb" }));
 app.use(validateMutationEnvelope);
 
+// Store websites are public documents, including guest checkout pages. Serve
+// them without a Clerk navigation handshake; the handlers enforce publication.
+// Protected API routes below still pass through Clerk and requireAuth.
+app.get("/@:handle", appRateLimiter, rateLimit("public-read"), storeSiteHandler);
+app.get("/@:handle/c/:productId", appRateLimiter, rateLimit("public-read"), storeSiteCheckoutHandler);
+app.get("/@:handle/c/:productId/done", appRateLimiter, rateLimit("public-read"), storeSiteCheckoutDoneHandler);
+app.get("/@:handle/p/:productId", appRateLimiter, rateLimit("public-read"), storeSiteProductHandler);
+app.get("/@:handle/go/:linkId", appRateLimiter, storeSiteLinkRedirect);
+app.get("/@:handle/og.png", appRateLimiter, rateLimit("public-read"), storeSiteOgHandler);
+
 // Clerk session middleware — handles both cookie (web) and Bearer token (mobile)
 app.use(
   clerkMiddleware((req) => ({
@@ -195,13 +205,6 @@ app.get("/bio/:slug/go/:linkId", bioLinkRedirect);
 app.get("/bio/:slug/shop", bioShopRedirect);
 app.get("/bio/:slug/p/:productId", bioProductRedirect);
 app.get("/g/:code", rateLimit("public-read"), giveawayLanding);
-// The seller's store website: brandthread.app/@handle (see routes/storeSite.ts).
-app.get("/@:handle", rateLimit("public-read"), storeSiteHandler);
-app.get("/@:handle/c/:productId", rateLimit("public-read"), storeSiteCheckoutHandler);
-app.get("/@:handle/c/:productId/done", rateLimit("public-read"), storeSiteCheckoutDoneHandler);
-app.get("/@:handle/p/:productId", rateLimit("public-read"), storeSiteProductHandler);
-app.get("/@:handle/go/:linkId", storeSiteLinkRedirect);
-app.get("/@:handle/og.png", rateLimit("public-read"), storeSiteOgHandler);
 app.use("/api/v1", (_req, res, next) => {
   res.setHeader("X-Brandthread-API-Version", "1");
   next();
