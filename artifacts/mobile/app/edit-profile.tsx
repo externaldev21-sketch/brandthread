@@ -31,6 +31,7 @@ import { getInitials } from '@/lib/format';
 import { FONT, TEXT_DISABLED } from '@/lib/theme';
 import { crispPx } from '@/lib/crispPixel';
 import { EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+import { BannerBottomFade } from '@/components/profile/ProfileBannerHeader';
 import { bannerStill, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
@@ -519,7 +520,10 @@ export default function EditProfileScreen() {
           <View style={styles.previewBannerWrap}>
             {/* One banner: the storefront cover is the profile banner's still frame. */}
             {bannerStill(bannerFlow.banner) ? (
-              <Image cachePolicy="memory-disk" source={{ uri: bannerStill(bannerFlow.banner) as string }} style={styles.previewBanner} />
+              <>
+                <Image cachePolicy="memory-disk" source={{ uri: bannerStill(bannerFlow.banner) as string }} style={styles.previewBanner} />
+                <BannerBottomFade height={88} fraction={0.6} color={theme.card} testID="storefront-preview-fade" />
+              </>
             ) : (
               <LinearGradient colors={theme.heroGradient as any} style={styles.previewBanner} />
             )}

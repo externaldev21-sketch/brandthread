@@ -33,7 +33,8 @@ const owner = `pc-owner-${suffix}`;
 const seller = `pc-seller-${suffix}`;
 const stranger = `pc-stranger-${suffix}`;
 const bannerOwner = `pc-banner-${suffix}`;
-const userIds = [owner, seller, stranger, bannerOwner];
+const longOwner = `pc-long-${suffix}`;
+const userIds = [owner, seller, stranger, bannerOwner, longOwner];
 
 /** A tiny buffer that passes the MP4 magic-byte check ("ftyp" at offset 4). */
 const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom"), Buffer.alloc(64)]);
@@ -46,6 +47,9 @@ const lastGif: { crop: unknown; fail: boolean } = { crop: null, fail: false };
 /** A tiny buffer that passes the GIF magic-byte check. */
 const GIF = Buffer.concat([Buffer.from("GIF89a"), Buffer.alloc(64)]);
 const stored: string[] = [];
+/** Finished chunked uploads: objectPath → { owner, bytes, contentType }. */
+const uploadsInStore = new Map<string, { owner: string; bytes: Buffer; contentType: string }>();
+const removedUploads: string[] = [];
 const deleted: string[] = [];
 let server: Server;
 let base = "";
@@ -64,6 +68,7 @@ beforeAll(async () => {
     { clerkId: seller, email: `${seller}@test.local`, name: "Cover Seller", displayName: "Cover Seller", brandName: "Cover Co", username: `pcseller${suffix}`, role: "seller", accountType: "seller" },
     { clerkId: bannerOwner, email: `${bannerOwner}@test.local`, name: "Banner Buyer", displayName: "Banner Buyer", username: `pcbanner${suffix}`, role: "buyer", accountType: "buyer" },
     { clerkId: stranger, email: `${stranger}@test.local`, name: "Stranger", displayName: "Stranger", username: `pcstr${suffix}`, role: "buyer", accountType: "buyer" },
+    { clerkId: longOwner, email: `${longOwner}@test.local`, name: "Long Clip", displayName: "Long Clip", username: `pclong${suffix}`, role: "seller", accountType: "seller" },
   ]);
 
   const { createProfileCoverRouter } = await import("../profile-cover");
@@ -96,6 +101,15 @@ beforeAll(async () => {
       },
       trySetObjectEntityAclPolicy: async () => undefined,
       deleteObjectEntity: async (path) => { deleted.push(path); },
+    },
+    uploads: {
+      download: async (objectPath, who, destination) => {
+        const upload = uploadsInStore.get(objectPath);
+        if (!upload || upload.owner !== who) return null;
+        await fs.writeFile(destination, upload.bytes);
+        return { contentType: upload.contentType, size: upload.bytes.length };
+      },
+      remove: async (objectPath) => { removedUploads.push(objectPath); uploadsInStore.delete(objectPath); },
     },
   });
   const app = express();
@@ -359,5 +373,61 @@ describe("GIF banner (POST /api/profile/cover-gif)", () => {
     } finally {
       lastGif.fail = false;
     }
+  });
+});
+
+describe("any-length clip (POST /api/profile/cover-video/from-upload)", () => {
+  const post = (as: string | undefined, body: unknown) => fetch(`${base}/api/profile/cover-video/from-upload`, {
+    method: "POST",
+    headers: { ...(as ? { "x-test-user-id": as } : {}), "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  it("renders the chosen 10s window + repositioned crop of a 72s clip from the chunked upload, then deletes the source", async () => {
+    uploadsInStore.set(`/objects/uploads/long-${suffix}`, { owner: longOwner, bytes: MP4, contentType: "video/mp4" });
+    probe.source = 72;
+    const response = await post(longOwner, {
+      objectPath: `/objects/uploads/long-${suffix}`,
+      trimStart: 41.5, trimDuration: 10,
+      cropX: 0, cropY: 0.21, cropW: 1, cropH: 0.43,
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json() as any;
+    expect(body.profileBanner).toMatchObject({ type: "video" });
+    expect(lastRender).toEqual({ trim: { start: 41.5, duration: 10 }, crop: { x: 0, y: 0.21, width: 1, height: 0.43 } });
+    expect(removedUploads).toContain(`/objects/uploads/long-${suffix}`);
+    const [row] = await db.select({ type: users.coverMediaType, video: users.coverVideoUrl }).from(users).where(eq(users.clerkId, longOwner));
+    expect(row).toEqual({ type: "video", video: body.coverVideoUrl });
+  });
+
+  it("refuses someone else's upload (and leaves it alone), bad paths and windows over 10s", async () => {
+    clock = new Date(clock.getTime() + 25 * 60 * 60 * 1000);
+    uploadsInStore.set(`/objects/uploads/theirs-${suffix}`, { owner: stranger, bytes: MP4, contentType: "video/mp4" });
+    expect((await post(longOwner, { objectPath: `/objects/uploads/theirs-${suffix}`, trimStart: 0, trimDuration: 10 })).status).toBe(404);
+    expect(uploadsInStore.has(`/objects/uploads/theirs-${suffix}`)).toBe(true);
+    expect((await post(longOwner, { objectPath: "/objects/../secret", trimStart: 0, trimDuration: 10 })).status).toBe(400);
+    expect((await post(longOwner, { objectPath: `/objects/uploads/theirs-${suffix}`, trimStart: 0, trimDuration: 30 })).status).toBe(400);
+    expect((await post(undefined, { objectPath: `/objects/uploads/theirs-${suffix}` })).status).toBe(401);
+  });
+
+  it("a long source still needs a window, and a non-video upload is refused (source deleted either way)", async () => {
+    uploadsInStore.set(`/objects/uploads/nowindow-${suffix}`, { owner: longOwner, bytes: MP4, contentType: "video/mp4" });
+    probe.source = 72;
+    const noWindow = await post(longOwner, { objectPath: `/objects/uploads/nowindow-${suffix}` });
+    expect(noWindow.status).toBe(400);
+    expect(((await noWindow.json()) as any).code).toBe("cover_too_long");
+    expect(removedUploads).toContain(`/objects/uploads/nowindow-${suffix}`);
+
+    uploadsInStore.set(`/objects/uploads/text-${suffix}`, { owner: longOwner, bytes: Buffer.from("not a video at all"), contentType: "video/mp4" });
+    expect((await post(longOwner, { objectPath: `/objects/uploads/text-${suffix}`, trimStart: 0, trimDuration: 10 })).status).toBe(400);
+    expect(removedUploads).toContain(`/objects/uploads/text-${suffix}`);
+  });
+
+  it("shares the 24h change window", async () => {
+    uploadsInStore.set(`/objects/uploads/again-${suffix}`, { owner: longOwner, bytes: MP4, contentType: "video/mp4" });
+    const first = await post(longOwner, { objectPath: `/objects/uploads/again-${suffix}`, trimStart: 0, trimDuration: 10 });
+    expect(first.status).toBe(201);
+    uploadsInStore.set(`/objects/uploads/again2-${suffix}`, { owner: longOwner, bytes: MP4, contentType: "video/mp4" });
+    expect((await post(longOwner, { objectPath: `/objects/uploads/again2-${suffix}`, trimStart: 0, trimDuration: 10 })).status).toBe(429);
   });
 });
