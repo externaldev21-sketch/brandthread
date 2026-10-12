@@ -6,8 +6,10 @@
  * TikTok-style profile banner (the profile cover): a looping muted video or a
  * GIF. `url` is what plays — the MP4 rendition (videos, and GIFs the server
  * converted) or the original GIF; `gifUrl` is a GIF banner's original file.
+ * `type: 'image'` is only a seller's former 3:1 storefront banner, adopted
+ * as their banner server-side (never offered in the picker).
  */
-export interface ProfileBanner { type: 'video' | 'gif'; url: string; posterUrl: string | null; gifUrl?: string | null }
+export interface ProfileBanner { type: 'video' | 'gif' | 'image'; url: string; posterUrl: string | null; gifUrl?: string | null }
 /** Normalized (0–1) crop rect from the banner crop screen. */
 export interface ProfileBannerCrop { x: number; y: number; width: number; height: number }
 

@@ -7,7 +7,9 @@ import express, { Router } from "express";
 import { db, interactions, orders, posts, users } from "@workspace/db";
 import { and, count, eq, isNotNull, notInArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { profileBannerFromRow } from "../lib/profileCover";
+import { checkCoverChangeAllowed, profileBannerFromRow, storefrontCoverUrl } from "../lib/profileCover";
+import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
+import { coverMediaUrl, coverObjectPath } from "./profile-cover";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
@@ -81,7 +83,7 @@ async function displayObjectImage(path: string | null): Promise<string | null> {
 // ─── GET /api/seller/profile ──────────────────────────────────────────────────
 router.get("/profile", async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
-  const [[user], [likeTotal], [paidOrderMetrics]] = await Promise.all([
+  const [[selected], [likeTotal], [paidOrderMetrics]] = await Promise.all([
     db
       .select({
         id:                  users.id,
@@ -135,25 +137,30 @@ router.get("/profile", async (req, res): Promise<void> => {
       )),
   ]);
 
-  if (!user) {
+  if (!selected) {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  // One banner: a former storefront banner becomes the profile banner.
+  const user = await withStorefrontBannerAdopted(req, selected, objectStorage);
+  const profileBanner = profileBannerFromRow(user);
 
   const storefrontVisits = user.storefrontVisits ?? 0;
   const paidOrders = Number(paidOrderMetrics?.orders ?? 0);
-  const [profileImageUrl, logoUrl, bannerUrl] = await Promise.all([
+  const [profileImageUrl, logoUrl] = await Promise.all([
     displayProfileImage(user.profileImageUrl, user.avatarUrl),
     displayObjectImage(user.logoUrl),
-    displayObjectImage(user.bannerUrl),
   ]);
+  // `bannerUrl` (storefront cover, read by store setup and ads) is the
+  // profile banner's still frame — there is only one banner.
+  const bannerUrl = storefrontCoverUrl(profileBanner);
   res.json({
     ...user,
     profileImageUrl,
     logoUrl,
     bannerUrl,
-    // TikTok-style profile banner (image or looping video), see profile-cover.ts.
-    profileBanner: profileBannerFromRow(user),
+    // TikTok-style profile banner (GIF or looping video), see profile-cover.ts.
+    profileBanner,
     totalLikes: Number(likeTotal?.totalLikes ?? 0),
     metrics: {
       revenueCents: Number(paidOrderMetrics?.revenueCents ?? 0),
@@ -256,7 +263,73 @@ router.post("/profile/avatar/upload", ...createProfileImageUploadHandler("profil
 router.post("/profile/logo/upload", ...createProfileImageUploadHandler("logoUrl", users.logoUrl, MAX_AVATAR_BYTES, "logo"));
 
 // ─── POST /api/seller/profile/banner/upload ───────────────────────────────────
-router.post("/profile/banner/upload", ...createProfileImageUploadHandler("bannerUrl", users.bannerUrl, MAX_BANNER_BYTES, "banner"));
+// Older app builds still upload a 3:1 storefront banner here. There is only
+// one banner now, so a still uploaded here becomes the profile banner
+// (public, served via /api/profile/cover-media, same 24h change window).
+router.post(
+  "/profile/banner/upload",
+  express.raw({ type: "image/*", limit: MAX_BANNER_BYTES }),
+  async (req: express.Request, res: express.Response): Promise<void> => {
+    const clerkId = (req as any).clerkUserId as string;
+    const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
+    const bytes = req.body as Buffer;
+    if (!IMAGE_MIMES.has(contentType)) {
+      res.status(400).json({ error: "Use a JPEG, PNG, or WebP image for your banner." });
+      return;
+    }
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_BANNER_BYTES) {
+      res.status(400).json({ error: `Your banner image must be no larger than ${Math.round(MAX_BANNER_BYTES / (1024 * 1024))} MB.` });
+      return;
+    }
+    if (!hasValidImageSignature(bytes, contentType)) {
+      res.status(400).json({ error: "The uploaded file does not match its declared image type." });
+      return;
+    }
+    const [row] = await db.select({
+      coverVideoUrl: users.coverVideoUrl,
+      coverPosterUrl: users.coverPosterUrl,
+      coverImageUrl: users.coverImageUrl,
+      coverVideoUpdatedAt: users.coverVideoUpdatedAt,
+    }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+    if (!row) {
+      res.status(404).json({ error: "Seller profile not found" });
+      return;
+    }
+    const check = checkCoverChangeAllowed(row.coverVideoUpdatedAt);
+    if (!check.allowed) {
+      res.status(429).json({ error: check.message, code: "cover_change_rate_limited", retryAfterHours: check.retryAfterHours });
+      return;
+    }
+    const screened = await screenImageBuffer(bytes, contentType);
+    if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
+      void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: "banner", verdict: { ...screened, verdict: "reject" } }));
+      res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
+      return;
+    }
+    let objectPath: string | null = null;
+    try {
+      const stored = await normalizeUploadedImage(bytes, contentType);
+      objectPath = await objectStorage.createObjectEntityFromBuffer(stored.buffer, stored.contentType);
+      await objectStorage.trySetObjectEntityAclPolicy(objectPath, { owner: clerkId, visibility: "public" });
+      const url = coverMediaUrl(req, objectPath);
+      await db.update(users)
+        .set({
+          coverMediaType: "image", coverImageUrl: url, coverPosterUrl: url, coverVideoUrl: null,
+          coverVideoUpdatedAt: new Date(), coverVideoModerationStatus: "visible", bannerUrl: null, updatedAt: new Date(),
+        })
+        .where(eq(users.clerkId, clerkId));
+      const old = [row.coverVideoUrl, row.coverPosterUrl, row.coverImageUrl]
+        .map((value) => coverObjectPath(value))
+        .filter((path, index, all): path is string => !!path && path !== objectPath && all.indexOf(path) === index);
+      for (const path of old) void objectStorage.deleteObjectEntity(path).catch(() => undefined);
+      res.status(201).json({ bannerUrl: url, profileBanner: { type: "image", url, posterUrl: url, gifUrl: null } });
+    } catch (err) {
+      if (objectPath) await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+      req.log.error({ err }, "Seller banner upload failed");
+      res.status(500).json({ error: "Could not save your banner. Please try again." });
+    }
+  },
+);
 
 // ─── Store identity setup ─────────────────────────────────────────────────────
 // Claim a store name + @handle, pick a monochrome accent, connect socials.

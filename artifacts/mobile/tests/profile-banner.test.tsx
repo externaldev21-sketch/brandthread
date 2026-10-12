@@ -50,6 +50,7 @@ vi.mock('react-native', () => {
     Platform: { get OS() { return platform.OS; }, select: (obj: Record<string, unknown>) => obj[platform.OS] ?? obj.default },
     Alert: { alert: alertMock },
     ActionSheetIOS: { showActionSheetWithOptions: actionSheetMock },
+    StatusBar: host('StatusBar'),
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
     PanResponder: { create: () => ({ panHandlers: {} }) },
     useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
@@ -73,6 +74,8 @@ vi.mock('react-native-gesture-handler', () => {
 });
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }) }));
 vi.mock('@/hooks/useHeaderTopInset', () => ({ useHeaderTopInset: () => 47 }));
+const { maskMock } = vi.hoisted(() => ({ maskMock: vi.fn() }));
+vi.mock('@/components/layout/ScreenChrome', () => ({ useSuppressStatusBarMask: maskMock }));
 vi.mock('@expo/vector-icons', () => ({ Feather: () => null }));
 vi.mock('@/lib/api', () => ({ useApi: () => apiMock }));
 vi.mock('@/hooks/useApi', () => ({ useApi: () => apiMock }));
@@ -98,7 +101,7 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 }));
 
 import {
-  bannerAspect, bannerHeight, bannerHeroMedia, bannerNeedsTrim, bannerSheetOptions, isGifAsset, resolveProfileBanner,
+  bannerAspect, bannerCoversStatusBar, bannerHeight, bannerHeroMedia, bannerNeedsTrim, bannerSheetOptions, bannerStill, isGifAsset, resolveProfileBanner,
 } from '@/components/profile/profileBannerRules';
 import { coverQuery } from '@/lib/profileBannerApi';
 import { bannerCropRect, BannerActionSheet, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
@@ -155,6 +158,20 @@ describe('banner rules', () => {
     expect(bannerHeroMedia(GIF)).toEqual({ videoUri: GIF.url, posterUri: GIF.posterUrl, gifUri: null });
     expect(bannerHeroMedia(RAW_GIF)).toEqual({ videoUri: null, posterUri: null, gifUri: RAW_GIF.url });
     expect(bannerHeroMedia(VIDEO)).toEqual({ videoUri: VIDEO.url, posterUri: VIDEO.posterUrl, gifUri: null });
+  });
+
+  it('a seller\'s former storefront banner (adopted server-side as type image) renders as a still', () => {
+    const STILL = { type: 'image' as const, url: 'https://cdn.x/storefront.jpg', posterUrl: 'https://cdn.x/storefront.jpg', gifUrl: null };
+    expect(resolveProfileBanner({ profileBanner: STILL })).toEqual(STILL);
+    expect(bannerHeroMedia(STILL)).toEqual({ videoUri: null, posterUri: STILL.url, gifUri: null });
+  });
+
+  it('the storefront cover (brand cards, previews) is the banner\'s still frame', () => {
+    expect(bannerStill(null)).toBeNull();
+    expect(bannerStill(VIDEO)).toBe(VIDEO.posterUrl);
+    expect(bannerStill(GIF)).toBe(GIF.posterUrl);
+    expect(bannerStill(RAW_GIF)).toBe(RAW_GIF.gifUrl);
+    expect(bannerStill({ type: 'image', url: 'https://cdn.x/s.jpg', posterUrl: null })).toBe('https://cdn.x/s.jpg');
   });
 
   it('orders the banner stats Following · Followers · Likes', () => {
@@ -406,6 +423,42 @@ describe('banner header', () => {
     expect(byTestId(renderer, 'profile-banner-note')).toHaveLength(1);
     const statKeys = byTestId(renderer, 'profile-banner-stats')[0].findAll((node) => /^profile-stat-/.test(node.props.testID ?? '') && typeof node.type === 'string').map((node) => node.props.testID);
     expect(statKeys).toEqual(['profile-stat-following', 'profile-stat-followers', 'profile-stat-likes']);
+    renderer.unmount();
+  });
+});
+
+describe('banner behind the status bar', () => {
+  it('only at rest at the top (and pull-to-refresh overscroll); any real scroll brings the strip back', () => {
+    expect(bannerCoversStatusBar(0)).toBe(true);
+    expect(bannerCoversStatusBar(-60)).toBe(true);
+    expect(bannerCoversStatusBar(5)).toBe(true);
+    expect(bannerCoversStatusBar(8)).toBe(false);
+    expect(bannerCoversStatusBar(240)).toBe(false);
+  });
+
+  const renderHeader = (coversTop: boolean) => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        <ProfileBannerHeader banner={VIDEO} height={380} active posterOnly={false} topPad={47} avatar={<React.Fragment />} name="N" stats={[]} coversTop={coversTop} />,
+      );
+    });
+    return renderer;
+  };
+
+  it('while the banner covers the top it lifts the status-bar strip and turns the status bar light', () => {
+    maskMock.mockClear();
+    const renderer = renderHeader(true);
+    expect(maskMock).toHaveBeenLastCalledWith(true);
+    expect(renderer.root.findAll((node) => (node.type as unknown) === 'StatusBar' && node.props.barStyle === 'light-content')).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('scrolled past the banner, the strip is back (content never slides under the clock)', () => {
+    maskMock.mockClear();
+    const renderer = renderHeader(false);
+    expect(maskMock).toHaveBeenLastCalledWith(false);
+    expect(renderer.root.findAll((node) => (node.type as unknown) === 'StatusBar')).toHaveLength(0);
     renderer.unmount();
   });
 });

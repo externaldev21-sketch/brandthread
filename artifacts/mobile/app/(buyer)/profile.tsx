@@ -57,7 +57,7 @@ import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
 import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
 import { ProfileBannerHeader } from '@/components/profile/ProfileBannerHeader';
-import { bannerHeight, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { bannerCoversStatusBar, bannerHeight, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 import { useProfileNote } from '@/components/profile/useProfileNote';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
@@ -503,10 +503,14 @@ export default function ProfileScreen() {
   // be imperative to actually work on web, which is where this ships.)
   const scrollYRef = useRef(0);
   const listRef = useRef<FlatList<ListRow> | null>(null);
+  // Banner mode: at rest at the top, the banner runs up behind the status bar.
+  const [bannerCoversTop, setBannerCoversTop] = useState(true);
   const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
     scrollYRef.current = event.nativeEvent.contentOffset.y;
     const next = event.nativeEvent.contentOffset.y < Math.max(heroHeight, 1);
     setHeroOnScreen((prev) => (prev === next ? prev : next));
+    const covers = bannerCoversStatusBar(event.nativeEvent.contentOffset.y);
+    setBannerCoversTop((prev) => (prev === covers ? prev : covers));
   }, [heroHeight]);
 
   useFocusEffect(useCallback(() => {
@@ -920,6 +924,7 @@ export default function ProfileScreen() {
             handle={displayHandle && displayHandle !== displayName ? displayHandle : null}
             stats={stats}
             statsLoading={loading}
+            coversTop={focused && bannerCoversTop}
           />
           {/* Below the banner the profile continues as before: chip, bio, link. */}
           <View style={topBarStyles.bannerBelow} testID="profile-banner-below">

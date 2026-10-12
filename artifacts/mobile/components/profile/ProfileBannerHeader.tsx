@@ -3,7 +3,7 @@
  * seller, own + visited profiles). Only rendered when the profile HAS a
  * banner; with none, every profile keeps its existing header untouched.
  *
- *   ┌──────────────────────────────┐ ← banner starts under the status bar,
+ *   ┌──────────────────────────────┐ ← banner runs up behind the status bar,
  *   │ ✎ @handle ⌄          🔔 ≡   │   full-bleed, ~45% of the screen
  *   │                              │   (a GIF or a muted ≤10s video, both
  *   │                   (On your…) │    looping forever; poster frame first,
@@ -16,7 +16,8 @@
  * Text sits on a solid dark gradient (no blur, no translucent overlay).
  */
 import React, { useEffect, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { useSuppressStatusBarMask } from '@/components/layout/ScreenChrome';
 import { CachedImage } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, ON_DARK, ON_DARK_MUTED, SP } from '@/lib/theme';
@@ -96,6 +97,7 @@ export function ProfileBannerHeader({
   handle,
   stats,
   statsLoading,
+  coversTop = false,
   testID = 'profile-banner-header',
 }: {
   banner: ProfileBanner;
@@ -117,14 +119,27 @@ export function ProfileBannerHeader({
   handle?: string | null;
   stats: ProfileStat[];
   statsLoading?: boolean;
+  /**
+   * True while the profile is focused and at rest at the top
+   * (bannerCoversStatusBar): the banner then runs up behind the status bar,
+   * like TikTok — the app-wide status-bar strip is lifted and the clock /
+   * battery turn light over the top gradient. Once it scrolls, the strip is
+   * back so nothing slides under the clock.
+   */
+  coversTop?: boolean;
   testID?: string;
 }) {
+  useSuppressStatusBarMask(coversTop);
   return (
     <View style={[styles.root, { height }]} testID={testID}>
+      {coversTop ? <StatusBar barStyle="light-content" /> : null}
       <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`profile-banner-${banner.type}`}>
         <BannerMedia banner={banner} active={active} posterOnly={posterOnly} height={height} />
         <LinearGradient
-          colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']} // theme-exempt: legibility scrim over banner media
+          // Subtle top gradient: keeps the status bar (time, battery) and the
+          // floating icons readable over any frame.
+          colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.22)', 'rgba(0,0,0,0)']} // theme-exempt: legibility scrim over banner media
+          locations={[0, 0.5, 1]}
           style={[styles.topScrim, { height: topPad + 72 }]}
         />
         <LinearGradient

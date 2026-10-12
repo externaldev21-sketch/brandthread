@@ -126,6 +126,7 @@ vi.mock('react-native', () => {
     },
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
+    StatusBar: () => null,
     AccessibilityInfo: {
       isReduceMotionEnabled: () => Promise.resolve(false),
       addEventListener: () => ({ remove: () => {} }),

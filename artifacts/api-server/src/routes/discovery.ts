@@ -18,6 +18,11 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, gte, inArray, isNull, isNotNull, notInArray, sql } from "drizzle-orm";
 import { setPublicCacheHeaders } from "../lib/httpCache";
+import { publicCoverFields, storefrontCoverUrl } from "../lib/profileCover";
+import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const bannerStorage = new ObjectStorageService();
 import { toPublicVariant } from "../lib/publicProfile";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { notBlockedWith, optionalViewerId } from "../lib/safety";
@@ -284,6 +289,12 @@ router.get("/trending/brands", async (req, res) => {
         verificationStatus: users.verificationStatus,
         activeStanding: users.activeStanding,
         policyRestricted: users.policyRestricted,
+        bannerUrl: users.bannerUrl,
+        coverVideoUrl: users.coverVideoUrl,
+        coverPosterUrl: users.coverPosterUrl,
+        coverImageUrl: users.coverImageUrl,
+        coverMediaType: users.coverMediaType,
+        coverVideoModerationStatus: users.coverVideoModerationStatus,
       })
       .from(users)
       .where(and(
@@ -315,6 +326,14 @@ router.get("/trending/brands", async (req, res) => {
         .orderBy(desc(products.createdAt)),
     ]);
     const followerMap = new Map(followerTotals.map((f) => [f.id, Number(f.n)]));
+    // A brand's card cover is its banner's still frame (one banner per
+    // seller), falling back to its newest product photo.
+    const bannerCovers = new Map<string, string>();
+    await Promise.all(ranked.map(async (s) => {
+      const row = await withStorefrontBannerAdopted(req, s, bannerStorage);
+      const cover = storefrontCoverUrl(publicCoverFields(row).profileBanner);
+      if (cover) bannerCovers.set(s.clerkId, cover);
+    }));
     const coverMap = new Map<string, string>();
     for (const c of covers) {
       if (coverMap.has(c.ownerId)) continue;
@@ -329,7 +348,7 @@ router.get("/trending/brands", async (req, res) => {
         name: s.brandName || s.displayName || "Brand",
         brandType: s.brandType ?? null,
         logoUrl: s.profileImageUrl ?? s.avatarUrl ?? null,
-        coverImageUrl: coverMap.get(s.clerkId) ?? null,
+        coverImageUrl: bannerCovers.get(s.clerkId) ?? coverMap.get(s.clerkId) ?? null,
         followerCount: followerMap.get(s.clerkId) ?? 0,
         verified: deriveSellerVerified(s),
       })),

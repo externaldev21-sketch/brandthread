@@ -15,6 +15,10 @@ import { Router } from "express";
 import { attachQuoteData } from "../lib/quotedPosts";
 import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
+import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const bannerStorage = new ObjectStorageService();
 import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -521,8 +525,10 @@ router.get("/profile/:userId", async (req, res) => {
   if (!canonicalClerkId) { res.status(404).json({ error: "User not found" }); return; }
   const other = canonicalClerkId;
 
-  const [user] = await db.select().from(users).where(eq(users.clerkId, other)).limit(1);
-  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  const [userRow] = await db.select().from(users).where(eq(users.clerkId, other)).limit(1);
+  if (!userRow) { res.status(404).json({ error: "User not found" }); return; }
+  // One banner: a former storefront banner becomes the profile banner.
+  const user = await withStorefrontBannerAdopted(req, userRow, bannerStorage);
 
   if (user.deletedAt || user.suspendedAt) { res.status(404).json({ error: "User not found" }); return; }
 

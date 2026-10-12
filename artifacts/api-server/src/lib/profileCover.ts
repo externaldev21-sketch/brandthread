@@ -90,7 +90,12 @@ export function parseCrop(xRaw: unknown, yRaw: unknown, wRaw: unknown, hRaw: unk
  * `url` is what plays: the MP4 rendition (video, and GIFs that converted) or
  * the original GIF. `gifUrl` is a GIF banner's original file (fallback).
  */
-export type ProfileBanner = { type: 'video' | 'gif'; url: string; posterUrl: string | null; gifUrl?: string | null };
+/**
+ * `type: 'image'` is only ever a seller's former 3:1 storefront banner,
+ * adopted as their profile banner (lib/storefrontBanner.ts); new banners are
+ * GIF or video.
+ */
+export type ProfileBanner = { type: 'video' | 'gif' | 'image'; url: string; posterUrl: string | null; gifUrl?: string | null };
 
 /**
  * The profile banner a row carries, or null. Rows written before migration
@@ -102,6 +107,11 @@ export function profileBannerFromRow(row: {
   coverImageUrl?: string | null;
   coverMediaType?: string | null;
 }): ProfileBanner | null {
+  if (row.coverMediaType === 'image') {
+    return row.coverImageUrl
+      ? { type: 'image', url: row.coverImageUrl, posterUrl: row.coverPosterUrl ?? row.coverImageUrl, gifUrl: null }
+      : null;
+  }
   if (row.coverMediaType === 'gif') {
     const playable = row.coverVideoUrl ?? row.coverImageUrl ?? null;
     return playable
@@ -109,6 +119,19 @@ export function profileBannerFromRow(row: {
       : null;
   }
   return row.coverVideoUrl ? { type: 'video', url: row.coverVideoUrl, posterUrl: row.coverPosterUrl ?? null } : null;
+}
+
+/**
+ * The still that stands for the banner wherever it can't animate — the
+ * storefront cover on brand cards, share previews (og:image), ads and store
+ * setup: the poster frame, else the GIF / still itself.
+ */
+export function storefrontCoverUrl(banner: ProfileBanner | null): string | null {
+  if (!banner) return null;
+  if (banner.posterUrl) return banner.posterUrl;
+  if (banner.type === 'gif') return banner.gifUrl ?? banner.url;
+  if (banner.type === 'image') return banner.url;
+  return null;
 }
 
 /** Cover URLs are only exposed while the cover is visible (not moderated away). */
