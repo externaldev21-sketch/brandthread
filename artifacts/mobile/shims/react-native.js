@@ -14,7 +14,9 @@
  * those (Text, TextInput) at shims/react-native-web-*.js.
  */
 const RN = require('react-native');
-const { withFontStyle } = require('./systemFontComponent');
+// The helper imports systemFont, which can resolve back to this shim in Metro.
+// Load it only after our native exports are published, not during bootstrap.
+const withFontStyle = (...args) => require('./systemFontComponent').withFontStyle(...args);
 
 /** Copies every own property descriptor, so lazy getters stay lazy. */
 function copyExports(source) {
