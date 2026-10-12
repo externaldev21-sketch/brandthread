@@ -216,7 +216,6 @@ export default function BuyerOtherProfileScreen() {
       setProfile(prev => prev ? { ...prev, followRequested: false } : prev);
       try {
         await api.social.unfollow(canonicalUserId);
-        hapticLight();
       } catch {
         setProfile(prev => prev ? { ...prev, followRequested: true } : prev);
         Alert.alert("Couldn't cancel request", 'Try again.');
@@ -247,7 +246,6 @@ export default function BuyerOtherProfileScreen() {
           followRequested: true,
           followersCount: typeof result.followersCount === 'number' ? result.followersCount : Math.max(0, prev.followersCount - 1),
         } : prev);
-        hapticLight();
         return;
       }
       if (!wasFollowing) void requestContextualPushPermission(currentUserId, api);
@@ -264,7 +262,6 @@ export default function BuyerOtherProfileScreen() {
       });
       // Becoming (or ceasing to be) friends changes which posts are visible.
       void videos.reload();
-      hapticLight();
     } catch {
       setProfile(prev => prev ? (optimisticRequest ? { ...prev, followRequested: false } : {
         ...prev,

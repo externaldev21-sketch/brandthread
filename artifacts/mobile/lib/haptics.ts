@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { Platform } from 'react-native';
 
 /**
  * Haptics are intentionally best-effort: unsupported devices and web previews
@@ -42,3 +43,25 @@ export const hapticSuccessAction = hapticSuccess;
 export const hapticDestructiveConfirm = hapticWarning;
 /** Bottom tab bar switch — a meaningful navigation change, not a selection tick. */
 export const hapticTabChange = hapticMedium;
+
+// ─── Follow ───────────────────────────────────────────────────────────────────
+
+/**
+ * The one haptic for every Follow / Unfollow tap in the app — the feed "+"
+ * avatar badge, profile Follow buttons, Follow pills in search, activity,
+ * followers/following lists, live, onboarding and so on. Call it on the tap
+ * itself, before the network request, so it lands instantly. Follow gets a
+ * light impact plus a success notification (Instagram/TikTok feel); Unfollow
+ * gets a softer selection tick. No-op on web.
+ *
+ * tests/follow-haptics.test.ts fails if a follow control skips this helper.
+ */
+export function hapticFollow(nextFollowing: boolean) {
+  if (Platform.OS === 'web') return;
+  if (nextFollowing) {
+    hapticLight();
+    hapticSuccess();
+  } else {
+    hapticSelection();
+  }
+}
