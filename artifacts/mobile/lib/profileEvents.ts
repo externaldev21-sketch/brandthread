@@ -24,7 +24,9 @@ export type ProfileEvent =
       /** Server-confirmed following count of the viewer, when the API returned one. */
       viewerFollowingCount?: number;
     }
-  | { type: 'content'; ownerId?: string | null };
+  | { type: 'content'; ownerId?: string | null }
+  /** The owner's profile banner changed (null = removed); mounted own profiles apply it at once. */
+  | { type: 'banner'; ownerId?: string | null; banner: import('./profileBannerApi').ProfileBanner | null };
 
 type Listener = (event: ProfileEvent) => void;
 const listeners = new Set<Listener>();

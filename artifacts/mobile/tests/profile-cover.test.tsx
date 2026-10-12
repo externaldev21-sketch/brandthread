@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Profile cover video — client flow: the first-visit coach mark shows exactly
 // once (server flag, so it survives reinstall / other devices), clips over
-// 25s go through trim with a 20s suggestion, and the server's 24h-limit
+// 10s (the profile banner limit) go through trim with a 10s suggestion, and the server's 24h-limit
 // message reaches the user.
 
 const { apiMock, alertMock, pickerMock } = vi.hoisted(() => ({
@@ -86,17 +86,17 @@ describe('cover rules', () => {
     expect(shouldShowCoverCoachmark({ own: true, status: null, dismissedLocally: false })).toBe(false);
   });
 
-  it('asks to trim clips over 25s and suggests the first 20s', () => {
-    expect(needsTrim(25)).toBe(false);
-    expect(needsTrim(25.2)).toBe(false);
-    expect(needsTrim(25.5)).toBe(true);
+  it('asks to trim clips over 10s and suggests the first 10s', () => {
+    expect(needsTrim(10)).toBe(false);
+    expect(needsTrim(10.2)).toBe(false);
+    expect(needsTrim(10.5)).toBe(true);
     expect(needsTrim(29.9)).toBe(true);
     expect(needsTrim(45)).toBe(true);
-    expect(defaultTrim(45)).toEqual({ start: 0, duration: 20 });
-    expect(clampTrim(40, 20, 45)).toEqual({ start: 25, duration: 20 });
-    expect(clampTrim(0, 60, 45).duration).toBe(25);
-    expect(COVER_MAX_SECONDS).toBe(25);
-    expect([...COVER_TRIM_LENGTHS]).toEqual([10, 15, 20, 25]);
+    expect(defaultTrim(45)).toEqual({ start: 0, duration: 10 });
+    expect(clampTrim(40, 10, 45)).toEqual({ start: 35, duration: 10 });
+    expect(clampTrim(0, 60, 45).duration).toBe(10);
+    expect(COVER_MAX_SECONDS).toBe(10);
+    expect([...COVER_TRIM_LENGTHS]).toEqual([5, 10]);
     expect(pickerDurationSeconds(45000)).toBe(45);
   });
 });
@@ -141,7 +141,7 @@ describe('upload flow', () => {
     pickerMock.launchImageLibraryAsync.mockReset();
   });
 
-  it('routes a clip over 25s through trim (20s suggested) before uploading with that trim', async () => {
+  it('routes a clip over 10s through trim (10s suggested) before uploading with that trim', async () => {
     pickerMock.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://long.mp4', mimeType: 'video/mp4', duration: 45000 }] });
     apiMock.profileCover.upload.mockResolvedValue({ coverVideoUrl: 'https://x/c', coverPosterUrl: 'https://x/p', coverVideoUpdatedAt: 'now' });
     const renderer = await mount();
@@ -151,13 +151,13 @@ describe('upload flow', () => {
     expect(latest!.trimSource).toMatchObject({ uri: 'file://long.mp4', durationSeconds: 45 });
     expect(apiMock.profileCover.upload).not.toHaveBeenCalled();
     await act(async () => { latest!.confirmTrim(defaultTrim(45)); await flush(); });
-    expect(apiMock.profileCover.upload).toHaveBeenCalledWith('file://long.mp4', 'video/mp4', { start: 0, duration: 20 });
+    expect(apiMock.profileCover.upload).toHaveBeenCalledWith('file://long.mp4', 'video/mp4', { start: 0, duration: 10 });
     expect(latest!.cover).toEqual({ videoUrl: 'https://x/c', posterUrl: 'https://x/p' });
     renderer.unmount();
   });
 
   it('shows the server’s 24h message when a change is too soon', async () => {
-    pickerMock.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://short.mp4', mimeType: 'video/mp4', duration: 12000 }] });
+    pickerMock.launchImageLibraryAsync.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://short.mp4', mimeType: 'video/mp4', duration: 8000 }] });
     apiMock.profileCover.upload.mockRejectedValue(new Error('You can change your cover again in 7 hours'));
     const renderer = await mount();
     await act(async () => { latest!.startAdd(); await flush(); });

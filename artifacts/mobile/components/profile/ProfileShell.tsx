@@ -28,6 +28,11 @@
  * behind the controls, avatar, name and bio and fades to solid at the stats
  * row; controls scroll with the page (no compact bar). Every other consumer
  * keeps the default `hero` layout unchanged.
+ *
+ * `banner` (optional, both variants): when the profile has a banner (image
+ * or looping muted video), TikTok's banner header (`ProfileBannerHeader`)
+ * replaces the hero / video header — name, handle and stats on the banner,
+ * avatar on the right. No banner → the layouts above, exactly as before.
  */
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -59,6 +64,8 @@ import { useLiveStreamForHost, useOpenLive } from '@/lib/live/useLiveDirectory';
 import { ProfileVideoHeader } from './ProfileVideoHeader';
 import { ProfileStoryAvatar } from './ProfileStoryAvatar';
 import { avatarGeometry, PROFILE_VIDEO_HEADER_AVATAR_SIZE } from './profileAvatarGeometry';
+import { ProfileBannerHeader } from './ProfileBannerHeader';
+import { bannerHeight, type ProfileBanner } from './profileBannerRules';
 /** Compact sticky header height below the status bar. */
 const COMPACT_BAR = 64;
 
@@ -116,6 +123,10 @@ export interface ProfileShellProps<T> {
   /** Directly under the tab bar, above the grid (e.g. a sub-filter for the active tab). */
   belowTabs?: React.ReactNode;
   hero: { videoUri?: string | null; posterUri?: string | null };
+  /** TikTok-style profile banner; when set it replaces the hero / video header. */
+  banner?: ProfileBanner | null;
+  /** Small status bubble above the avatar on the banner (the profile's active note). */
+  bannerNote?: { text: string; placeholder?: boolean; onPress?: () => void } | null;
   /** Owner-only cover-video affordance ("Add cover video" / "Edit cover"), shown in the hero. */
   coverAffordance?: React.ReactNode;
   /**
@@ -159,12 +170,13 @@ export interface ProfileShellProps<T> {
 
 export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const {
-    testID, identity, avatar, hero, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, belowStats, actions, extras,
+    testID, identity, avatar, hero, banner = null, bannerNote = null, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, belowStats, actions, extras,
     tabs, section, data, renderItem, keyExtractor, numColumns = 1, listKey,
     ListEmptyComponent, ListFooterComponent, onEndReached, refreshing = false, onRefresh,
     renderFloating, bottomInset = 0, headerVariant = 'hero', tabsVariant = 'labeled', belowTabs,
   } = props;
   const isVideoHeader = headerVariant === 'video';
+  const bannerMode = !!banner;
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
@@ -172,7 +184,10 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const liveStreamId = useLiveStreamForHost(isOwnProfile ? null : avatar?.liveHostId);
   const openLive = useOpenLive();
   const layout = useProfileLayout();
-  const { heroHeight, columnWidth } = layout;
+  const { columnWidth } = layout;
+  const bannerH = bannerHeight(layout.windowHeight);
+  // With a banner, the collapse choreography + "hero on screen" track the banner instead.
+  const heroHeight = bannerMode ? bannerH : layout.heroHeight;
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollResetRef = useScrollReset<any>();
@@ -213,11 +228,13 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   useEffect(() => {
     const id = scrollY.addListener(({ value }) => {
       lastOffsetRef.current = value;
-      const next = isVideoHeader ? value < Math.max(videoHeroHeight, 1) : value < heroHeight - 40;
+      const next = bannerMode
+        ? value < bannerH - 40
+        : isVideoHeader ? value < Math.max(videoHeroHeight, 1) : value < heroHeight - 40;
       setHeroOnScreen((prev) => (prev === next ? prev : next));
     });
     return () => scrollY.removeListener(id);
-  }, [scrollY, heroHeight, isVideoHeader, videoHeroHeight]);
+  }, [scrollY, heroHeight, isVideoHeader, videoHeroHeight, bannerMode, bannerH]);
 
   // ── Preserve scroll position across an in-screen tab switch ─────────────
   // `listKey` changes when a tab needs a different `numColumns` (FlatList
@@ -367,7 +384,68 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
 
   const topPad = headerTopInset;
   const videoAvatarSize = avatarGeometry(PROFILE_VIDEO_HEADER_AVATAR_SIZE).outer;
-  const videoHeader = isVideoHeader ? (
+  const roleChips = [
+    <ProfileChip key="role" size="sm" label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />,
+    ...(identity.extraChips ?? []).map((c) => <ProfileChip key={c.label} size="sm" label={c.label} icon={c.icon} />),
+  ];
+  const bannerHeader = banner ? (
+    <>
+      <ProfileBannerHeader
+        banner={banner}
+        height={bannerH}
+        active={heroActive}
+        posterOnly={heroPosterOnly}
+        topPad={topPad}
+        // Own video-header profiles scroll their top bar with the banner;
+        // the hero variant keeps its floating controls (rendered below).
+        topBar={isVideoHeader ? (
+          <>
+            <View style={styles.controlGroup}>{topLeft}</View>
+            <View style={styles.controlGroup}>
+              {isOwnProfile && walletChip ? <ProfileWalletChip balanceLabel={walletChip.balanceLabel} onPress={walletChip.onPress} /> : null}
+              {topRight}
+            </View>
+          </>
+        ) : null}
+        avatar={isVideoHeader ? (
+          <LiveAvatarRing live={!!liveStreamId} size={videoAvatarSize} testID={liveStreamId ? 'profile-live-ring' : undefined}>
+            <ProfileStoryAvatar
+              size={PROFILE_VIDEO_HEADER_AVATAR_SIZE}
+              uri={identity.avatarUrl}
+              videoUri={identity.avatarVideoUrl}
+              initials={identity.initials || '•'}
+              hasActiveStory={!!avatar?.ring}
+              onPress={avatarPress}
+              onPressBadge={isOwnProfile ? avatar?.onPressStoryBadge : undefined}
+              accessibilityLabel={avatarPressLabel}
+            />
+          </LiveAvatarRing>
+        ) : avatarPress ? (
+          <PressableScale onPress={avatarPress} accessibilityRole="button" accessibilityLabel={avatarPressLabel} testID="profile-avatar">
+            {avatarNode}
+          </PressableScale>
+        ) : (
+          <View accessible accessibilityLabel={`${identity.name} avatar`} testID="profile-avatar">{avatarNode}</View>
+        )}
+        note={bannerNote}
+        name={identity.name}
+        nameAccessory={identity.verified ? <Feather name="check-circle" size={18} color={ON_DARK} accessibilityLabel="Verified" /> : null}
+        handle={identity.handle ?? null}
+        stats={stats}
+        statsLoading={statsLoading}
+      />
+      {/* Below the banner the profile continues as before: chips, bio, links. */}
+      <View style={styles.bannerBelow} testID="profile-banner-below">
+        <View style={styles.bannerChips}>
+          {identity.pronouns ? <Text style={styles.handleSoft} numberOfLines={1}>{identity.pronouns}</Text> : null}
+          {roleChips}
+        </View>
+        {meta ? <View style={styles.bannerMeta}>{meta}</View> : null}
+      </View>
+    </>
+  ) : null;
+
+  const videoHeader = isVideoHeader && !bannerMode ? (
     <ProfileVideoHeader
       hero={hero}
       heroActive={heroActive}
@@ -414,7 +492,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
 
   const header = (
     <View>
-      {videoHeader ?? (<>
+      {bannerHeader ?? videoHeader ?? (<>
       {/* ── Hero ── */}
       <View style={[styles.hero, { height: heroHeight }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: heroTranslate }, { scale: heroScale }] }]}>
@@ -629,6 +707,9 @@ function makeStyles(theme: AppThemePreset) {
     extras: { paddingTop: SP.md, gap: SP.md },
     tabsBlock: { paddingTop: SP.lg },
     coverSlot: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+    bannerBelow: { paddingHorizontal: SP.md, paddingTop: 12, gap: SP.xs },
+    bannerChips: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+    bannerMeta: { paddingTop: 2, gap: 2 },
     gridRow: { gap: PROFILE_GRID_GAP },
 
     compact: {

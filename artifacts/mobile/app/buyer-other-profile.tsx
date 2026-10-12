@@ -38,6 +38,9 @@ import { emitProfileEvent, subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
+import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { useProfileBannerState } from '@/components/profile/useProfileBanner';
+import { useProfileNote } from '@/components/profile/useProfileNote';
 import { ProfileStoriesRow } from '@/components/profile/ProfileStoriesRow';
 import { highlightFromServer, type Highlight } from '@/lib/highlightsService';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -70,6 +73,7 @@ const CONTENT_TAB_ITEMS: ProfileTab[] = [
 ];
 
 type RemoteProfile = {
+  profileBanner?: ProfileBanner | null;
   coverVideoUrl?: string | null;
   coverPosterUrl?: string | null;
   userId?: string;
@@ -139,6 +143,8 @@ export default function BuyerOtherProfileScreen() {
   const followRequested = profile?.followRequested ?? false;
 
   const videos = useCreatorVideos(canonicalReady && !iBlockedThem ? canonicalUserId : null, { asVisitor: previewAsVisitor });
+  const banner = useProfileBannerState({ server: iBlockedThem ? null : resolveProfileBanner(profile), ownerId: canonicalUserId, own: false });
+  const bannerNote = useProfileNote({ userId: canonicalUserId, own: false, enabled: !!banner && !iBlockedThem });
 
   // Mode is decided by id alone. The owner lands on their own profile (with
   // their private tabs) — this screen is only ever the visitor view, apart
@@ -529,6 +535,9 @@ export default function BuyerOtherProfileScreen() {
         avatar={storyIds.length > 0
           ? { ring: true, onPress: openStories, accessibilityLabel: `View ${displayName}'s story`, liveHostId: canonicalUserId }
           : { liveHostId: canonicalUserId }}
+        // Their banner (image or muted looping video) replaces the hero when set.
+        banner={banner}
+        bannerNote={bannerNote}
         // Their cover video (muted, looping, poster first) leads the hero when set.
         hero={profile?.coverVideoUrl
           ? { videoUri: profile.coverVideoUrl, posterUri: profile.coverPosterUrl ?? null }

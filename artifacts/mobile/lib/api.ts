@@ -79,6 +79,7 @@ import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
   CommunityMessage, CommunityMessagesPage, CommunityReaction, CreateCommunityInput, UpdateCommunityInput,
 } from '@/lib/communities/types';
+import { coverQuery, type ProfileBanner, type ProfileBannerCrop } from './profileBannerApi';
 
 function communityQuery(params: { q?: string; offset?: number }): string {
   const q = new URLSearchParams();
@@ -882,6 +883,7 @@ async function uploadVideo<T = any>(
   await clearApiCache(await getCacheScope());
   return data;
 }
+export { coverQuery, type ProfileBanner, type ProfileBannerCrop } from './profileBannerApi';
 export interface ProductPairing { id: string; name: string; image: string | null; active: boolean; position: number }
 export interface PublicPairedProduct {
   id: string;
@@ -2565,20 +2567,32 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         coverVideoUrl: string | null;
         coverPosterUrl: string | null;
         coverVideoUpdatedAt: string | null;
+        profileBanner?: ProfileBanner | null;
         canChange: boolean;
         retryAfterHours?: number;
         message?: string;
       }>('/api/profile/cover-video'),
-      upload: (uri: string, mimeType?: string | null, trim?: { start: number; duration: number } | null) =>
-        uploadVideo<{ coverVideoUrl: string; coverPosterUrl: string; coverVideoUpdatedAt: string }>(
-          trim
-            ? `/api/profile/cover-video?trimStart=${encodeURIComponent(trim.start.toFixed(2))}&trimDuration=${encodeURIComponent(trim.duration.toFixed(2))}`
-            : '/api/profile/cover-video',
+      upload: (
+        uri: string,
+        mimeType?: string | null,
+        trim?: { start: number; duration: number } | null,
+        crop?: ProfileBannerCrop | null,
+      ) =>
+        uploadVideo<{ coverVideoUrl: string; coverPosterUrl: string; coverVideoUpdatedAt: string; profileBanner?: ProfileBanner | null }>(
+          `/api/profile/cover-video${coverQuery(trim, crop)}`,
           { uri, mimeType },
           getToken,
           getCacheScope,
         ),
-      remove: () => del<{ coverVideoUrl: null; coverPosterUrl: null; coverVideoUpdatedAt: string | null }>('/api/profile/cover-video'),
+      /** GIF profile banner (raw image/gif body, ≤15MB); converted server-side to a looping MP4. */
+      uploadGif: (uri: string, crop?: ProfileBannerCrop | null) =>
+        uploadVideo<{ coverVideoUrl: string | null; coverPosterUrl: string | null; coverGifUrl: string; coverVideoUpdatedAt: string; profileBanner: ProfileBanner }>(
+          `/api/profile/cover-gif${coverQuery(null, crop)}`,
+          { uri, mimeType: 'image/gif' },
+          getToken,
+          getCacheScope,
+        ),
+      remove: () => del<{ coverVideoUrl: null; coverPosterUrl: null; coverVideoUpdatedAt: string | null; profileBanner?: null }>('/api/profile/cover-video'),
       coachmark: () => freshGet<{ seen: boolean; hasCover: boolean }>('/api/profile/cover-coachmark'),
       markCoachmarkSeen: () => post<{ seen: true }>('/api/profile/cover-coachmark/seen', {}),
     },

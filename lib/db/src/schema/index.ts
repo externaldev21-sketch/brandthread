@@ -156,6 +156,11 @@ export const users = pgTable('users', {
   coverPosterUrl:             text('cover_poster_url'),
   coverVideoUpdatedAt:        timestamp('cover_video_updated_at', { withTimezone: true }),
   coverVideoModerationStatus: text('cover_video_moderation_status').notNull().default('visible'),
+  // Profile banner (migration 261): the cover can also be a GIF.
+  // 'video' | 'gif'; NULL on older rows = 'video' when coverVideoUrl is set.
+  // coverImageUrl = a GIF banner's original (coverVideoUrl = its MP4 loop).
+  coverMediaType:             text('cover_media_type'),
+  coverImageUrl:              text('cover_image_url'),
   // First-visit coach mark ("add a cover video") — shown exactly once per
   // account, server-side so it survives reinstalls and other devices.
   coverCoachmarkSeenAt:       timestamp('cover_coachmark_seen_at', { withTimezone: true }),

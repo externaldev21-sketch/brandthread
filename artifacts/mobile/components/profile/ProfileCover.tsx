@@ -5,7 +5,7 @@
  *    only), runs pick → (trim) → upload / remove, and surfaces the server's
  *    24h-limit message ("You can change your cover again in X hours").
  *  - `CoverCoachmarkSheet` — the one-time "add a cover video" pop-up.
- *  - `CoverTrimSheet` — shown for clips over 25s; suggests the first 20s.
+ *  - `CoverTrimSheet` — shown for clips over 10s; suggests the first 10s.
  *  - `CoverManageSheet` — change / remove an existing cover.
  *
  * Avatar editing is untouched — the cover is a separate thing.
@@ -89,6 +89,8 @@ export function useProfileCover({ own, cover, userId }: { own: boolean; cover: C
     try {
       const saved = await api.profileCover.upload(video.uri, video.mimeType, trim);
       setCurrent({ videoUrl: saved.coverVideoUrl, posterUrl: saved.coverPosterUrl });
+      // The cover video is the profile banner — mounted own profiles show it at once.
+      emitProfileEvent({ type: 'banner', ownerId: userId ?? null, banner: { type: 'video', url: saved.coverVideoUrl, posterUrl: saved.coverPosterUrl } });
       emitProfileEvent({ type: 'content', ownerId: userId ?? null });
     } catch (error) {
       notify('Cover not updated', errorMessage(error));
@@ -122,7 +124,7 @@ export function useProfileCover({ own, cover, userId }: { own: boolean; cover: C
 
   const startAdd = useCallback(() => {
     if (Platform.OS === 'web') { void pickFrom('library'); return; }
-    Alert.alert('Add cover video', 'Up to 25 seconds. It plays muted on a loop.', [
+    Alert.alert('Add cover video', `Up to ${COVER_MAX_SECONDS} seconds. It plays muted on a loop.`, [
       { text: 'Choose from library', onPress: () => { void pickFrom('library'); } },
       { text: 'Record video', onPress: () => { void pickFrom('camera'); } },
       { text: 'Cancel', style: 'cancel' },
@@ -135,6 +137,7 @@ export function useProfileCover({ own, cover, userId }: { own: boolean; cover: C
     try {
       await api.profileCover.remove();
       setCurrent({ videoUrl: null, posterUrl: null });
+      emitProfileEvent({ type: 'banner', ownerId: userId ?? null, banner: null });
       emitProfileEvent({ type: 'content', ownerId: userId ?? null });
     } catch (error) {
       notify('Cover not removed', errorMessage(error));
@@ -210,7 +213,7 @@ export function CoverCoachmarkSheet({ visible, onAdd, onLater }: { visible: bool
       </View>
       <Text style={s.coachTitle} accessibilityRole="header">Make your profile move</Text>
       <Text style={s.coachBody}>
-        Add a short video as your profile cover. It plays on a silent loop for everyone who visits — up to 25 seconds.
+        Add a short video as your profile cover. It plays on a silent loop for everyone who visits — up to {COVER_MAX_SECONDS} seconds.
       </Text>
       <View style={s.coachActions}>
         <ProfileButton label="Add cover video" icon="film" variant="primary" onPress={onAdd} testID="cover-coachmark-add" />
@@ -285,9 +288,9 @@ export function CoverTrimSheet({
   return (
     <Sheet visible={!!source} onClose={onCancel} testID="cover-trim">
       <Text style={s.coachTitle} accessibilityRole="header">Trim your cover</Text>
-      <Text style={s.coachBody}>Covers are up to 25 seconds. Drag the window to pick the part that loops.</Text>
+      <Text style={s.coachBody}>Covers are up to {COVER_MAX_SECONDS} seconds. Drag the window to pick the part that loops.</Text>
       <View style={[s.trimPreview, { borderColor: theme.border }]}>
-        {source ? <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} /> : null}
+        {source ? <VideoView player={player} style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} contentFit="cover" nativeControls={false} /> : null}
       </View>
       <View
         style={[s.trimTrack, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
