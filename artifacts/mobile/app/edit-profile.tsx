@@ -26,6 +26,9 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { Avatar } from '@/components/ui/Avatar';
+import { EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+import { bannerStill, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -77,7 +80,7 @@ export default function EditProfileScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const api = useApi();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const { theme } = useAppTheme();
   const preview = __DEV__ && isSellerDevPreview();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
@@ -120,6 +123,13 @@ export default function EditProfileScreen() {
   }
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
+  // Profile banner (TikTok): image or looping muted video, edited from the
+  // banner preview at the top of this screen. Separate from the 3:1
+  // storefront banner further down.
+  const [serverBanner, setServerBanner] = useState<ProfileBanner | null>(null);
+  const shownBanner = useProfileBannerState({ server: serverBanner, ownerId: userId, own: true });
+  const bannerFlow = useProfileBanner({ banner: shownBanner, userId });
+
   const loadProfile = useCallback(() => {
     setProfileError(false);
     if (preview) {
@@ -135,7 +145,7 @@ export default function EditProfileScreen() {
         setAvatarUri((profile as any).avatarPosterUrl || profile.profileImageUrl || null);
         setAvatarVideoUri((profile as any).avatarVideoUrl ?? null);
         setLogoUri(profile.logoUrl ?? null);
-        setBannerUri(profile.bannerUrl ?? null);
+        setServerBanner(resolveProfileBanner(profile as any));
         const loadedFields: Fields = {
           name: profile.brandName ?? profile.displayName ?? '',
           username: profile.username ?? '',
@@ -350,7 +360,6 @@ export default function EditProfileScreen() {
   }
 
   const pickLogo = () => uploadSlot('logo', [1, 1], 'Update logo', '/api/seller/profile/logo/upload', setLogoUri, 'logoUrl', true);
-  const pickBanner = () => uploadSlot('banner', [3, 1], 'Update banner', '/api/seller/profile/banner/upload', setBannerUri, 'bannerUrl', true);
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof Fields, string>> = {};
@@ -465,12 +474,42 @@ export default function EditProfileScreen() {
       ) : (
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}>
 
+        {/* Profile banner (TikTok): preview + "Edit banner", avatar overlapping its bottom edge */}
+        <EditProfileBanner
+          banner={bannerFlow.banner}
+          busy={bannerFlow.busy}
+          onEditBanner={bannerFlow.openSheet}
+          onEditAvatar={pickAvatar}
+          avatarDisabled={uploading.avatar}
+          avatarLabel={uploading.avatar ? `Uploading… ${uploadProgress.avatar}%` : 'Edit photo or avatar'}
+          avatar={(
+            <View style={styles.bannerAvatar}>
+              <Avatar uri={avatarUri} name={fields.name || fields.username} size={96} />
+              {uploading.avatar && (
+                <View style={[styles.imageOverlay, styles.bannerAvatarOverlay]}>
+                  <ActivityIndicator color="#FFF" size="small" />
+                  <Text style={styles.imageOverlayText}>{uploadProgress.avatar}%</Text>
+                </View>
+              )}
+              {!uploading.avatar && (
+                <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
+                  <Feather name="camera" size={12} color={theme.onAccent} />
+                </View>
+              )}
+            </View>
+          )}
+        />
+        {uploadError.avatar ? (
+          <View style={styles.avatarRetry}><RetryLink onPress={pickAvatar} theme={theme} /></View>
+        ) : null}
+
         {/* Live storefront header preview */}
         <Text style={styles.sectionLabel}>Storefront preview</Text>
         <View style={styles.previewCard}>
           <View style={styles.previewBannerWrap}>
-            {bannerUri ? (
-              <Image source={{ uri: bannerUri }} style={styles.previewBanner} />
+            {/* One banner: the storefront cover is the profile banner's still frame. */}
+            {bannerStill(bannerFlow.banner) ? (
+              <Image source={{ uri: bannerStill(bannerFlow.banner) as string }} style={styles.previewBanner} />
             ) : (
               <LinearGradient colors={theme.heroGradient as any} style={styles.previewBanner} />
             )}
@@ -492,51 +531,9 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-        {/* Banner */}
-        <ImageUploadRow
-          label="Banner / cover"
-          hint="Wide image shown at the top of your storefront"
-          uploading={uploading.banner}
-          progress={uploadProgress.banner}
-          error={uploadError.banner}
-          onPress={pickBanner}
-          theme={theme}
-        >
-          <View style={styles.bannerPreviewSlot}>
-            {bannerUri ? (
-              <Image source={{ uri: bannerUri }} style={styles.bannerPreviewImage} />
-            ) : (
-              <View style={[styles.bannerPreviewImage, styles.bannerPreviewEmpty]}>
-                <Feather name="image" size={20} color={theme.muted} />
-              </View>
-            )}
-          </View>
-        </ImageUploadRow>
-
-        {/* Avatar + Logo */}
+        {/* Logo (the avatar is edited once, at the top under the banner) */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarLogoRow}>
-            <View style={styles.avatarColumn}>
-              <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={uploading.avatar}>
-                <View style={styles.avatarWrap}>
-                  <Avatar uri={avatarUri} name={fields.name || fields.username} size={84} />
-                  {uploading.avatar && (
-                    <View style={styles.imageOverlay}>
-                      <ActivityIndicator color="#FFF" size="small" />
-                      <Text style={styles.imageOverlayText}>{uploadProgress.avatar}%</Text>
-                    </View>
-                  )}
-                  {!uploading.avatar && (
-                    <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-                      <Feather name="camera" size={12} color={theme.onAccent} />
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-              <Text style={styles.editPhotoLink}>{uploading.avatar ? 'Uploading…' : 'Avatar'}</Text>
-              {uploadError.avatar && <RetryLink onPress={pickAvatar} theme={theme} />}
-            </View>
-
             <View style={styles.avatarColumn}>
               <TouchableOpacity activeOpacity={0.8} onPress={pickLogo} disabled={uploading.logo}>
                 <View style={styles.avatarWrap}>
@@ -661,6 +658,7 @@ export default function EditProfileScreen() {
         </View>
       </ScrollView>
       )}
+      {bannerFlow.sheet}
       {imageSourceSheet}
     </KeyboardAvoidingView>
   );
@@ -804,14 +802,14 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   previewName: { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
   previewMeta: { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: theme.muted },
 
-  bannerPreviewSlot: { marginLeft: 8 },
-  bannerPreviewImage: { width: 64, height: 40, borderRadius: 8 },
-  bannerPreviewEmpty: { backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center' },
 
   avatarSection: { paddingVertical: 8 },
   avatarLogoRow: { flexDirection: 'row', justifyContent: 'center', gap: 36 },
   avatarColumn: { alignItems: 'center', gap: 6 },
+  avatarRetry: { alignItems: 'center', marginTop: -8, marginBottom: 8 },
   avatarWrap: { width: 84, height: 84, borderRadius: 42, position: 'relative' },
+  bannerAvatar: { width: 96, height: 96, borderRadius: 48, position: 'relative' },
+  bannerAvatarOverlay: { borderRadius: 48 },
   avatar: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
   logoEmpty: { backgroundColor: theme.surface },
   cameraBadge: {

@@ -67,6 +67,10 @@ import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import {
   CoverCoachmarkSheet, CoverHeroAffordance, CoverManageSheet, CoverTrimSheet, useProfileCover,
 } from '@/components/profile/ProfileCover';
+import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { useProfileBannerState } from '@/components/profile/useProfileBanner';
+import { useProfileNote } from '@/components/profile/useProfileNote';
+import { useProfileBanner } from '@/components/profile/ProfileBannerEditor';
 
 type ContentTab = 'Posts' | 'Shop' | 'Tagged';
 // Internal key stays 'Shop'; the label (and accessibility name) is "Products".
@@ -98,6 +102,8 @@ interface SellerView {
   videosCount: number;
   coverVideoUrl: string | null;
   coverPosterUrl: string | null;
+  /** TikTok-style profile banner (image or looping video), null when unset. */
+  profileBanner: ProfileBanner | null;
   /** Authoritative public totals from the API (likes on public posts, follower / following counts). */
   likesCount: number | null;
   followersCount: number | null;
@@ -133,6 +139,7 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
     videosCount: Number(profile?.videosCount ?? 0),
     coverVideoUrl: httpOrNull(profile?.coverVideoUrl),
     coverPosterUrl: httpOrNull(profile?.coverPosterUrl),
+    profileBanner: resolveProfileBanner(profile),
     likesCount: typeof profile?.likesCount === 'number' ? profile.likesCount : null,
     followersCount: typeof profile?.followersCount === 'number' ? profile.followersCount : null,
     followingCount: typeof profile?.followingCount === 'number' ? profile.followingCount : null,
@@ -332,6 +339,10 @@ export default function SellerProfileScreen() {
     cover: { videoUrl: seller?.coverVideoUrl ?? null, posterUrl: seller?.coverPosterUrl ?? null },
     userId: canonicalSellerId,
   });
+  const banner = useProfileBannerState({ server: seller?.profileBanner ?? null, ownerId: canonicalSellerId, own: isOwner });
+  const bannerNote = useProfileNote({ userId: canonicalSellerId, own: isOwner, enabled: !!banner });
+  // Owner (not "view as visitor") with no banner: a dark "Add banner" placeholder.
+  const bannerFlow = useProfileBanner({ banner, userId: canonicalSellerId });
 
   // Returning to this profile (after posting, editing listings, deleting a
   // video, or following from another screen) silently refetches counts,
@@ -697,6 +708,9 @@ export default function SellerProfileScreen() {
         hero={coverFlow.hasCover
           ? { videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }
           : { videoUri: firstVideo?.mediaUris[0] ?? null, posterUri: heroPoster }}
+        banner={banner}
+        onAddBanner={isOwner && !previewAsVisitor ? bannerFlow.openSheet : undefined}
+        bannerNote={bannerNote}
         coverAffordance={isOwner ? (
           <CoverHeroAffordance hasCover={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
         ) : undefined}
@@ -780,6 +794,7 @@ export default function SellerProfileScreen() {
           />
           <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
           <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
+          {bannerFlow.sheet}
         </>
       ) : null}
       {isOwner ? (

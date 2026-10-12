@@ -10,7 +10,9 @@
  *     profile screenshot: avatar / "+" badge / stats under the island).
  *     Genuinely immersive full-bleed media screens (camera, live, story and
  *     post viewers, the video feeds) and the auth/onboarding flow keep
- *     their edge-to-edge media — see isImmersiveTopRoute().
+ *     their edge-to-edge media — see isImmersiveTopRoute(). A profile
+ *     banner (TikTok-style) lifts the strip only while the banner itself
+ *     covers the top of the screen — see useSuppressStatusBarMask().
  *
  *  2. Nothing ever sits under or behind the floating tab bar.
  *     useTabBarClearance() (components/buyer-nav/buyerTabBarMetrics.ts) is
@@ -22,7 +24,7 @@
  *     views, sticky footers and absolutely-positioned bottom bars alike —
  *     ends above the bar without touching each of those screens.
  */
-import React from 'react';
+import React, { useEffect, useId, useSyncExternalStore } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSegments } from 'expo-router';
 
@@ -60,6 +62,33 @@ export function isImmersiveTopRoute(segments: readonly string[]): boolean {
   return false;
 }
 
+// ─── Media that may sit behind the status bar ──────────────────────────────
+// A profile banner extends up behind the status bar (TikTok) — only while the
+// profile is at rest at the top: the moment it scrolls, the strip is back so
+// content never slides under the clock.
+const maskSuppressors = new Set<string>();
+const maskListeners = new Set<() => void>();
+function setMaskSuppressed(id: string, on: boolean) {
+  const had = maskSuppressors.has(id);
+  if (on === had) return;
+  if (on) maskSuppressors.add(id); else maskSuppressors.delete(id);
+  maskListeners.forEach((listener) => listener());
+}
+function subscribeMask(listener: () => void) {
+  maskListeners.add(listener);
+  return () => { maskListeners.delete(listener); };
+}
+const maskSuppressedSnapshot = () => maskSuppressors.size > 0;
+
+/** While `active`, the status-bar strip is lifted (full-bleed media under the status bar). */
+export function useSuppressStatusBarMask(active: boolean): void {
+  const id = useId();
+  useEffect(() => {
+    setMaskSuppressed(id, active);
+    return () => setMaskSuppressed(id, false);
+  }, [id, active]);
+}
+
 /** Height of the masked strip: the same top inset every header pads by
  *  (useHeaderTopInset — the real safe-area top on device, the simulated
  *  notch on the web preview), so a header's own content always starts
@@ -77,7 +106,8 @@ export function StatusBarMask() {
   const { theme } = useAppTheme();
   const segments = useSegments() as string[];
   const height = useStatusBarMaskHeight();
-  if (height <= 0 || isImmersiveTopRoute(segments)) return null;
+  const suppressed = useSyncExternalStore(subscribeMask, maskSuppressedSnapshot, maskSuppressedSnapshot);
+  if (height <= 0 || suppressed || isImmersiveTopRoute(segments)) return null;
   return (
     <View
       testID="status-bar-mask"
