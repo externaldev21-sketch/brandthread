@@ -22,7 +22,7 @@ import { CachedImage } from '@/components/CachedImage';
 import MediaViewer from '@/components/chat/MediaViewer';
 import VideoMessageViewer from '@/components/chat/VideoMessageViewer';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { hapticPrimaryAction, hapticSelection, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticSelection, hapticSuccessAction, hapticDestructiveConfirm, hapticFollow } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -2349,9 +2349,9 @@ export default function SellerConversationScreen() {
         onAction={async () => {
           setThreadCashNotice(null);
           if (!other?.userId) return;
+          hapticFollow(true);
           try {
             await api.social.follow(other.userId);
-            hapticSuccessAction();
           } catch {
             // Best-effort — the composer button stays disabled until the
             // next mutual-follow check confirms it either way.

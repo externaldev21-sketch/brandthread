@@ -7,6 +7,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { hapticFollow } from '@/lib/haptics';
 import { apiErrorMessage } from '@/lib/safety';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
@@ -81,6 +82,7 @@ export function ConversationSettingsSheet({
     setError('');
     try {
       if (action === 'unfollow') {
+        hapticFollow(false);
         await api.social.unfollow(counterpart.userId);
         setFollowing(false);
       } else if (action === 'block') {

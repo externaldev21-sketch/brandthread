@@ -36,7 +36,7 @@ import ReanimatedAnimated, { useSharedValue, useAnimatedStyle, withTiming } from
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
-import { hapticLight } from '@/lib/haptics';
+import { hapticFollow, hapticLight } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, RADIUS } from '@/lib/theme';
@@ -577,7 +577,7 @@ function LiveRoomPage({
               </View>
             </View>
             <PressableScale
-              onPress={() => { hapticLight(); setFollowing(v => !v); }}
+              onPress={() => { hapticFollow(!following); setFollowing(v => !v); }}
               style={[styles.followBtn, following && styles.followBtnActive]}
               accessibilityRole="button"
               accessibilityLabel={following ? `Following ${room.brandName}` : `Follow ${room.brandName}`}

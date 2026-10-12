@@ -12,6 +12,7 @@ import {
 } from '@/services/socialService';
 import type { FriendSuggestion } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { hapticFollow } from '@/lib/haptics';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ListSkeleton } from '@/components/layout';
@@ -117,6 +118,7 @@ export default function BuyerFriendRequestsScreen() {
 
   // ── Follow back (accept incoming) ───────────────────────────────────────────
   const handleFollowBack = async (row: FollowRow) => {
+    hapticFollow(true);
     setActionId(row.userId);
     try {
       await api.social.follow(row.userId);
@@ -151,6 +153,7 @@ export default function BuyerFriendRequestsScreen() {
 
   // ── Cancel sent (unfollow) ───────────────────────────────────────────────────
   const handleCancel = async (row: FollowRow) => {
+    hapticFollow(false);
     setActionId(row.userId);
     try {
       await api.social.unfollow(row.userId);
@@ -164,6 +167,7 @@ export default function BuyerFriendRequestsScreen() {
 
   // ── Follow a suggestion ──────────────────────────────────────────────────────
   const handleFollowSuggestion = async (sug: FriendSuggestion) => {
+    hapticFollow(true);
     setSentSet(prev => new Set([...prev, sug.userId]));
     try {
       const res = await api.social.follow(sug.userId);

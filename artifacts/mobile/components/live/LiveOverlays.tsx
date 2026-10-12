@@ -11,7 +11,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, RADIUS, ON_DARK_MUTED } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { hapticFollow, hapticLight } from '@/lib/haptics';
 import { LIVE_CHAT_VISIBLE, formatViewerCount } from '@/lib/live/liveOrdering';
 import type { LiveChatMessage, LiveHost, LiveProduct, LiveViewerAvatar } from '@/lib/live/types';
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
@@ -76,7 +76,7 @@ export function LiveHostPill({
         </Pressable>
       </View>
       <Pressable
-        onPress={() => { hapticSelection(); onFollow(); }}
+        onPress={() => { hapticFollow(!following); onFollow(); }}
         style={[styles.followBtn, following && styles.followBtnOn]}
         accessibilityRole="button"
         accessibilityState={{ selected: following }}
