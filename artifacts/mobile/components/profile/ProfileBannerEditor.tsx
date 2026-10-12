@@ -40,7 +40,7 @@ import { emitProfileEvent } from '@/lib/profileEvents';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { CoverTrimSheet } from './ProfileCover';
 import { pickerDurationSeconds } from './profileCoverRules';
-import { BannerMedia } from './ProfileBannerHeader';
+import { BannerMedia, BannerPlaceholder } from './ProfileBannerHeader';
 import {
   BANNER_GIF_MAX_BYTES, bannerAspect, bannerNeedsTrim, bannerSheetOptions, isGifAsset,
   type BannerSheetAction, type ProfileBanner,
@@ -505,6 +505,10 @@ export function EditProfileBanner({
         {banner ? (
           <BannerMedia banner={banner} active posterOnly={false} height={EDIT_BANNER_HEIGHT} />
         ) : null}
+        {/* No banner yet: the whole area is a subtle dark "Add banner" placeholder. */}
+        {!banner && !busy ? (
+          <BannerPlaceholder onAdd={onEditBanner} contentBottom={EDIT_AVATAR / 2} testID="edit-banner-button" />
+        ) : (
         <Pressable
           onPress={onEditBanner}
           disabled={!!busy}
@@ -517,6 +521,7 @@ export function EditProfileBanner({
           {busy ? <ActivityIndicator size="small" color="#000000" /> : <Feather name="film" size={14} color="#000000" />}
           <Text style={styles.editPillText}>{label}</Text>
         </Pressable>
+        )}
       </View>
       <Pressable
         onPress={onEditAvatar}

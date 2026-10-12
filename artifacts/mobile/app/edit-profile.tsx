@@ -499,6 +499,9 @@ export default function EditProfileScreen() {
             </View>
           )}
         />
+        {uploadError.avatar ? (
+          <View style={styles.avatarRetry}><RetryLink onPress={pickAvatar} theme={theme} /></View>
+        ) : null}
 
         {/* Live storefront header preview */}
         <Text style={styles.sectionLabel}>Storefront preview</Text>
@@ -528,30 +531,9 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-        {/* Avatar + Logo */}
+        {/* Logo (the avatar is edited once, at the top under the banner) */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarLogoRow}>
-            <View style={styles.avatarColumn}>
-              <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={uploading.avatar}>
-                <View style={styles.avatarWrap}>
-                  <Avatar uri={avatarUri} name={fields.name || fields.username} size={84} />
-                  {uploading.avatar && (
-                    <View style={styles.imageOverlay}>
-                      <ActivityIndicator color="#FFF" size="small" />
-                      <Text style={styles.imageOverlayText}>{uploadProgress.avatar}%</Text>
-                    </View>
-                  )}
-                  {!uploading.avatar && (
-                    <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-                      <Feather name="camera" size={12} color={theme.onAccent} />
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-              <Text style={styles.editPhotoLink}>{uploading.avatar ? 'Uploading…' : 'Avatar'}</Text>
-              {uploadError.avatar && <RetryLink onPress={pickAvatar} theme={theme} />}
-            </View>
-
             <View style={styles.avatarColumn}>
               <TouchableOpacity activeOpacity={0.8} onPress={pickLogo} disabled={uploading.logo}>
                 <View style={styles.avatarWrap}>
@@ -824,6 +806,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatarSection: { paddingVertical: 8 },
   avatarLogoRow: { flexDirection: 'row', justifyContent: 'center', gap: 36 },
   avatarColumn: { alignItems: 'center', gap: 6 },
+  avatarRetry: { alignItems: 'center', marginTop: -8, marginBottom: 8 },
   avatarWrap: { width: 84, height: 84, borderRadius: 42, position: 'relative' },
   bannerAvatar: { width: 96, height: 96, borderRadius: 48, position: 'relative' },
   bannerAvatarOverlay: { borderRadius: 48 },
