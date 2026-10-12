@@ -2,19 +2,21 @@
  * Profile cover video rules — pure, so they're unit-testable without ffmpeg,
  * object storage or a database.
  *
- * - A cover is at most 25 seconds (validated server-side on the probed
+ * - A cover is at most 10 seconds (the profile banner limit; validated server-side on the probed
  *   duration of what was actually uploaded, after any requested trim).
  * - A cover can change at most once per 24 hours. Setting a cover and
  *   removing one BOTH count as a change, so "remove, then re-add" can't be
  *   used to cycle covers faster than once a day.
  */
 
-export const COVER_MAX_SECONDS = 25;
+export const COVER_MAX_SECONDS = 10;
 /** Container durations are rarely exact; allow a few frames of slack. */
 export const COVER_DURATION_TOLERANCE_SECONDS = 0.25;
-export const COVER_SUGGESTED_TRIM_SECONDS = 20;
+export const COVER_SUGGESTED_TRIM_SECONDS = 10;
 export const COVER_CHANGE_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const COVER_MAX_UPLOAD_BYTES = 120 * 1024 * 1024;
+/** GIF banners are capped at ~15MB (converted server-side to a looping MP4). */
+export const COVER_GIF_MAX_BYTES = 15 * 1024 * 1024;
 
 export type CoverChangeCheck =
   | { allowed: true }
@@ -43,7 +45,7 @@ export type TrimRequest = { start: number; duration: number } | null;
 
 /**
  * Parse an optional client trim (`trimStart`, `trimDuration` seconds). The
- * client shows a trim UI for clips over 25s; the server applies the trim and
+ * client shows a trim screen for clips over 10s; the server applies the trim and
  * then re-validates the result, so a client can never skip the limit.
  */
 export function parseTrim(startRaw: unknown, durationRaw: unknown): TrimRequest | { error: string } {
@@ -66,15 +68,61 @@ export function coverDurationError(seconds: number): string | null {
   return null;
 }
 
+export type CropRequest = { x: number; y: number; width: number; height: number } | null;
+
+/**
+ * Parse an optional normalized (0–1) crop rect from the banner crop screen
+ * (`cropX`, `cropY`, `cropW`, `cropH`). All four or none; the rect must sit
+ * inside the source.
+ */
+export function parseCrop(xRaw: unknown, yRaw: unknown, wRaw: unknown, hRaw: unknown): CropRequest | { error: string } {
+  if (xRaw === undefined && yRaw === undefined && wRaw === undefined && hRaw === undefined) return null;
+  const [x, y, width, height] = [xRaw, yRaw, wRaw, hRaw].map((value) => Number(value));
+  const finite = [x, y, width, height].every((value) => Number.isFinite(value));
+  const EPS = 0.001;
+  if (!finite || x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > 1 + EPS || y + height > 1 + EPS) {
+    return { error: 'crop must be a normalized rect (cropX, cropY, cropW, cropH) inside the source' };
+  }
+  return { x, y, width: Math.min(width, 1 - x), height: Math.min(height, 1 - y) };
+}
+
+/**
+ * `url` is what plays: the MP4 rendition (video, and GIFs that converted) or
+ * the original GIF. `gifUrl` is a GIF banner's original file (fallback).
+ */
+export type ProfileBanner = { type: 'video' | 'gif'; url: string; posterUrl: string | null; gifUrl?: string | null };
+
+/**
+ * The profile banner a row carries, or null. Rows written before migration
+ * 261 have no `coverMediaType`; a set `coverVideoUrl` means a video banner.
+ */
+export function profileBannerFromRow(row: {
+  coverVideoUrl?: string | null;
+  coverPosterUrl?: string | null;
+  coverImageUrl?: string | null;
+  coverMediaType?: string | null;
+}): ProfileBanner | null {
+  if (row.coverMediaType === 'gif') {
+    const playable = row.coverVideoUrl ?? row.coverImageUrl ?? null;
+    return playable
+      ? { type: 'gif', url: playable, posterUrl: row.coverPosterUrl ?? null, gifUrl: row.coverImageUrl ?? null }
+      : null;
+  }
+  return row.coverVideoUrl ? { type: 'video', url: row.coverVideoUrl, posterUrl: row.coverPosterUrl ?? null } : null;
+}
+
 /** Cover URLs are only exposed while the cover is visible (not moderated away). */
 export function publicCoverFields(row: {
   coverVideoUrl?: string | null;
   coverPosterUrl?: string | null;
+  coverImageUrl?: string | null;
+  coverMediaType?: string | null;
   coverVideoModerationStatus?: string | null;
-}): { coverVideoUrl: string | null; coverPosterUrl: string | null } {
+}): { coverVideoUrl: string | null; coverPosterUrl: string | null; profileBanner: ProfileBanner | null } {
   const visible = (row.coverVideoModerationStatus ?? 'visible') === 'visible';
   return {
     coverVideoUrl: visible ? row.coverVideoUrl ?? null : null,
     coverPosterUrl: visible ? row.coverPosterUrl ?? null : null,
+    profileBanner: visible ? profileBannerFromRow(row) : null,
   };
 }

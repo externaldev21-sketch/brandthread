@@ -26,6 +26,9 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { Avatar } from '@/components/ui/Avatar';
+import { EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -77,7 +80,7 @@ export default function EditProfileScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const api = useApi();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const { theme } = useAppTheme();
   const preview = __DEV__ && isSellerDevPreview();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
@@ -120,6 +123,13 @@ export default function EditProfileScreen() {
   }
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
+  // Profile banner (TikTok): image or looping muted video, edited from the
+  // banner preview at the top of this screen. Separate from the 3:1
+  // storefront banner further down.
+  const [serverBanner, setServerBanner] = useState<ProfileBanner | null>(null);
+  const shownBanner = useProfileBannerState({ server: serverBanner, ownerId: userId, own: true });
+  const bannerFlow = useProfileBanner({ banner: shownBanner, userId });
+
   const loadProfile = useCallback(() => {
     setProfileError(false);
     if (preview) {
@@ -136,6 +146,7 @@ export default function EditProfileScreen() {
         setAvatarVideoUri((profile as any).avatarVideoUrl ?? null);
         setLogoUri(profile.logoUrl ?? null);
         setBannerUri(profile.bannerUrl ?? null);
+        setServerBanner(resolveProfileBanner(profile as any));
         const loadedFields: Fields = {
           name: profile.brandName ?? profile.displayName ?? '',
           username: profile.username ?? '',
@@ -465,6 +476,32 @@ export default function EditProfileScreen() {
       ) : (
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}>
 
+        {/* Profile banner (TikTok): preview + "Edit banner", avatar overlapping its bottom edge */}
+        <EditProfileBanner
+          banner={bannerFlow.banner}
+          busy={bannerFlow.busy}
+          onEditBanner={bannerFlow.openSheet}
+          onEditAvatar={pickAvatar}
+          avatarDisabled={uploading.avatar}
+          avatarLabel={uploading.avatar ? `Uploading… ${uploadProgress.avatar}%` : 'Edit photo or avatar'}
+          avatar={(
+            <View style={styles.bannerAvatar}>
+              <Avatar uri={avatarUri} name={fields.name || fields.username} size={96} />
+              {uploading.avatar && (
+                <View style={[styles.imageOverlay, styles.bannerAvatarOverlay]}>
+                  <ActivityIndicator color="#FFF" size="small" />
+                  <Text style={styles.imageOverlayText}>{uploadProgress.avatar}%</Text>
+                </View>
+              )}
+              {!uploading.avatar && (
+                <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
+                  <Feather name="camera" size={12} color={theme.onAccent} />
+                </View>
+              )}
+            </View>
+          )}
+        />
+
         {/* Live storefront header preview */}
         <Text style={styles.sectionLabel}>Storefront preview</Text>
         <View style={styles.previewCard}>
@@ -661,6 +698,7 @@ export default function EditProfileScreen() {
         </View>
       </ScrollView>
       )}
+      {bannerFlow.sheet}
       {imageSourceSheet}
     </KeyboardAvoidingView>
   );
@@ -812,6 +850,8 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatarLogoRow: { flexDirection: 'row', justifyContent: 'center', gap: 36 },
   avatarColumn: { alignItems: 'center', gap: 6 },
   avatarWrap: { width: 84, height: 84, borderRadius: 42, position: 'relative' },
+  bannerAvatar: { width: 96, height: 96, borderRadius: 48, position: 'relative' },
+  bannerAvatarOverlay: { borderRadius: 48 },
   avatar: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
   logoEmpty: { backgroundColor: theme.surface },
   cameraBadge: {

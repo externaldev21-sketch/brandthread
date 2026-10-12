@@ -7,6 +7,7 @@ import express, { Router } from "express";
 import { db, interactions, orders, posts, users } from "@workspace/db";
 import { and, count, eq, isNotNull, notInArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { profileBannerFromRow } from "../lib/profileCover";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
@@ -91,6 +92,8 @@ router.get("/profile", async (req, res): Promise<void> => {
         website:             users.website,
         coverVideoUrl:       users.coverVideoUrl,
         coverPosterUrl:      users.coverPosterUrl,
+        coverImageUrl: users.coverImageUrl,
+        coverMediaType: users.coverMediaType,
         avatarVideoUrl:      users.avatarVideoUrl,
         avatarPosterUrl:     users.avatarPosterUrl,
         username:            users.username,
@@ -149,6 +152,8 @@ router.get("/profile", async (req, res): Promise<void> => {
     profileImageUrl,
     logoUrl,
     bannerUrl,
+    // TikTok-style profile banner (image or looping video), see profile-cover.ts.
+    profileBanner: profileBannerFromRow(user),
     totalLikes: Number(likeTotal?.totalLikes ?? 0),
     metrics: {
       revenueCents: Number(paidOrderMetrics?.revenueCents ?? 0),

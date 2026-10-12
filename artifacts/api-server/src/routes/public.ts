@@ -1284,6 +1284,8 @@ router.get("/sellers/:sellerId", async (req, res) => {
       coverVideoUrl:   users.coverVideoUrl,
       coverPosterUrl:  users.coverPosterUrl,
       coverVideoModerationStatus: users.coverVideoModerationStatus,
+      coverImageUrl: users.coverImageUrl,
+      coverMediaType: users.coverMediaType,
     })
     .from(users)
     .where(eq(users.clerkId, canonicalClerkId))
@@ -1957,6 +1959,8 @@ router.get("/profiles/:username", async (req, res) => {
         coverVideoUrl:  users.coverVideoUrl,
         coverPosterUrl: users.coverPosterUrl,
         coverVideoModerationStatus: users.coverVideoModerationStatus,
+        coverImageUrl: users.coverImageUrl,
+        coverMediaType: users.coverMediaType,
       })
       .from(users)
       // Case-insensitive lookup using the normalized form.

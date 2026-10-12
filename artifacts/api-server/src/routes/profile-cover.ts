@@ -1,8 +1,10 @@
 /**
  * Profile cover video — any account type (buyer or seller).
  *
- * POST   /api/profile/cover-video?trimStart=&trimDuration=   raw video body
- *          → { coverVideoUrl, coverPosterUrl, coverVideoUpdatedAt }
+ * POST   /api/profile/cover-video?trimStart=&trimDuration=&cropX=&cropY=&cropW=&cropH=
+ *          raw video body → { coverVideoUrl, coverPosterUrl, coverVideoUpdatedAt, profileBanner }
+ * POST   /api/profile/cover-gif?cropX=&cropY=&cropW=&cropH=     raw image/gif body (≤15MB)
+ *          → { coverVideoUrl, coverPosterUrl, coverGifUrl, coverVideoUpdatedAt, profileBanner }
  * DELETE /api/profile/cover-video                            → { coverVideoUrl: null, … }
  * GET    /api/profile/cover-video                            → own cover + change-limit status
  * GET    /api/profile/cover-coachmark                        → { seen }
@@ -14,8 +16,16 @@
  * compressed, silent (always muted), faststart H.264 rendition plus a poster
  * frame; both go to object storage via ObjectStorageService.
  *
+ * The cover is the profile banner (TikTok-style): a looping muted video OR a
+ * GIF. Uploading one replaces the other. A GIF is converted to a looping,
+ * silent MP4 (smaller and smoother than the GIF itself) with a poster frame;
+ * the original GIF is kept as the fallback. The optional crop is the banner
+ * crop screen's normalized rect, applied here by ffmpeg so every client gets
+ * the same framing.
+ *
  * Limits (server-enforced — see lib/profileCover.ts):
- *  - ≤25s after the optional trim (probed on the rendered file);
+ *  - ≤10s after the optional trim (the client's trim screen picks the 10s
+ *    window; probed on the rendered file);
  *  - one change per 24h — setting AND removing both count, so removing
  *    can't be used to cycle covers faster than once a day.
  *
@@ -38,10 +48,14 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import {
+  COVER_GIF_MAX_BYTES,
   COVER_MAX_UPLOAD_BYTES,
   checkCoverChangeAllowed,
   coverDurationError,
+  parseCrop,
   parseTrim,
+  profileBannerFromRow,
+  type CropRequest,
   type TrimRequest,
 } from "../lib/profileCover";
 
@@ -50,8 +64,18 @@ const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
 export interface CoverMediaProcessor {
   probeDuration(path: string): Promise<number>;
   /** Render the silent compressed rendition to `output` and a poster JPEG to `poster`. */
-  render(input: string, output: string, poster: string, trim: TrimRequest): Promise<void>;
+  render(input: string, output: string, poster: string, trim: TrimRequest, crop?: CropRequest): Promise<void>;
+  /** Convert a GIF to a looping silent MP4 at `output` plus its first frame as a poster JPEG. */
+  renderGif(input: string, output: string, poster: string, crop: CropRequest): Promise<void>;
 }
+
+function cropFilterFor(crop: CropRequest | undefined): string {
+  return crop
+    ? `crop=trunc(iw*${crop.width}/2)*2:trunc(ih*${crop.height}/2)*2:trunc(iw*${crop.x}):trunc(ih*${crop.y}),`
+    : "";
+}
+/** ≤1280 on the long edge, even dimensions (yuv420p), constant 30fps so loops have no hitch. */
+const SCALE_FILTER = "scale='if(gt(iw,ih),min(1280,iw),-2)':'if(gt(iw,ih),-2,min(1280,ih))',scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=30";
 
 export interface CoverStorage {
   createObjectEntityFromBuffer(bytes: Buffer, contentType: string): Promise<string>;
@@ -71,13 +95,14 @@ export const ffmpegCoverProcessor: CoverMediaProcessor = {
     if (!Number.isFinite(value) || value <= 0) throw new Error("Invalid video duration");
     return value;
   },
-  async render(input, output, poster, trim) {
+  async render(input, output, poster, trim, crop) {
     const trimArgs = trim ? ["-ss", String(trim.start), "-t", String(trim.duration)] : [];
-    // 720p max on the long edge, no audio track at all (covers are always
-    // muted), faststart so playback begins while it streams.
+    // Banner framing first (even dimensions for yuv420p), then 720p max on
+    // the long edge, no audio track at all (covers are always muted),
+    // faststart so playback begins while it streams.
     await exec("ffmpeg", [
       "-y", ...trimArgs, "-i", input,
-      "-vf", "scale='if(gt(iw,ih),min(1280,iw),-2)':'if(gt(iw,ih),-2,min(1280,ih))',fps=30",
+      "-vf", `${cropFilterFor(crop)}${SCALE_FILTER}`,
       "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
       "-movflags", "+faststart", output,
     ], { timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
@@ -85,7 +110,24 @@ export const ffmpegCoverProcessor: CoverMediaProcessor = {
       "-y", "-ss", "0.3", "-i", output, "-frames:v", "1", "-q:v", "3", poster,
     ], { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
   },
+  async renderGif(input, output, poster, crop) {
+    await exec("ffmpeg", [
+      "-y", "-i", input,
+      "-vf", `${cropFilterFor(crop)}${SCALE_FILTER}`,
+      "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
+      "-movflags", "+faststart", output,
+    ], { timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
+    // The poster is the very first frame, so the loop restarts on what was shown first.
+    await exec("ffmpeg", [
+      "-y", "-i", output, "-frames:v", "1", "-q:v", "3", poster,
+    ], { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
+  },
 };
+
+function isGif(bytes: Buffer): boolean {
+  const header = bytes.subarray(0, 6).toString("ascii");
+  return header === "GIF87a" || header === "GIF89a";
+}
 
 function isSupportedVideo(contentType: string, bytes: Buffer): boolean {
   if (!VIDEO_TYPES.has(contentType)) return false;
@@ -119,11 +161,20 @@ async function loadCover(clerkId: string) {
   const [row] = await db.select({
     coverVideoUrl: users.coverVideoUrl,
     coverPosterUrl: users.coverPosterUrl,
+    coverImageUrl: users.coverImageUrl,
+    coverMediaType: users.coverMediaType,
     coverVideoUpdatedAt: users.coverVideoUpdatedAt,
     coverVideoModerationStatus: users.coverVideoModerationStatus,
     coverCoachmarkSeenAt: users.coverCoachmarkSeenAt,
   }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
   return row ?? null;
+}
+
+/** Every stored object the current cover references (video, poster, image). */
+function coverObjectPaths(row: { coverVideoUrl?: string | null; coverPosterUrl?: string | null; coverImageUrl?: string | null }): string[] {
+  return [row.coverVideoUrl, row.coverPosterUrl, row.coverImageUrl]
+    .map((url) => coverObjectPath(url))
+    .filter((path, index, all): path is string => !!path && all.indexOf(path) === index);
 }
 
 export function createProfileCoverRouter({
@@ -142,6 +193,7 @@ export function createProfileCoverRouter({
       coverVideoUrl: row.coverVideoUrl,
       coverPosterUrl: row.coverPosterUrl,
       coverVideoUpdatedAt: row.coverVideoUpdatedAt,
+      profileBanner: profileBannerFromRow(row),
       canChange: check.allowed,
       ...(check.allowed ? {} : { retryAfterHours: check.retryAfterHours, message: check.message }),
     });
@@ -162,6 +214,8 @@ export function createProfileCoverRouter({
 
       const trim = parseTrim(req.query.trimStart, req.query.trimDuration);
       if (trim && "error" in trim) return res.status(400).json({ error: trim.error });
+      const crop = parseCrop(req.query.cropX, req.query.cropY, req.query.cropW, req.query.cropH);
+      if (crop && "error" in crop) return res.status(400).json({ error: crop.error });
 
       const contentType = String(req.get("content-type") ?? "").split(";")[0].toLowerCase();
       if (!VIDEO_TYPES.has(contentType)) return res.status(415).json({ error: "Unsupported video type" });
@@ -176,7 +230,8 @@ export function createProfileCoverRouter({
         const input = join(dir, contentType === "video/webm" ? "source.webm" : "source.mp4");
         await fs.writeFile(input, bytes);
 
-        // Without a trim, the source itself must already be ≤25s.
+        // Without a trim, the source itself must already be ≤10s (the
+        // client's trim screen sends the chosen window for longer clips).
         if (!trim) {
           const sourceError = coverDurationError(await processor.probeDuration(input));
           if (sourceError) return res.status(400).json({ error: sourceError, code: "cover_too_long" });
@@ -184,7 +239,7 @@ export function createProfileCoverRouter({
 
         const output = join(dir, "cover.mp4");
         const poster = join(dir, "poster.jpg");
-        await processor.render(input, output, poster, trim);
+        await processor.render(input, output, poster, trim, crop);
         // Re-validate what will actually be served.
         const renderedError = coverDurationError(await processor.probeDuration(output));
         if (renderedError) return res.status(400).json({ error: renderedError, code: "cover_too_long" });
@@ -211,7 +266,7 @@ export function createProfileCoverRouter({
         // both land within the same 24h.
         const windowStart = new Date(updatedAt.getTime() - 24 * 60 * 60 * 1000);
         const updated = await db.update(users)
-          .set({ coverVideoUrl, coverPosterUrl, coverVideoUpdatedAt: updatedAt, coverVideoModerationStatus: "visible" })
+          .set({ coverVideoUrl, coverPosterUrl, coverImageUrl: null, coverMediaType: "video", coverVideoUpdatedAt: updatedAt, coverVideoModerationStatus: "visible" })
           .where(sql`${users.clerkId} = ${clerkId} AND (${users.coverVideoUpdatedAt} IS NULL OR ${users.coverVideoUpdatedAt} <= ${windowStart})`)
           .returning({ id: users.id });
         if (updated.length === 0) {
@@ -221,10 +276,13 @@ export function createProfileCoverRouter({
         }
 
         // The previous cover's objects are no longer referenced.
-        for (const oldPath of [coverObjectPath(row.coverVideoUrl), coverObjectPath(row.coverPosterUrl)]) {
-          if (oldPath) await storage.deleteObjectEntity(oldPath).catch(() => {});
-        }
-        return res.status(201).json({ coverVideoUrl, coverPosterUrl, coverVideoUpdatedAt: updatedAt.toISOString() });
+        for (const oldPath of coverObjectPaths(row)) await storage.deleteObjectEntity(oldPath).catch(() => {});
+        return res.status(201).json({
+          coverVideoUrl,
+          coverPosterUrl,
+          coverVideoUpdatedAt: updatedAt.toISOString(),
+          profileBanner: { type: "video", url: coverVideoUrl, posterUrl: coverPosterUrl },
+        });
       } catch (err) {
         await Promise.all(created.map((path) => storage.deleteObjectEntity(path).catch(() => {})));
         req.log?.error?.({ err, clerkId }, "Could not save profile cover video");
@@ -235,30 +293,128 @@ export function createProfileCoverRouter({
     },
   );
 
+  // GIF banner — same 24h window, storage, ACL and moderation path as the
+  // video. Converted to a looping silent MP4 (+ poster); the original GIF is
+  // stored too as the fallback. Replaces a video banner (and vice versa).
+  router.post(
+    "/cover-gif",
+    requireAuth,
+    express.raw({ type: ["image/gif"], limit: COVER_GIF_MAX_BYTES }),
+    async (req, res) => {
+      const clerkId = (req as any).clerkUserId as string;
+      const row = await loadCover(clerkId);
+      if (!row) return res.status(404).json({ error: "Account not found" });
+
+      const check = checkCoverChangeAllowed(row.coverVideoUpdatedAt, now());
+      if (!check.allowed) return res.status(429).json(limitResponse(check));
+
+      const crop = parseCrop(req.query.cropX, req.query.cropY, req.query.cropW, req.query.cropH);
+      if (crop && "error" in crop) return res.status(400).json({ error: crop.error });
+
+      const contentType = String(req.get("content-type") ?? "").split(";")[0].toLowerCase();
+      if (contentType !== "image/gif") return res.status(415).json({ error: "Choose a GIF" });
+      const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+      if (bytes.length === 0) return res.status(400).json({ error: "GIF is empty" });
+      if (bytes.length > COVER_GIF_MAX_BYTES) return res.status(413).json({ error: "GIFs can be at most 15MB" });
+      if (!isGif(bytes)) return res.status(400).json({ error: "Invalid GIF file" });
+
+      const dir = await fs.mkdtemp(join(tmpdir(), "bt-cover-gif-"));
+      const created: string[] = [];
+      try {
+        const input = join(dir, "source.gif");
+        await fs.writeFile(input, bytes);
+        const output = join(dir, "cover.mp4");
+        const poster = join(dir, "poster.jpg");
+        // A GIF that ffmpeg can't convert still works as a banner: the
+        // original plays as is (expo-image animates GIFs).
+        let converted = true;
+        try {
+          await processor.renderGif(input, output, poster, crop);
+        } catch (err) {
+          converted = false;
+          req.log?.warn?.({ err, clerkId }, "GIF banner conversion failed; serving the original GIF");
+        }
+
+        const screened = await screenVideo({ buffer: converted ? await fs.readFile(output) : bytes });
+        if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
+          void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: "cover_gif", verdict: { ...screened, verdict: "reject" } }));
+          return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
+        }
+
+        const gifPath = await storage.createObjectEntityFromBuffer(bytes, "image/gif");
+        created.push(gifPath);
+        let videoPath: string | null = null;
+        let posterPath: string | null = null;
+        if (converted) {
+          videoPath = await storage.createObjectEntityFromBuffer(await fs.readFile(output), "video/mp4");
+          created.push(videoPath);
+          posterPath = await storage.createObjectEntityFromBuffer(await fs.readFile(poster), "image/jpeg");
+          created.push(posterPath);
+        }
+        await Promise.all(created.map((path) => storage.trySetObjectEntityAclPolicy(path, { owner: clerkId, visibility: "public" })));
+
+        const updatedAt = now();
+        const coverGifUrl = coverMediaUrl(req, gifPath);
+        const coverVideoUrl = videoPath ? coverMediaUrl(req, videoPath) : null;
+        const coverPosterUrl = posterPath ? coverMediaUrl(req, posterPath) : null;
+        const windowStart = new Date(updatedAt.getTime() - 24 * 60 * 60 * 1000);
+        const updated = await db.update(users)
+          .set({
+            coverImageUrl: coverGifUrl,
+            coverMediaType: "gif",
+            coverVideoUrl,
+            coverPosterUrl,
+            coverVideoUpdatedAt: updatedAt,
+            coverVideoModerationStatus: "visible",
+          })
+          .where(sql`${users.clerkId} = ${clerkId} AND (${users.coverVideoUpdatedAt} IS NULL OR ${users.coverVideoUpdatedAt} <= ${windowStart})`)
+          .returning({ id: users.id });
+        if (updated.length === 0) {
+          await Promise.all(created.map((path) => storage.deleteObjectEntity(path).catch(() => {})));
+          const again = checkCoverChangeAllowed((await loadCover(clerkId))?.coverVideoUpdatedAt, now());
+          return res.status(429).json(again.allowed ? { error: "Please try again", code: "cover_change_rate_limited" } : limitResponse(again));
+        }
+
+        for (const oldPath of coverObjectPaths(row)) await storage.deleteObjectEntity(oldPath).catch(() => {});
+        return res.status(201).json({
+          coverVideoUrl,
+          coverPosterUrl,
+          coverGifUrl,
+          coverVideoUpdatedAt: updatedAt.toISOString(),
+          profileBanner: { type: "gif", url: coverVideoUrl ?? coverGifUrl, posterUrl: coverPosterUrl, gifUrl: coverGifUrl },
+        });
+      } catch (err) {
+        await Promise.all(created.map((path) => storage.deleteObjectEntity(path).catch(() => {})));
+        req.log?.error?.({ err, clerkId }, "Could not save profile banner GIF");
+        return res.status(500).json({ error: "Banner could not be saved" });
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      }
+    },
+  );
+
   router.delete("/cover-video", requireAuth, async (req, res) => {
     const clerkId = (req as any).clerkUserId as string;
     const row = await loadCover(clerkId);
     if (!row) return res.status(404).json({ error: "Account not found" });
-    if (!row.coverVideoUrl) return res.json({ coverVideoUrl: null, coverPosterUrl: null, coverVideoUpdatedAt: row.coverVideoUpdatedAt });
+    if (!profileBannerFromRow(row)) return res.json({ coverVideoUrl: null, coverPosterUrl: null, coverVideoUpdatedAt: row.coverVideoUpdatedAt, profileBanner: null });
     // Removing counts as a change for the 24h limit (documented choice): it
     // is limited by the same window, and it restarts the window.
     const check = checkCoverChangeAllowed(row.coverVideoUpdatedAt, now());
     if (!check.allowed) return res.status(429).json(limitResponse(check));
     const updatedAt = now();
     await db.update(users)
-      .set({ coverVideoUrl: null, coverPosterUrl: null, coverVideoUpdatedAt: updatedAt })
+      .set({ coverVideoUrl: null, coverPosterUrl: null, coverImageUrl: null, coverMediaType: null, coverVideoUpdatedAt: updatedAt })
       .where(eq(users.clerkId, clerkId));
-    for (const oldPath of [coverObjectPath(row.coverVideoUrl), coverObjectPath(row.coverPosterUrl)]) {
-      if (oldPath) await storage.deleteObjectEntity(oldPath).catch(() => {});
-    }
-    return res.json({ coverVideoUrl: null, coverPosterUrl: null, coverVideoUpdatedAt: updatedAt.toISOString() });
+    for (const oldPath of coverObjectPaths(row)) await storage.deleteObjectEntity(oldPath).catch(() => {});
+    return res.json({ coverVideoUrl: null, coverPosterUrl: null, coverVideoUpdatedAt: updatedAt.toISOString(), profileBanner: null });
   });
 
   router.get("/cover-coachmark", requireAuth, async (req, res) => {
     const clerkId = (req as any).clerkUserId as string;
     const row = await loadCover(clerkId);
     if (!row) return res.status(404).json({ error: "Account not found" });
-    return res.json({ seen: !!row.coverCoachmarkSeenAt, hasCover: !!row.coverVideoUrl });
+    return res.json({ seen: !!row.coverCoachmarkSeenAt, hasCover: !!profileBannerFromRow(row) });
   });
 
   router.post("/cover-coachmark/seen", requireAuth, async (req, res) => {
@@ -280,7 +436,11 @@ export function createProfileCoverRouter({
       const mediaSuffix = `%/api/profile/cover-media/${suffix}`;
       const [owner] = await db.select({ status: users.coverVideoModerationStatus })
         .from(users)
-        .where(or(sql`${users.coverVideoUrl} LIKE ${mediaSuffix}`, sql`${users.coverPosterUrl} LIKE ${mediaSuffix}`))
+        .where(or(
+          sql`${users.coverVideoUrl} LIKE ${mediaSuffix}`,
+          sql`${users.coverPosterUrl} LIKE ${mediaSuffix}`,
+          sql`${users.coverImageUrl} LIKE ${mediaSuffix}`,
+        ))
         .limit(1);
       if (!owner || owner.status !== "visible") return res.status(404).end();
       const objectStorage = new ObjectStorageService();
