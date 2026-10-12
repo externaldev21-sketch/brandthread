@@ -14,9 +14,17 @@ const guestEmail = `guest-${suffix}@test.local`;
 const fakeStripe = vi.hoisted(() => {
   const sessions = new Map<string, any>();
   const creates: any[] = [];
+  const customerCreates: any[] = [];
   return {
     creates,
+    customerCreates,
     stripe: {
+      customers: {
+        create: async (params: any, options: any) => {
+          customerCreates.push({ params, options });
+          return { id: `cus_guest_test_${customerCreates.length}` };
+        },
+      },
       checkout: {
         sessions: {
           create: async (params: any, options: any) => {
@@ -27,6 +35,7 @@ const fakeStripe = vi.hoisted(() => {
               status: "open",
               payment_status: "unpaid",
               amount_total: 2_500,
+              client_secret: params.ui_mode === "embedded_page" ? `cs_secret_${creates.length}` : null,
             };
             sessions.set(session.id, session);
             return session;
@@ -163,6 +172,46 @@ describe("guest checkout", () => {
       allowed_countries: ["US"],
     });
     expect(fakeStripe.creates[0].params.line_items[0].price_data.tax_behavior).toBe("exclusive");
+  });
+
+  it("embedded mode (the store's own checkout page) returns a client secret and doesn't ask for the address twice", async () => {
+    const email = `embedded-${suffix}@test.local`;
+    const body = {
+      items: [{ productId, variantId, quantity: 1 }],
+      contactEmail: email,
+      contactPhone: "+1 503 555 0100",
+      shippingAddress: { name: "Guest Buyer", street: "123 Test Street", line2: "Apt 4", city: "Portland", state: "OR", zip: "97205", country: "US", phone: "+1 503 555 0100" },
+      successUrl: "https://brandthread.test/@maison/c/x/done?session_id={CHECKOUT_SESSION_ID}",
+      cancelUrl: "https://brandthread.test/@maison/c/x",
+      clientIdempotencyKey: `guest-embedded-${suffix}`,
+      uiMode: "embedded",
+    };
+    const first = await post("/api/guest/checkout/session", body);
+    expect(first.status).toBe(201);
+    const params = fakeStripe.creates.at(-1).params;
+    expect(first.body.clientSecret).toBe(`cs_secret_${fakeStripe.creates.length}`);
+    expect(params.ui_mode).toBe("embedded_page");
+    expect(params.return_url).toBe(body.successUrl);
+    expect(params.success_url).toBeUndefined();
+    expect(params.cancel_url).toBeUndefined();
+    expect(params.shipping_address_collection).toBeUndefined();
+    expect(params.customer).toBe(`cus_guest_test_${fakeStripe.customerCreates.length}`);
+    // The address typed on the store page is what Stripe Tax and the order use.
+    expect(fakeStripe.customerCreates.at(-1).params).toMatchObject({
+      email,
+      shipping: { name: "Guest Buyer", address: { line1: "123 Test Street", line2: "Apt 4", city: "Portland", state: "OR", postal_code: "97205", country: "US" } },
+    });
+    expect(fakeStripe.customerCreates.at(-1).options).toEqual({ idempotencyKey: `guest_cus_guest-embedded-${suffix}` });
+    const [stored] = await db.select().from(checkoutSessions).where(eq(checkoutSessions.stripeSessionId, first.body.sessionId)).limit(1);
+    expect(stored.shippingAddress).toMatchObject({ street: "123 Test Street", zip: "97205" });
+
+    // A retry hands back the same embedded session.
+    const repeated = await post("/api/guest/checkout/session", body);
+    expect(repeated.status).toBe(200);
+    expect(repeated.body.clientSecret).toBe(first.body.clientSecret);
+
+    expect((await post("/api/guest/checkout/session", { ...body, clientIdempotencyKey: `guest-bad-mode-${suffix}`, uiMode: "popup" })).status).toBe(400);
+    await db.delete(checkoutSessions).where(eq(checkoutSessions.guestEmail, email));
   });
 
   it("rejects a soft-deleted product before creating a Stripe session", async () => {

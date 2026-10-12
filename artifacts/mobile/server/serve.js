@@ -107,7 +107,7 @@ const API_ROOT_PATTERNS = [
   /^\/g\/[^/]+$/,
   /^\/u\/[^/]+$/,
   // The seller's store website: /@handle, its product pages, link buttons and preview card.
-  /^\/@[^/]+(\/p\/[^/]+|\/go\/[^/]+|\/og\.png)?\/?$/,
+  /^\/@[^/]+(\/p\/[^/]+|\/c\/[^/]+(\/done)?|\/go\/[^/]+|\/og\.png)?\/?$/,
 ];
 
 function isApiRootPath(pathname) {

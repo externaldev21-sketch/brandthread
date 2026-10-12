@@ -22,7 +22,10 @@ import { validateMutationEnvelope } from "./middlewares/validateRequest";
 import { DESIGN_STUDIO_ASSET_MIME_TYPES } from "./lib/designStudioAssetTypes";
 import { requireAuth } from "./middlewares/requireAuth";
 import { profileLanding } from "./routes/profileLanding";
-import { storeSiteHandler, storeSiteLinkRedirect, storeSiteOgHandler, storeSiteProductHandler } from "./routes/storeSite";
+import {
+  storeSiteCheckoutDoneHandler, storeSiteCheckoutHandler, storeSiteHandler, storeSiteLinkRedirect, storeSiteOgHandler,
+  storeSiteProductHandler,
+} from "./routes/storeSite";
 import { IP_NOTICE_PATHS, ipNoticePage } from "./routes/ipNoticePage";
 import {
   bioLinkRedirect, bioPageHandler, bioProductRedirect, bioShopRedirect, trackedLinkRedirect,
@@ -193,6 +196,8 @@ app.get("/bio/:slug/p/:productId", bioProductRedirect);
 app.get("/g/:code", rateLimit("public-read"), giveawayLanding);
 // The seller's store website: brandthread.app/@handle (see routes/storeSite.ts).
 app.get("/@:handle", rateLimit("public-read"), storeSiteHandler);
+app.get("/@:handle/c/:productId", rateLimit("public-read"), storeSiteCheckoutHandler);
+app.get("/@:handle/c/:productId/done", rateLimit("public-read"), storeSiteCheckoutDoneHandler);
 app.get("/@:handle/p/:productId", rateLimit("public-read"), storeSiteProductHandler);
 app.get("/@:handle/go/:linkId", storeSiteLinkRedirect);
 app.get("/@:handle/og.png", rateLimit("public-read"), storeSiteOgHandler);
