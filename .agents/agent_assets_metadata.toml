@@ -159,3 +159,17 @@ mtime_ms = 1791326858082
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/5d5baeda-408d-4bc4-8579-fba941dbc01a/fe27fe67-4e5b-4837-a2d8-c06bfdc15103"
 storage_version_token = "1791326859380539"
 content_type = "text/html"
+
+[[outputs]]
+id = "uTGz6OZDnVG3zOdyKnd6f"
+uri = "file://.local/merge-audit/merge-844-845-841-report.html"
+type = "html"
+title = "PRs 844, 845, 841 — conflict resolutions"
+description = "Conflicted file list and resolutions, protected glow, verification results and push error."
+logical_id = "9cd00427-3577-4da8-92fe-e3b1a25f4f2b"
+content_hash = "sha256:b13519ea2c753522c9137a38ef6722d4a90562e32bb40eb5173f919a285e8f42"
+size = 22553
+mtime_ms = 1791766633479
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/9cd00427-3577-4da8-92fe-e3b1a25f4f2b/3aba0147-24c0-4abb-aa7f-264e26f72eed"
+storage_version_token = "1791766634413879"
+content_type = "text/html"
