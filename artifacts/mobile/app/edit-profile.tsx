@@ -538,30 +538,6 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-<<<<<<< HEAD
-        {/* Banner */}
-        <ImageUploadRow
-          label="Banner / cover"
-          hint="Wide image shown at the top of your storefront"
-          uploading={uploading.banner}
-          progress={uploadProgress.banner}
-          error={uploadError.banner}
-          onPress={pickBanner}
-          theme={theme}
-        >
-          <View style={styles.bannerPreviewSlot}>
-            {bannerUri ? (
-              <Image cachePolicy="memory-disk" source={{ uri: bannerUri }} style={styles.bannerPreviewImage} />
-            ) : (
-              <View style={[styles.bannerPreviewImage, styles.bannerPreviewEmpty]}>
-                <Icon name="image" size={20} color={theme.muted} />
-              </View>
-            )}
-          </View>
-        </ImageUploadRow>
-
-=======
->>>>>>> origin/approved-pr-850
         {/* Avatar + Logo */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarLogoRow}>
