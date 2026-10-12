@@ -5,6 +5,7 @@ import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import * as ImagePicker from 'expo-image-picker';
@@ -317,7 +318,7 @@ export default function StoreFromMoodboardScreen() {
         <View style={mb.grid}>
           {imageUris.map((uri, idx) => (
             <View key={uri + idx} style={mb.imageWrap}>
-              <Image source={{ uri }} style={mb.gridImage} resizeMode="cover" />
+              <CachedImage source={{ uri }} style={mb.gridImage} contentFit="cover" />
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove image"
                 style={mb.removeBtn}
                 onPress={() => removeImage(idx)}

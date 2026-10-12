@@ -50,6 +50,7 @@ import {
   type PostPurchaseOfferSettings,
 } from '@/lib/checkoutExtras';
 import { minHitSlop } from '@/lib/hitSlop';
+import { crispPx } from '@/lib/crispPixel';
 
 // Checkbox rows draw only as tall as their label (~18-20pt); pad the touch
 // area vertically to 44pt without changing layout. The post-purchase row has
@@ -533,7 +534,7 @@ const styles = StyleSheet.create({
   selectValue: { fontSize: FS.md, fontFamily: FONT.semibold },
   cardTitle: { fontSize: FS.md, fontFamily: FONT.semibold },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginTop: SP.xs },
-  checkbox: { width: 18, height: 18, borderRadius: RADIUS.xs - 2, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 18, height: 18, borderRadius: RADIUS.xs - 2, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
   radioRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginBottom: SP.sm + 4 },
   radioLabel: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
   fieldLabel: { fontSize: FS.sm, fontFamily: FONT.medium, marginBottom: 6 },

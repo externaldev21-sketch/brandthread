@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { hapticToggle } from '@/lib/haptics';
 /**
  * Add Product — single-scroll product creation
@@ -63,6 +63,7 @@ import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { takePendingMockup } from '@/lib/mockupProductHandoff';
 import { minHitSlop } from '@/lib/hitSlop';
+import { crispPx } from '@/lib/crispPixel';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -2674,7 +2675,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   variantRow: { gap: SP.sm },
   variantTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   variantCheckbox: {
-    width: 18, height: 18, borderRadius: RADIUS.xs, borderWidth: 1.5, borderColor: BORDER,
+    width: 18, height: 18, borderRadius: RADIUS.xs, borderWidth: crispPx(1.5), borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
   variantTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },

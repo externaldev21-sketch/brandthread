@@ -26,7 +26,7 @@ import {
   ActivityIndicator, Modal, TextInput, RefreshControl,
   Linking,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

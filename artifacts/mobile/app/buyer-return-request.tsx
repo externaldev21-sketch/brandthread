@@ -31,7 +31,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

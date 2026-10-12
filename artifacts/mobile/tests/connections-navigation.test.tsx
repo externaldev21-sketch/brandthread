@@ -14,6 +14,10 @@ const { routerMock, apiMock, paramsMock } = vi.hoisted(() => ({
   paramsMock: vi.fn(() => ({ type: 'followers', userId: 'user_seller' } as Record<string, string | undefined>)),
 }));
 
+vi.mock('expo-image', () => ({
+  Image: (props: Record<string, unknown>) => React.createElement('Image', props),
+}));
+
 vi.mock('react-native', () => {
   const React = require('react') as any;
   const nativeComponent = (name: string) => {

@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 /**
  * Product transfer (A): "Import from Shopify" — connect (read-only scopes),
  * pick products, one tap import. Never touches orders — separate from

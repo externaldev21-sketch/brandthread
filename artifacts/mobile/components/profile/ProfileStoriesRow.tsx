@@ -11,6 +11,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { InteractionLayer } from './ProfileControls';
+import { crispPx } from '@/lib/crispPixel';
 
 const CELL = 72;
 const CIRCLE = 62;
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
   cell: { width: CELL },
   press: { width: CELL, alignItems: 'center', gap: 6, paddingVertical: 2 },
   circle: {
-    width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, borderWidth: 1.5,
+    width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, borderWidth: crispPx(1.5),
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   newCircle: { borderStyle: 'dashed' },

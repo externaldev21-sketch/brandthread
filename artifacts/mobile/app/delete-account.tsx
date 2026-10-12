@@ -46,6 +46,7 @@ import { storeSubscriptionsUrl } from '@/lib/currentPlan';
 import { isOAuthCancellationError } from '@/lib/oauthFlow';
 import { ListRow } from '@/components/ui';
 import { useLinkedProfiles } from '@/hooks/useLinkedProfiles';
+import { crispPx } from '@/lib/crispPixel';
 
 type Step = 'overview' | 'confirm' | 'done';
 
@@ -620,7 +621,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   appleBtnText: { color: MEDIA.foreground, fontFamily: FONT.semibold, fontSize: FS.base },
   ackRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginTop: SP.lg },
   checkbox: {
-    width: 22, height: 22, borderRadius: 8, borderWidth: 1.5, borderColor: theme.muted,
+    width: 22, height: 22, borderRadius: 8, borderWidth: crispPx(1.5), borderColor: theme.muted,
     alignItems: 'center', justifyContent: 'center', marginTop: 1,
   },
   checkboxOn: { backgroundColor: theme.accent, borderColor: theme.accent },

@@ -28,6 +28,7 @@ import { useAuth } from '@clerk/expo';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
+import { crispPx } from '@/lib/crispPixel';
 
 export default function VacationModeScreen() {
   const { theme } = useAppTheme();
@@ -223,7 +224,7 @@ const createStyles = (theme: { accent: string; onAccent: string }) => {
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
 
-  statusCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: CARD, borderWidth: 1.5, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
+  statusCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: CARD, borderWidth: crispPx(1.5), borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
   statusIndicator: { width: 10, height: 10, borderRadius: 5 },
   statusTitle:{ fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: 2 },
   statusSub:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },

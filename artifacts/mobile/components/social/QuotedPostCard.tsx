@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 /**
  * Embedded card for a quoted (reposted-with-comment) post.
  *

@@ -11,9 +11,10 @@ import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform,
+  ActivityIndicator, Alert, Animated, Dimensions, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform,
   Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -62,6 +63,7 @@ import type { MentionPerson } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
 import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
 import { MODE_LABEL, stepCreateMode, storyCameraModes, type CreateMode } from '@/constants/postLimits';
+import { crispPx } from '@/lib/crispPixel';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -241,7 +243,7 @@ function OverlayChip({
           style={[styles.selectionOutline, {
             left: -slop.x, right: -slop.x, top: -slop.y, bottom: -slop.y,
             // keep the outline ~1.5pt on screen however far the sticker is zoomed out
-            borderWidth: 1.5 / Math.max(scale, MENTION_MIN_SCALE),
+            borderWidth: crispPx(1.5) / Math.max(scale, MENTION_MIN_SCALE),
             borderRadius: 10 / Math.max(scale, MENTION_MIN_SCALE),
           }]}
         />
@@ -330,7 +332,7 @@ function GridIcon({ spec, active }: { spec: GridSpec; active: boolean }) {
           style={{
             width: `${100 / spec.cols}%`,
             height: `${100 / spec.rows}%`,
-            borderWidth: 0.5,
+            borderWidth: StyleSheet.hairlineWidth,
             borderColor: 'rgba(255,255,255,0.3)',
             backgroundColor: active ? 'rgba(255,255,255,0.25)' : 'transparent',
           }}
@@ -1330,7 +1332,7 @@ export default function StoryComposer() {
             {/* Gallery thumbnail */}
             <TouchableOpacity style={styles.galleryThumb} onPress={openGallery} accessibilityLabel="Choose from camera roll" accessibilityRole="button">
               {lastGalleryUri ? (
-                <Image source={{ uri: lastGalleryUri }} style={styles.galleryThumbImg} />
+                <CachedImage source={{ uri: lastGalleryUri }} style={styles.galleryThumbImg} />
               ) : (
                 <Icon name="image" size={20} color={ON_DARK} />
               )}
@@ -1407,11 +1409,11 @@ export default function StoryComposer() {
             const cw = W / gridSpec.cols;
             const ch = H / gridSpec.rows;
             return (
-              <Image
+              <CachedImage
                 key={i}
                 source={{ uri }}
                 style={{ position: 'absolute', left: col * cw, top: row * ch, width: cw, height: ch }}
-                resizeMode="cover"
+                contentFit="cover"
               />
             );
           })}
@@ -1637,7 +1639,7 @@ export default function StoryComposer() {
       {isReshare ? (
         <LinearGradient colors={reshareGradientFromBackground(reshareBg)} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
       ) : media?.kind === 'video' ? <VideoPreview uri={media.uri} /> : media ? (
-        <Image source={{ uri: media.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <CachedImage source={{ uri: media.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
       )}
@@ -2416,7 +2418,7 @@ const styles = StyleSheet.create({
   colorCircleBorder: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   bgSwatchRow: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: SP.sm, justifyContent: 'center' },
   bgSwatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
-  bgSwatchActive: { borderWidth: 2.5, borderColor: ON_DARK },
+  bgSwatchActive: { borderWidth: crispPx(2.5), borderColor: ON_DARK },
 
 
   overlayChip: { position: 'absolute', top: 0, left: 0, zIndex: 15 },
@@ -2518,7 +2520,7 @@ const styles = StyleSheet.create({
   shareRowAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
   shareRowTitle: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
   shareRowSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
   radioOuterActive: { borderColor: ON_DARK },
   radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: ON_DARK },
 

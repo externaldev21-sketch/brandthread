@@ -33,6 +33,7 @@ import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
 import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
 import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
 import { endLiveStreamActivity, startLiveStreamActivity, updateLiveStreamActivity } from '@/lib/nativeSystem';
+import { crispPx } from '@/lib/crispPixel';
 
 
 // ─── Agora SDK (native-only, gracefully skipped on web/Expo Go) ───────────────
@@ -697,7 +698,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pickerRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   pickerRowName:    { fontSize: FS.sm, fontFamily: FONT.semibold },
   pickerRowPrice:   { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   emptyText:        { textAlign: 'center', padding: 24, fontFamily: FONT.regular, fontSize: FS.sm },
   });
 };

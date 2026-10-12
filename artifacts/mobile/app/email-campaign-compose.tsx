@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 /**
  * Email campaign composer (Shopify Email-style stacked fields): audience, subject,
  * preview text, headline, text, image, up to 3 product cards, button, live preview,

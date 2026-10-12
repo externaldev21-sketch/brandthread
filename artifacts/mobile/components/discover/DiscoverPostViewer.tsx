@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { hapticLight } from '@/lib/haptics';
 /**
  * Full-screen Discover post viewer — vertical swipe through the same set of

@@ -63,6 +63,7 @@ import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/story
 import { reshareGradientFromBackground } from '@/lib/storyReshare';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
 import { apiErrorMessage } from '@/lib/safety';
+import { crispPx } from '@/lib/crispPixel';
 
 // Mirrors Instagram's own quick-reaction row (Mobbin: Instagram iOS story
 // viewer reply screen) — same 8 emoji, in the same order: laughing-crying,
@@ -1327,7 +1328,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: 22,
     height: 22,
     borderRadius: 11,
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
     borderColor: '#000',
     backgroundColor: CARD_ELEVATED,
     alignItems: 'center',

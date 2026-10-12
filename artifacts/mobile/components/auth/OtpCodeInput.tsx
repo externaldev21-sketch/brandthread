@@ -14,6 +14,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
+import { crispPx } from '@/lib/crispPixel';
 
 export interface OtpCodeInputProps {
   length?: number;
@@ -88,7 +89,7 @@ export function OtpCodeInput({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: SPACING.xs + 2, justifyContent: 'center' },
   box: {
-    width: 44, height: 52, borderRadius: RADII.input, borderWidth: 1.5,
+    width: 44, height: 52, borderRadius: RADII.input, borderWidth: crispPx(1.5),
     alignItems: 'center', justifyContent: 'center',
   },
   digit: { fontSize: 22, fontFamily: FONT.semibold },

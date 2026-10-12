@@ -44,6 +44,7 @@ import { DayPickerSheet } from '@/components/DayPickerSheet';
 import { formatDayKey, isoToDayKey, resolveDiscountDates, toDayKey } from '@/lib/discountDates';
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
+import { crispPx } from '@/lib/crispPixel';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products' | 'collections';
@@ -837,7 +838,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   modal:       { flex: 1, backgroundColor: BG },
 
-  summaryCard: { backgroundColor: CARD_ELEVATED, borderWidth: 1.5, borderRadius: RADIUS.md, padding: SP.md, gap: 6 },
+  summaryCard: { backgroundColor: CARD_ELEVATED, borderWidth: crispPx(1.5), borderRadius: RADIUS.md, padding: SP.md, gap: 6 },
   summaryCode: { fontSize: FS.md, fontFamily: FONT.bold },
   summaryValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: 2 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },

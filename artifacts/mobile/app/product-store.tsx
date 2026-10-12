@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, Platform, useWindowDimensions } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
 import { formatCalendarDate } from '@/lib/calendarDate';

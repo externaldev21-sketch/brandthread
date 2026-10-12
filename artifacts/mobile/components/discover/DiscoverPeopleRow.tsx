@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { useRouter } from 'expo-router';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';

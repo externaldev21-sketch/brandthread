@@ -8,7 +8,8 @@
  * swipes to the previous/next slide.
  */
 import React, { useMemo, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
@@ -87,7 +88,7 @@ export function SlideEditor({ slides, aspect, activeIndex, onActiveIndex, onAspe
         onPressItem={(_item, i) => onActiveIndex(i)}
         renderItem={(sl, i) => (
           <View style={[s.thumbWrap, i === activeIndex && s.thumbOn]}>
-            <Image source={{ uri: sl.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <CachedImage source={{ uri: sl.uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
           </View>
         )}
       />

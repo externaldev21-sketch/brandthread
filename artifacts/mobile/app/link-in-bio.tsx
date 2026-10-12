@@ -6,7 +6,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Alert, Share, StyleSheet } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
@@ -21,6 +21,7 @@ import {
   addBioLink, deleteBioLink, getBio, getDestinations, patchBioLink, reorderBioLinks, saveBio,
   type BioLink, type BioPage, type GrowthDestinations,
 } from '@/services/growthService';
+import { crispPx } from '@/lib/crispPixel';
 
 const SOCIAL_FIELDS = [
   { key: 'instagram', label: 'Instagram', placeholder: '@handle' },
@@ -334,7 +335,7 @@ const s = StyleSheet.create({
   pvAvatar: { width: 84, height: 84, borderRadius: 42, borderWidth: 1, marginBottom: SP.sm },
   pvName: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center' },
   pvBio: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: 6, marginBottom: SP.md },
-  pvBtn: { width: '100%', borderWidth: 1.5, borderRadius: 12, minHeight: 50, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, marginTop: SP.sm },
+  pvBtn: { width: '100%', borderWidth: crispPx(1.5), borderRadius: 12, minHeight: 50, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, marginTop: SP.sm },
   pvGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginTop: SP.md, justifyContent: 'space-between' },
   pvImg: { width: '100%', aspectRatio: 4 / 5, borderRadius: 12 },
 });

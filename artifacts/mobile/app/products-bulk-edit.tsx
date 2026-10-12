@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Select products — bulk edit prices and stock, archive and duplicate.
@@ -46,6 +46,7 @@ import {
   type BulkPriceResult, type BulkProduct, type BulkRounding, type BulkStatusFilter, type BulkStockChange,
   type BulkStockResult, type LocalBulkEntry, type PriceEditMode,
 } from '@/lib/productBulk';
+import { crispPx } from '@/lib/crispPixel';
 
 type EditTab = 'price' | 'stock';
 const EDIT_TABS: Array<{ id: EditTab; label: string }> = [
@@ -773,7 +774,7 @@ function localDuplicate(entries: LocalBulkEntry[], ids: string[], update: (next:
 function Checkbox({ checked, theme }: { checked: boolean; theme: any }) {
   return (
     <View style={{
-      width: 22, height: 22, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
+      width: 22, height: 22, borderRadius: 8, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center',
       borderColor: checked ? theme.text : theme.subtle, backgroundColor: checked ? theme.text : 'transparent',
     }}>
       {checked && <Icon name="check" size={ICON_SIZE.sm} color={theme.background} />}

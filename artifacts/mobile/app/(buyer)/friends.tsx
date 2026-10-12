@@ -36,6 +36,7 @@ import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure }
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_STORIES, PREVIEW_FOLLOWING, PREVIEW_FRIEND_ACTIVITY } from '@/lib/previewFriends';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { crispPx } from '@/lib/crispPixel';
 
 type ApiFollowing = {
   userId: string; name: string; username: string | null;
@@ -819,7 +820,7 @@ const s = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
   },
   friendName: {
     textAlign: 'center',

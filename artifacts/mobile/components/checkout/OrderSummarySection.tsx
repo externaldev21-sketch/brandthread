@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 /**
  * ORDER SUMMARY: items grouped by seller (3:4 thumbnails), each seller's
  * shipping and delivery window, then the one price breakdown (subtotal,

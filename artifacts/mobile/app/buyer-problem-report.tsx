@@ -7,7 +7,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Alert, Platform } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -166,7 +166,7 @@ export default function BuyerProblemReportScreen() {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {evidencePhotos.map((uri, idx) => (
                 <View key={idx} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
-                  <Image source={{ uri }} style={{ width: 72, height: 72 }} resizeMode="cover" />
+                  <Image source={{ uri }} style={{ width: 72, height: 72 }} contentFit="cover" />
                   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove photo"
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}

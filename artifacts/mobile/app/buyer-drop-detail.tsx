@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  AccessibilityInfo, ActivityIndicator, Alert, Animated, Image, LayoutAnimation,
+  AccessibilityInfo, ActivityIndicator, Alert, Animated, LayoutAnimation,
   Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View, useWindowDimensions,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { pickRouteParam } from '@/lib/routeParamAliases';
 import { Icon } from '@/components/ui/Icon';
@@ -33,6 +34,7 @@ import { isWellFormedDropId } from '@/lib/dropId';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { buildCanonicalDropUrl } from '@/lib/shareDrop';
 import { computeCountdownParts, type CountdownParts } from '@/lib/dropCountdown';
+import { crispPx } from '@/lib/crispPixel';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -254,7 +256,7 @@ function ProductTile({
           {/* Locked: the photo stays hidden until launch (a solid tile under
               the lock), never shown blurred. */}
           {imageUri && !locked ? (
-            <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <CachedImage source={{ uri: imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={styles.productFallback}>{locked ? null : <Icon name="image" size={28} color={SUBTLE} />}</View>
           )}
@@ -484,7 +486,7 @@ export default function BuyerDropDetail() {
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}>
         <View style={[styles.hero, { height: HERO_H }]}>
           {heroUri ? (
-            heroIsVideo ? <HeroVideo uri={heroUri} /> : <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            heroIsVideo ? <HeroVideo uri={heroUri} /> : <CachedImage source={{ uri: heroUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <LinearGradient colors={['#23202A', '#050506']} style={StyleSheet.absoluteFill} />
           )}
@@ -686,7 +688,7 @@ const styles = StyleSheet.create({
   heroBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   heroCopy: { padding: 20, paddingBottom: 28 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SP.md },
-  brandMark: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center' },
+  brandMark: { width: 38, height: 38, borderRadius: 19, borderWidth: crispPx(1.5), backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center' },
   brandInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11 },
   brandNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   brandName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },

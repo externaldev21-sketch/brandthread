@@ -50,6 +50,10 @@ vi.mock('expo-video', () => ({
   VideoView: () => require('react').createElement('View', { testID: 'profile-avatar-video' }),
 }));
 
+vi.mock('expo-image', () => ({
+  Image: (props: Record<string, unknown>) => React.createElement('Image', props),
+}));
+
 vi.mock('react-native', () => {
   const React = require('react') as typeof import('react');
   const nativeComponent = (name: string) => {

@@ -14,3 +14,9 @@ description: The clean app-wide visual language that replaced the decorative Wov
 **Why:** The owner approved the system-font/native-icon/flat-card foundation while protecting navigation appearance, then explicitly authorized faster active-pill speed and timing only.
 
 **How to apply:** Preserve the approved faster timing during later merges. Apply the foundation elsewhere without restyling the bars or changing their swipe or glow behavior.
+
+**Rule:** Crisp/no-blur styling is approved, but glow hairlines retain the original full-strength accent (full white in the default seller theme), not the standard translucent border color.
+
+**Why:** The owner approved the broader crisp pass while explicitly rejecting its dimmed glow-outline change.
+
+**How to apply:** Preserve the original accent-colored hairlines when importing shared card changes. Keep the seller tab bar's swipe/glow implementation and appearance untouched.

@@ -14,7 +14,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { TYPE_SCALE } from '@/constants/typography';
 import { FONT } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';

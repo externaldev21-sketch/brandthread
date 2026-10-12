@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Platform, Text } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 
 /**
  * One consistent emoji glyph across iOS, Android and web.

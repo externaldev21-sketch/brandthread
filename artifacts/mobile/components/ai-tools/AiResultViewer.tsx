@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 /**
  * Brandthread AI Tools — full-screen swipeable result viewer (shared)
  *

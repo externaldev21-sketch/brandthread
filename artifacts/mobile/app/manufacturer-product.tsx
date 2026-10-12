@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 /**
  * Manufacturer Product Detail — full quantity price-tier table, MOQ,
  * customization options, lead time and sample price for one catalog product.

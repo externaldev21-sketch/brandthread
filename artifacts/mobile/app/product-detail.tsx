@@ -9,7 +9,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { formatCalendarDate } from '@/lib/calendarDate';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import { View, Text, ScrollView, StyleSheet, Alert, Animated, FlatList, Share, Linking, TextInput } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';

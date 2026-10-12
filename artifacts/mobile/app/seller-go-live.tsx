@@ -10,7 +10,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
   Animated, Platform, Linking, FlatList,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,6 +33,7 @@ import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { getEntitlementRejection, type EntitlementRejection } from '@/lib/entitlementError';
 import { LIVE_HOST_MIN_PLAN } from '@/lib/sellerPlans';
+import { crispPx } from '@/lib/crispPixel';
 
 const FG = '#FFFFFF';
 const GLASS = 'rgba(0,0,0,0.5)';
@@ -444,7 +445,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     pickerRowThumbPlaceholder: { backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
     pickerRowName:      { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
     pickerRowPrice:     { color: TEXT_TERTIARY, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-    checkbox:           { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' },
+    checkbox:           { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' },
     checkboxActive:      { backgroundColor: FG, borderColor: FG },
 
     // Permissions gate

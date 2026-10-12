@@ -6,7 +6,8 @@
  * to swipe to the neighbouring slide.
  */
 import React, { useEffect, useState } from 'react';
-import { Image, Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -129,7 +130,7 @@ export function CropFrame({ slide, aspect, frameW, frameH, onCrop, onSwipe, grid
             {slide.kind === 'video' ? (
               <CropVideo uri={slide.uri} start={slide.trimStart} end={slide.trimEnd} w={baseW} h={baseH} filter={filter} playing={playing} />
             ) : (
-              <Image source={{ uri: slide.uri }} style={[{ width: baseW, height: baseH }, filter ? ({ filter } as any) : null]} resizeMode="cover" />
+              <CachedImage source={{ uri: slide.uri }} style={[{ width: baseW, height: baseH }, filter ? ({ filter } as any) : null]} contentFit="cover" />
             )}
           </Animated.View>
         </View>

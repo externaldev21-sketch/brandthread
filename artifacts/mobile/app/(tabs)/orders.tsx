@@ -49,6 +49,7 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 import { useRouteIsFocused } from '@/hooks/useRouteIsFocused';
+import { crispPx } from '@/lib/crispPixel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1418,7 +1419,7 @@ const createStyles = (theme: AppThemePreset) => {
     width: 20,
     height: 20,
     borderRadius: 10,
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
     borderColor: BORDER,
     backgroundColor: CARD,
     alignItems: 'center',

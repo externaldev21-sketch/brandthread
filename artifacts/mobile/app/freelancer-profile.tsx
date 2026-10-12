@@ -5,7 +5,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, Platform, Linking } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';

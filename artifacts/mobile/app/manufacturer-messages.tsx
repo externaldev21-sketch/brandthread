@@ -16,7 +16,7 @@ import {
   ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable,
   RefreshControl, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -509,7 +509,7 @@ export default function ManufacturerMessagesScreen() {
       {/* Full-screen photo viewer */}
       <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
         <Pressable style={s.viewer} onPress={() => setViewer(null)} accessibilityLabel="Close photo">
-          {viewer ? <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} resizeMode="contain" /> : null}
+          {viewer ? <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} contentFit="contain" /> : null}
           <View style={[s.viewerClose, { top: headerTopInset + SP.sm }]}><Icon name="x" size={22} color="#fff" /></View>
         </Pressable>
       </Modal>

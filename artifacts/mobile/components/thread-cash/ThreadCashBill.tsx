@@ -23,7 +23,8 @@
  *   size it's the full <ThreadCashBill/>.
  */
 import React from 'react';
-import { Image, type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
+import { type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
+import { Image } from 'expo-image';
 
 // Metro's asset plugin turns these into asset-registry lookups; outside
 // Metro (Vitest's plain Node/esbuild transform has no handler for image
@@ -73,7 +74,7 @@ export function ThreadCashBill({
     <Image
       source={BILL_SOURCE}
       style={[{ width, height }, style as StyleProp<ImageStyle>]}
-      resizeMode="contain"
+      contentFit="contain"
       accessibilityIgnoresInvertColors
     />
   );
@@ -92,7 +93,7 @@ export function ThreadCashBillStack({
     <Image
       source={STACK_SOURCE}
       style={[{ width, height }, style as StyleProp<ImageStyle>]}
-      resizeMode="contain"
+      contentFit="contain"
       accessibilityIgnoresInvertColors
     />
   );
@@ -117,7 +118,7 @@ export function ThreadCashBillIcon({
       <Image
         source={MINI_BILL_SOURCE}
         style={[{ width: size, height }, style as StyleProp<ImageStyle>]}
-        resizeMode="contain"
+        contentFit="contain"
         accessibilityIgnoresInvertColors
       />
     );

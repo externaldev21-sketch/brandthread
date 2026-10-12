@@ -64,7 +64,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -74,6 +73,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -1577,7 +1577,7 @@ export default function SellerStudioRadialMenu({
                 {avatarVideoUrl ? (
                   <HeaderAvatarVideo uri={avatarVideoUrl} />
                 ) : avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                  <CachedImage source={{ uri: avatarUrl }} style={styles.avatarImage} />
                 ) : headerMonogram ? (
                   <Text style={styles.avatarLetter}>{headerMonogram}</Text>
                 ) : (

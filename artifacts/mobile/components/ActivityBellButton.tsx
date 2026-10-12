@@ -6,6 +6,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS } from '@/lib/theme';
 import { getUnreadActivityCount, subscribeActivity, subscribeUnreadOverride, watchActivityRealtime } from '@/services/activityService';
 import { Icon } from '@/components/ui/Icon';
+import { crispPx } from '@/lib/crispPixel';
 
 /**
  * Unread Activity Center count. Refreshes when the host screen gains focus,
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: crispPx(1.5),
   },
   badgeText: {
     fontSize: FS.xs,

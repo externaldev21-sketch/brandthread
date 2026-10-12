@@ -38,13 +38,8 @@ import {
   View,
   type ViewToken,
 } from 'react-native';
-<<<<<<< HEAD
 import { Icon } from '@/components/ui/Icon';
-import { useFocusEffect, useRouter } from 'expo-router';
-=======
-import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useSegments } from 'expo-router';
->>>>>>> origin/approved-20261012-845
 import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';

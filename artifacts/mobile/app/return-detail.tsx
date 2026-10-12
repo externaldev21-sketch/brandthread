@@ -29,7 +29,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { View, Text, ScrollView, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';

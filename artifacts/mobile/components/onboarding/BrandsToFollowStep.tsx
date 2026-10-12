@@ -9,7 +9,8 @@ import { haptics } from '@/lib/haptics';
  * (socialService.setSellerFollowing) — no parallel follow system.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { Icon } from '@/components/ui';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';

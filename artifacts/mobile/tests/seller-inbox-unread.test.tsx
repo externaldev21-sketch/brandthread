@@ -24,6 +24,9 @@ const { apiMock, focusState, routerMock, previewMock } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('expo-image', () => ({
+  Image: (props: Record<string, unknown>) => React.createElement('Image', props),
+}));
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-native')>();
   const nativeComponent = (name: string) => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';

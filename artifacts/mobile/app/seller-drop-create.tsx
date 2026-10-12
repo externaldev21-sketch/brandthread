@@ -22,7 +22,7 @@ import {
   ActivityIndicator, Alert, Modal, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
@@ -42,6 +42,7 @@ import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 import { radius } from '@/constants/radii';
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 import { dateToHm, dateToYmd, hmToDate, startOfToday, ymdToDate } from '@/lib/dateTimeField';
+import { crispPx } from '@/lib/crispPixel';
 
 interface SellerProductRow {
   id: string;
@@ -731,7 +732,7 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   productRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.sm, padding: 8 },
   productThumb: { width: 36, height: 36, borderRadius: RADIUS.xs },
-  checkbox: { width: 22, height: 22, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 22, height: 22, borderRadius: 8, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
   saveBtn: { minHeight: 52, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.sm },
   secondaryBtn: { flexDirection: 'row', minHeight: 46, borderWidth: 1, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: 8 },
   tzHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },

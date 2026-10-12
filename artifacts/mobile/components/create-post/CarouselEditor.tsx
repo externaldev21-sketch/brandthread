@@ -23,6 +23,7 @@ import { CP, IconButton, PillButton, tap } from '@/components/create-post/ui';
 import { CropFrame } from '@/components/create-post/CropFrame';
 import { ReorderStrip } from '@/components/create-post/ReorderStrip';
 import { formatDuration, MediaThumb } from '@/components/create-post/GalleryPicker';
+import { crispPx } from '@/lib/crispPixel';
 
 function SlideThumb({ slide, style, adjust }: { slide: SlideDraft; style: any; adjust?: Adjust }) {
   const f = adjust ? previewFilter(adjust) : undefined;
@@ -314,7 +315,7 @@ const ed = StyleSheet.create({
   preset: { width: '25%', alignItems: 'center', gap: 5, paddingBottom: 8 },
   presetLabel: { fontFamily: FONT.semibold, fontSize: 13 },
   presetThumb: { width: 56, height: 56, borderRadius: 28, overflow: 'hidden', borderWidth: 2, borderColor: CP.line },
-  toolCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderColor: CP.line, alignItems: 'center', justifyContent: 'center' },
+  toolCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: crispPx(1.5), borderColor: CP.line, alignItems: 'center', justifyContent: 'center' },
   toolValue: { position: 'absolute', bottom: 6, color: CP.silver, fontFamily: FONT.semibold, fontSize: 10 },
   sliderBox: { paddingHorizontal: 24, paddingTop: 12 },
   sliderLabel: { color: CP.white, fontFamily: FONT.bold, fontSize: 15, textAlign: 'center', marginBottom: 6 },

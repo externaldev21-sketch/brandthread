@@ -1,11 +1,12 @@
 import React, { useRef } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, RADIUS, SP, TYPE } from '@/lib/theme';
+import { crispPx } from '@/lib/crispPixel';
 
 /**
  * Shared "brand world" hero used by both the buyer-facing seller-profile
@@ -221,7 +222,7 @@ const heroStyles = StyleSheet.create({
 
   body: { alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.md },
   avatarWrap: { marginBottom: SP.md },
-  verifiedRing: { borderWidth: 1.5, borderRadius: RADIUS.pill, padding: 2 },
+  verifiedRing: { borderWidth: crispPx(1.5), borderRadius: RADIUS.pill, padding: 2 },
   avatar: {
     width: 96, height: 96, borderRadius: 48, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',

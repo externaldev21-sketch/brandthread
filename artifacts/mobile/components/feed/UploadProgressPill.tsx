@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 /**
  * Slim pill at the top of the feed showing real posting progress after the
  * composer hands off (item 118, Mobbin ref: Instagram's own posting-progress

@@ -24,6 +24,9 @@ const {
   saveDraftMock: vi.fn(),
 }));
 
+vi.mock('expo-image', () => ({
+  Image: (props: Record<string, unknown>) => React.createElement('Image', props),
+}));
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-native')>();
   const React = require('react') as typeof import('react');

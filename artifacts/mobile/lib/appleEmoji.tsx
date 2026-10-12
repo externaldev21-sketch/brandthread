@@ -20,7 +20,7 @@
  */
 import React, { useState } from 'react';
 import { Platform, StyleSheet, Text, TextStyle } from 'react-native';
-import { Image } from 'expo-image';
+import { CachedImage as Image } from '@/components/CachedImage';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 
 /** codepoint (lowercase, hyphen-joined, no leading zeros) per quick reaction */
