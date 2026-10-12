@@ -40,6 +40,25 @@ export const MODE_LABEL: Record<CreateMode, string> = {
   live: 'LIVE',
 };
 
+/**
+ * Mode switcher order on the story camera (buyer-story-create), derived from
+ * CREATE_MODES_BY_ROLE: the feed modes first, STORY next to them, LIVE last.
+ * Seller → THREAD, POST, STORY, LIVE. Buyer → POST, STORY.
+ */
+export function storyCameraModes(role: 'seller' | 'buyer'): CreateMode[] {
+  const modes = CREATE_MODES_BY_ROLE[role];
+  const feed = modes.filter((m) => m !== 'story' && m !== 'live');
+  const tail = (['story', 'live'] as const).filter((m) => modes.includes(m));
+  return [...feed, ...tail];
+}
+
+/** One step through `modes` for a horizontal swipe (+1 = next / swipe left, -1 = previous). Clamps at the ends. */
+export function stepCreateMode(modes: CreateMode[], current: CreateMode, dir: 1 | -1): CreateMode {
+  const i = modes.indexOf(current);
+  if (i < 0) return current;
+  return modes[Math.min(modes.length - 1, Math.max(0, i + dir))];
+}
+
 /** Server `posts.surface` value for a mode. Buyers can never use 'thread'. */
 export const SURFACE_BY_MODE: Record<PostMode, 'thread' | 'profile'> = {
   thread: 'thread',
