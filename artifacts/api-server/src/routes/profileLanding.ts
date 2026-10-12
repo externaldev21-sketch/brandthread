@@ -1,6 +1,11 @@
 import type { Request, Response } from "express";
 import { db, users } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { publicCoverFields, storefrontCoverUrl } from "../lib/profileCover";
+import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const bannerStorage = new ObjectStorageService();
 
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (char) => ({
@@ -28,7 +33,7 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
   }
 
   try {
-    const [profile] = await db.select({
+    const [profileRow] = await db.select({
       id: users.id,
       username: users.username,
       accountType: users.accountType,
@@ -40,12 +45,24 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
       deletedAt: users.deletedAt,
       deletionRequestedAt: users.deletionRequestedAt,
       suspendedAt: users.suspendedAt,
+      clerkId: users.clerkId,
+      bannerUrl: users.bannerUrl,
+      coverVideoUrl: users.coverVideoUrl,
+      coverPosterUrl: users.coverPosterUrl,
+      coverImageUrl: users.coverImageUrl,
+      coverMediaType: users.coverMediaType,
+      coverVideoModerationStatus: users.coverVideoModerationStatus,
     }).from(users).where(sql`lower(${users.username}) = ${username}`).limit(1);
 
-    if (!profile || profile.deletedAt || profile.deletionRequestedAt || profile.suspendedAt || !profile.username || !profile.accountType) {
+    if (!profileRow || profileRow.deletedAt || profileRow.deletionRequestedAt || profileRow.suspendedAt || !profileRow.username || !profileRow.accountType) {
       res.status(404).send("Profile not found");
       return;
     }
+    // The profile banner's still frame is the share preview's cover (one banner).
+    const profileHandle = profileRow.username;
+    const profile = { ...(await withStorefrontBannerAdopted(req, profileRow, bannerStorage)), username: profileHandle };
+    const cover = storefrontCoverUrl(publicCoverFields(profile).profileBanner);
+    const coverImage = cover && cover.startsWith("https://") ? cover : null;
 
     const name = escapeHtml(profile.displayName || profile.name || `@${profile.username}`);
     const handle = escapeHtml(profile.username);
@@ -72,19 +89,21 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
 <meta property="og:type" content="profile"><meta property="og:title" content="${name} on Brandthread">
 <meta property="og:description" content="${bio || `View @${handle}'s public profile` }">
 <meta property="og:url" content="${escapeHtml(url)}">
-${avatar ? `<meta property="og:image" content="${escapeHtml(avatar)}">` : ""}
+${(coverImage ?? avatar) ? `<meta property="og:image" content="${escapeHtml((coverImage ?? avatar) as string)}">` : ""}
 ${shopHref ? `<meta http-equiv="refresh" content="0;url=${escapeHtml(shopHref)}">` : ""}
 <style>
 *{box-sizing:border-box}body{margin:0;background:#0a0a0b;color:#f8f8f8;font-family:Inter,system-ui,-apple-system,sans-serif;min-height:100vh;display:grid;place-items:center;padding:24px}
 main{width:min(100%,440px);text-align:center}.brand{font-weight:700;letter-spacing:.08em;font-size:14px;margin-bottom:56px}
 .avatar{width:104px;height:104px;object-fit:cover;border-radius:50%;margin:auto;border:2px solid #484848}
+.cover{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:16px;margin:0 0 -52px}
+.cover + .avatar,.cover + .placeholder{position:relative}
 .placeholder{display:grid;place-items:center;background:#292929;font-size:40px}
 h1{font-size:26px;line-height:1.2;margin:22px 0 6px}.handle{color:#a6a6a6;margin:0}
 .bio{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;margin:20px 0 34px}
 .button{display:block;background:#fff;color:#0a0a0b;text-decoration:none;font-weight:700;border-radius:100px;padding:17px 24px;margin:28px 0 16px}
 .link{font-size:13px;overflow-wrap:anywhere;color:#bdbdbd}
 </style></head><body><main>
-<div class="brand">BRANDTHREAD</div>${image}
+<div class="brand">BRANDTHREAD</div>${coverImage ? `<img src="${escapeHtml(coverImage)}" alt="" class="cover">` : ""}${image}
 <h1>${name}</h1><p class="handle">@${handle}</p>
 ${bio ? `<p class="bio">${bio}</p>` : `<p class="bio">On Brandthread</p>`}
 ${shopHref

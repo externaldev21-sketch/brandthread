@@ -31,7 +31,7 @@ import { getInitials } from '@/lib/format';
 import { FONT, TEXT_DISABLED } from '@/lib/theme';
 import { crispPx } from '@/lib/crispPixel';
 import { EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
-import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { bannerStill, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
@@ -156,7 +156,6 @@ export default function EditProfileScreen() {
         setAvatarUri((profile as any).avatarPosterUrl || profile.profileImageUrl || null);
         setAvatarVideoUri((profile as any).avatarVideoUrl ?? null);
         setLogoUri(profile.logoUrl ?? null);
-        setBannerUri(profile.bannerUrl ?? null);
         setServerBanner(resolveProfileBanner(profile as any));
         const loadedFields: Fields = {
           name: profile.brandName ?? profile.displayName ?? '',
@@ -372,7 +371,6 @@ export default function EditProfileScreen() {
   }
 
   const pickLogo = () => uploadSlot('logo', [1, 1], 'Update logo', '/api/seller/profile/logo/upload', setLogoUri, 'logoUrl', true);
-  const pickBanner = () => uploadSlot('banner', [3, 1], 'Update banner', '/api/seller/profile/banner/upload', setBannerUri, 'bannerUrl', true);
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof Fields, string>> = {};
@@ -516,8 +514,9 @@ export default function EditProfileScreen() {
         <Text style={styles.sectionLabel}>Storefront preview</Text>
         <View style={styles.previewCard}>
           <View style={styles.previewBannerWrap}>
-            {bannerUri ? (
-              <Image cachePolicy="memory-disk" source={{ uri: bannerUri }} style={styles.previewBanner} />
+            {/* One banner: the storefront cover is the profile banner's still frame. */}
+            {bannerStill(bannerFlow.banner) ? (
+              <Image cachePolicy="memory-disk" source={{ uri: bannerStill(bannerFlow.banner) as string }} style={styles.previewBanner} />
             ) : (
               <LinearGradient colors={theme.heroGradient as any} style={styles.previewBanner} />
             )}
@@ -539,6 +538,7 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
+<<<<<<< HEAD
         {/* Banner */}
         <ImageUploadRow
           label="Banner / cover"
@@ -560,6 +560,8 @@ export default function EditProfileScreen() {
           </View>
         </ImageUploadRow>
 
+=======
+>>>>>>> origin/approved-pr-850
         {/* Avatar + Logo */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarLogoRow}>
@@ -851,9 +853,6 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   previewName: { fontSize: 16, fontFamily: FONT.bold, color: theme.text },
   previewMeta: { fontSize: 13, fontFamily: FONT.regular, color: theme.muted },
 
-  bannerPreviewSlot: { marginLeft: 8 },
-  bannerPreviewImage: { width: 64, height: 40, borderRadius: 8 },
-  bannerPreviewEmpty: { backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center' },
 
   avatarSection: { paddingVertical: 8 },
   avatarLogoRow: { flexDirection: 'row', justifyContent: 'center', gap: 36 },

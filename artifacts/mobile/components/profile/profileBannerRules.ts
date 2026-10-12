@@ -70,7 +70,7 @@ export function resolveProfileBanner(source: {
   const http = (value: string | null | undefined) => (typeof value === 'string' && /^https?:\/\//i.test(value) ? value : null);
   if (source.profileBanner !== undefined) {
     const banner = source.profileBanner;
-    if (!banner || !http(banner.url) || (banner.type !== 'gif' && banner.type !== 'video')) return null;
+    if (!banner || !http(banner.url) || (banner.type !== 'gif' && banner.type !== 'video' && banner.type !== 'image')) return null;
     return { type: banner.type, url: banner.url, posterUrl: http(banner.posterUrl), gifUrl: http(banner.gifUrl) };
   }
   const video = http(source.coverVideoUrl);
@@ -82,8 +82,34 @@ export function resolveProfileBanner(source: {
  * GIF the server couldn't convert, the animated GIF itself.
  */
 export function bannerHeroMedia(banner: ProfileBanner): { videoUri: string | null; posterUri: string | null; gifUri: string | null } {
+  if (banner.type === 'image') return { videoUri: null, posterUri: banner.url, gifUri: null };
   const playsGif = banner.type === 'gif' && (banner.url === banner.gifUrl || /\.gif(\?|$)/i.test(banner.url));
   return playsGif
     ? { videoUri: null, posterUri: banner.posterUrl, gifUri: banner.url }
     : { videoUri: banner.url, posterUri: banner.posterUrl, gifUri: null };
+}
+
+/**
+ * The still that stands for the banner wherever animation can't play
+ * (storefront previews, brand cards, share cards): its poster frame, else the
+ * GIF / still itself. Mirrors the server's storefrontCoverUrl().
+ */
+export function bannerStill(banner: ProfileBanner | null | undefined): string | null {
+  if (!banner) return null;
+  if (banner.posterUrl) return banner.posterUrl;
+  if (banner.type === 'gif') return banner.gifUrl ?? banner.url;
+  if (banner.type === 'image') return banner.url;
+  return null;
+}
+
+/**
+ * Scroll slack (points) within which the banner still runs up behind the
+ * status bar. Past it, the app's solid status-bar strip returns, so the top
+ * bar, name and avatar never slide under the clock / Dynamic Island.
+ */
+export const BANNER_STATUS_BAR_SLACK = 8;
+
+/** True while the profile is at rest at the top (incl. pull-to-refresh overscroll). */
+export function bannerCoversStatusBar(scrollOffset: number): boolean {
+  return scrollOffset < BANNER_STATUS_BAR_SLACK;
 }

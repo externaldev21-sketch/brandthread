@@ -65,7 +65,7 @@ import { ProfileVideoHeader } from './ProfileVideoHeader';
 import { ProfileStoryAvatar } from './ProfileStoryAvatar';
 import { avatarGeometry, PROFILE_VIDEO_HEADER_AVATAR_SIZE } from './profileAvatarGeometry';
 import { ProfileBannerHeader } from './ProfileBannerHeader';
-import { bannerHeight, type ProfileBanner } from './profileBannerRules';
+import { bannerCoversStatusBar, bannerHeight, type ProfileBanner } from './profileBannerRules';
 /** Compact sticky header height below the status bar. */
 const COMPACT_BAR = 64;
 
@@ -192,6 +192,8 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollResetRef = useScrollReset<any>();
   const [heroOnScreen, setHeroOnScreen] = useState(true);
+  // Banner mode: at rest at the top, the banner runs up behind the status bar.
+  const [bannerCoversTop, setBannerCoversTop] = useState(true);
   const [focused, setFocused] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [rightWidth, setRightWidth] = useState(0);
@@ -232,6 +234,8 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         ? value < bannerH - 40
         : isVideoHeader ? value < Math.max(videoHeroHeight, 1) : value < heroHeight - 40;
       setHeroOnScreen((prev) => (prev === next ? prev : next));
+      const covers = bannerCoversStatusBar(value);
+      setBannerCoversTop((prev) => (prev === covers ? prev : covers));
     });
     return () => scrollY.removeListener(id);
   }, [scrollY, heroHeight, isVideoHeader, videoHeroHeight, bannerMode, bannerH]);
@@ -433,6 +437,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         handle={identity.handle ?? null}
         stats={stats}
         statsLoading={statsLoading}
+        coversTop={focused && bannerCoversTop}
       />
       {/* Below the banner the profile continues as before: chips, bio, links. */}
       <View style={styles.bannerBelow} testID="profile-banner-below">

@@ -6,6 +6,7 @@ import { attachQuoteData } from "../lib/quotedPosts";
 import { Router } from "express";
 import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
+import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
 import { resolveDevice } from "../lib/sellerInsights";
 import { db, readDb, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
@@ -1296,9 +1297,10 @@ router.get("/sellers/:sellerId", async (req, res) => {
   const canonicalClerkId = await resolveToClerkId(sellerId, "seller");
   if (!canonicalClerkId) return res.status(404).json({ error: "Seller not found" });
 
-  const [seller] = await db
+  const [sellerRow] = await db
     .select({
       clerkId:         users.clerkId,
+      bannerUrl:       users.bannerUrl,
       displayName:     users.displayName,
       brandName:       users.brandName,
       bio:             users.bio,
@@ -1324,7 +1326,9 @@ router.get("/sellers/:sellerId", async (req, res) => {
     .where(eq(users.clerkId, canonicalClerkId))
     .limit(1);
 
-  if (!seller) return res.status(404).json({ error: "Seller not found" });
+  if (!sellerRow) return res.status(404).json({ error: "Seller not found" });
+  // One banner: a former storefront banner becomes the profile banner.
+  const { bannerUrl: _legacyBanner, ...seller } = await withStorefrontBannerAdopted(req, sellerRow, objectStorage);
   const viewerId = optionalViewerId(req);
   if (viewerId && viewerId !== canonicalClerkId && await isBlockedEitherWay(viewerId, canonicalClerkId)) {
     return res.status(404).json({ error: "Seller not found" });
@@ -2007,10 +2011,11 @@ router.get("/profiles/:username", async (req, res) => {
   }
 
   try {
-    const [user] = await db
+    const [userRow] = await db
       .select({
         id:          users.id,
         clerkId:     users.clerkId,
+        bannerUrl:   users.bannerUrl,
         username:    users.username,
         accountType: users.accountType,
         displayName: users.displayName,
@@ -2033,10 +2038,11 @@ router.get("/profiles/:username", async (req, res) => {
       .limit(1);
 
     // Not found.
-    if (!user) {
+    if (!userRow) {
       res.status(404).json({ error: "Profile not found" });
       return;
     }
+    const { bannerUrl: _legacyBanner, ...user } = await withStorefrontBannerAdopted(req, userRow, objectStorage);
 
     // Tombstoned / deleted account.
     if (user.deletedAt || user.deletionRequestedAt) {
