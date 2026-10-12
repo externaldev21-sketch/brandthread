@@ -24,7 +24,7 @@ describe('temporary seller preview flag', () => {
     const bypass = readFileSync(resolve(root, 'lib/devBypass.ts'), 'utf8');
     expect(layout).toContain("DEV_BYPASS_ROLE === 'seller'");
     expect(layout).toMatch(
-      /if \(Platform\.OS !== 'web' && DEV_BYPASS_ROLE === 'seller'\) \{\s*setOnboardingChecked\(true\);\s*setOnboardingDone\(true\);\s*setStoredRole\('seller'\);[\s\S]*?return;\s*\}\s*if \(!isSignedIn\)[\s\S]*?AsyncStorage\.multiGet/,
+      /if \(Platform\.OS !== 'web' && DEV_BYPASS_ROLE\) \{\s*setOnboardingChecked\(true\);\s*setOnboardingDone\(true\);\s*setStoredRole\(DEV_BYPASS_ROLE\);[\s\S]*?return;\s*\}\s*if \(!isSignedIn\)[\s\S]*?AsyncStorage\.multiGet/,
     );
     expect(layout).not.toContain("AsyncStorage.setItem('onboarding_complete', 'true')");
     expect(bypass).not.toContain('AsyncStorage');

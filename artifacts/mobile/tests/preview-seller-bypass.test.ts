@@ -42,13 +42,13 @@ describe('development app preview routing', () => {
       /export const DEV_SELLER_PREVIEW = resolveDevSellerPreview\(\s*__DEV__,\s*IS_PROD_NATIVE,\s*process\.env\.EXPO_PUBLIC_DEV_PREVIEW,\s*\);/,
     );
     expect(devBypassSource).toContain("!__DEV__ ? null");
-    expect(devBypassSource).toContain("Platform.OS !== 'web' ? (DEV_SELLER_PREVIEW ? 'seller' : null)");
+    expect(devBypassSource).toContain("Platform.OS !== 'web' ? (DEV_BUYER_PREVIEW ? 'buyer' : DEV_SELLER_PREVIEW ? 'seller' : null)");
     expect(layoutSource).toContain("DEV_BYPASS_ROLE === 'seller'");
     expect(layoutSource).toContain('{PREVIEW_SESSION_ROLE || DEV_BYPASS_ROLE ? (');
     expect(indexSource).toContain("effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/'");
     expect(devBypassSource).not.toContain('AsyncStorage');
     expect(layoutSource).toMatch(
-      /if \(Platform\.OS !== 'web' && DEV_BYPASS_ROLE === 'seller'\) \{\s*setOnboardingChecked\(true\);\s*setOnboardingDone\(true\);[\s\S]*?return;\s*\}/,
+      /if \(Platform\.OS !== 'web' && DEV_BYPASS_ROLE\) \{\s*setOnboardingChecked\(true\);\s*setOnboardingDone\(true\);[\s\S]*?return;\s*\}/,
     );
   });
 });

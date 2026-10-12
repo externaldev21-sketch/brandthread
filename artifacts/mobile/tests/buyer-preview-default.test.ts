@@ -1,0 +1,76 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resolvePreviewRole } from '../lib/previewRoleSelection';
+
+const platform = vi.hoisted(() => ({ OS: 'web' }));
+vi.mock('react-native', () => ({ Platform: platform }));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.resetModules();
+  platform.OS = 'web';
+});
+
+describe('buyer-first development preview', () => {
+  it('defaults to buyer and preserves explicit seller selection', () => {
+    expect(resolvePreviewRole('', null)).toBe('buyer');
+    expect(resolvePreviewRole('', 'invalid')).toBe('buyer');
+    expect(resolvePreviewRole('?bt_preview=seller', null)).toBe('seller');
+    expect(resolvePreviewRole('', 'seller')).toBe('seller');
+    expect(resolvePreviewRole('?bt_preview=buyer', 'seller')).toBe('buyer');
+  });
+
+  it('ignores the retired seller session key and persists only the new role key', async () => {
+    vi.stubGlobal('__DEV__', true);
+    const entries = new Map([['bt:previewRole:seller-default', 'seller']]);
+    vi.stubGlobal('window', {
+      location: { search: '', hostname: 'localhost' },
+      sessionStorage: {
+        getItem: (key: string) => entries.get(key) ?? null,
+        setItem: (key: string, value: string) => entries.set(key, value),
+      },
+    });
+    const preview = await import('../lib/devPreview');
+    expect(preview.getDevWebPreviewRole()).toBe('buyer');
+    window.location.search = '?bt_preview=seller';
+    expect(preview.getDevWebPreviewRole()).toBe('seller');
+    expect(entries.get('bt:previewRole:buyer-default')).toBe('seller');
+    window.location.search = '';
+    expect(preview.getDevWebPreviewRole()).toBe('seller');
+    expect(preview.isPreviewDemoMode()).toBe(false);
+  });
+
+  it('enables native buyer only in development, never in a release', async () => {
+    vi.stubGlobal('__DEV__', true);
+    const { resolveDevBuyerPreview, resolveDevSellerPreview } = await import('../lib/buildFlags');
+    expect(resolveDevBuyerPreview(true, false, 'buyer')).toBe(true);
+    expect(resolveDevBuyerPreview(true, false, 'seller')).toBe(false);
+    expect(resolveDevBuyerPreview(false, true, 'buyer')).toBe(false);
+    expect(resolveDevBuyerPreview(false, false, 'buyer')).toBe(false);
+    expect(resolveDevBuyerPreview(true, true, 'buyer')).toBe(false);
+    expect(resolveDevSellerPreview(true, false, 'seller')).toBe(true);
+  });
+
+  it('routes a native buyer preview without demo data or persistent account writes', async () => {
+    vi.stubGlobal('__DEV__', true);
+    vi.stubEnv('EXPO_PUBLIC_DEV_PREVIEW', 'buyer');
+    vi.stubEnv('EXPO_OS', 'ios');
+    platform.OS = 'ios';
+    const { DEV_BYPASS_ROLE } = await import('../lib/devBypass');
+    const preview = await import('../lib/devPreview');
+    expect(DEV_BYPASS_ROLE).toBe('buyer');
+    expect(preview.isBuyerDevPreview()).toBe(true);
+    expect(preview.isSellerDevPreview()).toBe(false);
+    expect(preview.isPreviewDemoMode('?demo=1')).toBe(false);
+    expect(preview.isPreviewFreshMode()).toBe(true);
+  });
+
+  it('keeps production web preview disabled even with an explicit buyer URL', async () => {
+    vi.stubGlobal('__DEV__', true);
+    vi.stubGlobal('window', { location: { search: '?bt_preview=buyer', hostname: 'brandthread.app' } });
+    const preview = await import('../lib/devPreview');
+    expect(preview.getDevWebPreviewRole()).toBe(null);
+    expect(preview.isBuyerDevPreview()).toBe(false);
+    expect(preview.isSellerDevPreview()).toBe(false);
+  });
+});

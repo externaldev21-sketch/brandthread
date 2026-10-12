@@ -42,6 +42,17 @@ export const DEV_SELLER_PREVIEW = resolveDevSellerPreview(
   process.env.EXPO_PUBLIC_DEV_PREVIEW,
 );
 
+/** Both native preview roles are explicit opt-ins and hard-disabled in releases. */
+export function resolveDevBuyerPreview(isDev: boolean, isProductionNative: boolean, value?: string): boolean {
+  return isDev && !isProductionNative && value === 'buyer';
+}
+
+export const DEV_BUYER_PREVIEW = resolveDevBuyerPreview(
+  __DEV__,
+  IS_PROD_NATIVE,
+  process.env.EXPO_PUBLIC_DEV_PREVIEW,
+);
+
 const requestedWebRole = __DEV__ ? process.env.EXPO_PUBLIC_DEV_BYPASS_ROLE : undefined;
 export const DEV_WEB_BYPASS_ROLE: 'buyer' | 'seller' | null =
   requestedWebRole === 'buyer' || requestedWebRole === 'seller' ? requestedWebRole : null;

@@ -3,7 +3,7 @@ name: Fresh seller preview
 description: Owner's standing requirement for an empty, new-account development preview and nonpersistent web demo mode.
 ---
 
-The seller preview must look like a brand-new seller who just signed up: zero products, zero orders, zero revenue, empty messages, an empty profile grid, and zero followers. Skipping onboarding in Expo Go selects the seller role; it must never select or seed a populated demo account.
+The seller preview must look like a brand-new seller who just signed up: zero products, zero orders, zero revenue, empty messages, an empty profile grid, and zero followers. Skipping onboarding in Expo Go selects the explicitly requested preview role; it must never select or seed a populated demo account.
 
 **Why:** The owner repeated: “I told you I wanted my app to be in a state on how it would be when somebody first downloads and creates an account.” Populated products, orders and dashboard money were explicitly rejected.
 

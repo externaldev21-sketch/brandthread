@@ -4,6 +4,7 @@ const platform = vi.hoisted(() => ({ OS: 'web' }));
 vi.mock('react-native', () => ({ Platform: platform }));
 vi.mock('../lib/buildFlags', () => ({
   DEV_SELLER_PREVIEW: true,
+  DEV_BUYER_PREVIEW: false,
   NAVIGATION_ISOLATION_TEST: true,
 }));
 import {
@@ -12,6 +13,7 @@ import {
 
 let stored: Map<string, string>;
 beforeEach(() => {
+  vi.stubGlobal('__DEV__', true);
   platform.OS = 'web';
   stored = new Map([['bt_preview_demo', '1']]);
   vi.stubGlobal('localStorage', {

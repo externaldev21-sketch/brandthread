@@ -7,11 +7,11 @@
  * so an exported, production (__DEV__ === false) preview build can still be
  * screenshotted with ?bt_preview=buyer|seller):
  *   - Inert (returns false) in a real production build (neither flag set)
- *   - Native seller preview is an explicit, dev-build-only EXPO_PUBLIC_DEV_PREVIEW=seller opt-in
+ *   - Native preview is an explicit, dev-build-only EXPO_PUBLIC_DEV_PREVIEW=buyer|seller opt-in
  *   - Inert when window is unavailable (SSR / test environments without window)
  *   - ?bt_preview=buyer|seller explicitly selects and persists a preview role
  *   - in dev, the saved tab role is used when the URL has no selection; a fresh
- *     dev-web session opens the seller preview
+ *     dev-web session opens the buyer preview
  *
  * Expo Router drops the query on in-app navigation. Dev builds retain the
  * tab-scoped choice; exported screenshot builds use the role that _layout
@@ -26,12 +26,11 @@
  */
 
 import { Platform } from 'react-native';
-import { DEV_SELLER_PREVIEW, NAVIGATION_ISOLATION_TEST } from './buildFlags';
+import { DEV_BUYER_PREVIEW, DEV_SELLER_PREVIEW, NAVIGATION_ISOLATION_TEST } from './buildFlags';
 import { resolvePreviewRole, type PreviewRole } from './previewRoleSelection';
 
-// Use a new session key so the former buyer-first default does not keep an
-// already-open preview tab on the buyer side after switching to seller-first.
-const PREVIEW_ROLE_KEY = 'bt:previewRole:seller-default';
+// Ignore the retired seller-first session key, including in already-open tabs.
+const PREVIEW_ROLE_KEY = 'bt:previewRole:buyer-default';
 
 export function getDevWebPreviewRole(searchOverride?: string): PreviewRole | null {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined' || isProductionPreviewHost()) return null;
@@ -101,7 +100,7 @@ function persistedPreviewRole(): 'buyer' | 'seller' | null {
 
 /**
  * Returns true in the dev-web seller preview context. The URL selection takes
- * precedence, then the saved browser-session role, with seller as the default.
+ * precedence, then the saved browser-session role, with buyer as the default.
  *
  * @param searchOverride  Optional query string (e.g. '?bt_preview=buyer')
  *   supplied by tests instead of reading window.location.search.
@@ -117,7 +116,6 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
   // NAVIGATION_ISOLATION_TEST env var somehow reached a production build.
   if (isProductionPreviewHost()) return false;
   if (typeof window === 'undefined') return false;
-  if (DEV_SELLER_PREVIEW) return true;
   if (__DEV__) return getDevWebPreviewRole(searchOverride) === 'seller';
   const v = new URLSearchParams(searchOverride ?? window.location.search).get('bt_preview');
   if (v === 'seller') return true;
@@ -192,7 +190,7 @@ export function isPreviewFreshMode(searchOverride?: string): boolean {
  */
 export function isBuyerDevPreview(searchOverride?: string): boolean {
   if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;
-  if (Platform.OS !== 'web') return false;
+  if (Platform.OS !== 'web') return DEV_BUYER_PREVIEW;
   if (isProductionPreviewHost()) return false;
   if (typeof window === 'undefined') return false;
   if (__DEV__) return getDevWebPreviewRole(searchOverride) === 'buyer';

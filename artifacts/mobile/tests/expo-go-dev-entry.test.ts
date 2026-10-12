@@ -16,7 +16,7 @@ const dashboardContent = readFileSync(resolve(__dirname, '../components/SellerHo
 describe('Expo Go development entry', () => {
   it('uses native dev-role routing while retaining web preview and normal auth gates', () => {
     expect(bypass).toContain("DEV_BYPASS_ROLE: 'buyer' | 'seller' | null =");
-    expect(bypass).toContain("DEV_SELLER_PREVIEW ? 'seller' : null");
+    expect(bypass).toContain("DEV_BUYER_PREVIEW ? 'buyer' : DEV_SELLER_PREVIEW ? 'seller' : null");
     expect(layout).toContain("DEV_BYPASS_ROLE === 'seller'");
     expect(layout).toContain('{PREVIEW_SESSION_ROLE || DEV_BYPASS_ROLE ? (');
     expect(layout).toContain('<ClerkLoaded>{appTree}</ClerkLoaded>');

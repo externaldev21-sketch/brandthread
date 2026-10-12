@@ -775,7 +775,7 @@ function AuthGate() {
 
   // Read splash_seen once on mount
   useEffect(() => {
-    if (Platform.OS !== 'web' && DEV_BYPASS_ROLE === 'seller') {
+    if (Platform.OS !== 'web' && DEV_BYPASS_ROLE) {
       setSplashSeen(true);
       return;
     }
@@ -784,15 +784,15 @@ function AuthGate() {
 
   // Read AsyncStorage whenever auth state or top segment changes
   useEffect(() => {
-    // Expo Go seller preview is a session-only route mode. Do not inspect or
+    // Expo Go role preview is a session-only route mode. Do not inspect or
     // write account/onboarding state and do not make auth/profile requests.
-    if (Platform.OS !== 'web' && DEV_BYPASS_ROLE === 'seller') {
+    if (Platform.OS !== 'web' && DEV_BYPASS_ROLE) {
       setOnboardingChecked(true);
       setOnboardingDone(true);
-      setStoredRole('seller');
+      setStoredRole(DEV_BYPASS_ROLE);
       setThreadExplainerSeen(true);
       setAccessRequired(false);
-      setActiveSeller(true);
+      setActiveSeller(DEV_BYPASS_ROLE === 'seller');
       return;
     }
     if (!isSignedIn) { setOnboardingChecked(false); return; }
