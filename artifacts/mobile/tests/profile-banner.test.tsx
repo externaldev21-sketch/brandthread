@@ -104,7 +104,7 @@ import {
   bannerAspect, bannerCoversStatusBar, bannerHeight, bannerHeroMedia, bannerNeedsTrim, bannerSheetOptions, bannerStill, isGifAsset, resolveProfileBanner,
 } from '@/components/profile/profileBannerRules';
 import { coverQuery } from '@/lib/profileBannerApi';
-import { bannerCropRect, BannerActionSheet, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+import { bannerCropRect, BannerActionSheet, EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
 import { bannerStats, ProfileBannerHeader } from '@/components/profile/ProfileBannerHeader';
 
 const VIDEO = { type: 'video' as const, url: 'https://cdn.x/cover.mp4', posterUrl: 'https://cdn.x/poster.jpg', gifUrl: null };
@@ -459,6 +459,49 @@ describe('banner behind the status bar', () => {
     const renderer = renderHeader(false);
     expect(maskMock).toHaveBeenLastCalledWith(false);
     expect(renderer.root.findAll((node) => (node.type as unknown) === 'StatusBar')).toHaveLength(0);
+    renderer.unmount();
+  });
+});
+
+describe('empty banner placeholder (owners)', () => {
+  const hostTap = (renderer: ReactTestRenderer, id: string) =>
+    renderer.root.findAll((node) => node.props.testID === id && typeof node.props.onPress === 'function')[0];
+
+  it('own profile with no banner: a dark "Add banner" placeholder that opens the banner sheet', () => {
+    const onAdd = vi.fn();
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        <ProfileBannerHeader banner={null} height={380} active posterOnly={false} topPad={47} avatar={<React.Fragment />} name="N" stats={[]} onAddBanner={onAdd} />,
+      );
+    });
+    expect(byTestId(renderer, 'profile-banner-placeholder')).toHaveLength(1);
+    expect(renderer.root.findAll((node) => (node.type as unknown) === 'VideoView')).toHaveLength(0);
+    act(() => { hostTap(renderer, 'profile-banner-placeholder-add').props.onPress(); });
+    expect(onAdd).toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('Edit profile with no banner: the banner area itself reads "Add banner" (no extra pill)', () => {
+    const onEdit = vi.fn();
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<EditProfileBanner banner={null} busy={null} onEditBanner={onEdit} avatar={<React.Fragment />} onEditAvatar={() => {}} />);
+    });
+    expect(byTestId(renderer, 'edit-banner-button')).toHaveLength(1);
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Edit banner')).toHaveLength(0);
+    act(() => { hostTap(renderer, 'edit-banner-button-add').props.onPress(); });
+    expect(onEdit).toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('Edit profile with a banner: the "Edit banner" pill, no placeholder', () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<EditProfileBanner banner={VIDEO} busy={null} onEditBanner={() => {}} avatar={<React.Fragment />} onEditAvatar={() => {}} />);
+    });
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Edit banner' && typeof node.type === 'string')).toHaveLength(1);
+    expect(byTestId(renderer, 'edit-banner-button-add')).toHaveLength(0);
     renderer.unmount();
   });
 });

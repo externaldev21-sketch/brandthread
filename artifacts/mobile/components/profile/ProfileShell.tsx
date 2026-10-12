@@ -125,6 +125,11 @@ export interface ProfileShellProps<T> {
   hero: { videoUri?: string | null; posterUri?: string | null };
   /** TikTok-style profile banner; when set it replaces the hero / video header. */
   banner?: ProfileBanner | null;
+  /**
+   * Own profile only: with no banner set, show the banner layout with a
+   * subtle dark "Add banner" placeholder that calls this.
+   */
+  onAddBanner?: () => void;
   /** Small status bubble above the avatar on the banner (the profile's active note). */
   bannerNote?: { text: string; placeholder?: boolean; onPress?: () => void } | null;
   /** Owner-only cover-video affordance ("Add cover video" / "Edit cover"), shown in the hero. */
@@ -170,13 +175,13 @@ export interface ProfileShellProps<T> {
 
 export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const {
-    testID, identity, avatar, hero, banner = null, bannerNote = null, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, belowStats, actions, extras,
+    testID, identity, avatar, hero, banner = null, bannerNote = null, onAddBanner, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, belowStats, actions, extras,
     tabs, section, data, renderItem, keyExtractor, numColumns = 1, listKey,
     ListEmptyComponent, ListFooterComponent, onEndReached, refreshing = false, onRefresh,
     renderFloating, bottomInset = 0, headerVariant = 'hero', tabsVariant = 'labeled', belowTabs,
   } = props;
   const isVideoHeader = headerVariant === 'video';
-  const bannerMode = !!banner;
+  const bannerMode = !!banner || (isOwnProfile && !!onAddBanner);
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
@@ -392,7 +397,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     <ProfileChip key="role" size="sm" label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />,
     ...(identity.extraChips ?? []).map((c) => <ProfileChip key={c.label} size="sm" label={c.label} icon={c.icon} />),
   ];
-  const bannerHeader = banner ? (
+  const bannerHeader = bannerMode ? (
     <>
       <ProfileBannerHeader
         banner={banner}
@@ -438,6 +443,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         stats={stats}
         statsLoading={statsLoading}
         coversTop={focused && bannerCoversTop}
+        onAddBanner={isOwnProfile ? onAddBanner : undefined}
       />
       {/* Below the banner the profile continues as before: chips, bio, links. */}
       <View style={styles.bannerBelow} testID="profile-banner-below">

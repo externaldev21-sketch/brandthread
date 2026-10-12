@@ -55,12 +55,13 @@ import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
+import { useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
 import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
 import { ProfileBannerHeader } from '@/components/profile/ProfileBannerHeader';
 import { bannerCoversStatusBar, bannerHeight, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 import { useProfileNote } from '@/components/profile/useProfileNote';
+import { useProfileBanner } from '@/components/profile/ProfileBannerEditor';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
@@ -391,12 +392,15 @@ export default function ProfileScreen() {
   const bannerNote = useProfileNote({
     userId: user?.id,
     own: true,
-    enabled: !!banner,
+    enabled: true,
     onCompose: () => router.push('/(buyer)/inbox' as any),
   });
+  // Own profile: always the banner layout; no banner = a dark "Add banner"
+  // placeholder that opens the same Edit banner sheet as Edit profile.
+  const bannerFlow = useProfileBanner({ banner, userId: user?.id });
   const { height: windowHeight } = useWindowDimensions();
   const bannerH = bannerHeight(windowHeight);
-  useEffect(() => { if (banner) setHeroHeight(bannerH); }, [banner, bannerH]);
+  useEffect(() => { setHeroHeight(bannerH); }, [bannerH]);
 
   // Sheets
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
@@ -840,7 +844,6 @@ export default function ProfileScreen() {
     );
   }
 
-  const hasCover = coverFlow.hasCover;
   const hasActiveStory = myStoryIds.length > 0;
   const heroActive = focused && heroOnScreen && !heroPosterOnly;
 
@@ -874,7 +877,7 @@ export default function ProfileScreen() {
     <ProfileAccountSwitcher
       label={displayHandle || displayName}
       onPress={() => { haptics.light(); setAccountSwitcherOpen(true); }}
-      overMedia={hasCover || !!banner}
+      overMedia
       accessibilityLabel="Switch account"
       testID="buyer-profile-account-switcher"
     />
@@ -898,12 +901,6 @@ export default function ProfileScreen() {
       />
       <ProfileTopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" />
     </ProfileTopBarIconRow>
-  );
-  const topBar = (
-    <>
-      {accountSwitcherNode}
-      {topBarIcons}
-    </>
   );
 
   const profileAvatar = (
@@ -946,50 +943,30 @@ export default function ProfileScreen() {
 
   const header = (
     <View onLayout={handleHeaderLayout}>
-      {/* ── Video hero + identity: the profile video (when set) runs from the
-          very top of the screen, behind the top bar, avatar, name/@handle/
-          chip and bio, and fades into the solid background exactly where the
-          stats row begins. No video → the same layout on the plain page. ── */}
-      {banner ? (
-        <>
-          <ProfileBannerHeader
-            banner={banner}
-            height={bannerH}
-            active={heroActive}
-            posterOnly={heroPosterOnly}
-            topPad={topPad}
-            topBar={bannerTopBar}
-            avatar={profileAvatar}
-            note={bannerNote}
-            name={displayName}
-            handle={displayHandle && displayHandle !== displayName ? displayHandle : null}
-            stats={stats}
-            statsLoading={loading}
-            coversTop={focused && bannerCoversTop}
-          />
-          {/* Below the banner the profile continues as before: chip, bio, link. */}
-          <View style={topBarStyles.bannerBelow} testID="profile-banner-below">
-            <View style={topBarStyles.bannerChips}><ProfileChip label="Buyer" icon="user" /></View>
-            {profileMeta}
-          </View>
-        </>
-      ) : (
-      <ProfileVideoHeader
-        hero={{ videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }}
-        heroActive={heroActive}
+      {/* ── Banner + identity (TikTok): always the banner layout on your own
+          profile; no banner yet → a subtle dark "Add banner" placeholder. ── */}
+      <ProfileBannerHeader
+        banner={banner}
+        height={bannerH}
+        active={heroActive}
         posterOnly={heroPosterOnly}
         topPad={topPad}
-        onHeroHeight={setHeroHeight}
-        topBar={topBar}
+        topBar={bannerTopBar}
         avatar={profileAvatar}
+        note={bannerNote}
         name={displayName}
         handle={displayHandle && displayHandle !== displayName ? displayHandle : null}
-        chip={<ProfileChip label="Buyer" icon="user" />}
-        meta={profileMeta}
         stats={stats}
         statsLoading={loading}
+        coversTop={focused && bannerCoversTop}
+        onAddBanner={bannerFlow.openSheet}
       />
-      )}
+      {/* Below the banner the profile continues as before: chip, bio, link. */}
+      <View style={topBarStyles.bannerBelow} testID="profile-banner-below">
+        <View style={topBarStyles.bannerChips}><ProfileChip label="Buyer" icon="user" /></View>
+        {profileMeta}
+      </View>
+
 
       {/* ── Edit profile · Share profile · discover people (shared Button) ── */}
       <View style={styles.actionsRow}>
@@ -1102,6 +1079,8 @@ export default function ProfileScreen() {
       />
       <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
       <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
+      {/* "Add banner" on the placeholder: the same Edit banner sheet as Edit profile. */}
+      {bannerFlow.sheet}
 
       <ProfileMenuSheet
         visible={menuOpen}

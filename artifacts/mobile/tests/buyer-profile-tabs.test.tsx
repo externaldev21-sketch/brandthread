@@ -243,6 +243,12 @@ vi.mock('@/services/socialService', () => ({
   getNotesForTray: vi.fn(async () => []),
 }));
 
+const { openBannerSheetMock } = vi.hoisted(() => ({ openBannerSheetMock: vi.fn() }));
+// The banner edit flow (pickers, crop) has its own suite (profile-banner.test.tsx).
+vi.mock('@/components/profile/ProfileBannerEditor', () => ({
+  useProfileBanner: ({ banner }: { banner: unknown }) => ({ banner, busy: null, openSheet: openBannerSheetMock, sheet: null }),
+}));
+
 vi.mock('@/lib/api', () => ({
   useApi: () => apiMock,
 }));
@@ -730,40 +736,31 @@ describe('buyer profile — Instagram layout', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-story-create');
   });
 
-  it('orders the stats Followers · Following · Likes (Posts was dropped — dev: high counts were getting cut off)', async () => {
+  it('orders the banner stats Following · Followers · Likes (TikTok; Posts was dropped — dev: high counts were getting cut off)', async () => {
     renderer = await renderScreen();
-    const row = renderer.root.findByProps({ testID: 'profile-stats-row' });
+    const row = renderer.root.findByProps({ testID: 'profile-banner-stats' });
     const keys = row.findAll((node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('profile-stat-') && typeof node.type === 'string')
       .map((node) => node.props.testID);
-    expect([...new Set(keys)]).toEqual(['profile-stat-followers', 'profile-stat-following', 'profile-stat-likes']);
+    expect([...new Set(keys)]).toEqual(['profile-stat-following', 'profile-stat-followers', 'profile-stat-likes']);
   });
 
-  it('puts the avatar and stats on the same row (Instagram order), with name/@handle/bio below it', async () => {
+  it('puts the avatar, name and stats on the banner (TikTok), with the chip and bio below it', async () => {
     renderer = await renderScreen();
-    const identityStack = renderer.root.findByProps({ testID: 'profile-identity-stack' });
+    const header = renderer.root.findByProps({ testID: 'profile-banner-header' });
     // The mocked Pressable exposes the same testID on both its composite and
-    // host instances, so count only host ('string' type) nodes — same
-    // pattern as the "orders the stats" test above.
-    const hostNodesWithTestID = (root: typeof identityStack, testID: string) => root.findAll(
+    // host instances, so count only host ('string' type) nodes.
+    const hostNodesWithTestID = (root: typeof header, testID: string) => root.findAll(
       (node) => node.props.testID === testID && typeof node.type === 'string',
     );
-    // The avatar and the stats row are both inside the measured
-    // identity-stack (what the video hero sizes itself to) — i.e. the same
-    // row, not stats on their own line further down the screen.
-    expect(hostNodesWithTestID(identityStack, 'profile-avatar')).toHaveLength(1);
-    expect(hostNodesWithTestID(identityStack, 'profile-stats-row')).toHaveLength(1);
-    // Name/@handle/bio render in a separate block AFTER the identity-stack,
-    // on the solid background below the fade — not beside the avatar.
-    const meta = renderer.root.findByProps({ testID: 'profile-identity-meta' });
-    expect(hostNodesWithTestID(meta, 'profile-avatar')).toHaveLength(0);
-    expect(hostNodesWithTestID(meta, 'profile-stats-row')).toHaveLength(0);
+    expect(hostNodesWithTestID(header, 'profile-avatar')).toHaveLength(1);
+    expect(hostNodesWithTestID(header, 'profile-banner-stats')).toHaveLength(1);
+    const below = renderer.root.findByProps({ testID: 'profile-banner-below' });
+    expect(hostNodesWithTestID(below, 'profile-avatar')).toHaveLength(0);
+    expect(hostNodesWithTestID(below, 'profile-banner-stats')).toHaveLength(0);
   });
 
-  it('renders no video layer without a profile video, and no "+ Add profile video" pill (removed from this screen — still reachable from Edit profile)', async () => {
+  it('renders no video layer without a banner, and no "+ Add profile video" pill (the placeholder covers it)', async () => {
     renderer = await renderScreen();
-    await act(async () => {
-      renderer!.root.findByProps({ testID: 'profile-identity-stack' }).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
-    });
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-video-hero')).toHaveLength(0);
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-cover-affordance')).toHaveLength(0);
   });
@@ -782,12 +779,16 @@ describe('buyer profile — Instagram layout', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
   });
 
-  it('with no banner keeps today\'s header exactly (no banner header)', async () => {
+  it('with no banner, your own profile shows a dark "Add banner" placeholder that opens the banner sheet', async () => {
+    openBannerSheetMock.mockClear();
     apiMock.social.profile.mockResolvedValue({ followersCount: 7, followingCount: 3, coverVideoUrl: null, coverPosterUrl: null, profileBanner: null });
     renderer = await renderScreen();
-    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-header')).toHaveLength(0);
-    expect(renderer.root.findAll((node) => node.props.testID === 'profile-identity-stack')).not.toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-header')).not.toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-placeholder')).not.toHaveLength(0);
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-video-hero')).toHaveLength(0);
+    const add = renderer.root.findAll((node) => node.props.testID === 'profile-banner-placeholder-add' && typeof node.props.onPress === 'function')[0];
+    await act(async () => { add.props.onPress(); });
+    expect(openBannerSheetMock).toHaveBeenCalled();
   });
 
   it('wires the highlights row: "New" opens the create form, a highlight opens itself in the manager', async () => {

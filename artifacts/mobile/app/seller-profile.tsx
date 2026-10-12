@@ -80,6 +80,7 @@ import { buildPostUrl } from '@/lib/shareLinks';
 import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 import { useProfileNote } from '@/components/profile/useProfileNote';
+import { useProfileBanner } from '@/components/profile/ProfileBannerEditor';
 
 type ContentTab = 'Posts' | 'Shop' | 'Tagged';
 // Internal key stays 'Shop'; the label (and accessibility name) is "Products".
@@ -370,6 +371,8 @@ export default function SellerProfileScreen() {
   });
   const banner = useProfileBannerState({ server: seller?.profileBanner ?? null, ownerId: canonicalSellerId, own: isOwner });
   const bannerNote = useProfileNote({ userId: canonicalSellerId, own: isOwner, enabled: !!banner });
+  // Owner (not "view as visitor") with no banner: a dark "Add banner" placeholder.
+  const bannerFlow = useProfileBanner({ banner, userId: canonicalSellerId });
 
   // Returning to this profile (after posting, editing listings, deleting a
   // video, or following from another screen) silently refetches counts,
@@ -764,6 +767,7 @@ export default function SellerProfileScreen() {
           ? { videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }
           : { videoUri: firstVideo?.mediaUris[0] ?? null, posterUri: heroPoster }}
         banner={banner}
+        onAddBanner={isOwner && !previewAsVisitor ? bannerFlow.openSheet : undefined}
         bannerNote={bannerNote}
         coverAffordance={isOwner ? (
           <CoverHeroAffordance hasCover={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
@@ -849,6 +853,7 @@ export default function SellerProfileScreen() {
           />
           <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
           <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
+          {bannerFlow.sheet}
         </>
       ) : null}
       {isOwner ? (

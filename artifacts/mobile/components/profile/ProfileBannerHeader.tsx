@@ -20,6 +20,7 @@ import { AppState, Pressable, StatusBar, StyleSheet, Text, View } from 'react-na
 import { useSuppressStatusBarMask } from '@/components/layout/ScreenChrome';
 import { CachedImage } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import { FONT, ON_DARK, ON_DARK_MUTED, SP } from '@/lib/theme';
 import { hapticSelection } from '@/lib/haptics';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
@@ -73,6 +74,51 @@ export function BannerMedia({
   );
 }
 
+/** Subtle dark fill of an empty banner area (own profile / Edit profile). */
+const PLACEHOLDER_GRADIENT = ['#242426', '#121214'] as const; // theme-exempt: banner area reads as dark media in every theme
+
+/**
+ * Empty-banner placeholder: a subtle dark fill with a centered
+ * "+ Add banner" prompt, so owners know the banner area is there. The
+ * prompt sits inside `contentTop`…`contentBottom` (clear of the top bar and
+ * the identity block / overlapping avatar). Owners only — visitors never see
+ * an empty banner.
+ */
+export function BannerPlaceholder({
+  onAdd,
+  contentTop = 0,
+  contentBottom = 0,
+  testID = 'banner-placeholder',
+}: {
+  onAdd?: () => void;
+  contentTop?: number;
+  contentBottom?: number;
+  testID?: string;
+}) {
+  return (
+    <View style={StyleSheet.absoluteFill} testID={testID}>
+      <LinearGradient colors={PLACEHOLDER_GRADIENT as unknown as [string, string]} style={StyleSheet.absoluteFill} />
+      <View style={[styles.placeholderSlot, { top: contentTop, bottom: contentBottom }]} pointerEvents="box-none">
+        <Pressable
+          onPress={onAdd ? () => { hapticSelection(); onAdd(); } : undefined}
+          disabled={!onAdd}
+          accessibilityRole="button"
+          accessibilityLabel="Add banner"
+          accessibilityHint="Choose a GIF or a video up to 10 seconds"
+          hitSlop={12}
+          style={({ pressed }) => [styles.placeholderPrompt, pressed && styles.pressed]}
+          testID={`${testID}-add`}
+        >
+          <View style={styles.placeholderIcon}>
+            <Feather name="plus" size={16} color={ON_DARK} />
+          </View>
+          <Text style={styles.placeholderText}>Add banner</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 /** TikTok's stat order on the banner: Following · Followers · Likes, then anything else. */
 export function bannerStats(stats: ProfileStat[]): ProfileStat[] {
   const order = ['following', 'followers', 'likes'];
@@ -98,9 +144,11 @@ export function ProfileBannerHeader({
   stats,
   statsLoading,
   coversTop = false,
+  onAddBanner,
   testID = 'profile-banner-header',
 }: {
-  banner: ProfileBanner;
+  /** null = owner's empty banner: a dark placeholder with "Add banner". */
+  banner: ProfileBanner | null;
   /** Banner height (`bannerHeight(windowHeight)`). */
   height: number;
   /** Screen focused + banner on screen (+ Reduce Motion / data saver off). */
@@ -127,14 +175,24 @@ export function ProfileBannerHeader({
    * back so nothing slides under the clock.
    */
   coversTop?: boolean;
+  /** Empty banner (owner): what "Add banner" opens. */
+  onAddBanner?: () => void;
   testID?: string;
 }) {
   useSuppressStatusBarMask(coversTop);
   return (
     <View style={[styles.root, { height }]} testID={testID}>
       {coversTop ? <StatusBar barStyle="light-content" /> : null}
-      <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`profile-banner-${banner.type}`}>
-        <BannerMedia banner={banner} active={active} posterOnly={posterOnly} height={height} />
+      {banner ? null : (
+        <BannerPlaceholder
+          onAdd={onAddBanner}
+          contentTop={topPad + 52}
+          contentBottom={IDENTITY_BLOCK_HEIGHT}
+          testID="profile-banner-placeholder"
+        />
+      )}
+      <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={banner ? `profile-banner-${banner.type}` : undefined}>
+        {banner ? <BannerMedia banner={banner} active={active} posterOnly={posterOnly} height={height} /> : null}
         <LinearGradient
           // Subtle top gradient: keeps the status bar (time, battery) and the
           // floating icons readable over any frame.
@@ -209,7 +267,17 @@ export function ProfileBannerHeader({
   );
 }
 
+/** Room the name / handle / stats block + avatar take at the banner's bottom. */
+const IDENTITY_BLOCK_HEIGHT = 172;
+
 const styles = StyleSheet.create({
+  placeholderSlot: { position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
+  placeholderPrompt: { alignItems: 'center', gap: 8, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  placeholderIcon: {
+    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: ON_DARK_MUTED,
+  },
+  placeholderText: { fontFamily: FONT.semibold, fontSize: 14, color: ON_DARK_MUTED },
   root: { width: '100%', overflow: 'hidden', backgroundColor: '#000000' }, // theme-exempt: banner backdrop before the first frame
   backdrop: { backgroundColor: '#000000' }, // theme-exempt: banner backdrop
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
