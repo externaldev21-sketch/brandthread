@@ -1,0 +1,18 @@
+[
+  {
+    "screen": "buyer-activity-long",
+    "variant": "fresh",
+    "barTop": 762,
+    "lowestContent": 734,
+    "gap": 28,
+    "scrollers": 1
+  },
+  {
+    "screen": "buyer-activity-long",
+    "variant": "demo",
+    "barTop": 762,
+    "lowestContent": 734,
+    "gap": 28,
+    "scrollers": 1
+  }
+]

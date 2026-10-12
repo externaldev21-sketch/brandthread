@@ -228,7 +228,7 @@ vi.mock('expo-haptics', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({ useBuyerTabBarInset: () => 80 }));
+vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({ useBuyerTabBarInset: () => 80, useTabBarClearance: () => 96 }));
 vi.mock('@/lib/api', () => ({ useApi: () => apiMock }));
 vi.mock('@/components/BrandthreadUI', () => {
   const ReactActual = require('react') as typeof import('react');

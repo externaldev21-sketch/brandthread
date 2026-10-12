@@ -207,6 +207,7 @@ vi.mock('@/components/layout', () => {
 
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
   useTabBarMetrics: () => ({ occupiedHeight: 90 }),
+  useTabBarClearance: () => 106,
 }));
 
 vi.mock('@/components/motion/SheetRise', () => {

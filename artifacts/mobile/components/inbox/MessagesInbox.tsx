@@ -31,7 +31,7 @@ import {
 import { Icon as Feather } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
-import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
@@ -315,7 +315,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   // so the search-mode header row sits at the identical vertical position
   // as the title/icon row it swaps with.
   const headerTopPad = useHeaderTopInset();
-  const buyerBarInset = useBuyerTabBarInset();
+  const buyerBarInset = useTabBarClearance();
   // The seller screen is pushed: the root stack scene already ends above the
   // seller tab bar (components/layout/ScreenChrome.tsx), so only the safe area.
   const barInset = isSeller ? insets.bottom : buyerBarInset;

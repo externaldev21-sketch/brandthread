@@ -38,8 +38,13 @@ import {
   View,
   type ViewToken,
 } from 'react-native';
+<<<<<<< HEAD
 import { Icon } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
+=======
+import { Feather } from '@expo/vector-icons';
+import { useFocusEffect, useRouter, useSegments } from 'expo-router';
+>>>>>>> origin/approved-20261012-845
 import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -50,8 +55,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
-import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { useBuyerTabBarTopInset, useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FollowPill } from '@/components/search/PersonRow';
 import { ThemedRefreshControl } from '@/components/ui';
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -599,17 +603,22 @@ export default function ActivityCenterScreen() {
   // BuyerTabBar) is rendered above this screen even though it's a pushed
   // stack route, not a buyer-tab route itself — confirmed live: the last row
   // was sitting under it.
-  // Rows still scroll IN UNDER the glass zone while scrolling (the list is
-  // full height), but the list's end clears the bar — the last row (e.g. the
-  // final "Suggested for you" person) used to stop under it. Buyers get the buyer
-  // bar's height (the (buyer)/activity tab and the root route both show
-  // it); sellers on the root route get the floating SellerGlobalTabBar's.
-  const sellerTabBarInset = useSellerTabBarInset();
-  const buyerTabBarInset = useBuyerTabBarInset();
+  // withTabBarInset: false — the list itself only reserves a small clearance
+  // (not the full tab-bar height) so its rows scroll IN UNDER the glass
+  // zone, like iOS, and are visible (softly, through blur) right up to the
+  // bar instead of stopping in an empty reserved gap above it.
+  const screenPadding = useScreenPadding({ withTabBarInset: false });
+  // Rows still scroll in under the glass while scrolling, but the END of
+  // the list must clear the bar (nothing ends under it). Inside the buyer
+  // tabs the bar floats over this screen, so pad by the shared clearance;
+  // the seller-side root route already gets that clearance from the root
+  // layout's scene margin, so it keeps the small safe-area padding.
+  const inBuyerTabs = (useSegments() as string[])[0] === '(buyer)';
+  const tabBarClearance = useTabBarClearance();
+  const listBottomPad = inBuyerTabs ? tabBarClearance : screenPadding.bottom + SP.xl;
   const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>(true, false);
   const router = useRouter();
   const { role } = useRole();
-  const listBottomInset = (role === 'seller' ? sellerTabBarInset : buyerTabBarInset) + SP.md;
   const api = useApi();
   const { user } = useUser();
   // "Story mentions" rail above the feed (Activity is the same screen for
@@ -1373,7 +1382,7 @@ export default function ActivityCenterScreen() {
           ListFooterComponent={listFooter}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: listBottomInset },
+            { paddingBottom: listBottomPad },
             sections.length === 0 && visibleSuggested.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}
