@@ -224,7 +224,6 @@ export default function BuyerOtherProfileScreen() {
       setProfile(prev => prev ? { ...prev, followRequested: false } : prev);
       try {
         await api.social.unfollow(canonicalUserId);
-        haptics.light();
       } catch {
         setProfile(prev => prev ? { ...prev, followRequested: true } : prev);
         Alert.alert("Couldn't cancel request", 'Try again.');
@@ -255,7 +254,6 @@ export default function BuyerOtherProfileScreen() {
           followRequested: true,
           followersCount: typeof result.followersCount === 'number' ? result.followersCount : Math.max(0, prev.followersCount - 1),
         } : prev);
-        haptics.light();
         return;
       }
       if (!wasFollowing) void requestContextualPushPermission(currentUserId, api, 'follow');
@@ -273,7 +271,6 @@ export default function BuyerOtherProfileScreen() {
       });
       // Becoming (or ceasing to be) friends changes which posts are visible.
       void videos.reload();
-      hapticLight();
     } catch (error) {
       // Bad connection: keep what the buyer tapped and deliver it in the
       // background (lib/engagementRetryQueue.ts). Only a real refusal rolls back.

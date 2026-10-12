@@ -39,7 +39,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { OptionSheet } from '@/components/ui/OptionSheet';
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticFollow } from '@/lib/haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { profileHref } from '@/lib/profileNavigation';
 import { InteractionLayer, ProfileChip } from '@/components/profile/ProfileControls';
@@ -208,7 +208,6 @@ export default function ConnectionsScreen() {
     const setList = tab === 'followers' ? setFollowers : setFollowing;
     setFollowPending((prev) => new Set(prev).add(row.id));
     setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: true } : u)));
-    haptics.light();
     try {
       if (row.accountType === 'seller') await setSellerFollowing(row.id, true);
       else if ((await api.social.follow(row.id))?.status === 'requested') {
@@ -486,7 +485,7 @@ function FollowPill({
   const label = following ? 'Following' : followBack ? 'Follow back' : 'Follow';
   return (
     <PressableScale
-      onPress={onPress}
+      onPress={() => { hapticFollow(!following); onPress(); }}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={following ? `${label}, tap to unfollow` : label}

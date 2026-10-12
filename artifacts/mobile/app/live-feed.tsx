@@ -38,7 +38,7 @@ import ReanimatedAnimated, { useSharedValue, useAnimatedStyle, withTiming } from
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticFollow } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, RADIUS, FG, TEXT_SECONDARY } from '@/lib/theme';
@@ -383,7 +383,6 @@ function LiveRoomPage({
   }, [api, room.isSample, room.sellerId]);
 
   async function toggleFollow() {
-    hapticLight();
     if (room.isSample) { setFollowing(v => !v); return; }
     if (!room.sellerId || followBusy) return;
     const was = following;
@@ -670,7 +669,7 @@ function LiveRoomPage({
               </View>
             </View>
             <PressableScale
-              onPress={() => { void toggleFollow(); }}
+              onPress={() => { hapticFollow(!following); void toggleFollow(); }}
               style={[styles.followBtn, following && styles.followBtnActive]}
               // Visual 30pt pill inside the capsule (QA-0482/0483); the auto
               // hit-slop still pads the tap area to 44pt.

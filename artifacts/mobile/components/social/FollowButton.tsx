@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text } from 
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+import { hapticFollow } from '@/lib/haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FILL_ELEVATED, FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
 import { useApi } from '@/lib/api';
@@ -76,9 +76,9 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       ? { isFollowing: false, isFollowedBy: state.isFollowedBy, isMutual: false }
       : { isFollowing: true, isFollowedBy: state.isFollowedBy, isMutual: state.isFollowedBy };
 
+    hapticFollow(!wasFollowing);
     setState(optimistic);
     setBusy(true);
-    haptics.light();
     onChange?.(optimistic, wasFollowing ? -1 : 1);
 
     try {

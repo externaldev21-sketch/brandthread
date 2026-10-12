@@ -23,7 +23,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticFollow } from '@/lib/haptics';
 import { FONT, FS, GOLD, ON_DARK } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
@@ -211,7 +211,7 @@ export function RightActionRail({
               disabled={!!engagement?.following}
               accessibilityRole="button"
               accessibilityLabel={`Follow ${creator}`}
-              onPress={async () => { haptics.light(); await onFollow(); }}
+              onPress={async () => { hapticFollow(true); await onFollow(); }}
               testID={`follow-btn-${testIdBase}`}
             >
               <Icon

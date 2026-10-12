@@ -311,7 +311,6 @@ export default function SellerActivityScreen() {
     if (!userId) return;
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
     if (!currentlyFollowing) {
-      haptics.light();
       void setFollowingPerson(userId, true);
       return;
     }

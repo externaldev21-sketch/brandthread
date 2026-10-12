@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { Platform } from 'react-native';
 
 /**
  * The one haptics map for Brandthread, after Apple HIG "Playing haptics":
@@ -19,8 +20,8 @@ import * as Haptics from 'expo-haptics';
  * devices and simulators must never turn a successful interaction into a
  * rejected promise.
  */
-// Expo inlines EXPO_OS at build time; no react-native import keeps this
-// module safe in every test mock.
+// Existing haptic mappings retain Expo's build-time EXPO_OS gate.
+// Follow additionally checks the runtime platform below.
 const enabled = () => process.env.EXPO_OS !== 'web';
 
 function play(run: () => Promise<void>) {
@@ -71,3 +72,25 @@ export const hapticSuccessAction = haptics.success;
 export const hapticDestructiveConfirm = haptics.warning;
 /** Bottom tab bar switch — owned by the tab bars, left as-is. */
 export const hapticTabChange = hapticMedium;
+
+// ─── Follow ───────────────────────────────────────────────────────────────────
+
+/**
+ * The one haptic for every Follow / Unfollow tap in the app — the feed "+"
+ * avatar badge, profile Follow buttons, Follow pills in search, activity,
+ * followers/following lists, live, onboarding and so on. Call it on the tap
+ * itself, before the network request, so it lands instantly. Follow gets a
+ * light impact plus a success notification (Instagram/TikTok feel); Unfollow
+ * gets a softer selection tick. No-op on web.
+ *
+ * tests/follow-haptics.test.ts fails if a follow control skips this helper.
+ */
+export function hapticFollow(nextFollowing: boolean) {
+  if (Platform.OS === 'web') return;
+  if (nextFollowing) {
+    hapticLight();
+    hapticSuccess();
+  } else {
+    hapticSelection();
+  }
+}

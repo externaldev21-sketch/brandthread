@@ -71,7 +71,7 @@ import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-c
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticFollow } from '@/lib/haptics';
 import {
   isPreviewActivityEnabled, getVisiblePreviewActivity, getPreviewActivitySuggestedPeople, previewActorAvatarUri,
   isPreviewActivityId, markPreviewActivityDismissed,
@@ -1206,7 +1206,7 @@ export default function ActivityCenterScreen() {
   }, []);
 
   const handleSuggestedFollow = useCallback(async (person: SuggestedPerson) => {
-    haptics.light();
+    hapticFollow(true);
     setSuggestedFollowState((prev) => ({ ...prev, [person.userId]: 'pending' }));
     try {
       await setSellerFollowing(person.userId, true);

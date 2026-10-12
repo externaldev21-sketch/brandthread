@@ -31,6 +31,7 @@ import { buildProductUrl } from '@/lib/shareLinks';
 import { MissingItemState } from '@/components/states/MissingItemState';
 import { useAuth } from '@clerk/expo';
 import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
+import { hapticFollow } from '@/lib/haptics';
 import { PREVIEW_PRODUCT_REVIEW_SUMMARY, previewReviewsEnabled } from '@/lib/previewReviews';
 
 const GALLERY_H = 380;
@@ -134,12 +135,12 @@ export default function ProductStoreScreen() {
     if (!sellerId || followBusy) return;
     if (!isSignedIn) { router.push('/sign-in' as never); return; }
     const was = followingSeller === true;
+    hapticFollow(!was);
     setFollowingSeller(!was);
     setFollowBusy(true);
     try {
       const state = await setSellerFollowing(sellerId, !was);
       setFollowingSeller(!!state?.isFollowing);
-      Haptics.selectionAsync();
     } catch {
       setFollowingSeller(was);
       Alert.alert(was ? 'Could not unfollow' : 'Could not follow', 'Check your connection and try again.');
