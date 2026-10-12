@@ -1,11 +1,11 @@
 /**
- * Design choices for the seller's store website (brandthread.app/@handle).
+ * Design choices for the seller's store (brandthread.app/@handle).
  *
- * Deliberately small (Linktree's "Theme" + "Style" sheets, cut down): seven
- * curated themes, two button shapes, three fonts. Every font is a system
- * stack, so the page never fetches a web font. The mobile editor keeps a copy
- * of THEMES in artifacts/mobile/lib/storeSiteDesign.ts; a test there checks
- * the two stay identical.
+ * Stan Store's "Edit Design": a handful of preset themes, each just a
+ * background and an accent (the colour of every product button). Black,
+ * white and silver only; the page always uses the system font. The mobile
+ * app keeps a copy of THEMES in artifacts/mobile/lib/storeSiteDesign.ts; a
+ * test there checks the two stay identical.
  */
 
 export type StoreSiteTheme = {
@@ -15,27 +15,34 @@ export type StoreSiteTheme = {
   bg: string;
   /** Primary text, icons. */
   fg: string;
-  /** Secondary text (bio, prices). */
+  /** Secondary text (bio, subtitles, ship-by dates). */
   muted: string;
-  /** Hairlines, empty image tiles. */
+  /** Hairlines, empty image tiles, form field borders. */
   line: string;
-  /** Link buttons and the Buy button. */
+  /** Product block and form field background. */
+  card: string;
+  /** Accent: product buttons and the checkout button. */
   buttonBg: string;
   buttonFg: string;
 };
 
 export const STORE_SITE_THEMES: readonly StoreSiteTheme[] = [
-  { key: "black",    label: "Black",    bg: "#000000", fg: "#FFFFFF", muted: "#C0C0C0", line: "#1C1C1E", buttonBg: "#FFFFFF", buttonFg: "#000000" },
-  { key: "white",    label: "White",    bg: "#FFFFFF", fg: "#000000", muted: "#6E6E73", line: "#E5E5EA", buttonBg: "#000000", buttonFg: "#FFFFFF" },
-  { key: "silver",   label: "Silver",   bg: "#D1D1D6", fg: "#000000", muted: "#3A3A3C", line: "#C0C0C0", buttonBg: "#000000", buttonFg: "#FFFFFF" },
-  { key: "graphite", label: "Graphite", bg: "#1C1C1E", fg: "#FFFFFF", muted: "#AEAEB2", line: "#2C2C2E", buttonBg: "#C0C0C0", buttonFg: "#000000" },
-  { key: "bone",     label: "Bone",     bg: "#F2EFE9", fg: "#1C1C1E", muted: "#6E6A64", line: "#E2DDD4", buttonBg: "#1C1C1E", buttonFg: "#F2EFE9" },
-  { key: "navy",     label: "Navy",     bg: "#0B1A2E", fg: "#FFFFFF", muted: "#A9B4C2", line: "#1B2B42", buttonBg: "#FFFFFF", buttonFg: "#0B1A2E" },
-  { key: "oxblood",  label: "Oxblood",  bg: "#3A0C12", fg: "#FFFFFF", muted: "#D9B8BC", line: "#4E1820", buttonBg: "#FFFFFF", buttonFg: "#3A0C12" },
+  { key: "black",    label: "Black",    bg: "#000000", fg: "#FFFFFF", muted: "#AEAEB2", line: "#2C2C2E", card: "#1C1C1E", buttonBg: "#FFFFFF", buttonFg: "#000000" },
+  { key: "white",    label: "White",    bg: "#FFFFFF", fg: "#000000", muted: "#6E6E73", line: "#E5E5EA", card: "#F2F2F7", buttonBg: "#000000", buttonFg: "#FFFFFF" },
+  { key: "silver",   label: "Silver",   bg: "#D1D1D6", fg: "#000000", muted: "#3A3A3C", line: "#C7C7CC", card: "#F2F2F7", buttonBg: "#000000", buttonFg: "#FFFFFF" },
+  { key: "graphite", label: "Graphite", bg: "#1C1C1E", fg: "#FFFFFF", muted: "#AEAEB2", line: "#3A3A3C", card: "#2C2C2E", buttonBg: "#C0C0C0", buttonFg: "#000000" },
+  { key: "onyx",     label: "Onyx",     bg: "#000000", fg: "#FFFFFF", muted: "#8E8E93", line: "#2C2C2E", card: "#1C1C1E", buttonBg: "#C0C0C0", buttonFg: "#000000" },
 ] as const;
+
+/** Themes from the first store website editor, shown as their nearest preset. */
+const LEGACY_THEMES: Record<string, string> = { mono: "white", dark: "black", bone: "white", navy: "black", oxblood: "black" };
 
 export const DEFAULT_STORE_SITE_THEME = "black";
 
+/**
+ * Button shape and font from the first editor. Still accepted and stored so
+ * older app builds keep saving, but the store page no longer uses them.
+ */
 export const BUTTON_STYLES = ["rounded", "square"] as const;
 export type ButtonStyle = (typeof BUTTON_STYLES)[number];
 
@@ -46,18 +53,17 @@ export const STORE_SITE_FONTS = {
 } as const;
 export type StoreSiteFont = keyof typeof STORE_SITE_FONTS;
 
-/** Most link buttons a store website shows (Dev: "up to 5 buttons"). */
+/** Most link buttons the older link-in-bio editor keeps (the store page no longer shows them). */
 export const MAX_STORE_SITE_LINKS = 5;
-/** Most products the grid shows; featured ones come first. */
+/** Most product blocks a store shows. */
 export const MAX_STORE_SITE_PRODUCTS = 24;
 
 /**
- * Theme key for a stored value. Pages saved before the store website used
- * "mono" (light) and "dark"; they keep their look as White and Black.
+ * Theme key for a stored value. Older pages used "mono" (light), "dark" and
+ * a few coloured themes; they show as the nearest preset.
  */
 export function resolveStoreSiteThemeKey(raw: unknown): string {
-  if (raw === "mono") return "white";
-  if (raw === "dark") return "black";
+  if (typeof raw === "string" && LEGACY_THEMES[raw]) return LEGACY_THEMES[raw];
   return typeof raw === "string" && STORE_SITE_THEMES.some((t) => t.key === raw) ? raw : DEFAULT_STORE_SITE_THEME;
 }
 

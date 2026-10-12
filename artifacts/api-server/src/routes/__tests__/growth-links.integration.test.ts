@@ -294,7 +294,7 @@ describe("link in bio", () => {
     expect((await api("DELETE", `/bio/links/${a.body.id}`, undefined, sellerB)).status).toBe(404);
   });
 
-  it("renders a server-side page with OG tags, escaped content and only enabled links", async () => {
+  it("renders the store page with OG tags and product blocks", async () => {
     // The bio page now lives at the store website address.
     const old = await get(`/bio/${slug}?utm_source=ig`);
     expect(old.status).toBe(301);
@@ -308,13 +308,14 @@ describe("link in bio", () => {
     expect(html).toMatch(/property="og:image" content="[^"]*\/@growtha[0-9a-f]+\/og\.png\?v=[0-9a-f]+"/);
     expect(html).toContain('src="https://cdn.test/a.jpg"');
     expect(html).toContain("Tee A");
-    expect(html).toContain("$45.00");
-    expect(html).toContain("Lookbook");
-    expect(html).toContain("Press &lt;b&gt;kit&lt;/b&gt;");
+    expect(html).toContain("$45");
+    // The store (Stan Store layout) shows product blocks only; older link
+    // buttons keep redirecting through /go but aren't on the page.
+    expect(html).not.toContain("Lookbook");
     expect(html).not.toContain("Hidden");
     expect(html).not.toContain("Tee B");
     expect(html.match(/<script/gi)).toHaveLength(1); // only the share button script, allowed by hash in the CSP
-    expect(html).not.toContain("lookbook.test"); // destination URLs only appear behind the tracked redirect
+    expect(html).not.toContain("lookbook.test");
     expect((await get("/bio/nope-nope")).status).toBe(404);
   });
 
