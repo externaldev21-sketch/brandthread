@@ -14,6 +14,7 @@ import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
 import { startDisputeEvidenceReminderJob } from "./jobs/disputeEvidenceReminder";
 import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
 import { startMoneySweepJob } from "./jobs/moneySweep";
+import { missingAppLinkEnv } from "./routes/wellKnown";
 import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
@@ -71,6 +72,11 @@ const server = app.listen(port, (err) => {
   ensureWebhookEvents().catch((err) =>
     logger.error({ err }, "ensureWebhookEvents startup call failed"),
   );
+
+  const missingAppLinks = missingAppLinkEnv();
+  if (missingAppLinks.length && process.env.NODE_ENV === "production") {
+    logger.warn({ missing: missingAppLinks }, "Universal links are off: /.well-known files are empty until these env vars are set");
+  }
 
   // Background jobs
   startAbandonedCartJob();

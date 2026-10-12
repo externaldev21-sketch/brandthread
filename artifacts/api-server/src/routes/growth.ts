@@ -13,7 +13,13 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
 import { generateUniqueLinkCode } from "../lib/growth/linkCodes";
 import { UTM_PRESETS, validateLinkInput } from "../lib/growth/utm";
-import { bioPageUrl, resolveStoreHome, shortLinkUrl } from "../lib/growth/destinations";
+import { bioPageUrl, resolveBioUrl, resolveStoreHome, shortLinkUrl, storeSiteUrl } from "../lib/growth/destinations";
+import {
+  DEFAULT_STORE_SITE_THEME, STORE_SITE_FONTS, STORE_SITE_THEMES, buttonStyleOf, fontOf, normalizeButtonStyle, normalizeStoreSiteFont,
+  normalizeStoreSiteTheme, resolveStoreSiteThemeKey,
+} from "../lib/growth/storeSiteDesign";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { siteProductTiles } from "./storeSite";
 import {
   BIO_SLUG_RE, MAX_BIO_LINKS, MAX_FEATURED, cleanText, normalizeAccent, normalizeBioLinkUrl, normalizeSocials, slugifyBio,
 } from "../lib/growth/bioValidation";
@@ -21,6 +27,22 @@ import { validateMetaPixelId, validateTikTokPixelId } from "../lib/growth/pixels
 
 const router = Router();
 router.use(requireAuth);
+const objectStorage = new ObjectStorageService();
+
+/** The older link-in-bio screen only knows light ("mono") and dark. */
+function legacyThemeOf(raw: unknown): "mono" | "dark" {
+  const t = STORE_SITE_THEMES.find((x) => x.key === resolveStoreSiteThemeKey(raw));
+  if (raw === "mono" || raw === "dark") return raw;
+  return t && parseInt(t.bg.slice(1), 16) < 0x808080 ? "dark" : "mono";
+}
+
+/** Seller identity images are private /objects/ paths; the editor gets short-lived signed URLs. */
+async function signedImage(ref: string | null | undefined): Promise<string | null> {
+  if (!ref) return null;
+  if (/^https:\/\//i.test(ref)) return ref;
+  if (ref.startsWith("/objects/")) return objectStorage.getObjectEntityDownloadURL(ref).catch(() => null);
+  return null;
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const sellerOf = (req: any): string => req.clerkUserId as string;
@@ -72,16 +94,17 @@ router.get("/utm-presets", (_req, res) => { res.json(UTM_PRESETS); });
 router.get("/destinations", async (req, res) => {
   try {
     const sellerId = sellerOf(req);
-    const [storeHome, bio, prods] = await Promise.all([
+    const [storeHome, bio, bioUrl, prods] = await Promise.all([
       resolveStoreHome(sellerId),
       db.select({ slug: bioPages.slug, published: bioPages.published }).from(bioPages).where(eq(bioPages.sellerId, sellerId)).limit(1),
+      resolveBioUrl(sellerId),
       db.select({ id: products.id, name: products.name, images: products.images }).from(products)
         .where(and(eq(products.ownerId, sellerId), eq(products.status, "active"), isNull(products.deletedAt)))
         .orderBy(desc(products.createdAt)).limit(100),
     ]);
     res.json({
       store: { available: !!storeHome },
-      bio: { available: !!bio[0]?.published, url: bio[0] ? bioPageUrl(bio[0].slug) : null },
+      bio: { available: !!bio[0]?.published, url: bioUrl ?? (bio[0] ? bioPageUrl(bio[0].slug) : null) },
       products: prods.map((p) => ({ id: p.id, name: p.name, image: Array.isArray(p.images) ? (p.images as string[])[0] ?? null : null })),
     });
   } catch (err) {
@@ -230,10 +253,15 @@ async function profileDefaults(sellerId: string) {
   const [u] = await db.select({
     username: users.username, displayName: users.displayName, name: users.name, brandName: users.brandName,
     bio: users.bio, profileImageUrl: users.profileImageUrl, avatarUrl: users.avatarUrl,
+    logoUrl: users.logoUrl, bannerUrl: users.bannerUrl, accountType: users.accountType,
   }).from(users).where(eq(users.clerkId, sellerId)).limit(1);
   const https = (s?: string | null) => (s && /^https:\/\//i.test(s) ? s : null);
   return {
     username: u?.username ?? null,
+    isSeller: u?.accountType === "seller" || u?.accountType === "both",
+    logoRef: u?.logoUrl ?? null,
+    bannerRef: u?.bannerUrl ?? null,
+    profileImageRef: u?.profileImageUrl ?? u?.avatarUrl ?? null,
     displayName: u?.brandName || u?.displayName || u?.name || "",
     bio: u?.bio ?? "",
     avatarUrl: https(u?.profileImageUrl) ?? https(u?.avatarUrl),
@@ -266,10 +294,27 @@ async function serializeBio(sellerId: string) {
   const counts = await bioClickCounts(sellerId, 30);
   const [sf] = await db.select({ theme: storefronts.theme }).from(storefronts).where(eq(storefronts.ownerId, sellerId)).limit(1);
   const storePrimary = normalizeAccent((sf?.theme as Record<string, unknown> | undefined)?.primaryColor);
+  const siteUrl = defaults.username && defaults.isSeller ? storeSiteUrl(defaults.username) : null;
+  const [logoUrl, bannerUrl] = await Promise.all([
+    signedImage(defaults.logoRef ?? page?.avatarUrl ?? defaults.profileImageRef),
+    signedImage(defaults.bannerRef),
+  ]);
   return {
     exists: !!page,
     slug: page?.slug ?? null,
-    url: page ? bioPageUrl(page.slug) : null,
+    url: siteUrl ?? (page ? bioPageUrl(page.slug) : null),
+    // Store website (brandthread.app/@username) — the Design editor's fields.
+    siteUrl,
+    username: defaults.username,
+    logoUrl,
+    bannerUrl,
+    showBanner: page?.showBanner ?? true,
+    siteTheme: resolveStoreSiteThemeKey(page?.theme),
+    buttonStyle: buttonStyleOf(page?.buttonStyle),
+    font: fontOf(page?.font),
+    themes: STORE_SITE_THEMES,
+    products: await siteProductTiles(sellerId, page?.featuredProductIds ?? []),
+    fonts: Object.entries(STORE_SITE_FONTS).map(([key, f]) => ({ key, label: f.label })),
     published: page?.published ?? true,
     displayName: page?.displayName ?? defaults.displayName,
     bio: page?.bio ?? defaults.bio,
@@ -278,7 +323,7 @@ async function serializeBio(sellerId: string) {
     shopButtonLabel: page?.shopButtonLabel ?? "Shop my store",
     featuredProductIds: page?.featuredProductIds ?? [],
     socials: page?.socials ?? {},
-    theme: page?.theme === "dark" ? "dark" : "mono",
+    theme: legacyThemeOf(page?.theme),
     accentColor: page?.accentColor ?? null,
     storeAccentColor: storePrimary,
     links: links.map((l) => ({ id: l.id, title: l.title, url: l.url, enabled: l.enabled, position: l.position, clicks30: counts.get(l.id) ?? 0 })),
@@ -312,7 +357,21 @@ router.put("/bio", requirePermission("marketing"), async (req, res) => {
       const ownedSet = new Set(owned.map((o) => o.id));
       featured = uniq.filter((id) => ownedSet.has(id));
     }
-    const theme = b.theme === "dark" ? "dark" : b.theme === "mono" ? "mono" : undefined;
+    // `siteTheme` is the store website's theme (Design editor). The older
+    // link-in-bio screen still sends `theme: "mono" | "dark"` on every save;
+    // that must not undo a site theme of the same lightness.
+    let theme: string | undefined;
+    if ("siteTheme" in b) {
+      const t = normalizeStoreSiteTheme(b.siteTheme);
+      if (!t) { res.status(400).json({ error: "Pick one of the offered themes" }); return; }
+      theme = t;
+    } else if (b.theme === "mono" || b.theme === "dark") {
+      theme = existing && legacyThemeOf(existing.theme) === b.theme ? existing.theme : b.theme;
+    }
+    const buttonStyle = "buttonStyle" in b ? normalizeButtonStyle(b.buttonStyle) : undefined;
+    if (buttonStyle === null) { res.status(400).json({ error: "buttonStyle must be rounded or square" }); return; }
+    const font = "font" in b ? normalizeStoreSiteFont(b.font) : undefined;
+    if (font === null) { res.status(400).json({ error: "Pick one of the offered fonts" }); return; }
     const accent = "accentColor" in b ? (b.accentColor === null ? null : normalizeAccent(b.accentColor)) : undefined;
     if ("accentColor" in b && b.accentColor !== null && accent === null) { res.status(400).json({ error: "accentColor must be a #rrggbb color" }); return; }
 
@@ -324,8 +383,11 @@ router.put("/bio", requirePermission("marketing"), async (req, res) => {
       shopButtonLabel: "shopButtonLabel" in b ? cleanText(b.shopButtonLabel, 30) || "Shop my store" : existing?.shopButtonLabel ?? "Shop my store",
       featuredProductIds: featured ?? existing?.featuredProductIds ?? [],
       socials: "socials" in b ? normalizeSocials(b.socials) : existing?.socials ?? {},
-      theme: theme ?? existing?.theme ?? "mono",
+      theme: theme ?? existing?.theme ?? DEFAULT_STORE_SITE_THEME,
       accentColor: accent !== undefined ? accent : existing?.accentColor ?? null,
+      showBanner: typeof b.showBanner === "boolean" ? b.showBanner : existing?.showBanner ?? true,
+      buttonStyle: buttonStyle ?? existing?.buttonStyle ?? "rounded",
+      font: font ?? existing?.font ?? "system",
       published: typeof b.published === "boolean" ? b.published : existing?.published ?? true,
       updatedAt: new Date(),
     };

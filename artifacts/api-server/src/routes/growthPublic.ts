@@ -14,7 +14,7 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { renderBioPage, esc, type BioPageModel } from "../lib/growth/bioPage";
 import { BIO_SLUG_RE } from "../lib/growth/bioValidation";
 import { countableClick } from "../lib/growth/clicks";
-import { resolveProductUrl, resolveStoreHome, resolveTrackedLinkTarget, bioPageUrl } from "../lib/growth/destinations";
+import { resolveProductUrl, resolveStoreHome, resolveStoreSiteUrl, resolveTrackedLinkTarget, bioPageUrl } from "../lib/growth/destinations";
 import { normalizeLinkCode } from "../lib/growth/linkCodes";
 import { buildDestinationUrl } from "../lib/growth/utm";
 
@@ -61,7 +61,7 @@ async function loadPublishedBio(slug: unknown) {
   return page && page.published ? page : null;
 }
 
-async function logBioEvent(req: Request, sellerId: string, kind: string, scope: string, extra: { bioLinkId?: string; ref?: string } = {}, max = 3) {
+export async function logBioEvent(req: Request, sellerId: string, kind: string, scope: string, extra: { bioLinkId?: string; ref?: string } = {}, max = 3) {
   const ctx = await countableClick(req, `bio:${sellerId}:${scope}`, { max });
   if (!ctx) return;
   await db.insert(bioEvents).values({
@@ -75,6 +75,14 @@ export async function bioPageHandler(req: Request, res: Response): Promise<void>
   try {
     const page = await loadPublishedBio(req.params.slug);
     if (!page) return notFound(res, "This page");
+    // One store link: the bio page now lives at brandthread.app/@username.
+    const site = await resolveStoreSiteUrl(page.sellerId);
+    if (site) {
+      const q = req.originalUrl.indexOf("?");
+      res.set("Cache-Control", "no-store");
+      res.redirect(301, q >= 0 ? `${site}${req.originalUrl.slice(q)}` : site);
+      return;
+    }
     const slug = page.slug;
     const links = await db.select().from(bioLinks)
       .where(and(eq(bioLinks.sellerId, page.sellerId), eq(bioLinks.enabled, true)))

@@ -64,6 +64,11 @@ export const bioPages = pgTable('bio_pages', {
   socials:            jsonb('socials').$type<Record<string, string>>().notNull().default({}),
   theme:              text('theme').notNull().default('mono'),
   accentColor:        text('accent_color'),
+  // Store website (brandthread.app/@handle) design — migration 275. The
+  // banner image is the seller's store banner (users.banner_url).
+  showBanner:         boolean('show_banner').notNull().default(true),
+  buttonStyle:        text('button_style').notNull().default('rounded'),
+  font:               text('font').notNull().default('system'),
   published:          boolean('published').notNull().default(true),
   createdAt:          timestamp('created_at').defaultNow().notNull(),
   updatedAt:          timestamp('updated_at').defaultNow().notNull(),
@@ -95,6 +100,31 @@ export const bioEvents = pgTable('bio_events', {
 }, (t) => ({
   sellerIdx: index('bio_events_seller_idx').on(t.sellerId, t.createdAt),
   linkIdx:   index('bio_events_link_idx').on(t.bioLinkId),
+}));
+
+/** Store website product cards (migration 276), Stan Store style. */
+export const storeBlocks = pgTable('store_blocks', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  sellerId:           text('seller_id').notNull(),
+  productId:          uuid('product_id').notNull(),
+  kind:               text('kind').notNull(), // 'premade' | 'preorder'
+  position:           integer('position').notNull().default(0),
+  visible:            boolean('visible').notNull().default(true),
+  status:             text('status').notNull().default('draft'), // 'draft' | 'published' | 'removed' (kept so a store isn't re-seeded)
+  style:              text('style').notNull().default('callout'), // 'callout' | 'button'
+  thumbImage:         text('thumb_image'),
+  title:              text('title').notNull().default(''),
+  subtitle:           text('subtitle').notNull().default(''),
+  buttonText:         text('button_text').notNull().default(''),
+  checkoutImage:      text('checkout_image'),
+  description:        text('description').notNull().default(''),
+  shipBy:             timestamp('ship_by'),
+  preorderCap:        integer('preorder_cap'),
+  createdAt:          timestamp('created_at').defaultNow().notNull(),
+  updatedAt:          timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  sellerIdx: index('store_blocks_seller_idx').on(t.sellerId, t.position),
+  sellerProductUidx: uniqueIndex('store_blocks_seller_product_uidx').on(t.sellerId, t.productId),
 }));
 
 export const storePixels = pgTable('store_pixels', {
