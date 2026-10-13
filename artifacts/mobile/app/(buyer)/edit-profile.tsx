@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Modal, Alert, ActivityIndicator, Animated,
+  Platform, TextInput, Alert, ActivityIndicator, Animated,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
+import { OptionSheet } from '@/components/ui/OptionSheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Icon } from '@/components/ui/Icon';
@@ -71,34 +72,25 @@ function Divider({ theme }: { theme: AppThemePreset }) {
 }
 
 function GenderPicker({
-  visible, current, onSelect, onClose, theme,
+  visible, current, onSelect, onClose,
 }: {
   visible: boolean;
   current: string;
   onSelect: (v: string) => void;
   onClose: () => void;
-  theme: AppThemePreset;
 }) {
-  const insets = useSafeAreaInsets();
+  // Instagram's edit-profile Gender picker: a radio list in a bottom sheet;
+  // picking a row saves it and closes the sheet.
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <TouchableOpacity style={styles.pickerBackdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={[styles.pickerSheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + 16 }]}>
-          <View style={[styles.pickerHandle, { backgroundColor: theme.border }]} />
-          <Text style={[styles.pickerTitle, { color: theme.muted }]}>Gender</Text>
-          {GENDER_OPTIONS.map(option => (
-            <TouchableOpacity
-              key={option}
-              style={[styles.pickerRow, current === option && { backgroundColor: theme.accentDim }]}
-              onPress={() => { onSelect(option); onClose(); }}
-            >
-              <Text style={[styles.pickerRowText, { color: theme.text }, current === option && { color: theme.accent }]}>{option}</Text>
-              {current === option && <Icon name="check" size={16} color={theme.accent} />}
-            </TouchableOpacity>
-          ))}
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
+    <OptionSheet
+      visible={visible}
+      onClose={onClose}
+      title="Gender"
+      options={GENDER_OPTIONS.map(option => ({ id: option, label: option }))}
+      selectedId={current}
+      onSelect={id => { onSelect(id); onClose(); }}
+      testID="gender-picker"
+    />
   );
 }
 
@@ -746,7 +738,6 @@ export default function BuyerEditProfileScreen() {
           current={extra.gender}
           onSelect={v => setExtra(prev => ({ ...prev, gender: v }))}
           onClose={() => setGenderPickerOpen(false)}
-          theme={theme}
         />
         {bannerFlow.sheet}
         {avatarSheet}

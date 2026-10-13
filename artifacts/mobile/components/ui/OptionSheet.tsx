@@ -65,7 +65,7 @@ export function OptionSheet({ visible, onClose, title, description, options, sel
               icon={opt.icon}
               title={opt.label}
               subtitle={opt.description}
-              right={<Radio selected={opt.id === selectedId} color={palette.foreground} />}
+              right={<OptionRadio selected={opt.id === selectedId} color={palette.foreground} />}
               selected={opt.id === selectedId}
               onPress={() => { haptics.selection(); onSelect(opt.id); }}
               testID={`${testID ?? 'option-sheet'}-${opt.id}`}
@@ -79,7 +79,7 @@ export function OptionSheet({ visible, onClose, title, description, options, sel
 }
 
 /** Instagram-style radio: an outlined ring, filled with a dot when chosen. */
-function Radio({ selected, color }: { selected: boolean; color: string }) {
+export function OptionRadio({ selected, color }: { selected: boolean; color: string }) {
   return (
     <View
       style={[styles.radio, { borderColor: color }]}

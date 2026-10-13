@@ -6,10 +6,8 @@
  * visually identical (same premium "grouped iOS list" feel, same tokens,
  * same haptics) while their content differs.
  */
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
-  Animated,
-  Modal,
   StyleProp,
   StyleSheet,
   Text,
@@ -22,6 +20,7 @@ import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { haptics } from '@/lib/haptics';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { PressableScale, SheetHandle, HapticSwitch } from '@/components/BrandthreadUI';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { radius } from '@/constants/radii';
@@ -263,47 +262,24 @@ export function ConfirmSheet({
 }) {
   const colors = useColors();
   const s = React.useMemo(() => makeCardStyles(colors), [colors]);
-  const translateY = useRef(new Animated.Value(40)).current;
-  const fade = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 18, bounciness: 4 }),
-        Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true }),
-      ]).start();
-    } else {
-      translateY.setValue(40);
-      fade.setValue(0);
-    }
-  }, [visible, translateY, fade]);
-
+  // Shared sheet chrome: title row + message, the confirm and cancel actions
+  // pinned above the home indicator. Dismissal is blocked while confirming.
+  const close = () => { if (!loading) onCancel(); };
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={s.sheetBackdrop}>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cancel" style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onCancel} />
-        <Animated.View style={[s.sheetCard, { opacity: fade, transform: [{ translateY }] }]}>
-          <SheetHandle />
-          <Text style={s.sheetTitle}>{title}</Text>
-          <Text style={s.sheetMessage}>{message}</Text>
-          <PressableScale
-            style={[s.sheetConfirmBtn, { backgroundColor: destructive ? colors.destructive : colors.primary }]}
-            onPress={() => {
-              if (destructive) haptics.warning();
-              onConfirm();
-            }}
-            disabled={loading}
-          >
-            <Text style={[s.sheetConfirmText, { color: destructive ? '#FFFFFF' : colors.primaryForeground }]}>
-              {loading ? 'Please wait…' : confirmLabel}
-            </Text>
-          </PressableScale>
-          <TouchableOpacity style={s.sheetCancelBtn} onPress={onCancel} disabled={loading}>
-            <Text style={s.sheetCancelText}>{cancelLabel}</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-    </Modal>
+    <Sheet
+      visible={visible}
+      onClose={close}
+      title={title}
+      primaryAction={{
+        label: confirmLabel,
+        onPress: onConfirm,
+        loading,
+        variant: destructive ? 'destructive' : 'primary',
+      }}
+      secondaryAction={{ label: cancelLabel, onPress: close, disabled: loading }}
+    >
+      <Text style={s.sheetMessage}>{message}</Text>
+    </Sheet>
   );
 }
 

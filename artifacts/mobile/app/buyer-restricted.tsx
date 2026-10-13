@@ -6,7 +6,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
-  TextInput, Modal, Pressable,
+  TextInput,
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,12 +16,11 @@ import { useColors } from '@/hooks/useColors';
 import { getRestrictedUsers, unrestrictUser } from '@/services/socialService';
 import type { RestrictRecord } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { Button, ListRow } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
@@ -32,7 +31,6 @@ export default function RestrictedAccountsScreen() {
   const insets = useSafeAreaInsets();
   const [restricted, setRestricted] = useState<RestrictRecord[]>([]);
   const [query, setQuery] = useState('');
-  const [confirmUser, setConfirmUser] = useState<RestrictRecord | null>(null);
 
   const loadRestricted = useCallback(() => getRestrictedUsers().then(setRestricted), []);
   const pull = usePullToRefresh(loadRestricted);
@@ -44,7 +42,18 @@ export default function RestrictedAccountsScreen() {
   const handleUnrestrict = async (user: RestrictRecord) => {
     await unrestrictUser(user.restrictedUserId);
     setRestricted(r => r.filter(u => u.restrictedUserId !== user.restrictedUserId));
-    setConfirmUser(null);
+  };
+
+  // iOS action sheet confirm (same title, message and buttons as before).
+  const confirmUnrestrict = (user: RestrictRecord) => {
+    showActionSheet(
+      `Unrestrict ${user.restrictedUserName}?`,
+      "Their future comments on your posts will be visible to everyone. They won't be notified.",
+      [
+        { text: 'Unrestrict', style: 'destructive', onPress: () => { void handleUnrestrict(user); } },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   };
 
   const filtered = restricted.filter(u =>
@@ -95,7 +104,7 @@ export default function RestrictedAccountsScreen() {
             right={(
               <Button
                 label="Unrestrict"
-                onPress={() => { setConfirmUser(item); }}
+                onPress={() => { confirmUnrestrict(item); }}
                 variant="secondary"
                 size="small"
                 accessibilityHint={`Unrestricts ${item.restrictedUserName}`}
@@ -104,55 +113,7 @@ export default function RestrictedAccountsScreen() {
           />
         )}
       />
-
-      {/* Confirmation modal */}
-      <Modal
-        visible={!!confirmUser}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setConfirmUser(null)}
-      >
-        <ModalSafeArea>
-          <UnrestrictConfirmSheet
-            confirmUser={confirmUser}
-            styles={styles}
-            onCancel={() => setConfirmUser(null)}
-            onConfirm={() => confirmUser && handleUnrestrict(confirmUser)}
-          />
-        </ModalSafeArea>
-      </Modal>
     </View>
-  );
-}
-
-/** Rendered inside the Modal's own `ModalSafeArea` so `useSafeAreaInsets()`
- * reads that native root's own insets, not the page's (stale/zeroed) ones. */
-function UnrestrictConfirmSheet({ confirmUser, styles, onCancel, onConfirm }: {
-  confirmUser: RestrictRecord | null;
-  styles: ReturnType<typeof makeStyles>;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const insets = useSafeAreaInsets();
-  return (
-    <Pressable style={styles.backdrop} onPress={onCancel}>
-      <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + SPACING.md }]}>
-        <View style={styles.sheetHandle} />
-        <Text style={styles.sheetTitle}>Unrestrict {confirmUser?.restrictedUserName}?</Text>
-        <Text style={styles.sheetDesc}>
-          Their future comments on your posts will be visible to everyone. They won't be notified.
-        </Text>
-        <View style={styles.sheetActions}>
-          <Button label="Cancel" onPress={onCancel} variant="secondary" style={{ flex: 1 }} />
-          <Button
-            label="Unrestrict"
-            onPress={onConfirm}
-            variant="destructive"
-            style={{ flex: 1 }}
-          />
-        </View>
-      </Pressable>
-    </Pressable>
   );
 }
 
@@ -168,10 +129,4 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
     paddingHorizontal: 12, paddingVertical: 10,
   },
   searchInput: { flex: 1, color: theme.text, ...TYPE_SCALE.body },
-  backdrop: { flex: 1, backgroundColor: `${theme.background}CC`, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: theme.card, borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet, padding: SPACING.xl },
-  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SPACING.md },
-  sheetTitle: { ...TYPE_SCALE.title2, color: theme.text, marginBottom: SPACING.xs },
-  sheetDesc: { ...TYPE_SCALE.callout, color: theme.muted, lineHeight: 20, marginBottom: SPACING.lg },
-  sheetActions: { flexDirection: 'row', gap: SPACING.sm },
 });
