@@ -19,6 +19,7 @@ export type BuyerStepId =
   | 'AUTH'
   | 'NAME'
   | 'STYLE'
+  | 'TASTE'
   | 'SIZES'
   | 'BRANDS'
   | 'LOADING'
@@ -44,9 +45,9 @@ export interface StepDef<Id extends string> {
   skippable: boolean;
 }
 
-// ─── Step order (v8) ──────────────────────────────────────────────────────
+// ─── Step order (v9) ──────────────────────────────────────────────────────
 // BOTH:   0=Welcome  1=AccountType  2=Auth  3=Name
-// BUYER:  4=Style  5=Sizes  6=Brands  7=Loading  8=Notifications  9=Success
+// BUYER:  4=Style  5=Taste (swipe quiz)  6=Sizes  7=Brands  8=Loading  9=Notifications  10=Success
 // SELLER: 4=BrandName  5=BrandStage  6=Goals  7=Plan  8=Loading  9=Notifications  10=Success
 export const BUYER_FLOW_STEPS: StepDef<BuyerStepId>[] = [
   { id: 'WELCOME', skippable: false },
@@ -54,6 +55,7 @@ export const BUYER_FLOW_STEPS: StepDef<BuyerStepId>[] = [
   { id: 'AUTH', skippable: false },
   { id: 'NAME', skippable: false },
   { id: 'STYLE', skippable: true },
+  { id: 'TASTE', skippable: true },
   { id: 'SIZES', skippable: true },
   { id: 'BRANDS', skippable: true },
   { id: 'LOADING', skippable: false },
@@ -121,7 +123,7 @@ export function canGoBack(stepIndex: number): boolean {
  * in-flight user resuming mid-onboarding lands back on an equivalent step
  * instead of restarting from scratch.
  */
-export const DRAFT_VERSION = 8;
+export const DRAFT_VERSION = 9;
 
 // v7 order (Welcome + Brands, no Sizes step): the *source* indices for the
 // v7 -> v8 migration. Frozen — never reference the live index maps here.
@@ -273,14 +275,24 @@ function v7ToV8(flow: Flow, v7Step: number): number {
   return v7Step >= V7_BUYER_STEP_INDEX.BRANDS ? v7Step + 1 : v7Step;
 }
 
+// v8 order (no Taste quiz): the *source* indices for the v8 -> v9 migration.
+const V8_BUYER_SIZES_INDEX = 5;
+
+/** v8 -> v9: the buyer flow gained the Taste quiz after Style; every buyer step from Sizes on shifts by one. */
+function v8ToV9(flow: Flow, v8Step: number): number {
+  if (flow === 'seller') return v8Step;
+  return v8Step >= V8_BUYER_SIZES_INDEX ? v8Step + 1 : v8Step;
+}
+
 /**
- * Translate a persisted (flow, step, version) draft into the current (v8)
+ * Translate a persisted (flow, step, version) draft into the current (v9)
  * step index for that flow. Unknown/undefined versions are treated as the
  * oldest legacy shape, matching the historical behaviour of this function.
  */
 export function restoreDraftStep(flow: Flow, step: number, version?: number): number {
   if (version === DRAFT_VERSION) return clampStep(flow, step);
-  if (version === 7) return clampStep(flow, v7ToV8(flow, step));
+  if (version === 8) return clampStep(flow, v8ToV9(flow, step));
+  if (version === 7) return clampStep(flow, v8ToV9(flow, v7ToV8(flow, step)));
   const v6Step = restoreLegacyStepToV6(flow, step, version);
-  return clampStep(flow, v7ToV8(flow, v6ToV7(flow, v6Step)));
+  return clampStep(flow, v8ToV9(flow, v7ToV8(flow, v6ToV7(flow, v6Step))));
 }
