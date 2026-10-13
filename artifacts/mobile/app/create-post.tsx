@@ -33,6 +33,7 @@ import { PostPicker } from '@/components/create-post/PostPicker';
 import { CarouselEditor } from '@/components/create-post/CarouselEditor';
 import { VideoEditor } from '@/components/create-post/VideoEditor';
 import { PostScreen, type PublishState } from '@/components/create-post/PostScreen';
+import { decodeFitTags } from '@/lib/closet';
 
 type Step = 'capture' | 'gallery' | 'edit' | 'post';
 
@@ -68,7 +69,7 @@ export default function CreatePostScreen() {
   const router = useRouter();
   const api = useApi();
   const { role, isLoaded: roleLoaded } = useRole();
-  const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; capture?: string }>();
+  const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; capture?: string; fitTags?: string }>();
   const isSeller = role === 'seller' && params.accountType !== 'buyer';
   const roleKey = isSeller ? 'seller' : 'buyer';
   const modes = CREATE_MODES_BY_ROLE[roleKey];
@@ -97,7 +98,8 @@ export default function CreatePostScreen() {
   const [step, setStep] = useState<Step>(editId ? 'post' : noCameraStep ? 'gallery' : 'capture');
   const [media, setMedia] = useState<MediaDraft | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
-  const [details, setDetails] = useState<PostDetails>(DEFAULT_DETAILS);
+  // A Fit posted from the Closet (or the unboxing card) arrives with its pieces tagged.
+  const [details, setDetails] = useState<PostDetails>(() => ({ ...DEFAULT_DETAILS, productTags: decodeFitTags(params.fitTags) }));
   const [publishState, setPublishState] = useState<PublishState>({ phase: 'idle' });
   const [editing, setEditing] = useState<SellerThreadPost | null>(null);
   const [pickedForGallery, setPickedForGallery] = useState<PickedAsset[]>([]);

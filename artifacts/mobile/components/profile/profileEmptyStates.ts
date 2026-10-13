@@ -8,7 +8,7 @@ import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 
 export type ProfileEmptyTab =
   | 'buyer:posts' | 'buyer:draft' | 'buyer:tagged' | 'buyer:reposts' | 'buyer:saved'
-  | 'buyer:liked' | 'buyer:orders'
+  | 'buyer:liked' | 'buyer:orders' | 'buyer:closet' | 'buyer:closet-outfits'
   | 'seller:post' | 'seller:draft' | 'seller:schedule' | 'seller:videos' | 'seller:tagged'
   | 'shop';
 
@@ -87,6 +87,20 @@ const TABLE: Record<ProfileEmptyTab, {
     title: 'No liked posts yet',
     message: 'Posts you like will appear here.',
     publicMessage: 'Liked posts are private.',
+  },
+  'buyer:closet': {
+    icon: 'layers',
+    title: 'Your closet is empty',
+    message: 'Pieces from your delivered orders land here.',
+    publicMessage: 'Closets are private.',
+    cta: { label: 'Start shopping', route: '/(buyer)/discover' },
+  },
+  'buyer:closet-outfits': {
+    icon: 'layers',
+    title: 'No outfits yet',
+    message: 'Put pieces from your closet together.',
+    publicMessage: 'Closets are private.',
+    cta: { label: 'New outfit', route: '/closet-outfit' },
   },
   'buyer:orders': {
     icon: 'package',

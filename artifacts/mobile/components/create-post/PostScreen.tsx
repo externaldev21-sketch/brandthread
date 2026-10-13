@@ -58,6 +58,32 @@ function OptionRow({ icon, label, value, onPress, testID }: {
   );
 }
 
+/** Buyer fit from the Closet: the pieces it arrived with, each removable (no product search for buyers). */
+function ClosetTagsRow({ tags, onChange }: { tags: PostDetails['productTags']; onChange: (tags: PostDetails['productTags']) => void }) {
+  return (
+    <View style={s.row} testID="row-closet-tags">
+      <Feather name="tag" size={22} color={CP.white} />
+      <View style={{ flex: 1, gap: 6 }}>
+        <Text style={s.rowLabel}>Tagged from your closet</Text>
+        {tags.map((tag) => (
+          <View key={tag.productId} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={[s.rowValue, { flex: 1 }]} numberOfLines={1}>{tag.productName}</Text>
+            <Pressable
+              onPress={() => { tap(); onChange(tags.filter((t) => t.productId !== tag.productId)); }}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={`Untag ${tag.productName}`}
+              testID={`closet-tag-remove-${tag.productId}`}
+            >
+              <Feather name="x" size={16} color={CP.silverDim} />
+            </Pressable>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function Scrubber({ value, max, onChange }: { value: number; max: number; onChange: (v: number) => void }) {
   const [w, setW] = useState(0);
   const base = useSharedValue(0);
@@ -482,6 +508,9 @@ export function PostScreen({
 
           <View style={{ height: 8 }} />
           {isPost ? <OptionRow icon="user" label="Tag people" value={mentionCount ? `${mentionCount} tagged` : undefined} onPress={() => setPage('people')} testID="row-people" /> : null}
+          {!isSeller && details.productTags.length > 0 ? (
+            <ClosetTagsRow tags={details.productTags} onChange={(productTags) => onDetails({ ...details, productTags })} />
+          ) : null}
           {isSeller ? (
             <OptionRow icon="tag" label="Tag products" value={details.productTags.length ? `${details.productTags.length} tagged` : undefined} onPress={() => setPage('products')} testID="row-products" />
           ) : null}
