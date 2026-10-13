@@ -1,7 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -44,7 +43,6 @@ export default function SwipeActionRow({
   const runAction = async () => {
     if (disabled || actionTriggered.current) return;
     actionTriggered.current = true;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       await onAction();
     } finally {

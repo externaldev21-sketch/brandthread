@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
@@ -63,13 +63,9 @@ export default function UsersScreen() {
     setRefreshing(false);
   }, [load]);
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
   const changeRole = () => {
     if (!detail) return;
-    haptic();
+    haptic('sheet');
     const { member } = detail;
     Alert.alert('Change role', `Choose a new role for ${member.name ?? member.email}`, [
       { text: 'Cancel', style: 'cancel' },
@@ -93,7 +89,6 @@ export default function UsersScreen() {
 
   const removeMember = () => {
     if (!detail) return;
-    haptic();
     const { member } = detail;
     Alert.alert(
       'Remove team member',
@@ -236,7 +231,7 @@ export default function UsersScreen() {
           <View style={styles.headerActions}>
             <TouchableOpacity
               onPress={() => {
-                haptic();
+                haptic('sheet');
                 Alert.alert(title, undefined, [
                   { text: 'Invite someone', onPress: () => router.push('/team' as never) },
                   { text: 'Cancel', style: 'cancel' },
@@ -265,7 +260,7 @@ export default function UsersScreen() {
             members.map((m) => (
               <TouchableOpacity
                 key={m.id}
-                onPress={() => { haptic(); router.push(`/users?id=${m.id}` as never); }}
+                onPress={() => { router.push(`/users?id=${m.id}` as never); }}
                 activeOpacity={0.7}
                 style={[styles.userRow, { borderBottomColor: colors.border }]}
               >

@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -62,12 +62,11 @@ export default function SellerDrops() {
 
   function handleRefresh() {
     setRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    haptic('refresh');
     load().finally(() => setRefreshing(false));
   }
 
   function openDrop(id: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     router.push((`/seller-drop-create?dropId=${encodeURIComponent(id)}`) as never);
   }
 

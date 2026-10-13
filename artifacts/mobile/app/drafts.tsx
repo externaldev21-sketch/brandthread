@@ -19,7 +19,6 @@ import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 
 import {
   BG, BORDER, CARD, FG, MUTED, ORANGE, RED, SUCCESS,
@@ -145,7 +144,6 @@ export default function DraftsScreen() {
 
   const discardDraft = useCallback((draft: ProductDraft) => {
     const name = draft.name?.trim() || 'Untitled product';
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       'Discard draft?',
       `"${name}" will be permanently deleted.`,

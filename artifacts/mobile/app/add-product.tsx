@@ -27,7 +27,7 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { RADII, radius } from '@/constants/radii';
 import { TYPE_SCALE } from '@/constants/typography';
-import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
@@ -110,7 +110,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
         <TouchableOpacity
           style={s.stepperBtn}
           disabled={value <= min}
-          onPress={() => { hapticToggle(); onChange(Math.max(min, value - 1)); }}
+          onPress={() => { onChange(Math.max(min, value - 1)); }}
           accessibilityLabel={`Decrease ${label}`}
         >
           <Feather name="minus" size={14} color={value <= min ? theme.subtle : theme.text} />
@@ -127,7 +127,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
         />
         <TouchableOpacity
           style={s.stepperBtn}
-          onPress={() => { hapticToggle(); onChange(value + 1); }}
+          onPress={() => { onChange(value + 1); }}
           accessibilityLabel={`Increase ${label}`}
         >
           <Feather name="plus" size={14} color={theme.text} />
@@ -313,7 +313,6 @@ export default function AddProductScreen() {
   }
 
   function toggleSection(key: string) {
-    hapticToggle();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
   }
@@ -591,7 +590,6 @@ export default function AddProductScreen() {
       sku: '', price: '', qty: '',
     }));
     updateUnsavedState(setLocalVariants, variants);
-    hapticSuccessAction();
   }
 
   // ── Publish ──
@@ -866,7 +864,6 @@ export default function AddProductScreen() {
   }
 
   function removeSizeChartPhoto() {
-    hapticToggle();
     setSizeChartUploadStatus('idle');
     patchDraft({ sizeChartImageUrl: null });
   }
@@ -881,26 +878,23 @@ export default function AddProductScreen() {
     const next = [...media];
     [next[idx], next[target]] = [next[target], next[idx]];
     const resequenced = next.map((m, i) => ({ ...m, sortOrder: i }));
-    hapticToggle();
     patchDraft({ media: resequenced });
   }
 
   function setCoverImage(id: string) {
     const media = draftData.media ?? [];
-    hapticToggle();
     patchDraft({ media: media.map(m => ({ ...m, isCover: m.id === id })) });
   }
 
   function toggleCutoutUse(id: string) {
     const media = draftData.media ?? [];
-    hapticToggle();
     patchDraft({ media: media.map(m => m.id === id ? { ...m, useCutout: !m.useCutout } : m) });
   }
 
   /** Opens the shared MediaCropper for an existing photo ("Edit crop"),
    *  always re-cropping from its uncropped original. */
   function openCropperFor(item: ProductMedia) {
-    hapticToggle();
+    haptic('sheet');
     setCropTargetId(item.id);
   }
 
@@ -927,7 +921,6 @@ export default function AddProductScreen() {
           ? { ...m, uri: croppedUri, originalUri: sourceUri, cropRect: result.rect }
           : m),
       });
-      hapticSuccessAction();
       void uploadMediaAsset({ ...item, uri: croppedUri });
     } catch {
       Alert.alert('Crop failed', 'Could not crop this photo. Please try again.');
@@ -964,7 +957,6 @@ export default function AddProductScreen() {
       const media = draftData.media ?? [];
       patchDraft({ media: media.map(m => m.id === item.id ? { ...m, cutoutUri: localFile.uri, useCutout: true } : m) });
       setBgRemovalState(prev => ({ ...prev, [item.id]: 'done' }));
-      hapticSuccessAction();
 
       // Upload the cutout in the background so it has a remote URL by publish time.
       try {
@@ -1018,7 +1010,7 @@ export default function AddProductScreen() {
    *  sheet instead of a permanent row of chips under every thumbnail. */
   function openPhotoActionsFor(m: ProductMedia) {
     const bgStatus = bgRemovalState[m.id];
-    hapticToggle();
+    haptic('longPress');
     showActionSheet(undefined, undefined, [
       ...(!m.isCover ? [{ text: 'Set as cover photo', onPress: () => setCoverImage(m.id) }] : []),
       { text: 'Edit crop', onPress: () => openCropperFor(m) },
@@ -1154,7 +1146,7 @@ export default function AddProductScreen() {
           {canAddSlot && (
             <TouchableOpacity
               style={s.photoMoreSlot}
-              onPress={() => { hapticToggle(); setPhotoSlotCount(c => Math.min(10, c + 1)); }}
+              onPress={() => { setPhotoSlotCount(c => Math.min(10, c + 1)); }}
               accessibilityLabel="Add another photo slot"
               accessibilityRole="button"
               testID="add-product-add-slot"
@@ -1168,7 +1160,7 @@ export default function AddProductScreen() {
   }
 
   function openCategoryPicker() {
-    hapticToggle();
+    haptic('sheet');
     showActionSheet('Category', undefined, [
       ...PRODUCT_CATEGORIES.map(cat => ({ text: cat, onPress: () => patchDraft({ category: cat }) })),
       { text: 'Cancel', style: 'cancel' as const },
@@ -1578,7 +1570,6 @@ export default function AddProductScreen() {
               <Text style={s.variantCount}>{localVariants.length} variant{localVariants.length !== 1 ? 's' : ''}</Text>
               <TouchableOpacity
                 onPress={() => {
-                  hapticToggle();
                   setBulkEditMode(v => !v);
                   setSelectedVariantIds(new Set());
                 }}
@@ -1634,7 +1625,6 @@ export default function AddProductScreen() {
                         return next;
                       });
                     }
-                    hapticSuccessAction();
                     setBulkPrice(''); setBulkQty('');
                   }}
                 />
@@ -1765,7 +1755,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="How will you sell this product?" style={s.sectionHdr} />
         {models.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { hapticToggle(); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { haptic('select'); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, sm === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.title}</Text>
@@ -1829,7 +1819,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="Manufacturer" style={s.sectionHdr} />
         {modes.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { hapticToggle(); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { haptic('select'); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, mfgMode === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.label}</Text>
@@ -1869,7 +1859,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="More visibility options" style={s.sectionHdr} />
         {statuses.map(st => (
-          <TouchableOpacity key={st.key} onPress={() => { hapticToggle(); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={st.key} onPress={() => { haptic('select'); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, ss.status === st.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{st.label}</Text>
@@ -2019,7 +2009,7 @@ export default function AddProductScreen() {
   const currentStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
 
   function openStatusPicker() {
-    hapticToggle();
+    haptic('sheet');
     showActionSheet('Product status', undefined, [
       {
         text: 'Active — visible and purchasable', onPress: () => {

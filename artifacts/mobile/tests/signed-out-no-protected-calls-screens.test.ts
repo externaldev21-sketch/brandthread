@@ -61,9 +61,9 @@ describe('seller screens make no protected API call when signed out / Clerk not 
     const s = read('app/subscription.tsx');
     expect(s).toContain('isSellerDevPreview() && (!authLoaded || !isSignedIn || !userId)');
     before(s, 'const fetchStatus = useCallback', 'if (isSellerPreview)', 'api.seller.subscription.status()');
-    for (const fn of ['handleChangePlan', 'handleOpenPortal', 'handleRestore']) {
-      before(s, `async function ${fn}`, 'if (isSellerPreview) return;', 'haptic()');
-    }
+    before(s, 'async function handleChangePlan', 'if (isSellerPreview) return;', 'purchase(');
+    before(s, 'async function handleOpenPortal', 'if (isSellerPreview) return;', 'Linking.openURL(');
+    before(s, 'async function handleRestore', 'if (isSellerPreview) return;', 'restore()');
   });
 
   it('StripeConnectWarning.tsx: refresh and connect require a signed-in session', () => {

@@ -23,7 +23,7 @@ import { useColors } from '@/hooks/useColors';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getInitials } from '@/lib/format';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
@@ -109,7 +109,7 @@ export default function SellerSettingsScreen() {
   async function chooseAccountScope(nextScope: 'global' | 'us') {
     if (scopeLoading || scopeSaving) return;
     if (nextScope === accountScope) { setScopeVisible(false); return; }
-    hapticLight();
+    haptic('select');
     setScopeSaving(nextScope);
     setScopeSaveError(null);
     try {
@@ -124,19 +124,19 @@ export default function SellerSettingsScreen() {
   }
 
   async function handleItem(item: SettingsCatalogItem) {
-    hapticLight();
     if (
       GROWTH_PLAN_ENFORCEMENT_ENABLED &&
       item.requiresGrowth &&
       (planLoading || !!planError || !hasPlan('growth'))
     ) {
       if (planError) retryPlan();
+      haptic('sheet');
       setUpsellFeature(item.label);
       return;
     }
-    if (item.action === 'sign-out') { setSignOutVisible(true); return; }
+    if (item.action === 'sign-out') { haptic('sheet'); setSignOutVisible(true); return; }
     if (item.action === 'delete-account') { router.push('/delete-account' as never); return; }
-    if (item.action === 'account-scope') { await openAccountScope(); return; }
+    if (item.action === 'account-scope') { haptic('sheet'); await openAccountScope(); return; }
     if (item.route) router.push(item.route as never);
   }
 
@@ -144,7 +144,6 @@ export default function SellerSettingsScreen() {
     setSigningOut(true);
     try {
       await signOut();
-      hapticSuccess();
       router.replace('/sign-in' as never);
     } finally {
       setSigningOut(false);
@@ -157,7 +156,7 @@ export default function SellerSettingsScreen() {
       <ScreenHeader
         title="Settings"
         variant="modal"
-        onBack={() => { hapticLight(); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
       />
 
       <ScrollView
@@ -238,7 +237,7 @@ function AccountRow({ name, initials, onPress }: { name: string; initials: strin
   const colors = useColors();
   const s = useMemo(() => makeListStyles(colors), [colors]);
   return (
-    <PressableScale style={s.accountRow} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel="Edit profile">
+    <PressableScale style={s.accountRow} onPress={() => { onPress(); }} accessibilityRole="button" accessibilityLabel="Edit profile">
       <View style={[s.accountAvatar, { backgroundColor: colors.primary }]}>
         <Text style={[s.accountAvatarText, { color: colors.primaryForeground }]}>{initials}</Text>
       </View>
@@ -337,7 +336,7 @@ function SettingsRow({ icon, label, testID, onPress, destructive, soon, badge, l
   if (!onPress || inert) return <View>{content}</View>;
 
   return (
-    <TouchableOpacity testID={testID} activeOpacity={0.65} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
+    <TouchableOpacity testID={testID} activeOpacity={0.65} onPress={() => { onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
       {content}
     </TouchableOpacity>
   );

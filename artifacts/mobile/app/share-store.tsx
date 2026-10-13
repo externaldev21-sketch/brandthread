@@ -12,7 +12,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useApi } from '@/lib/api';
@@ -48,14 +47,12 @@ export default function ShareStoreScreen() {
   const handleStr = `@${handle ?? storeSlug}`;
 
   async function copyLink() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await Clipboard.setStringAsync(storeUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
 
   async function shareLink() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Share.share({
         message: `Shop ${brandName} on Brandthread: ${storeUrl}`,

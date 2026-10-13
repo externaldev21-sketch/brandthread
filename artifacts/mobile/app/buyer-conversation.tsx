@@ -18,7 +18,7 @@ import { CachedImage } from '@/components/CachedImage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle, hapticFollow } from '@/lib/haptics';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
@@ -2863,9 +2863,9 @@ export default function BuyerConversationScreen() {
         onAction={async () => {
           setThreadCashNotice(null);
           if (!sellerUserId) return;
+          hapticFollow(true);
           try {
             await api.social.follow(sellerUserId);
-            hapticSuccessAction();
             setThreadCashMutual(null);
             const status = await api.social.status(sellerUserId);
             setThreadCashMutual(status.isMutual);

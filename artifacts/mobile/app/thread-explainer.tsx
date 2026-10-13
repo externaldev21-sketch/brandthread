@@ -26,7 +26,6 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { ONBOARDING_OWNER_KEY } from './_layout';
@@ -119,7 +118,6 @@ export default function ThreadExplainerScreen() {
   }, [isSignedIn, userId]);
 
   async function handleEnterThread() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (userId) {
       await AsyncStorage.setItem(explainerSeenKey(userId), 'true').catch(() => {});
     }

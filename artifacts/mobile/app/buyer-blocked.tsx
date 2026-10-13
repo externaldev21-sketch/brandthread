@@ -22,7 +22,6 @@ import { apiErrorMessage, confirmUnblock, shortRelativeTime } from '@/lib/safety
 import type { BlockedAccount } from '@/lib/safetyTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, ListRow, SegmentedControl, ThemedRefreshControl } from '@/components/ui';
-import { hapticSuccess, hapticToggle } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -72,13 +71,11 @@ export default function BlockedAndMutedScreen() {
     const done = await confirmUnblock({ userId: account.userId, name: account.name }, api.social.unblock);
     setPendingId(null);
     if (done) {
-      hapticSuccess();
       setBlocked((prev) => prev.filter((row) => row.userId !== account.userId));
     }
   }
 
   async function unmute(record: MuteRecord) {
-    hapticToggle();
     await unmuteUser(record.mutedUserId);
     setMuted((prev) => prev.filter((row) => row.id !== record.id));
   }

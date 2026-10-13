@@ -32,6 +32,22 @@ export interface PushPayload {
   explicitRequest?: boolean;
 }
 
+/** The seller's new-order chime (artifacts/mobile/assets/sounds/order_received.wav). */
+export const ORDER_SOUND_FILE = "order_received.wav";
+
+/**
+ * Seller Settings › Sounds & haptics › New order sound. When the seller turns
+ * it off, new-order pushes use the standard notification sound instead of the
+ * order chime. Every other sound is unchanged.
+ */
+export function resolvePushSound(
+  sound: string | null | undefined,
+  preferences: Record<string, boolean> | null | undefined,
+): string | null | undefined {
+  if (sound === ORDER_SOUND_FILE && preferences?.new_order_sound === false) return "default";
+  return sound;
+}
+
 export type NotificationEventType = "receipt" | "open" | "tap";
 /**
  * Send a push notification to all devices registered for a given Clerk user ID.
@@ -280,6 +296,7 @@ export async function sendPushToUser(
         : crypto.randomUUID();
     const enrichedPayload: PushPayload = {
       ...payload,
+      sound: resolvePushSound(payload.sound, recipient?.preferences),
       data: { ...(payload.data ?? {}), notificationId },
     };
     // Stable notification IDs are also the delivery idempotency key. Never

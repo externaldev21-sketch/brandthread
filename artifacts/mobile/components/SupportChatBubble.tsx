@@ -18,7 +18,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import {
   BG, CARD, BORDER, FG, MUTED,
@@ -128,7 +128,6 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const userMsg: ChatMsg = { id: uid(), role: 'user', content: text.trim(), ts: Date.now() };
     setMsgs(prev => [...prev, userMsg]);
@@ -333,7 +332,7 @@ export default function SupportChatBubble({ bottomOffset = 0, side = 'left' }: S
   }, []);
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptic('sheet');
     Animated.sequence([
       Animated.timing(scale, { toValue: 0.88, duration: 80, useNativeDriver: true }),
       Animated.spring(scale,  { toValue: 1,    useNativeDriver: true, damping: 10 }),

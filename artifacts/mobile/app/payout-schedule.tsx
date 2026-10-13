@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -106,7 +106,7 @@ export default function PayoutScheduleScreen() {
   function pick(next: ScheduleChoice) {
     if (!canEdit) return;
     if (next === 'instant' && instantBlocked) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    haptic('select');
     setChoice(next);
   }
 
@@ -120,7 +120,6 @@ export default function PayoutScheduleScreen() {
           ? { interval: 'weekly', weeklyAnchor: anchor }
           : { interval: choice === 'instant' ? 'manual' : 'daily' },
       );
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await load();
     } catch (error) {
       const message = error instanceof ApiError && error.status < 500
@@ -157,13 +156,12 @@ export default function PayoutScheduleScreen() {
                   idempotencyKey: cashoutKeyRef.current.key, amount: max, currency: 'usd', method: 'instant',
                 });
                 cashoutKeyRef.current = null;
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                 Alert.alert('Cash out requested', `${payout.formatted ?? formatCents(max)} is on its way to your card.`);
               } catch (error) {
                 if (error instanceof ApiError && error.status < 500 && error.code !== 'PAYOUT_REVIEW_REQUIRED') {
                   cashoutKeyRef.current = null;
                 }
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+                haptic('error');
                 Alert.alert(
                   'Could not cash out',
                   error instanceof ApiError && error.code === 'BALANCE_CHANGED'
@@ -247,7 +245,7 @@ export default function PayoutScheduleScreen() {
                       key={day}
                       testID={`payout-schedule-day-${day}`}
                       style={[styles.dayChip, { width: Math.floor((gridWidth - DAY_GAP * (DAY_COLUMNS - 1)) / DAY_COLUMNS) }, anchor === day && styles.dayChipOn]}
-                      onPress={() => { if (canEdit) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setAnchor(day); } }}
+                      onPress={() => { if (canEdit) { haptic('select'); setAnchor(day); } }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: anchor === day }}
                       accessibilityLabel={cap(day)}

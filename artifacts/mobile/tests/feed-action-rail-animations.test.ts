@@ -1,7 +1,8 @@
 /**
  * Structure tests: the feed's action rail buttons stay solid-filled (never
  * outlined) and get distinct micro-animations — repost spins/morphs, save
- * drops/settles — each with haptics, on top of the existing like burst.
+ * drops/settles, on top of the existing like burst. Save plays the light
+ * `save` haptic when saving; repost has none (not in lib/haptics.ts HAPTIC_MAP).
  *
  * The rail itself moved into its own component as part of the buyer feed
  * presentation-layer rebuild (see components/buyer-feed/RightActionRail.tsx);
@@ -30,17 +31,17 @@ describe('Action rail icons stay solid-filled', () => {
 });
 
 describe('Repost and save micro-animations', () => {
-  it('repost spins a full turn on toggle, with haptics', () => {
+  it('repost spins a full turn on toggle (no haptic)', () => {
     expect(feed).toContain('function spinRepost(');
     expect(rail).toContain('rotateAnim={repostSpin}');
-    expect(rail).toContain('onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onRepost(); }}');
+    expect(rail).toContain('onPress={async () => { await onRepost(); }}');
     expect(feed).toContain('onRepost={async () => { spinRepost(); await onRepost(item.id); }}');
   });
 
-  it('save lifts then drops/settles on toggle, with haptics', () => {
+  it('save lifts then drops/settles on toggle, with the save haptic', () => {
     expect(feed).toContain('function dropSave(');
     expect(rail).toContain('translateYAnim={saveDrop}');
-    expect(rail).toContain('onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onSave(); }}');
+    expect(rail).toContain("onPress={async () => { if (!engagement?.saved) haptic('save'); await onSave(); }}");
     expect(feed).toContain('onSave={async () => { dropSave(); await onSave(item.id); }}');
   });
 

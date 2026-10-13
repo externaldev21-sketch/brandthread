@@ -11,7 +11,6 @@ import { useRouter } from 'expo-router';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
-import { hapticLight } from '@/lib/haptics';
 import { LAUNCH_STEP_META, nextLaunchStep } from '@/lib/launchChecklist';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
@@ -27,7 +26,7 @@ export default function LaunchChecklistCard() {
   return (
     <View style={s.root}>
       <PressableScale
-        onPress={() => { hapticLight(); router.push('/launch-checklist' as never); }}
+        onPress={() => { router.push('/launch-checklist' as never); }}
         accessibilityLabel={`Launch your store, ${checklist.doneCount} of ${checklist.total} done`}
         style={s.body}
       >

@@ -12,7 +12,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 
@@ -71,14 +70,12 @@ export default function TeamInviteScreen() {
   }, [token]);
 
   const goToAuth = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Stash the token so the AuthGate brings the user back after sign-in + onboarding.
     await AsyncStorage.setItem(PENDING_INVITE_KEY, String(token));
     router.replace('/splash' as never);
   };
 
   const acceptInvite = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setAccepting(true);
     try {
       await api.team.accept(String(token));
@@ -91,7 +88,6 @@ export default function TeamInviteScreen() {
   };
 
   const goToDashboard = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Team members work in the seller dashboard.
     await AsyncStorage.setItem('user_role', 'seller');
     router.replace('/(tabs)/' as never);

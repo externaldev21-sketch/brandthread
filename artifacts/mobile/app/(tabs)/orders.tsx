@@ -10,7 +10,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON, ANIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
@@ -515,7 +515,7 @@ function SortModal({
           <TouchableOpacity
             key={key}
             style={[s.sortOption, current === key && s.sortOptionActive]}
-            onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
+            onPress={() => { haptic('select'); onSelect(key); onClose(); }}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel={`Sort by ${label}`}
@@ -556,7 +556,7 @@ function FilterSheet({
             <TouchableOpacity
               key={key}
               style={[s.sortOption, current === key && s.sortOptionActive]}
-              onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
+              onPress={() => { haptic('select'); onSelect(key); onClose(); }}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel={`Filter orders by ${label}`}
@@ -888,7 +888,6 @@ export default function OrdersScreen() {
   }, [loading]);
 
   const retryUpdates = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const generation = generationRef.current;
     consecutiveFailuresRef.current = 0;
     setUpdatesPaused(false);
@@ -899,6 +898,7 @@ export default function OrdersScreen() {
   }, [loadData]);
 
   const onRefresh = useCallback(() => {
+    haptic('refresh');
     setRefreshing(true);
     retryUpdates();
   }, [retryUpdates]);
@@ -944,7 +944,6 @@ export default function OrdersScreen() {
   }, [router]);
 
   const handleBulkFulfill = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(('/fulfill-batch?orderIds=' + selectedIds.join(',')) as never);
   }, [router, selectedIds]);
 
@@ -973,16 +972,15 @@ export default function OrdersScreen() {
   }, [selectedIds, queryClient, api, userId]);
 
   const handleLongPress = useCallback((orderId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setSelectedIds(prev =>
       prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
     );
   }, []);
 
   const handleBulkMarkReady = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'fulfilled')));
+      haptic('orderShipped');
       setSelectedIds([]);
       await loadData(generationRef.current);
     } catch {

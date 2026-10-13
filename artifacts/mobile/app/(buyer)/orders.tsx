@@ -10,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
 import { getBuyerOrdersWithStatus, mapApiBuyerOrder } from '@/services/orderService';
@@ -222,7 +222,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
           <TouchableOpacity
              style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
             activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+            onPress={() => { onPress(); }}
           >
             <Feather name="map-pin" size={12} color={theme.secondary} />
             <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>
@@ -365,7 +365,7 @@ export default function BuyerOrdersScreen() {
 
   const retry = useCallback(() => {
     if (refreshing) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptic('refresh');
     consecutiveFailuresRef.current = 0;
     setRefreshing(true);
     if (orders.length === 0) setLoading(true);
