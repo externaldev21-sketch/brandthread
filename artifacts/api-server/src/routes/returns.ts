@@ -430,6 +430,8 @@ router.get("/:id", async (req, res) => {
         totalCents: orders.totalCents,
         sellerName: sql<string>`(SELECT COALESCE(u.brand_name, u.display_name, u.name, 'Seller') FROM users u WHERE u.clerk_id = ${returns.sellerId} LIMIT 1)`,
         buyerName: sql<string>`(SELECT COALESCE(u.display_name, u.name, 'Buyer') FROM users u WHERE u.clerk_id = ${returns.buyerId} LIMIT 1)`,
+        // How the refund was actually paid (card / Thread Cash / store credit), once it was.
+        refundMethod: sql<string | null>`(SELECT r.method FROM order_refunds r WHERE r.idempotency_key = 'return/' || ${returns.id} AND r.state = 'succeeded' LIMIT 1)`,
       })
       .from(returns)
       .innerJoin(orders, eq(orders.id, returns.orderId))

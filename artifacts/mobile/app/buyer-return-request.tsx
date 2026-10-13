@@ -15,10 +15,12 @@
  *  - Photos are uploaded (POST /api/returns/evidence) before
  *    POST /api/returns, so the seller can actually see them. Local device
  *    URIs are no longer sent.
- *  - The resolution is a refund to the original payment. That is the only
- *    outcome the server delivers (approving a return refunds it), so the
- *    old exchange / store-credit / replacement radios, which approving
- *    silently turned into a refund anyway, are gone.
+ *  - The buyer picks how the refund is paid (items 113/114), copied from
+ *    Etsy's help request "What's your ideal refund method?" radios
+ *    (https://mobbin.com/screens/3643ba01-28c0-43f7-9226-a5c8a4206042):
+ *    original payment, Thread Cash (only while it can be spent; from GET
+ *    /api/returns/refund-options) or store credit at this seller. Approval
+ *    pays it out exactly that way (api-server lib/money/refunds.ts).
  *  - Success opens /return-detail, the same status screen the return push
  *    and Activity rows open.
  *
@@ -48,7 +50,7 @@ import { BrandthreadScreen, BrandthreadCard, EmptyState } from '@/components/Bra
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui';
 import { useApi } from '@/hooks/useApi';
-import { activeReturnFor, isReturnEligible, returnSubmitError } from '@/lib/returns';
+import { activeReturnFor, isReturnEligible, resolutionForRefundMethod, returnSubmitError, type RefundMethodKey } from '@/lib/returns';
 
 const MAX_PHOTOS = 5;
 const MAX_NOTES = 1000;
@@ -75,7 +77,7 @@ function makeSectionStyles(theme: AppThemePreset) {
   });
 }
 
-function RadioRow({ label, selected, onPress, isLast }: { label: string; selected: boolean; onPress: () => void; isLast?: boolean }) {
+function RadioRow({ label, detail, selected, onPress, isLast, testID }: { label: string; detail?: string; selected: boolean; onPress: () => void; isLast?: boolean; testID?: string }) {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeRadioStyles(theme), [theme]);
   return (
@@ -85,12 +87,20 @@ function RadioRow({ label, selected, onPress, isLast }: { label: string; selecte
       activeOpacity={0.7}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={label}
+      accessibilityLabel={detail ? `${label}. ${detail}` : label}
+      testID={testID}
     >
       <View style={[s.radio, selected && s.radioSelected]}>
         {selected && <View style={s.radioDot} />}
       </View>
-      <Text style={[s.label, selected && s.labelSelected]}>{label}</Text>
+      {detail ? (
+        <View style={{ flex: 1 }}>
+          <Text style={[s.label, selected && s.labelSelected]}>{label}</Text>
+          <Text style={s.detail}>{detail}</Text>
+        </View>
+      ) : (
+        <Text style={[s.label, selected && s.labelSelected]}>{label}</Text>
+      )}
     </TouchableOpacity>
   );
 }
@@ -104,6 +114,7 @@ function makeRadioStyles(theme: AppThemePreset) {
     radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: theme.accent },
     label: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted, flex: 1 },
     labelSelected: { color: theme.text, fontFamily: FONT.semibold },
+    detail: { fontSize: FS.xs + 1, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 18 },
   });
 }
 
@@ -128,15 +139,19 @@ export default function BuyerReturnRequestScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [attempted, setAttempted] = useState(false);
+  const [refundMethods, setRefundMethods] = useState<RefundMethodKey[]>(['original', 'store_credit']);
+  const [refundMethod, setRefundMethod] = useState<RefundMethodKey>('original');
 
   const load = useCallback(async () => {
     if (!orderId) { setPhase('error'); return; }
     setPhase('loading');
     try {
-      const [loaded, existing] = await Promise.all([
+      const [loaded, existing, options] = await Promise.all([
         getBuyerOrder(orderId),
         api.returns.listBuyer().then(rows => activeReturnFor(Array.isArray(rows) ? rows : [], orderId)).catch(() => null),
+        api.returns.refundOptions().catch(() => null),
       ]);
+      if (options && Array.isArray(options.methods) && options.methods.includes('original')) setRefundMethods(options.methods);
       if (!loaded) { setPhase('error'); return; }
       setOrder(loaded);
       if (existing?.id) { setExistingReturnId(existing.id); setPhase('existing'); return; }
@@ -195,7 +210,7 @@ export default function BuyerReturnRequestScreen() {
         reason: reason as BuyerReturnReason,
         description: description.trim(),
         imageUris: evidencePhotos,
-        preferredResolution: 'refund',
+        preferredResolution: resolutionForRefundMethod(refundMethod),
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCreatedReturnId(created.id);
@@ -385,14 +400,22 @@ export default function BuyerReturnRequestScreen() {
           {photoNotice ? <Text style={s.photoNotice}>{photoNotice}</Text> : null}
         </Section>
 
-        <Section title="Refund">
-          <View style={s.summaryRow}>
-            <Feather name="credit-card" size={ICON.sm} color={theme.muted} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.summaryTitle}>Refund to your original payment</Text>
-              <Text style={s.summarySub}>Up to {formatCents(itemsTotal)} for these items. The seller confirms the amount.</Text>
-            </View>
-          </View>
+        <Section title="How do you want your refund?" subtitle={`Up to ${formatCents(itemsTotal)} for these items. The seller confirms the amount.`}>
+          {refundMethods.map((method, idx) => (
+            <RadioRow
+              key={method}
+              label={method === 'original' ? 'Original payment method' : method === 'thread_cash' ? 'Thread Cash' : `Store credit at ${order?.sellerName ?? 'this store'}`}
+              detail={method === 'original'
+                ? 'Back on your card 5–10 business days after approval.'
+                : method === 'thread_cash'
+                  ? 'In your Thread Cash as soon as it’s approved. Spend it at any store.'
+                  : 'A gift card for this store as soon as it’s approved. Never expires.'}
+              selected={refundMethod === method}
+              onPress={() => { Haptics.selectionAsync(); setRefundMethod(method); }}
+              isLast={idx === refundMethods.length - 1}
+              testID={`refund-method-${method}`}
+            />
+          ))}
           {returnDeadline ? (
             <View style={[s.summaryRow, { marginTop: SP.sm }]}>
               <Feather name="calendar" size={ICON.sm} color={theme.muted} />

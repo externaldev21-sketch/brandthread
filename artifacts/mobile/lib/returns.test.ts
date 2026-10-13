@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeReturnFor, adaptReturnRow, isReturnEligible, itemsTotalCents, returnHeadline, returnReasonLabel,
-  returnSteps, returnSubmitError, statusLabel,
+  activeReturnFor, adaptReturnRow, isReturnEligible, itemsTotalCents, refundDestination, refundMethodForResolution,
+  resolutionForRefundMethod, returnHeadline, returnReasonLabel, returnSteps, returnSubmitError, statusLabel,
 } from './returns';
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -64,5 +64,36 @@ describe('lib/returns', () => {
     expect(returnSubmitError({ status: 400, body: JSON.stringify({ error: 'Attach up to 5 photos uploaded with this return request' }) }).message)
       .toBe('Attach up to 5 photos uploaded with this return request');
     expect(returnSubmitError(new TypeError('Network request failed')).message).toMatch(/connection/);
+  });
+});
+
+describe('refund methods (items 113/114)', () => {
+  const base = { id: 'r1', orderId: 'o1', orderNumber: '1001', buyerName: 'Sam', sellerName: 'Atelier', status: 'refunded', refundAmountCents: 2500 };
+
+  it('maps resolutions to methods and back', () => {
+    expect(refundMethodForResolution('refund')).toBe('original');
+    expect(refundMethodForResolution('exchange')).toBe('original');
+    expect(refundMethodForResolution('thread_cash')).toBe('thread_cash');
+    expect(refundMethodForResolution('store_credit')).toBe('store_credit');
+    expect(resolutionForRefundMethod('original')).toBe('refund');
+    expect(resolutionForRefundMethod('thread_cash')).toBe('thread_cash');
+  });
+
+  it('prefers how the refund was actually paid over what was asked', () => {
+    expect(adaptReturnRow({ ...base, resolutionRequested: 'thread_cash' }).refundMethod).toBe('thread_cash');
+    expect(adaptReturnRow({ ...base, resolutionRequested: 'thread_cash', refundMethod: 'original' }).refundMethod).toBe('original');
+    expect(adaptReturnRow({ ...base, resolutionRequested: 'store_credit', refundMethod: null }).refundMethod).toBe('store_credit');
+  });
+
+  it('tells each side where the money went', () => {
+    const tc = adaptReturnRow({ ...base, resolutionRequested: 'thread_cash' });
+    expect(returnHeadline(tc, 'buyer', money).body).toContain('Thread Cash');
+    expect(returnHeadline(tc, 'seller', money).body).toBe('Refunded to Sam’s Thread Cash.');
+    const sc = adaptReturnRow({ ...base, resolutionRequested: 'store_credit' });
+    expect(returnHeadline(sc, 'buyer', money).body).toContain('Atelier store credit');
+    const pending = adaptReturnRow({ ...base, status: 'pending', resolutionRequested: 'store_credit' });
+    expect(returnSteps(pending, 'buyer').at(-1)?.label).toBe('Refund to store credit at Atelier');
+    expect(returnSteps(adaptReturnRow({ ...base, status: 'pending' }), 'buyer').at(-1)?.label).toBe('Refund to your original payment');
+    expect(refundDestination('thread_cash', 'seller', { buyerName: 'Sam', sellerName: 'Atelier' })).toBe('Sam’s Thread Cash');
   });
 });
