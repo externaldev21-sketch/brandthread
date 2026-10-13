@@ -28,6 +28,7 @@ export async function adaptSavedRows(rows: (typeof savedItems.$inferSelect)[]) {
       notifyOnPriceDrop: r.notifyOnPriceDrop,
       image:         badges?.image ?? undefined,
       brand:         badges?.brand ?? undefined,
+      sellerId:      badges?.sellerId ?? undefined,
       priceCents:    currentPriceCents ?? undefined,
       oldPriceCents: priceDropped ? r.savedPriceCents ?? undefined : undefined,
       priceDropped,

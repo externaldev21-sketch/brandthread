@@ -620,6 +620,8 @@ export interface SavedItem {
   // ── Live badge data (product items only) ────────────────────────────────
   image?: string;
   brand?: string;
+  /** The brand's seller id: the brand name links to its store (item 136). */
+  sellerId?: string;
   /** Current lowest variant price, in cents. */
   priceCents?: number;
   /** The price this was saved at — shown struck through when priceDropped. */

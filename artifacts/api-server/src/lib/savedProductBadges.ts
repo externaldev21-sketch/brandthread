@@ -14,6 +14,8 @@ const BACK_IN_STOCK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // badge fades after a 
 export interface ProductBadgeInfo {
   image: string | null;
   brand: string;
+  /** The brand's seller id, so the client can link the brand name to its store. */
+  sellerId: string;
   priceCents: number | null;
   inStock: boolean;
   lowStock: boolean;
@@ -62,6 +64,7 @@ export async function fetchProductBadgeInfo(productIds: string[]): Promise<Map<s
     result.set(p.id, {
       image: images[0] ?? null,
       brand: brandByOwner.get(p.ownerId) ?? "Brand",
+      sellerId: p.ownerId,
       priceCents: minPrice,
       inStock: totalStock > 0,
       lowStock: totalStock > 0 && totalStock <= LOW_STOCK_THRESHOLD,
