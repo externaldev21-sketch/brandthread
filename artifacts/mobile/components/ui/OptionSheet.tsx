@@ -2,7 +2,10 @@
  * Brandthread Design System — OptionSheet (Phase 1)
  *
  * A grouped radio-list picker in a bottom sheet: title, optional description,
- * one row per option (icon, label, optional description, trailing check).
+ * one row per option (icon, label, optional description, trailing radio).
+ * Rows copy Instagram's picker sheets (Mobbin: Instagram "Sort by") — an
+ * outlined radio on the right that fills when chosen — on the shared
+ * `<Sheet>` chrome (left-aligned title, circular close).
  * Replaces `Alert.alert(...)` button-list pickers used for settings like
  * "Profile visibility" or "Who can message you" — those render as a native
  * OS alert with Title Case buttons and no room for a description, unlike the
@@ -21,14 +24,13 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Icon, type IconName } from '@/components/ui/Icon';
+import { type IconName } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { haptics } from '@/lib/haptics';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Sheet, SHEET_GUTTER } from '@/components/ui/BottomSheet';
 import { ListRow } from '@/components/ui/ListRow';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { FONT } from '@/lib/theme';
 
 export interface OptionSheetOption {
   id: string;
@@ -52,13 +54,10 @@ export function OptionSheet({ visible, onClose, title, description, options, sel
   const palette = useColors();
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} testID={testID}>
-      <View style={styles.header}>
-        <Text style={[TYPE_SCALE.headline, { color: palette.foreground }]}>{title}</Text>
-        {description ? (
-          <Text style={[TYPE_SCALE.footnote, { color: palette.mutedForeground, marginTop: 4 }]}>{description}</Text>
-        ) : null}
-      </View>
+    <Sheet visible={visible} onClose={onClose} title={title} testID={testID} padded={false}>
+      {description ? (
+        <Text style={[TYPE_SCALE.footnote, styles.description, { color: palette.mutedForeground }]}>{description}</Text>
+      ) : null}
       <View style={styles.list}>
         {options.map((opt, i) => (
           <React.Fragment key={opt.id}>
@@ -66,7 +65,8 @@ export function OptionSheet({ visible, onClose, title, description, options, sel
               icon={opt.icon}
               title={opt.label}
               subtitle={opt.description}
-              right={opt.id === selectedId ? <Icon name="check" size={18} color={palette.accent} /> : undefined}
+              right={<Radio selected={opt.id === selectedId} color={palette.foreground} />}
+              selected={opt.id === selectedId}
               onPress={() => { haptics.selection(); onSelect(opt.id); }}
               testID={`${testID ?? 'option-sheet'}-${opt.id}`}
             />
@@ -74,12 +74,27 @@ export function OptionSheet({ visible, onClose, title, description, options, sel
           </React.Fragment>
         ))}
       </View>
-    </BottomSheet>
+    </Sheet>
+  );
+}
+
+/** Instagram-style radio: an outlined ring, filled with a dot when chosen. */
+function Radio({ selected, color }: { selected: boolean; color: string }) {
+  return (
+    <View
+      style={[styles.radio, { borderColor: color }]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      {selected ? <View style={[styles.radioDot, { backgroundColor: color }]} /> : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm },
-  list: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 12, height: 12, borderRadius: 6 },
+  description: { paddingHorizontal: SHEET_GUTTER, paddingBottom: SPACING.sm },
+  list: { paddingHorizontal: SHEET_GUTTER },
   divider: { height: StyleSheet.hairlineWidth },
 });

@@ -66,6 +66,9 @@ export const withSpring = (toValue: unknown, _config?: unknown, callback?: (fini
   callback?.(true);
   return toValue;
 };
+export function useAnimatedScrollHandler(_handler: unknown) {
+  return () => undefined;
+}
 export const runOnJS = <T extends (...args: never[]) => unknown>(fn: T) => fn;
 export const runOnUI = <T extends (...args: never[]) => unknown>(fn: T) => fn;
 export const cancelAnimation = () => undefined;
