@@ -73,7 +73,10 @@ export const ProductCard = React.memo(function ProductCard({
   const stock = product.inventory.totalStock;
   const threshold = product.inventory.lowStockThreshold;
   const stockColor = stock === 0 ? theme.error : stock <= threshold ? theme.warning : theme.success;
-  const stockLabel = stock === 0 ? 'Out of stock' : stock <= threshold ? `${stock} in stock` : `${stock} in stock`;
+  const stockLabel = stock === 0 ? 'Out of stock' : `${stock} left`;
+  // Sold out (S5 #123): the card goes gray on its own and the chip becomes the
+  // Restock action (same quick stock editor). Archived cards stay as they are.
+  const soldOut = stock === 0 && product.status !== 'archived';
 
   const price = product.pricing.priceCents;
   const compare = product.pricing.compareAtPriceCents;
@@ -128,7 +131,7 @@ export const ProductCard = React.memo(function ProductCard({
               activeScale={0.98}
               accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
             >
-            <View style={{ height: imageHeight, width: '100%' }}>
+            <View style={{ height: imageHeight, width: '100%', opacity: soldOut ? 0.4 : 1 }}>
             {coverUri ? (
               <CachedImage source={{ uri: coverUri }} style={s.image} contentFit="cover" recyclingKey={product.id} />
             ) : (
@@ -158,12 +161,15 @@ export const ProductCard = React.memo(function ProductCard({
                 per-variant stock editor. */}
             {(stock === 0 || stock <= threshold) && (
               <PressableScale
-                style={[s.chipBottomLeft, { backgroundColor: stockColor }]}
+                style={[s.chipBottomLeft, { backgroundColor: soldOut ? theme.text : stockColor }]}
                 onPress={() => onEditStock(product)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
+                accessibilityLabel={soldOut ? `Restock ${product.name}, sold out` : `Edit stock for ${product.name}, ${stockLabel}`}
+                testID={soldOut ? 'product-card-restock' : undefined}
               >
-                <Text style={s.chipBottomLabel} numberOfLines={1}>{stockLabel}</Text>
+                <Text style={[s.chipBottomLabel, soldOut && { color: theme.background }]} numberOfLines={1}>
+                  {soldOut ? 'Sold out · Restock' : stockLabel}
+                </Text>
               </PressableScale>
             )}
           </View>
