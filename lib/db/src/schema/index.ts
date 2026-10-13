@@ -24,6 +24,7 @@ export * from './emailMarketing';
 export * from './giftCards';
 export * from './productBulkSeo';
 export * from './promotions';
+export * from './firstOrderDiscounts';
 export * from './sellerPushGiveaways';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
@@ -773,6 +774,9 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // intent was created. The paid webhook builds the order from these instead
   // of a Stripe Checkout Session's totals. NULL for hosted-Checkout rows.
   amountTotalCents: integer('amount_total_cents'),
+  // Brandthread-funded first-order discount taken off this group's
+  // amountTotalCents (migration 271). Never part of the fee basis.
+  firstOrderDiscountCents: integer('first_order_discount_cents').notNull().default(0),
   shippingCents: integer('shipping_cents'),
   taxCents: integer('tax_cents'),
   stripeTaxCalculationId: text('stripe_tax_calculation_id'),
