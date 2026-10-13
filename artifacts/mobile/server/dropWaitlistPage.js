@@ -54,7 +54,7 @@ const pad = (n) => String(n).padStart(2, '0');
 
 const STYLE = `
 *{box-sizing:border-box}
-:root{--bg:#0a0a0b;--fg:#f8f8f8;--muted:#a6a6a6;--line:#2c2c2e;--card:#161618;--err:#ff6b6b;--live:#ff3b30}
+:root{--bg:#0a0a0b;--fg:#f8f8f8;--muted:#a6a6a6;--line:#2c2c2e;--card:#161618;--live:#ff3b30}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;font-size:16px;line-height:1.45}
 main{max-width:480px;margin:0 auto;padding:16px 16px 40px}
@@ -81,7 +81,7 @@ input:focus,.btn:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 .btn{display:flex;align-items:center;justify-content:center;width:100%;height:52px;margin-top:16px;font:inherit;font-weight:700;font-size:16px;color:#0a0a0b;background:var(--fg);border:0;border-radius:12px;text-decoration:none;cursor:pointer}
 .btn[disabled]{opacity:.5;cursor:default}
 .btn-outline{background:transparent;color:var(--fg);border:1px solid var(--line)}
-.error{color:var(--err);font-size:14px;margin:12px 0 0}
+.error{color:var(--fg);font-weight:600;font-size:14px;margin:12px 0 0}
 .live{display:inline-flex;align-items:center;gap:6px;background:var(--live);color:#fff;font-weight:700;font-size:12px;letter-spacing:.06em;border-radius:6px;padding:4px 8px;margin-top:20px}
 .live+h1{margin-top:10px}
 .done h2{font-size:20px;margin:0 0 6px}
@@ -222,8 +222,9 @@ fetch(C.endpoint,{method:'POST',headers:{'content-type':'application/json'},cred
 body:JSON.stringify({phone:phone,countryCode:cc,consent:true,company:document.getElementById('company').value})})
 .then(function(r){return r.json().catch(function(){return{}}).then(function(b){return{ok:r.ok,status:r.status,b:b}})})
 .then(function(res){
-if(res.status===409&&res.b&&res.b.code==='DROP_LIVE'){location.reload();return}
-if(!res.ok){btn.disabled=false;btn.textContent='Notify me';return show((res.b&&(res.b.error||res.b.message))||'Something went wrong. Try again.')}
+var b=res.b||{},e=b.error&&typeof b.error==='object'?b.error:{message:b.error,code:b.code};
+if(res.status===409&&e.code==='DROP_LIVE'){location.reload();return}
+if(!res.ok){btn.disabled=false;btn.textContent='Notify me';return show((typeof e.message==='string'&&e.message)||'Something went wrong. Try again.')}
 var who=res.b&&res.b.phone?res.b.phone:'your number';
 document.getElementById('doneText').textContent='We\\u2019ll text '+who+' when '+(C.dropName||(C.brandName+'\\u2019s next drop'))+' goes live.';
 document.getElementById('formView').hidden=true;document.getElementById('doneView').hidden=false;
