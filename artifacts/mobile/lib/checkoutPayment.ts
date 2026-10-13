@@ -101,7 +101,9 @@ export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] 
     const code = single
       ? session.discounts.find(d => d.isValid)?.code
       : session.discounts.find(d => d.isValid && d.sellerId === group.sellerId)?.code;
-    const liveStreamId = code ? getLiveCheckoutContext(group.sellerId ?? null)?.streamId : undefined;
+    // Shopping from a live: the stream id rides along with or without a code,
+    // so the server can attribute the paid order to the live ("just bought").
+    const liveStreamId = getLiveCheckoutContext(group.sellerId ?? null)?.streamId;
     return {
       items: group.items.map(item => ({
         variantId: String(item.variantId),

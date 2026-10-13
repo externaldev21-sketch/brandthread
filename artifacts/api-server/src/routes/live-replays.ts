@@ -23,7 +23,9 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { isBlockedEitherWay, optionalViewerId } from "../lib/safety";
 import { resolveToClerkId } from "./public";
 import { parsePagination } from "../lib/pagination";
+import { loadProductCards } from "../lib/liveBag";
 import {
+  REPLAY_SHOPPABLE_DAYS,
   canViewReplay,
   normalizeVisibility,
   shapeReplay,
@@ -32,12 +34,26 @@ import {
 
 const router = Router();
 
+async function replayProducts(row: ReplayRow & { product_tags?: unknown }) {
+  const tags = Array.isArray(row.product_tags) ? row.product_tags as any[] : [];
+  const hostIds = tags.filter((t) => t && typeof t.productId === "string").map((t) => String(t.productId));
+  const cohost = await db.execute(sql`
+    SELECT product_id FROM live_cohost_products WHERE stream_id = ${row.id}::uuid ORDER BY created_at ASC
+  `);
+  const ids = [...new Set([...hostIds, ...(cohost.rows as any[]).map((r) => String(r.product_id))])];
+  const cards = await loadProductCards(ids);
+  return ids.flatMap((productId) => {
+    const card = cards.get(productId);
+    return card ? [{ productId, ...card }] : [];
+  });
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const SELECT_REPLAY = sql`
   SELECT ls.id, ls.seller_id, ls.title, ls.description, ls.thumbnail_url,
          ls.replay_url, ls.replay_post_id, ls.replay_visibility, ls.replay_deleted_at,
-         ls.peak_viewer_count, ls.started_at, ls.ended_at,
+         ls.peak_viewer_count, ls.started_at, ls.ended_at, ls.product_tags,
          p.post_status, p.moderation_status AS post_moderation_status
   FROM live_streams ls
   LEFT JOIN posts p ON p.id = ls.replay_post_id
@@ -69,6 +85,7 @@ router.get("/by-seller/:sellerId", async (req, res) => {
           ls.replay_visibility = 'public'
           AND p.post_status = 'published'
           AND p.moderation_status = 'visible'
+          AND (ls.ended_at IS NULL OR ls.ended_at > now() - make_interval(days => ${REPLAY_SHOPPABLE_DAYS}))
           AND NOT EXISTS (
             SELECT 1 FROM users su
             WHERE su.clerk_id = ls.seller_id
@@ -101,7 +118,11 @@ router.get("/:streamId", async (req, res) => {
     const blocked = !!viewerId && viewerId !== row.seller_id && (await isBlockedEitherWay(viewerId, row.seller_id));
     // Same 404 for missing, hidden, deleted and blocked: never reveal which.
     if (!canViewReplay(viewerId, row, { blocked })) return res.status(404).json({ error: "Replay not found" });
-    return res.json({ replay: shapeReplay(row, viewerId) });
+    const replay = shapeReplay(row, viewerId);
+    // Shoppable for REPLAY_SHOPPABLE_DAYS: the live's products (host tags and
+    // co-host products), at today's price, only while the replay is current.
+    const products = replay.expired ? [] : await replayProducts(row);
+    return res.json({ replay: { ...replay, products } });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

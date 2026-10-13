@@ -90,6 +90,7 @@ import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
+import { announceLivePurchase } from "../lib/livePurchases";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1212,6 +1213,10 @@ export async function handleCheckoutPaid(
       charge_model: chargeModel,
       is_guest: !buyerId,
     });
+  }
+  // Bought while watching a live: "<first name> just bought …" in that live.
+  if (createdOrderId && oversoldItems.length === 0) {
+    await announceLivePurchase(csRecord.id, createdOrderId);
   }
 
   // ── Issue Stripe refund for oversold orders ───────────────────────────────

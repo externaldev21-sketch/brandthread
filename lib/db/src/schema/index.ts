@@ -19,6 +19,7 @@ export * from './sales';
 export * from './sellerAnalytics';
 export * from './affiliate';
 export * from './liveCommerce';
+export * from './liveShopping';
 export * from './growth';
 export * from './emailMarketing';
 export * from './giftCards';

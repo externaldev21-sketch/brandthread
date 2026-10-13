@@ -5,8 +5,8 @@
  * credit in one transaction, using the `live_gift` source cashOut.ts expects.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
-import { blocks, db, follows, liveStreams, threadCashConfig, threadCashEntries, users } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
+import { blocks, db, follows, liveGiftPlatformFees, liveStreams, threadCashConfig, threadCashEntries, users } from "@workspace/db";
 import { getBalanceCents, sendLiveGift } from "../../lib/threadCash/wallet";
 
 const testUserIds: string[] = [];
@@ -41,6 +41,18 @@ async function grant(buyerId: string, amountCents: number): Promise<void> {
   });
 }
 
+/** Gifts `cap` cents to the seller from as many buyers as the per-buyer send cap needs. */
+async function reachReceiveCap(seller: string, stream: string, cap: number, sendCap: number, feeBps: number): Promise<void> {
+  let left = cap;
+  while (left > 0) {
+    const amount = Math.min(left, sendCap);
+    const giver = await makeUser();
+    await grant(giver, amount);
+    await sendLiveGift(giver, seller, stream, amount, crypto.randomUUID(), feeBps);
+    left -= amount;
+  }
+}
+
 afterEach(async () => {
   while (testStreamIds.length > 0) {
     await db.delete(liveStreams).where(eq(liveStreams.id, testStreamIds.pop()!));
@@ -48,6 +60,7 @@ afterEach(async () => {
   while (testUserIds.length > 0) {
     const id = testUserIds.pop()!;
     await db.delete(threadCashEntries).where(eq(threadCashEntries.buyerId, id));
+    await db.delete(liveGiftPlatformFees).where(eq(liveGiftPlatformFees.buyerId, id));
     await db.delete(blocks).where(eq(blocks.blockerId, id));
     await db.delete(blocks).where(eq(blocks.blockedId, id));
     await db.delete(follows).where(eq(follows.followerId, id));
@@ -67,8 +80,9 @@ describe("sendLiveGift", () => {
     expect(giftId).toBeTruthy();
     expect(await getBalanceCents(db, buyer)).toBe(300);
     // Unlike sendThreadCash, a gift is spendable/cashable by the seller
-    // immediately — there is no pending/claim step.
-    expect(await getBalanceCents(db, seller)).toBe(200);
+    // immediately — there is no pending/claim step. The seller is credited
+    // the gift minus Brandthread's default 30% cut.
+    expect(await getBalanceCents(db, seller)).toBe(140);
   });
 
   it("records one debit entry (source live_gift_sent) and one credit entry (source live_gift)", async () => {
@@ -80,12 +94,12 @@ describe("sendLiveGift", () => {
     await sendLiveGift(buyer, seller, stream, 150, crypto.randomUUID());
 
     const [debit] = await db.select().from(threadCashEntries)
-      .where(eq(threadCashEntries.buyerId, buyer)).limit(1);
+      .where(and(eq(threadCashEntries.buyerId, buyer), eq(threadCashEntries.source, "live_gift_sent"))).limit(1);
     expect(debit).toMatchObject({ amountCents: -150, source: "live_gift_sent", referenceId: stream });
 
     const [credit] = await db.select().from(threadCashEntries)
       .where(eq(threadCashEntries.buyerId, seller)).limit(1);
-    expect(credit).toMatchObject({ amountCents: 150, source: "live_gift", referenceId: stream });
+    expect(credit).toMatchObject({ amountCents: 105, source: "live_gift", referenceId: stream });
   });
 
   it("rejects gifting yourself", async () => {
@@ -134,7 +148,10 @@ describe("sendLiveGift", () => {
     ]);
     expect(first.giftId).toBe(second.giftId);
     expect(await getBalanceCents(db, buyer)).toBe(400);
-    expect(await getBalanceCents(db, seller)).toBe(100);
+    expect(await getBalanceCents(db, seller)).toBe(70);
+    expect(second.netCents).toBe(70);
+    const fees = await db.select().from(liveGiftPlatformFees).where(eq(liveGiftPlatformFees.buyerId, buyer));
+    expect(fees).toHaveLength(1);
   });
 
   it("20 parallel gifts with DIFFERENT idempotency keys never drive the buyer's balance negative", async () => {
@@ -171,11 +188,52 @@ describe("sendLiveGift", () => {
     const stream = await makeStream(seller);
     const [config] = await db.select().from(threadCashConfig).limit(1);
     const cap = config?.dailyReceiveCapCents ?? 5000;
-    await grant(buyer, cap * 3);
-
-    await sendLiveGift(buyer, seller, stream, cap, crypto.randomUUID());
+    await reachReceiveCap(seller, stream, cap, config?.dailySendCapCents ?? 2000, 0);
+    const late = await makeUser();
+    await grant(late, 100);
     await expect(
-      sendLiveGift(buyer, seller, stream, 1, crypto.randomUUID()),
+      sendLiveGift(late, seller, stream, 1, crypto.randomUUID(), 0),
+    ).rejects.toMatchObject({ code: "THREAD_CASH_DAILY_RECEIVE_CAP" });
+  });
+
+  it("credits the seller the gift minus the platform fee and records the fee", async () => {
+    const buyer = await makeUser();
+    const seller = await makeUser();
+    const stream = await makeStream(seller);
+    await grant(buyer, 1000);
+
+    const gift = await sendLiveGift(buyer, seller, stream, 999, crypto.randomUUID(), 3000);
+    expect(gift).toMatchObject({ grossCents: 999, feeCents: 299, netCents: 700, created: true });
+    expect(await getBalanceCents(db, buyer)).toBe(1);
+    expect(await getBalanceCents(db, seller)).toBe(700);
+    const [fee] = await db.select().from(liveGiftPlatformFees).where(eq(liveGiftPlatformFees.giftEntryId, gift.giftId));
+    expect(fee).toMatchObject({ streamId: stream, buyerId: buyer, sellerId: seller, grossCents: 999, feeBps: 3000, feeCents: 299, netCents: 700 });
+  });
+
+  it("a 0 bps fee credits the seller in full", async () => {
+    const buyer = await makeUser();
+    const seller = await makeUser();
+    const stream = await makeStream(seller);
+    await grant(buyer, 500);
+
+    const gift = await sendLiveGift(buyer, seller, stream, 250, crypto.randomUUID(), 0);
+    expect(gift).toMatchObject({ feeCents: 0, netCents: 250 });
+    expect(await getBalanceCents(db, seller)).toBe(250);
+  });
+
+  it("the receive cap counts the gross gift, not just the seller's net", async () => {
+    const buyer = await makeUser();
+    const seller = await makeUser();
+    const stream = await makeStream(seller);
+    const [config] = await db.select().from(threadCashConfig).limit(1);
+    const cap = config?.dailyReceiveCapCents ?? 5000;
+    await reachReceiveCap(seller, stream, cap, config?.dailySendCapCents ?? 2000, 3000);
+    // The seller was only credited 70% of `cap`, but the cap is on gifts received.
+    expect(await getBalanceCents(db, seller)).toBeLessThan(cap);
+    const late = await makeUser();
+    await grant(late, 100);
+    await expect(
+      sendLiveGift(late, seller, stream, 1, crypto.randomUUID(), 3000),
     ).rejects.toMatchObject({ code: "THREAD_CASH_DAILY_RECEIVE_CAP" });
   });
 });

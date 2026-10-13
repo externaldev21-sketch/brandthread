@@ -8,7 +8,9 @@
  *  - no replay_url, or soft-deleted (replay_deleted_at)  -> nobody, not even the owner
  *  - owner                                              -> always (public or hidden)
  *  - everyone else                                      -> only when 'public', the linked
- *    post is still published + moderation-visible, and no block exists either way.
+ *    post is still published + moderation-visible, no block exists either way,
+ *    and the replay is still inside its shoppable window (REPLAY_SHOPPABLE_DAYS
+ *    after the live ended). After that only the owner sees it, marked expired.
  */
 export type ReplayVisibility = "public" | "hidden";
 
@@ -37,14 +39,30 @@ export function replayExists(row: ReplayRow): boolean {
   return !!row.replay_url && !!row.replay_post_id && !row.replay_deleted_at;
 }
 
+/** Replays are watchable and shoppable for this many days after the live ends. */
+export const REPLAY_SHOPPABLE_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** When the replay stops being public; null when the stream has no end time yet. */
+export function replayExpiresAt(row: Pick<ReplayRow, "ended_at">): Date | null {
+  const ended = toIso(row.ended_at);
+  return ended ? new Date(Date.parse(ended) + REPLAY_SHOPPABLE_DAYS * DAY_MS) : null;
+}
+
+export function isReplayExpired(row: Pick<ReplayRow, "ended_at">, now: Date = new Date()): boolean {
+  const expires = replayExpiresAt(row);
+  return !!expires && expires.getTime() <= now.getTime();
+}
+
 export function canViewReplay(
   viewerId: string | null,
   row: ReplayRow,
-  opts: { blocked?: boolean } = {},
+  opts: { blocked?: boolean; now?: Date } = {},
 ): boolean {
   if (!replayExists(row)) return false;
   if (viewerId && viewerId === row.seller_id) return true;
   if (opts.blocked) return false;
+  if (isReplayExpired(row, opts.now)) return false;
   if ((row.replay_visibility ?? "public") !== "public") return false;
   if (row.post_status != null && row.post_status !== "published") return false;
   if (row.post_moderation_status != null && row.post_moderation_status !== "visible") return false;
@@ -65,8 +83,9 @@ export function replayDurationSeconds(row: Pick<ReplayRow, "started_at" | "ended
   return secs > 0 ? secs : null;
 }
 
-export function shapeReplay(row: ReplayRow, viewerId: string | null) {
+export function shapeReplay(row: ReplayRow, viewerId: string | null, now: Date = new Date()) {
   const isOwner = !!viewerId && viewerId === row.seller_id;
+  const expiresAt = replayExpiresAt(row);
   return {
     streamId: row.id,
     sellerId: row.seller_id,
@@ -80,6 +99,9 @@ export function shapeReplay(row: ReplayRow, viewerId: string | null) {
     endedAt: toIso(row.ended_at),
     durationSeconds: replayDurationSeconds(row),
     isOwner,
+    expiresAt: expiresAt ? expiresAt.toISOString() : null,
+    /** Only ever true for the owner: everyone else can't load an expired replay. */
+    expired: isReplayExpired(row, now),
     // Owner-only: buyers never learn a replay is hidden.
     ...(isOwner ? { visibility: normalizeVisibility(row.replay_visibility) ?? "public" } : {}),
   };

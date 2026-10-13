@@ -51,6 +51,8 @@ import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import Composer from '@/components/ui/Composer';
 import { radius } from '@/constants/radii';
+import { getLiveStreamProvider } from '@/lib/live/liveProvider';
+import type { UpcomingLive } from '@/lib/live/types';
 
 // Same sample fashion footage the For You feed uses in dev preview, reused
 // here (not modified, not shared state) so a preview room shows a real
@@ -225,6 +227,28 @@ export default function LiveFeedScreen() {
     return () => { active = false; };
   }, [api]);
 
+  // Nobody live: show the real scheduled lives with "Remind me" (same
+  // provider + reminder API the LIVE pager's empty state uses).
+  const [upcoming, setUpcoming] = useState<UpcomingLive[]>([]);
+  const nobodyLive = !loadingReal && rooms.length === 0;
+  useEffect(() => {
+    if (!nobodyLive) return undefined;
+    let active = true;
+    getLiveStreamProvider().listUpcoming()
+      .then(list => { if (active) setUpcoming(list); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [nobodyLive]);
+  const setReminder = async (id: string, on: boolean) => {
+    hapticLight();
+    setUpcoming(prev => prev.map(u => (u.id === id ? { ...u, reminderSet: on } : u)));
+    try {
+      await getLiveStreamProvider().setReminder(id, on);
+    } catch {
+      setUpcoming(prev => prev.map(u => (u.id === id ? { ...u, reminderSet: !on } : u)));
+    }
+  };
+
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index != null) {
       setActiveIndex(viewableItems[0].index);
@@ -275,11 +299,11 @@ export default function LiveFeedScreen() {
         ) : rooms.length === 0 ? (
           <>
             <LiveEmptyState
-              upcoming={[]}
+              upcoming={upcoming}
               suggested={[]}
               topInset={topInset}
               bottomInset={insets.bottom}
-              onRemind={() => {}}
+              onRemind={(id, on) => { void setReminder(id, on); }}
               onFollow={() => {}}
               onOpenCreator={() => {}}
             />

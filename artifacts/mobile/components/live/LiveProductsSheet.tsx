@@ -16,6 +16,8 @@ import type { LiveProduct } from '@/lib/live/types';
 import { LIVE_RED } from './LiveAvatarRing';
 import { Button } from '@/components/ui/Button';
 import { describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
+import { activeDeals, dealRemainingMs, formatDealCountdown } from '@/lib/live/flashDeal';
+import { useNowTick } from '@/lib/live/useNowTick';
 import { radius } from '@/constants/radii';
 
 export function LiveProductsSheet({
@@ -34,6 +36,9 @@ export function LiveProductsSheet({
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  // Flash deals tick down and drop out of the list when they run out.
+  const now = useNowTick(visible && codes.some(c => !!c.expiresAt));
+  const liveCodes = activeDeals(codes, now);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close products" />
@@ -49,10 +54,11 @@ export function LiveProductsSheet({
           </Pressable>
         </View>
         <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: SP.sm }}>
-          {codes.length > 0 && onApplyCode && (
+          {liveCodes.length > 0 && onApplyCode && (
             <View style={{ gap: SP.sm }} testID="live-codes">
-              {codes.map(c => {
+              {liveCodes.map(c => {
                 const applied = appliedCode?.toUpperCase() === c.code.toUpperCase();
+                const left = dealRemainingMs(c.expiresAt, now);
                 return (
                   <View key={c.id} style={[styles.row, { borderColor: theme.border }]}>
                     <Feather name="tag" size={18} color={theme.text} style={{ marginHorizontal: 8 }} />
@@ -62,6 +68,12 @@ export function LiveProductsSheet({
                         {describeLiveCode(c)}{c.minOrderCents > 0 ? ` over ${formatCents(c.minOrderCents)}` : ''}
                       </Text>
                     </View>
+                    {left !== null && (
+                      <View style={styles.timer} accessibilityLabel={`Deal ends in ${formatDealCountdown(left)}`} testID={`live-code-timer-${c.id}`}>
+                        <Feather name="clock" size={11} color={LIVE_RED} />
+                        <Text style={[styles.timerText, { color: LIVE_RED }, TABULAR_NUMS]}>{formatDealCountdown(left)}</Text>
+                      </View>
+                    )}
                     <Button
                       label={applied ? 'Applied' : 'Apply'}
                       variant={applied ? 'secondary' : 'primary'}
@@ -91,6 +103,7 @@ export function LiveProductsSheet({
                     </View>
                   )}
                   <Text style={[styles.name, { color: theme.text }]} numberOfLines={2}>{p.name}</Text>
+                  {p.sellerName ? <Text style={[styles.sub, { color: theme.muted }]} numberOfLines={1}>{p.sellerName}</Text> : null}
                   <Text style={[styles.price, { color: theme.text }, TABULAR_NUMS]}>{formatCents(p.priceCents)}</Text>
                 </View>
                 <Pressable
@@ -127,4 +140,6 @@ const styles = StyleSheet.create({
   price: { fontFamily: FONT.bold, fontSize: FS.sm, marginTop: 2 },
   buy: { height: 32, paddingHorizontal: 16, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   buyText: { fontFamily: FONT.bold, fontSize: FS.xs },
+  timer: { flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 2 },
+  timerText: { fontFamily: FONT.bold, fontSize: FS.xs },
 });
