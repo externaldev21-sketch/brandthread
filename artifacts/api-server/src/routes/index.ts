@@ -103,6 +103,7 @@ import emailMarketingWebhookRouter from "./email-marketing-webhook";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
 import salesRouter from "./sales";
+import wholesaleRouter from "./wholesale";
 import returnsRouter from "./returns";
 import returnLabelsRouter from "./return-labels";
 import sellerVerificationRouter from "./seller-verification";
@@ -328,6 +329,7 @@ router.use("/shipping-zones",            shippingZonesRouter); // router mounts 
 router.use("/shipping-labels",           shippingLabelsRouter);
 router.use("/discount-codes",            tc, discountCodesRouter);
 router.use("/sales",                     tc, salesRouter);
+router.use("/wholesale",                 wholesaleRouter); // public store check + buyer apply (own auth); seller routes use requirePermission; no tc
 router.use("/returns",                   tc, returnsRouter);
 router.use("/return-labels",             returnLabelsRouter);
 router.use("/sample-orders",             tc, sampleOrdersRouter);

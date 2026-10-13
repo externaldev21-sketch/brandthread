@@ -32,6 +32,7 @@ import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneW
 import { getSellerVacationStatus } from "../sellerAvailability";
 import { validateDiscountCode, DiscountValidationError } from "../discounts";
 import { effectiveUnitPrice } from "../pricing/salesRuntime";
+import { applyWholesaleToCart } from "../pricing/wholesaleRuntime";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
 import { resolveSellerPlatformFeeBps } from "../planPerks";
@@ -197,6 +198,9 @@ export async function priceCartGroup(input: {
     weightGrams += (row.weightGrams ?? 0) * item.quantity;
   }
   if (!sellerId) throw new CartCheckoutError(400, "EMPTY_GROUP", "A seller group has no items.");
+  // Wholesale price list (lib/pricing/wholesale.ts): approved wholesale buyers pay the
+  // wholesale price (lower of sale and wholesale, never both); those lines leave code eligibility.
+  await applyWholesaleToCart({ sellerId, buyerId: input.buyerId, lines: items, discountLines });
 
   const vacation = await getSellerVacationStatus(sellerId);
   if (vacation.active) throw new CartCheckoutError(409, "SELLER_ON_VACATION", vacation.message);

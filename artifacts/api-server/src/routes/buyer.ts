@@ -50,6 +50,7 @@ import {
 } from "../lib/buyerCancellationPolicy";
 import { consumeBuyerAddressListFailure } from "./release-test-control";
 import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
+import { applyWholesaleToCart } from "../lib/pricing/wholesaleRuntime";
 
 const router = Router();
 router.use(requireAuth);
@@ -654,6 +655,12 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       discountLines.push({ productId: item.productId, priceCents: row.priceCents, quantity: qty });
       cartWeightGrams += (row.weightGrams ?? 0) * qty;
     }
+
+    // Wholesale price list (lib/pricing/wholesale.ts): never stacks with sales or discount codes.
+    (await applyWholesaleToCart({
+      sellerId: [...sellerIds][0], buyerId, discountLines,
+      lines: cartItems.map((c, i) => ({ ...c, productId: items[i].productId })),
+    })).forEach((cents, i) => { if (cents != null) { cartItems[i].priceCents = cents; lineItems[i].price_data.unit_amount = cents; } });
 
     // ── Verify seller has an active Connect account ───────────────────────
     const sellerId = [...sellerIds][0];
