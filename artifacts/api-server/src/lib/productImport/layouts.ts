@@ -2,7 +2,7 @@
  * Layout detection + mapping for the three CSV layouts we accept:
  *   shopify  — Shopify admin product export (one row per variant/image, folded by Handle)
  *   etsy     — Etsy Shop Manager "Download listings" CSV (one row per listing)
- *   generic  — Brandthread template (name, description, category, price, sku, images, tags, size, color, stock)
+ *   generic  — Brandthread template (name, description, category, price, sku, barcode, images, tags, size, color, stock)
  * Pure: takes parsed CSV, returns normalised products + issues.
  */
 import type { ParsedCsv } from "./csv";
@@ -58,6 +58,17 @@ class Columns {
 
 const cell = (row: string[], i: number) => (i >= 0 ? (row[i] ?? "").trim() : "");
 
+/**
+ * A barcode cell as stored on the variant, or null. Spreadsheet exports often
+ * keep leading zeros by prefixing an apostrophe ('0123…); that is dropped.
+ * Anything with spaces or longer than 64 characters isn't a barcode.
+ */
+export function importBarcode(raw: string): string | null {
+  const value = raw.trim().replace(/^'/, "");
+  if (!value || value.length > 64 || !/^[\x21-\x7e]+$/.test(value)) return null;
+  return value;
+}
+
 function issue(list: Issue[], severity: Issue["severity"], line: number, product: string, field: string | null, message: string) {
   list.push({ severity, line, product, field, message });
 }
@@ -99,14 +110,14 @@ export function mapShopify(csv: ParsedCsv): MapResult {
     handle: c.find("handle"), title: c.find("title"), body: c.find("body (html)", "body html", "body"),
     vendor: c.find("vendor"), type: c.find("type", "product type"), tags: c.find("tags"),
     opt: [1, 2, 3].map((n) => ({ name: c.find(`option${n} name`), value: c.find(`option${n} value`) })),
-    sku: c.find("variant sku", "sku"), grams: c.find("variant grams", "weight"),
+    sku: c.find("variant sku", "sku"), grams: c.find("variant grams", "weight"), barcode: c.find("variant barcode", "barcode"),
     qty: c.find("variant inventory qty", "inventory qty", "inventory quantity"),
     price: c.find("variant price", "price"), compare: c.find("variant compare at price", "compare at price"),
     imgSrc: c.find("image src", "image url"), imgPos: c.find("image position"),
     status: c.find("status"), seoTitle: c.find("seo title"), seoDesc: c.find("seo description"),
   };
   // Columns we read only to know they are understood.
-  c.find("published", "product category", "variant image", "image alt text", "variant barcode", "variant taxable",
+  c.find("published", "product category", "variant image", "image alt text", "variant taxable",
     "variant requires shipping", "variant inventory tracker", "variant inventory policy", "variant fulfillment service",
     "variant weight unit", "gift card", "cost per item", "option1 linked to", "option2 linked to", "option3 linked to");
 
@@ -169,6 +180,7 @@ export function mapShopify(csv: ParsedCsv): MapResult {
     const variant: ImportVariant = {
       sku: cell(row, col.sku), size, color, priceCents, compareAtCents: compare && compare > priceCents ? compare : null,
       stock: stock.value, weightGrams: Number.isFinite(grams) && grams > 0 ? grams : null,
+      barcode: importBarcode(cell(row, col.barcode)),
     };
     p.variants.push(variant);
   });
@@ -286,6 +298,7 @@ export function mapGeneric(csv: ParsedCsv): MapResult {
     size: c.find("size"), color: c.find("color", "colour"),
     stock: c.find("stock", "quantity", "inventory", "qty", "inventory qty"),
     weight: c.find("weight grams", "grams", "weight (g)"),
+    barcode: c.find("barcode", "variant barcode", "upc", "ean", "gtin", "isbn"),
     status: c.find("status"),
   };
   const issues: Issue[] = [];
@@ -336,6 +349,7 @@ export function mapGeneric(csv: ParsedCsv): MapResult {
       sku: cell(row, col.sku), size: cell(row, col.size) || null, color: cell(row, col.color) || null,
       priceCents, compareAtCents: compare && compare > priceCents ? compare : null, stock: stock.value,
       weightGrams: Number.isFinite(grams) && grams > 0 ? grams : null,
+      barcode: importBarcode(cell(row, col.barcode)),
     });
   });
 

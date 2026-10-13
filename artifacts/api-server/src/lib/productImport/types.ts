@@ -22,6 +22,8 @@ export type ImportVariant = {
   compareAtCents: number | null;
   stock: number;
   weightGrams: number | null;
+  /** Scannable barcode (UPC / EAN / ISBN…) when the source had one. */
+  barcode?: string | null;
 };
 
 export type ImportProduct = {

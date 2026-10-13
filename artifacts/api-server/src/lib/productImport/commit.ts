@@ -173,7 +173,8 @@ async function saveOne(
       productId = created.id;
       await tx.insert(productVariants).values(p.variants.map((v, i) => ({
         productId: created.id, size: v.size, color: v.color, sku: finalSkus[i], priceCents: v.priceCents,
-        stock: v.stock, lowStockThreshold: 5, weightGrams: v.weightGrams ?? 0,
+        // Low-stock level follows the product / store default (resolved on insert, migration 273).
+        stock: v.stock, weightGrams: v.weightGrams ?? 0, barcode: v.barcode ?? null,
       })));
       await tx.insert(productImportMappings).values({
         ownerId, source, externalKey: p.externalKey, productId, contentHash: hash, lastRunId: runId,
@@ -197,12 +198,13 @@ async function saveOne(
       if (existingId) {
         await tx.update(productVariants).set({
           size: v.size, color: v.color, priceCents: v.priceCents, stock: v.stock,
-          ...(v.weightGrams != null ? { weightGrams: v.weightGrams } : {}), updatedAt: new Date(),
+          ...(v.weightGrams != null ? { weightGrams: v.weightGrams } : {}),
+          ...(v.barcode ? { barcode: v.barcode } : {}), updatedAt: new Date(),
         }).where(eq(productVariants.id, existingId));
       } else {
         await tx.insert(productVariants).values({
           productId, size: v.size, color: v.color, sku: finalSkus[i], priceCents: v.priceCents,
-          stock: v.stock, lowStockThreshold: 5, weightGrams: v.weightGrams ?? 0,
+          stock: v.stock, weightGrams: v.weightGrams ?? 0, barcode: v.barcode ?? null,
         });
       }
     }

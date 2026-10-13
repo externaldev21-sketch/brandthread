@@ -28,6 +28,7 @@ import type { StatementDetail, StatementFormat, StatementList } from '@/lib/stat
 import type { PayoutDetail, PayoutScheduleInfo, WeeklyAnchor } from '@/lib/payoutScheduleView';
 import type { DisputeEvidenceFile, DisputeFileType, DisputeTimeline } from '@/lib/disputeTypes';
 import type { ReorderResolution } from '@/lib/reorderSummary';
+import type { InventoryLookupResult, InventorySettings } from '@/lib/inventoryScan';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
@@ -1443,6 +1444,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       list:   () => get<any[]>('/api/inventory'),
       adjust: (variantId: string, body: { delta?: number; newStock?: number }) =>
         patch<any>(`/api/inventory/${variantId}/adjust`, body),
+      /** Barcode or SKU → the seller's matching variants (inventory scanner). */
+      lookup: (code: string) =>
+        get<InventoryLookupResult>(`/api/inventory/lookup?code=${encodeURIComponent(code)}`),
+      /** Store-wide low stock level + variants at or below their level. */
+      settings: () => get<InventorySettings>('/api/inventory/settings'),
+      saveSettings: (body: { lowStockThresholdDefault: number; applyToExisting?: boolean }) =>
+        put<InventorySettings>('/api/inventory/settings', body),
     },
     /** Manufacturer hub — public directory, invite tokens, threads, sample orders, drop wallets. */
     manufacturers: {
@@ -3413,7 +3421,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         put<any>(`/api/product-variants/${encodeURIComponent(productId)}/axes`, { axes }),
       generate: (productId: string, data: { priceCents?: number; stock?: number; lowStockThreshold?: number; baseSku?: string }) =>
         post<any>(`/api/product-variants/${encodeURIComponent(productId)}/generate`, data),
-      bulkUpdate: (productId: string, updates: Array<{ variantId: string; priceCents?: number; stock?: number; sku?: string; lowStockThreshold?: number }>) =>
+      bulkUpdate: (productId: string, updates: Array<{ variantId: string; priceCents?: number; stock?: number; sku?: string; barcode?: string | null; lowStockThreshold?: number }>) =>
         patch<any>(`/api/product-variants/${encodeURIComponent(productId)}/variants/bulk`, { updates }),
       getStockRules: (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`),
       putStockRules: (productId: string, data: Record<string, unknown>) =>

@@ -25,6 +25,7 @@ import {
   MAX_MATRIX_VARIANTS, MAX_PRICE_CENTS, MAX_STOCK, baseSkuFromName, buildSku, columnAxisFor, comboKey,
   generateCombos, matrixSize, normalizeAxes, uniqueSku, validateBulkUpdates, validateStockRules,
 } from "../lib/variantMatrix";
+import { getStoreLowStockThreshold, resetVariantsToInherit, resolveLowStockThreshold, syncInheritedLowStock } from "../lib/lowStockThreshold";
 
 const router = Router();
 router.use(requireAuth);
@@ -42,13 +43,14 @@ async function ownedProduct(productId: string, ownerId: string) {
   return product ?? null;
 }
 
-async function loadState(productId: string) {
+async function loadState(productId: string, ownerId: string) {
   const axes = await db.select().from(productOptionAxes)
     .where(eq(productOptionAxes.productId, productId)).orderBy(asc(productOptionAxes.position));
   const variantRows = await db
     .select({
       id: productVariants.id, sku: productVariants.sku, size: productVariants.size, color: productVariants.color,
       priceCents: productVariants.priceCents, stock: productVariants.stock, lowStockThreshold: productVariants.lowStockThreshold,
+      lowStockThresholdInherit: productVariants.lowStockThresholdInherit, barcode: productVariants.barcode,
       options: productVariantOptions.options,
     })
     .from(productVariants)
@@ -59,13 +61,15 @@ async function loadState(productId: string) {
   return {
     axes: axes.map((a) => ({ name: a.name, values: a.values })),
     variants: variantRows.map((v) => ({ ...v, options: v.options ?? {} })),
-    stockRules: rulesPayload(rules),
+    stockRules: rulesPayload(rules, await getStoreLowStockThreshold(ownerId)),
   };
 }
 
-function rulesPayload(rule?: typeof productStockRules.$inferSelect) {
+function rulesPayload(rule: typeof productStockRules.$inferSelect | undefined, storeLevel: number | null) {
   return {
     lowStockThresholdDefault: rule?.lowStockThresholdDefault ?? null,
+    // What a variant without its own level falls back to when the product has no default.
+    storeLowStockThreshold: resolveLowStockThreshold({ store: storeLevel }),
     soldOutBehavior: (rule?.soldOutBehavior ?? "show") as "show" | "hide" | "archive",
     limitedQuantityEnabled: rule?.limitedQuantityEnabled ?? false,
     limitedQuantityTotal: rule?.limitedQuantityTotal ?? null,
@@ -78,7 +82,7 @@ router.get("/:productId", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const product = await ownedProduct(req.params.productId, ownerId);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
-  res.json({ product, ...(await loadState(product.id)), maxVariants: MAX_MATRIX_VARIANTS });
+  res.json({ product, ...(await loadState(product.id, ownerId)), maxVariants: MAX_MATRIX_VARIANTS });
 });
 
 router.put("/:productId/axes", requireRole("manager"), async (req, res) => {
@@ -125,13 +129,14 @@ router.post("/:productId/generate", requireRole("manager"), async (req, res) => 
     return;
   }
 
-  const [rule] = await db.select().from(productStockRules).where(eq(productStockRules.productId, product.id)).limit(1);
-  const lowStockThreshold = body.lowStockThreshold !== undefined ? body.lowStockThreshold : (rule?.lowStockThresholdDefault ?? 10);
-  if (!Number.isInteger(lowStockThreshold) || (lowStockThreshold as number) < 0 || (lowStockThreshold as number) > MAX_STOCK) {
+  // A level in the body is set on each new variant; otherwise they follow the product / store default.
+  const explicitLevel = body.lowStockThreshold !== undefined;
+  const lowStockThreshold = explicitLevel ? body.lowStockThreshold : undefined;
+  if (explicitLevel && (!Number.isInteger(lowStockThreshold) || (lowStockThreshold as number) < 0 || (lowStockThreshold as number) > MAX_STOCK)) {
     res.status(400).json({ error: "lowStockThreshold must be a whole number of 0 or more" }); return;
   }
 
-  const existing = await loadState(product.id);
+  const existing = await loadState(product.id, ownerId);
   let priceCents = body.priceCents;
   if (priceCents === undefined) priceCents = existing.variants.length ? Math.min(...existing.variants.map((v) => v.priceCents)) : undefined;
   if (!Number.isInteger(priceCents) || (priceCents as number) <= 0 || (priceCents as number) > MAX_PRICE_CENTS) {
@@ -166,7 +171,7 @@ router.post("/:productId/generate", requireRole("manager"), async (req, res) => 
           const rows = missing.map((combo, i) => ({
             productId: product.id, size: combo.size, color: combo.color,
             sku: uniqueSku(candidates[i], taken), priceCents: priceCents as number,
-            stock: defaultStock, lowStockThreshold: lowStockThreshold as number,
+            stock: defaultStock, lowStockThreshold: lowStockThreshold as number | undefined,
           }));
           const inserted = await tx.insert(productVariants).values(rows).returning({ id: productVariants.id, sku: productVariants.sku });
           const withOptions = inserted
@@ -187,7 +192,7 @@ router.post("/:productId/generate", requireRole("manager"), async (req, res) => 
     if (defaultStock > 0) void afterStockChange(product.id);
   }
 
-  res.status(created.length > 0 ? 201 : 200).json({ created: created.length, skipped: size - missing.length, ...(await loadState(product.id)) });
+  res.status(created.length > 0 ? 201 : 200).json({ created: created.length, skipped: size - missing.length, ...(await loadState(product.id, ownerId)) });
 });
 
 router.patch("/:productId/variants/bulk", requireRole("manager"), async (req, res) => {
@@ -226,7 +231,9 @@ router.patch("/:productId/variants/bulk", requireRole("manager"), async (req, re
           ...(u.priceCents !== undefined && { priceCents: u.priceCents }),
           ...(u.stock !== undefined && { stock: u.stock }),
           ...(u.sku !== undefined && { sku: u.sku }),
-          ...(u.lowStockThreshold !== undefined && { lowStockThreshold: u.lowStockThreshold }),
+          // A level typed on the variant is its own from now on (stops following defaults).
+          ...(u.lowStockThreshold !== undefined && { lowStockThreshold: u.lowStockThreshold, lowStockThresholdInherit: false }),
+          ...(u.barcode !== undefined && { barcode: u.barcode }),
           updatedAt: new Date(),
         }).where(eq(productVariants.id, u.variantId)).returning();
         result.push({
@@ -253,7 +260,7 @@ router.patch("/:productId/variants/bulk", requireRole("manager"), async (req, re
   }
   await afterStockChange(product.id);
 
-  res.json({ updated: outcomes.length, ...(await loadState(product.id)), product: (await ownedProduct(product.id, ownerId)) });
+  res.json({ updated: outcomes.length, ...(await loadState(product.id, ownerId)), product: (await ownedProduct(product.id, ownerId)) });
 });
 
 router.get("/:productId/stock-rules", async (req, res) => {
@@ -261,7 +268,7 @@ router.get("/:productId/stock-rules", async (req, res) => {
   const product = await ownedProduct(req.params.productId, ownerId);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
   const [rule] = await db.select().from(productStockRules).where(eq(productStockRules.productId, product.id)).limit(1);
-  res.json(rulesPayload(rule));
+  res.json(rulesPayload(rule, await getStoreLowStockThreshold(ownerId)));
 });
 
 router.put("/:productId/stock-rules", requireRole("manager"), async (req, res) => {
@@ -277,20 +284,24 @@ router.put("/:productId/stock-rules", requireRole("manager"), async (req, res) =
     showRemainingCounter: r.showRemainingCounter, counterThreshold: r.counterThreshold,
     updatedAt: new Date(),
   };
-  await db.transaction(async (tx) => {
-    await tx.insert(productStockRules).values({ productId: product.id, ...values })
-      .onConflictDoUpdate({ target: productStockRules.productId, set: values });
-    if (req.body?.applyLowStockToVariants === true && r.lowStockThresholdDefault !== null) {
-      await tx.update(productVariants).set({ lowStockThreshold: r.lowStockThresholdDefault, updatedAt: new Date() })
-        .where(eq(productVariants.productId, product.id));
-    }
-  });
+  await db.insert(productStockRules).values({ productId: product.id, ...values })
+    .onConflictDoUpdate({ target: productStockRules.productId, set: values });
+  // Variants that follow the defaults pick up the new product default; "apply to
+  // existing variants" also makes the ones with their own level follow it.
+  if (req.body?.applyLowStockToVariants === true && r.lowStockThresholdDefault !== null) {
+    await resetVariantsToInherit({ ownerId, productId: product.id });
+  } else {
+    await syncInheritedLowStock({ ownerId, productId: product.id });
+  }
   const actor = reqActor(req);
   void logActivity(actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
     `Updated stock rules for ${product.name}`, "product", product.id, { soldOutBehavior: r.soldOutBehavior });
   // Switching to hide/archive on an already sold-out product applies right away.
   await afterStockChange(product.id);
-  res.json(rulesPayload((await db.select().from(productStockRules).where(eq(productStockRules.productId, product.id)).limit(1))[0]));
+  res.json(rulesPayload(
+    (await db.select().from(productStockRules).where(eq(productStockRules.productId, product.id)).limit(1))[0],
+    await getStoreLowStockThreshold(ownerId),
+  ));
 });
 
 class HttpFail extends Error {

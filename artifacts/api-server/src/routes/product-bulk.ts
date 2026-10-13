@@ -403,7 +403,8 @@ router.post("/duplicate", requireRole("manager"), async (req, res): Promise<void
             sku: uniqueCopySku(v.sku, taken),
             priceCents: v.priceCents,
             stock: copyInventory ? v.stock : 0,
-            lowStockThreshold: v.lowStockThreshold,
+            // A copied variant that followed the defaults keeps following them.
+            lowStockThreshold: v.lowStockThresholdInherit ? undefined : v.lowStockThreshold,
             weightGrams: v.weightGrams,
           }).returning({ id: productVariants.id });
           const cmp = compareAtByVariant.get(v.id);

@@ -146,12 +146,24 @@ export function uniqueSku(candidate: string, taken: Set<string>): string {
 
 // ─── Bulk update validation ──────────────────────────────────────────────────
 
+/** Validates a seller-entered barcode (printable, no spaces, max 64). null / "" clears it. */
+export function parseBarcode(raw: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (raw === null) return { ok: true, value: null };
+  if (typeof raw !== "string") return { ok: false };
+  const value = raw.trim();
+  if (value === "") return { ok: true, value: null };
+  if (value.length > 64 || !/^[\x21-\x7e]+$/.test(value)) return { ok: false };
+  return { ok: true, value };
+}
+
 export interface BulkVariantUpdate {
   variantId: string;
   priceCents?: number;
   stock?: number;
   sku?: string;
   lowStockThreshold?: number;
+  /** null clears it. */
+  barcode?: string | null;
 }
 
 export type BulkValidation =
@@ -198,6 +210,11 @@ export function validateBulkUpdates(input: unknown): BulkValidation {
       if (seenSkus.has(sku.toLowerCase())) return { ok: false, error: `SKU ${sku} is used twice`, variantId };
       seenSkus.add(sku.toLowerCase());
       update.sku = sku;
+    }
+    if (row.barcode !== undefined) {
+      const parsed = parseBarcode(row.barcode);
+      if (!parsed.ok) return { ok: false, error: "Barcode can use letters, numbers and symbols, no spaces (max 64)", variantId };
+      update.barcode = parsed.value;
     }
     updates.push(update);
   }

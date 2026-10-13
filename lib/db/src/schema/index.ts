@@ -5,6 +5,7 @@ export * from './sizeCharts';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './productVariantsStock';
+export * from './inventorySettings';
 export * from './security';
 export * from './money';
 export * from './productLaunches';
@@ -358,11 +359,18 @@ export const productVariants = pgTable('product_variants', {
   size: text('size'),
   color: text('color'),
   sku: text('sku').notNull().unique(),
+  // Scannable product code (UPC / EAN / any), not unique (migration 273). Null = none.
+  barcode: text('barcode'),
   priceCents: integer('price_cents').notNull(),
   // Seller-set "was" price, shown struck through (migration 120). Null = none.
   compareAtPriceCents: integer('compare_at_price_cents'),
   stock: integer('stock').notNull().default(0),
-  lowStockThreshold: integer('low_stock_threshold').notNull().default(10),
+  // Effective low-stock level: variant → product default → store default → 5.
+  // Omit it on insert to follow the defaults: the column has no default and a
+  // BEFORE INSERT trigger resolves it and sets inherit (migration 273,
+  // api-server lib/lowStockThreshold.ts). Pass a value to give the variant its own.
+  lowStockThreshold: integer('low_stock_threshold').notNull().default(sql`NULL`),
+  lowStockThresholdInherit: boolean('low_stock_threshold_inherit').notNull().default(false),
   // Used to resolve weight-tiered shipping zone rates at checkout (see
   // shippingZones). 0 = unknown/unset, which weight-tiered zones treat as
   // falling into their lowest tier.
@@ -371,6 +379,7 @@ export const productVariants = pgTable('product_variants', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   productIdx: index('product_variants_product_id_idx').on(table.productId),
+  barcodeIdx: index('product_variants_barcode_idx').on(table.barcode).where(sql`${table.barcode} IS NOT NULL`),
 }));
 
 // ─── Customers ────────────────────────────────────────────────────────────────

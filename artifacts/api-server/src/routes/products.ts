@@ -177,7 +177,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
   // Validate ALL variants before any DB writes so we never leave a partial product
   const validatedVariants: Array<{
     size?: string; color?: string; sku: string;
-    priceCents: number; compareAtPriceCents: number | null; stock: number; lowStockThreshold: number;
+    priceCents: number; compareAtPriceCents: number | null; stock: number; lowStockThreshold?: number;
   }> = [];
   for (let i = 0; i < rawVariantList.length; i++) {
     const v = rawVariantList[i];
@@ -199,8 +199,9 @@ router.post("/", requireRole("manager"), async (req, res) => {
     if (!Number.isInteger(stock) || stock < 0) {
       res.status(400).json({ error: `variants[${i}] (${v.sku}): stock must be a non-negative integer` }); return;
     }
-    const threshold = v.lowStockThreshold ?? 10;
-    if (!Number.isInteger(threshold) || threshold < 0) {
+    // No level sent → the variant follows the product / store default (resolved on insert, migration 273).
+    const threshold = v.lowStockThreshold ?? undefined;
+    if (threshold !== undefined && (!Number.isInteger(threshold) || threshold < 0)) {
       res.status(400).json({ error: `variants[${i}] (${v.sku}): lowStockThreshold must be a non-negative integer` }); return;
     }
     validatedVariants.push({
@@ -512,7 +513,9 @@ router.post("/:id/variants", requireRole("manager"), async (req, res) => {
     .limit(1);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
 
-  const { size, color, sku, priceCents, compareAtPriceCents, stock = 0, lowStockThreshold = 10 } = req.body;
+  const { size, color, sku, priceCents, compareAtPriceCents, stock = 0 } = req.body;
+  // No level sent → the variant follows the product / store default (resolved on insert, migration 273).
+  const lowStockThreshold: number | undefined = req.body.lowStockThreshold ?? undefined;
   if (!sku || !priceCents || priceCents <= 0) {
     res.status(400).json({ error: "sku and positive priceCents required" }); return;
   }
@@ -550,7 +553,7 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
     .set({
       ...(stock             !== undefined && { stock }),
       ...(priceCents        !== undefined && priceCents > 0 && { priceCents }),
-      ...(lowStockThreshold !== undefined && { lowStockThreshold }),
+      ...(lowStockThreshold !== undefined && { lowStockThreshold, lowStockThresholdInherit: false }),
       ...(compareAtPriceCents !== undefined && { compareAtPriceCents }),
       updatedAt: new Date(),
     })
@@ -646,7 +649,6 @@ router.post("/import", requireRole("manager"), async (req, res) => {
           sku: row.sku ?? (row.name.replace(/\s+/g, '-').toUpperCase() + '-DEFAULT'),
           priceCents: row.priceCents,
           stock: 0,
-          lowStockThreshold: 5,
         });
       }
       created.push({ name: row.name, productId: product.id });
