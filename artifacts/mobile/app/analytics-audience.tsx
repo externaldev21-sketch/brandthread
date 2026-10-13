@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { Card, CardDivider, SectionTitle, StatRow } from '@/components/analytics/AnalyticsKit';
 import { InsightFrame } from '@/components/analytics/InsightFrame';
 import { InsightLineChart, KpiGrid, ShareBarRow } from '@/components/analytics/InsightCharts';
+import { MostActiveTimesCard } from '@/components/analytics/MostActiveTimesCard';
 import { useSellerInsight } from '@/hooks/useSellerInsight';
 import { DEFAULT_INSIGHT_RANGE, getAudienceStats, type InsightRange, type SplitCounts } from '@/services/sellerInsightsService';
 
@@ -99,6 +100,8 @@ export default function AnalyticsAudienceScreen() {
               ))}
             </Card>
           )}
+
+          <MostActiveTimesCard />
           <Text style={s.note}>Groups with fewer than {data.minGroupSize} people are hidden.</Text>
         </>
       )}

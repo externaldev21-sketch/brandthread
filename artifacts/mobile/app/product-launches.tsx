@@ -4,12 +4,17 @@
  * Lists products waiting on a launch time with their Notify me signups, and
  * sets / changes / cancels a launch. `?productId=` (from the product action
  * sheet) opens the editor straight away for that product.
+ *
+ * The editor shows the launch checklist (GET …/:productId/checklist — Shopify
+ * "Get ready to sell" setup guide pattern) and a "Best time" suggestion from
+ * follower activity (GET …/best-time — TikTok Studio "Most active times").
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
@@ -19,13 +24,29 @@ import { Header } from '@/components/layout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { EmptyState, HapticSwitch, PrimaryButton } from '@/components/BrandthreadUI';
 import { LaunchTimePicker, parseWallClock } from '@/components/products/LaunchTimePicker';
+import { LaunchChecklistSection } from '@/components/products/LaunchChecklistSection';
+import { BestTimeSuggestion } from '@/components/products/BestTimeSuggestion';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import {
+  buildDemoBestTime, buildDemoLaunchChecklist, nextSlotWallClock, withLiveChecks,
+  type ActiveSlot, type ProductLaunchChecklist,
+} from '@/lib/productLaunchChecklist';
 import { listSupportedTimeZones, zonedTimeToUtc } from '@/lib/dropSchedule';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 type Launch = {
   productId: string; name: string; imageUrl: string | null; status: string;
   launchAt: string; launchedAt: string | null; notifyFollowers: boolean; alertCount: number;
+  readiness?: { readyCount: number; total: number; blockers: string[] } | null;
 };
+type Draft = { date: string; time: string; zone: string; notifyFollowers: boolean };
+type EditTarget = { productId: string; name: string; existing: Launch | null; draft?: Draft };
+
+/** Signed-out web preview never calls the seller API (payout-schedule.tsx pattern). */
+function useSignedOutPreview() {
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  return isSellerDevPreview() && (!isLoaded || !isSignedIn || !userId);
+}
 type SellerProduct = { id: string; name: string; images?: string[]; status?: string };
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
@@ -51,7 +72,9 @@ export default function ProductLaunchesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [editing, setEditing] = useState<{ productId: string; name: string; existing: Launch | null } | null>(null);
+  const [editing, setEditing] = useState<EditTarget | null>(null);
+  // Set while the seller is away fixing a checklist item; the editor reopens on return.
+  const resumeRef = React.useRef<EditTarget | null>(null);
   const [picking, setPicking] = useState(false);
   const [autoOpened, setAutoOpened] = useState(false);
 
@@ -62,8 +85,14 @@ export default function ProductLaunchesScreen() {
         api.productLaunches.list(),
         (api.products.list() as Promise<any>).catch(() => []),
       ]);
-      setLaunches(Array.isArray(l) ? l : []);
+      const nextLaunches: Launch[] = Array.isArray(l) ? l : [];
+      setLaunches(nextLaunches);
       setProducts(Array.isArray(p) ? p : []);
+      const resume = resumeRef.current;
+      if (resume) {
+        resumeRef.current = null;
+        setEditing({ ...resume, existing: nextLaunches.find((x) => x.productId === resume.productId) ?? resume.existing });
+      }
     } catch {
       setLaunches([]);
     } finally {
@@ -150,6 +179,12 @@ export default function ProductLaunchesScreen() {
             target={editing}
             onClose={() => setEditing(null)}
             onSaved={() => { setEditing(null); load(true); }}
+            onFix={(route, draft) => {
+              // A Modal sits above the stack, so close it before pushing the screen that fixes the item.
+              resumeRef.current = { ...editing, draft };
+              setEditing(null);
+              router.push(route as never);
+            }}
           />
         )}
       </Modal>
@@ -183,6 +218,14 @@ function LaunchRow({ launch, onPress }: { launch: Launch; onPress: () => void })
             {launch.alertCount} {launch.alertCount === 1 ? 'person' : 'people'} waiting{launch.notifyFollowers ? ' · followers notified' : ''}
           </Text>
         </View>
+        {!done && launch.readiness && launch.readiness.readyCount < launch.readiness.total && (
+          <View style={s.metaRow}>
+            <Feather name={launch.readiness.blockers.length > 0 ? 'alert-circle' : 'check-circle'} size={12} color={colors.mutedForeground} />
+            <Text style={[s.meta, { color: colors.mutedForeground }]}>
+              {launch.readiness.readyCount} of {launch.readiness.total} ready{launch.readiness.blockers.length > 0 ? ' · needs attention' : ''}
+            </Text>
+          </View>
+        )}
       </View>
       {!done && <Feather name="chevron-right" size={16} color={colors.mutedForeground} />}
     </TouchableOpacity>
@@ -190,24 +233,57 @@ function LaunchRow({ launch, onPress }: { launch: Launch; onPress: () => void })
 }
 
 function LaunchEditor({
-  target, onClose, onSaved,
+  target, onClose, onSaved, onFix,
 }: {
-  target: { productId: string; name: string; existing: Launch | null };
+  target: EditTarget;
   onClose: () => void;
   onSaved: () => void;
+  onFix: (route: string, draft: Draft) => void;
 }) {
   const api = useApi();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const existing = target.existing;
   const tomorrow = useMemo(() => { const d = new Date(Date.now() + 86400000); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }, []);
-  const [date, setDate] = useState(existing ? localDate(existing.launchAt) : tomorrow);
-  const [time, setTime] = useState(existing ? localTime(existing.launchAt) : '09:00');
-  const [zone, setZone] = useState(deviceZone());
+  const draft = target.draft;
+  const [date, setDate] = useState(draft?.date ?? (existing ? localDate(existing.launchAt) : tomorrow));
+  const [time, setTime] = useState(draft?.time ?? (existing ? localTime(existing.launchAt) : '09:00'));
+  const [zone, setZone] = useState(draft?.zone ?? deviceZone());
   const [zoneOpen, setZoneOpen] = useState(false);
   const [zoneFilter, setZoneFilter] = useState('');
-  const [notifyFollowers, setNotifyFollowers] = useState(existing?.notifyFollowers ?? false);
+  const [notifyFollowers, setNotifyFollowers] = useState(draft?.notifyFollowers ?? existing?.notifyFollowers ?? false);
   const [saving, setSaving] = useState(false);
+  const signedOutPreview = useSignedOutPreview();
+  const [checklist, setChecklist] = useState<ProductLaunchChecklist | null>(null);
+  const [bestSlot, setBestSlot] = useState<ActiveSlot | null>(null);
+
+  const loadChecklist = useCallback(async () => {
+    if (signedOutPreview) { setChecklist(isPreviewDemoMode() ? buildDemoLaunchChecklist() : null); return; }
+    try { setChecklist(await api.productLaunches.checklist(target.productId)); }
+    catch { setChecklist(null); }
+  }, [api, signedOutPreview, target.productId]);
+  React.useEffect(() => { loadChecklist(); }, [loadChecklist]);
+
+  // Best time follows the zone being edited in, so the suggestion reads in that zone's wall clock.
+  React.useEffect(() => {
+    let live = true;
+    if (signedOutPreview) { setBestSlot(isPreviewDemoMode() ? buildDemoBestTime(zone).top[0] ?? null : null); return; }
+    api.productLaunches.bestTime(zone)
+      .then((r) => { if (live) setBestSlot(r.status === 'ok' ? r.top[0] ?? null : null); })
+      .catch(() => { if (live) setBestSlot(null); });
+    return () => { live = false; };
+  }, [api, signedOutPreview, zone]);
+
+  const liveLaunchAt = useMemo(() => {
+    const parts = parseWallClock(date, time);
+    return parts ? zonedTimeToUtc(parts, zone) : null;
+  }, [date, time, zone]);
+  const liveChecklist = useMemo(
+    () => (checklist ? withLiveChecks(checklist, { launchAt: liveLaunchAt, notifyFollowers }) : null),
+    [checklist, liveLaunchAt, notifyFollowers],
+  );
+  const blocked = !!checklist && checklist.blockers.length > 0;
+  const bestWall = useMemo(() => (bestSlot ? nextSlotWallClock(bestSlot, zone) : null), [bestSlot, zone]);
   const zones = useMemo(() => listSupportedTimeZones(), []);
   const filtered = useMemo(() => {
     const f = zoneFilter.trim().toLowerCase();
@@ -225,6 +301,11 @@ function LaunchEditor({
       await api.productLaunches.schedule(target.productId, { launchAt: launchAt.toISOString(), notifyFollowers });
       onSaved();
     } catch (e: any) {
+      if (e?.code === 'LAUNCH_NOT_READY') {
+        loadChecklist();
+        Alert.alert('Finish the required steps', 'Add a photo, set a price and connect payouts, then schedule the launch.');
+        return;
+      }
       Alert.alert("Couldn't save", e?.message ?? 'Try again.');
     } finally {
       setSaving(false);
@@ -275,6 +356,13 @@ function LaunchEditor({
 
         <Text style={[s.label, { color: colors.mutedForeground }]}>LAUNCH DATE AND TIME</Text>
         <LaunchTimePicker dateValue={date} timeValue={time} onDateChange={setDate} onTimeChange={setTime} />
+        {bestSlot && bestWall && (
+          <BestTimeSuggestion
+            slot={bestSlot}
+            selected={date === bestWall.date && time === bestWall.time}
+            onPress={() => { setDate(bestWall.date); setTime(bestWall.time); }}
+          />
+        )}
         <TouchableOpacity
           style={[s.zoneBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
           onPress={() => setZoneOpen(true)}
@@ -293,7 +381,21 @@ function LaunchEditor({
           <HapticSwitch value={notifyFollowers} onValueChange={setNotifyFollowers} />
         </View>
 
-        <PrimaryButton label={existing ? 'Save launch' : 'Schedule launch'} onPress={save} loading={saving} disabled={saving} />
+        {liveChecklist && (
+          <>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>LAUNCH CHECKLIST</Text>
+            <LaunchChecklistSection
+              checklist={liveChecklist}
+              productId={target.productId}
+              onOpen={(route) => onFix(route, { date, time, zone, notifyFollowers })}
+            />
+          </>
+        )}
+
+        <PrimaryButton label={existing ? 'Save launch' : 'Schedule launch'} onPress={save} loading={saving} disabled={saving || blocked} />
+        {blocked && (
+          <Text style={[s.meta, s.blockedNote, { color: colors.mutedForeground }]}>Finish the required steps to schedule this launch.</Text>
+        )}
         {existing && (
           <TouchableOpacity style={s.cancelBtn} onPress={cancelLaunch} accessibilityRole="button">
             <Text style={[s.cancelText, { color: colors.destructive }]}>Cancel launch</Text>
@@ -322,6 +424,7 @@ const s = StyleSheet.create({
   zoneBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, minHeight: 44 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: SP.md },
   cancelBtn: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  blockedNote: { textAlign: 'center', marginTop: -SP.sm },
   cancelText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   filter: { margin: SP.md, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, fontSize: FS.sm, fontFamily: FONT.medium },
   zoneRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: 14, borderBottomWidth: 1 },

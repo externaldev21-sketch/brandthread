@@ -3340,7 +3340,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       list:        () => get<Array<{
         productId: string; name: string; imageUrl: string | null; status: string;
         launchAt: string; launchedAt: string | null; notifyFollowers: boolean; alertCount: number;
+        readiness: { readyCount: number; total: number; blockers: string[] } | null;
       }>>('/api/product-launches'),
+      /** Launch readiness checklist for one product. */
+      checklist:   (productId: string) =>
+        get<import('./productLaunchChecklist').ProductLaunchChecklist>(`/api/product-launches/${encodeURIComponent(productId)}/checklist`),
+      /** When followers are active (weekday x hour in `tz`), k-anonymous. */
+      bestTime:    (tz: string) =>
+        get<import('./productLaunchChecklist').BestTimeResponse>(`/api/product-launches/best-time?tz=${encodeURIComponent(tz)}`),
       schedule:    (productId: string, data: { launchAt: string; notifyFollowers?: boolean }) =>
         put<any>(`/api/product-launches/${encodeURIComponent(productId)}`, data),
       cancel:      (productId: string) =>
