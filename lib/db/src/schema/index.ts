@@ -2628,4 +2628,5 @@ export * from './ranking';
 export * from './comments';
 export * from './hashtags';
 export * from './captions';
+export * from './postPolls';
 export * from './places';
