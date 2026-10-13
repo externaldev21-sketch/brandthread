@@ -45,6 +45,7 @@ export function LiveAuctionBidSheet({ auction, receivedAt, visible, onClose, onS
 
   return (
     <BottomSheet visible={visible} onClose={onClose} testID="live-auction-bid-sheet">
+      <View style={{ paddingHorizontal: SP.md, paddingTop: SP.xs }}>
       <View style={styles.head}>
         <Text style={styles.title} numberOfLines={2}>{auction.productName}</Text>
         <Text style={[styles.current, TABULAR_NUMS]}>{formatBid(auction.currentBidCents ?? auction.startingBidCents)}</Text>
@@ -74,6 +75,7 @@ export function LiveAuctionBidSheet({ auction, receivedAt, visible, onClose, onS
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button label={`Bid ${formatBid(amount)}`} onPress={() => void submit()} loading={busy} disabled={auction.status !== 'open'} fullWidth testID="live-auction-bid-submit" />
+      </View>
     </BottomSheet>
   );
 }

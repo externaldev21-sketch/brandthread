@@ -56,6 +56,7 @@ export function LiveAuctionHostSheet({ streamId, products, visible, onClose, onS
 
   return (
     <BottomSheet visible={visible} onClose={onClose} testID="live-auction-host-sheet">
+      <View style={{ paddingHorizontal: SP.md, paddingTop: SP.xs }}>
       <Text style={styles.title}>Start an auction</Text>
       <Text style={styles.label}>Piece</Text>
       <ScrollView style={{ maxHeight: 180 }}>
@@ -95,6 +96,7 @@ export function LiveAuctionHostSheet({ streamId, products, visible, onClose, onS
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button label="Start auction" onPress={() => void start()} loading={busy} disabled={!productId} fullWidth testID="live-auction-start" />
+      </View>
     </BottomSheet>
   );
 }

@@ -27,7 +27,12 @@ export interface LiveAuctionState {
 export function useLiveAuction(streamId: string | null | undefined, opts: {
   enabled: boolean; viewerId?: string | null; poll?: boolean; demo?: { productName: string; imageUri?: string | null; priceCents: number } | null;
 }): LiveAuctionState {
-  const { enabled, viewerId, poll = false, demo = null } = opts;
+  const { enabled, viewerId, poll = false } = opts;
+  // Callers build `demo` inline; key it by content so a re-render doesn't restart the demo.
+  const demoKey = opts.demo ? `${opts.demo.productName}|${opts.demo.priceCents}|${opts.demo.imageUri ?? ''}` : null;
+  const demoInputRef = useRef(opts.demo ?? null);
+  demoInputRef.current = opts.demo ?? null;
+  const demo = demoKey ? demoInputRef.current : null;
   const [auction, setAuction] = useState<LiveAuction | null>(null);
   const [receivedAt, setReceivedAt] = useState(() => Date.now());
   const viewerRef = useRef(viewerId);
@@ -46,7 +51,7 @@ export function useLiveAuction(streamId: string | null | undefined, opts: {
     fetchActiveAuction(streamId)
       .then(r => accept(r.enabled ? r.auction : null))
       .catch(() => {});
-  }, [accept, demo, enabled, streamId]);
+  }, [accept, demoKey, enabled, streamId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setAuction(null);
@@ -55,7 +60,7 @@ export function useLiveAuction(streamId: string | null | undefined, opts: {
     if (!poll) return undefined;
     const t = setInterval(refresh, POLL_MS);
     return () => clearInterval(t);
-  }, [demo, enabled, poll, refresh, streamId]);
+  }, [demoKey, enabled, poll, refresh, streamId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleEvent = useCallback((event: { type: string; auction?: LiveAuction }) => {
     if (!enabled || !event.auction) return;
@@ -65,7 +70,8 @@ export function useLiveAuction(streamId: string | null | undefined, opts: {
   // ─── Demo (preview only) ───────────────────────────────────────────────────
   const demoRef = useRef<LiveAuction | null>(null);
   useEffect(() => {
-    if (!enabled || !demo) return undefined;
+    const demo = demoInputRef.current;
+    if (!enabled || !demoKey || !demo) return undefined;
     const startedAt = Date.now();
     const a: LiveAuction = {
       id: 'preview-auction', streamId: String(streamId ?? 'preview'), sellerId: 'preview-host', productId: 'preview-product',
@@ -87,7 +93,7 @@ export function useLiveAuction(streamId: string | null | undefined, opts: {
       setAuction(withViewer(done, viewerRef.current ?? 'preview-you'));
     }, 250);
     return () => clearInterval(settle);
-  }, [demo, enabled, streamId]);
+  }, [demoKey, enabled, streamId]);
 
   const bid = useCallback(async (amountCents: number): Promise<string | null> => {
     if (!auction || !streamId) return null;
@@ -113,7 +119,7 @@ export function useLiveAuction(streamId: string | null | undefined, opts: {
       refresh();
       return apiErrorMessage(e, 'Your bid didn’t go through. Try again.');
     }
-  }, [accept, auction, demo, refresh, streamId]);
+  }, [accept, auction, demoKey, refresh, streamId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { auction, receivedAt, bid, handleEvent, refresh };
 }

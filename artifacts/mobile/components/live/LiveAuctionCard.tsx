@@ -98,7 +98,7 @@ export function LiveAuctionCard({
         </Pressable>
       ) : null}
       {!open && auction.youWon && auction.payable && onPay ? (
-        <Pressable onPress={onPay} style={[styles.bid, styles.wideBid]} accessibilityRole="button" testID="live-auction-pay">
+        <Pressable onPress={onPay} style={styles.pay} accessibilityRole="button" testID="live-auction-pay">
           <Text style={styles.bidText}>{`Pay ${formatBid(price)}`}</Text>
         </Pressable>
       ) : null}
@@ -130,6 +130,6 @@ function makeStyles() {
     bidDisabled: { backgroundColor: '#8E8E93' },
     bidText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.base },
     wide: { height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-    wideBid: { flex: 0, alignSelf: 'stretch' },
+    pay: { height: 44, borderRadius: radius.md, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   });
 }
