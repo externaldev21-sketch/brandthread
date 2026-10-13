@@ -12,8 +12,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { InteractionLayer } from './ProfileControls';
 
-const CELL = 72;
-const CIRCLE = 62;
+const CELL = 74;
+// Instagram highlights: 64pt circles, 11pt titles.
+const CIRCLE = 64;
 
 export interface ProfileStoryItem {
   id: string;

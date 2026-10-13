@@ -235,7 +235,7 @@ export function ProfileStatColumns({ stats, loading }: { stats: ProfileStat[]; l
             <Text style={[styles.statValue, { color: loading ? theme.subtle : theme.text }]} numberOfLines={1}>
               {loading ? '–' : stat.value}
             </Text>
-            <Text style={[styles.statLabel, { color: theme.muted }]} numberOfLines={1}>{stat.label}</Text>
+            <Text style={[styles.statLabel, { color: `${theme.text}99` }]} numberOfLines={1}>{stat.label}</Text>
           </>
         );
         return stat.onPress ? (
@@ -298,5 +298,6 @@ const styles = StyleSheet.create({
   statCell: { alignItems: 'center', minWidth: 44 },
   statPressed: { opacity: 0.6 },
   statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, fontVariant: ['tabular-nums'] },
-  statLabel: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 17 },
+  // 12pt at 60% white under the 17pt bold number.
+  statLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 15 },
 });

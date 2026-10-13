@@ -93,11 +93,14 @@ export interface FollowMorphButtonProps {
   style?: StyleProp<ViewStyle>;
   /** Additive: label type override so the button can match a surrounding button row. */
   labelStyle?: StyleProp<TextStyle>;
+  /** Additive: icon shown before the label while following (e.g. "Friends"). */
+  followingIcon?: React.ComponentProps<typeof Feather>['name'];
 }
 
 /** Text/style cross-fades between "Follow" (solid) and "Following" (outline). */
 export function FollowMorphButton({
   following, onChange, small, followLabel = 'Follow', followingLabel = 'Following', disabled, style, labelStyle,
+  followingIcon,
 }: FollowMorphButtonProps) {
   const { theme } = useAppTheme();
   const progress = useSharedValue(following ? 1 : 0);
@@ -106,13 +109,14 @@ export function FollowMorphButton({
     progress.set(withTiming(following ? 1 : 0, { duration: 180 }));
   }, [following, progress]);
 
+  // Follow = white fill / black label; Following / Friends = outline.
   const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.value, [0, 1], [theme.accent, 'transparent']),
+    backgroundColor: interpolateColor(progress.value, [0, 1], [theme.text, 'transparent']),
     borderWidth: 1,
-    borderColor: interpolateColor(progress.value, [0, 1], [theme.accent, theme.text]),
+    borderColor: interpolateColor(progress.value, [0, 1], [theme.text, theme.border]),
   }));
   const textStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(progress.value, [0, 1], [theme.onAccent, theme.text]),
+    color: interpolateColor(progress.value, [0, 1], [theme.background, theme.text]),
   }));
 
   return (
@@ -123,7 +127,8 @@ export function FollowMorphButton({
       disabled={disabled}
       onPress={() => { hapticToggle(); onChange(!following); }}
     >
-      <Animated.View style={[styles.followBtn, small && styles.followBtnSmall, animatedStyle, disabled && styles.followBtnDisabled, style]}>
+      <Animated.View style={[styles.followBtn, small && styles.followBtnSmall, animatedStyle, disabled && styles.followBtnDisabled, style, followingIcon && following ? styles.followBtnWithIcon : null]}>
+        {following && followingIcon ? <Feather name={followingIcon} size={16} color={theme.text} /> : null}
         <Animated.Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold }, labelStyle, textStyle]}>
           {following ? followingLabel : followLabel}
         </Animated.Text>
@@ -181,4 +186,5 @@ const styles = StyleSheet.create({
   followBtn: { height: 36, paddingHorizontal: 18, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   followBtnSmall: { height: 30, paddingHorizontal: 14 },
   followBtnDisabled: { opacity: 0.5 },
+  followBtnWithIcon: { flexDirection: 'row', gap: 6 },
 });
