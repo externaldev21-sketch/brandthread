@@ -79,7 +79,7 @@ import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
 import { getClosetOutfits, getClosetPieces, type ClosetOutfit, type ClosetPiece } from '@/services/closetService';
-import { ClosetOutfitTile, ClosetPieceTile, ClosetSubBar, type ClosetView } from '@/components/closet/ClosetViews';
+import { ClosetEmpty, ClosetOutfitTile, ClosetPieceTile, ClosetSubBar, type ClosetView } from '@/components/closet/ClosetViews';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -1034,7 +1034,9 @@ export default function ProfileScreen() {
         numColumns={numColumns}
         columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
         ListHeaderComponent={header}
-        ListEmptyComponent={(
+        ListEmptyComponent={activeTab === 'Closet' && !loading ? (
+          <ClosetEmpty title={emptyTitle} action={emptyAction} minHeight={emptyArea.minHeight} />
+        ) : (
           // `emptyArea` (computeEmptyArea, shared with ProfileShell) sizes
           // this to fill the rest of the viewport below the (measured, video
           // hero included) header, and `emptyArea.paddingBottom` below

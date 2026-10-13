@@ -91,14 +91,14 @@ const TABLE: Record<ProfileEmptyTab, {
   'buyer:closet': {
     icon: 'layers',
     title: 'Your closet is empty',
-    message: 'Pieces from your delivered orders land here.',
+    message: '',
     publicMessage: 'Closets are private.',
     cta: { label: 'Start shopping', route: '/(buyer)/discover' },
   },
   'buyer:closet-outfits': {
     icon: 'layers',
     title: 'No outfits yet',
-    message: 'Put pieces from your closet together.',
+    message: '',
     publicMessage: 'Closets are private.',
     cta: { label: 'New outfit', route: '/closet-outfit' },
   },

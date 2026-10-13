@@ -108,6 +108,21 @@ export function ClosetOutfitTile({ pieces, width, onPress, testID }: { pieces: C
   );
 }
 
+/** Plain empty state: a title and a text action — no icon badge, no explainer. */
+export function ClosetEmpty({ title, action, minHeight }: { title: string; action?: { label: string; onPress: () => void }; minHeight?: number }) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={[styles.empty, minHeight ? { minHeight } : null]} testID="closet-empty">
+      <Text style={[styles.emptyTitle, { color: theme.text }]}>{title}</Text>
+      {action ? (
+        <Pressable onPress={action.onPress} hitSlop={8} accessibilityRole="button" testID="closet-empty-action">
+          <Text style={[styles.emptyAction, { color: theme.text }]}>{action.label}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 export type ClosetView = 'pieces' | 'outfits';
 
 export function ClosetSubBar({
@@ -172,4 +187,7 @@ const styles = StyleSheet.create({
   segText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   segCount: { fontFamily: FONT.regular },
   newOutfit: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  empty: { alignItems: 'center', paddingTop: SP.xl, paddingHorizontal: SP.lg, gap: SP.sm },
+  emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md },
+  emptyAction: { fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline' },
 });

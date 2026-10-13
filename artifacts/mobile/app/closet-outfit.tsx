@@ -146,7 +146,6 @@ export default function ClosetOutfitScreen() {
         {pieces.length === 0 ? (
           <View style={styles.empty}>
             <Text style={[styles.emptyTitle, { color: theme.text }]}>Your closet is empty</Text>
-            <Text style={[styles.emptyBody, { color: theme.muted }]}>Pieces from your delivered orders land here.</Text>
           </View>
         ) : (
           <FlatList
@@ -236,7 +235,6 @@ const styles = StyleSheet.create({
   loading: { marginTop: SP.xl },
   empty: { paddingHorizontal: SP.lg, paddingTop: SP.xl, gap: SP.xs },
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md },
-  emptyBody: { fontFamily: FONT.regular, fontSize: FS.sm },
   bottomBar: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
     paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: StyleSheet.hairlineWidth,
