@@ -3,7 +3,7 @@
  * Mounted at /api/gift-cards.
  *
  * Public
- *   GET  /store/:sellerId            does this store sell gift cards, and at which amounts
+ *   GET  /store/:sellerId            does this store sell gift cards, at which amounts, and whether we text them
  * Buyer (signed in)
  *   POST /purchase                   start buying a card: creates the PaymentIntent (Brandthread balance)
  *   POST /purchase/:id/confirm       after paying: activate the card (covers a slow webhook), returns the code once
@@ -37,6 +37,9 @@ import { getGiftCardSettings, saveGiftCardSettings, expiryFromMonths } from "../
 import { confirmGiftCardPurchase, createGiftCardPurchase, deliverGiftCard, storeNameFor } from "../lib/giftCards/purchase";
 import { guardCodeLookup } from "../lib/giftCards/checkout";
 import { looksLikeGiftCardCode } from "../lib/giftCards/codes";
+import { purchaseSchema } from "../lib/giftCards/purchaseSchema";
+import { smsEnabled } from "../lib/sms/twilio";
+import { phoneLast4 } from "../lib/sms/phone";
 
 const router = Router();
 
@@ -70,22 +73,14 @@ router.get("/store/:sellerId", async (req, res) => {
     allowCustom: settings.enabled && settings.allowCustom,
     minCents: settings.minCents,
     maxCents: settings.maxCents,
+    // The server texts cards sent to a phone itself; otherwise the app opens Messages.
+    smsDelivery: smsEnabled(),
   });
 });
 
 router.use(requireAuth);
 
 // ─── Buyer ───────────────────────────────────────────────────────────────────
-
-const purchaseSchema = z.object({
-  sellerId: requestPrimitives.id,
-  amountCents: z.coerce.number().int(),
-  recipientEmail: requestPrimitives.email,
-  recipientName: z.string().trim().max(80).optional(),
-  message: z.string().trim().max(300).optional(),
-  forSelf: z.boolean().optional(),
-  clientIdempotencyKey: z.string().trim().min(8).max(120),
-});
 
 router.post("/purchase", validateRequest({ body: purchaseSchema }), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
@@ -112,6 +107,8 @@ router.post("/purchase/:id/confirm", async (req, res) => {
       card: presentCard(result.card, "purchaser"),
       // Shown once, to the buyer who just paid, so they can also share it themselves.
       code: result.code,
+      // Last 4 of the recipient's phone when the server already texted the card.
+      textedTo: result.card.recipientPhone && result.card.deliveredAt ? phoneLast4(result.card.recipientPhone) : null,
     });
   } catch (error) {
     if (fail(res, error)) return;

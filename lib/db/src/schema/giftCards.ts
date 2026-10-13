@@ -19,6 +19,8 @@ export const giftCards = pgTable('gift_cards', {
   /** Set when a buyer claims the card into their wallet (or buys it for themselves). */
   ownerId:       text('owner_id'),
   recipientEmail: text('recipient_email'),
+  /** E.164, for cards sent by text message (migration 262). */
+  recipientPhone: text('recipient_phone'),
   recipientName: text('recipient_name'),
   message:       text('message'),
   /** 'pending_payment' | 'active' | 'void' */

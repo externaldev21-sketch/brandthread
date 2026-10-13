@@ -8,7 +8,9 @@
  *  - checkout: the card covers part of ITS store's group only, the seller is
  *    still paid in full (supplemental transfer), abandoned checkouts free the
  *    card, a full refund gives it back and reverses the seller's gift payout;
- *  - code lookups are rate limited.
+ *  - code lookups are rate limited;
+ *  - text delivery: a card bought for a phone is texted once when SMS is
+ *    configured, and left for the buyer to send when it isn't.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,6 +33,16 @@ vi.mock("../../brandthreadEmail", async (importOriginal) => ({
   sendBrandthreadEmail: async (mail: { to: string; subject: string; html: string }) => {
     sentEmails.push(mail);
     return true;
+  },
+}));
+const sms = vi.hoisted(() => ({ enabled: false, ok: true, sent: [] as Array<{ to: string; body: string }> }));
+vi.mock("../../sms/twilio", () => ({
+  smsEnabled: () => sms.enabled,
+  sendSms: async (to: string, body: string) => {
+    if (!sms.enabled) return { sent: false, reason: "not_configured" };
+    if (!sms.ok) return { sent: false, reason: "api_error" };
+    sms.sent.push({ to, body });
+    return { sent: true, sid: "SM_test" };
   },
 }));
 vi.mock("../../../middlewares/requireAuth", () => ({
@@ -81,6 +93,9 @@ afterAll(async () => {
 beforeEach(() => {
   fake.reset();
   sentEmails.length = 0;
+  sms.enabled = false;
+  sms.ok = true;
+  sms.sent.length = 0;
 });
 
 /** A fresh checkout_sessions row to hang a reservation on. */
@@ -373,6 +388,74 @@ describe("buying a gift card", () => {
     });
     expect(odd.body.code).toBe("INVALID_AMOUNT");
     expect(fake.state.paymentIntents.size).toBe(0);
+  });
+
+  async function buyForPhone(tag: string, extra: Record<string, unknown> = {}) {
+    const seller = await sellingStore(tag);
+    const buyer = await seedBuyer(tag);
+    const res = await call(app.base, "POST", "/api/gift-cards/purchase", buyer, {
+      sellerId: seller, amountCents: 2_500, recipientPhone: "(415) 555-2671", message: "Enjoy https://x.example.com", clientIdempotencyKey: uid("sms"), ...extra,
+    });
+    expect(res.status).toBe(200);
+    fake.state.paymentIntents.get(res.body.paymentIntentId).status = "succeeded";
+    const confirmed = await call(app.base, "POST", `/api/gift-cards/purchase/${res.body.giftCardId}/confirm`, buyer, {});
+    const [row] = await db.select().from(giftCards).where(eq(giftCards.id, res.body.giftCardId));
+    return { seller, buyer, confirmed: confirmed.body, row, intent: fake.state.paymentIntents.get(res.body.paymentIntentId) };
+  }
+
+  it("texts a card bought for a phone once when SMS is configured, with the code and no links from the note", async () => {
+    sms.enabled = true;
+    const { seller, confirmed, row, intent } = await buyForPhone("smson");
+    expect((await call(app.base, "GET", `/api/gift-cards/store/${seller}`, "anon")).body.smsDelivery).toBe(true);
+    expect(row.recipientPhone).toBe("+14155552671");
+    expect(row.recipientEmail).toBeNull();
+    expect(row.deliveredAt).not.toBeNull();
+    expect(confirmed.textedTo).toBe("2671");
+    expect(confirmed.card.recipientPhoneLast4).toBe("2671");
+    expect(sms.sent).toHaveLength(1);
+    expect(sms.sent[0].to).toBe("+14155552671");
+    expect(sms.sent[0].body).toContain("$25");
+    expect(sms.sent[0].body).toContain(confirmed.code);
+    expect(sms.sent[0].body).toContain("Claim it: https://brandthread.app/gift-cards");
+    expect(sms.sent[0].body).not.toContain("x.example.com");
+    expect(sentEmails).toHaveLength(0);
+    await handleGiftCardPaymentSucceeded(intent); // a late webhook doesn't text again
+    expect(sms.sent).toHaveLength(1);
+  });
+
+  it("leaves a phone card undelivered when SMS is off or Twilio refuses, so the buyer sends it", async () => {
+    const off = await buyForPhone("smsoff");
+    expect((await call(app.base, "GET", `/api/gift-cards/store/${off.seller}`, "anon")).body.smsDelivery).toBe(false);
+    expect(off.confirmed.textedTo).toBeNull();
+    expect(off.confirmed.code).toBeTruthy();
+    expect(off.row.deliveredAt).toBeNull();
+
+    sms.enabled = true;
+    sms.ok = false;
+    const refused = await buyForPhone("smsfail");
+    expect(refused.confirmed.textedTo).toBeNull();
+    expect(refused.row.deliveredAt).toBeNull();
+    expect(sms.sent).toHaveLength(0);
+  });
+
+  it("emails as before when the buyer gives an email, even with SMS configured", async () => {
+    sms.enabled = true;
+    const { confirmed, row } = await buyForPhone("smsemail", { recipientPhone: undefined, recipientEmail: "friend@test.local" });
+    expect(row.recipientPhone).toBeNull();
+    expect(confirmed.textedTo).toBeNull();
+    expect(sentEmails).toHaveLength(1);
+    expect(sms.sent).toHaveLength(0);
+  });
+
+  it("needs an email or a valid phone", async () => {
+    const seller = await sellingStore("smsbad");
+    const buyer = await seedBuyer("smsbad");
+    const none = await call(app.base, "POST", "/api/gift-cards/purchase", buyer, { sellerId: seller, amountCents: 2_500, clientIdempotencyKey: uid("sms") });
+    expect(none.status).toBe(400);
+    const bad = await call(app.base, "POST", "/api/gift-cards/purchase", buyer, {
+      sellerId: seller, amountCents: 2_500, recipientPhone: "555", clientIdempotencyKey: uid("sms"),
+    });
+    expect(bad.status).toBe(400);
   });
 
   it("a retried purchase request returns the same intent and card", async () => {
