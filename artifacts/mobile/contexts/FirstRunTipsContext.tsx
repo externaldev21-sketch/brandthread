@@ -17,6 +17,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState, useEffect } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
   FirstRunTipsLocalState,
   markTipSeen,
@@ -27,7 +28,7 @@ import {
 } from '@/lib/firstRunTips/storage';
 
 interface FirstRunTipsContextValue {
-  /** Loading the initial server reconcile — screens should not gate on this (local cache is already usable). */
+  /** True once auth has settled and the saved seen-state (local + server) is loaded. useFirstRunTip waits for it so a tip never shows on a stale or empty state. */
   ready: boolean;
   hasSeen: (tipId: string) => boolean;
   skipAll: boolean;
@@ -43,26 +44,49 @@ interface FirstRunTipsContextValue {
 const FirstRunTipsContext = createContext<FirstRunTipsContextValue | null>(null);
 
 export function FirstRunTipsProvider({ children }: { children: React.ReactNode }) {
-  const { userId } = useAuth();
+  const { userId, isLoaded: authLoaded } = useAuth();
   const api = useApi();
 
   const [state, setState] = useState<FirstRunTipsLocalState>({ seenIds: new Set(), skipAll: false });
   const [ready, setReady] = useState(false);
   const [activeTipId, setActiveTipId] = useState<string | null>(null);
   const activeTipRef = useRef<string | null>(null);
+  /** Which account the in-memory seen-state belongs to (null = not signed in yet). */
+  const stateOwnerRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Nothing is decided until auth has settled (or this is a dev preview,
+    // which renders without waiting for Clerk), and `ready` only flips once
+    // the saved seen-state is loaded, so a tip can't flash on a stale or empty
+    // state or show twice across a null → real userId switch.
+    const settled = authLoaded || isSellerDevPreview() || isBuyerDevPreview();
+    if (!settled) return;
     let active = true;
-    // Paint instantly from the local cache, then reconcile with the server
-    // (source of truth) without blocking anything on the network round-trip.
-    readLocalFirstRunTipsState(userId).then((local) => { if (active) setState(local); });
+    setReady(false);
+    // Seen-state only grows for the same account, and what was seen before
+    // the account id resolved carries over to it. A different account starts
+    // from its own record.
+    const owner = userId ?? null;
+    const carry = stateOwnerRef.current === owner || stateOwnerRef.current === null;
+    const apply = (next: FirstRunTipsLocalState) => setState((prev) => (carry
+      ? { seenIds: new Set([...prev.seenIds, ...next.seenIds]), skipAll: prev.skipAll || next.skipAll }
+      : next));
+    readLocalFirstRunTipsState(userId).then((local) => {
+      if (!active) return;
+      apply(local);
+      stateOwnerRef.current = owner;
+      if (!userId) setReady(true);
+    });
     if (userId) {
-      syncFirstRunTipsFromServer(userId, api).then((synced) => { if (active) { setState(synced); setReady(true); } });
-    } else {
-      setReady(true);
+      syncFirstRunTipsFromServer(userId, api).then((synced) => {
+        if (!active) return;
+        apply(synced);
+        stateOwnerRef.current = owner;
+        setReady(true);
+      });
     }
     return () => { active = false; };
-  }, [userId, api]);
+  }, [authLoaded, userId, api]);
 
   // Pure account state only — the preview/&tips=1 override lives in
   // useFirstRunTip itself (see that file for why: it needs to react to

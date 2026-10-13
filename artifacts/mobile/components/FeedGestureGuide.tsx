@@ -1,13 +1,13 @@
 /**
  * FeedGestureGuide — first-time buyer coach screen for the video feed.
- * Modeled on Instagram's "Watching stories" coach mark: a dim/blurred
- * overlay, a title and subtitle, four animated gesture rows, and
- * "Tap to keep watching". Any tap dismisses it; shown once per account
- * (see FEED_GESTURE_GUIDE_SEEN_KEY / dismissFeedGestureGuide below).
+ * Modeled on Instagram's "Watching stories" coach mark: a near-opaque black
+ * backdrop (nothing behind it reads through), a title and subtitle, four
+ * animated gesture rows, and a white "Keep watching" button. Any tap
+ * dismisses it. Shown once per account: the feed marks it seen the moment it
+ * appears (lib/feedGestureGuideStorage.ts).
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
 
@@ -123,14 +123,10 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
       accessibilityViewIsModal
       testID="feed-gesture-guide"
     >
-      <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Tap to keep watching">
-        <BlurView
-          intensity={Platform.OS === 'ios' ? 46 : 60}
-          tint="dark"
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[StyleSheet.absoluteFill, styles.dim]} />
-        <View style={styles.content} pointerEvents="none">
+      {/* Tap anywhere dismisses; "Keep watching" is the visible button. */}
+      <Pressable style={[StyleSheet.absoluteFill, styles.backdrop]} onPress={onDismiss} accessibilityLabel="Tap to keep watching" />
+      <View style={styles.content} pointerEvents="box-none">
+        <View style={styles.inner} pointerEvents="none">
           <Text style={styles.title}>Watching Threads</Text>
           <Text style={styles.subtitle}>A few gestures to get you moving</Text>
 
@@ -150,18 +146,28 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
               );
             })}
           </View>
-
-          <Text style={styles.dismissHint}>Tap to keep watching</Text>
         </View>
-      </Pressable>
+
+        <Pressable
+          onPress={onDismiss}
+          style={({ pressed }) => [styles.dismissBtn, pressed && { opacity: 0.85 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Keep watching"
+          testID="feed-gesture-guide-dismiss"
+        >
+          <Text style={styles.dismissText}>Keep watching</Text>
+        </Pressable>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { zIndex: 9999, elevation: 9999 },
-  dim: { backgroundColor: 'rgba(0,0,0,0.38)' },
+  // Near-opaque so the feed behind ("No posts yet", "Shop products") never reads through.
+  backdrop: { backgroundColor: 'rgba(0,0,0,0.94)' },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
+  inner: { width: '100%', alignItems: 'center' },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.xxl, textAlign: 'center' },
   subtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 6, marginBottom: 40 },
   rows: { width: '100%', gap: 28 },
@@ -170,5 +176,9 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   rowTitle: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base },
   rowSubtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  dismissHint: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 48, letterSpacing: 0.3 },
+  dismissBtn: {
+    marginTop: 48, alignSelf: 'stretch', height: 50, borderRadius: 12,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+  },
+  dismissText: { color: '#000000', fontFamily: FONT.semibold, fontSize: FS.base },
 });

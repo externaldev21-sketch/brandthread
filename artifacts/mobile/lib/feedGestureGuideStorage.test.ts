@@ -105,4 +105,46 @@ describe('Feed gesture guide — shown once per account, versioned, server-backe
       expect((await api.feedGesturesTip.get()).seenVersion).toBe(FEED_GESTURES_TIP_VERSION + 1);
     }
   });
+
+  // ── Dev's bug: the coach showed on EVERY load of the Threads page ──
+
+  it('shown once → reload → not shown (with a server that works)', async () => {
+    const { api } = makeServer();
+    expect(await hasSeenFeedGestureGuide('user_123', api)).toBe(false); // first load: show
+    await markFeedGestureGuideSeen('user_123', api); // marked the moment it is shown
+    expect(await hasSeenFeedGestureGuide('user_123', api)).toBe(true); // reload
+  });
+
+  it('a failed server PATCH never brings it back: the server saying 0 cannot overwrite local', async () => {
+    const seen = { value: 0 };
+    const api = {
+      feedGesturesTip: {
+        get: vi.fn(async () => ({ seenVersion: seen.value })),
+        markSeen: vi.fn(async () => { throw new Error('401 / offline'); }),
+      },
+    };
+    expect(await hasSeenFeedGestureGuide('user_123', api)).toBe(false);
+    await markFeedGestureGuideSeen('user_123', api); // PATCH fails; server still 0
+    for (let reload = 0; reload < 3; reload++) {
+      expect(await hasSeenFeedGestureGuide('user_123', api)).toBe(true);
+    }
+    expect(store.get(feedGestureGuideKey('user_123'))).toBe(String(FEED_GESTURES_TIP_VERSION)); // never downgraded
+  });
+
+  it('when local is ahead of the server, it re-sends markSeen so the server catches up', async () => {
+    const { api, seen } = makeServer(); // server: 0
+    store.set(feedGestureGuideKey('user_123'), String(FEED_GESTURES_TIP_VERSION));
+    expect(await hasSeenFeedGestureGuide('user_123', api)).toBe(true);
+    await Promise.resolve();
+    expect(api.feedGesturesTip.markSeen).toHaveBeenCalledWith(FEED_GESTURES_TIP_VERSION);
+    expect(seen.get('user_123')).toBe(FEED_GESTURES_TIP_VERSION);
+  });
+
+  it('null → real userId: seen while the id was still loading counts for the account', async () => {
+    const { api } = makeServer();
+    expect(await hasSeenFeedGestureGuide(null)).toBe(false);
+    await markFeedGestureGuideSeen(null); // shown under 'anon'
+    expect(await hasSeenFeedGestureGuide('user_123', api)).toBe(true); // not shown twice
+  });
 });
+

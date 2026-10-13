@@ -51,28 +51,39 @@ export function useFirstRunTip(tipId: string, options: UseFirstRunTipOptions): U
   const forceShow = isFirstRunTipsPreviewForceShow();
   const previewSuppressed = isPreviewWithoutTipsForce(isSellerDevPreview() || isBuyerDevPreview());
 
+  // Whether the screen can host the tip right now (content loaded, not an
+  // auth route, not suppressed). Separate from seen-state: a tip that is
+  // already showing stays up even though it was marked seen when it appeared.
+  const canShow = contentReady && !suppressed && !isAuthFlowRoute(pathname) && (forceShow || !previewSuppressed);
+
   const eligible = useMemo(() => {
-    if (!contentReady || suppressed || isAuthFlowRoute(pathname)) return false;
+    if (!canShow) return false;
     if (forceShow) return true; // Dev's &tips=1: always eligible, ignoring seen-state
-    if (previewSuppressed) return false; // plain preview, no &tips=1: never show
+    // Never decide before the saved seen-state has loaded (and auth settled).
+    if (!controller.ready) return false;
     return !controller.hasSeen(tipId);
     // controller.hasSeen closes over state that changes identity each render when relevant —
     // depending on the primitives it reads keeps this from re-running needlessly.
-  }, [contentReady, suppressed, pathname, forceShow, previewSuppressed, controller, tipId]);
+  }, [canShow, forceShow, controller, tipId]);
 
   useEffect(() => {
-    if (!eligible) {
-      if (claimed) { controller.release(tipId); setClaimed(false); }
+    if (claimed) {
+      if (!canShow) { controller.release(tipId); setClaimed(false); }
       return;
     }
-    if (claimed) return;
-    if (controller.claim(tipId)) setClaimed(true);
+    if (!eligible) return;
+    if (controller.claim(tipId)) {
+      setClaimed(true);
+      // Seen the moment it shows: swiping away, switching tabs or killing
+      // the app all count, so no first-run tip ever repeats.
+      if (!forceShow) controller.markSeen(tipId);
+    }
     // Intentionally does not retry on every render if the claim fails (another
     // tip is showing) — this screen simply doesn't show its tip this visit,
     // per the "never stacks" rule. It will show next time the screen mounts
     // fresh with nothing else active.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eligible, tipId]);
+  }, [eligible, canShow, tipId]);
 
   useEffect(() => () => { if (claimed) controller.release(tipId); }, [claimed, tipId, controller]);
 
@@ -82,5 +93,5 @@ export function useFirstRunTip(tipId: string, options: UseFirstRunTipOptions): U
     setClaimed(false);
   }
 
-  return { visible: eligible && claimed, dismiss };
+  return { visible: claimed && canShow, dismiss };
 }
