@@ -17,7 +17,7 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import {
-  buildPreviewWeb, launchBrowser, openContext, openScreen, serveBuild, waitForQuietNetwork,
+  buildPreviewWeb, launchBrowser, openContext, serveBuild, waitForQuietNetwork,
   DEFAULT_BUILD_DIR, MOBILE_ROOT,
 } from './store-screenshots/harness.mjs';
 
@@ -49,9 +49,9 @@ function buyerPrefs() {
 /** Routes registered after openContext's catch-all are tried first by Playwright. */
 async function fakeApi(context, sms) {
   const json = (route, body, status = 200) => route.fulfill({ status, headers: CORS, contentType: 'application/json', body: JSON.stringify(body) });
-  await context.route(`${DEMO_API}/api/notification-prefs`, (route) =>
+  await context.route(/\/api\/(v1\/)?notification-prefs$/, (route) =>
     route.request().method() === 'OPTIONS' ? route.fulfill({ status: 204, headers: CORS }) : json(route, buyerPrefs()));
-  await context.route(`${DEMO_API}/api/notification-prefs/sms**`, (route) => {
+  await context.route(/\/api\/(v1\/)?notification-prefs\/sms(\/verify)?$/, (route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
     const url = new URL(req.url());
@@ -81,7 +81,16 @@ async function shot(page, name) {
 async function session(browser, origin, sms, target) {
   const { context, page, activity } = await openContext(browser, { device: DEVICE, role: 'buyer', origin, images: {} });
   await fakeApi(context, sms);
-  await openScreen(page, activity, origin, 'buyer', target, { extraQuery: '&demo=1' });
+  page.on('pageerror', (e) => console.log('  PAGEERROR', e.message.slice(0, 200)));
+  page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) console.log('  CONSOLE', m.text().slice(0, 300)); });
+  page.on('request', (r) => { if (r.url().includes('notification-prefs')) console.log('  ', r.method(), new URL(r.url()).pathname); });
+  // A full load of the target keeps `&demo=1` in the URL while the screen
+  // mounts (a client-side pushState mounts it before the URL updates).
+  await page.goto(`${origin}${target}?bt_preview=buyer&demo=1`);
+  await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 });
+  if (!(await page.evaluate(() => window.location.pathname)).startsWith(target)) {
+    throw new Error(`Navigation to ${target} never took effect`);
+  }
   await settle(page, activity);
   return { context, page, activity };
 }
@@ -94,6 +103,7 @@ async function main() {
   try {
     {
       const { context, page } = await session(browser, origin, { available: false, phone: null, enabled: false }, '/notifications-settings');
+      await page.mouse.move(196, 500);
       await page.mouse.wheel(0, 2000);
       await page.waitForTimeout(600);
       await shot(page, 'before-notifications-settings.png');
@@ -101,6 +111,7 @@ async function main() {
     }
     {
       const { context, page } = await session(browser, origin, { available: true, phone: null, enabled: false }, '/notifications-settings');
+      await page.mouse.move(196, 500);
       await page.mouse.wheel(0, 2000);
       await page.waitForTimeout(600);
       await shot(page, 'after-notifications-settings.png');
