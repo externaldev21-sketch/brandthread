@@ -84,7 +84,7 @@ import {
   FeedToastProvider,
   useFeedToast,
 } from '@/components/EngagementButton';
-import { formatCount } from '@/lib/engagementUtils';
+import { formatCount, isUUID as isUUIDId } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -98,7 +98,13 @@ import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
-import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
+import { LongPressMenu, type NotInterestedReason } from '@/components/buyer-feed/LongPressMenu';
+import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
+import { useCaptionsPreference, useReadyCaptionTrack, type CaptionTrack } from '@/lib/captions';
+import { saveVideoToPhotos } from '@/lib/saveVideoToPhotos';
+import { buildPostUrl } from '@/lib/shareLinks';
+import * as Clipboard from 'expo-clipboard';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
@@ -357,6 +363,10 @@ interface SpotlightItem {
   /** Admin-approved paid promotion served in For You; rendered with a "Sponsored" label. */
   sponsored?: boolean;
   sponsoredBoostId?: string;
+  /** Seller's "Allow downloads" post option (missing = allowed). */
+  allowDownloads?: boolean;
+  /** Seller's "Allow reposts" post option (missing = allowed). */
+  allowReposts?: boolean;
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
@@ -1079,6 +1089,8 @@ type VideoVisualProps = {
    * very first item, to know when it's safe to swap away the plain overlay
    * poster FeedScreen renders above the whole list on first mount. */
   onFirstFramePainted?: () => void;
+  /** Ready auto-caption segments to draw over the clip (CC on). */
+  captions?: CaptionSegment[];
 };
 
 /**
@@ -1190,12 +1202,20 @@ function LiveVideoVisual({
   bottomStripHeight = 0,
   posterPriority,
   onFirstFramePainted,
+  captions,
 }: VideoVisualProps) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
     p.muted = muted;
     if (progressBottom != null) p.timeUpdateEventInterval = 0.25;
   });
+  const [captionTime, setCaptionTime] = useState(0);
+  React.useEffect(() => {
+    if (!captions || !isActive) return undefined;
+    if (!player.timeUpdateEventInterval) player.timeUpdateEventInterval = 0.25;
+    const subscription = player.addListener('timeUpdate', ({ currentTime }) => setCaptionTime(currentTime));
+    return () => subscription.remove();
+  }, [captions, isActive, player]);
   const [hasStarted, setHasStarted] = useState(false);
   // Kept mounted (opacity-only), not conditionally rendered — conditional
   // mount/unmount can only pop the pause glyph in, never fade it out on
@@ -1347,6 +1367,10 @@ function LiveVideoVisual({
           <FontAwesome name="play" size={56} color={ON_DARK} />
         </Animated.View>
       </View>
+      {captions && isActive ? (
+        // Sits just above the caption/sound stack, clear of the rail.
+        <CaptionsOverlay segments={captions} currentTime={captionTime} bottomOffset={(chromeTop ?? 140) + 8} />
+      ) : null}
       {progressBottom != null && isActive && (
         <ScrubProgressBar
           player={player}
@@ -1451,7 +1475,7 @@ function SpotlightPageImpl({
   onFollow: (id: string) => Promise<void>;
   onOpenComments: (id: string) => void;
   onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
-  onNotInterested: (id: string) => void;
+  onNotInterested: (id: string, reason?: NotInterestedReason) => void;
   onVideoWatched: (id: string) => void;
   /** Whether the app-wide feed sound preference is on. */
   soundOn: boolean;
@@ -1466,6 +1490,7 @@ function SpotlightPageImpl({
   const router = useRouter();
   const { openReport } = useReportSheet();
   const { push } = useThreadPull();
+  const feedApi = useApi();
   const commentCountDelta = useCommentCountDelta(item.id);
   // The creator player (no tab bar) always plays edge to edge like Buyer Home.
   const immersive = immersiveProp || !hasTabBar;
@@ -1487,9 +1512,33 @@ function SpotlightPageImpl({
   // Starts at the taller of the two nominal minimums so the very first
   // frame (before layout fires) still clears a repost row if there is one.
   const [captionBlockHeight, setCaptionBlockHeight] = useState(CAPTION_BLOCK_HEIGHT_WITH_REPOST);
-  /** Long-press context menu: "2x speed" / "Not interested" / "Report". */
+  /** Long-press "Video options" sheet (components/buyer-feed/LongPressMenu). */
   const [menuOpen, setMenuOpen] = useState(false);
   const { showToast } = useFeedToast();
+  // Auto-captions (lib/captions): only the active page asks for its track.
+  const captionsFlag = useFeatureFlag('autoCaptions');
+  const [captionsOn, setCaptionsOn] = useCaptionsPreference();
+  const fetchCaptionTracks = useCallback(
+    (id: string) => feedApi.posts.captions(id) as Promise<{ tracks: CaptionTrack[] }>,
+    [feedApi],
+  );
+  const captionTrack = useReadyCaptionTrack(
+    isActive ? item.id : undefined, item.contentType === 'video', captionsFlag, fetchCaptionTracks,
+  );
+  const postUrl = buildPostUrl(item.id);
+  const downloadAbortRef = useRef<AbortController | null>(null);
+  const handleDownload = useCallback(() => {
+    const uri = item.mediaUris[0];
+    if (!uri || downloadAbortRef.current) return;
+    const controller = new AbortController();
+    downloadAbortRef.current = controller;
+    showToast('Saving video…', 'info');
+    void saveVideoToPhotos(uri, item.id, { signal: controller.signal }).then(result => {
+      downloadAbortRef.current = null;
+      if (result.ok) showToast('Video saved to Photos.', 'info');
+      else showToast(result.message, result.reason === 'cancelled' ? 'info' : 'error');
+    });
+  }, [item.id, item.mediaUris, showToast]);
   const heartBurst = useRef(new Animated.Value(0)).current;
   // Separate from `heartBurst` (which now only drives opacity/fade): the
   // scale pop needs its own 0.8 -> 1.1 -> 1 sequence, not a value
@@ -1689,6 +1738,7 @@ function SpotlightPageImpl({
                 pageHeight={pageHeight}
                 bottomStripHeight={immersive && hasTabBar ? (videoFrameInset ?? bottomClearance) : 0}
                 onFirstFramePainted={isFirstItem ? onFirstFramePainted : undefined}
+                captions={captionTrack && captionsOn ? captionTrack.segments : undefined}
               />
             )
             : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} onPageChange={setPhotoPageIndex} onFirstImagePainted={isFirstItem ? onFirstFramePainted : undefined} />}
@@ -1795,9 +1845,29 @@ function SpotlightPageImpl({
 
       <LongPressMenu
         visible={menuOpen}
+        creator={item.creator}
+        isVideo={item.contentType === 'video'}
         speedActive={speedActive}
         onToggleSpeed={() => setSpeedActive(v => !v)}
-        onNotInterested={() => onNotInterested(item.id)}
+        saved={engagement?.saved === true}
+        onToggleSave={() => { dropSave(); void onSave(item.id); }}
+        reposted={engagement?.reposted === true}
+        canRepost={item.allowReposts !== false}
+        onToggleRepost={() => { spinRepost(); void onRepost(item.id); }}
+        onShare={() => setShareOpen(true)}
+        onCopyLink={postUrl ? () => {
+          void Clipboard.setStringAsync(postUrl).then(
+            () => {
+              showToast('Link copied.', 'info');
+              if (isUUIDId(item.id)) void feedApi.posts.interact(item.id, { type: 'share' }).catch(() => {});
+            },
+            () => showToast('Could not copy the link. Try again.', 'error'),
+          );
+        } : undefined}
+        captions={captionTrack ? { on: captionsOn, onToggle: () => setCaptionsOn(!captionsOn) } : undefined}
+        canDownload={item.allowDownloads !== false && !!item.mediaUris[0]}
+        onDownload={handleDownload}
+        onNotInterested={(reason) => onNotInterested(item.id, reason)}
         onReport={() => openReport({
           targetType: item.contentType === 'video' ? 'video' : 'post',
           targetId: item.id,
@@ -1942,6 +2012,8 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     commentsCount: post.commentsCount,
     sponsored: post.sponsored === true ? true : undefined,
     sponsoredBoostId: post.sponsoredBoostId,
+    allowDownloads: post.visibility?.allowDownloads !== false,
+    allowReposts: post.visibility?.allowReposts !== false,
   };
 }
 
@@ -2521,7 +2593,10 @@ export default function FeedScreen({
           await setSellerFollowing(action.targetId, action.payload?.value !== 'unfollow');
           break;
         case 'not_interested':
-          await api.posts.interact(action.targetId, { type: 'not_interested' });
+          await api.posts.interact(action.targetId, {
+            type: 'not_interested',
+            value: typeof action.payload?.value === 'string' ? action.payload.value : undefined,
+          });
           break;
       }
     });
@@ -2846,14 +2921,19 @@ export default function FeedScreen({
   // (a real, visible effect — not just a toast) and records the signal so
   // ranking can downweight similar posts going forward. Fire-and-forget:
   // the post is already gone from the feed either way.
-  const handleNotInterested = useCallback((id: string) => {
-    setSellerFeedPosts(prev => prev.filter(post => post.id !== id));
+  const handleNotInterested = useCallback((id: string, reason: NotInterestedReason = 'video') => {
+    // "Don't recommend videos from <seller>" drops every post of theirs
+    // already loaded in this session, not just the one long-pressed.
+    setSellerFeedPosts(prev => {
+      const sellerId = reason === 'creator' ? prev.find(post => post.id === id)?.sellerId : undefined;
+      return prev.filter(post => post.id !== id && (!sellerId || post.sellerId !== sellerId));
+    });
     if (/^[0-9a-f-]{36}$/i.test(id)) {
-      void api.posts.interact(id, { type: 'not_interested' }).catch((error) => {
-        if (isRetryableFailure(error)) void enqueueEngagementRetry({ kind: 'not_interested', targetId: id });
+      void api.posts.interact(id, { type: 'not_interested', value: reason }).catch((error) => {
+        if (isRetryableFailure(error)) void enqueueEngagementRetry({ kind: 'not_interested', targetId: id, payload: { value: reason } });
       });
     }
-    showToast('We’ll show you fewer posts like this.', 'info');
+    showToast(reason === 'creator' ? 'You’ll see fewer videos from this seller.' : 'We’ll show you fewer posts like this.', 'info');
   }, [api, showToast]);
 
   useEffect(() => {

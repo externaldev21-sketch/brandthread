@@ -560,7 +560,7 @@ export interface SellerThreadPost {
   /** Paid promotion served in For You; must be rendered with a "Sponsored" label. */
   sponsored?:        boolean;
   sponsoredBoostId?: string;
-  visibility:        { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
+  visibility:        { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean; allowDownloads?: boolean };
   scheduledAt:       string | null;
   publishedAt?:      string;
   createdAt:         string;

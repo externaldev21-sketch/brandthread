@@ -205,6 +205,29 @@ describe("not interested", () => {
     const delta = (after.eventCount ?? 0) - (before[0]?.eventCount ?? 0);
     expect(delta).toBe(1);
   });
+
+  it("rejects an unknown reason", async () => {
+    const target = await makePost({ userId: owner });
+    const r = await post(`/api/posts/${target}/interact`, third, { type: "not_interested", value: "sound" });
+    expect(r.status).toBe(400);
+  });
+
+  it("the creator reason hides every post from that seller in For You until undone", async () => {
+    const hidden = await makePost({ userId: owner });
+    const sibling = await makePost({ userId: owner });
+    const { computeForYouRankingForUser } = await import("../../lib/ranking/forYou");
+    const ids = async () => (await computeForYouRankingForUser(third)).map((i) => i.postId);
+    expect(await ids()).toContain(sibling);
+
+    const r = await post(`/api/posts/${hidden}/interact`, third, { type: "not_interested", value: "creator" });
+    expect(r.status).toBe(200);
+    const after = await ids();
+    expect(after).not.toContain(hidden);
+    expect(after).not.toContain(sibling);
+
+    await req(`/api/feed/not-interested/${hidden}`, third, { method: "DELETE" });
+    expect(await ids()).toContain(sibling);
+  });
 });
 
 describe("POST /buyer/saved for posts", () => {
