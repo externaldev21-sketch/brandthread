@@ -92,6 +92,11 @@ None.
 - `cd artifacts/mobile && pnpm exec vitest run tests/pinned-posts.test.ts`: **6 passed**.
 - Typecheck: api-server 0 errors. Mobile: no new errors; the only ones left are the TS6305 errors for the unbuilt `lib/api-client-react/dist`, which exist without this change.
 - `tests/no-hardcoded-theme-color-lint.test.ts` fails the same way on dev: 16 untracked files plus 1 stale allowlist entry, none of them touched here.
+- **Full mobile vitest** (`cd artifacts/mobile && pnpm exec vitest run`):
+  - This branch: 72 failed / 416 passed files (88 failed / 4817 passed tests).
+  - origin/dev: 72 failed / 415 passed files (88 failed / 4811 passed tests).
+  - The sorted FAIL/× lists from the two runs are **identical**, so there are zero new failures. The extra passing file and 6 extra passing tests are this PR's own.
+- `tests/a11y-icon-only-lint.test.ts` run alone: "keeps the screens fixed in the accessibility PR at zero" passes. The baseline test fails on dev too, and on the same 4 files (design-canvas, product-variants, PostScreen, ColorPicker). `buyer-post-viewer` and `PostOwnerSheet` are not flagged: the ••• button is labelled "More options" and the sheet row has a text label.
 - Screenshots: `node artifacts/mobile/scripts/f6-pinned-posts-screenshots.mjs` at 390x844, output in `docs/pr-assets/pinned-posts/ours/`.
 
 ## Suggestions for Dev
