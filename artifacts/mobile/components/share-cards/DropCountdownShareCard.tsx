@@ -38,9 +38,11 @@ export const DropCountdownShareCard = React.forwardRef<View, DropCountdownShareC
     return (
       <ShareCardFrame ref={ref} theme={theme} qrValue={qrValue}>
         <Text style={styles.brand} numberOfLines={1}>{data.brandName.toUpperCase()}</Text>
-        <View style={styles.hero}>
-          {data.heroUri ? <Image source={{ uri: data.heroUri }} style={styles.heroImg} /> : null}
-        </View>
+        {data.heroUri ? (
+          <View style={styles.hero}>
+            <Image source={{ uri: data.heroUri }} style={styles.heroImg} />
+          </View>
+        ) : null}
         <Text style={styles.dropName} numberOfLines={2}>{data.dropName}</Text>
         {big ? (
           <View style={styles.sticker}>

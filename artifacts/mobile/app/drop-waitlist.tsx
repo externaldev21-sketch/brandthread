@@ -238,8 +238,12 @@ export default function DropWaitlistScreen() {
               <>
                 <Text style={styles.url} numberOfLines={1} selectable>{displayUrl(publicUrl)}</Text>
                 <View style={styles.row}>
-                  <Button label="Copy link" icon="copy" variant="secondary" size="small" onPress={() => copyLink()} style={{ flex: 1 }} />
-                  <Button label="Share" icon="share" variant="secondary" size="small" onPress={shareLink} style={{ flex: 1 }} />
+                  <View style={{ flex: 1 }}>
+                    <Button label="Copy link" icon="copy" variant="secondary" size="small" fullWidth onPress={() => copyLink()} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button label="Share" icon="share" variant="secondary" size="small" fullWidth onPress={shareLink} />
+                  </View>
                 </View>
               </>
             ) : (
@@ -359,10 +363,12 @@ function Tile({ styles, theme, icon, label, onPress, disabled }: {
   disabled?: boolean;
 }) {
   return (
-    <PressableScale style={[styles.tile, disabled && { opacity: 0.5 }]} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
-      <Feather name={icon} size={20} color={theme.text} />
-      <Text style={styles.tileLabel}>{label}</Text>
-    </PressableScale>
+    <View style={{ flex: 1 }}>
+      <PressableScale style={[styles.tile, disabled && { opacity: 0.5 }]} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
+        <Feather name={icon} size={20} color={theme.text} />
+        <Text style={styles.tileLabel}>{label}</Text>
+      </PressableScale>
+    </View>
   );
 }
 
@@ -392,14 +398,16 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     backgroundColor: theme.cardElevated, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 6,
   },
   chipText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-  messageBox: { marginTop: SP.sm, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, padding: SP.md },
+  messageBox: {
+    marginTop: SP.sm, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.md,
+  },
   messageText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20 },
   sentRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md },
   sentTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   storyWrap: { alignItems: 'center', gap: SP.md },
   tiles: { flexDirection: 'row', gap: SP.sm, alignSelf: 'stretch' },
   tile: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SP.md,
+    alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SP.md,
     backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
   },
   tileLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
