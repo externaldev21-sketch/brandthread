@@ -95,6 +95,14 @@ describe("validateBulkUpdates", () => {
     expect(validateBulkUpdates([{ variantId: id1, sku: "A" }, { variantId: id2, sku: "a" }]).ok).toBe(false);
     expect(validateBulkUpdates(Array.from({ length: 201 }, () => ({ variantId: id1 }))).ok).toBe(false);
   });
+  it("accepts a compare-at price or null to clear it, and rejects bad amounts", () => {
+    expect(validateBulkUpdates([{ variantId: id1, compareAtCents: 4000 }, { variantId: id2, compareAtCents: null }])).toEqual({
+      ok: true, updates: [{ variantId: id1, compareAtCents: 4000 }, { variantId: id2, compareAtCents: null }],
+    });
+    expect(validateBulkUpdates([{ variantId: id1, compareAtCents: 0 }]).ok).toBe(false);
+    expect(validateBulkUpdates([{ variantId: id1, compareAtCents: 19.99 }]).ok).toBe(false);
+    expect(validateBulkUpdates([{ variantId: id1, compareAtCents: "4000" }]).ok).toBe(false);
+  });
 });
 
 describe("validateStockRules", () => {

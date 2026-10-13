@@ -4,7 +4,7 @@
  *   GET  /api/product-variants/:productId                    axes + variants (with options) + stock rules
  *   PUT  /api/product-variants/:productId/axes               replace the ordered option axes
  *   POST /api/product-variants/:productId/generate           create the missing size × colour × fit (× custom) variants
- *   PATCH /api/product-variants/:productId/variants/bulk     transactional price / stock / SKU / low-stock edit
+ *   PATCH /api/product-variants/:productId/variants/bulk     transactional price / compare-at / stock / SKU / low-stock edit
  *   GET/PUT /api/product-variants/:productId/stock-rules     sold-out behaviour, low-stock default, limited quantity + counter
  *
  * Size and colour stay on the existing variant columns; fit + custom axes are
@@ -13,7 +13,7 @@
 import { Router } from "express";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import {
-  db, products, productVariants, productOptionAxes, productVariantOptions, productStockRules,
+  db, products, productVariants, productOptionAxes, productVariantOptions, productStockRules, productVariantCompareAt,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
@@ -50,15 +50,17 @@ async function loadState(productId: string) {
       id: productVariants.id, sku: productVariants.sku, size: productVariants.size, color: productVariants.color,
       priceCents: productVariants.priceCents, stock: productVariants.stock, lowStockThreshold: productVariants.lowStockThreshold,
       options: productVariantOptions.options,
+      compareAtCents: productVariantCompareAt.compareAtCents,
     })
     .from(productVariants)
     .leftJoin(productVariantOptions, eq(productVariantOptions.variantId, productVariants.id))
+    .leftJoin(productVariantCompareAt, eq(productVariantCompareAt.variantId, productVariants.id))
     .where(eq(productVariants.productId, productId))
     .orderBy(asc(productVariants.createdAt), asc(productVariants.sku));
   const [rules] = await db.select().from(productStockRules).where(eq(productStockRules.productId, productId)).limit(1);
   return {
     axes: axes.map((a) => ({ name: a.name, values: a.values })),
-    variants: variantRows.map((v) => ({ ...v, options: v.options ?? {} })),
+    variants: variantRows.map((v) => ({ ...v, options: v.options ?? {}, compareAtCents: v.compareAtCents ?? null })),
     stockRules: rulesPayload(rules),
   };
 }
@@ -229,6 +231,19 @@ router.patch("/:productId/variants/bulk", requireRole("manager"), async (req, re
           ...(u.lowStockThreshold !== undefined && { lowStockThreshold: u.lowStockThreshold }),
           updatedAt: new Date(),
         }).where(eq(productVariants.id, u.variantId)).returning();
+        if (u.compareAtCents === null) {
+          await tx.delete(productVariantCompareAt).where(eq(productVariantCompareAt.variantId, u.variantId));
+        } else if (u.compareAtCents !== undefined) {
+          if (u.compareAtCents <= after.priceCents) {
+            throw new HttpFail(400, "Compare-at price must be higher than the price", u.variantId);
+          }
+          await tx.insert(productVariantCompareAt)
+            .values({ variantId: u.variantId, compareAtCents: u.compareAtCents })
+            .onConflictDoUpdate({
+              target: productVariantCompareAt.variantId,
+              set: { compareAtCents: u.compareAtCents, updatedAt: new Date() },
+            });
+        }
         result.push({
           variantId: u.variantId, previousStock: before.stock, newStock: after.stock, threshold: after.lowStockThreshold,
           previousPrice: before.priceCents, newPrice: after.priceCents,

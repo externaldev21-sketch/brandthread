@@ -152,6 +152,8 @@ export interface BulkVariantUpdate {
   stock?: number;
   sku?: string;
   lowStockThreshold?: number;
+  /** "Was" price shown struck through; null clears it. Must end up above the variant's price. */
+  compareAtCents?: number | null;
 }
 
 export type BulkValidation =
@@ -191,6 +193,12 @@ export function validateBulkUpdates(input: unknown): BulkValidation {
         return { ok: false, error: "Low-stock level must be a whole number of 0 or more", variantId };
       }
       update.lowStockThreshold = row.lowStockThreshold as number;
+    }
+    if (row.compareAtCents !== undefined) {
+      if (row.compareAtCents !== null && (!Number.isInteger(row.compareAtCents) || (row.compareAtCents as number) <= 0 || (row.compareAtCents as number) > MAX_PRICE_CENTS)) {
+        return { ok: false, error: "Compare-at price must be a positive amount", variantId };
+      }
+      update.compareAtCents = row.compareAtCents as number | null;
     }
     if (row.sku !== undefined) {
       const sku = String(row.sku).trim();

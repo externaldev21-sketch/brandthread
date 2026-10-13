@@ -144,6 +144,52 @@ describe("bulk update", () => {
     expect((await call(`/api/product-variants/${foreign.id}/variants/bulk`, seller, "PATCH", { updates: [{ variantId: v1.id, stock: 1 }] })).status).toBe(404);
     expect((await call(`/api/product-variants/${p.id}/variants/bulk`, other, "PATCH", { updates: [{ variantId: v1.id, stock: 1 }] })).status).toBe(404);
   });
+
+  it("applies one price, stock or compare-at to many selected variants in one call", async () => {
+    const p = await newProduct(seller);
+    await call(`/api/product-variants/${p.id}/axes`, seller, "PUT", { axes: [{ name: "Size", values: ["S", "M", "L"] }, { name: "Colour", values: ["Black", "White"] }] });
+    const gen = await call(`/api/product-variants/${p.id}/generate`, seller, "POST", { priceCents: 3000, stock: 2, baseSku: `S${suffix}` });
+    expect(gen.body.variants.every((v: any) => v.compareAtCents === null)).toBe(true);
+    const black = gen.body.variants.filter((v: any) => v.color === "Black");
+    expect(black).toHaveLength(3);
+
+    const priced = await call(`/api/product-variants/${p.id}/variants/bulk`, seller, "PATCH", {
+      updates: black.map((v: any) => ({ variantId: v.id, priceCents: 2800, compareAtCents: 3500 })),
+    });
+    expect(priced.status).toBe(200);
+    expect(priced.body.updated).toBe(3);
+    for (const v of priced.body.variants) {
+      if (v.color === "Black") expect(v).toMatchObject({ priceCents: 2800, compareAtCents: 3500, stock: 2 });
+      else expect(v).toMatchObject({ priceCents: 3000, compareAtCents: null, stock: 2 });
+    }
+
+    const stocked = await call(`/api/product-variants/${p.id}/variants/bulk`, seller, "PATCH", {
+      updates: gen.body.variants.filter((v: any) => v.size === "S").map((v: any) => ({ variantId: v.id, stock: 12 })),
+    });
+    expect(stocked.status).toBe(200);
+    expect(stocked.body.variants.filter((v: any) => v.stock === 12).map((v: any) => v.size)).toEqual(["S", "S"]);
+    // Untouched fields keep their compare-at.
+    expect(stocked.body.variants.find((v: any) => v.size === "S" && v.color === "Black").compareAtCents).toBe(3500);
+
+    // Compare-at must end up above the price; the whole batch is refused.
+    const low = await call(`/api/product-variants/${p.id}/variants/bulk`, seller, "PATCH", {
+      updates: [{ variantId: black[0].id, stock: 7 }, { variantId: black[1].id, compareAtCents: 2800 }],
+    });
+    expect(low.status).toBe(400);
+    expect(low.body.variantId).toBe(black[1].id);
+    const unchanged = await call(`/api/product-variants/${p.id}`, seller);
+    expect(unchanged.body.variants.find((v: any) => v.id === black[0].id).stock).not.toBe(7);
+    // Setting a price and compare-at together checks against the new price.
+    expect((await call(`/api/product-variants/${p.id}/variants/bulk`, seller, "PATCH", {
+      updates: [{ variantId: black[0].id, priceCents: 1500, compareAtCents: 2000 }],
+    })).status).toBe(200);
+
+    const cleared = await call(`/api/product-variants/${p.id}/variants/bulk`, seller, "PATCH", {
+      updates: black.map((v: any) => ({ variantId: v.id, compareAtCents: null })),
+    });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.variants.every((v: any) => v.compareAtCents === null)).toBe(true);
+  });
 });
 
 async function soldOutFlow(behavior: "hide" | "archive" | "show") {
