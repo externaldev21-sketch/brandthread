@@ -23,6 +23,8 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
 const SEARCH_DEBOUNCE_MS = 250;
+import { setPendingChatFocus } from '@/lib/chatFocus';
+import { formatDate } from '@/lib/chatGrouping';
 
 export default function ConversationSearchScreen() {
   const { theme } = useAppTheme();
@@ -43,6 +45,14 @@ export default function ConversationSearchScreen() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestSearch = useRef(0);
   useEffect(() => () => { if (searchTimer.current) clearTimeout(searchTimer.current); }, []);
+
+  function openResult(messageId: string) {
+    hapticPrimaryAction();
+    setPendingChatFocus(params.id, messageId);
+    // Search sits on top of Chat details on top of the chat.
+    if (router.canDismiss()) router.dismiss(2);
+    else goBackOr(router);
+  }
 
   function runSearch(q: string) {
     setQuery(q);
@@ -123,10 +133,27 @@ export default function ConversationSearchScreen() {
             <Text style={[s.empty, { color: theme.muted }]}>No messages found</Text>
           ) : null}
           renderItem={({ item }) => (
-            <View style={[s.resultRow, { borderBottomColor: theme.border }]} testID="conversation-search-result">
-              <Text style={[s.resultFrom, { color: theme.text }]}>{item.fromName}</Text>
-              <Text style={[s.resultText, { color: theme.muted }]} numberOfLines={2}>{item.text}</Text>
-            </View>
+            // Tap → back in the chat, scrolled to this message (#164).
+            <PressableScale
+              rippleEnabled={false}
+              style={[s.resultRow, { borderBottomColor: theme.border }]}
+              onPress={() => openResult(item.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.fromName}: ${item.text}`}
+              testID="conversation-search-result"
+            >
+              <View style={s.resultTop}>
+                <Text style={[s.resultFrom, { color: theme.text }]} numberOfLines={1}>{item.fromName}</Text>
+                {typeof item.ts === 'number' ? (
+                  <Text style={[s.resultDate, { color: theme.muted }]}>{formatDate(item.ts)}</Text>
+                ) : null}
+              </View>
+              <Text style={[s.resultText, { color: theme.muted }]} numberOfLines={2}>
+                {highlightParts(item.text, query).map((part, i) => (
+                  <Text key={i} style={part.match ? { color: theme.text, fontFamily: FONT.semibold } : undefined}>{part.text}</Text>
+                ))}
+              </Text>
+            </PressableScale>
           )}
         />
       )}
@@ -143,6 +170,25 @@ const makeStyles = () => StyleSheet.create({
   searchInput: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base, height: 40 },
   empty: { textAlign: 'center', marginTop: SP.xl, fontFamily: FONT.regular, fontSize: FS.sm },
   resultRow: { paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth, gap: 2 },
-  resultFrom: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  resultTop: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  resultFrom: { flex: 1, fontFamily: FONT.semibold, fontSize: FS.sm },
+  resultDate: { fontFamily: FONT.regular, fontSize: FS.xs },
   resultText: { fontFamily: FONT.regular, fontSize: FS.sm },
 });
+
+/** Splits text around case-insensitive matches of the query, for bolding. */
+function highlightParts(text: string, query: string): { text: string; match: boolean }[] {
+  const q = query.trim();
+  if (!q) return [{ text, match: false }];
+  const parts: { text: string; match: boolean }[] = [];
+  const lower = text.toLowerCase();
+  const needle = q.toLowerCase();
+  let from = 0;
+  for (let at = lower.indexOf(needle); at >= 0; at = lower.indexOf(needle, from)) {
+    if (at > from) parts.push({ text: text.slice(from, at), match: false });
+    parts.push({ text: text.slice(at, at + q.length), match: true });
+    from = at + q.length;
+  }
+  if (from < text.length) parts.push({ text: text.slice(from), match: false });
+  return parts;
+}

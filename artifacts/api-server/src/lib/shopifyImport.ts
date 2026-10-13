@@ -54,7 +54,8 @@ export function normalizeShopifyUrl(input: unknown): string {
   return `https://${hostname}`;
 }
 
-function isPrivateAddress(address: string): boolean {
+/** Loopback, private, link-local, CGNAT, documentation, multicast… — never fetched. */
+export function isPrivateAddress(address: string): boolean {
   const normalized = address.toLowerCase();
   const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
   if (mapped) return isPrivateAddress(mapped);

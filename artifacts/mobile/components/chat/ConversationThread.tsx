@@ -29,6 +29,8 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import { TypingBubble } from '@/components/chat/TypingBubble';
+import { LinkPreviewCard } from '@/components/chat/LinkPreviewCard';
+import { CHAT_FOCUS_HIGHLIGHT_MS, messageRowIndex, takePendingChatFocus } from '@/lib/chatFocus';
 import VideoMessageViewer from '@/components/chat/VideoMessageViewer';
 import * as Clipboard from 'expo-clipboard';
 import { Icon as Feather } from '@/components/ui/Icon';
@@ -429,6 +431,49 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // whatever the composer is showing by the time it resolves. uploadMedia()
   // has no real cancel/abort — this only makes the UI stop listening to it.
   const mediaUploadTokenRef = useRef(0);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const pendingUploadRef = useRef<{ promise: Promise<MessageAttachment | null>; messageId: string | null; fraction: number } | null>(null);
+
+  function stageMediaUpload(placeholder: MessageAttachment, upload: (report: (fraction: number) => void) => Promise<MessageAttachment>) {
+    const owner = userId;
+    const thread = currentThreadIdRef.current;
+    if (owner !== currentUserIdRef.current) return;
+    const token = ++mediaUploadTokenRef.current;
+    const ticket = { promise: Promise.resolve<MessageAttachment | null>(null), messageId: null as string | null, fraction: 0 };
+    const current = () => currentUserIdRef.current === owner && currentThreadIdRef.current === thread;
+    pendingUploadRef.current = ticket;
+    setSelectedAttachment(placeholder);
+    setIsUploading(true);
+    setUploadProgress(0);
+    ticket.promise = (async () => {
+      try {
+        const completed = await upload(fraction => {
+          if (!current()) return;
+          ticket.fraction = Math.max(ticket.fraction, Math.min(1, fraction));
+          if (ticket.messageId) {
+            setMessages(prev => prev.map(msg => msg.id === ticket.messageId ? {
+              ...msg, attachment: msg.attachment ? {
+                ...msg.attachment, meta: { ...msg.attachment.meta, uploadProgress: String(ticket.fraction) },
+              } : undefined,
+            } : msg));
+          } else if (mediaUploadTokenRef.current === token) setUploadProgress(ticket.fraction);
+        });
+        if (!current()) return null;
+        if (!ticket.messageId && mediaUploadTokenRef.current === token) setSelectedAttachment(completed);
+        return completed;
+      } catch {
+        if (current() && !ticket.messageId && mediaUploadTokenRef.current === token) {
+          setSelectedAttachment(null);
+          Alert.alert('Upload failed', 'Could not upload. Please try again.');
+        }
+        return null;
+      } finally {
+        if (current() && mediaUploadTokenRef.current === token) {
+          setIsUploading(false); setUploadProgress(null);
+        }
+      }
+    })();
+  }
   // Real-time "X is typing…": true once we've told the server we're
   const focused = useRouteIsFocused();
   const realtimeConnected = useRealtimeConnected();
@@ -907,8 +952,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     return result.url;
   }
 
-  async function uploadMediaFile(uri: string, mimeType: string, extension: string): Promise<string> {
-    const result = await api.conversations.uploadMediaFile({ uri, mimeType, extension });
+  async function uploadMediaFile(uri: string, mimeType: string, extension: string, onProgress?: (fraction: number) => void): Promise<string> {
+    const result = await api.conversations.uploadMediaFile({ uri, mimeType, extension }, onProgress);
     return result.url;
   }
 
@@ -1120,38 +1165,15 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     });
     if (result.canceled || !result.assets.length) return;
     setShowMediaSheet(false);
-    const token = ++mediaUploadTokenRef.current;
-    // Stage the REAL picked photo(s) immediately, using their local URIs —
-    // so the composer shows an actual thumbnail (not a placeholder icon)
-    // while the upload is in flight. meta.uploading drives MediaUploadThumb's
-    // ring overlay; it's cleared once the real upload resolves below.
-    const localUris = result.assets.map((a) => a.uri);
-    setSelectedAttachment({
-      type: 'image', uri: localUris[0],
-      title: localUris.length > 1 ? `${localUris.length} photos` : 'Photo',
-      meta: { photoUris: JSON.stringify(localUris), uploading: 'true' },
-    });
-    setIsUploading(true);
-    try {
+    const localUris = result.assets.map(a => a.uri);
+    stageMediaUpload({ type: 'image', uri: localUris[0], title: localUris.length > 1 ? String(localUris.length) + ' photos' : 'Photo', meta: { photoUris: JSON.stringify(localUris), uploading: 'true' } }, async report => {
       const urls: string[] = [];
-      for (const asset of result.assets) {
+      for (const [index, asset] of result.assets.entries()) {
         const mime = asset.mimeType === 'image/png' || asset.mimeType === 'image/webp' ? asset.mimeType : 'image/jpeg';
-        urls.push(await uploadMediaFile(asset.uri, mime, 'jpg'));
+        urls.push(await uploadMediaFile(asset.uri, mime, 'jpg', fraction => report((index + fraction) / result.assets.length)));
       }
-      if (mediaUploadTokenRef.current !== token) return; // superseded/cancelled
-      if (!urls.length) { setSelectedAttachment(null); return; }
-      setSelectedAttachment({
-        type: 'image', uri: urls[0],
-        title: urls.length > 1 ? `${urls.length} photos` : 'Photo',
-        meta: { photoUris: JSON.stringify(urls) },
-      });
-    } catch {
-      if (mediaUploadTokenRef.current === token) {
-        setSelectedAttachment(null);
-        Alert.alert('Upload failed', 'Could not upload. Please try again.');
-      }
-    }
-    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
+      return { type: 'image', uri: urls[0], title: urls.length > 1 ? String(urls.length) + ' photos' : 'Photo', meta: { photoUris: JSON.stringify(urls) } };
+    });
   }
 
   async function handlePickVideo() {
@@ -1167,29 +1189,12 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     if ((asset.duration ?? 0) > 60000) { Alert.alert('Video too long', 'Choose a video under 1 minute.'); return; }
     if (!asset.uri) { Alert.alert('Couldn’t read that video', 'Please try a different file.'); return; }
     setShowMediaSheet(false);
-    const token = ++mediaUploadTokenRef.current;
     const durationLabel = String(Math.round((asset.duration ?? 0) / 1000));
-    setSelectedAttachment({
-      type: 'video', title: 'Video clip',
-      meta: { duration: durationLabel, uploading: 'true' },
+    stageMediaUpload({ type: 'video', uri: asset.uri, title: 'Video clip', meta: { duration: durationLabel, uploading: 'true' } }, async report => {
+      const ext = asset.uri.split('.').pop()?.toLowerCase() === 'mov' ? 'mov' : 'mp4';
+      const url = await uploadMediaFile(asset.uri, asset.mimeType || 'video/mp4', ext, report);
+      return { type: 'video', uri: url, title: 'Video clip', meta: { duration: durationLabel } };
     });
-    setIsUploading(true);
-    try {
-      const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
-      const url = await uploadMediaFile(asset.uri, 'video/mp4', ext);
-      if (mediaUploadTokenRef.current !== token) return; // superseded/cancelled
-      setSelectedAttachment({
-        type: 'video', uri: url,
-        title: 'Video clip',
-        meta: { duration: durationLabel },
-      });
-    } catch {
-      if (mediaUploadTokenRef.current === token) {
-        setSelectedAttachment(null);
-        Alert.alert('Upload failed', 'Could not upload video. Please try again.');
-      }
-    }
-    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
   }
 
   // ── Voice recording ────────────────────────────────────────────────────────────
@@ -1670,6 +1675,43 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       return;
     }
 
+    if (userId && att?.meta?.uploading === 'true') {
+      const ticket = pendingUploadRef.current;
+      if (!ticket) {
+        setText(t); setReplyTo(replyingTo);
+        Alert.alert('Upload not ready', 'Choose the media again before sending.');
+        return;
+      }
+      const owner = userId;
+      const threadId = conv.id;
+      pendingUploadRef.current = null;
+      const localId = 'upload-' + Date.now();
+      ticket.messageId = localId;
+      setMessages(prev => [...prev, {
+        id: localId, conversationId: threadId, fromId: myId, fromName: 'You',
+        fromInitials: MY_INITIALS, fromColor: theme.accent, text: t,
+        attachment: { ...att, meta: { ...att.meta, uploadProgress: String(ticket.fraction) } },
+        reactions: [], status: 'sending', ts: Date.now(), deletedForMe: false,
+      }]);
+      listScroll.requestScrollToEnd();
+      const completed = await ticket.promise;
+      if (currentUserIdRef.current !== owner || currentThreadIdRef.current !== threadId) return;
+      if (!completed) {
+        setMessages(prev => prev.filter(msg => msg.id !== localId));
+        setText(t); setReplyTo(replyingTo);
+        Alert.alert('Upload failed', 'Your message was not sent. Choose the media again to retry.');
+        return;
+      }
+      await enqueueOutboxMessage(owner, threadId, {
+        text: t, attachment: completed,
+        replyToId: replyingTo && !isOutboxMessageId(replyingTo.id) ? replyingTo.id : undefined,
+        replyPreview: replyingTo?.text, replyToAuthorName: replyingTo?.fromName,
+      });
+      if (currentUserIdRef.current !== owner || currentThreadIdRef.current !== threadId) return;
+      setMessages(prev => prev.filter(msg => msg.id !== localId));
+      void flushOutboxNow();
+      return;
+    }
     if (userId) {
       await enqueueOutboxMessage(userId, conv.id, { text: t, attachment: att ?? undefined, replyToId: replyingTo && !isOutboxMessageId(replyingTo.id) ? replyingTo.id : undefined, replyPreview: replyingTo?.text, replyToAuthorName: replyingTo?.fromName });
       listScroll.requestScrollToEnd();
@@ -1868,7 +1910,25 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
 
   // ── Render list item ────────────────────────────────────────────────────────
 
-  function renderItem({ item }: ListRenderItemInfo<ListRow>) {
+  function renderItem(info: ListRenderItemInfo<ListRow>) {
+    const row = renderRow(info);
+    if (info.item.type !== 'message') return row;
+    const msg = info.item.msg;
+    const uploading = msg.attachment?.meta?.uploading === 'true';
+    return (
+      <View style={msg.id === focusedMessageId ? { backgroundColor: theme.border } : undefined} testID={msg.id === focusedMessageId ? 'conversation-focused-message' : undefined}>
+        {row}
+        {uploading ? (
+          <View style={{ alignItems: 'flex-end', paddingHorizontal: SP.md }}>
+            <UploadRing size={24} progress={Number(msg.attachment?.meta?.uploadProgress ?? 0)} color={theme.accent} trackColor={theme.border} />
+          </View>
+        ) : null}
+        {msg.text ? <LinkPreviewCard text={msg.text} enabled={!isPreviewId(conv?.id ?? '')} /> : null}
+      </View>
+    );
+  }
+
+  function renderRow({ item }: ListRenderItemInfo<ListRow>) {
     if (item.type === 'date') {
       // Plain small gray centered text, like Instagram/Threads — no pill.
       return (
@@ -2301,6 +2361,26 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
 
   const visibleMessages = mergeOutboxIntoThread(messages.filter(m => !m.deletedForMe), outboxEntries.map(entry => outboxEntryToMessage(entry, { fromId: myId, fromName: myCallName, fromInitials: MY_INITIALS, fromColor: MY_COLOR })));
   const listData = mergeCallLogRows(buildListRows(visibleMessages, unreadDividerId), callLog);
+  const listDataRef = useRef(listData);
+  listDataRef.current = listData;
+  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
+  const focusHoldRef = useRef<number | null>(null);
+  const focusScrollIdRef = useRef<string | null>(null);
+  useFocusEffect(useCallback(() => {
+    const target = takePendingChatFocus(conv?.id);
+    if (!target) return;
+    const index = messageRowIndex(listDataRef.current, target);
+    if (index < 0) return;
+    focusHoldRef.current = messages.length;
+    focusScrollIdRef.current = target;
+    setFocusedMessageId(target);
+    requestAnimationFrame(() => flatListRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }));
+    const timer = setTimeout(() => setFocusedMessageId(null), CHAT_FOCUS_HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [conv?.id, messages.length]));
+  useEffect(() => {
+    focusHoldRef.current = null; focusScrollIdRef.current = null; setFocusedMessageId(null);
+  }, [userId, params.id]);
 
   useEffect(() => {
     if (!unreadDividerId || hasScrolledToUnreadRef.current) return;
@@ -2329,6 +2409,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                   type={selectedAttachment.type as 'image' | 'video'}
                   uri={selectedAttachment.type === 'image' ? selectedAttachment.uri : undefined}
                   uploading={uploadingMedia}
+                  progress={uploadProgress ?? undefined}
                   size={40}
                   ringColor={theme.accent}
                   iconColor={theme.muted}
@@ -2651,12 +2732,19 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         onContentSizeChange={() => {
+          if (focusHoldRef.current === messages.length) return;
+          focusHoldRef.current = null;
           listScroll.onContentSizeChange();
           if (!unreadDividerId || hasScrolledToUnreadRef.current) {
             flatListRef.current?.scrollToEnd({ animated: false });
           }
         }}
-        onScrollToIndexFailed={() => {
+        onScrollToIndexFailed={(info) => {
+          if (focusScrollIdRef.current) {
+            flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => flatListRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: false }), 60);
+            return;
+          }
           listScroll.requestScrollToEnd(false);
         }}
         // Windowing kept at RN defaults (10/21) — the history stays performant

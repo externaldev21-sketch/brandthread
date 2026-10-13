@@ -170,6 +170,7 @@ import adsServeRouter from "./ads-serve";
 import metaAdsRouter from "./meta-ads";
 import vacationRouter  from "./vacation";
 import { quickRepliesRouter, awayMessageRouter } from "./seller-messaging-tools";
+import linkPreviewRouter from "./link-preview";
 import loyaltyRouter   from "./loyalty";
 import threadCashRouter from "./thread-cash";
 import giftCardsRouter from "./gift-cards";
@@ -509,6 +510,7 @@ router.use("/iap-promotions",            tc, iapPromotionsRouter);
 router.use("/ads",                       adsServeRouter); // buyer feed ad delivery; no tc
 router.use("/meta-ads",                  tc, metaAdsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
+router.use("/link-preview",             linkPreviewRouter); // DM link cards (signed-in, SSRF-guarded)
 router.use("/seller/quick-replies",     tc, quickRepliesRouter);
 router.use("/seller/away-message",      tc, awayMessageRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
