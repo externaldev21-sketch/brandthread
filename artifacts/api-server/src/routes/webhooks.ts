@@ -883,7 +883,7 @@ export async function handleCheckoutPaid(
   // makes shipping look like zero (or negative) in the persisted order.
   const shippingCents = Number.isInteger(totalDetails.amount_shipping)
     ? Math.max(0, totalDetails.amount_shipping)
-    : Math.max(0, totalCents + stripeDiscountCents - subtotalCents - taxCents);
+    : Math.max(0, totalCents + stripeDiscountCents - subtotalCents - taxCents - Math.max(0, csRecord.dutiesCents ?? 0));
 
   // Stripe's final Checkout destination is authoritative because it is the
   // address used for automatic tax. Fall back to the pre-Checkout snapshot

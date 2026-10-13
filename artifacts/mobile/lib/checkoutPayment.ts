@@ -189,6 +189,11 @@ export type QuoteGroup = {
 /** paymentMethodTypes: what the server will offer for this cart (card, plus klarna / afterpay_clearpay when every seller opted in). */
 export type CartQuote = { amountCents: number; groups: QuoteGroup[]; paymentMethodTypes?: string[] };
 
+/** Intl #109: DDP duties in a quote (0 when none), for the price breakdown and wallet sheets. */
+export function quoteDutiesCents(quote: Pick<CartQuote, 'groups'> | null | undefined): number {
+  return (quote?.groups ?? []).reduce((sum, group) => sum + Math.max(0, group.dutiesCents ?? 0), 0);
+}
+
 /** Whether the quote offers Buy now, pay later (web Payment Element only; native keeps card / wallets). */
 export function quoteOffersBnpl(quote: CartQuote | null | undefined): boolean {
   return !!quote?.paymentMethodTypes?.some(type => type === 'klarna' || type === 'afterpay_clearpay');

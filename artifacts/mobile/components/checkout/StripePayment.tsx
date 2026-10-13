@@ -18,7 +18,7 @@
  */
 import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { NativeModules, Platform, StyleSheet, TurboModuleRegistry, View } from 'react-native';
-import { centsToAmountString, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
+import { centsToAmountString, quoteDutiesCents, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
 import { FONT } from '@/lib/theme';
 import { useCheckoutColors } from './CheckoutPrimitives';
 import {
@@ -223,6 +223,8 @@ export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, c
     const tax = next ? next.groups.reduce((sum, group) => sum + group.taxCents, 0) : 0;
     const ship = next ? next.groups.reduce((sum, group) => sum + group.shippingCents, 0) : shippingCents;
     const discount = next ? next.groups.reduce((sum, group) => sum + group.discountCents, 0) : 0;
+    // Intl #109: DDP duties, only when the quote carries them.
+    const duties = quoteDutiesCents(next);
     const total = next ? next.amountCents : amountCents;
     const item = (label: string, cents: number, pending = false): PlatformPayTypes.ImmediateCartSummaryItem => ({
       paymentType: PlatformPay.PaymentType.Immediate as PlatformPayTypes.PaymentType.Immediate,
@@ -235,6 +237,7 @@ export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, c
       ...(discount > 0 ? [item('Discount', -discount)] : []),
       item('Shipping', ship),
       item('Tax', tax, !next),
+      ...(duties > 0 ? [item('Duties & import taxes', duties)] : []),
       item('Brandthread', total, !next),
     ];
   }, [stripe, amountCents, subtotalCents, shippingCents]);

@@ -20,6 +20,7 @@ import { recordDelivery } from "../lib/delivery/deliveryState";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { resolveWithLiveRates } from "../lib/intl/liveShippingRates";
+import { DUTIES_UNAVAILABLE_RESPONSE, DutiesUnavailableError, dutiesLineItem, hostedCheckoutDuties } from "../lib/intl/duties";
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import { notifyBuyerOrderCancelled, notifySellerOrderCancelledByBuyer } from "../lib/orderNotifications";
 import { withItemProductIds } from "../lib/orderItemProducts";
@@ -881,6 +882,8 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       .where(and(eq(shippingZones.sellerId, sellerId), eq(shippingZones.active, true)));
     let shippingCents = 0;
     let shippingLineName = "Shipping";
+    let zoneDutiesHandling: string | null = null; // intl #109
+    let sellerHomeCountry = "US";
     if (sellerZoneRows.length > 0) {
       const [sellerHome] = await db.select({ country: users.sellerShipFromCountry }).from(users)
         .where(eq(users.clerkId, sellerId)).limit(1);
@@ -909,6 +912,8 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       }
       shippingCents = resolved.shippingCents;
       shippingLineName = resolved.zoneName ? `Shipping (${resolved.zoneName})` : "Shipping";
+      zoneDutiesHandling = resolved.dutiesHandling;
+      sellerHomeCountry = sellerHome?.country ?? "US";
     } else {
       const [configuredShippingRate] = await db
         .select()
@@ -932,6 +937,24 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         quantity: 1,
       });
     }
+    // ── Intl #109: DDP duties as their own line (0 unless
+    // DUTIES_AT_CHECKOUT_ENABLED and the seller's zone is DDP). This route
+    // also serves the in-app fallbacks (preorder, loyalty, Thread Cash), so
+    // none of them can charge a DDP order without duties.
+    let dutiesQuote: { dutiesCents: number; quoteId: string | null } = { dutiesCents: 0, quoteId: null };
+    try {
+      dutiesQuote = await hostedCheckoutDuties({
+        dutiesHandling: zoneDutiesHandling, shipFromCountry: sellerHomeCountry,
+        destination: validatedShipping, items: cartItems, shippingCents,
+      });
+    } catch (err) {
+      if (err instanceof DutiesUnavailableError) {
+        res.status(409).json(DUTIES_UNAVAILABLE_RESPONSE);
+        return;
+      }
+      throw err;
+    }
+    if (dutiesQuote.dutiesCents > 0) lineItems.push(dutiesLineItem(dutiesQuote.dutiesCents));
     // ── Discount code (validated fresh at charge time — never trusts the
     // client's earlier /cart/validate check) ──────────────────────────────
     let discountApplication: Awaited<ReturnType<typeof validateDiscountCode>> | null = null;
@@ -1069,6 +1092,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       } : {}),
       ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
       ...(hasKey ? { clientIdempotencyKey } : {}),
+      ...(dutiesQuote.dutiesCents > 0 ? { dutiesCents: dutiesQuote.dutiesCents, dutiesQuoteId: dutiesQuote.quoteId } : {}),
     };
     let checkoutRecord: { id: string } | undefined;
     try {

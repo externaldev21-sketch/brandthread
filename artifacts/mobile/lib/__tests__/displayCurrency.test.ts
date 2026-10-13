@@ -62,3 +62,12 @@ describe('display currency store', () => {
     expect(getDisplayCurrencyState().rates?.EUR).toBe(0.9187);
   });
 });
+
+describe('wallet sheet duties (intl #109)', () => {
+  it('sums duties from the quote and is 0 when none', async () => {
+    const { quoteDutiesCents } = await import('../checkoutPayment');
+    expect(quoteDutiesCents(null)).toBe(0);
+    expect(quoteDutiesCents({ groups: [{ dutiesCents: 4738 }, {}, { dutiesCents: 2264 }] as any })).toBe(7002);
+    expect(quoteDutiesCents({ groups: [{ sellerId: 'a' }] as any })).toBe(0);
+  });
+});

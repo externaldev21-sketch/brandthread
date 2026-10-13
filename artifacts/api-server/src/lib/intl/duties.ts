@@ -219,3 +219,61 @@ export async function dutiesForGroup(input: {
   const quote = await provider.quote(input.request);
   return { dutiesCents: Math.max(0, quote.dutiesCents), quoteId: quote.quoteId };
 }
+
+// ─── Hosted Stripe Checkout (buyer.ts session, guest checkout) ──────────────
+
+/** The 409 every checkout path answers when a DDP quote is needed but unavailable. */
+export const DUTIES_UNAVAILABLE_RESPONSE = {
+  error: "Import duties couldn't be calculated for this address. Try again in a moment.",
+  code: "DUTIES_UNAVAILABLE",
+} as const;
+
+/** Stripe's "nontaxable" product tax code, so Stripe Tax never taxes the duties line itself. */
+export const NONTAXABLE_TAX_CODE = "txcd_00000000";
+export const DUTIES_LINE_NAME = "Duties & import taxes";
+
+/** The Checkout Session line item for DDP duties (its own line, like shipping). */
+export function dutiesLineItem(dutiesCents: number) {
+  return {
+    price_data: {
+      currency: "usd",
+      unit_amount: dutiesCents,
+      tax_behavior: "exclusive" as const,
+      product_data: { name: DUTIES_LINE_NAME, tax_code: NONTAXABLE_TAX_CODE },
+    },
+    quantity: 1,
+  };
+}
+
+/**
+ * Duties for a hosted-Checkout cart. Zero (and no work at all) unless the
+ * flag is on and the matched zone is DDP; throws DutiesUnavailableError
+ * when a quote is needed and can't be had.
+ */
+export async function hostedCheckoutDuties(input: {
+  dutiesHandling: string | null | undefined;
+  shipFromCountry: string;
+  destination: { country: string; zip: string; city?: string; state?: string; street?: string };
+  items: Array<{ variantId: string; productName: string; priceCents: number; quantity: number }>;
+  shippingCents: number;
+  provider?: DutiesProvider | null;
+  env?: NodeJS.ProcessEnv;
+}): Promise<{ dutiesCents: number; quoteId: string | null }> {
+  if (input.dutiesHandling !== "ddp") return { dutiesCents: 0, quoteId: null };
+  if (input.provider === undefined && !dutiesAtCheckoutEnabled(input.env)) return { dutiesCents: 0, quoteId: null };
+  return dutiesForGroup({
+    dutiesHandling: input.dutiesHandling,
+    shipFromCountry: input.shipFromCountry,
+    provider: input.provider,
+    env: input.env,
+    request: {
+      origin: { country: input.shipFromCountry, postalCode: null },
+      destination: {
+        country: input.destination.country, postalCode: input.destination.zip,
+        city: input.destination.city, state: input.destination.state, street: input.destination.street,
+      },
+      items: input.items.map((item) => ({ productId: item.variantId, name: item.productName, unitPriceCents: item.priceCents, quantity: item.quantity })),
+      shippingCents: input.shippingCents,
+    },
+  });
+}
