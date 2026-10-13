@@ -54,7 +54,7 @@ function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
         </Text>
         {bundle.sales?.setsSold > 0 ? (
           <Text style={r.meta} testID={`bundle-sales-${bundle.id}`}>
-            {bundle.sales.setsSold} sold · {formatCents(bundle.sales.revenueCents ?? 0)}
+            {bundle.sales.setsSold} sold · {formatMoney(bundle.sales.revenueCents ?? 0)}
           </Text>
         ) : null}
       </View>

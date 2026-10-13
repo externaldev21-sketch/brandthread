@@ -68,7 +68,14 @@ describe("Maestro e2e flows", () => {
 
   it.each(FLOWS)("%s: every on-screen text it uses exists", (name) => {
     for (const text of textsIn(flows[name])) {
-      expect(source.includes(text), `text "${text}"`).toBe(true);
+      if (/^\d{4}$/.test(text)) {
+        // Birthday wheel years are generated, not literal UI copy.
+        const year = Number(text);
+        expect(year).toBeGreaterThanOrEqual(new Date().getFullYear() - 100);
+        expect(year).toBeLessThanOrEqual(new Date().getFullYear());
+      } else {
+        expect(source.includes(text), `text "${text}"`).toBe(true);
+      }
     }
   });
 

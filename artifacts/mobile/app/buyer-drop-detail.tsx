@@ -437,7 +437,7 @@ export default function BuyerDropDetail() {
     }
     if (product.soldOut) return;
     if (drop?.membersOnly && drop.viewerIsMember === false) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      haptics.warning();
       Alert.alert('Past buyers only', `This drop is only for people who've bought from ${sellerName}.`);
       return;
     }
@@ -565,7 +565,7 @@ export default function BuyerDropDetail() {
 
             {!showRecap && !!drop.membersOnly && (
               <View style={styles.earlyAccessRow} testID="drop-members-only-row">
-                <Feather name={drop.viewerIsMember === false ? 'lock' : 'check'} size={12} color={theme.accent} />
+                <Icon name={drop.viewerIsMember === false ? 'lock' : 'check'} size={12} color={theme.accent} />
                 <Text style={[styles.earlyAccessText, { color: theme.accent }]}>
                   {drop.viewerIsMember === false
                     ? `Only for past buyers of ${sellerName}`

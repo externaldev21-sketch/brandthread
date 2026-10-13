@@ -68,7 +68,7 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
   const openMenu = () => {
     if (!url) return;
     const saved = savedProducts.has(productId);
-    const price = typeof item.priceCents === 'number' ? formatCents(item.priceCents) : null;
+    const price = typeof item.priceCents === 'number' ? formatMoney(item.priceCents) : null;
     openContextMenu({
       preview: {
         imageUri: item.imageUri,

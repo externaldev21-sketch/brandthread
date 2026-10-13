@@ -93,13 +93,13 @@ export function SellerThreadCashCard({
               <View style={styles.splitRow}>
                 <Text style={[styles.splitLabel, { color: theme.text }]}>Withdrawable</Text>
                 <Text style={[styles.splitValue, { color: THREAD_CASH_GREEN_MID }]} testID="seller-thread-cash-withdrawable">
-                  {formatCents(quotedCents ?? 0)}
+                  {formatMoney(quotedCents ?? 0)}
                 </Text>
               </View>
               <View style={styles.splitRow}>
                 <Text style={[styles.splitLabel, { color: theme.muted }]}>Promo credit · spendable in Brandthread</Text>
                 <Text style={[styles.splitValue, { color: theme.muted }]} testID="seller-thread-cash-promo">
-                  {formatCents(promoCents)}
+                  {formatMoney(promoCents)}
                 </Text>
               </View>
             </View>

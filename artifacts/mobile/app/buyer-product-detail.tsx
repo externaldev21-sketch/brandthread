@@ -1019,10 +1019,6 @@ export default function BuyerProductDetailScreen() {
   const sizeOptionId = sizeOption?.id ?? null;
   const { [sizeOptionId ?? '']: _pickedSize, ...otherSelections } = selections;
   const cells = sizeOption ? sizeCells(product, sizeOption, otherSelections) : [];
-  const stockLine = !variant ? null
-    : !inStock ? 'Sold out'
-    : variant.inventoryQuantity <= 5 ? `Only ${variant.inventoryQuantity} left`
-    : 'In stock';
   const openSizeSheet = () => { haptics.light(); setSizeSheetOpen(true); };
 
   function handleSelect(optionId: string, valueId: string) {
@@ -1637,7 +1633,7 @@ export default function BuyerProductDetailScreen() {
           title={`${sizeOption.name}s`}
           cells={cells}
           selectedValueId={selections[sizeOption.id] ?? null}
-          stockLine={stockLine}
+          stockLine={stockLine?.kind === 'hidden' ? null : stockLine?.text ?? null}
           promiseLine={deliveryPromiseLine(!!product.isPreOrder)}
           checkoutLabel={product.isPreOrder ? 'Reserve' : 'Checkout'}
           checkoutDisabled={product.isPreOrder ? reserved || launching : paymentUnavailable || launching || !allSelected}

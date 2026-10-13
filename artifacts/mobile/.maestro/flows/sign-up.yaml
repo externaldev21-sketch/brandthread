@@ -13,48 +13,64 @@ env:
     id: onboarding-welcome-get-started
 - tapOn: "I'm here to shop"
 - tapOn: "Continue"
-- tapOn: "Email address"
+- tapOn:
+    id: onboarding-email-input
 - inputText: ${EMAIL}
-- tapOn: "First name"
-- inputText: "Jordan"
-- tapOn: "Last name"
-- inputText: "Tester"
-- tapOn: "Password"
+- tapOn:
+    id: onboarding-email-next
+- extendedWaitUntil:
+    visible:
+      id: onboarding-code-input
+    timeout: 15000
+- tapOn:
+    id: onboarding-code-input
+- inputText: "424242"
+- tapOn:
+    id: onboarding-code-next
+- tapOn:
+    id: onboarding-password-input
 - inputText: "Brandthread-e2e-1"
-- tapOn: "Confirm password"
-- inputText: "Brandthread-e2e-1"
+- tapOn:
+    id: onboarding-password-next
+# The birthday uses wheels, not the retired text input.
+- tapOn:
+    id: onboarding-birthday-year
+- scrollUntilVisible:
+    element: "1995"
+    direction: UP
+- tapOn: "1995"
+- tapOn:
+    id: onboarding-birthday-next
+- tapOn:
+    id: onboarding-terms-agree
+- extendedWaitUntil:
+    visible:
+      id: onboarding-first-name-input
+    timeout: 15000
+- tapOn:
+    id: onboarding-first-name-input
+- inputText: "Jordan Tester"
+- tapOn:
+    id: onboarding-name-next
 - tapOn:
     id: onboarding-username-input
 - inputText: ${USERNAME}
 - tapOn:
-    id: onboarding-dob-input
-- inputText: "01/01/1995"
+    id: onboarding-username-next
 - hideKeyboard
-- scrollUntilVisible:
-    element: "Create account"
-- tapOn: "Create account"
-- extendedWaitUntil:
-    visible: "Verification code"
-    timeout: 15000
-- tapOn: "Verification code"
-- inputText: "424242"
-- tapOn: "Verify email"
-# Name step is prefilled from the account form.
-- extendedWaitUntil:
-    visible: "Continue"
-    timeout: 15000
-- tapOn: "Continue"
-# Style and sizes are skippable.
-- tapOn: "Skip for now"
-- tapOn: "Skip for now"
-# Brands
-- tapOn: "Continue"
-# Notifications are asked in context later, never forced here.
-- extendedWaitUntil:
-    visible:
-      id: onboarding-notifications-skip
-    timeout: 20000
 - tapOn:
-    id: onboarding-notifications-skip
-- tapOn: "Start exploring"
-- assertNotVisible: "Create account"
+    id: onboarding-photo-skip
+- tapOn:
+    id: onboarding-welcome-user
+# Personalization is optional; notifications are asked in context later.
+- tapOn:
+    id: onboarding-style-skip
+- tapOn:
+    id: onboarding-sizes-skip
+- tapOn:
+    id: onboarding-brands-skip
+- extendedWaitUntil:
+    visible: "Threads"
+    timeout: 20000
+- assertNotVisible:
+    id: onboarding-email-input
