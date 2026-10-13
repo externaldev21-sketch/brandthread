@@ -20,7 +20,7 @@ import {
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
 import { BrandedLoadingState, EmptyState, PressableScale, ThreadDivider } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { BottomSheet, Chip, ListRow } from '@/components/ui';
+import { Chip, MenuSheet } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -351,6 +351,10 @@ export default function BuyerNotifications() {
   };
 
   const closeOptions = () => setOptionsFor(null);
+  // Keep the last notification's rows on screen while the sheet slides away.
+  const lastOptionsRef = useRef<Notification | null>(null);
+  if (optionsFor) lastOptionsRef.current = optionsFor;
+  const optionsShown = optionsFor ?? lastOptionsRef.current;
 
   const handleToggleReadOption = async () => {
     const notif = optionsFor;
@@ -366,7 +370,7 @@ export default function BuyerNotifications() {
   };
 
   const handleDeleteOption = async () => {
-    // ListRow already fires a haptic on tap; the sheet closes and the row is
+    // The menu row already fires a haptic on tap; the sheet closes and the row is
     // removed immediately so no second haptic is needed here.
     const notif = optionsFor;
     if (!notif) return;
@@ -624,28 +628,27 @@ export default function BuyerNotifications() {
       )}
 
       {/* LONG-PRESS OPTIONS SHEET */}
-      <BottomSheet visible={!!optionsFor} onClose={closeOptions}>
-        {optionsFor && (
-          <View style={styles.sheetContent}>
-            <ListRow
-              icon={optionsFor.isRead ? 'mail' : 'check'}
-              title={optionsFor.isRead ? 'Mark unread' : 'Mark read'}
-              onPress={handleToggleReadOption}
-            />
-            <ListRow
-              icon="bell-off"
-              title={`Mute ${categoryLabel(optionsFor.category)} alerts`}
-              onPress={handleMuteOption}
-            />
-            <ListRow
-              icon="trash-2"
-              title="Delete"
-              destructive
-              onPress={handleDeleteOption}
-            />
-          </View>
-        )}
-      </BottomSheet>
+      <MenuSheet
+        visible={!!optionsFor}
+        onClose={closeOptions}
+        accessibilityLabel="Notification options"
+        testID="notification-options-sheet"
+        sections={optionsShown ? [
+          [
+            {
+              key: 'read', icon: optionsShown.isRead ? 'mail' : 'check',
+              label: optionsShown.isRead ? 'Mark unread' : 'Mark read',
+              onPress: () => { void handleToggleReadOption(); },
+            },
+            {
+              key: 'mute', icon: 'bell-off',
+              label: `Mute ${categoryLabel(optionsShown.category)} alerts`,
+              onPress: () => { void handleMuteOption(); },
+            },
+          ],
+          [{ key: 'delete', icon: 'trash-2', label: 'Delete', destructive: true, onPress: () => { void handleDeleteOption(); } }],
+        ] : []}
+      />
     </View>
   );
 }
@@ -760,9 +763,5 @@ const makeStyles = () => StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginTop: SPACING.xxs,
-  },
-  sheetContent: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.sm,
   },
 });

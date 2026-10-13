@@ -1,10 +1,12 @@
-import { hapticSuccess } from '@/lib/haptics';
+import { hapticSuccess, hapticLight, haptics } from '@/lib/haptics';
 /**
  * Seller Thread Cash cash-out sheet — moves earned Thread Cash (Live gifts,
- * message payments) into the seller's real Stripe payout balance. Same
- * Modal + SheetRise + useAppTheme() structure as LiveThreadCashSheet.tsx
- * (the buyer-side "send" sheet this mirrors), but for a seller converting
- * their own balance to money rather than gifting it to someone else.
+ * message payments) into the seller's real Stripe payout balance.
+ *
+ * Copies Cash App's "Cash out" sheet on the shared `<Sheet>`: the amount as
+ * one big centred figure you type into, the available balance under it with
+ * a "Use all" shortcut, then a short receipt (you'll receive / fee / where
+ * it goes) and one pinned "Cash out $X" button.
  *
  * The rate/fee are read live from the server (GET /thread-cash/quote) —
  * never hardcoded here — so if Dev changes
@@ -17,13 +19,12 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { randomUUID } from 'expo-crypto';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { haptics } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 export function CashOutSheet({
@@ -39,7 +40,6 @@ export function CashOutSheet({
   onCashedOut: (result: { threadCashCents: number; payoutCents: number; feeCents: number }) => void;
 }) {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const api = useApi();
   const [amountText, setAmountText] = useState('');
   const [quote, setQuote] = useState<{ payoutCents: number; feeCents: number } | null>(null);
@@ -92,125 +92,94 @@ export function CashOutSheet({
     }
   }
 
+  const over = amountCents > balanceCents;
+  const receive = quoting ? '···' : quote ? formatCents(quote.payoutCents) : amountCents > 0 ? formatCents(amountCents) : '$0.00';
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1 }}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close cash out" />
-      <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="cash-out-sheet">
-        <View style={[styles.handle, { backgroundColor: theme.border }]} />
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: theme.text }]}>Cash out</Text>
-            <Text style={[styles.sub, { color: theme.muted }]}>Move Thread Cash to your payout balance</Text>
-          </View>
-          <Pressable onPress={onClose} style={[styles.close, { backgroundColor: theme.cardElevated }]} accessibilityRole="button" accessibilityLabel="Close" hitSlop={6}>
-            <Icon name="x" size={18} color={theme.text} />
-          </Pressable>
-        </View>
-
-        <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-          <ThreadCashBillIcon size={16} />
-          <Text style={[styles.balanceText, { color: theme.text }]} testID="cash-out-balance">
-            {formatCents(balanceCents)} withdrawable
-          </Text>
-        </View>
-        {promoCents > 0 && (
-          <Text style={[styles.promoNote, { color: theme.muted }]} testID="cash-out-promo-note">
-            {formatCents(promoCents)} promo credit · spendable in Brandthread, not withdrawable
-          </Text>
-        )}
-
-        <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
-          <Text style={[styles.dollarSign, { color: theme.text }]}>$</Text>
-          <TextInput returnKeyType="done"
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Cash out"
+      testID="cash-out-sheet"
+      primaryAction={{
+        label: amountCents > 0 ? `Cash out ${formatCents(amountCents)}` : 'Enter an amount',
+        onPress: () => { void handleConfirm(); },
+        disabled: !canSubmit,
+        loading: confirming,
+        accessibilityLabel: amountCents > 0 ? `Cash out ${formatCents(amountCents)}` : 'Cash out',
+      }}
+    >
+      <View style={styles.hero}>
+        <View style={styles.amountRow}>
+          <Text style={[styles.dollarSign, { color: over ? theme.error : theme.text }]}>$</Text>
+          <TextInput
             value={amountText}
             onChangeText={setAmountText}
-            placeholder="0.00"
+            placeholder="0"
             placeholderTextColor={theme.muted}
             keyboardType="decimal-pad"
-            style={[styles.input, { color: theme.text }]}
+            style={[styles.amountInput, { color: over ? theme.error : theme.text }]}
             testID="cash-out-amount-input"
             accessibilityLabel="Amount to cash out"
           />
+        </View>
+        <View style={styles.balanceRow}>
+          <ThreadCashBillIcon size={14} />
+          <Text style={[styles.balanceText, { color: theme.muted }]} testID="cash-out-balance">
+            {formatCents(balanceCents)} available
+          </Text>
           <Pressable
-            onPress={() => setAmountText((balanceCents / 100).toFixed(2))}
-            style={[styles.allChip, { borderColor: theme.border }]}
+            onPress={() => { hapticLight(); setAmountText((balanceCents / 100).toFixed(2)); }}
+            hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Cash out all"
           >
-            <Text style={[styles.allChipText, { color: theme.accentLight }]}>All</Text>
+            <Text style={[styles.useAll, { color: theme.text }]}>Use all</Text>
           </Pressable>
         </View>
-        {amountCents > balanceCents && (
-          <Text style={[styles.errorText, { color: theme.error }]}>That's more than you can withdraw.</Text>
+        {over && (
+          <Text style={[styles.errorText, { color: theme.error }]}>That's more than your Thread Cash balance.</Text>
         )}
+      </View>
 
-        <View style={[styles.quoteRow, { borderColor: theme.border }]}>
-          <Text style={[styles.quoteLabel, { color: theme.muted }]}>You'll receive</Text>
-          <Text style={[styles.quoteValue, { color: theme.text }]} testID="cash-out-quote">
-            {quoting ? '···' : quote ? formatCents(quote.payoutCents) : amountCents > 0 ? formatCents(amountCents) : '$0.00'}
-          </Text>
+      <View style={[styles.receipt, { backgroundColor: `${theme.text}0F` }]}>
+        <View style={styles.receiptRow}>
+          <Text style={[styles.receiptLabel, { color: theme.muted }]}>You'll receive</Text>
+          <Text style={[styles.receiptValue, { color: theme.text }]} testID="cash-out-quote">{receive}</Text>
         </View>
         {quote != null && quote.feeCents > 0 && (
-          <Text style={[styles.feeText, { color: theme.muted }]}>Includes a {formatCents(quote.feeCents)} fee</Text>
+          <>
+            <View style={[styles.receiptDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.receiptRow}>
+              <Text style={[styles.receiptLabel, { color: theme.muted }]}>Fee</Text>
+              <Text style={[styles.receiptValue, { color: theme.text }]}>{formatCents(quote.feeCents)}</Text>
+            </View>
+          </>
         )}
-
-        {error && <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>}
-
-        <Pressable
-          onPress={handleConfirm}
-          disabled={!canSubmit}
-          style={[styles.confirmBtn, { backgroundColor: theme.accent }, !canSubmit && styles.confirmBtnDisabled]}
-          accessibilityRole="button"
-          accessibilityLabel={amountCents > 0 ? `Cash out ${formatCents(amountCents)}` : 'Cash out'}
-        >
-          <Text style={[styles.confirmBtnText, { color: theme.onAccent }]}>
-            {confirming ? 'Cashing out…' : amountCents > 0 ? `Cash out ${formatCents(amountCents)}` : 'Enter an amount'}
-          </Text>
-        </Pressable>
-      </SheetRise>
+        <View style={[styles.receiptDivider, { backgroundColor: theme.border }]} />
+        <View style={styles.receiptRow}>
+          <Text style={[styles.receiptLabel, { color: theme.muted }]}>To</Text>
+          <Text style={[styles.receiptValue, { color: theme.text }]}>Payout balance</Text>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+
+      {error && <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>}
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    paddingHorizontal: SP.md, paddingTop: SP.xs,
-  },
-  handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.sm },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: SP.sm },
-  title: { fontFamily: FONT.bold, fontSize: FS.md },
-  sub: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  balancePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
-    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6, marginBottom: SP.md,
-  },
-  balanceText: { fontFamily: FONT.semibold, fontSize: FS.xs },
-  promoNote: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: -SP.sm + 2, marginBottom: SP.md },
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md,
-    paddingHorizontal: SP.md, height: 52, gap: SP.xs,
-  },
-  dollarSign: { fontFamily: FONT.bold, fontSize: FS.lg },
-  input: { flex: 1, minWidth: 0, fontFamily: FONT.bold, fontSize: FS.lg, height: '100%' },
-  allChip: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
-  allChipText: { fontFamily: FONT.semibold, fontSize: FS.xs },
-  quoteRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: SP.md, paddingTop: SP.md, borderTopWidth: 1,
-  },
-  quoteLabel: { fontFamily: FONT.medium, fontSize: FS.sm },
-  quoteValue: { fontFamily: FONT.bold, fontSize: FS.md },
-  feeText: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 4 },
-  errorText: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: SP.xs },
-  confirmBtn: { height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.md },
-  confirmBtnDisabled: { opacity: 0.4 },
-  confirmBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },
+  hero: { alignItems: 'center', paddingTop: SP.md, paddingBottom: SP.lg },
+  amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  dollarSign: { fontFamily: FONT.bold, fontSize: 40, lineHeight: 52, marginRight: 2 },
+  amountInput: { fontFamily: FONT.bold, fontSize: 56, lineHeight: 64, minWidth: 60, textAlign: 'center', padding: 0, fontVariant: ['tabular-nums'] },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm },
+  balanceText: { fontFamily: FONT.medium, fontSize: FS.sm },
+  useAll: { fontFamily: FONT.semibold, fontSize: FS.sm, marginLeft: SP.xs },
+  receipt: { borderRadius: radius.md, paddingHorizontal: SP.md },
+  receiptRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48 },
+  receiptDivider: { height: StyleSheet.hairlineWidth },
+  receiptLabel: { fontFamily: FONT.medium, fontSize: FS.sm },
+  receiptValue: { fontFamily: FONT.semibold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
+  errorText: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: SP.sm, textAlign: 'center' },
 });

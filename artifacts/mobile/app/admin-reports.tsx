@@ -6,11 +6,11 @@
  * Backed by /api/moderation (moderators only: users.role = 'admin').
  * Non-moderators see an access notice instead of the queue.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, ScrollView, StyleSheet, RefreshControl, ActivityIndicator,
-  Modal, Pressable, TextInput, Platform } from 'react-native';
+  Pressable, TextInput, Platform } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -21,14 +21,13 @@ import { useApi } from '@/lib/api';
 import { EmptyState, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { Sheet } from '@/components/ui/BottomSheet';
 import {
   REPORT_REASONS, TARGET_ICONS, TARGET_LABELS, apiErrorMessage, normalizeReportTarget, reportSla, shortRelativeTime,
 } from '@/lib/safety';
 import type {
   ModerationAction, ModerationQueue, ModerationQueueItem, ProfileSummary, ReportTargetType,
 } from '@/lib/safetyTypes';
-import { SheetRise } from '@/components/motion/SheetRise';
 import { radius, nestedRadius } from '@/constants/radii';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
@@ -59,17 +58,6 @@ const ACTION_LABELS: Record<string, string> = {
 
 function reasonLabel(reason: string) {
   return REPORT_REASONS.find((r) => r.id === reason)?.label ?? reason.replace(/_/g, ' ');
-}
-
-/**
- * Reads `useSafeAreaInsets()` from wherever it's actually rendered, not
- * from the component that returns it — so a value read inside
- * `<ModalSafeArea>` (a Modal's own native root) is the fresh, modal-local
- * inset rather than whatever the caller's own render position saw.
- */
-function SheetBottomInset({ children }: { children: (bottom: number) => React.ReactNode }) {
-  const insets = useSafeAreaInsets();
-  return <>{children(insets.bottom)}</>;
 }
 
 export default function ReviewQueueScreen() {
@@ -320,7 +308,7 @@ function MiniAvatar({ profile, size = 22 }: { profile: ProfileSummary; size?: nu
 // ─── Review sheet ─────────────────────────────────────────────────────────────
 
 function ReviewSheet({
-  item, onClose, onResolve, onReinstate,
+  item: itemProp, onClose, onResolve, onReinstate,
 }: {
   item: ModerationQueueItem | null;
   onClose: () => void;
@@ -333,6 +321,10 @@ function ReviewSheet({
   const [busy, setBusy] = useState<ModerationAction | 'reinstate' | null>(null);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Keep the last item on screen while the sheet slides away.
+  const lastItem = useRef<ModerationQueueItem | null>(itemProp);
+  if (itemProp) lastItem.current = itemProp;
+  const item = itemProp ?? lastItem.current;
 
   React.useEffect(() => { setNote(''); setBusy(null); setConfirmSuspend(false); setError(null); }, [item?.id]);
 
@@ -372,20 +364,15 @@ function ReviewSheet({
   );
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <ModalSafeArea>
-      <Pressable style={s.scrim} onPress={onClose} accessibilityLabel="Close review" />
-      <SheetBottomInset>
-      {(insetBottom) => (
-      <SheetRise style={[s.sheet, { paddingBottom: insetBottom + SP.md }]}>
-        <View style={s.sheetHandle} />
-        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <Sheet
+      visible={!!itemProp}
+      onClose={onClose}
+      title={auto ? 'Held by the content filter' : `${reasonLabel(item.reason)} report`}
+      testID="admin-review-sheet"
+    >
           <View style={s.sheetHeader}>
-            <View style={s.typeIconLg}><Icon name={TARGET_ICONS[type]} size={18} color={theme.text} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.sheetTitle}>{auto ? 'Held by the content filter' : `${reasonLabel(item.reason)} report`}</Text>
-              <Text style={s.sheetSub}>{TARGET_LABELS[type]} · {new Date(item.createdAt).toLocaleString()}</Text>
-            </View>
+            <Icon name={TARGET_ICONS[type]} size={14} color={theme.muted} />
+            <Text style={s.sheetSub}>{TARGET_LABELS[type]} · {new Date(item.createdAt).toLocaleString()}</Text>
           </View>
 
           <View style={s.contentBox}>
@@ -486,12 +473,7 @@ function ReviewSheet({
               </PressableScale>
             </View>
           ) : null}
-        </ScrollView>
-      </SheetRise>
-      )}
-      </SheetBottomInset>
-      </ModalSafeArea>
-    </Modal>
+    </Sheet>
   );
 }
 
@@ -514,7 +496,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   card: { backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md, gap: 10 },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   typeIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  typeIconLg: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   cardType: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.pill, borderWidth: 1 },
   badgeNeutral: { borderColor: theme.border, backgroundColor: theme.cardElevated },
@@ -533,16 +514,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: theme.accent, borderRadius: RADIUS.pill, paddingHorizontal: 16, paddingVertical: 10,
   },
   toastText: { color: theme.onAccent, fontFamily: FONT.semibold, fontSize: FS.sm },
-  scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '88%',
-    backgroundColor: theme.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    borderWidth: 1, borderBottomWidth: 0, borderColor: theme.border, paddingHorizontal: SP.md,
-  },
-  sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, marginTop: SP.sm, marginBottom: SP.md },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginBottom: SP.md },
-  sheetTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg },
-  sheetSub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SP.md },
+  sheetSub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs },
   contentBox: { backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.md, marginBottom: SP.sm },
   contentEyebrow: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, marginBottom: 6 },
   contentText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22 },

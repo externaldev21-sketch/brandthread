@@ -43,7 +43,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedScrollHandler, useAnimatedStyle } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { useKeyboardHeight } from '@/components/KeyboardProviderCompat';
+import { useKeyboardHeight } from '@/components/ui/useKeyboardHeight';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { radius } from '@/constants/radii';
 import { FONT } from '@/lib/theme';

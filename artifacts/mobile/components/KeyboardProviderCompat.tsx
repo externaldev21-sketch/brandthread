@@ -1,8 +1,7 @@
-import React, { useEffect } from 'react';
-import { useSharedValue, withTiming, Easing, type SharedValue } from 'react-native-reanimated';
+import React from 'react';
+import type { SharedValue } from 'react-native-reanimated';
 import {
   KeyboardAvoidingView as RNKeyboardAvoidingView,
-  Keyboard,
   NativeModules,
   Platform,
   TurboModuleRegistry,
@@ -76,36 +75,3 @@ export function useReanimatedKeyboardAnimation(): { progress: { value: number } 
   if (nativeHook) return nativeHook();
   return { progress: { value: 0 } };
 }
-/**
- * The keyboard's offset as a Reanimated shared value that tracks the keyboard
- * frame by frame on the UI thread: 0 when hidden, `-keyboardHeight` while
- * shown (keyboard-controller's own sign convention, so it can be fed straight
- * into a translateY; take `-value` for a height).
- * Bottom sheets use it to sit their pinned action on top of the keyboard.
- *
- * With react-native-keyboard-controller registered, this mirrors its
- * per-frame `height`. Without it
- * (Expo Go, web), it falls back to RN's `Keyboard` events and animates over
- * the keyboard's own reported duration, so the sheet still rises smoothly
- * instead of jumping.
- */
-export const useKeyboardHeight: () => SharedValue<number> = keyboardController?.useReanimatedKeyboardAnimation
-  ? function useControllerKeyboardHeight() {
-    const { height } = keyboardController!.useReanimatedKeyboardAnimation!();
-    return height;
-  }
-  : function useFallbackKeyboardHeight() {
-    const height = useSharedValue(0);
-    useEffect(() => {
-      const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-      const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-      const show = Keyboard.addListener(showEvt, e => {
-        height.set(withTiming(-e.endCoordinates.height, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) }));
-      });
-      const hide = Keyboard.addListener(hideEvt, e => {
-        height.set(withTiming(0, { duration: e?.duration || 250, easing: Easing.out(Easing.cubic) }));
-      });
-      return () => { show.remove(); hide.remove(); };
-    }, [height]);
-    return height;
-  };

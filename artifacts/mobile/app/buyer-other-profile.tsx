@@ -1,4 +1,4 @@
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
 /**
  * A buyer's profile as seen by a VISITOR — the same ProfileShell as every
  * other profile. Visitors get only: avatar, name, @username, followers /
@@ -17,18 +17,17 @@ import { haptics } from '@/lib/haptics';
  * a non-friend sees a clear locked state instead of an empty grid.
  */
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { View, Text, Alert, StyleSheet, Modal, Pressable, Platform, Share } from 'react-native';
+import { View, Text, Alert, StyleSheet, Pressable, Platform, Share } from 'react-native';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure } from '@/lib/engagementRetryQueue';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { GiveawayProfileCard } from '@/components/GiveawayProfileCard';
-import { hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
 import { muteUser, createOrGetConversation } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
@@ -46,11 +45,11 @@ import { highlightFromServer, type Highlight } from '@/lib/highlightsService';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
-  InteractionLayer, ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
+  ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { MenuSheet } from '@/components/ui/MenuSheet';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { isVisitorPreviewParam, resolveProfileMode } from '@/lib/profileAccess';
@@ -90,7 +89,6 @@ type RemoteProfile = {
 export default function BuyerOtherProfileScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
   const layout  = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
@@ -627,53 +625,25 @@ export default function BuyerOtherProfileScreen() {
       <Snackbar visible={!!snackbar} message={snackbar} onDismiss={() => setSnackbar('')} />
 
       {/* ── More options sheet ── */}
-      <Modal visible={moreSheetOpen} transparent animationType="slide" onRequestClose={() => setMoreSheetOpen(false)}>
-        <ModalSafeArea>
-          <View style={styles.moreBackdrop}>
-            {/* Plain Pressable, not PressableScale: PressableScale only
-                forwards a plain-object `style` prop to its *inner*
-                Animated.View, never the outer Pressable that actually
-                receives touches — so this backdrop had no real hit area and
-                tapping it did nothing. */}
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setMoreSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close options" />
-            <View style={[styles.moreSheet, { paddingBottom: insets.bottom + SP.md }]}>
-              <View style={styles.moreHandle} />
-              <Text style={styles.moreTitle}>{displayName}</Text>
-              <MoreRow icon="share-2" label="Share profile" onPress={handleShare} />
-              <View style={styles.moreDivider} />
-              <MoreRow icon="volume-x" label="Mute" onPress={handleMute} />
-              <View style={styles.moreDivider} />
-              <MoreRow icon="flag" label="Report" onPress={handleReport} />
-              <View style={styles.moreDivider} />
-              <MoreRow icon="slash" label={iBlockedThem ? 'Unblock' : 'Block'} onPress={handleBlock} destructive />
-            </View>
-          </View>
-        </ModalSafeArea>
-      </Modal>
+      <MenuSheet
+        visible={moreSheetOpen}
+        onClose={() => setMoreSheetOpen(false)}
+        accessibilityLabel={`${displayName} options`}
+        testID="buyer-other-profile-more-sheet"
+        sections={[
+          [{ key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShare }],
+          [
+            { key: 'mute', icon: 'volume-x', label: 'Mute', onPress: () => { void handleMute(); } },
+          ],
+          [
+            { key: 'report', icon: 'flag', label: 'Report', destructive: true, onPress: handleReport },
+            { key: 'block', icon: 'slash', label: iBlockedThem ? 'Unblock' : 'Block', destructive: true, onPress: () => { void handleBlock(); } },
+          ],
+        ]}
+      />
     </>
   );
 }
-
-function MoreRow({ icon, label, onPress, destructive }: { icon: IconName; label: string; onPress: () => void; destructive?: boolean }) {
-  const { theme } = useAppTheme();
-  const color = destructive ? theme.error : theme.text;
-  return (
-    <PressableScale style={moreRowStyles.row} onPress={onPress} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={label}>
-      {(state) => (
-        <>
-          <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.sm} theme={theme} />
-          <Icon name={icon} size={20} color={color} />
-          <Text style={[moreRowStyles.text, { color }]}>{label}</Text>
-        </>
-      )}
-    </PressableScale>
-  );
-}
-
-const moreRowStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 50, paddingHorizontal: SP.xs },
-  text: { fontFamily: FONT.medium, fontSize: FS.base },
-});
 
 function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
@@ -694,13 +664,5 @@ function makeStyles(theme: AppThemePreset) {
     },
     blockedBannerText: { flex: 1, color: theme.muted, fontSize: FS.xs, lineHeight: 18 },
     blockedBannerAction: { color: theme.text, fontSize: FS.xs, fontFamily: FONT.semibold },
-    moreBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' }, // theme-exempt: modal scrim
-    moreSheet: {
-      backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-      paddingHorizontal: SP.md, paddingTop: SP.md,
-    },
-    moreHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.md },
-    moreTitle: { fontFamily: FONT.bold, fontSize: FS.md, color: theme.text, paddingBottom: SP.sm },
-    moreDivider: { height: 1, backgroundColor: theme.border },
   });
 }

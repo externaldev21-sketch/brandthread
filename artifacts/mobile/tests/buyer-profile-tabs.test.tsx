@@ -136,6 +136,9 @@ vi.mock('react-native', () => {
       addEventListener: () => ({ remove: () => {} }),
     },
     useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+    // The shared sheet (profile ... menu) reads the window height on open.
+    Dimensions: { get: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }) },
+    Keyboard: { addListener: () => ({ remove: () => {} }) },
   };
 });
 
@@ -477,6 +480,12 @@ describe('buyer profile tabs', () => {
         node => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === `${tab} tab`,
       ).length, tab).toBeGreaterThan(0);
     }
+    // The menu mounts its rows on first open (shared MenuSheet), so open it
+    // the way a user does: the ... button.
+    const menuButton = renderer.root.findAll(
+      node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { menuButton.props.onPress(); });
     const row = renderer.root.findAll(
       node => node.props.testID === 'profile-menu-sheet-view-as-visitor' && typeof node.props.onPress === 'function',
     )[0];

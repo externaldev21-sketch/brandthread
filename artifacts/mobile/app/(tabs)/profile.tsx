@@ -15,7 +15,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { openShareStoreSheet } from '@/lib/shareStoreSheet';
 import { useAuth } from '@clerk/expo';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, Alert, TextInput,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -28,8 +28,7 @@ import {
   CARD, BORDER, FG, MUTED,
   FONT, FS, SP, RADIUS, SURFACE,
 } from '@/lib/theme';
-import { SheetRise } from '@/components/motion/SheetRise';
-import { Button } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { ListRow } from '@/components/ui/ListRow';
@@ -786,93 +785,52 @@ export default function ProfileScreen() {
         ].filter(Boolean) as ProfileMenuItem[]}
       />
 
-      {/* ── Profile Editor Modal ── */}
-      <Modal
+      {/* ── Profile editor sheet ── */}
+      <Sheet
         visible={profileEditorVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeProfileEditor}
+        onClose={closeProfileEditor}
+        title="Edit brand"
+        testID="profile-edit-sheet"
+        primaryAction={{
+          label: 'Save changes',
+          onPress: () => { void saveProfileDetails(); },
+          loading: savingProfile,
+          disabled: savingProfile,
+          testID: 'profile-edit-save',
+        }}
       >
-        <KeyboardAvoidingView
-          style={s.sheetModal}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <TouchableOpacity
-            style={s.sheetBackdrop}
-            activeOpacity={1}
-            onPress={closeProfileEditor}
-            accessibilityLabel="Close profile editor"
-          />
-          <SheetRise style={s.sheet}>
-            <View style={s.sheetHandle} />
-            <View style={s.sheetHeader}>
-              <View>
-                <Text style={s.sheetTitle}>Edit brand</Text>
-                <Text style={s.sheetSubtitle}>Keep your Profile details up to date.</Text>
-              </View>
-              <TouchableOpacity
-                style={s.sheetClose}
-                onPress={closeProfileEditor}
-                disabled={savingProfile}
-                accessibilityLabel="Close profile editor"
-              >
-                <Icon name="x" size={18} color={FG} />
-              </TouchableOpacity>
-            </View>
+        <Text style={s.inputLabel}>Brand name</Text>
+        <TextInput
+          value={brandNameInput}
+          onChangeText={setBrandNameInput}
+          style={s.textInput}
+          placeholder="Your brand name"
+          placeholderTextColor={MUTED}
+          autoCapitalize="words"
+          autoCorrect={false}
+          maxLength={80}
+          returnKeyType="next"
+          editable={!savingProfile}
+          testID="profile-edit-brand-name"
+        />
 
-            <Text style={s.inputLabel}>Brand name</Text>
-            <TextInput
-              value={brandNameInput}
-              onChangeText={setBrandNameInput}
-              style={s.textInput}
-              placeholder="Your brand name"
-              placeholderTextColor={MUTED}
-              autoCapitalize="words"
-              autoCorrect={false}
-              maxLength={80}
-              returnKeyType="next"
-              editable={!savingProfile}
-              testID="profile-edit-brand-name"
-            />
-
-            <View style={s.bioLabelRow}>
-              <Text style={s.inputLabel}>Bio</Text>
-              <Text style={s.characterCount}>{bioInput.length}/280</Text>
-            </View>
-            <TextInput
-              value={bioInput}
-              onChangeText={setBioInput}
-              style={[s.textInput, s.bioInput]}
-              placeholder="Tell people about your brand"
-              placeholderTextColor={MUTED}
-              multiline
-              maxLength={280}
-              textAlignVertical="top"
-              editable={!savingProfile}
-              testID="profile-edit-bio"
-            />
-
-            <View style={s.sheetActions}>
-              <Button
-                label="Cancel"
-                variant="secondary"
-                style={s.cancelButton}
-                onPress={closeProfileEditor}
-                disabled={savingProfile}
-              />
-              <Button
-                label="Save changes"
-                variant="primary"
-                loading={savingProfile}
-                style={s.saveButton}
-                onPress={saveProfileDetails}
-                disabled={savingProfile}
-                testID="profile-edit-save"
-              />
-            </View>
-          </SheetRise>
-        </KeyboardAvoidingView>
-      </Modal>
+        <View style={s.bioLabelRow}>
+          <Text style={s.inputLabel}>Bio</Text>
+          <Text style={s.characterCount}>{bioInput.length}/280</Text>
+        </View>
+        <TextInput
+          value={bioInput}
+          onChangeText={setBioInput}
+          style={[s.textInput, s.bioInput]}
+          placeholder="Tell people about your brand"
+          placeholderTextColor={MUTED}
+          multiline
+          maxLength={280}
+          textAlignVertical="top"
+          editable={!savingProfile}
+          testID="profile-edit-bio"
+        />
+      </Sheet>
 
       <CoverCoachmarkSheet
         visible={coverFlow.coachmarkVisible}
@@ -915,17 +873,6 @@ const s = StyleSheet.create({
   draftsTileCount: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
 
   // Profile editor sheet
-  sheetModal:       { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop:    { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.68)' },
-  sheet: {
-    backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    borderTopWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: 26,
-  },
-  sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.lg },
-  sheetHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: SP.lg },
-  sheetTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg, marginBottom: 4 },
-  sheetSubtitle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
-  sheetClose: { width: 44, height: 44, borderRadius: 22, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
   inputLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
   bioLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.md },
   characterCount: { color: MUTED, fontFamily: FONT.regular, fontSize: 11, marginBottom: SP.sm },
@@ -935,7 +882,4 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.md, paddingVertical: 12,
   },
   bioInput: { minHeight: 96, maxHeight: 128 },
-  sheetActions: { flexDirection: 'row', gap: 10, marginTop: SP.lg },
-  cancelButton: { flex: 1 },
-  saveButton: { flex: 1.45 },
 });

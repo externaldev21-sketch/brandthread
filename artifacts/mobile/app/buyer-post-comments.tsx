@@ -24,13 +24,13 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useStableCallback } from '@/hooks/useStableCallback';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
+  View, Text, FlatList, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
 } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import Composer from '@/components/ui/Composer';
 import { KeyboardAccessoryBar, keyboardAccessoryID } from '@/components/ui/KeyboardAccessoryBar';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,17 +44,17 @@ import {
 import { SHEET_EASING_BEZIER, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';
 import { RADII } from '@/constants/radii';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
-import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { MenuBlocks } from '@/components/ui/MenuSheet';
 import { useApi } from '@/lib/api';
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 import type { ThreadComment } from '@/lib/safetyTypes';
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticDestructiveConfirm } from '@/lib/haptics';
 import { bumpCommentCount } from '@/lib/commentCountBus';
 import { buildPreviewComments, previewNotificationComments, PREVIEW_MENTION_PEOPLE } from '@/lib/previewComments';
 import { isPreviewDemoMode } from '@/lib/devPreview';
@@ -200,7 +200,7 @@ function Avatar({ uri, initials, size = 38, ring = true, backgroundColor, recycl
 }
 
 // ─── Like heart ───────────────────────────────────────────────────────────────
-// Solid filled heart when liked, outline when not (Feather only ships an
+// Solid filled heart when liked, outline when not (Icon only ships an
 // outline heart, so liking used to just recolor the same stroked glyph —
 // FontAwesome's solid "heart" is the app-wide fallback for a filled heart,
 // same as the feed's RightActionRail/EngagementButton). The container is
@@ -443,100 +443,94 @@ function CommentActionsSheet({
 }) {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
-  const insets = useSafeAreaInsets();
   const [step, setStep] = useState<SheetStep>('menu');
   const [busy, setBusy] = useState(false);
+  // Keep the last comment on screen while the sheet slides away.
+  const lastComment = useRef<Row | null>(comment);
+  if (comment) lastComment.current = comment;
+  const shown = comment ?? lastComment.current;
 
   useEffect(() => { setStep('menu'); setBusy(false); }, [comment?.id]);
 
-  if (!comment) return null;
-  const name = comment.author.name;
+  if (!shown) return null;
+  const name = shown.author.name;
 
   const run = async (action: (c: Row) => Promise<void>) => {
     setBusy(true);
-    try { await action(comment); } finally { setBusy(false); }
+    try { await action(shown); } finally { setBusy(false); }
   };
 
-  const Option = ({ icon, label, destructive, onPress }: {
-    icon: IconName; label: string; destructive?: boolean; onPress: () => void;
-  }) => (
-    <PressableScale
-      style={s.sheetOption}
-      onPress={() => onPress()}
-      accessibilityRole="button"
-      activeOpacity={0.75}
-    >
-      <Icon name={icon} size={18} color={destructive ? theme.error : theme.text} />
-      <Text style={[s.sheetOptionText, destructive && { color: theme.error }]}>{label}</Text>
-    </PressableScale>
-  );
+  const confirming = step !== 'menu';
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <ModalSafeArea>
-      <Pressable style={s.sheetScrim} onPress={onClose} accessibilityLabel="Dismiss" />
-      <View style={[s.sheetCard, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-        <View style={s.sheetHandle} />
-        <View style={s.sheetPreview}>
-          <Avatar uri={comment.author.avatarUrl} initials={comment.author.initials} size={30} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.sheetPreviewName}>{name}</Text>
-            <Text style={s.sheetPreviewText} numberOfLines={2}>{comment.body}</Text>
-          </View>
+    <Sheet
+      visible={!!comment}
+      onClose={busy ? () => {} : onClose}
+      headerRight="none"
+      accessibilityLabel="Comment options"
+      testID="comment-actions-sheet"
+      primaryAction={confirming ? {
+        label: step === 'confirm-block' ? 'Block' : 'Delete',
+        variant: 'destructive',
+        loading: busy,
+        disabled: busy,
+        onPress: () => { hapticDestructiveConfirm(); void run(step === 'confirm-block' ? onBlock : onDelete); },
+      } : undefined}
+      secondaryAction={confirming ? { label: 'Cancel', onPress: () => setStep('menu'), disabled: busy } : undefined}
+    >
+      <View style={s.sheetPreview}>
+        <Avatar uri={shown.author.avatarUrl} initials={shown.author.initials} size={30} />
+        <View style={{ flex: 1 }}>
+          <Text style={s.sheetPreviewName}>{name}</Text>
+          <Text style={s.sheetPreviewText} numberOfLines={2}>{shown.body}</Text>
         </View>
-
-        {step === 'menu' ? (
-          <View style={s.sheetGroup}>
-            {!comment.pendingReview ? (
-              <Option icon="corner-up-left" label="Reply" onPress={() => { onClose(); onReply(comment); }} />
-            ) : null}
-            {canPin && onTogglePin && !comment.isReply && !comment.pendingReview ? (
-              <Option
-                icon="bookmark"
-                label={comment.pinned ? 'Unpin comment' : 'Pin comment'}
-                onPress={() => { onClose(); onTogglePin(comment); }}
-              />
-            ) : null}
-            {!comment.isMine ? (
-              <>
-                <Option icon="flag" label="Report comment" onPress={() => { onClose(); onReport(comment); }} />
-                <Option icon="slash" label={`Block ${name}`} destructive onPress={() => setStep('confirm-block')} />
-              </>
-            ) : null}
-            {comment.canDelete ? (
-              <Option icon="trash-2" label="Delete comment" destructive onPress={() => setStep('confirm-delete')} />
-            ) : null}
-          </View>
-        ) : (
-          <View style={s.confirmBlock}>
-            <Text style={s.confirmTitle}>
-              {step === 'confirm-block' ? `Block ${name}?` : 'Delete this comment?'}
-            </Text>
-            <Text style={s.confirmBody}>
-              {step === 'confirm-block'
-                ? BLOCK_EXPLAINER
-                : comment.isMine
-                  ? 'It will be removed for everyone. This can’t be undone.'
-                  : 'As the post owner you can remove comments from your post. This can’t be undone.'}
-            </Text>
-            <PressableScale
-              style={[s.confirmPrimary, { backgroundColor: theme.error }, busy && { opacity: 0.6 }]}
-              disabled={busy}
-              onPress={() => { haptics.warning(); run(step === 'confirm-block' ? onBlock : onDelete); }}
-              accessibilityRole="button"
-            >
-              {busy
-                ? <InlineSpinner style={{ paddingVertical: 0 }} />
-                : <Text style={s.confirmPrimaryText}>{step === 'confirm-block' ? 'Block' : 'Delete'}</Text>}
-            </PressableScale>
-            <PressableScale style={s.confirmSecondary} onPress={() => setStep('menu')} accessibilityRole="button">
-              <Text style={s.confirmSecondaryText}>Cancel</Text>
-            </PressableScale>
-          </View>
-        )}
       </View>
-      </ModalSafeArea>
-    </Modal>
+
+      {!confirming ? (
+        <MenuBlocks
+          onClose={onClose}
+          testID="comment-actions"
+          sections={[
+            [
+              ...(!shown.pendingReview
+                ? [{ key: 'reply', icon: 'corner-up-left' as const, label: 'Reply', onPress: () => onReply(shown) }]
+                : []),
+              ...(canPin && onTogglePin && !shown.isReply && !shown.pendingReview
+                ? [{
+                  key: 'pin', icon: 'bookmark' as const,
+                  label: shown.pinned ? 'Unpin comment' : 'Pin comment',
+                  onPress: () => onTogglePin(shown),
+                }]
+                : []),
+            ],
+            [
+              ...(!shown.isMine
+                ? [
+                  { key: 'report', icon: 'flag' as const, label: 'Report comment', destructive: true, onPress: () => onReport(shown) },
+                  { key: 'block', icon: 'slash' as const, label: `Block ${name}`, destructive: true, keepOpen: true, onPress: () => setStep('confirm-block') },
+                ]
+                : []),
+              ...(shown.canDelete
+                ? [{ key: 'delete', icon: 'trash-2' as const, label: 'Delete comment', destructive: true, keepOpen: true, onPress: () => setStep('confirm-delete') }]
+                : []),
+            ],
+          ]}
+        />
+      ) : (
+        <View style={s.confirmBlock}>
+          <Text style={s.confirmTitle}>
+            {step === 'confirm-block' ? `Block ${name}?` : 'Delete this comment?'}
+          </Text>
+          <Text style={s.confirmBody}>
+            {step === 'confirm-block'
+              ? BLOCK_EXPLAINER
+              : shown.isMine
+                ? 'It will be removed for everyone. This can’t be undone.'
+                : 'As the post owner you can remove comments from your post. This can’t be undone.'}
+          </Text>
+        </View>
+      )}
+    </Sheet>
   );
 }
 
@@ -1591,27 +1585,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   mentionIcon: { color: MUTED, fontFamily: FONT.bold, fontSize: 17, lineHeight: 20 },
 
   // Actions sheet
-  sheetScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.55)' }, // theme-exempt: matches components/ui/BottomSheet.tsx's backdrop
-  sheetCard: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    backgroundColor: theme.card, borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet,
-    borderWidth: 1, borderBottomWidth: 0, borderColor: theme.border, paddingHorizontal: SP.md,
-  },
-  sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, marginTop: SP.sm, marginBottom: SP.md },
   sheetPreview: {
     flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start',
-    paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: theme.borderSubtle,
+    paddingTop: SP.xs, paddingBottom: SP.md,
   },
   sheetPreviewName: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
   sheetPreviewText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 2 },
-  sheetGroup: { paddingVertical: SP.xs },
-  sheetOption: { flexDirection: 'row', alignItems: 'center', gap: SP.md, minHeight: 52 },
-  sheetOptionText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base },
   confirmBlock: { paddingTop: SP.md, paddingBottom: SP.xs },
   confirmTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg },
   confirmBody: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginTop: 6 },
-  confirmPrimary: { marginTop: SP.lg, height: 50, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-  confirmPrimaryText: { color: '#1A0A0A', fontFamily: FONT.bold, fontSize: FS.base },
-  confirmSecondary: { height: 48, alignItems: 'center', justifyContent: 'center' },
-  confirmSecondaryText: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.base },
 });

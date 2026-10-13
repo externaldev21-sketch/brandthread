@@ -192,6 +192,7 @@ function isRouteFile(full: string, entry: string): boolean {
 // yet reference useSafeAreaInsets/useHeaderTopInset/SafeAreaView anywhere.
 const MODAL_INSETS_ALLOWLIST = new Set([
   'app/(tabs)/profile.tsx',
+  'app/design-bg-replace.tsx',
   'app/help.tsx',
   'components/PlanUpsellModal.tsx',
   'components/ProductReviewsSection.tsx',
@@ -199,8 +200,9 @@ const MODAL_INSETS_ALLOWLIST = new Set([
   'components/SetupCelebration.tsx',
   'components/buyer-feed/LongPressMenu.tsx',
   'components/discover/DiscoverSafetyMenu.tsx',
+  'components/chat/ThemePickerSheet.tsx',
+  'components/motion/SheetRise.tsx',
   'components/settings/SettingsKit.tsx',
-  'components/thread-cash/ChatAttachThreadCash.tsx',
 ]);
 
 function isSourceFile(full: string, entry: string): boolean {

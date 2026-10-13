@@ -1,15 +1,10 @@
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { spotlightPagePropsEqual } from '@/lib/feedPageMemo';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { DEMO_RUNWAY_VIDEO_SOURCES, DEMO_RUNWAY_VIDEO_URIS } from '@/lib/demoMedia';
 import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
-import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  Animated, TextInput, Modal, Pressable, PanResponder,
-  AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator, Easing,
-  useWindowDimensions, type LayoutChangeEvent,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback, Animated, TextInput, Modal, Pressable, PanResponder, AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator, Easing, useWindowDimensions, type LayoutChangeEvent, type ViewToken, Platform, type ImageSourcePropType } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -21,17 +16,9 @@ import { useAuth } from '@clerk/expo';
 import { ForYouEmptyShop } from '@/components/feed/ForYouEmptyShop';
 import { useSignInGate } from '@/hooks/useSignInGate';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  createThreadFeedCursor,
-  getSellerFollowStates,
-  getThreadPostsPage,
-  setSellerFollowing,
-  subscribeSocial,
-} from '@/services/socialService';
+import { createThreadFeedCursor, getSellerFollowStates, getThreadPostsPage, setSellerFollowing, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { confirmSponsoredImpression } from '@/services/sponsoredService';
-import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
-import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
@@ -45,9 +32,6 @@ import {
   enqueueEngagementRetry, isRetryableFailure, setEngagementRetryExecutor, startEngagementRetryQueuePump,
 } from '@/lib/engagementRetryQueue';
 import { computeJustDroppedDrops, type FollowedDrop } from '@/lib/justDroppedDrops';
-import type { ViewToken } from 'react-native';
-import { Platform } from 'react-native';
-import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
 import { useSettled } from '@/lib/animationUtils';
 import {
@@ -81,8 +65,7 @@ import {
   URGENCY_UNITS_THRESHOLD,
   type CommerceSignalData,
 } from '@/components/CommerceSignal';
-import { ShopProductSheet } from '@/components/ShopProductSheet';
-import type { ShopSheetSelection } from '@/components/ShopProductSheet';
+import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { FeedGestureGuide } from '@/components/FeedGestureGuide';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
@@ -100,7 +83,7 @@ import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII, radius } from '@/constants/radii';
 import { minHitSlop } from '@/lib/hitSlop';
@@ -3567,68 +3550,46 @@ export default function FeedScreen({
 
       {/* Notifications now open the real /buyer-notifications screen instead of
           this hardcoded fake sheet — see the bell button's onPress above. */}
-      <Modal
+      <Sheet
         visible={showRepostEducation}
-        animationType="fade"
-        transparent
-        statusBarTranslucent
-        onRequestClose={() => setShowRepostEducation(false)}
+        onClose={() => setShowRepostEducation(false)}
+        headerRight="close"
+        accessibilityLabel="About reposts"
+        testID="repost-education-sheet"
+        primaryAction={{ label: 'OK', onPress: () => setShowRepostEducation(false), accessibilityLabel: 'Got it' }}
       >
-        <View style={styles.repostEducationBackdrop}>
-          <TouchableWithoutFeedback accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowRepostEducation(false)}>
-            <View style={StyleSheet.absoluteFill} />
-          </TouchableWithoutFeedback>
-          <SheetRise style={[styles.repostEducationSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
-            <TouchableOpacity
-              style={styles.repostEducationClose}
-              onPress={() => setShowRepostEducation(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Close repost information"
-            >
-              <Icon name="x" size={24} color={FG} />
-            </TouchableOpacity>
-            <View style={styles.repostEducationPreview}>
-              <View style={styles.repostEducationPreviewMedia}>
-                <View style={styles.repostEducationPreviewBadge}>
-                  <View style={styles.repostEducationPreviewAvatar}>
-                    <Icon name="user" size={11} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.repostEducationPreviewBadgeText}>You reposted</Text>
-                </View>
-                <Icon name="more-horizontal" size={18} color="#FFFFFF99" style={styles.repostEducationPreviewMore} />
-                <View style={styles.repostEducationPreviewLines}>
-                  <View style={styles.repostEducationPreviewLineShort} />
-                  <View style={styles.repostEducationPreviewLineLong} />
-                </View>
-                <Icon name="corner-up-right" size={30} color="#FFFFFF99" style={styles.repostEducationPreviewShare} />
+        <View style={styles.repostEducationPreview}>
+          <View style={styles.repostEducationPreviewMedia}>
+            <View style={styles.repostEducationPreviewBadge}>
+              <View style={styles.repostEducationPreviewAvatar}>
+                <Icon name="user" size={11} color="#FFFFFF" />
               </View>
+              <Text style={styles.repostEducationPreviewBadgeText}>You reposted</Text>
             </View>
-            <Text style={styles.repostEducationTitle}>Introduce this post to others by reposting</Text>
-            <View style={styles.repostEducationPoint}>
-              <Icon name="users" size={22} color={FG} />
-              <Text style={styles.repostEducationPointText}>Your repost can appear to friends in their Thread.</Text>
+            <Icon name="more-horizontal" size={18} color="#FFFFFF99" style={styles.repostEducationPreviewMore} />
+            <View style={styles.repostEducationPreviewLines}>
+              <View style={styles.repostEducationPreviewLineShort} />
+              <View style={styles.repostEducationPreviewLineLong} />
             </View>
-            <View style={styles.repostEducationPoint}>
-              <Icon name="repeat" size={22} color={FG} />
-              <Text style={styles.repostEducationPointText}>Use the Repost button again at any time to remove it.</Text>
-            </View>
-            <View style={styles.repostEducationPrivacy}>
-              <Icon name="lock" size={15} color={MUTED} />
-              <Text style={styles.repostEducationPrivacyText}>
-                Only mutual friends can see your profile on a repost.
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.repostEducationOkay, { backgroundColor: theme.accent }]}
-              onPress={() => setShowRepostEducation(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Got it"
-            >
-              <Text style={[styles.repostEducationOkayText, { color: theme.onAccent }]}>OK</Text>
-            </TouchableOpacity>
-          </SheetRise>
+            <Icon name="corner-up-right" size={30} color="#FFFFFF99" style={styles.repostEducationPreviewShare} />
+          </View>
         </View>
-      </Modal>
+        <Text style={styles.repostEducationTitle}>Introduce this post to others by reposting</Text>
+        <View style={styles.repostEducationPoint}>
+          <Icon name="users" size={22} color={FG} />
+          <Text style={styles.repostEducationPointText}>Your repost can appear to friends in their Thread.</Text>
+        </View>
+        <View style={styles.repostEducationPoint}>
+          <Icon name="repeat" size={22} color={FG} />
+          <Text style={styles.repostEducationPointText}>Use the Repost button again at any time to remove it.</Text>
+        </View>
+        <View style={styles.repostEducationPrivacy}>
+          <Icon name="lock" size={15} color={MUTED} />
+          <Text style={styles.repostEducationPrivacyText}>
+            Only mutual friends can see your profile on a repost.
+          </Text>
+        </View>
+      </Sheet>
       {shopSelection && (
         <ShopProductSheet
           selection={shopSelection}
@@ -3846,16 +3807,6 @@ const styles = StyleSheet.create({
   },
 
   modalBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
-  repostEducationBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.56)', justifyContent: 'flex-end' },
-  repostEducationSheet: {
-    backgroundColor: CARD, borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    paddingHorizontal: 24, paddingTop: 22,
-    borderWidth: 1, borderBottomWidth: 0, borderColor: BORDER,
-  },
-  repostEducationClose: {
-    position: 'absolute', top: 12, right: 12, zIndex: 2,
-    width: 42, height: 42, alignItems: 'center', justifyContent: 'center',
-  },
   repostEducationPreview: { alignItems: 'center', marginBottom: 20 },
   repostEducationPreviewMedia: {
     width: 220, height: 150, borderRadius: 16, backgroundColor: '#313136',
@@ -3889,10 +3840,6 @@ const styles = StyleSheet.create({
     gap: 7, marginTop: 1, marginBottom: 18,
   },
   repostEducationPrivacyText: { color: MUTED, fontFamily: FONT.regular, fontSize: 12 },
-  repostEducationOkay: {
-    minHeight: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-  },
-  repostEducationOkayText: { fontFamily: FONT.bold, fontSize: FS.base },
   commentsSheet: {
     backgroundColor: SURFACE, borderTopLeftRadius: 16, borderTopRightRadius: 16,
     paddingTop: 10, paddingHorizontal: 18,
