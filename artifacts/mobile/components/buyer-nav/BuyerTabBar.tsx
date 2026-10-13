@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSegments, type Tabs } from 'expo-router';
 import Animated, {
-  Easing,
   useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -15,7 +15,7 @@ import { hapticTabChange } from '@/lib/haptics';
 import { useActivityUnreadCount } from '@/components/ActivityBellButton';
 import {
   TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, CrossfadeNavIcon, tabIconColor,
-  useTabBarActiveIndex,
+  useTabBarActiveIndex, INDICATOR_SPRING,
 } from '@/components/tab-bar/TabBarParts';
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
@@ -24,11 +24,14 @@ import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
 import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
 
-// Smooth ease-out, no bounce/overshoot — this round's explicit spec for the
-// compact <-> regular capsule transition (superseding the earlier SHEET_EASING/
-// 260ms pairing for this one motion, same way #225/#344 superseded a shared
-// constant for the pill).
-const BAR_MODE_TIMING = { duration: 220, easing: Easing.bezier(0.2, 0, 0, 1) } as const;
+// The compact <-> regular capsule resize rides the pill's own spring
+// (INDICATOR_SPRING: critically damped, no overshoot, ~90% there by ~115ms)
+// so the resize and the pill's glide to/from Home start on the same frame
+// and land together as one motion. It replaced a 220ms withTiming: being
+// time-based, any frame the JS thread held up (the destination tab's
+// render, on web) made the timing jump straight to its end on the next
+// frame — measured as a 47% -> 100% snap — whereas the spring steps on
+// from where it was.
 
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -171,7 +174,7 @@ export function BuyerTabBar({
     () => indicatorTarget.value === 0,
     (nowCompact, wasCompact) => {
       if (nowCompact === wasCompact) return;
-      progress.set(reducedMotion ? (nowCompact ? 1 : 0) : withTiming(nowCompact ? 1 : 0, BAR_MODE_TIMING));
+      progress.set(reducedMotion ? (nowCompact ? 1 : 0) : withSpring(nowCompact ? 1 : 0, INDICATOR_SPRING));
     },
     [reducedMotion],
   );
