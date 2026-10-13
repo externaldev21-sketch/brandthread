@@ -136,7 +136,7 @@ export default function BuyerSettingsScreen() {
                   {!textOnly && <Icon name={item.icon} size={ROW_ICON_SIZE} color={color} />}
                   <View style={s.rowText}>
                     <Text style={[s.rowLabel, { color }]} numberOfLines={1}>{item.label}</Text>
-                    {item.showDescription ? (
+                    {item.showDescription && item.action === 'delete-account' ? (
                       <Text style={[s.rowDescription, { color: theme.subtle }]} numberOfLines={1}>{item.description}</Text>
                     ) : null}
                   </View>

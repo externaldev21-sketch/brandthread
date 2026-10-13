@@ -135,14 +135,14 @@ export default function StoreSettingsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[ss.scroll, { paddingBottom: 60 + tabBarInset }]}>
 
         {/* STORE IDENTITY */}
-        <SectionHeader title="STORE IDENTITY" style={ss.sectionHeader} />
+        <SectionHeader title="IDENTITY" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <FieldRow ss={ss} label="Store name">
             <TextInput returnKeyType="done"
               style={ss.input}
               value={form.storeName}
               onChangeText={v => patch({ storeName: v })}
-              placeholder="Your Brand Name"
+              placeholder="Desires"
               placeholderTextColor={colors.mutedForeground}
             />
           </FieldRow>
@@ -153,7 +153,7 @@ export default function StoreSettingsScreen() {
                 style={[ss.input, { flex: 1, minWidth: 0 }]}
                 value={form.storeUrl}
                 onChangeText={v => patch({ storeUrl: v })}
-                placeholder="yourstore"
+                placeholder="desires"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="none"
               />
@@ -166,7 +166,7 @@ export default function StoreSettingsScreen() {
               style={ss.input}
               value={form.contactEmail}
               onChangeText={v => patch({ contactEmail: v })}
-              placeholder="you@brand.com"
+              placeholder="maya@brand.co"
               placeholderTextColor={colors.mutedForeground}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -178,7 +178,7 @@ export default function StoreSettingsScreen() {
               style={ss.input}
               value={form.supportEmail}
               onChangeText={v => patch({ supportEmail: v })}
-              placeholder="support@brand.com"
+              placeholder="help@brand.co"
               placeholderTextColor={colors.mutedForeground}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -231,7 +231,7 @@ export default function StoreSettingsScreen() {
         </BrandthreadCard>
 
         {/* STORE STATUS */}
-        <SectionHeader title="STORE STATUS" style={ss.sectionHeader} />
+        <SectionHeader title="STATUS" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <View style={ss.chipRow}>
             {STATUS_OPTIONS.map(opt => {
@@ -272,7 +272,7 @@ export default function StoreSettingsScreen() {
         </BrandthreadCard>
 
         {/* CHECKOUT & ACCOUNTS */}
-        <SectionHeader title="CHECKOUT & ACCOUNTS" style={ss.sectionHeader} />
+        <SectionHeader title="CHECKOUT" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <ListRow
             title="Checkout"
@@ -284,37 +284,31 @@ export default function StoreSettingsScreen() {
           />
           <View style={ss.divider} />
           <SwitchRow
-            label="Require account"
-            description="Buyers must create an account to check out"
-            descriptionLines={2}
+            label="Require Account"
             value={form.checkoutRequireAccount}
             onValueChange={v => patch({ checkoutRequireAccount: v })}
           />
           <View style={ss.divider} />
           <SwitchRow
-            label="Guest checkout"
-            description="Allow guest checkout"
+            label="Guest Checkout"
             value={form.checkoutGuestAllowed}
             onValueChange={v => patch({ checkoutGuestAllowed: v })}
           />
           <View style={ss.divider} />
           <SwitchRow
-            label="Order notifications"
-            description="Email seller on new orders"
+            label="Order Notifications"
             value={form.orderNotifications}
             onValueChange={v => patch({ orderNotifications: v })}
           />
           <View style={ss.divider} />
           <SwitchRow
             label="Analytics"
-            description="Enable analytics tracking"
             value={form.analyticsEnabled}
             onValueChange={v => patch({ analyticsEnabled: v })}
           />
           <View style={ss.divider} />
           <ListRow
             title="Discounts"
-            subtitle="Discount codes for your store"
             chevron
             onPress={() => router.push('/discounts')}
             style={{ minHeight: 48 }}
@@ -336,7 +330,7 @@ function FieldRow({ ss, label, children }: { ss: ReturnType<typeof makeStyles>; 
 }
 
 function SwitchRow({ label, description, descriptionLines, value, onValueChange }: {
-  label: string; description: string; descriptionLines?: number; value: boolean; onValueChange: (v: boolean) => void;
+  label: string; description?: string; descriptionLines?: number; value: boolean; onValueChange: (v: boolean) => void;
 }) {
   return (
     <ListRow

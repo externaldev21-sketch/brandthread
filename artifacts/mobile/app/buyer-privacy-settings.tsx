@@ -176,7 +176,7 @@ export default function BuyerPrivacySettings() {
         </Card>
 
         {/* INTERACTIONS */}
-        <SectionHeader title="WHO CAN SEE AND CONTACT YOU" style={styles.sectionSpacing} />
+        <SectionHeader title="WHO CAN" style={styles.sectionSpacing} />
         <Card style={styles.card}>
           <ListRow
             icon="user-plus"
@@ -225,28 +225,22 @@ export default function BuyerPrivacySettings() {
           <ListRow
             icon="activity"
             title="Activity status"
-            subtitle="Let others see when you're active"
-            subtitleNumberOfLines={2}
             toggle={{ value: settings.activityStatusVisible, onChange: v => update('activityStatusVisible', v) }}
           />
           <View style={styles.divider} />
           <ListRow
             icon="check-square"
             title="Read receipts"
-            subtitle="Show when you've read messages"
-            subtitleNumberOfLines={2}
             toggle={{ value: settings.readReceiptsEnabled, onChange: v => update('readReceiptsEnabled', v) }}
           />
         </Card>
 
         {/* SEARCH & DISCOVERY */}
-        <SectionHeader title="SEARCH AND DISCOVERY" style={styles.sectionSpacing} />
+        <SectionHeader title="DISCOVERY" style={styles.sectionSpacing} />
         <Card style={styles.card}>
           <ListRow
             icon="search"
             title="Appear in search"
-            subtitle="Let others find your profile in search"
-            subtitleNumberOfLines={2}
             toggle={{ value: settings.searchable, onChange: v => update('searchable', v) }}
           />
           <View style={styles.divider} />
@@ -278,7 +272,7 @@ export default function BuyerPrivacySettings() {
         </Card>
 
         {/* BLOCKED & MUTED & RESTRICTED */}
-        <SectionHeader title="BLOCKED AND MUTED" style={styles.sectionSpacing} />
+        <SectionHeader title="SAFETY" style={styles.sectionSpacing} />
         <Card style={styles.card}>
           <ListRow
             icon="slash"

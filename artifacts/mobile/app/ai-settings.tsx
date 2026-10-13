@@ -312,7 +312,6 @@ export default function AiSettingsScreen() {
           <RowDivider colors={colors} />
           <ToggleRow
             label="Dashboard suggestions"
-            subtitle="Smart cards on your dashboard"
             value={settings.suggestionsEnabled}
             onValueChange={v => update(s => ({ ...s, suggestionsEnabled: v }))}
             colors={colors}
@@ -320,15 +319,13 @@ export default function AiSettingsScreen() {
           <RowDivider colors={colors} />
           <ToggleRow
             label="Session memory"
-            subtitle="Remembers your current conversation"
             value={settings.sessionMemoryEnabled}
             onValueChange={v => update(s => ({ ...s, sessionMemoryEnabled: v }))}
             colors={colors}
           />
           <RowDivider colors={colors} />
           <ToggleRow
-            label="Brand memory"
-            subtitle="Your brand voice, audience, and style"
+            label="Brand Memory"
             value={settings.brandMemoryEnabled}
             onValueChange={v => update(s => ({ ...s, brandMemoryEnabled: v }))}
             colors={colors}
@@ -343,7 +340,7 @@ export default function AiSettingsScreen() {
 
         {/* Section: Data Sources */}
         <SettingSection
-          title="Data sources"
+          title="Data"
           subtitle="AI may reference data from these areas"
           colors={colors}
         >

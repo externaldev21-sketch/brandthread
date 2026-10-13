@@ -246,11 +246,11 @@ export default function BuyerAddressesScreen() {
             <View style={styles.form}>
               <View style={styles.field}>
                 <Text style={styles.label}>Label (e.g. Home, Office)</Text>
-                <TextInput value={label} ref={(r) => { fieldRefs.current.label = r; }} onChangeText={setLabel} style={styles.input} placeholder="Label" placeholderTextColor={palette.mutedForeground} returnKeyType="next" autoComplete="off" blurOnSubmit={false} onSubmitEditing={focusField('recipientName')} />
+                <TextInput value={label} ref={(r) => { fieldRefs.current.label = r; }} onChangeText={setLabel} style={styles.input} placeholder="Home" placeholderTextColor={palette.mutedForeground} returnKeyType="next" autoComplete="off" blurOnSubmit={false} onSubmitEditing={focusField('recipientName')} />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Recipient name</Text>
-                <TextInput value={recipientName} ref={(r) => { fieldRefs.current.recipientName = r; }} onChangeText={setRecipientName} style={styles.input} placeholder="Full name" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="name" autoComplete="name" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusField('street')} />
+                <TextInput value={recipientName} ref={(r) => { fieldRefs.current.recipientName = r; }} onChangeText={setRecipientName} style={styles.input} placeholder="Maya Chen" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="name" autoComplete="name" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusField('street')} />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Street address</Text>
@@ -263,17 +263,17 @@ export default function BuyerAddressesScreen() {
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>City</Text>
-                  <TextInput value={city} ref={(r) => { fieldRefs.current.city = r; }} onChangeText={setCity} style={styles.input} placeholder="City" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="addressCity" returnKeyType="next" autoComplete="postal-address-locality" blurOnSubmit={false} onSubmitEditing={focusField('state')} />
+                  <TextInput value={city} ref={(r) => { fieldRefs.current.city = r; }} onChangeText={setCity} style={styles.input} placeholder="Los Angeles" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="addressCity" returnKeyType="next" autoComplete="postal-address-locality" blurOnSubmit={false} onSubmitEditing={focusField('state')} />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>State / Province</Text>
-                  <TextInput value={state} ref={(r) => { fieldRefs.current.state = r; }} onChangeText={setState} style={styles.input} placeholder="State" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="addressState" returnKeyType="next" autoComplete="postal-address-region" blurOnSubmit={false} onSubmitEditing={focusField('postalCode')} />
+                  <TextInput value={state} ref={(r) => { fieldRefs.current.state = r; }} onChangeText={setState} style={styles.input} placeholder="CA" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="addressState" returnKeyType="next" autoComplete="postal-address-region" blurOnSubmit={false} onSubmitEditing={focusField('postalCode')} />
                 </View>
               </View>
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>ZIP / Postal Code</Text>
-                  <TextInput value={postalCode} ref={(r) => { fieldRefs.current.postalCode = r; }} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" placeholderTextColor={palette.mutedForeground} keyboardType="number-pad" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusField('country')} />
+                  <TextInput value={postalCode} ref={(r) => { fieldRefs.current.postalCode = r; }} onChangeText={setPostalCode} style={styles.input} placeholder="90012" placeholderTextColor={palette.mutedForeground} keyboardType="number-pad" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusField('country')} />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>Country</Text>

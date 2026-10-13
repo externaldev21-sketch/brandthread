@@ -243,7 +243,7 @@ export default function StoreDomainScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={dm.scroll}>
 
         {/* Brandthread Subdomain */}
-        <SectionHeader title="BRANDTHREAD SUBDOMAIN" style={dm.sh} />
+        <SectionHeader title="SUBDOMAIN" style={dm.sh} />
         {btLoadFailed ? (
           <BrandthreadCard style={dm.card}>
             <ErrorState message="Couldn't load your subdomain." onRetry={loadSubdomain} />
@@ -288,7 +288,7 @@ export default function StoreDomainScreen() {
         )}
 
         {/* Custom Domains */}
-        {(hosting.customDomainsLive || customDomains.length > 0) && <SectionHeader title="CUSTOM DOMAIN" style={dm.sh} />}
+        {(hosting.customDomainsLive || customDomains.length > 0) && <SectionHeader title="CUSTOM" style={dm.sh} />}
         {customDomains.map(cd => (
           <BrandthreadCard key={cd.id} style={dm.card}>
             <View style={dm.domainRow}>

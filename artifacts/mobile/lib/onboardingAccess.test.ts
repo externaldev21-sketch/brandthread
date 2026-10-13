@@ -15,6 +15,6 @@ describe('onboarding account boundary', () => {
     const checkout = read('../app/buyer-checkout.tsx');
     const storeSettings = read('../app/store-settings.tsx');
     expect(checkout).toContain('Guest checkout');
-    expect(storeSettings).toContain('Allow guest checkout');
+    expect(storeSettings).toContain('label="Guest Checkout"');
   });
 });

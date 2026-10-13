@@ -418,7 +418,7 @@ export default function ProductVariantsScreen() {
 
         {rules && (
           <>
-            <SectionHeader title="STOCK RULES" style={st.sh} />
+            <SectionHeader title="STOCK" style={st.sh} />
             <BrandthreadCard style={st.card}>
               <Text style={st.axisName}>When a product sells out</Text>
               {BEHAVIORS.map((b) => {

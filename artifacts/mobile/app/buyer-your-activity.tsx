@@ -120,7 +120,7 @@ export default function BuyerYourActivity() {
 
           </>
         )}
-        <Text style={s.groupLabel}>Viewing history</Text>
+        <Text style={s.groupLabel}>History</Text>
         <Card style={s.card}>
           <ListRow
             icon="play-circle"
@@ -138,8 +138,6 @@ export default function BuyerYourActivity() {
             icon="archive"
             iconColor={theme.accent}
             title="Archive"
-            subtitle="Posts you've archived from your profile"
-            subtitleNumberOfLines={2}
             chevron
             onPress={() => router.push('/buyer-archive' as never)}
           />

@@ -15,19 +15,19 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 type Row = {
   label: string;
   icon: IconName;
-  sub: string;
+  sub?: string;
   route?: string;
   destructive?: boolean;
 };
 
 const ROWS: Row[] = [
-  { label: 'Personal details', icon: 'user', sub: 'Name, email, phone and birthday', route: '/buyer-personal-details' },
-  { label: 'Password and security', icon: 'shield', sub: 'Password, two-factor authentication and login alerts', route: '/buyer-security' },
-  { label: 'Login methods', icon: 'link', sub: 'Apple, Google and email', route: '/login-methods' },
-  { label: 'Biometric unlock', icon: 'unlock', sub: 'Face ID, Touch ID or device biometrics', route: '/biometric-unlock' },
-  { label: "Where you're logged in", icon: 'smartphone', sub: 'Review active sessions', route: '/login-activity' },
-  { label: 'Download your information', icon: 'download', sub: 'Get a copy of your data', route: '/buyer-download-data' },
-  { label: 'Ad and recommendation preferences', icon: 'sliders', sub: 'Control personalization', route: '/buyer-settings-detail?section=content' },
+  { label: 'Personal details', icon: 'user', route: '/buyer-personal-details' },
+  { label: 'Password and security', icon: 'shield', route: '/buyer-security' },
+  { label: 'Login methods', icon: 'link', route: '/login-methods' },
+  { label: 'Biometric unlock', icon: 'unlock', route: '/biometric-unlock' },
+  { label: "Where you're logged in", icon: 'smartphone', route: '/login-activity' },
+  { label: 'Download your information', icon: 'download', route: '/buyer-download-data' },
+  { label: 'Ad and recommendation preferences', icon: 'sliders', route: '/buyer-settings-detail?section=content' },
   { label: 'Delete account', icon: 'trash-2', sub: 'Permanently delete your account and data', route: '/delete-account', destructive: true },
 ];
 
@@ -50,7 +50,6 @@ export default function BuyerAccountCenter() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[s.heroTitle, { color: colors.foreground }]}>Manage your Brandthread account</Text>
-            <Text style={[s.heroSub, { color: colors.mutedForeground }]}>Security, personal details, permissions and account ownership live here.</Text>
           </View>
         </LinearGradient>
 

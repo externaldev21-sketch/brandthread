@@ -129,8 +129,6 @@ export default function StoreAiImproveScreen() {
       <ScreenHeader title="Improve Store" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ai.scroll}>
-        <Text style={ai.subtitle}>AI-powered suggestions to improve your storefront.</Text>
-
         <SecondaryButton
           label={loading ? 'Refreshing...' : 'Refresh Suggestions'}
           onPress={handleRefresh}

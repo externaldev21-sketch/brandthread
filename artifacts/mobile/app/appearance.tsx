@@ -108,9 +108,6 @@ export default function AppearanceScreen() {
         <View style={[styles.followRow, { borderColor: theme.border }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.followTitle, { color: theme.text }]}>Follow app theme</Text>
-            <Text style={[styles.followSubtitle, { color: theme.muted }]}>
-              App icon matches your theme
-            </Text>
           </View>
           <HapticSwitch
             value={followsTheme}

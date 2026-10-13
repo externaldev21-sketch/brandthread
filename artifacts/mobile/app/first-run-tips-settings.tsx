@@ -50,16 +50,9 @@ export default function FirstRunTipsSettingsScreen() {
       <ScreenHeader title="Tips" onBack={() => goBackOr(router, '/general-settings')} />
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
-            First-run tips walk you through a screen's gestures and controls the first time you open it.
-          </Text>
-
           <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowTitle, { color: colors.foreground }]}>Skip all tips</Text>
-              <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>
-                Turn off first-run tips everywhere in the app
-              </Text>
             </View>
             <HapticSwitch
               value={controller.skipAll}
@@ -78,9 +71,11 @@ export default function FirstRunTipsSettingsScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowTitle, { color: colors.foreground }]}>Replay tips</Text>
-              <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>
-                {replayedAt ? 'Reset — tips will show again as you open each screen' : 'See every first-run tip again, from the start'}
-              </Text>
+              {replayedAt ? (
+                <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>
+                  Reset — tips will show again as you open each screen
+                </Text>
+              ) : null}
             </View>
           </PressableScale>
         </View>
