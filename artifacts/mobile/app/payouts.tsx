@@ -39,7 +39,7 @@ interface PayoutRecord {
   amount: string;
   status: PayoutStatus;
   bankLast4: string;
-  ordersCount: number;
+  ordersCount: number | null;
 }
 
 // Status label fallback for Stripe statuses not in our union
@@ -156,7 +156,7 @@ function PayoutsScreenContent() {
         amount:     p.formatted,
         status:     stripeStatusToLocal(p.status),
         bankLast4:  p.destination?.last4 ?? '····',
-        ordersCount: 0,
+        ordersCount: typeof p.ordersCount === 'number' ? p.ordersCount : null,
       })));
     } catch {
       setLoadError(true);
@@ -285,6 +285,12 @@ function PayoutsScreenContent() {
           <Text style={styles.balancePendingLabel}>Pending</Text>
           <Text style={styles.balancePendingAmount}>{loadError ? '—' : pendFmt}</Text>
         </View>
+        {!loadError && balance?.inTransit?.formatted ? (
+          <View style={styles.balancePendingRow}>
+            <Text style={styles.balancePendingLabel}>In transit</Text>
+            <Text style={styles.balancePendingAmount}>{balance.inTransit.formatted}</Text>
+          </View>
+        ) : null}
       </View>
 
       {!isPreview && (
