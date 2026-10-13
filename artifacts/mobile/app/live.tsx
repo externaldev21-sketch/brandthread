@@ -58,6 +58,11 @@ import { a11yHidden } from '@/lib/a11yHidden';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { LIVE_VIEWER_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
+import { useAuth } from '@clerk/expo';
+import { isPreviewDemoMode as isAuctionDemo } from '@/lib/devPreview';
+import { useLiveAuction } from '@/lib/live/useLiveAuction';
+import { LiveAuctionCard } from '@/components/live/LiveAuctionCard';
+import { LiveAuctionBidSheet } from '@/components/live/LiveAuctionBidSheet';
 
 /** Same preference key as the Threads feed, so sound on/off carries over. */
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
@@ -67,7 +72,7 @@ const ND = Platform.OS !== 'web';
 
 function LivePage({
   stream, rt, isActive, ending, pageWidth, pageHeight, topInset, bottomInset, muted,
-  onClose, onToggleSound, onFollow, onOpenHost, onBuy, onOpenBag, onShare, onGift, onMore, onLike, onSend, onOpenRtcPlayer,
+  onClose, onToggleSound, onFollow, onOpenHost, onBuy, onOpenBag, onShare, onGift, onMore, onLike, onSend, onOpenRtcPlayer, auctionCard,
 }: {
   stream: LiveStream;
   rt: LiveRuntime | undefined;
@@ -92,6 +97,8 @@ function LivePage({
   onLike: (x: number, y: number, count?: number) => void;
   onSend: (text: string) => Promise<void>;
   onOpenRtcPlayer: () => void;
+  /** Live auction card (live_auctions flag, active page only) — takes the pinned card's place. */
+  auctionCard?: React.ReactNode;
 }) {
   const exit = useRef(new Animated.Value(0)).current;
   const [liked, setLiked] = useState(false);
@@ -209,7 +216,7 @@ function LivePage({
       <Text style={[styles.title, { top: topInset + 68 }]} numberOfLines={1}>{stream.title}</Text>
 
       {/* Right rail */}
-      <View style={[styles.railWrap, { bottom: bottomInset + 52 + (pinned ? 74 : 0) + 8 }]} pointerEvents="box-none">
+      <View style={[styles.railWrap, { bottom: bottomInset + 52 + (auctionCard ? 160 : pinned ? 74 : 0) + 8 }]} pointerEvents="box-none">
         <LiveRail
           likeCount={likeCount}
           liked={liked}
@@ -230,9 +237,9 @@ function LivePage({
           <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} style={styles.chatTopFade} />
           <LiveChatList messages={rt?.chat ?? []} />
         </View>
-        {pinned && (
+        {auctionCard ?? (pinned && (
           <LivePinnedProductCard product={pinned} onBuy={() => onBuy(pinned.productId)} onOpenBag={onOpenBag} />
-        )}
+        ))}
         <LiveCommentBar onSend={onSend} disabled={ending} onGift={onGift} onShare={onShare} onMore={onMore} />
       </View>
     </Animated.View>
@@ -262,6 +269,18 @@ export default function LiveScreen() {
   // Server-side `live_tips` flag via the existing feature-flags context; a failed
   // flag call keeps the OFF default, so the gift button just stays hidden.
   const liveTipsEnabled = useFeatureFlag('live_tips');
+  // Live auctions (live_auctions flag): the active page's auction, polled
+  // (this pager has no socket). Web preview `&demo=1` runs a local one.
+  const liveAuctionsEnabled = useFeatureFlag('live_auctions');
+  const { userId: viewerId } = useAuth();
+  const auctionStream = streams[activeIndex];
+  const auctionDemo = provider.id === 'preview' && isAuctionDemo() && auctionStream?.products[0]
+    ? { productName: auctionStream.products[0].name, imageUri: auctionStream.products[0].imageUri ?? null, priceCents: auctionStream.products[0].priceCents }
+    : null;
+  const auctionState = useLiveAuction(auctionStream?.id, {
+    enabled: liveAuctionsEnabled && (provider.id !== 'preview' || !!auctionDemo), viewerId, poll: true, demo: auctionDemo,
+  });
+  const [customBidOpen, setCustomBidOpen] = useState(false);
   const [optionsFor, setOptionsFor] = useState<LiveStream | null>(null);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [notice, setNotice] = useState('');
@@ -466,6 +485,19 @@ export default function LiveScreen() {
                   }
                 }}
                 onOpenRtcPlayer={() => router.push(`/buyer-live?streamId=${encodeURIComponent(item.id)}` as never)}
+                auctionCard={liveAuctionsEnabled && index === activeIndex && auctionState.auction ? (
+                  <LiveAuctionCard
+                    auction={auctionState.auction}
+                    receivedAt={auctionState.receivedAt}
+                    onBid={amount => { void auctionState.bid(amount).then(m => { if (m) setNotice(m); }); }}
+                    onCustom={() => setCustomBidOpen(true)}
+                    // Paying happens in the live player's in-stream checkout, at the winning price.
+                    onPay={() => {
+                      if (provider.id === 'preview') { if (item.products[0]) buy(item, item.products[0].productId); return; }
+                      router.push(`/buyer-live?streamId=${encodeURIComponent(item.id)}&payAuction=${encodeURIComponent(auctionState.auction!.id)}` as never);
+                    }}
+                  />
+                ) : undefined}
               />
             )}
           />
@@ -511,6 +543,15 @@ export default function LiveScreen() {
           onClose={() => setGiftFor(null)}
           onSent={amountCents => { void handleGiftSent(giftFor, amountCents); }}
           onSendFailed={handleGiftFailed}
+        />
+      )}
+      {liveAuctionsEnabled && auctionState.auction && (
+        <LiveAuctionBidSheet
+          auction={auctionState.auction}
+          receivedAt={auctionState.receivedAt}
+          visible={customBidOpen}
+          onClose={() => setCustomBidOpen(false)}
+          onSubmit={auctionState.bid}
         />
       )}
       {optionsFor && (

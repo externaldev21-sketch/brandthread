@@ -16,6 +16,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
+import { useFeatureFlag as useAuctionFlag } from '@/contexts/FeatureFlagContext';
+import { useLiveAuction } from '@/lib/live/useLiveAuction';
+import { LiveAuctionCard } from '@/components/live/LiveAuctionCard';
+import { LiveAuctionBidSheet } from '@/components/live/LiveAuctionBidSheet';
+import type { LiveAuction } from '@/lib/live/liveAuction';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
@@ -66,7 +71,7 @@ function BuyerLiveNativeScreen() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary;
   const s = makeStyles(theme);
-  const params = useLocalSearchParams<{ streamId: string }>();
+  const params = useLocalSearchParams<{ streamId: string; payAuction?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
@@ -127,6 +132,7 @@ function BuyerLiveNativeScreen() {
 
   // ─── Realtime: WebSocket room for this stream, replacing the old 3s poll ──────
   const handleLiveEvent = React.useCallback((event: LiveSocketEvent) => {
+    auctionEventRef.current(event as any);
     if (event.type === 'comment') {
       lastTs.current = event.comment.created_at;
       setComments(prev => [...prev, event.comment].slice(-80));
@@ -362,6 +368,36 @@ function BuyerLiveNativeScreen() {
     ]);
   }
 
+  // ─── Live auction (live_auctions flag): Whatnot-style card above the composer ──
+  const liveAuctionsEnabled = useAuctionFlag('live_auctions');
+  const auctionState = useLiveAuction(params.streamId, { enabled: liveAuctionsEnabled && !loading && !ended, viewerId: user?.id });
+  const auctionEventRef = useRef(auctionState.handleEvent);
+  auctionEventRef.current = auctionState.handleEvent;
+  const [customBidOpen, setCustomBidOpen] = useState(false);
+  const [bidBusy, setBidBusy] = useState(false);
+  // The win being paid for: checkout sends its id and the server charges the winning price.
+  const [payingAuction, setPayingAuction] = useState<LiveAuction | null>(null);
+  const placeBid = async (amountCents: number) => {
+    hapticPrimaryAction();
+    setBidBusy(true);
+    const message = await auctionState.bid(amountCents);
+    setBidBusy(false);
+    if (message) setOrderSnackbar(message);
+  };
+  const payAuction = (a: LiveAuction) => {
+    setPayingAuction(a);
+    void openPurchase({ productId: a.productId, productName: a.productName, priceCents: a.currentBidCents ?? a.startingBidCents });
+  };
+  // Opened from the LIVE pager's "Pay" (app/live.tsx): go straight to paying.
+  const payParamHandled = useRef(false);
+  useEffect(() => {
+    const a = auctionState.auction;
+    if (payParamHandled.current || !params.payAuction || !a || a.id !== params.payAuction || !a.payable) return;
+    payParamHandled.current = true;
+    payAuction(a);
+  }, [auctionState.auction, params.payAuction]); // eslint-disable-line react-hooks/exhaustive-deps
+  const auctionPaying = !!payingAuction && purchaseTag?.productId === payingAuction.productId;
+
   async function openPurchase(tag: ProductTag) {
     setPurchaseTag(tag);
     setPurchaseProduct(null);
@@ -396,7 +432,7 @@ function BuyerLiveNativeScreen() {
     setCheckoutError('');
     try {
       const result = await api.buyer.checkout.createSession(
-        [{ variantId: selectedVariantId, productId: purchaseProduct.id, quantity: 1 }],
+        [{ variantId: selectedVariantId, productId: purchaseProduct.id, quantity: 1, ...(auctionPaying ? { auctionId: payingAuction!.id } : {}) }] as any,
         {
           contactEmail: buyerEmail.trim(),
           contactPhone: buyerPhone.trim(),
@@ -592,7 +628,28 @@ function BuyerLiveNativeScreen() {
           hideTabBar={false}
           testID="buyer-live-composer"
         />
+        {liveAuctionsEnabled && auctionState.auction ? (
+          <View style={{ marginHorizontal: 12, marginBottom: insets.bottom + 8 }}>
+            <LiveAuctionCard
+              auction={auctionState.auction}
+              receivedAt={auctionState.receivedAt}
+              busy={bidBusy}
+              onBid={amount => { void placeBid(amount); }}
+              onCustom={() => setCustomBidOpen(true)}
+              onPay={() => payAuction(auctionState.auction!)}
+            />
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
+      {liveAuctionsEnabled && auctionState.auction ? (
+        <LiveAuctionBidSheet
+          auction={auctionState.auction}
+          receivedAt={auctionState.receivedAt}
+          visible={customBidOpen}
+          onClose={() => setCustomBidOpen(false)}
+          onSubmit={auctionState.bid}
+        />
+      ) : null}
 
       {purchaseTag && (
         <KeyboardAvoidingView
@@ -624,9 +681,9 @@ function BuyerLiveNativeScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <Text style={s.purchasePrice}>
-                {formatCents(
+                {formatCents(auctionPaying ? purchaseTag.priceCents : (
                   (purchaseProduct?.variants ?? []).find((variant: any) => variant.id === selectedVariantId)?.priceCents
-                    ?? purchaseTag.priceCents,
+                    ?? purchaseTag.priceCents),
                 )}
               </Text>
               <Text style={s.fieldLabel}>Option</Text>
