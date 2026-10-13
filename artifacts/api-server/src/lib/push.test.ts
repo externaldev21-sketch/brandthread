@@ -50,10 +50,10 @@ describe("push notification delivery contract", () => {
     expect(buildExpoPushMessages([{ token: "ExponentPushToken[order]" }], {
       title: "New order! 🛍️",
       body: "Order ready to review",
-      sound: "order-received.wav",
+      sound: "order_received.wav",
       channelId: "orders",
     })[0]).toMatchObject({
-      sound: "order-received.wav",
+      sound: "order_received.wav",
       channelId: "orders",
     });
   });

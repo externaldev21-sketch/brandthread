@@ -90,6 +90,7 @@ import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
+import { newOrderPushDelivery } from "../lib/saleAlerts";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1294,6 +1295,11 @@ export async function handleCheckoutPaid(
             .innerJoin(products, eq(products.id, productVariants.productId))
             .where(eq(orderItems.orderId, createdOrderId))
             .limit(1);
+          const [sellerPrefs] = await db
+            .select({ preferences: users.notificationPreferences })
+            .from(users)
+            .where(eq(users.clerkId, createdOrder.ownerId))
+            .limit(1);
           await publishNotification({
             userId: createdOrder.ownerId,
             category: "orders",
@@ -1303,8 +1309,7 @@ export async function handleCheckoutPaid(
             targetId: createdOrderId,
             targetType: "order",
             targetImageUrl: productThumbnail(firstItem?.images),
-            pushSound: "order-received.wav",
-            pushChannelId: "orders",
+            ...newOrderPushDelivery(sellerPrefs?.preferences),
           });
           // The buyer's side of the same event (guest checkouts have no feed).
           if (buyerId) {

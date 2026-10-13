@@ -16,6 +16,8 @@ import { ListRow } from '@/components/ui';
 import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications/QuietHoursRow';
 import { Card } from '@/components/ui/Card';
 import { SPACING } from '@/constants/spacing';
+import { getSaleAlertPrefs, rememberSaleAlertPrefs } from '@/lib/saleAlerts';
+import { playSaleSoundPreview } from '@/lib/saleSoundPreview';
 
 type Role = 'buyer' | 'seller';
 
@@ -57,6 +59,8 @@ export default function NotificationsSettingsScreen() {
   const [promotionalPush, setPromotionalPush] = useState(false);
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [categories, setCategories] = useState<Record<string, boolean>>({});
+  const [saleSound, setSaleSound] = useState(() => getSaleAlertPrefs().saleSound);
+  const [saleHaptic, setSaleHaptic] = useState(() => getSaleAlertPrefs().saleHaptic);
 
   const rows = role === 'buyer' ? BUYER_ROWS : SELLER_ROWS;
 
@@ -73,6 +77,12 @@ export default function NotificationsSettingsScreen() {
         setPushEnabled(data.pushEnabled ?? true);
         setPromotionalPush(data.promotionalPush ?? false);
         setQuietHours({ start: data.quietHours?.start ?? null, end: data.quietHours?.end ?? null });
+        if (data.role === 'seller') {
+          const sale = { saleSound: data.saleSound ?? true, saleHaptic: data.saleHaptic ?? true };
+          setSaleSound(sale.saleSound);
+          setSaleHaptic(sale.saleHaptic);
+          rememberSaleAlertPrefs(sale);
+        }
       })
       .catch(() => {/* fallback to push on, quiet hours off */});
   }, []);
@@ -109,6 +119,23 @@ export default function NotificationsSettingsScreen() {
       });
     } catch {
       setQuietHours(prior);
+    }
+  }
+
+  async function handleSaleAlert(key: 'saleSound' | 'saleHaptic', value: boolean) {
+    hapticToggle();
+    const setter = key === 'saleSound' ? setSaleSound : setSaleHaptic;
+    const prior = key === 'saleSound' ? saleSound : saleHaptic;
+    setter(value);
+    // Turning the sound on plays it once, so the seller knows what they'll hear.
+    if (key === 'saleSound' && value) playSaleSoundPreview();
+    try {
+      const result = await api.notificationPrefs.update({ [key]: value });
+      const saved = result[key] ?? value;
+      setter(saved);
+      rememberSaleAlertPrefs({ [key]: saved });
+    } catch {
+      setter(prior);
     }
   }
 
@@ -166,6 +193,33 @@ export default function NotificationsSettingsScreen() {
         </View>
 
         <View style={s.divider} />
+
+        {/* ── New order alerts (sellers): how a sale feels, never whether it arrives ── */}
+        {role === 'seller' && (
+          <>
+            <View style={s.section}>
+              <Card style={s.listCard}>
+                <ListRow
+                  icon="volume-2"
+                  title="Sale sound"
+                  subtitle="Cha-ching when an order comes in"
+                  subtitleNumberOfLines={1}
+                  toggle={{ value: saleSound, onChange: (value) => handleSaleAlert('saleSound', value) }}
+                />
+                <View style={[s.rowDivider, { backgroundColor: colors.border }]} />
+                <ListRow
+                  icon="smartphone"
+                  title="Sale haptic"
+                  subtitle="A tap when an order comes in while the app is open"
+                  subtitleNumberOfLines={2}
+                  toggle={{ value: saleHaptic, onChange: (value) => handleSaleAlert('saleHaptic', value) }}
+                />
+              </Card>
+            </View>
+
+            <View style={s.divider} />
+          </>
+        )}
 
         {/* ── Promotions (explicit opt-in, off by default; Guideline 4.5.4) ── */}
         <View style={s.section}>
