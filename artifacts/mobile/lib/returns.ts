@@ -97,6 +97,21 @@ export function parseRefundAmount(text: string, maxCents: number): { cents: numb
 }
 
 /**
+ * The server's error text from an ApiError body. Routes answer either
+ * `{ error: "…" }` or `{ error: { message, code } }`; anything else → fallback.
+ */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  const raw = (err as { body?: unknown } | null)?.body;
+  if (typeof raw !== 'string' || !raw) return fallback;
+  try {
+    const error = JSON.parse(raw)?.error;
+    if (typeof error === 'string' && error.trim()) return error;
+    if (error && typeof error.message === 'string' && error.message.trim()) return error.message;
+  } catch { /* not JSON */ }
+  return fallback;
+}
+
+/**
  * Toast after a one-tap approve from the returns list. The server answers
  * "refunded" once the refund went through; "approved" means it was approved
  * but the refund didn't confirm (open the return to retry).

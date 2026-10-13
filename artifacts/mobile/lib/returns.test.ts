@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeReturnFor, adaptReturnRow, isReturnEligible, itemsTotalCents, parseRefundAmount, quickApproveMessage,
+  activeReturnFor, adaptReturnRow, apiErrorMessage, isReturnEligible, itemsTotalCents, parseRefundAmount, quickApproveMessage,
   returnHeadline, returnReasonLabel, returnSteps, returnSubmitError, statusLabel,
 } from './returns';
 
@@ -61,6 +61,13 @@ describe('lib/returns', () => {
     expect(parseRefundAmount('160.01', 16000)).toHaveProperty('error');
     expect(parseRefundAmount('0', 16000)).toHaveProperty('error');
     expect(parseRefundAmount('abc', 16000)).toHaveProperty('error');
+  });
+
+  it('reads both server error shapes', () => {
+    expect(apiErrorMessage({ body: '{"error":"This return is already denied"}' }, 'x')).toBe('This return is already denied');
+    expect(apiErrorMessage({ body: '{"error":{"message":"Unavailable","code":"dev_preview_offline"}}' }, 'x')).toBe('Unavailable');
+    expect(apiErrorMessage({ body: 'oops' }, 'fallback')).toBe('fallback');
+    expect(apiErrorMessage(null, 'fallback')).toBe('fallback');
   });
 
   it('one-tap approve toast says what happened', () => {

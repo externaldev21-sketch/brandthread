@@ -52,7 +52,7 @@ import { formatCents } from '@/lib/money';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
-  adaptReturnRow, itemsTotalCents, parseRefundAmount, returnHeadline, returnReasonLabel, returnSteps, statusLabel,
+  adaptReturnRow, apiErrorMessage, itemsTotalCents, parseRefundAmount, returnHeadline, returnReasonLabel, returnSteps, statusLabel,
   type ReturnView, type ReturnViewer,
 } from '@/lib/returns';
 
@@ -142,12 +142,6 @@ export default function ReturnDetailScreen() {
 
   const viewer: ReturnViewer = view && userId && view.sellerId === userId && view.buyerId !== userId ? 'seller' : 'buyer';
 
-  function errorMessage(err: unknown, fallback: string): string {
-    const raw = (err as { body?: string } | null)?.body ?? '';
-    let message = '';
-    try { message = JSON.parse(raw)?.error ?? ''; } catch { message = ''; }
-    return message || fallback;
-  }
 
   async function updateStatus(
     status: 'approved' | 'denied',
@@ -171,7 +165,7 @@ export default function ReturnDetailScreen() {
       }
       await load();
     } catch (err) {
-      setActionError(errorMessage(err, 'Couldn’t update this return. Check your connection and try again.'));
+      setActionError(apiErrorMessage(err, 'Couldn’t update this return. Check your connection and try again.'));
     } finally {
       setActing(null);
     }
@@ -203,7 +197,7 @@ export default function ReturnDetailScreen() {
       setToast(result?.label?.carrier ? `${result.label.carrier} label sent` : 'Return label sent');
       await load();
     } catch (err) {
-      setActionError(errorMessage(err, 'Couldn’t create the return label. Check the address and try again.'));
+      setActionError(apiErrorMessage(err, 'Couldn’t create the return label. Check the address and try again.'));
     } finally {
       setBuyingLabel(false);
     }

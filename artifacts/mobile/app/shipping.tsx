@@ -10,7 +10,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
-import { quickApproveMessage, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
+import { apiErrorMessage, quickApproveMessage, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
 import { Button } from '@/components/ui';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticSuccess } from '@/lib/haptics';
@@ -219,10 +219,7 @@ export default function ShippingScreen() {
       if (updated?.status === 'refunded') hapticSuccess();
       setReturnToast(quickApproveMessage(updated, formatCents));
     } catch (err) {
-      const raw = (err as { body?: string } | null)?.body ?? '';
-      let message = '';
-      try { message = JSON.parse(raw)?.error ?? ''; } catch { message = ''; }
-      setReturnRowError({ id: r.id, message: message || 'Couldn’t approve this return. Check your connection and try again.' });
+      setReturnRowError({ id: r.id, message: apiErrorMessage(err, 'Couldn’t approve this return. Check your connection and try again.') });
     } finally {
       setApprovingReturnId(null);
     }

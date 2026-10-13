@@ -101,9 +101,27 @@ async function waitFor(page, target, locator) {
       return;
     } catch (error) {
       if (attempt === 5) throw error;
-      await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate')); }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=seller`);
+      await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate')); }, target);
     }
   }
+}
+
+/**
+ * The signed-out seller preview refuses every API call (lib/api.ts), so the
+ * stubbed API is reached the way a signed-in seller reaches it: load once in
+ * the seller preview (seeds the seller role), then drop the preview flag and
+ * navigate client-side with the stub Clerk session.
+ */
+async function go(page, activity, origin, target) {
+  await openScreen(page, activity, origin, 'seller', '/');
+  await page.evaluate((url) => {
+    localStorage.removeItem('user_role');
+    // Keep it off for the rest of this page (the app writes it back on role changes).
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) { if (key === 'user_role') return; return setItem.call(this, key, value); };
+    history.pushState(history.state, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+  }, target);
 }
 
 async function sellerContext(browser, images, origin) {
@@ -114,11 +132,15 @@ async function sellerContext(browser, images, origin) {
     // Print dialogs are captured as screenshots, not opened.
     window.print = () => {};
   });
+  page.on('pageerror', (err) => console.log('pageerror', err.message));
+  page.on('console', (msg) => { if (msg.type() === 'error') console.log('console.error', msg.text().slice(0, 300)); });
+  if (process.env.F4_DEBUG) page.on('request', (r) => { if (!r.url().includes('/_expo/') && !r.url().includes('cdn.')) console.log('req', r.method(), r.url()); });
   const returns = [RETURN_PENDING, RETURN_PENDING_2, RETURN_REFUNDED].map(r => ({ ...r }));
   await context.route(`${API}/**`, async (route) => {
     const request = route.request();
     if (request.method() === 'OPTIONS') return route.fallback();
     const p = new URL(request.url()).pathname.replace(/^\/api\/v1\//, '/api/');
+    if (process.env.F4_DEBUG) console.log('api', request.method(), p);
     const orderMatch = p.match(/^\/api\/orders\/(ord_f[45])$/);
     if (orderMatch) return json(route, ORDERS[orderMatch[1]]);
     if (/^\/api\/shipping-labels\/ord_f[45]\/parcel-suggestion$/.test(p)) return json(route, { weightKnown: false, weightLb: 0 });
@@ -141,7 +163,7 @@ async function sellerContext(browser, images, origin) {
 
 async function orderDetailFlow(browser, images, origin) {
   const { context, page, activity } = await sellerContext(browser, images, origin);
-  await openScreen(page, activity, origin, 'seller', '/order-detail?id=ord_f4');
+  await go(page, activity, origin, '/order-detail?id=ord_f4');
   await waitFor(page, '/order-detail?id=ord_f4', () => page.getByText('Heavyweight Hoodie'));
   await waitForQuietNetwork(activity, 900, 15_000);
   await page.waitForTimeout(800);
@@ -162,7 +184,7 @@ async function orderDetailFlow(browser, images, origin) {
 
 async function fulfillFlow(browser, images, origin) {
   const { context, page, activity } = await sellerContext(browser, images, origin);
-  await openScreen(page, activity, origin, 'seller', '/fulfill-order?orderId=ord_f4&step=3');
+  await go(page, activity, origin, '/fulfill-order?orderId=ord_f4&step=3');
   await waitFor(page, '/fulfill-order?orderId=ord_f4&step=3', () => page.getByText('Ground Advantage'));
   await waitForQuietNetwork(activity, 900, 15_000);
   await page.waitForTimeout(800);
@@ -178,10 +200,12 @@ async function fulfillFlow(browser, images, origin) {
 
 async function returnsFlow(browser, images, origin) {
   const { context, page, activity } = await sellerContext(browser, images, origin);
-  await openScreen(page, activity, origin, 'seller', '/shipping');
+  await go(page, activity, origin, '/shipping');
   await waitFor(page, '/shipping', () => page.getByText('Returns & Exchanges'));
   await waitForQuietNetwork(activity, 900, 15_000);
-  await page.getByText('Returns & Exchanges').first().scrollIntoViewIfNeeded();
+  const firstReturn = page.getByText('#NS-1046 · Amara Chen').first();
+  await firstReturn.waitFor({ timeout: 10_000 }).catch(() => {});
+  await page.getByText('Ship From', { exact: true }).first().scrollIntoViewIfNeeded().catch(() => {});
   await page.waitForTimeout(800);
   await shot(page, '06-returns-list');
   await overflowCheck(page, 'returns-list');
@@ -195,7 +219,7 @@ async function returnsFlow(browser, images, origin) {
 
 async function returnDetailFlow(browser, images, origin) {
   const { context, page, activity } = await sellerContext(browser, images, origin);
-  await openScreen(page, activity, origin, 'seller', '/return-detail?returnId=ret_f4b');
+  await go(page, activity, origin, '/return-detail?returnId=ret_f4b');
   await waitFor(page, '/return-detail?returnId=ret_f4b', () => page.getByText('Review this return'));
   await waitForQuietNetwork(activity, 900, 15_000);
   await page.waitForTimeout(800);
@@ -229,7 +253,7 @@ async function returnDetailFlow(browser, images, origin) {
     await shot(page, '11-return-label-form-submit');
     await overflowCheck(page, 'return-label-form');
 
-    await openScreen(page, activity, origin, 'seller', '/return-detail?returnId=ret_f4a&decline=1');
+    await go(page, activity, origin, '/return-detail?returnId=ret_f4a&decline=1');
     await waitFor(page, '/return-detail?returnId=ret_f4a&decline=1', () => page.getByText('Reason for the buyer'));
     await page.waitForTimeout(800);
     await page.getByText('Reason for the buyer').first().scrollIntoViewIfNeeded();
@@ -240,7 +264,7 @@ async function returnDetailFlow(browser, images, origin) {
 
 async function batchFlow(browser, images, origin) {
   const { context, page, activity } = await sellerContext(browser, images, origin);
-  await openScreen(page, activity, origin, 'seller', '/fulfill-batch?orderIds=ord_f4,ord_f5');
+  await go(page, activity, origin, '/fulfill-batch?orderIds=ord_f4,ord_f5');
   await waitFor(page, '/fulfill-batch?orderIds=ord_f4,ord_f5', () => page.getByText('Selected orders'));
   await waitForQuietNetwork(activity, 900, 15_000);
   await page.waitForTimeout(800);
