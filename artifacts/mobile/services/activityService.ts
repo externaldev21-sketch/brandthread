@@ -10,6 +10,7 @@
  * pub/sub so the bell badges and the older notifications screen stay in sync.
  */
 import { serviceRequest } from '@/lib/serviceConfig';
+import { setAppBadgeCount, syncNotificationBadge } from '@/lib/notificationBadge';
 import { subscribeSocial } from '@/services/socialService';
 import { ACTIVITY_PAGE_SIZE, type ActivityFilter, type ActivityItem } from '@/lib/activity';
 import {
@@ -152,6 +153,7 @@ export async function markActivityRead(id: string): Promise<void> {
 export async function markAllActivityRead(): Promise<void> {
   if (isPreviewActivityEnabled()) markAllPreviewActivityRead();
   emitUnreadOverride(0);
+  void setAppBadgeCount(0);
   try {
     await serviceRequest(`${BASE}/read-all`, { method: 'PATCH', body: JSON.stringify({}) });
   } catch (err) {
@@ -159,6 +161,7 @@ export async function markAllActivityRead(): Promise<void> {
     // happened above, so don't surface a false failure there.
     if (!isPreviewActivityEnabled() || !isPreviewActivitySeedServed()) {
       emitChange(); // badges refetch the true count
+      void syncNotificationBadge();
       throw err;
     }
   }
@@ -212,6 +215,8 @@ export function watchActivityRealtime(
       const key = `${count}:${latestId}`;
       if (key !== lastKey) {
         lastKey = key;
+        // The app icon follows the same server count as the bell.
+        void setAppBadgeCount(count);
         onChange({ count, latestId });
       }
     } catch {

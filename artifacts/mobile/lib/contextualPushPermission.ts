@@ -6,13 +6,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { deviceTimeZone } from './deviceTimeZone';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 const ONBOARDING_OWNER_KEY = 'onboarding_owner_id';
 const requestedKey = (userId: string) => `bt:push:permission-requested:v1:${userId}`;
 
 type PushApi = {
-  push: { register: (body: { token: string; platform?: string }) => Promise<unknown> };
+  push: { register: (body: { token: string; platform?: string; timezone?: string }) => Promise<unknown> };
 };
 
 async function isOnboardedUser(userId: string): Promise<boolean> {
@@ -25,7 +26,9 @@ async function isOnboardedUser(userId: string): Promise<boolean> {
 
 async function registerToken(api: PushApi): Promise<void> {
   const token = await Notifications.getExpoPushTokenAsync();
-  await api.push.register({ token: token.data, platform: 'expo' });
+  // The device zone keeps quiet hours on local time (and follows travel).
+  const timezone = deviceTimeZone();
+  await api.push.register({ token: token.data, platform: 'expo', ...(timezone ? { timezone } : {}) });
 }
 
 /**

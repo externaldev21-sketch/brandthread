@@ -1271,7 +1271,9 @@ function RootLayoutNav() {
         // Refresh the in-app feed so the unread badge count picks up this
         // notification immediately rather than waiting for the feed screen
         // to be opened.
-        void getFeedNotifications().then(syncNotificationBadge).catch(() => {});
+        void getFeedNotifications()
+          .catch(() => {})
+          .then(() => syncNotificationBadge());
       },
     );
     void Notifications.getLastNotificationResponseAsync()

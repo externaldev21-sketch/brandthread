@@ -278,7 +278,7 @@ export default function BuyerNotifications() {
       const data = await getNotifications();
       setNotifs(data);
       setNotifFailed(false);
-      void syncNotificationBadge(data);
+      void syncNotificationBadge();
     } catch (_) {
       setNotifFailed(true);
     } finally {
