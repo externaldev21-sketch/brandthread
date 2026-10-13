@@ -121,6 +121,8 @@ type GroupBreakdown = {
   giftCardCents: number;
   totalCents: number;
   processingDays: number | null;
+  /** Item 109: DDP duties & import taxes; present only when above zero. */
+  dutiesCents?: number;
 };
 
 function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gift: Map<string, number> = new Map()): GroupBreakdown[] {
@@ -136,6 +138,7 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
       giftCardCents: gift.get(row.id) ?? 0,
       totalCents: row.amountTotalCents ?? 0,
       processingDays: null,
+      ...((row.dutiesCents ?? 0) > 0 ? { dutiesCents: row.dutiesCents } : {}),
     };
   });
 }
@@ -161,7 +164,8 @@ async function priceCart(
     }
     sellers.add(pricedGroup.sellerId);
     const tax = await calculateGroupTax(stripe, pricedGroup, shipping);
-    const fullTotalCents = pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents;
+    // Duties (item 109) are 0 unless the seller's zone is DDP and the flag is on.
+    const fullTotalCents = pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents + pricedGroup.dutiesCents;
     // A store gift card covers part of THIS seller's group only.
     const gift = group.giftCard
       ? await applyGiftCardToGroup({
@@ -193,6 +197,7 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     giftCardCents: group.giftCardCents,
     totalCents: group.totalCents,
     processingDays: group.processingDays,
+    ...(group.dutiesCents > 0 ? { dutiesCents: group.dutiesCents } : {}),
   }));
 }
 
@@ -335,6 +340,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
           shippingCents: group.shippingCents,
           taxCents: group.taxCents,
           stripeTaxCalculationId: group.calculationId,
+          ...(group.dutiesCents > 0 ? { dutiesCents: group.dutiesCents, dutiesQuoteId: group.dutiesQuoteId } : {}),
         }).returning();
         await reserveStock(tx, row.id, group.items.map((item) => ({
           variantId: item.variantId, quantity: item.quantity, productName: item.productName,

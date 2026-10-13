@@ -16,6 +16,7 @@ import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
+import { resolveWithLiveRates } from "../lib/intl/liveShippingRates";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import { recordCheckoutAttribution } from "../lib/growth/attribution";
@@ -223,13 +224,18 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         const rows = await db.select().from(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, z.id));
         weightTierRows.push(...rows);
       }
-      const resolved = resolveShippingForDestination({
+      // Item 108: live carrier quote for a 'calculated' zone when SHIPPO_LIVE_RATES_ENABLED (flat rate otherwise).
+      const resolved = await resolveWithLiveRates(resolveShippingForDestination({
         zones: zoneRows as unknown as ShippingZoneRow[],
         weightTiers: weightTierRows,
         destinationCountry: shippingAddressValue.country,
         sellerHomeCountry: sellerRow?.country ?? "US",
         subtotalCents,
         weightGrams: cartWeightGrams,
+      }), {
+        sellerId: sellerId, zones: zoneRows as unknown as ShippingZoneRow[], shipFromCountry: sellerRow?.country ?? "US",
+        destination: { country: shippingAddressValue.country, postalCode: shippingAddressValue.zip, city: shippingAddressValue.city, state: shippingAddressValue.state, street: shippingAddressValue.street },
+        weightGrams: cartWeightGrams, subtotalCents: subtotalCents,
       });
       if (resolved.unavailable) {
         return res.status(400).json({ error: "This seller does not ship to the selected destination" });

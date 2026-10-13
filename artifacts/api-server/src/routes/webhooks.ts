@@ -657,6 +657,8 @@ export async function handleCartPaymentSucceeded(pi: any, providerEventId: strin
     const amountTotal = group.amountTotalCents ?? 0;
     const tax = group.taxCents ?? 0;
     const shippingCents = group.shippingCents ?? 0;
+    // Item 109: DDP duties are part of the group's total, not a discount.
+    const dutiesCents = group.dutiesCents ?? 0;
     await handleCheckoutPaid({
       id: group.stripeSessionId,
       payment_intent: pi.id,
@@ -665,7 +667,7 @@ export async function handleCartPaymentSucceeded(pi: any, providerEventId: strin
       total_details: {
         amount_tax: tax,
         amount_shipping: shippingCents,
-        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal - (giftByGroup.get(group.id) ?? 0)),
+        amount_discount: Math.max(0, subtotal + shippingCents + tax + dutiesCents - amountTotal - (giftByGroup.get(group.id) ?? 0)),
       },
       shipping_details: shipping,
       metadata: { csRef: group.id },
@@ -970,6 +972,8 @@ export async function handleCheckoutPaid(
         subtotalCents,
         shippingCents,
         taxCents,
+        // Item 109: DDP duties fixed on the checkout row (0 for every other checkout).
+        ...((csRecord.dutiesCents ?? 0) > 0 ? { dutiesCents: csRecord.dutiesCents } : {}),
         grossChargedCents: totalCents,
         paidAt: successfulPaymentAt,
         discountAmountCents: stripeDiscountCents,
