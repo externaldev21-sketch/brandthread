@@ -39,6 +39,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
+import { AddToWalletButton } from '@/components/orders/AddToWalletButton';
 import { BuyerOrderView, cancellationReasonLabel, OrderStatus, TrackingStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -1211,6 +1212,7 @@ export default function BuyerOrderDetailScreen() {
                 <StatusBadge label="IN PRODUCTION" variant="info" />
               </View>
             </GradientCard>
+            <AddToWalletButton orderId={order.id} />
           </View>
         )}
 
