@@ -21,7 +21,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { apiErrorMessage } from '@/lib/safety';
-import { isPreviewDemoMode } from '@/lib/devPreview';
+import { isPreviewCatalogEnabled } from '@/lib/previewCatalog';
 import { isPreviewSellerId } from '@/lib/previewCheckout';
 import { formatCents } from '@/lib/money';
 import {
@@ -48,7 +48,9 @@ export function AddToOrderOffer({ orderId, sellerId, fallback }: {
   const [now, setNow] = useState(() => Date.now());
   const [picked, setPicked] = useState<AddOnProduct | null>(null);
   const [added, setAdded] = useState<Set<string>>(() => new Set());
-  const demo = isPreviewSellerId(sellerId) && isPreviewDemoMode();
+  // Dev-web preview only: a seeded preview order (lib/previewCheckout.ts, never
+  // in production) gets an offer built from the preview catalog.
+  const demo = isPreviewSellerId(sellerId) && !!orderId?.startsWith('preview-order-') && isPreviewCatalogEnabled();
 
   useEffect(() => {
     let alive = true;
