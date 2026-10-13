@@ -77,6 +77,7 @@ import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
 import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
+import { WhatsNewHost } from '@/components/whats-new/WhatsNewHost';
 import { ReportSheetProvider } from '@/components/safety/ReportSheet';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { SaveHeartHost } from '@/components/SaveHeartHost';
@@ -106,7 +107,6 @@ import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
-import { WhatsNewHost } from '@/components/whats-new/WhatsNewHost';
 
 // Generated API hooks share this guard with the app-local API clients so
 // signed-out seller preview never reaches the backend through an alternate
