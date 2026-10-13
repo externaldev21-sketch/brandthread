@@ -3098,7 +3098,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** In-app support tickets */
     support: {
-      submitTicket: (body: { subject: string; body: string; category: string; email: string; name: string }) =>
+      submitTicket: (body: { subject: string; body: string; category: string; email: string; name: string; diagnostics?: Record<string, string | undefined> }) =>
         post<any>('/api/support/tickets', body),
       getTickets: () => get<any[]>('/api/support/tickets'),
     },

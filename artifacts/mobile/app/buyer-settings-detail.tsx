@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
-import { appVersion } from '@/lib/appVersion';
+import { View, Text, ScrollView, StyleSheet, Alert, Pressable } from 'react-native';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,6 +12,9 @@ import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ListRow, OptionSheet } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
+import { useInternalDevMenuGesture } from '@/lib/internalDevMenu';
+const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import {
   COMMENT_AUDIENCE_OPTIONS, CommentAudience, DEFAULT_INTERACTION_SETTINGS, InteractionSettings,
@@ -28,6 +30,7 @@ type Item = {
   label: string; sub?: string; icon?: IconName; toggle?: ToggleKey; value?: string; action?: () => void;
   /** A switch backed by the server (account interaction settings), not the local buyer settings. */
   remoteToggle?: { value: boolean; onChange: (value: boolean) => void };
+  secretTap?: () => void;
 };
 
 /** Server-backed values for the story, comments and sharing sections (GET /api/interaction-settings, blocks). */
@@ -49,7 +52,7 @@ type Display = {
   pickTranslationLanguage: () => void;
 };
 
-type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>, remote?: Remote, display?: Display) => Item[] };
+type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>, remote?: Remote, display?: Display, extra?: { onVersionTap?: () => void }) => Item[] };
 
 /** Sections whose rows show server-backed values. */
 const REMOTE_SECTIONS = new Set(['story', 'comments', 'sharing', 'tags', 'suggested']);
@@ -85,7 +88,7 @@ const CONFIG: Record<string, Config> = {
   media: { title: 'Media quality and data usage', items: s => [{ label: 'Use less cellular data', toggle: 'dataSaver' }, { label: 'Upload at highest quality', toggle: 'highQualityUploads' }, { label: 'Autoplay videos', toggle: 'autoplayVideos' }] },
   appearance: { title: 'Appearance', items: s => [{ label: 'Theme', value: s.theme }, { label: 'Reduce motion', toggle: 'reduceMotion' }] },
   'privacy-center': { title: 'Privacy Center', items: () => [{ label: 'Privacy policy', icon: 'file-text' }, { label: 'How Brandthread uses your data', icon: 'database' }, { label: 'Ad and recommendation controls', icon: 'sliders' }, { label: 'Download your information', icon: 'download' }] },
-  about: { title: 'About Brandthread', items: (_s, router) => [{ label: 'App version', value: '1.0.0' }, { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) }, { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) }, { label: 'Privacy policy', icon: 'lock', action: () => router?.push('/privacy' as never) }, { label: 'Refund policy', icon: 'rotate-ccw', action: () => router?.push('/refund-policy' as never) }, { label: 'Seller agreement', icon: 'briefcase', action: () => router?.push('/seller-agreement' as never) }, { label: 'Open-source licenses', icon: 'code' }] },
+  about: { title: 'About Brandthread', items: (_s, router, extra) => [{ label: 'App version', value: APP_VERSION_LABEL, secretTap: extra?.onVersionTap }, { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) }, { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) }, { label: 'Privacy policy', icon: 'lock', action: () => router?.push('/privacy' as never) }, { label: 'Refund policy', icon: 'rotate-ccw', action: () => router?.push('/refund-policy' as never) }, { label: 'Seller agreement', icon: 'briefcase', action: () => router?.push('/seller-agreement' as never) }, { label: 'Open-source licenses', icon: 'code' }] },
 };
 
 // ─── Sections that only had device-only or dead rows (QA audit) ─────────────
@@ -117,8 +120,8 @@ Object.assign(CONFIG, {
     { label: 'Privacy policy', icon: 'file-text', action: () => router?.push('/privacy' as never) },
     { label: 'Download my data', icon: 'download', action: () => router?.push('/buyer-download-data' as never) },
   ] },
-  about: { title: 'About Brandthread', items: (_s, router) => [
-    { label: 'App version', value: appVersion() || undefined },
+  about: { title: 'About Brandthread', items: (_s, router, _remote, _display, extra) => [
+    { label: 'App version', value: APP_VERSION_LABEL, secretTap: extra?.onVersionTap },
     { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) },
     { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) },
     { label: 'Privacy policy', icon: 'shield', action: () => router?.push('/privacy' as never) },
@@ -227,10 +230,11 @@ export default function BuyerSettingsDetail() {
       Alert.alert('Could not update setting', 'Try again.');
     }
   }, [api, section, settings]);
+  const onVersionTap = useInternalDevMenuGesture();
   const [sensitivePicker, setSensitivePicker] = useState(false);
-  const items = useMemo(() => settings ? cfg.items(settings, router, remote, display).map(item =>
+  const items = useMemo(() => settings ? cfg.items(settings, router, remote, display, { onVersionTap }).map(item =>
     item.label === 'Sensitive content' ? { ...item, action: () => setSensitivePicker(true) } : item
-  ) : [], [cfg, settings, router, remote, display]);
+  ) : [], [cfg, settings, router, remote, display, onVersionTap]);
 
   return <View style={styles.page}>
     <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings')} />
@@ -239,8 +243,7 @@ export default function BuyerSettingsDetail() {
       {!loading && loadError && !settings ? <ErrorState message="Couldn't load your settings." onRetry={() => { setLoading(true); load(); }} /> : null}
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <Card style={styles.card}>{items.map((item, i) => {
         const isActionable = !!item.toggle || !!item.remoteToggle || !!item.action;
-        return <React.Fragment key={`${item.label}-${i}`}>
-          <ListRow
+        const row = <ListRow
             icon={item.icon}
             title={item.label}
             subtitle={item.sub}
@@ -249,7 +252,9 @@ export default function BuyerSettingsDetail() {
             toggle={item.toggle && settings ? { value: Boolean(settings[item.toggle]), onChange: (v) => toggle(item.toggle!, v) } : item.remoteToggle}
             onPress={isActionable && item.action ? item.action : undefined}
             disabled={!isActionable}
-          />
+          />;
+        return <React.Fragment key={`${item.label}-${i}`}>
+          {item.secretTap ? <Pressable onPress={item.secretTap} accessible={false}>{row}</Pressable> : row}
           {i < items.length - 1 && <View style={styles.divider} />}
         </React.Fragment>;
       })}</Card> : null}

@@ -4,6 +4,9 @@
  * GET  /api/support/tickets      (requireAuth — user's own tickets)
  * POST /api/support/problem-reports (requireAuth — buyer "Report a problem",
  *      filed as a support ticket with category 'order_problem')
+ *
+ * POST accepts an optional `diagnostics` object (app version/build, OS,
+ * device) that "Report a problem" attaches; see lib/supportDiagnostics.ts.
  */
 import { Router } from "express";
 import { z } from "zod";
@@ -13,6 +16,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { logger } from "../lib/logger";
 import { looseBody, optText, validateBody } from "../middlewares/bodySchemas";
+import { sanitizeSupportDiagnostics } from "../lib/supportDiagnostics";
 
 const router = Router();
 
@@ -42,6 +46,8 @@ const supportTicketBody = looseBody({
         updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
+    // Mirrors lib/db/migrations/261_support_ticket_diagnostics.sql.
+    await db.execute(sql`ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS diagnostics JSONB`);
   } catch (err) {
     logger.error({ err }, "Support tickets migration failed");
   }
@@ -50,12 +56,13 @@ const supportTicketBody = looseBody({
 // ─── POST /api/support/tickets ────────────────────────────────────────────────
 router.post("/tickets", requireAuth, validateBody(supportTicketBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { subject, body, category, email, name } = req.body as {
+  const { subject, body, category, email, name, diagnostics } = req.body as {
     subject?: string;
     body?: string;
     category?: string;
     email?: string;
     name?: string;
+    diagnostics?: unknown;
   };
 
   if (!subject?.trim() || !body?.trim() || !email?.trim() || !name?.trim()) {
@@ -66,10 +73,11 @@ router.post("/tickets", requireAuth, validateBody(supportTicketBody), async (req
   const cat = ["general", "billing", "account", "bug", "feature"].includes(category ?? "")
     ? (category ?? "general")
     : "general";
+  const diag = sanitizeSupportDiagnostics(diagnostics);
 
   const result = await db.execute(sql`
-    INSERT INTO support_tickets (clerk_id, email, name, subject, body, category)
-    VALUES (${clerkId}, ${email.trim()}, ${name.trim()}, ${subject.trim()}, ${body.trim()}, ${cat})
+    INSERT INTO support_tickets (clerk_id, email, name, subject, body, category, diagnostics)
+    VALUES (${clerkId}, ${email.trim()}, ${name.trim()}, ${subject.trim()}, ${body.trim()}, ${cat}, ${diag ? JSON.stringify(diag) : null}::jsonb)
     RETURNING *
   `);
   res.status(201).json(result.rows[0] ?? {});

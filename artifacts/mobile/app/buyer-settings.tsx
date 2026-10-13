@@ -35,6 +35,9 @@ import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useJoinedCommunities } from '@/lib/communities/useCommunityClient';
 import { BUYER_SETTINGS_CATALOG, settingsGroupsFor, type SettingsCatalogItem } from '@/services/settingsCatalog';
+import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
+
+const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
 
 export default function BuyerSettingsScreen() {
   const { theme } = useAppTheme();
@@ -147,6 +150,8 @@ export default function BuyerSettingsScreen() {
             })}
           </View>
         ))}
+
+        <Text style={s.version}>Brandthread v{APP_VERSION_LABEL}</Text>
       </ScrollView>
 
       <ShareProfileSheet visible={shareSheetOpen} onClose={() => setShareSheetOpen(false)} />

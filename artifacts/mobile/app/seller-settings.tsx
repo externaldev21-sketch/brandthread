@@ -38,6 +38,9 @@ import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
+
+const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
 
 export default function SellerSettingsScreen() {
   const colors = useColors();
@@ -191,7 +194,7 @@ export default function SellerSettingsScreen() {
           </SettingsGroup>
         ))}
 
-        <Text style={s.version}>Brandthread v{appVersion()}</Text>
+        <Text style={s.version}>Brandthread v{APP_VERSION_LABEL}</Text>
       </Animated.ScrollView>
 
       <PlanUpsellModal
