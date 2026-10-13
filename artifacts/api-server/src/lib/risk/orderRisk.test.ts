@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  applyReviewEvent, buildRiskView, computeOrderRisk, withRiskView, HIGH_VALUE_THRESHOLD_CENTS,
+  applyEarlyFraudWarning, applyReviewEvent, buildRiskView, computeOrderRisk, withRiskView, HIGH_VALUE_THRESHOLD_CENTS,
 } from "./orderRisk";
-import { applyReviewToOrders, enrichOrderRisk, type EnrichInput } from "./orderRiskStore";
+import { applyEarlyFraudWarningToOrders, applyReviewToOrders, enrichOrderRisk, type EnrichInput } from "./orderRiskStore";
 
 const codes = (r: ReturnType<typeof computeOrderRisk>) => r.flags.map((f) => f.code);
 
@@ -198,6 +198,44 @@ describe("applyReviewToOrders", () => {
   it("does nothing without a payment reference", async () => {
     const findOrders = vi.fn();
     expect(await applyReviewToOrders({ findOrders, updateRisk: vi.fn() }, "opened", {})).toBe(0);
+    expect(findOrders).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyEarlyFraudWarning", () => {
+  it("raises the order to highest risk, unreviewed, with a plain-language flag", () => {
+    const next = applyEarlyFraudWarning(
+      { level: "normal", flags: [{ code: "first_time_buyer", label: "First order", severity: "info" }], reviewed: true },
+      { fraud_type: "made_with_stolen_card", actionable: true },
+    );
+    expect(next.level).toBe("highest");
+    expect(next.reviewed).toBe(false);
+    expect(next.flags.map((f) => f.code)).toEqual(["first_time_buyer", "early_fraud_warning"]);
+    expect(next.flags[1].label).toBe("The card's bank reported this payment as stolen card");
+  });
+  it("is idempotent across created/updated events", () => {
+    const once = applyEarlyFraudWarning({ level: null, flags: [], reviewed: null }, { fraud_type: "misc" });
+    const twice = applyEarlyFraudWarning(once, { fraud_type: "misc" });
+    expect(twice.flags.filter((f) => f.code === "early_fraud_warning")).toHaveLength(1);
+  });
+  it("falls back to a generic label for unknown fraud types", () => {
+    const next = applyEarlyFraudWarning({ level: null, flags: [], reviewed: null }, { fraud_type: "something_new" });
+    expect(next.flags[0].label).toBe("The card's bank reported this payment as fraud");
+  });
+});
+
+describe("applyEarlyFraudWarningToOrders", () => {
+  it("flags every order paid by the warned charge", async () => {
+    const updateRisk = vi.fn().mockResolvedValue(undefined);
+    const findOrders = vi.fn().mockResolvedValue([{ id: "a", riskLevel: "normal", riskFlags: [], riskReviewed: true }]);
+    const n = await applyEarlyFraudWarningToOrders({ findOrders, updateRisk }, { charge: "ch_9", fraud_type: "misc" });
+    expect(n).toBe(1);
+    expect(findOrders).toHaveBeenCalledWith({ paymentIntentId: null, chargeId: "ch_9" });
+    expect(updateRisk).toHaveBeenCalledWith("a", expect.objectContaining({ riskLevel: "highest", riskReviewed: false }));
+  });
+  it("does nothing without a payment reference", async () => {
+    const findOrders = vi.fn();
+    expect(await applyEarlyFraudWarningToOrders({ findOrders, updateRisk: vi.fn() }, {})).toBe(0);
     expect(findOrders).not.toHaveBeenCalled();
   });
 });

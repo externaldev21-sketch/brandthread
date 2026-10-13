@@ -5,6 +5,10 @@ import { afterAll } from "vitest";
 // guarantee suite (lib/delivery/__tests__) sets "hold" explicitly and
 // policy.test.ts pins the default.
 process.env.PAYOUT_MODE ??= "immediate";
+// Same for the first-payout identity gate (lib/money/firstPayoutGate.ts):
+// the money suites seed sellers who never ran Stripe Identity. The gate's own
+// suite (firstPayoutGate.integration.test.ts) turns it back on.
+process.env.PAYOUT_REQUIRE_IDENTITY ??= "off";
 import pg from "pg";
 import { purgeTestData } from "@workspace/db/testing";
 

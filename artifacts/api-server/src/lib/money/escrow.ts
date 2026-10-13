@@ -30,6 +30,7 @@ import {
 } from "./stateMachines";
 import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode, type ChargeDetails } from "./stripeMoney";
 import { payoutHoldApplies, payoutReleasableSql, payoutTimeReached, hasOpenReturn } from "../delivery/payoutGate";
+import { checkFirstPayout } from "./firstPayoutGate";
 import type Stripe from "stripe";
 
 type StripeLike = Pick<Stripe, "transfers">;
@@ -470,6 +471,15 @@ export async function executeOrderRelease(
         lastErrorMessage: stripeClient
           ? "The seller has no connected Stripe account yet; the release will retry."
           : "Stripe is not configured on this server.",
+        updatedAt: new Date(),
+      }).where(eq(orderReleases.id, releaseId));
+      return { release: { ...release, state: release.state }, go: false as const, blocked: true };
+    }
+    // A new seller's first payout waits for Stripe Identity (lib/money/firstPayoutGate.ts).
+    if (release.amount_cents > 0 && !staleTransfer && !(await checkFirstPayout(tx, release.seller_id)).ok) {
+      await tx.update(orderReleases).set({
+        lastErrorCode: "IDENTITY_REQUIRED",
+        lastErrorMessage: "The seller hasn't verified their identity yet; the release will retry.",
         updatedAt: new Date(),
       }).where(eq(orderReleases.id, releaseId));
       return { release: { ...release, state: release.state }, go: false as const, blocked: true };

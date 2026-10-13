@@ -36,6 +36,7 @@ import {
   validateScheduleInput,
 } from "../lib/money/payoutSchedule";
 import { assertBreakdownReconciles, buildPayoutBreakdown } from "../lib/money/payoutBreakdown";
+import { checkFirstPayout, IDENTITY_REQUIRED_MESSAGE } from "../lib/money/firstPayoutGate";
 
 const router = Router();
 router.use(requireAuth);
@@ -622,6 +623,11 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
       return;
     }
     const method: "standard" | "instant" = methodInput === "instant" ? "instant" : "standard";
+    // A new seller's first cash-out waits for Stripe Identity (lib/money/firstPayoutGate.ts).
+    if (!(await checkFirstPayout(db, sellerId)).ok) {
+      res.status(403).json({ error: IDENTITY_REQUIRED_MESSAGE, code: "IDENTITY_REQUIRED", verifyRoute: "/seller-verification" });
+      return;
+    }
     const currentAccountId = await getStripeAccount(sellerId);
     if (!stripe) {
       res.status(503).json({ error: "Stripe is unavailable" }); return;
@@ -994,6 +1000,18 @@ function scheduleView(account: any) {
     ? { interval: schedule.interval, weeklyAnchor: schedule.weeklyAnchor, delayDays: schedule.delayDays }
     : null;
 }
+
+// ─── GET /api/finance/first-payout — is the first payout waiting on identity? ──
+router.get("/first-payout", requirePayoutsRead(), async (req, res) => {
+  const sellerId = getSellerId(req);
+  try {
+    const check = await checkFirstPayout(db, sellerId);
+    res.json({ identityRequired: !check.ok, message: check.ok ? null : IDENTITY_REQUIRED_MESSAGE });
+  } catch (err) {
+    req.log?.error({ err, sellerId }, "First payout check failed");
+    res.status(500).json({ error: "Could not check payout readiness" });
+  }
+});
 
 router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);

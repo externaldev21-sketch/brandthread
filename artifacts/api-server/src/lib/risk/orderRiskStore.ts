@@ -4,8 +4,8 @@
  * best effort: a risk failure must never fail order creation or a webhook.
  */
 import {
-  applyReviewEvent, computeOrderRisk, isRiskLevel,
-  type CardChecksInput, type ChargeOutcomeInput, type OrderRisk, type ReviewInput, type RiskFlag,
+  applyEarlyFraudWarning, applyReviewEvent, computeOrderRisk, isRiskLevel,
+  type CardChecksInput, type ChargeOutcomeInput, type EarlyFraudWarningInput, type OrderRisk, type ReviewInput, type RiskFlag,
 } from "./orderRisk";
 
 /** What fetchChargeDetails reads off the charge for Radar. */
@@ -104,6 +104,26 @@ export async function applyReviewToOrders(
       riskFlags: next.flags,
       riskReviewed: next.reviewed === true,
     });
+  }
+  return rows.length;
+}
+
+/** Applies radar.early_fraud_warning.* to every order paid by the warned charge. Returns orders updated. */
+export async function applyEarlyFraudWarningToOrders(
+  deps: ReviewDeps,
+  warning: EarlyFraudWarningInput & { payment_intent?: unknown; charge?: unknown },
+): Promise<number> {
+  const paymentIntentId = refId(warning.payment_intent);
+  const chargeId = refId(warning.charge);
+  if (!paymentIntentId && !chargeId) return 0;
+  const rows = await deps.findOrders({ paymentIntentId, chargeId });
+  for (const row of rows) {
+    const flags = Array.isArray(row.riskFlags) ? (row.riskFlags as RiskFlag[]) : [];
+    const next = applyEarlyFraudWarning(
+      { level: isRiskLevel(row.riskLevel) ? row.riskLevel : null, flags, reviewed: row.riskReviewed },
+      warning,
+    );
+    await deps.updateRisk(row.id, { riskLevel: next.level ?? "highest", riskFlags: next.flags, riskReviewed: false });
   }
   return rows.length;
 }
