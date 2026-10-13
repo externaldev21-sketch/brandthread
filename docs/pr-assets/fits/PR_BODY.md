@@ -87,7 +87,8 @@ None. No new keys and no paid APIs. The signed-out web preview makes only public
   - Permission flow: brand repost and quote blocked before approval; request → notification → approve → repost row; per-brand approval; approval works with `allowReposts=false`; decline, cancel and re-request rules; only the owner can answer; answered requests are final; blocked brands get 404.
 - Every existing API suite that imports `routes/posts.ts` (19 files) passes except 23 tests in 3 files: `post-slide-validation`, `post-quotes` (3 "quote payloads on reads" tests) and `media-moderation` (1 test). The same 23 fail on `origin/dev` with `posts.ts` reverted, so these failures predate this PR.
 - `pnpm exec tsc -p tsconfig.json --noEmit` reports 0 errors in both api-server and mobile (after `pnpm exec tsc --build` for the libs).
-- Mobile: `pnpm exec vitest run tests/fits.test.ts` passes 7/7. Full mobile vitest: see below.
+- Mobile: `pnpm exec vitest run tests/fits.test.ts` passes 7/7. Full mobile vitest (`pnpm exec vitest run` in artifacts/mobile): the origin/dev baseline has 88 failed / 4811 passed, and this branch has 87 failed / 4819 passed. Diffing the two FAIL lists shows **zero new failures**. `components/__tests__/ThreadShareSheet.structure.test.ts` still passes.
+- Screenshots: `node scripts/f6-fits-screenshots.mjs [--skip-build]` (in artifacts/mobile) writes 13 shots at 390x844 to `docs/pr-assets/fits/ours/`, and I reviewed every one. In the buyer web preview, the post viewer shows its seeded local post, so its media area is the existing placeholder. Those shots verify the new chip, attribution and menu, not the media.
 
 ## Suggestions for Dev
 
