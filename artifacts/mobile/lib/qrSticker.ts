@@ -103,7 +103,7 @@ export function stickerSvg(layoutId: StickerLayoutId, content: StickerContent, o
       cut ? `<rect x="0.5" y="0.5" width="${w - 1}" height="${h - 1}" fill="none" stroke="${CUT}" stroke-width="0.3"/>` : '',
       textEl(name, w / 2, 24, fitFont(name, 88, 9), 700),
       textEl('Scan to shop', w / 2, 35, 5.5, 500),
-      qrPath(content.qrUrl, 17.5, 43, 70),
+      qrPath(content.qrUrl, 19.5, 45, 66),
       url ? textEl(url, w / 2, 127, fitFont(url, 90, 4.6), 500) : '',
     ];
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}mm" height="${h}mm">${parts.join('')}</svg>`;
@@ -113,11 +113,12 @@ export function stickerSvg(layoutId: StickerLayoutId, content: StickerContent, o
   const outline = round
     ? `<circle cx="50" cy="50" r="49.6" fill="#FFFFFF"${cut ? ` stroke="${CUT}" stroke-width="0.4"` : ''}/>`
     : `<rect x="0.4" y="0.4" width="99.2" height="99.2" rx="6" fill="#FFFFFF"${cut ? ` stroke="${CUT}" stroke-width="0.4"` : ''}/>`;
-  // Text widths stay inside the circle's chord at each line's height.
+  // Text widths stay inside the circle's chord at each line's height, and the
+  // code keeps about four modules of white around it (the QR quiet zone).
   const parts = [
     outline,
-    textEl(name, 50, round ? 20.5 : 15, fitFont(name, round ? 72 : 86, 6.6), 700),
-    qrPath(content.qrUrl, round ? 28 : 25, round ? 25 : 20, round ? 44 : 50),
+    textEl(name, 50, round ? 19.5 : 15, fitFont(name, round ? 70 : 86, 6.6), 700),
+    qrPath(content.qrUrl, round ? 29 : 26, round ? 27 : 22, round ? 42 : 48),
     textEl('Scan to shop', 50, round ? 78.5 : 80, 4.6, 500),
     url ? textEl(url, 50, round ? 86 : 89, fitFont(url, round ? 62 : 88, 3.6), 500) : '',
   ];

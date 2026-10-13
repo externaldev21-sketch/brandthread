@@ -91,7 +91,7 @@ export default function StoreQrStickerScreen() {
   } : null, [link, showLink]);
 
   const layout = stickerLayout(layoutId);
-  const previewWidth = Math.min(screenWidth - SP.md * 2 - 48, layout.shape === 'sign' ? 210 : 248);
+  const previewWidth = Math.min(screenWidth - SP.md * 2 - 48, layout.shape === 'sign' ? 168 : 220);
   const previewHeight = Math.round((previewWidth * layout.heightIn) / layout.widthIn);
   const svg = useMemo(() => (content ? stickerSvg(layoutId, content) : ''), [content, layoutId]);
 
@@ -125,10 +125,10 @@ export default function StoreQrStickerScreen() {
     content: { paddingHorizontal: SP.md, paddingTop: SP.md },
     stage: {
       alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.lg, backgroundColor: theme.surface,
-      paddingVertical: SP.lg, minHeight: 300, marginBottom: SP.md,
+      paddingVertical: SP.md, minHeight: 252, marginBottom: SP.md,
     },
     group: { borderRadius: 14, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, overflow: 'hidden', marginTop: SP.md },
-    actions: { flexDirection: 'row', justifyContent: 'space-around', marginTop: SP.lg },
+    actions: { flexDirection: 'row', justifyContent: 'space-around', marginTop: SP.md },
     action: { alignItems: 'center', width: 96 },
     actionCircle: {
       width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
