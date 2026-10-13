@@ -28,8 +28,15 @@ export interface QueuedEngagementAction {
   createdAt: number;
 }
 
-const STORAGE_KEY = 'bt:engagement-retry-queue:v1';
+const STORAGE_PREFIX = 'bt:engagement-retry-queue:v1';
 const MAX_ATTEMPTS = 8;
+
+// Scoped by Clerk userId (same pattern as feedPostsCache/tabDataCache) so a
+// like queued offline by one account is never replayed under another.
+let _scopeUserId = 'anon';
+function storageKey(userId: string = _scopeUserId): string {
+  return `${STORAGE_PREFIX}:${userId}`;
+}
 
 let queue: QueuedEngagementAction[] = [];
 let loaded = false;
@@ -45,23 +52,55 @@ function emit() {
 function load(): Promise<void> {
   if (loaded) return Promise.resolve();
   if (!loadPromise) {
-    loadPromise = AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => { queue = raw ? JSON.parse(raw) : []; })
+    const key = storageKey();
+    loadPromise = AsyncStorage.getItem(key)
+      .then((raw) => {
+        if (key !== storageKey()) return; // account switched mid-read
+        const parsed = raw ? JSON.parse(raw) : [];
+        queue = Array.isArray(parsed) ? parsed : [];
+      })
       .catch(() => { queue = []; })
-      .finally(() => { loaded = true; });
+      .finally(() => { if (key === storageKey()) loaded = true; });
   }
   return loadPromise;
 }
 
 async function persist(): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+    await AsyncStorage.setItem(storageKey(), JSON.stringify(queue));
   } catch {
     // Best-effort — a failed persist just means a cold-start won't recover
     // this particular pending action; the in-memory queue still retries it
     // for the rest of this session.
   }
   emit();
+}
+
+/**
+ * Call on sign-in/sign-out/account switch (app/_layout.tsx), before anything
+ * enqueues. Switches the queue to that account's own stored entries.
+ */
+export function initEngagementRetryQueue(userId: string | null): void {
+  const next = userId ?? 'anon';
+  if (next === _scopeUserId) return;
+  _scopeUserId = next;
+  queue = [];
+  loaded = false;
+  loadPromise = null;
+  emit();
+}
+
+/** Drop an account's queued actions (explicit sign-out). */
+export async function clearEngagementRetryQueue(userId: string): Promise<void> {
+  if (userId === _scopeUserId) {
+    queue = [];
+    emit();
+  }
+  try {
+    await AsyncStorage.removeItem(storageKey(userId));
+  } catch {
+    // Best-effort.
+  }
 }
 
 /** A screen registers how to actually replay each kind of queued action. */
@@ -140,4 +179,5 @@ export function __resetEngagementRetryQueueForTests(): void {
   loadPromise = null;
   executor = null;
   processing = false;
+  _scopeUserId = 'anon';
 }

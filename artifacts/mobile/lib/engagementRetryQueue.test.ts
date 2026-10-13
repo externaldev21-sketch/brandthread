@@ -6,6 +6,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
     setItem: vi.fn((key: string, value: string) => { store.set(key, value); return Promise.resolve(); }),
+    removeItem: vi.fn((key: string) => { store.delete(key); return Promise.resolve(); }),
   },
 }));
 
@@ -14,6 +15,8 @@ vi.mock('react-native', () => ({ AppState: { addEventListener: vi.fn(() => ({ re
 import { ApiError } from './networkNotice';
 import {
   __resetEngagementRetryQueueForTests,
+  clearEngagementRetryQueue,
+  initEngagementRetryQueue,
   enqueueEngagementRetry,
   getQueuedEngagementActions,
   isRetryableFailure,
@@ -76,5 +79,32 @@ describe('engagement retry queue', () => {
     const pending = getQueuedEngagementActions();
     expect(pending).toHaveLength(1);
     expect(pending[0].payload).toEqual({ value: 'remove' });
+  });
+
+  it('keeps each account\'s queued taps separate and never replays them under another account', async () => {
+    const replayed: string[] = [];
+    setEngagementRetryExecutor(async () => { throw new ApiError(408, '{}'); });
+    initEngagementRetryQueue('user-a');
+    await enqueueEngagementRetry({ kind: 'like', targetId: 'post-a' });
+    await new Promise((r) => setTimeout(r, 0));
+
+    initEngagementRetryQueue('user-b');
+    setEngagementRetryExecutor(async (action) => { replayed.push(action.targetId); });
+    await processEngagementRetryQueue();
+    expect(replayed).toEqual([]);
+
+    initEngagementRetryQueue('user-a');
+    await processEngagementRetryQueue();
+    expect(replayed).toEqual(['post-a']);
+  });
+
+  it('forgets an account\'s queued taps on sign-out', async () => {
+    setEngagementRetryExecutor(async () => { throw new ApiError(408, '{}'); });
+    initEngagementRetryQueue('user-c');
+    await enqueueEngagementRetry({ kind: 'follow', targetId: 'seller-1' });
+    await new Promise((r) => setTimeout(r, 0));
+    await clearEngagementRetryQueue('user-c');
+    expect(getQueuedEngagementActions()).toHaveLength(0);
+    expect([...store.keys()].some((k) => k.includes('user-c'))).toBe(false);
   });
 });

@@ -2280,8 +2280,10 @@ export default function FeedScreen({
     } catch {
       if (feedGenerationRef.current !== generation) return;
       // Keep the current feed visible when a pull-to-refresh or social
-      // notification fails; only the first load needs an empty state.
-      if (initial) setSellerFeedPosts([]);
+      // notification fails; only the first load needs an empty state, and
+      // only when there was no cached page to paint (offline cold start
+      // keeps showing the last feed instead of going blank).
+      if (initial && !getCachedFeedPosts<SpotlightItem>(loadKey)) setSellerFeedPosts([]);
     } finally {
       if (feedLoadKeyRef.current === loadKey) feedLoadKeyRef.current = null;
       if (feedGenerationRef.current === generation) {
