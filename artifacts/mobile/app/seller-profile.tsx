@@ -188,6 +188,7 @@ export default function SellerProfileScreen() {
   const [reloadTick, setReloadTick] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followsMe, setFollowsMe] = useState(false);
   const [followers, setFollowers] = useState<number | null>(cachedSellerView?.followersCount ?? null);
   const [following, setFollowing] = useState<number | null>(cachedSellerView?.followingCount ?? null);
   const [likes, setLikes] = useState<number | null>(cachedSellerView?.likesCount ?? null);
@@ -215,6 +216,13 @@ export default function SellerProfileScreen() {
   const mode = resolveProfileMode({ viewerId: userId, ownerId: canonicalSellerId, previewAsVisitor });
   const isOwner = mode === 'owner';
   const caps = profileCapabilities('seller', mode);
+  // A visited store opens on its Products ("Shop") tab — what a shopper came
+  // for. The owner still lands on Posts. Only until the viewer picks a tab.
+  const tabPickedRef = useRef(false);
+  useEffect(() => {
+    // Wait for auth so an owner never flashes onto Shop while signing in.
+    if (!tabPickedRef.current && authLoaded && canonicalSellerId && mode === 'visitor') setActiveTab('Shop');
+  }, [authLoaded, canonicalSellerId, mode]);
   // The signed-out web preview (?bt_preview=…) must never reach protected APIs.
   const devPreview = isSellerDevPreview() || isBuyerDevPreview();
 
@@ -297,6 +305,7 @@ export default function SellerProfileScreen() {
       if (!active) return;
       if (followState.status === 'fulfilled' && followState.value) {
         setIsFollowing(followState.value.isFollowing);
+        setFollowsMe(followState.value.isFollowedBy === true);
         if (typeof followState.value.followersCount === 'number') setFollowers(followState.value.followersCount);
       }
       if (social.status === 'fulfilled' && social.value) {
@@ -705,11 +714,14 @@ export default function SellerProfileScreen() {
           following={isFollowing}
           onChange={handleFollow}
           disabled={previewAsVisitor || followPending || !canonicalSellerId || !userId}
+          followLabel={followsMe ? 'Follow back' : 'Follow'}
+          followingLabel={followsMe ? 'Friends' : 'Following'}
+          followingIcon={followsMe ? 'users' : undefined}
           style={styles.followBtn}
           labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
         />
       </View>
-      <ProfileButton label="Message" icon="message-circle" onPress={handleMessageSeller} disabled={previewAsVisitor} testID="seller-profile-message" />
+      <ProfileButton label="Message" icon="message-circle" variant="outline" onPress={handleMessageSeller} disabled={previewAsVisitor} testID="seller-profile-message" />
     </View>
   );
 
@@ -827,7 +839,7 @@ export default function SellerProfileScreen() {
         tabs={{
           items: CONTENT_TAB_ITEMS,
           active: activeTab,
-          onChange: (key) => { setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
+          onChange: (key) => { hapticLight(); tabPickedRef.current = true; setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
         }}
         data={gridData}
         renderItem={renderTile}

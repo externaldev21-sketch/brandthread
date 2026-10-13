@@ -1134,6 +1134,8 @@ export type ThreadFeedMode = 'following' | 'for-you' | 'mixed';
 export interface SellerFollowState {
   isFollowing: boolean;
   followersCount?: number;
+  /** They follow the viewer (GET /api/social/status) — drives Follow back / Friends. */
+  isFollowedBy?: boolean;
 }
 
 export async function getSellerFollowState(sellerId: string): Promise<SellerFollowState> {

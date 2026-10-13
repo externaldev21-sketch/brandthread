@@ -563,7 +563,11 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           <View style={styles.handleRow}>
             {identity.handle ? <Text style={styles.handle} numberOfLines={1}>{identity.handle}</Text> : null}
             {identity.pronouns ? <Text style={styles.handleSoft} numberOfLines={1}>({identity.pronouns})</Text> : null}
-            <ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />
+          </View>
+          {/* Seller / Buyer badge: a small outline chip on its own line under
+              the handle, same as the own-profile header. */}
+          <View style={styles.roleChipRow}>
+            <ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} size="sm" />
           </View>
         </Animated.View>
       </View>
@@ -706,6 +710,7 @@ function makeStyles(theme: AppThemePreset) {
       ...TYPE_SCALE.display, letterSpacing: -1.6, color: theme.text,
       textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 12, // theme-exempt: legibility over media
     },
+    roleChipRow: { flexDirection: 'row', marginTop: 6 },
     handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm },
     // Solid `theme.muted` (as `handleSoft` right below already uses) instead
     // of `color: theme.text, opacity: 0.86` — text opacity anti-aliases
@@ -762,13 +767,28 @@ export function ProfileMeta({
 }) {
   const { theme } = useAppTheme();
   const [expanded, setExpanded] = useState(false);
-  const long = !!bio && bio.length > 140;
+  // Bio stops at 3 lines with "more" (Instagram). Whether it overflows is
+  // measured from an invisible, unclamped copy laid out at the same width —
+  // works on native and web alike (onTextLayout doesn't exist on web).
+  const [fullHeight, setFullHeight] = useState(0);
+  const long = !!bio && fullHeight > BIO_LINE_HEIGHT * 3 + 1;
   return (
     <>
       {bio ? (
-        <Text style={[metaStyles.bio, { color: theme.text }, overMedia && metaStyles.overMedia]} numberOfLines={expanded ? undefined : 3}>
-          {bio}
-        </Text>
+        <View style={metaStyles.bioWrap}>
+          <Text style={[metaStyles.bio, { color: theme.text }, overMedia && metaStyles.overMedia]} numberOfLines={expanded ? undefined : 3}>
+            {bio}
+          </Text>
+          <Text
+            style={[metaStyles.bio, metaStyles.bioMeasure]}
+            onLayout={(e) => setFullHeight(e.nativeEvent.layout.height)}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            aria-hidden
+          >
+            {bio}
+          </Text>
+        </View>
       ) : null}
       {long ? (
         <PressableScale
@@ -777,7 +797,7 @@ export function ProfileMeta({
           accessibilityLabel={expanded ? 'Show less bio' : 'Show full bio'}
           style={metaStyles.more}
         >
-          <Text style={[metaStyles.moreText, { color: theme.muted }]}>{expanded ? 'Less' : 'More'}</Text>
+          <Text style={[metaStyles.moreText, { color: theme.muted }]}>{expanded ? 'less' : 'more'}</Text>
         </PressableScale>
       ) : null}
       {(website || location) ? (
@@ -806,8 +826,13 @@ export function ProfileMeta({
   );
 }
 
+const BIO_LINE_HEIGHT = 20;
+
 const metaStyles = StyleSheet.create({
-  bio: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+  bio: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: BIO_LINE_HEIGHT },
+  bioWrap: { position: 'relative' },
+  // Same width as the visible bio, never seen or hit.
+  bioMeasure: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 },
   overMedia: {
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, // theme-exempt: legibility over cover media
   },

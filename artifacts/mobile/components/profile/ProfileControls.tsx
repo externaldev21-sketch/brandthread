@@ -73,8 +73,10 @@ export function ProfileButton({
    * own-profile's Edit/Share row look (see app/(buyer)/profile.tsx), used
    * where every button in the row should read as equally weighted rather
    * than one being visually promoted above the others.
+   * 'outline' — no fill, hairline-strong border: Message beside Follow on a
+   * visited profile, the same height as Follow.
    */
-  variant?: 'primary' | 'secondary' | 'neutral';
+  variant?: 'primary' | 'secondary' | 'neutral' | 'outline';
   disabled?: boolean;
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -106,7 +108,10 @@ export function ProfileButton({
             ? { backgroundColor: theme.accent, borderColor: theme.accent }
             : variant === 'neutral'
               ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
-              : { backgroundColor: theme.cardGlass, borderColor: theme.border },
+              : variant === 'outline'
+                ? { backgroundColor: 'transparent', borderColor: theme.border }
+                : { backgroundColor: theme.cardGlass, borderColor: theme.border },
+          disabled && styles.disabled,
         ]}
       >
         {(state) => (
@@ -287,18 +292,17 @@ export function ProfileStatsRow({ stats, loading }: { stats: ProfileStat[]; load
   const { theme } = useAppTheme();
   return (
     <View style={[styles.statsRow, { borderColor: theme.border }]}>
-      {stats.map((stat, index) => {
+      {stats.map((stat) => {
         const content = (
           <>
             <Text style={[styles.statValue, { color: loading ? theme.subtle : theme.text }]} numberOfLines={1}>
               {loading ? '–' : stat.value}
             </Text>
-            <Text style={[styles.statLabel, { color: theme.muted }]} numberOfLines={1}>{stat.label}</Text>
+            <Text style={[styles.statLabel, { color: `${theme.text}99` }]} numberOfLines={1}>{stat.label}</Text>
           </>
         );
         return (
           <React.Fragment key={stat.key}>
-            {index > 0 ? <View style={[styles.statDivider, { backgroundColor: theme.border }]} /> : null}
             {/* Every cell has the same wrapper + inner box so values and labels
                 sit on one baseline whether or not the stat is tappable. */}
             {stat.onPress ? (
@@ -401,7 +405,8 @@ export function ProfileTabs({
     >
       {tabs.map((tab) => {
         const selected = tab.key === active;
-        const color = selected ? theme.text : theme.muted;
+        // Icon-only content tabs: active white, the rest at 50%.
+        const color = selected ? theme.text : iconOnly ? `${theme.text}80` : theme.muted;
         return (
           <View key={tab.key} style={styles.flexCell}>
             <PressableScale
@@ -557,7 +562,8 @@ export function ProfileChip({ label, icon, tone = 'muted', size = 'md' }: { labe
   const { theme } = useAppTheme();
   const color = tone === 'accent' ? theme.accent : tone === 'warning' ? theme.warning : theme.muted;
   return (
-    <View style={[styles.chip, size === 'sm' && styles.chipSm, { borderColor: tone === 'muted' ? theme.border : `${color}66`, backgroundColor: theme.cardGlass }]}>
+    // Pure outline chip — no fill (seller / plan badges under the handle).
+    <View style={[styles.chip, size === 'sm' && styles.chipSm, { borderColor: tone === 'muted' ? theme.border : `${color}66`, backgroundColor: 'transparent' }]}>
       {icon ? <Icon name={icon} size={size === 'sm' ? 10 : 11} color={color} /> : null}
       <Text style={[styles.chipText, { color }]} numberOfLines={1}>{label}</Text>
     </View>
@@ -628,10 +634,11 @@ const styles = StyleSheet.create({
     marginHorizontal: SP.md, paddingBottom: SP.sm,
   },
   statSlot: { flex: 1, justifyContent: 'center' },
-  statCell: { height: 64, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, gap: 2 },
-  statValue: { ...TYPE_SCALE.title1, ...TABULAR_NUMS, letterSpacing: -0.8 },
-  statLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, },
-  statDivider: { width: StyleSheet.hairlineWidth, marginVertical: SP.md },
+  // Instagram stats: 17pt bold number over a 12pt label at 60% white,
+  // evenly spaced — no dividers, no caps.
+  statCell: { height: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, gap: 1 },
+  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, ...TABULAR_NUMS },
+  statLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 15 },
 
   tabs: {
     flexDirection: 'row', paddingHorizontal: SP.xs, position: 'relative',

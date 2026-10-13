@@ -462,6 +462,7 @@ export default function BuyerOtherProfileScreen() {
             disabled={followDisabled}
             followLabel={isFollowedBy ? 'Follow back' : 'Follow'}
             followingLabel={followRequested ? 'Requested' : isMutual ? 'Friends' : 'Following'}
+            followingIcon={!followRequested && isMutual ? 'users' : undefined}
             style={styles.followMorphBtn}
             labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
           />
@@ -471,6 +472,7 @@ export default function BuyerOtherProfileScreen() {
           icon="message-circle"
           onPress={handleMessage}
           disabled={msgLoading || !canonicalReady || iBlockedThem || previewAsVisitor}
+          variant="outline"
           testID="buyer-profile-message"
         />
       </View>
