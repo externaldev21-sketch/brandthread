@@ -57,6 +57,18 @@ export function fmtCents(cents: number): string {
   return `${sign}$${whole}.${fraction}`;
 }
 
+/**
+ * Display money the way the app says it (docs/VOICE.md): "$1,240" for whole
+ * amounts, "$12.50" when there are cents. Input is integer cents. Use for
+ * prices, totals and stats on screen; receipts and checkout line items keep
+ * fmtCents so every line shows its cents and the sum visibly adds up.
+ * @example formatMoney(124000) → "$1,240"   formatMoney(1250) → "$12.50"
+ */
+function formatVoiceMoney(cents: number): string {
+  const full = fmtCents(cents);
+  return full.endsWith('.00') ? full.slice(0, -3) : full;
+}
+
 // ─── Dates ────────────────────────────────────────────────────────────────────
 
 /**
@@ -149,7 +161,10 @@ function currencyFormatter(currency: string, locale: string): Intl.NumberFormat 
  * Formats an amount in MINOR units (cents for USD, yen for JPY) in its currency.
  * @example formatMoney(1250) → "$12.50" (en-US)   formatMoney(1250, 'EUR', 'de-DE') → "12,50 €"
  */
-export function formatMoney(amountMinor: number, currency = 'USD', locale?: string): string {
+export function formatMoney(amountMinor: number, currency?: string, locale?: string): string {
+  // Keep the existing explicit currency/locale contract while adopting
+  // the voice guide's compact USD display for unqualified screen amounts.
+  if (currency === undefined && locale === undefined) return formatVoiceMoney(amountMinor);
   const code = (currency || 'USD').toUpperCase();
   try {
     const fmt = currencyFormatter(code, locale ?? getDeviceLocale());
@@ -236,6 +251,31 @@ export function formatRelative(value: DateInput, now: number = Date.now(), local
   const diffD = Math.floor(diffH / 24);
   if (diffD < 7) return rel(diffD, 'day', `${diffD}d ago`);
   return formatDate(d, SHORT_DATE, loc);
+/**
+ * Relative day the way the app says it (docs/VOICE.md): "now", "5m", "2h",
+ * "Yesterday", "Mar 4", and "Mar 4, 2025" once it's a different year.
+ * Hours within today (and the first 6 hours across midnight), then calendar
+ * days. Future dates fall back to the short date.
+ */
+export function fmtRelativeDay(value: string | number | Date, now: number | Date = Date.now()): string {
+  const d = new Date(value);
+  const then = d.getTime();
+  if (!Number.isFinite(then)) return '';
+  const current = new Date(now);
+  const diffMin = Math.floor((current.getTime() - then) / 60_000);
+  if (diffMin >= 0 && diffMin < 1) return 'now';
+  if (diffMin >= 1 && diffMin < 60) return `${diffMin}m`;
+  const startOfToday = new Date(current.getFullYear(), current.getMonth(), current.getDate()).getTime();
+  if (diffMin >= 60 && then >= startOfToday) return `${Math.floor(diffMin / 60)}h`;
+  const startOfYesterday = new Date(current.getFullYear(), current.getMonth(), current.getDate() - 1).getTime();
+  if (diffMin >= 60 && then >= startOfYesterday) {
+    // Just after midnight, a post from 11pm still reads "2h", not "Yesterday".
+    return diffMin < 6 * 60 ? `${Math.floor(diffMin / 60)}h` : 'Yesterday';
+  }
+  const sameYear = d.getFullYear() === current.getFullYear();
+  return d.toLocaleDateString('en-US', sameYear
+    ? { month: 'short', day: 'numeric' }
+    : { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 // ─── Percentages ──────────────────────────────────────────────────────────────
