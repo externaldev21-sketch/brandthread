@@ -15,10 +15,7 @@ import { setSellerFollowing } from '@/services/socialService';
 import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
 import { SPACE, TYPE } from './onboardingTokens';
 import { radius } from '@/constants/radii';
-import { CachedImage } from '@/components/CachedImage';
-import { Button } from '@/components/ui/Button';
-
-const FEATURED_CARD_WIDTH = 188;
+import { FeaturedBrandsRail } from './FeaturedBrandsRail';
 
 export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
   const { theme } = useAppTheme();
@@ -121,47 +118,12 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
         <Text style={styles.emptyText}>Couldn't load brands right now. You can follow brands anytime from Discover.</Text>
       )}
 
-      {featured.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.featuredRail}
-          contentContainerStyle={styles.featuredRailContent}
-          testID="onboarding-featured-brands"
-        >
-          {featured.map((brand) => {
-            const isFollowing = !!following[brand.sellerId];
-            return (
-              <View key={brand.id} style={styles.featuredCard} testID={`onboarding-featured-brand-${brand.sellerId}`}>
-                <View style={styles.featuredPhotos}>
-                  {brand.productImages.slice(0, 3).map((uri, i) => (
-                    <CachedImage key={`${uri}-${i}`} source={{ uri }} style={styles.featuredPhoto} contentFit="cover" />
-                  ))}
-                </View>
-                <View style={styles.featuredBody}>
-                  <View style={styles.nameRow}>
-                    <Text numberOfLines={1} style={styles.featuredName}>{brand.name}</Text>
-                    {brand.verified && <Feather name="check-circle" size={12} color={theme.text} />}
-                  </View>
-                  <Text style={styles.featuredCount}>
-                    {brand.productCount.toLocaleString()} {brand.productCount === 1 ? 'product' : 'products'}
-                  </Text>
-                  <Button
-                    label={isFollowing ? 'Following' : 'Follow'}
-                    variant={isFollowing ? 'secondary' : 'primary'}
-                    size="small"
-                    fullWidth
-                    loading={!!pending[brand.sellerId]}
-                    onPress={() => { void toggleFollow(brand); }}
-                    accessibilityLabel={`${isFollowing ? 'Unfollow' : 'Follow'} ${brand.name}`}
-                    testID={`onboarding-featured-follow-${brand.sellerId}`}
-                  />
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-      )}
+      <FeaturedBrandsRail
+        brands={featured}
+        following={following}
+        pending={pending}
+        onToggle={(brand) => { void toggleFollow(brand); }}
+      />
 
       {!loading && !loadError && totalBrands === 0 && (
         <Text style={styles.emptyText}>No brands to show yet — check back soon.</Text>
@@ -239,17 +201,4 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cardName: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.text },
-  // Featured brands — Grailed's "Curate your Feed" card: three of the
-  // brand's own product photos (4:5), name, product count, Follow.
-  featuredRail: { flexGrow: 0, marginBottom: SPACE.md },
-  featuredRailContent: { gap: 10, alignItems: 'flex-start' },
-  featuredCard: {
-    width: FEATURED_CARD_WIDTH, backgroundColor: theme.card, borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, overflow: 'hidden',
-  },
-  featuredPhotos: { flexDirection: 'row', gap: 1, backgroundColor: theme.border },
-  featuredPhoto: { flex: 1, aspectRatio: 4 / 5, backgroundColor: theme.surface },
-  featuredBody: { padding: 12, gap: 6, alignItems: 'stretch' },
-  featuredName: { flexShrink: 1, fontSize: 14, fontFamily: 'Inter_600SemiBold', color: theme.text },
-  featuredCount: { fontSize: 12, fontFamily: 'Inter_500Medium', color: theme.muted, marginBottom: 4 },
 });
