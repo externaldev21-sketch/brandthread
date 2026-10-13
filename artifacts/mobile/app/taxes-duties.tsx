@@ -6,12 +6,20 @@ import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { ApiError } from '@/lib/networkNotice';
+import { useScreenToast } from '@/lib/taxScreens';
+import { takePendingTaxToast } from '@/lib/taxRegistrationsView';
 
 const STRIPE_TAX_REGISTRATIONS_URL = 'https://dashboard.stripe.com/tax/registrations';
 
 export default function TaxesDutiesScreen() {
   const colors = useColors();
   const api    = useApi();
+  const router = useRouter();
+  const toast  = useScreenToast();
 
   const [loading,            setLoading]            = useState(true);
   const [stripeTaxEnabled,   setStripeTaxEnabled]   = useState(false);
@@ -38,6 +46,15 @@ export default function TaxesDutiesScreen() {
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 
+  // Back from Head office (turning automatic tax on) or Tax regions.
+  useFocusEffect(useCallback(() => {
+    const pending = takePendingTaxToast();
+    if (pending) {
+      toast.show(pending);
+      void loadConfig();
+    }
+  }, [loadConfig, toast.show]));
+
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
@@ -50,13 +67,18 @@ export default function TaxesDutiesScreen() {
       if (next) {
         await api.taxes.enable();
         setProviderConfigured(true);
-        Alert.alert('Automatic tax turned on', "Tax will be calculated from the buyer's checkout destination when an applicable registration is active.");
+        toast.show('Automatic tax turned on');
       } else {
         await api.taxes.config({ stripeTaxEnabled: false });
-        Alert.alert('Automatic tax turned off', 'Brandthread will stop calculating tax at checkout for your store.');
+        toast.show('Automatic tax turned off');
       }
-    } catch {
+    } catch (error) {
       setStripeTaxEnabled(previous);
+      // Stripe Tax needs a head office first: ask for it, then turn tax on.
+      if (error instanceof ApiError && error.code === 'HEAD_OFFICE_REQUIRED') {
+        router.push('/tax-head-office?enable=1' as never);
+        return;
+      }
       Alert.alert("Couldn't update", 'Something went wrong updating automatic tax. Try again.');
     } finally {
       setSavingTax(false);
@@ -164,15 +186,22 @@ export default function TaxesDutiesScreen() {
               <Text style={[styles.manageBtnText, { color: colors.foreground }]}>Open Stripe</Text>
             </TouchableOpacity>
           </View>
-          <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <PressableScale
+            testID="taxes-duties-regions"
+            onPress={() => router.push('/tax-regions' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Tax regions"
+            style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center' }]}
+          >
             <Feather name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available directly in-app yet</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Tax regions</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Adding, removing, or reviewing where you're registered to collect tax (your nexus) is managed in your Stripe Tax dashboard, not in Brandthread. Tap "Open Stripe" to manage it there.
+                Add the states and countries where you're registered to collect tax, and your head office.
               </Text>
             </View>
-          </View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </PressableScale>
         </View>
 
         <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
@@ -249,6 +278,7 @@ export default function TaxesDutiesScreen() {
         </View>
 
       </ScrollView>
+      <Snackbar visible={toast.message !== null} message={toast.message ?? ''} onDismiss={toast.hide} />
     </View>
   );
 }
