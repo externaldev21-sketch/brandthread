@@ -55,7 +55,9 @@ describe('seller home dashboard data contract', () => {
     // class, though not itself infinite, as app/boost.tsx's "Maximum
     // update depth exceeded" crash — see that fix's own comments).
     expect(source).toContain('const buckets = data?.buckets ?? EMPTY_BUCKETS');
-    expect(source).toContain('metricSeries(metric, buckets)');
+    // 90D folds the same daily buckets into exact 7-day points.
+    expect(source).toContain("range === '90d' ? groupBucketsByWeek(buckets) : buckets");
+    expect(source).toContain('metricSeries(metric, chartBuckets)');
     expect(source).toContain('bucketLabel(b.bucket, range as SellerHomeTimeRange)');
     expect(source).toMatch(/case 'sales': return \{ current: data\.totalCents, previous: previous\.totalCents \}/);
   });

@@ -29,7 +29,7 @@ export function SellerDashboardSectionTitle({
         {title}
       </Text>
       {action && onAction ? (
-        <PressableScale onPress={onAction} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel={action}>
+        <PressableScale onPress={onAction} noMinHeight hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel={action}>
           <Text style={[styles.action, { color: theme.muted }]} numberOfLines={1}>{action}</Text>
         </PressableScale>
       ) : null}

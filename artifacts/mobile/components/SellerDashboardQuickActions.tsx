@@ -39,8 +39,10 @@ export function SellerDashboardQuickActions({
   return (
     <View style={styles.row} testID="seller-dashboard-quick-actions">
       {actions.map((action) => (
+        // Equal columns: the flex lives on a plain wrapper, since
+        // PressableScale sizes its own box to its content.
+        <View key={action.id} style={styles.cell}>
         <PressableScale
-          key={action.id}
           onPress={() => onNavigate(action.route)}
           style={styles.item}
           accessibilityRole="button"
@@ -52,6 +54,7 @@ export function SellerDashboardQuickActions({
           </View>
           <Text style={[styles.label, { color: theme.text }]} numberOfLines={1}>{action.label}</Text>
         </PressableScale>
+        </View>
       ))}
     </View>
   );
@@ -59,7 +62,8 @@ export function SellerDashboardQuickActions({
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: SP.sm },
-  item: { flex: 1, minWidth: 0, alignItems: 'center', gap: SP.sm, paddingVertical: SP.xs },
+  cell: { flex: 1, minWidth: 0 },
+  item: { alignSelf: 'stretch', alignItems: 'center', gap: SP.sm, paddingVertical: SP.xs },
   iconCircle: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   label: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 18, textAlign: 'center' },
 });

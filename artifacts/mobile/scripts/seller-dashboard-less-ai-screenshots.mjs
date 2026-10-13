@@ -53,8 +53,16 @@ async function fitCheck(page, label) {
 
 async function scrollDashboard(page, y) {
   await page.evaluate((top) => {
-    const el = document.querySelector('[data-testid="seller-dashboard-scroll"]');
-    if (el) el.scrollTo({ top, behavior: 'instant' });
+    // The ScrollView's testID can sit on a wrapper; scroll whichever node
+    // (it or a descendant/ancestor) actually overflows vertically.
+    const root = document.querySelector('[data-testid="seller-dashboard-scroll"]');
+    if (!root) return;
+    const canScroll = (el) => el && el.scrollHeight > el.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(el).overflowY);
+    let target = null;
+    for (let p = root; p && !target; p = p.parentElement) if (canScroll(p)) target = p;
+    if (!target) target = [...root.querySelectorAll('*')].find(canScroll) ?? null;
+    // Plain scrollTop assignment: scrollTo() is a no-op under the harness's fake clock.
+    (target ?? document.scrollingElement).scrollTop = top;
   }, y);
   await page.waitForTimeout(500);
 }

@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { SellerDashboardSectionTitle } from '@/components/SellerDashboardSectionTitle';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { describeDashboardDelta } from '@/lib/sellerDashboardStats';
@@ -121,12 +122,7 @@ export function SellerDashboardTrafficSources({
 
   return (
     <View testID="seller-dashboard-traffic-sources">
-      <View style={styles.headerRow}>
-        <Text style={[styles.sectionHeader, { color: theme.muted }]}>Traffic sources</Text>
-        <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all traffic analytics" hitSlop={8}>
-          <Text style={[styles.seeAll, { color: theme.subtle }]}>See all</Text>
-        </TouchableOpacity>
-      </View>
+      <SellerDashboardSectionTitle title="Traffic sources" theme={theme} action="See all" onAction={onSeeAll} />
 
       {displayTotal === 0 ? (
         <View style={styles.emptyState}>

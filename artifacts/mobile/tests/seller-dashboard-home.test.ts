@@ -3,6 +3,7 @@ import {
   HOME_DASHBOARD_RANGES,
   datedNextPayout,
   describeHomeDelta,
+  groupBucketsByWeek,
   hasTodo,
   mergeDashboardActivity,
   payoutProgress,
@@ -45,6 +46,20 @@ describe('Dashboard range set', () => {
     expect(bucketLabel(iso, '7d')).toBe('Tue');
     expect(bucketLabel(iso, '30d')).toBe('Oct 13');
     expect(bucketLabel(iso, '90d')).toBe('Oct 13');
+  });
+});
+
+describe('groupBucketsByWeek (90D chart points)', () => {
+  it('folds 90 daily buckets into 13 points from the newest day back, with exact sums', () => {
+    const daily = Array.from({ length: 90 }, (_, i) => ({
+      bucket: new Date(2026, 6, 16 + i).toISOString(), totalCents: 100 + i, netCents: 90, orderCount: 1, visitorCount: 3,
+    }));
+    const weekly = groupBucketsByWeek(daily);
+    expect(weekly).toHaveLength(13);
+    expect(weekly[0].orderCount).toBe(6); // oldest point covers the 6 leftover days
+    expect(weekly[12].orderCount).toBe(7);
+    expect(weekly[12].bucket).toBe(daily[83].bucket);
+    expect(weekly.reduce((s, b) => s + b.totalCents, 0)).toBe(daily.reduce((s, b) => s + b.totalCents, 0));
   });
 });
 

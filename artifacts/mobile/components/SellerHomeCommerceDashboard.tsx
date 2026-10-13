@@ -86,6 +86,7 @@ import {
   HOME_RANGE_COMPARISON,
   HOME_RANGE_EMPTY_MESSAGE,
   describeHomeDelta,
+  groupBucketsByWeek,
   mergeDashboardActivity,
   type DashboardActivityItem,
   type NextPayoutEstimate,
@@ -683,6 +684,10 @@ export default function SellerHomeCommerceDashboard({
     router.push(withOrigin(task.route, 'dashboard') as never);
   }, [router]);
 
+  // Owner-only money sections. The signed-out web preview has no team role,
+  // so its demo mode (and only demo mode — fresh never shows a balance)
+  // stands in for an owner to show the Payouts section.
+  const showOwnerMoney = currentRole === 'owner' || (sellerPreview && isPreviewDemoMode());
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
   const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
   const actionCounts: DashboardActionCounts | null = actionInputs ? {
@@ -694,8 +699,11 @@ export default function SellerHomeCommerceDashboard({
 
   // ── Metric aggregate + chart series for the currently focused metric ─────
   const buckets = data?.buckets ?? EMPTY_BUCKETS;
-  const series = useMemo(() => metricSeries(metric, buckets), [metric, buckets]);
-  const labels = useMemo(() => buckets.map((b) => bucketLabel(b.bucket, range as SellerHomeTimeRange)), [buckets, range]);
+  // 90D: the API's daily buckets are drawn as 7-day points (exact sums) so
+  // the line reads as a trend, not 90 daily spikes.
+  const chartBuckets = useMemo(() => (range === '90d' ? groupBucketsByWeek(buckets) : buckets), [buckets, range]);
+  const series = useMemo(() => metricSeries(metric, chartBuckets), [metric, chartBuckets]);
+  const labels = useMemo(() => chartBuckets.map((b) => bucketLabel(b.bucket, range as SellerHomeTimeRange)), [chartBuckets, range]);
 
   const metricAggregate = useMemo(() => {
     if (!data) return { current: 0, previous: 0 };
@@ -885,7 +893,7 @@ export default function SellerHomeCommerceDashboard({
               )}
 
               {/* ── Payouts: next payout, then balance / withdraw ───────── */}
-              {currentRole === 'owner' && (
+              {showOwnerMoney && (
                 <View style={styles.section} testID="seller-dashboard-payouts">
                   <SellerDashboardSectionTitle title="Payouts" theme={theme} />
                   <SellerDashboardPayoutCard
@@ -896,7 +904,7 @@ export default function SellerHomeCommerceDashboard({
                   />
                 </View>
               )}
-              {currentRole === 'owner' && (
+              {showOwnerMoney && (
                 <View style={[styles.balanceRow, { borderColor: theme.borderSubtle }]}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.balanceLabel, { color: theme.muted }]}>Available balance</Text>
@@ -921,7 +929,7 @@ export default function SellerHomeCommerceDashboard({
               )}
 
               {/* ── Thread Cash — small row, links to the Payouts card/cash-out ── */}
-              {currentRole === 'owner' && (
+              {showOwnerMoney && (
                 <TouchableOpacity
                   style={[styles.threadCashRow, { borderColor: theme.borderSubtle }]}
                   activeOpacity={0.8}

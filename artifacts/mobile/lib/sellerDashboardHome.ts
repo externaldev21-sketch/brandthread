@@ -201,6 +201,31 @@ export function mergeDashboardActivity(
   return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
 }
 
+// ─── 90D chart points ──────────────────────────────────────────────────────
+
+type ChartBucket = { bucket: string; totalCents: number; netCents: number; orderCount: number; visitorCount: number };
+
+/**
+ * Folds daily buckets into 7-day points counted back from the newest day
+ * (the oldest point may cover fewer days), so a 90-day line reads as a
+ * trend instead of 90 daily spikes. Sums are exact — every day lands in one
+ * point — and each point is keyed by its first day.
+ */
+export function groupBucketsByWeek(daily: ChartBucket[]): ChartBucket[] {
+  const out: ChartBucket[] = [];
+  for (let end = daily.length; end > 0; end -= 7) {
+    const chunk = daily.slice(Math.max(0, end - 7), end);
+    out.unshift({
+      bucket: chunk[0].bucket,
+      totalCents: chunk.reduce((s, b) => s + b.totalCents, 0),
+      netCents: chunk.reduce((s, b) => s + b.netCents, 0),
+      orderCount: chunk.reduce((s, b) => s + b.orderCount, 0),
+      visitorCount: chunk.reduce((s, b) => s + b.visitorCount, 0),
+    });
+  }
+  return out;
+}
+
 /** Short relative time: "now", "2m", "3h", "4d", "5w", then "Mar 4". */
 export function shortRelativeTime(iso: string, now: number = Date.now()): string {
   const ms = Date.parse(iso);
