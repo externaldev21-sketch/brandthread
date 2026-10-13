@@ -172,6 +172,8 @@ async function buildBuyerPosts(
   limit: number,
   offset: number,
   postId?: string,
+  /** Profile grid only: pinned posts first (most recently pinned first). */
+  pinnedFirst = false,
 ) {
   if (authorIds.length === 0) return [];
   const pageRows = await db.select({
@@ -745,7 +747,7 @@ router.get("/profile/:userId/posts", async (req, res) => {
       res.status(403).json({ error: "Posts are available to friends only" }); return;
     }
   }
-  res.json(await buildBuyerPosts(myId, [other], limit, offset));
+  res.json(await buildBuyerPosts(myId, [other], limit, offset, undefined, true));
 });
 
 // ─── GET /api/social/profile/:userId/tagged ──────────────────────────────────

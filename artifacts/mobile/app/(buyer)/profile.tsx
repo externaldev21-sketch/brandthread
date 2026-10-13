@@ -34,8 +34,9 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import {
   getMyProfile, getMyPosts, getSavedItems,
   getPrivacySettings, archivePost, deletePost,
-  subscribeSocial,
+  subscribeSocial, setPostPinned, pinErrorMessage,
 } from '@/services/socialService';
+import { Snackbar } from '@/components/ui/Snackbar';
 import { useApi } from '@/lib/api';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { formatCents } from '@/lib/money';
@@ -328,6 +329,7 @@ export default function ProfileScreen() {
   const tagged = useTaggedPosts(user?.id, activeTab === 'Tagged' && !!user?.id && !isBuyerDevPreview());
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
+  const [pinSnackbar, setPinSnackbar] = useState('');
 
   const loadCounts = useCallback(async () => {
     const id = user?.id;
@@ -551,6 +553,22 @@ export default function ProfileScreen() {
     setPostSheet(null);
     setPosts(prev => prev.filter(item => item.id !== post.id));
     try { await archivePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert('Could not archive post', 'Try again.'); }
+  };
+
+  // Instagram "Pin to your profile" / "Unpin from profile" (max 3, pinned first).
+  const handleTogglePin = async () => {
+    const post = postSheet;
+    setPostSheet(null);
+    if (!post) return;
+    const pin = !post.pinnedAt;
+    try {
+      const result = await setPostPinned(post.id, pin);
+      if (!result) return;
+      setPinSnackbar(pin ? 'Pinned to your profile' : 'Unpinned from profile');
+      await loadData();
+    } catch (error) {
+      Alert.alert(pin ? 'Couldn’t pin post' : 'Couldn’t unpin post', pinErrorMessage(error));
+    }
   };
 
   const handleDeletePost = (target?: BuyerPost) => {
@@ -1009,11 +1027,13 @@ export default function ProfileScreen() {
         sections={[
           [
             { key: 'share', icon: 'share-2', label: 'Share post', onPress: () => { void handleShareCurrentPost(); } },
+            ...(postSheet && (!postSheet.isDraft || postSheet.pinnedAt) ? [{key: 'pin', icon: 'bookmark' as const, label: postSheet.pinnedAt ? 'Unpin from profile' : 'Pin to your profile', onPress: () => { void handleTogglePin(); }}] : []),
             { key: 'archive', icon: 'archive', label: 'Archive', onPress: () => { void handleArchivePost(); } },
           ],
           [{ key: 'delete', icon: 'trash-2', label: 'Delete post', destructive: true, onPress: handleDeletePost }],
         ]}
       />
+      <Snackbar visible={!!pinSnackbar} message={pinSnackbar} onDismiss={() => setPinSnackbar('')} />
     </View>
   );
 }

@@ -1,3 +1,4 @@
+import { pinPostWithReplacePrompt, unpinPost } from './postPinService';
 /**
  * Brandthread Social Service
  * All social features backed by AsyncStorage with in-memory caching.
@@ -425,6 +426,31 @@ export async function archivePost(id: string): Promise<void> {
   const idx = posts.findIndex(p => p.id === id);
   if (idx >= 0) { posts[idx].isArchived = true; await save(k.posts, posts); notify(); }
 }
+/**
+ * Pin / unpin one of my posts to the top of my profile grid (Instagram's
+ * "Pin to your profile", max 3). Throws with the server's message on failure
+ * (e.g. the 3-pin limit) — see pinErrorMessage.
+ */
+export async function setPostPinned(id: string, pinned: boolean): Promise<{ id: string; pinnedAt: string | null } | null> {
+  const result = pinned ? await pinPostWithReplacePrompt(id) : await unpinPost(id);
+  if (!result) return null;
+  notify();
+  return {id, pinnedAt: result.pinnedAt ?? null};
+}
+
+/** The server's reason a pin failed (e.g. "You can pin up to 3 posts…"), or a generic retry line. */
+export function pinErrorMessage(error: unknown): string {
+  const body = (error as { body?: unknown })?.body;
+  if (typeof body === 'string') {
+    try {
+      const parsed = JSON.parse(body);
+      const message = typeof parsed?.error === 'string' ? parsed.error : parsed?.error?.message;
+      if (typeof message === 'string' && message) return message;
+    } catch { /* not JSON */ }
+  }
+  return 'Try again.';
+}
+
 export async function unarchivePost(id: string): Promise<void> {
   const k = K();
   const posts = await getMyPosts(k);
@@ -649,6 +675,8 @@ export interface SellerThreadPost {
   sponsoredBoostId?: string;
   visibility:        { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean; allowDownloads?: boolean };
   scheduledAt:       string | null;
+  /** Pinned to the top of the author's profile grid (null/absent = not pinned). */
+  pinnedAt?:         string | null;
   publishedAt?:      string;
   createdAt:         string;
   updatedAt:         string;
@@ -1103,6 +1131,7 @@ export function mapApiPostToSellerThreadPost(p: FeedPostApiRow, idx: number): Se
     })),
     visibility:    p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:   null,
+    pinnedAt:      typeof p.pinnedAt === 'string' ? p.pinnedAt : null,
     publishedAt:   p.createdAt ?? now,
     createdAt:     p.createdAt ?? now,
     updatedAt:     p.createdAt ?? now,

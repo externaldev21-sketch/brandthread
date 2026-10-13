@@ -83,6 +83,7 @@ export function gridItemFromBuyerPost(post: BuyerPost): ProfileGridItem {
 function tileLabel(item: ProfileGridItem): string {
   const noun = item.kind === 'video' ? 'video' : item.kind === 'slideshow' ? 'slideshow' : 'photo';
   const parts = [`Play ${noun}`];
+  if (item.pinned) parts.push('Pinned');
   if (typeof item.viewsCount === 'number') parts.push(`${formatCompactCount(item.viewsCount)} views`);
   if (item.productCount > 0) parts.push(`${item.productCount} product${item.productCount === 1 ? '' : 's'} tagged`);
   if (item.pinned) parts.push('Pinned');

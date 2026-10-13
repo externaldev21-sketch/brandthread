@@ -32,7 +32,8 @@ import { useApi } from '@/hooks/useApi';
 import { useStoreGiftCards } from '@/hooks/useStoreGiftCards';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { getSellerFollowState, setSellerFollowing, type SellerThreadPost } from '@/services/socialService';
+import { getSellerFollowState, setSellerFollowing, setPostPinned, pinErrorMessage } from '@/services/socialService';
+import type { SellerThreadPost } from '@/services/socialService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
@@ -556,6 +557,20 @@ export default function SellerProfileScreen() {
     router.push(profileVideosHref({ source: 'creator', id: seller.sellerId, startPostId: item.id, title: seller.brandName }) as never);
   }, [router, seller]);
 
+  // Instagram "Pin to your profile" / "Unpin from profile" (max 3, pinned first).
+  const handleTogglePin = useCallback(async (post: SellerThreadPost) => {
+    const pin = !post.pinnedAt;
+    try {
+      const result = await setPostPinned(post.id, pin);
+      if (!result) return;
+      hapticSuccessAction();
+      setSnackbar(pin ? 'Pinned to your profile' : 'Unpinned from profile');
+      void videos.reload({ fresh: true });
+    } catch (error) {
+      Alert.alert(pin ? 'Couldn’t pin post' : 'Couldn’t unpin post', pinErrorMessage(error));
+    }
+  }, [videos]);
+
   const handleCopyPostLink = useCallback(async (post: SellerThreadPost) => {
     const profileUrl = seller ? buildCanonicalProfileUrl(seller.username) : null;
     const url = profileUrl ? `${profileUrl}?post=${encodeURIComponent(post.id)}` : null;
@@ -898,6 +913,7 @@ export default function SellerProfileScreen() {
           { key: 'play', icon: 'play', label: 'Play', onPress: () => { const post = selectedPost; if (post) openVideo(gridItemFromThreadPost(post)); } },
           { key: 'edit', icon: 'edit-2', label: 'Edit post', onPress: () => { const post = selectedPost; if (post) router.push(('/create-post?editId=' + post.id) as never); } },
           { key: 'analytics', icon: 'bar-chart-2', label: 'View analytics', onPress: () => { const post = selectedPost; if (post) router.push(('/post-analytics?id=' + post.id) as never); } },
+          ...(selectedPost && (selectedPost.postStatus === 'published' || selectedPost.pinnedAt) ? [{key: 'pin', icon: 'bookmark' as const, label: selectedPost.pinnedAt ? 'Unpin from profile' : 'Pin to your profile', onPress: () => { const post = selectedPost; setSelectedPost(null); if (post) void handleTogglePin(post); }}] : []),
           { key: 'copy-link', icon: 'link', label: 'Copy link', onPress: () => { const post = selectedPost; if (post) void handleCopyPostLink(post); } },
         ]]}
       />

@@ -957,7 +957,7 @@ export function respond({ method, path, query, role, options = {} }) {
       likedByMe: false, repostedByMe: false, savedByMe: false, isArchived: false,
     };
     return [
-      { ...base, id: 'buyer-post-published', caption: 'Fit check', isDraft: false, createdAt: iso(0), updatedAt: iso(0) },
+      { ...base, id: 'buyer-post-published', caption: 'Fit check', isDraft: false, createdAt: iso(0), updatedAt: iso(0), pinnedAt: iso(0) },
       { ...base, id: 'buyer-post-draft', caption: 'Untitled draft', isDraft: true, createdAt: iso(0), updatedAt: iso(0) },
     ];
   }
@@ -1139,7 +1139,8 @@ export function respond({ method, path, query, role, options = {} }) {
     return undefined;
   }
   if ((match = p.match(/^\/public\/users\/([^/]+)\/videos$/)) && decodeURIComponent(match[1]) === SELLER_USER.id) {
-    const videos = feedPosts().filter((post) => post.userId === SELLER_USER.id).map((post) => ({ ...post, authorAccountType: 'seller', viewsCount: 1200 }));
+    // Pinned posts PR: the first video is pinned (pin glyph on its tile).
+    const videos = feedPosts().filter((post) => post.userId === SELLER_USER.id).map((post, i) => ({ ...post, authorAccountType: 'seller', viewsCount: 1200, pinnedAt: i === 0 ? iso(0) : null }));
     return { user: { userId: SELLER_USER.id, accountType: 'seller', displayName: 'Northline Studio', username: 'northlinestudio' }, restricted: null, total: videos.length, hasMore: false, videos };
   }
   if ((match = p.match(/^\/public\/products\/([^/]+)\/related$/))) return PUBLIC_PRODUCTS.filter((item) => item.id !== match[1]).slice(0, 5);
