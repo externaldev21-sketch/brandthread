@@ -596,6 +596,7 @@ export default function SellerProfileScreen() {
           icon="bar-chart-2"
           title="Professional dashboard"
           subtitle="Views, followers and content stats"
+          subtitleNumberOfLines={2}
           chevron
           // navigate (not push): this switches to the existing Dashboard tab
           // rather than stacking a duplicate instance of the whole tab

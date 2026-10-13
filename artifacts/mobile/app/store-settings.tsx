@@ -147,7 +147,7 @@ export default function StoreSettingsScreen() {
           <FieldRow ss={ss} label="Store URL">
             <View style={ss.urlRow}>
               <TextInput
-                style={[ss.input, { flex: 1 }]}
+                style={[ss.input, { flex: 1, minWidth: 0 }]}
                 value={form.storeUrl}
                 onChangeText={v => patch({ storeUrl: v })}
                 placeholder="yourstore"
@@ -354,7 +354,7 @@ function makeStyles(colors: Colors) {
       minHeight: 44,
     },
     urlRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-    urlSuffix: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
+    urlSuffix: { flexShrink: 0, fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     statusChip: {
       paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.md,

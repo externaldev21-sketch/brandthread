@@ -92,7 +92,7 @@ function TaskCard({
               </View>
             )}
           </View>
-          <Text style={ts.desc} numberOfLines={1}>{task.description}</Text>
+          <Text style={ts.desc} numberOfLines={2}>{task.description}</Text>
         </View>
 
         {/* Right: action */}

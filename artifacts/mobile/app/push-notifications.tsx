@@ -82,6 +82,7 @@ export default function PushNotificationsScreen() {
                   <ListRow
                     title={row.label}
                     subtitle={row.description}
+                    subtitleNumberOfLines={2}
                     toggle={{ value: values[row.key], onChange: () => toggle(row.key) }}
                   />
                   {i !== group.rows.length - 1 && (

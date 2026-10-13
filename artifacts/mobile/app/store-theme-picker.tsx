@@ -133,7 +133,7 @@ export default function StoreThemePicker() {
             {'  ·  '}
             {item.supportedModes.join(', ')}
           </Text>
-          <Text style={styles.themeBestFor} numberOfLines={1}>{item.bestFor}</Text>
+          <Text style={styles.themeBestFor} numberOfLines={2}>{item.bestFor}</Text>
 
           <View style={styles.themeActions}>
             <TouchableOpacity

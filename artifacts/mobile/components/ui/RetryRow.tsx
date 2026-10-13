@@ -43,7 +43,7 @@ export function RetryRow({ label = "Couldn't load", onRetry, style, testID }: Re
       noMinHeight
     >
       <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
-      <Text style={[TYPE_SCALE.footnote, styles.text, { color: colors.mutedForeground }]} numberOfLines={1}>
+      <Text style={[TYPE_SCALE.footnote, styles.text, { color: colors.mutedForeground }]} numberOfLines={2}>
         {label} — Tap to retry
       </Text>
     </PressableScale>
@@ -60,8 +60,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     alignSelf: 'flex-start',
+    // Never wider than its container: a long label wraps to a second line
+    // instead of running off the screen edge (iPhone SE / large text).
+    maxWidth: '100%',
   },
   text: {
     fontFamily: FONT.medium,
+    flexShrink: 1,
   },
 });
