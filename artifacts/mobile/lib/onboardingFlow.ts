@@ -43,6 +43,7 @@ export type StepId =
   | 'WELCOME_USER'
   // buyer personalisation
   | 'STYLE'
+  | 'TASTE'
   | 'SIZES'
   | 'BRANDS'
   | 'FEED_PREVIEW'
@@ -59,7 +60,7 @@ export const BUYER_STEPS: readonly StepId[] = [
   'WELCOME', 'ACCOUNT_TYPE',
   'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
   'NAME', 'USERNAME', 'PHOTO', 'WELCOME_USER',
-  'STYLE', 'SIZES', 'BRANDS', 'FEED_PREVIEW',
+  'STYLE', 'TASTE', 'SIZES', 'BRANDS', 'FEED_PREVIEW',
 ];
 
 export const SELLER_STEPS: readonly StepId[] = [
@@ -71,7 +72,7 @@ export const SELLER_STEPS: readonly StepId[] = [
 ];
 
 /** Steps the person may pass without answering (Shopify "Skip", Instagram "Skip"). */
-const SKIPPABLE: ReadonlySet<StepId> = new Set(['STAGE', 'GOALS', 'PHOTO', 'STYLE', 'SIZES', 'BRANDS']);
+const SKIPPABLE: ReadonlySet<StepId> = new Set(['STAGE', 'GOALS', 'PHOTO', 'STYLE', 'TASTE', 'SIZES', 'BRANDS']);
 
 /** Shopify's question screens: the thin progress bar sits above their bottom buttons. */
 export const SELLER_QUESTION_STEPS: readonly StepId[] = ['STAGE', 'GOALS', 'LOCATION'];

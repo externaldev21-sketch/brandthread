@@ -86,6 +86,8 @@ import { allStepsFor, stepsFor, isAccountStep, firstStepAfterAccount, isStepId, 
 import { PENDING_DRAFT_KEY, parseDraft, resolveResumeStep, sanitizeDraftForStorage, userDraftKey, type OnboardingDraft } from '@/lib/onboardingDraft';
 
 import { EMPTY_SURVEY, hasSurveyAnswers, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
+import { TasteQuizStep } from '@/components/onboarding/TasteQuizStep';
+import type { QuizSwipe } from '@/lib/tasteQuiz';
 
 import { Icon, Input } from '@/components/ui';
 
@@ -287,6 +289,7 @@ export default function OnboardingScreen() {
   const [referralCode, setReferralCode] = useState(cleanReferral(referralCodeParam));
   const [showReferral, setShowReferral] = useState(false);
   const [styleInterests, setStyleArr] = useState<string[]>(DEFAULT_BUYER_INTERESTS);
+  const tasteSwipesRef = useRef<QuizSwipe[]>([]);
   const [survey, setSurvey] = useState<OnboardingSurvey>(EMPTY_SURVEY);
   const setSurveySizes = useCallback((sizes: OnboardingSurvey['sizes']) => setSurvey((prev) => ({ ...prev, sizes })), []);
   const setSurveyBrands = useCallback((likedBrandIds: string[]) => setSurvey((prev) => (
@@ -836,6 +839,10 @@ export default function OnboardingScreen() {
       failureStage = 'preferences-or-completion';
       await syncBuyerOnboarding(profile.clerkId, styleInterests, api);
       await saveBuyerSurvey(profile.clerkId, survey, styleInterests, api);
+      if (tasteSwipesRef.current.length) {
+        await api.buyer.tasteQuiz.submit(tasteSwipesRef.current, styleInterests);
+        tasteSwipesRef.current = [];
+      }
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],
@@ -1163,6 +1170,11 @@ export default function OnboardingScreen() {
           </StepScreen>
         );
 
+      case 'TASTE':
+        return <TasteQuizStep onDone={(result) => {
+          tasteSwipesRef.current = result.swipes;
+          goNext('TASTE');
+        }} />;
       case 'SIZES':
         return (
           <StepScreen

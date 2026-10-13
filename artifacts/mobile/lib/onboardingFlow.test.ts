@@ -25,7 +25,7 @@ describe('step order', () => {
   it('buyer follows Instagram: email, code, password, birthday, terms, name, username, photo, welcome, then styles and brands', () => {
     expect(stepsFor('buyer', signedOutEmail)).toEqual([
       'WELCOME', 'ACCOUNT_TYPE', 'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
-      'NAME', 'USERNAME', 'PHOTO', 'WELCOME_USER', 'STYLE', 'SIZES', 'BRANDS', 'FEED_PREVIEW',
+      'NAME', 'USERNAME', 'PHOTO', 'WELCOME_USER', 'STYLE', 'TASTE', 'SIZES', 'BRANDS', 'FEED_PREVIEW',
     ]);
   });
 

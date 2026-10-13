@@ -46,6 +46,7 @@ import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { WeeklyQuestsClaimResult, WeeklyQuestsStatus } from '@/lib/weeklyQuests';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
+import type { QuizProduct, QuizSwipe } from '@/lib/tasteQuiz';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
 import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
@@ -2336,6 +2337,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** "Brands you might like" — ranked by style interests + liked brands + popularity; excludes followed/blocked. */
       recommendedBrands: (limit = 12) =>
         get<{ brands: RecommendedBrand[]; followedBrandCount: number }>(`/api/buyer/recommended-brands?limit=${limit}`),
+      /** Onboarding taste quiz: 12–15 real products (empty when the catalog can't fill it), swipes train For You. */
+      tasteQuiz: {
+        products: () => get<{ products: QuizProduct[] }>('/api/buyer/taste-quiz'),
+        submit: (swipes: QuizSwipe[], styleInterests: string[]) =>
+          post<{ applied: number }>('/api/buyer/taste-quiz/swipes', { swipes, styleInterests }),
+      },
       addresses: {
         list:   () => get<any[]>('/api/buyer/addresses'),
         autocomplete: (query: string, country = 'US') =>
