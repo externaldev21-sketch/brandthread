@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   commissionBaseCents, commissionEligibleAt, computeCommissionCents, effectiveBps, isAttributionActive, isSelfReferral,
-  normalizeAffiliateCode, owedCents, percentToBps, planPayout, statusAfterChange, totalReversalCents,
+  isAllowedSellerCommission, normalizeAffiliateCode, owedCents, percentToBps, planPayout, statusAfterChange, totalReversalCents,
 } from "../commission";
 
 describe("commission math", () => {
@@ -30,6 +30,23 @@ describe("commission math", () => {
     expect(percentToBps("10")).toBe(1000);
     expect(percentToBps(-1)).toBeNull();
     expect(percentToBps("abc")).toBeNull();
+  });
+});
+
+describe("seller commission range", () => {
+  it("allows 500 to 1000 bps inclusive", () => {
+    expect(isAllowedSellerCommission(500)).toBe(true);
+    expect(isAllowedSellerCommission(750)).toBe(true);
+    expect(isAllowedSellerCommission(1000)).toBe(true);
+    expect(isAllowedSellerCommission(499)).toBe(false);
+    expect(isAllowedSellerCommission(1001)).toBe(false);
+    expect(isAllowedSellerCommission(0)).toBe(false);
+    expect(isAllowedSellerCommission(750.5)).toBe(false);
+  });
+  it("accepts only the unchanged stored value when it is outside the range", () => {
+    expect(isAllowedSellerCommission(1500, 1500)).toBe(true);
+    expect(isAllowedSellerCommission(1400, 1500)).toBe(false);
+    expect(isAllowedSellerCommission(1500, null)).toBe(false);
   });
 });
 
