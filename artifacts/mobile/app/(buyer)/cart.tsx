@@ -26,11 +26,11 @@ import { applyCartQuantity } from '@/lib/cartOptimistic';
 
 import * as Haptics from 'expo-haptics';
 
-import { getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot, saveForLater, moveToCart, removeSavedItem, groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart, estimateGroupShipping, totalShippingEstimate, replaceCartItemVariant, type ShippingEstimate, refreshCartStock } from '@/services/cartService';
+import { getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot, saveForLater, moveToCart, removeSavedItem, groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart, estimateGroupShipping, totalShippingEstimate, replaceCartItemVariant, type ShippingEstimate, refreshCartStock, getSellerFreeShippingThreshold } from '@/services/cartService';
 
 import { FreeShippingStrip } from '@/components/cart/FreeShippingStrip';
 
-import { refreshFreeShippingThresholds } from '@/lib/freeShipping';
+import { refreshFreeShippingThresholds, freeShippingLabel } from '@/lib/freeShipping';
 
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
 
@@ -263,6 +263,20 @@ export default function CartScreen() {
   }, [api, load, isSignedIn, cartOwnerId]));
 
   const groups = groupCartBySeller(cart.items);
+
+  // Each seller's real free-shipping threshold (null = none), for the
+  // section headers. Fetched once per seller, cached in cartService.
+  const [freeShippingBySeller, setFreeShippingBySeller] = useState<Record<string, number | null>>({});
+  const sellerIdsKey = groups.map(g => g.sellerId).join('|');
+  useEffect(() => {
+    if (!sellerIdsKey) return;
+    let active = true;
+    const ids = sellerIdsKey.split('|');
+    void Promise.all(ids.map(async id => [id, await getSellerFreeShippingThreshold(id)] as const))
+      .then(entries => { if (active) setFreeShippingBySeller(Object.fromEntries(entries)); });
+    return () => { active = false; };
+  }, [sellerIdsKey]);
+
   const hasPreOrder = cart.items.some(i => i.isPreOrder);
   // Real shipping per seller group (the rate checkout will charge).
   const groupsKey = groups.map(g => `${g.sellerId}:${g.subtotalCents}`).join('|');
@@ -292,7 +306,9 @@ export default function CartScreen() {
   const selectedItems = cart.items.filter(i => selectedIds.has(i.id));
   const allSelected = cart.items.length > 0 && selectedItems.length === cart.items.length;
   const selectedSummary = calculateCartSummary(selectedItems);
-  const selectedDisplayedTotal = allSelected ? displayedTotal : selectedSummary.totalCents;
+  // The pinned block shows the subtotal (Nike Bag); the full breakdown with
+  // rewards is in the Order summary above.
+  const selectedSubtotal = selectedSummary.subtotalCents;
 
   function toggleSelect(itemId: string) {
     setSelectedIds(prev => {
@@ -604,14 +620,24 @@ export default function CartScreen() {
             {hasItems ? (
               <>
                 <BagColumns count={itemCount} />
-                {groups.map(group => (
-                  <FreeShippingStrip key={group.sellerId} sellerId={group.sellerId} sellerName={group.sellerName} subtotalCents={group.subtotalCents} hasPreOrder={group.hasPreOrder} />
-                ))}
                 {editMode && <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: SP.sm }}>
                   <Button label="Select all" variant="secondary" size="small" onPress={() => setSelectedIds(new Set(cart.items.map(i => i.id)))} />
                   <Button label={`Remove (${selectedIds.size})`} variant="secondary" size="small" disabled={!selectedIds.size} loading={removingSelected} onPress={handleRemoveSelected} />
                 </View>}
-                {cart.items.map(item => (
+                {groups.map(group => (
+                  <View key={group.sellerId}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.md }}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ color: theme.text, fontFamily: FONT.semibold }} numberOfLines={1}>{group.sellerName}</Text>
+                        {freeShippingLabel(group.subtotalCents, freeShippingBySeller[group.sellerId]) && (
+                          <Text style={{ color: theme.muted, fontSize: FS.meta }} testID={`cart-seller-shipping-${group.sellerId}`}>
+                            {freeShippingLabel(group.subtotalCents, freeShippingBySeller[group.sellerId])}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <FreeShippingStrip sellerId={group.sellerId} sellerName={group.sellerName} subtotalCents={group.subtotalCents} hasPreOrder={group.hasPreOrder} />
+                {group.items.map(item => (
                   <View key={item.id}>
                   {editMode && <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: selectedIds.has(item.id) }} accessibilityLabel={`Select ${item.productName}`} onPress={() => setSelectedIds(ids => { const next = new Set(ids); next.has(item.id) ? next.delete(item.id) : next.add(item.id); return next; })}>
                     <Text style={{ color: theme.text }}>{selectedIds.has(item.id) ? 'Selected' : 'Select'}</Text>
@@ -627,6 +653,8 @@ export default function CartScreen() {
                     onMoveToSaves={() => handleMoveToSaves(item.id)}
                     onRemove={() => handleRemove(item.id)}
                   />
+                  </View>
+                ))}
                   </View>
                 ))}
 
@@ -687,7 +715,7 @@ export default function CartScreen() {
             ) : (
               <BagEmpty
                 loadArrivals={loadNewArrivals}
-                onShopNow={() => router.navigate('/(buyer)/discover' as never)}
+                onShopNow={() => router.navigate('/(buyer)' as never)}
                 onViewAll={() => router.navigate('/(buyer)/discover' as never)}
                 onOpenProduct={(productId) => push({ pathname: '/thread-product-detail' as any, params: { productId, src: 'cart' } } as never)}
               />
@@ -716,10 +744,11 @@ export default function CartScreen() {
           {hasItems && (
             <BagCheckoutBar
               totalCents={displayedTotal}
+              subtotalCents={selectedSubtotal}
               bottomInset={insets.bottom}
               busy={validating}
-              disabled={availableItems.length === 0 || validating}
-              onCheckout={() => { void startCheckout(availableItems); }}
+              disabled={selectedItems.length === 0 || validating}
+              onCheckout={handleCheckoutSelected}
             />
           )}
         </>

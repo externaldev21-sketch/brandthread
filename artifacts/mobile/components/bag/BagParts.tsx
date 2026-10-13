@@ -25,8 +25,8 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import type { CartItem } from '@/services/cartTypes';
 
 const fmt = formatCents;
-const IMAGE_W = 96;
-const IMAGE_H = 128;
+const IMAGE_W = 80;
+const IMAGE_H = 100;
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 
@@ -203,9 +203,10 @@ export function BagTotals({
 // ─── Sticky bar ───────────────────────────────────────────────────────────────
 
 export function BagCheckoutBar({
-  totalCents, bottomInset, busy, disabled, onCheckout,
+  totalCents, subtotalCents = totalCents, bottomInset, busy, disabled, onCheckout,
 }: {
   totalCents: number;
+  subtotalCents?: number;
   bottomInset: number;
   busy: boolean;
   disabled: boolean;
@@ -216,16 +217,17 @@ export function BagCheckoutBar({
   return (
     <View style={[s.bar, { paddingBottom: bottomInset + SP.sm }]} testID="cart-checkout-bar">
       <View style={s.barTotal}>
-        <Text style={s.barLabel}>Total estimate</Text>
-        <Text style={s.barAmount} numberOfLines={1} adjustsFontSizeToFit>{fmt(totalCents)} USD</Text>
+        <Text style={s.barLabel}>Subtotal</Text>
+        <Text style={s.barAmount} numberOfLines={1} adjustsFontSizeToFit>{fmt(subtotalCents)}</Text>
       </View>
       <View style={s.barButton}>
         <Button
-          label="Go to checkout"
+          label="Checkout"
           onPress={onCheckout}
           loading={busy}
           disabled={disabled}
           fullWidth
+          style={{ minHeight: 56 }}
           accessibilityHint="Reviews shipping and payment"
           testID="cart-go-to-checkout"
         />
@@ -235,7 +237,7 @@ export function BagCheckoutBar({
 }
 
 /** Height of the sticky bar above the safe area, for the list's bottom padding. */
-export const BAG_BAR_HEIGHT = SP.sm * 2 + 52;
+export const BAG_BAR_HEIGHT = SP.sm * 3 + 22 + 56;
 
 // ─── Empty bag ────────────────────────────────────────────────────────────────
 
@@ -287,8 +289,13 @@ export function BagEmpty({
 
   return (
     <View testID="cart-empty">
-      <Text style={s.emptyLine}>Your bag is empty.</Text>
-      <Button label="Shop now" onPress={onShopNow} style={s.shopNow} testID="cart-shop-now" />
+      <View style={{ alignItems: 'center', paddingVertical: SP.xl }}>
+        <View style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="shopping-bag" size={52} color={theme.text} />
+        </View>
+        <Text style={[s.emptyLine, { fontSize: FS.lg, fontFamily: FONT.bold }]}>Your cart is empty</Text>
+        <Button label="Shop Threads" onPress={onShopNow} style={s.shopNow} testID="cart-shop-now" />
+      </View>
       {arrivals.length > 0 && (
         <View style={s.arrivals}>
           <View style={s.arrivalsHeader}>
@@ -364,7 +371,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   barTotal: { flexShrink: 1, minWidth: 0 },
   barLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted },
   barAmount: { fontFamily: FONT.semibold, fontSize: FS.lg, color: theme.text, ...TABULAR_NUMS },
-  barButton: { flex: 1, minWidth: 190 },
+  barButton: { alignSelf: 'stretch' },
 
   emptyLine: { fontFamily: FONT.regular, fontSize: FS.base, color: theme.text, marginTop: SP.md },
   shopNow: { alignSelf: 'flex-start', marginTop: SP.md, minWidth: 180 },

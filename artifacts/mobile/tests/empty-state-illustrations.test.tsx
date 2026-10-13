@@ -50,6 +50,7 @@ describe('the old colored icon-in-a-square + two dots decoration is gone', () =>
 
 describe('each named screen wires its thread-motif illustration through the shared EmptyState', () => {
   const cases: [path: string, needle: string][] = [
+    ['../components/bag/BagParts.tsx', 'name="shopping-bag"'],
     ['../components/profile/profileEmptyStates.ts', "illustration: 'spool'"],
     ['../app/(buyer)/friends.tsx', 'illustration="friends"'],
     ['../components/discover/search/SearchResults.tsx', 'illustration="search"'],

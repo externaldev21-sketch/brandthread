@@ -6,7 +6,7 @@
 import { track } from '@/lib/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { safeGetItem, safeSetItem, safeRemoveItem } from '@/lib/safeAsyncStorage';
-import { previewShippingRate } from '@/lib/previewCheckout';
+import { previewShippingRate, previewFreeShippingThreshold } from '@/lib/previewCheckout';
 import { getPreviewBuyerProduct, isPreviewProductId } from '@/lib/previewProducts';
 import { applyLiveStock, cartMaxQuantity, lineQuantityCap } from '@/lib/cartStock';
 import { serviceRequest } from '@/lib/serviceConfig';
@@ -930,6 +930,36 @@ export function totalShippingEstimate(
     total += estimate.amountCents;
   }
   return total;
+}
+
+/**
+ * A seller's free-shipping threshold in cents, from their own shipping rate
+ * (the public rate endpoint's `freeAboveCents`), or null when they have none
+ * or it can't be read. The bag only shows "away from free shipping" when this
+ * is a real number. Cached per seller for the session.
+ */
+const freeShippingThresholdCache = new Map<string, Promise<number | null>>();
+
+export function getSellerFreeShippingThreshold(sellerId: string): Promise<number | null> {
+  const preview = previewFreeShippingThreshold(sellerId);
+  if (preview != null) return Promise.resolve(preview);
+  const cached = freeShippingThresholdCache.get(sellerId);
+  if (cached) return cached;
+  const request = serviceRequest<{ freeAboveCents?: number | null }>(
+    `/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=0`,
+    {},
+    false,
+  )
+    .then(resp => (typeof resp?.freeAboveCents === 'number' && Number.isSafeInteger(resp.freeAboveCents) && resp.freeAboveCents >= 0
+      ? resp.freeAboveCents
+      : null))
+    .catch(() => {
+      // Don't cache a failure: the next visit to the bag tries again.
+      freeShippingThresholdCache.delete(sellerId);
+      return null;
+    });
+  freeShippingThresholdCache.set(sellerId, request);
+  return request;
 }
 
 // ─── Cart validation ──────────────────────────────────────────────────────────
