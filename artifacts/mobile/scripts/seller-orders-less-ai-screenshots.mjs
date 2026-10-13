@@ -10,7 +10,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { MOBILE_ROOT, WORK_DIR, buildPreviewWeb, serveBuild, launchBrowser, openContext, openScreen, waitForQuietNetwork } from './store-screenshots/harness.mjs';
+import { MOBILE_ROOT, WORK_DIR, buildPreviewWeb, serveBuild, launchBrowser, openContext, waitForQuietNetwork } from './store-screenshots/harness.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
@@ -54,12 +54,19 @@ async function fitCheck(page, label) {
   if (problems.length) process.exitCode = 1;
 }
 
+/**
+ * Loads the screen as the FIRST page load (not a client-side push): the
+ * Orders tab and order detail read `demo=1` from the URL when they load, and
+ * a pushState / tab tap drops the query string.
+ */
 async function open(target, demo) {
   const ctx = await openContext(browser, { device, role: 'seller', origin: server.origin, images: {} });
   ctx.page.setDefaultNavigationTimeout(240_000);
-  await openScreen(ctx.page, ctx.activity, server.origin, 'seller', target, { extraQuery: demo ? '&demo=1' : '' });
+  const query = `bt_preview=seller${demo ? '&demo=1' : ''}`;
+  await ctx.page.goto(`${server.origin}${target}${target.includes('?') ? '&' : '?'}${query}`);
+  await ctx.page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 30_000 });
   await waitForQuietNetwork(ctx.activity, 900, 20_000);
-  await ctx.page.waitForTimeout(2000);
+  await ctx.page.waitForTimeout(3000);
   return ctx;
 }
 
@@ -73,17 +80,26 @@ try {
 
   let late = existsSync(LATE_FILE) ? JSON.parse(readFileSync(LATE_FILE, 'utf8')) : null;
   const lateTag = list.page.locator('[data-testid^="order-status-"][data-testid$="-late"]').first();
-  if (await lateTag.count()) {
+  const target = () => (late?.orderNumber && !process.env.RECORD_LATE
+    ? list.page.getByText(late.orderNumber, { exact: true }).first()
+    : lateTag);
+  // The list is virtualised: wheel down until the row is rendered.
+  for (let i = 0; i < 25 && !(await target().count()); i += 1) {
+    await list.page.mouse.move(195, 500);
+    await list.page.mouse.wheel(0, 700);
+    await list.page.waitForTimeout(350);
+  }
+  if (await lateTag.count() && (!late || process.env.RECORD_LATE)) {
     const testId = await lateTag.getAttribute('data-testid');
     const id = testId.replace(/^order-status-/, '').replace(/-late$/, '');
-    const card = lateTag.locator('xpath=ancestor::*[.//*[starts-with(normalize-space(text()), "BT-")]][1]');
-    const orderNumber = (await card.locator('text=/^BT-\\d+$/').first().textContent())?.trim();
+    const orderNumber = await lateTag.evaluate((el) => {
+      for (let p = el; p; p = p.parentElement) { const m = /BT-\d+/.exec(p.textContent || ''); if (m) return m[0]; }
+      return null;
+    });
     late = { id, orderNumber };
     writeFileSync(LATE_FILE, JSON.stringify(late));
-    await scrollTo(lateTag);
-  } else if (late?.orderNumber) {
-    await scrollTo(list.page.getByText(late.orderNumber, { exact: true }).first());
   }
+  if (await target().count()) await scrollTo(target());
   console.log('late order', late);
   await shot(list.page, '02-orders-list-late-demo.png');
   await fitCheck(list.page, 'orders list demo (late row)');
