@@ -29,7 +29,7 @@ export const PRIVATE_PROFILE_KEYS = [
   // contact details
   "email", "phone", "phoneNumber", "contactEmail",
   // moderation / scheduling internals
-  "moderationStatus", "coverVideoModerationStatus", "scheduledAt", "lowStockThreshold", "sku",
+  "moderationStatus", "coverVideoModerationStatus", "scheduledAt", "lowStockThreshold", "lowStockThresholdInherit", "sku", "barcode",
   "clerkSessionId", "stripeCheckoutSessionId",
 ] as const;
 
