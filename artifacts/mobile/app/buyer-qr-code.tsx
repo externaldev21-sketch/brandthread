@@ -14,6 +14,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyProfile } from '@/services/socialService';
 import type { BuyerSocialProfile } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { BRANDTHREAD_ORIGIN, buildCanonicalProfileUrl } from '@/lib/shareProfile';
 import { radius } from '@/constants/radii';
 
 export default function BuyerQRCode() {
@@ -30,11 +31,9 @@ export default function BuyerQRCode() {
   }, []);
 
   const handle = profile?.username ? `@${profile.username}` : null;
-  const canonicalUrl = profile?.username
-    ? `https://brandthread.app/u/${profile.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '')}`
-    : null;
+  const canonicalUrl = buildCanonicalProfileUrl(profile?.username);
   // Legacy alias — used by existing Share call below; keep for compatibility.
-  const qrValue = canonicalUrl ?? 'https://brandthread.app';
+  const qrValue = canonicalUrl ?? BRANDTHREAD_ORIGIN;
 
   async function handleShare() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

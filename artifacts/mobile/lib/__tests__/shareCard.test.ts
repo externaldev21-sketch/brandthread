@@ -6,7 +6,10 @@ vi.mock('react-native', () => ({
   Share: { share: vi.fn().mockResolvedValue(undefined) },
 }));
 
-import { STORY_CARD_WIDTH, STORY_CARD_HEIGHT, captureShareCard } from '@/lib/shareCard';
+// mediaLibraryCompat pulls in expo-constants, which can't load under vitest.
+vi.mock('@/lib/mediaLibraryCompat', () => ({ getMediaLibrary: () => null }));
+
+import { STORY_CARD_WIDTH, STORY_CARD_HEIGHT, captureShareCard, shareStoryCardImage } from '@/lib/shareCard';
 
 describe('shareCard: story image dimensions', () => {
   it('targets a 9:16 Instagram-Stories-ready canvas', () => {
@@ -33,5 +36,16 @@ describe('shareCard: captureShareCard', () => {
     );
     expect(uri).toBe('file:///tmp/card.png');
     vi.doUnmock('react-native-view-shot');
+  });
+});
+
+describe('shareCard: shareStoryCardImage', () => {
+  it('opens the system share sheet with the PNG when sharing is available', async () => {
+    const shareAsync = vi.fn().mockResolvedValue(undefined);
+    vi.doMock('expo-sharing', () => ({ isAvailableAsync: vi.fn().mockResolvedValue(true), shareAsync }));
+
+    expect(await shareStoryCardImage('file:///tmp/card.png', 'maya-story.png')).toBe('shared');
+    expect(shareAsync).toHaveBeenCalledWith('file:///tmp/card.png', expect.objectContaining({ mimeType: 'image/png' }));
+    vi.doUnmock('expo-sharing');
   });
 });

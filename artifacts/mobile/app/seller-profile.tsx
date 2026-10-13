@@ -34,6 +34,7 @@ import type { SellerThreadPost } from '@/services/socialService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
+import { copyProfileLink } from '@/lib/copyProfileLink';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -428,6 +429,12 @@ export default function SellerProfileScreen() {
     const sellerId = seller.sellerId;
     const items: ProfileMenuItem[] = [];
     if (caps.showShare) items.push({ key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShare });
+    if (caps.showShare && seller.username) {
+      items.push({
+        key: 'copy-link', icon: 'link', label: 'Copy profile link',
+        onPress: () => { void copyProfileLink(seller.username, Clipboard.setStringAsync).then((ok) => { if (ok) { hapticSuccessAction(); setSnackbar('Link copied'); } }); },
+      });
+    }
     if (replayCount > 0) {
       items.push({
         key: 'replays', icon: 'video', label: 'Replays',
