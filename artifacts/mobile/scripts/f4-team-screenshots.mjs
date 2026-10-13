@@ -83,8 +83,8 @@ async function context(browser, images, origin) {
 
 async function ownerFlow(browser, images, origin) {
   const { context: c, page, activity } = await context(browser, images, origin);
-  await openScreen(page, activity, origin, 'seller', '/team', { extraQuery: '&demo=1' });
-  await page.getByText('Staff Accounts').first().waitFor({ timeout: 20_000 });
+  await page.goto(`${origin}/team?bt_preview=seller&demo=1`);
+  await page.getByText('Staff Accounts').first().waitFor({ timeout: 30_000 });
   await waitForQuietNetwork(activity, 900, 15_000);
   await page.getByText('Invite', { exact: true }).first().click();
   await page.getByPlaceholder('Email address or @username').waitFor({ timeout: 10_000 });
@@ -95,8 +95,8 @@ async function ownerFlow(browser, images, origin) {
   await c.close();
 
   const second = await context(browser, images, origin);
-  await openScreen(second.page, second.activity, origin, 'seller', '/roles', { extraQuery: '&demo=1' });
-  await second.page.getByText('Roles', { exact: true }).first().waitFor({ timeout: 20_000 });
+  await second.page.goto(`${origin}/roles?bt_preview=seller&demo=1`);
+  await second.page.getByText('Owner', { exact: true }).first().waitFor({ timeout: 30_000 });
   await waitForQuietNetwork(second.activity, 900, 15_000);
   await second.page.waitForTimeout(800);
   await shot(second.page, '02-roles');
@@ -118,8 +118,13 @@ async function packerFlow(browser, images, origin) {
   }
   for (const [target, name] of [['/products', '04-packer-products-locked'], ['/store-settings', '05-packer-store-settings-locked']]) {
     const { context: c, page, activity } = await context(browser, images, origin);
-    await openScreen(page, activity, origin, 'seller', target, { extraQuery });
-    await page.getByTestId('packer-route-locked').waitFor({ timeout: 20_000 });
+    // A full load of the target: "/" itself would redirect a packer to Orders.
+    await page.goto(`${origin}${target}?bt_preview=seller${extraQuery}`);
+    await page.getByTestId('packer-route-locked').waitFor({ timeout: 30_000 }).catch(async (error) => {
+      await shot(page, `${name}-FAILED`);
+      console.log('  url', page.url());
+      throw error;
+    });
     await page.waitForTimeout(1200);
     await shot(page, name);
     await overflowCheck(page, name);
