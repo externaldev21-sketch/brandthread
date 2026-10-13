@@ -29,7 +29,7 @@ import { useApi } from '@/hooks/useApi';
 import { useStoreGiftCards } from '@/hooks/useStoreGiftCards';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
+import { getSellerFollowState, setSellerFollowing, setPostPinned, pinErrorMessage } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -484,6 +484,19 @@ export default function SellerProfileScreen() {
     if (post) { hapticMedium(); setSelectedPost(post); }
   }, [isOwner, videos.posts]);
 
+  // Instagram "Pin to your profile" / "Unpin from profile" (max 3, pinned first).
+  const handleTogglePin = useCallback(async (post: SellerThreadPost) => {
+    const pin = !post.pinnedAt;
+    try {
+      await setPostPinned(post.id, pin);
+      hapticSuccessAction();
+      setSnackbar(pin ? 'Pinned to your profile' : 'Unpinned from profile');
+      void videos.reload({ fresh: true });
+    } catch (error) {
+      Alert.alert(pin ? 'Couldn’t pin post' : 'Couldn’t unpin post', pinErrorMessage(error));
+    }
+  }, [videos]);
+
   const handleCopyPostLink = useCallback(async (post: SellerThreadPost) => {
     const profileUrl = seller ? buildCanonicalProfileUrl(seller.username) : null;
     const url = profileUrl ? `${profileUrl}?post=${encodeURIComponent(post.id)}` : null;
@@ -767,6 +780,9 @@ export default function SellerProfileScreen() {
             <SheetRow icon="edit-2" label="Edit post" onPress={() => { const post = selectedPost; setSelectedPost(null); router.push(('/create-post?editId=' + post.id) as never); }} />
             <SheetRow icon="bar-chart-2" label="View analytics" onPress={() => { const post = selectedPost; setSelectedPost(null); router.push(('/post-analytics?id=' + post.id) as never); }} />
             <SheetRow icon="copy" label="Copy link" onPress={() => { const post = selectedPost; setSelectedPost(null); void handleCopyPostLink(post); }} />
+            {selectedPost.postStatus === 'published' || selectedPost.pinnedAt ? (
+              <SheetRow icon="bookmark" label={selectedPost.pinnedAt ? 'Unpin from profile' : 'Pin to your profile'} onPress={() => { const post = selectedPost; setSelectedPost(null); void handleTogglePin(post); }} />
+            ) : null}
           </View>
         ) : null}
       </Modal>

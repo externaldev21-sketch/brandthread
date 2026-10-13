@@ -94,6 +94,8 @@ export interface BuyerPost {
   quotesCount?: number;
   createdAt: string;
   updatedAt: string;
+  /** Pinned to the top of the author's profile grid (null/absent = not pinned). */
+  pinnedAt?: string | null;
   /** Tagged place, when the author added one (see /api/places). */
   location?: { id: string; name: string } | null;
 }

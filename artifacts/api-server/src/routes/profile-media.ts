@@ -62,6 +62,7 @@ const videoRowSelection = {
   sound:        posts.sound,
   visibility:   posts.visibility,
   createdAt:    posts.createdAt,
+  pinnedAt:     posts.pinnedAt,
   accountType:  users.accountType,
   displayName:  users.displayName,
   brandName:    users.brandName,
@@ -89,6 +90,7 @@ type VideoRow = {
   sound: unknown;
   visibility: { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean } | null;
   createdAt: Date;
+  pinnedAt?: Date | null;
   accountType: string | null;
   displayName: string | null;
   brandName: string | null;
@@ -181,6 +183,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     sound:        row.sound,
     visibility:   row.visibility,
     createdAt:    row.createdAt,
+    pinnedAt:     row.pinnedAt ?? null,
     authorAccountType: row.accountType === "seller" ? "seller" : "buyer",
     seller: {
       // Same field names as GET /api/public/posts so one client mapper reads both.
@@ -304,7 +307,7 @@ router.get("/users/:userId/videos", async (req, res) => {
         .from(posts)
         .innerJoin(users, eq(users.clerkId, posts.userId))
         .where(where)
-        .orderBy(desc(posts.createdAt), asc(posts.id))
+        .orderBy(sql`${posts.pinnedAt} DESC NULLS LAST`, desc(posts.createdAt), asc(posts.id))
         .limit(limit)
         .offset(offset),
     ]);
