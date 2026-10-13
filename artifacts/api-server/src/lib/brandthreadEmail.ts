@@ -515,7 +515,7 @@ export function renderOrderReceiptHtml(input: OrderReceiptInput): string {
               <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
                 <tr>
                   <td valign="middle">${brandMark}</td>
-                  <td valign="middle" align="right" class="bt-muted" style="color:#737373;font-size:14px;line-height:20px;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">Order #${escapeHtml(input.orderNumber)}</td>
+                  <td valign="middle" align="right" class="bt-muted" style="padding-left:16px;color:#737373;font-size:14px;line-height:20px;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">Order #${escapeHtml(input.orderNumber)}</td>
                 </tr>
               </table>
             </td>
