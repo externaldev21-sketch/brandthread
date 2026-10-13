@@ -91,7 +91,7 @@ import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notific
 import { getDevWebPreviewRole } from '@/lib/devPreview';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
-import { ActionSheetHost } from '@/components/ui/ActionSheet';
+import { ActionSheetHost, installConfirmationSheets } from '@/components/ui/ActionSheet';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
@@ -106,6 +106,10 @@ import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
+
+// Every confirmation (an Alert with 2+ choices) is a bottom action sheet,
+// never a centered alert — see components/ui/ActionSheet.tsx.
+installConfirmationSheets();
 
 // Generated API hooks share this guard with the app-local API clients so
 // signed-out seller preview never reaches the backend through an alternate
