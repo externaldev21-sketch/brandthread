@@ -61,7 +61,7 @@ import { processDisputeEvent } from "../lib/disputes/webhook";
 import { buildDisputeDeps } from "../lib/disputes/store";
 import { productThumbnail } from "../lib/activityEvents";
 import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
-import { NEW_ORDER_PUSH_SOUND, sendPushToUser, stableNotificationId } from "../lib/push";
+import { sendPushToUser, stableNotificationId } from "../lib/push";
 import { connectReadiness } from "./manufacturer-connect";
 import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
 import {
@@ -1303,7 +1303,7 @@ export async function handleCheckoutPaid(
             targetId: createdOrderId,
             targetType: "order",
             targetImageUrl: productThumbnail(firstItem?.images),
-            pushSound: NEW_ORDER_PUSH_SOUND,
+            pushSound: "order_received.wav", // = NEW_ORDER_PUSH_SOUND (lib/push.ts); literal so suites mocking lib/push keep working
             pushChannelId: "orders",
           });
           // The buyer's side of the same event (guest checkouts have no feed).
