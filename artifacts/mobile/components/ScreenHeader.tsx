@@ -12,6 +12,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { CollapsingTitleBar } from '@/components/ui/CollapsingTitleBar';
 import type { LargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 import { crispPx } from '@/lib/crispPixel';
+import { titleFitScale } from '@/lib/titleFit';
 
 export interface ScreenHeaderAction {
   icon: IconName;
@@ -92,6 +93,17 @@ export function ScreenHeader({
   const router = useRouter();
   const topPad = useHeaderTopInset() + SP.sm;
 
+  // Shrink-to-fit: a long title next to several actions (Edit Store,
+  // Metafields and metaobjects, …) used to ellipsize mid-word, worst on
+  // iPhone SE and at large Dynamic Type. A hidden, unconstrained copy of the
+  // title measures its natural width; when that exceeds the room in
+  // `titleBlock`, the title shrinks just enough to fit (floor 78%, then it
+  // ellipsizes as before). Titles that fit are untouched.
+  const [titleRoom, setTitleRoom] = React.useState(0);
+  const [titleNatural, setTitleNatural] = React.useState(0);
+  const titleScale = titleFitScale(titleRoom, titleNatural);
+  const fitStyle = titleScale < 1 ? { fontSize: TITLE_SIZE * titleScale } : null;
+
   const largeTitleOpacity = scrollY
     ? scrollY.interpolate({ inputRange: [0, collapseDistance], outputRange: [1, 0], extrapolate: 'clamp' })
     : null;
@@ -125,7 +137,7 @@ export function ScreenHeader({
           ) : <View style={{ width: COMP.iconBtn }} />
         )}
 
-        <View style={[styles.titleBlock, collapse ? styles.titleBlockClip : null]}>
+        <View style={[styles.titleBlock, collapse ? styles.titleBlockClip : null]} onLayout={(e) => setTitleRoom(e.nativeEvent.layout.width)}>
           {collapse ? (
             <Animated.Text
               testID="screen-header-title"
@@ -144,7 +156,7 @@ export function ScreenHeader({
               {...({ dataSet: { variant } } as object)}
               accessibilityRole="header"
               maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
-              style={[styles.title, { color: colors.foreground, opacity: compactTitleOpacity }]}
+              style={[styles.title, fitStyle, { color: colors.foreground, opacity: compactTitleOpacity }]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.8}
@@ -152,8 +164,19 @@ export function ScreenHeader({
               {title}
             </Animated.Text>
           ) : (
-            <Text testID="screen-header-title" {...({ dataSet: { variant } } as object)} accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.title, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
+            <Text testID="screen-header-title" {...({ dataSet: { variant } } as object)} accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.title, fitStyle, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
           )}
+          <View style={styles.titleMeasureClip} pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <View style={styles.titleMeasure}>
+              <Text
+                maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
+                style={[styles.title, styles.titleMeasureText]}
+                onLayout={(e) => setTitleNatural(e.nativeEvent.layout.width)}
+              >
+                {title}
+              </Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.rightSlot}>
@@ -256,6 +279,26 @@ const styles = StyleSheet.create({
     fontSize: TITLE_SIZE,
     fontFamily: FONT.bold,
     letterSpacing: -0.3,
+  },
+  // Invisible, unconstrained copy of the title used only for measuring,
+  // inside a zero-size clip so it can never widen the page.
+  titleMeasureClip: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    overflow: 'hidden',
+    opacity: 0,
+  },
+  // A flex item with flexShrink 0 lays out at its max-content width, so
+  // the text is measured on one line regardless of the 0-wide clip.
+  titleMeasure: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+  },
+  titleMeasureText: {
+    flexShrink: 0,
   },
   rightSlot: {
     minWidth: COMP.iconBtn,

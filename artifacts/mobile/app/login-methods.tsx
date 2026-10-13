@@ -322,7 +322,7 @@ export default function LoginMethods() {
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={s.methodLabel}>{method.label}</Text>
-                    <Text style={s.methodSub} numberOfLines={1}>{method.sublabel}</Text>
+                    <Text style={s.methodSub} numberOfLines={2}>{method.sublabel}</Text>
                   </View>
                   {method.connected ? (
                     <View style={s.connectedActions}>

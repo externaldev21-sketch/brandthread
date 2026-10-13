@@ -408,7 +408,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
     paddingHorizontal: SP.md, paddingVertical: 10,
   },
-  urlSuffix: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  urlSuffix: { flexShrink: 0, fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   urlPreview: { fontSize: FS.sm, fontFamily: FONT.medium, color: CYAN },
   badgeRow: { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   domainRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

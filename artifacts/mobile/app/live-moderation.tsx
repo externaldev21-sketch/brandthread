@@ -220,7 +220,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   segmentRow: { flexDirection: 'row', gap: SP.sm },
   segment: { flex: 1, height: 44, borderRadius: ControlRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   segmentText: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  rowBtn: { width: 112 },
+  rowBtn: { minWidth: 112 },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   input: {
     flex: 1, minWidth: 0, height: 44, borderRadius: RADIUS.md, paddingHorizontal: SP.md,

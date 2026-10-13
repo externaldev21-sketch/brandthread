@@ -60,8 +60,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   text: {
     fontFamily: FONT.medium,
+    flexShrink: 1,
   },
 });

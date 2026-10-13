@@ -707,6 +707,7 @@ export default function ProfileScreen() {
               icon="bar-chart-2"
               title="Professional dashboard"
               subtitle="Views, followers and content stats"
+              subtitleNumberOfLines={2}
               chevron
               onPress={() => nav('/(tabs)/')}
               style={s.dashboardRow}

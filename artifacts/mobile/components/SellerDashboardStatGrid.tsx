@@ -46,7 +46,7 @@ export function SellerDashboardStatGrid({
             accessibilityLabel={`${tile.label}: ${tile.value}${tile.deltaLabel ? `, ${tile.deltaLabel}` : ''}. Tap to chart this metric.`}
             accessibilityState={{ selected }}
           >
-            <Text style={[styles.label, { color: theme.muted }]} numberOfLines={1} maxFontSizeMultiplier={1.8}>
+            <Text style={[styles.label, { color: theme.muted }]} numberOfLines={2} maxFontSizeMultiplier={1.8}>
               {tile.label}
             </Text>
             <Text

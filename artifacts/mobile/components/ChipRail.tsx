@@ -53,6 +53,10 @@ export function ChipRail({ chips, style, testID = 'chip-rail' }: { chips: ChipRa
     if (Math.abs(x - scrollXRef.current) < 1) return;
     scrollRef.current?.scrollTo({ x, animated: true });
   }, []);
+  const selectedKey = chips.find((chip) => chip.active)?.key;
+  useEffect(() => {
+    if (selectedKey) scrollChipIntoView(selectedKey);
+  }, [selectedKey, scrollChipIntoView]);
 
   // ── Web: mouse drag-to-scroll (touch already scrolls natively) ──────────
   useEffect(() => {
@@ -152,7 +156,10 @@ export function ChipRail({ chips, style, testID = 'chip-rail' }: { chips: ChipRa
       scrollEventThrottle={16}
       onScroll={(e) => { scrollXRef.current = e.nativeEvent.contentOffset.x; }}
       onLayout={(e: LayoutChangeEvent) => { viewportWidthRef.current = e.nativeEvent.layout.width; }}
-      onContentSizeChange={(w) => { contentWidthRef.current = w; }}
+      onContentSizeChange={(w) => {
+        contentWidthRef.current = w;
+        if (selectedKey) scrollChipIntoView(selectedKey);
+      }}
       style={[styles.viewport, Platform.OS === 'web' ? (webRailStyle as ViewStyle) : null, style]}
       contentContainerStyle={styles.row}
       testID={testID}
