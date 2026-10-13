@@ -32,15 +32,15 @@ const REQUIRED_VARS: RequiredVar[] = [
 // shipping labels, ...) rather than the whole server, so a missing one is
 // worth a warning but never a boot failure.
 const OPTIONAL_VARS = [
-  // Pop-up mode (in-person Tap to Pay via Stripe Terminal). "1" turns the
-  // /api/seller/terminal routes on; also needs STRIPE_SECRET_KEY.
-  "STRIPE_TERMINAL_ENABLED",
   "REDIS_URL",
   "AGORA_APP_ID",
   "AGORA_APP_CERTIFICATE",
   "AGORA_CUSTOMER_ID",
   "AGORA_CUSTOMER_SECRET",
   "AGORA_RECORDING_S3_BUCKET",
+  // Pop-up mode (in-person Tap to Pay via Stripe Terminal). "1" turns the
+  // /api/seller/terminal routes on; also needs STRIPE_SECRET_KEY.
+  "STRIPE_TERMINAL_ENABLED",
   "AGORA_RECORDING_S3_REGION",
   "AGORA_RECORDING_S3_ACCESS_KEY",
   "AGORA_RECORDING_S3_SECRET_KEY",
