@@ -4,18 +4,22 @@
  * Payment is an ordinary Stripe PaymentIntent on Brandthread's balance
  * (metadata.kind = "gift_card_purchase"). No money goes to the seller at
  * purchase: it is held as a gift card liability until the card is redeemed
- * (payout.ts). The code is generated only once payment succeeded, emailed to
- * the recipient, and returned once to the buyer's app (for the share sheet).
+ * (payout.ts). The code is generated only once payment succeeded, emailed (or
+ * texted, when the buyer gave a phone number and SMS is configured) to the
+ * recipient, and returned once to the buyer's app (for the share sheet).
  * Only its hash is ever stored.
  */
 import type Stripe from "stripe";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db, giftCards, users } from "@workspace/db";
 import { logger } from "../logger";
 import { ensureStripeCustomer } from "../stripe";
 import { escapeHtml, formatCents, renderBrandthreadEmail, sendBrandthreadEmail } from "../brandthreadEmail";
 import { activateCard, assertValidAmount, createPendingCard, GiftCardError, type GiftCardRow } from "./service";
 import { assertSellable, expiryFromMonths, getGiftCardSettings } from "./settings";
+import { giftCardSmsBody } from "./sms";
+import { generateGiftCardCode, giftCardLast4, hashGiftCardCode } from "./codes";
+import { sendSms, smsEnabled } from "../sms/twilio";
 
 export const GIFT_CARD_PURCHASE_KIND = "gift_card_purchase";
 
@@ -23,7 +27,9 @@ export type PurchaseInput = {
   buyerId: string;
   sellerId: string;
   amountCents: number;
-  recipientEmail: string;
+  /** One of recipientEmail / recipientPhone (E.164) is set. */
+  recipientEmail?: string | null;
+  recipientPhone?: string | null;
   recipientName?: string | null;
   message?: string | null;
   /** Bought for the buyer themself (the card lands in their wallet on purchase). */
@@ -64,7 +70,8 @@ export async function createGiftCardPurchase(stripeClient: StripePurchase, input
     amountCents: input.amountCents,
     purchaserId: input.buyerId,
     ownerId: input.forSelf ? input.buyerId : null,
-    recipientEmail: input.recipientEmail,
+    recipientEmail: input.recipientEmail ?? null,
+    recipientPhone: input.recipientPhone ?? null,
     recipientName: input.recipientName ?? null,
     message: input.message ?? null,
     source: "purchase",
@@ -85,8 +92,12 @@ export async function storeNameFor(sellerId: string): Promise<string> {
   return sellerDisplayName(sellerId);
 }
 
-/** Emails the code to the recipient. Returns whether the mail went out. */
+/**
+ * Sends the code to the recipient: by text when the card has a phone and SMS
+ * is configured, otherwise by email. Returns whether it went out.
+ */
 export async function deliverGiftCard(card: GiftCardRow, code: string, senderName?: string | null): Promise<boolean> {
+  if (card.recipientPhone && smsEnabled()) return textGiftCard(card, code, senderName);
   if (!card.recipientEmail) return false;
   const store = await sellerDisplayName(card.sellerId);
   const greeting = card.recipientName ? `Hi ${escapeHtml(card.recipientName)},` : "Hi,";
@@ -112,13 +123,34 @@ export async function deliverGiftCard(card: GiftCardRow, code: string, senderNam
     html,
     idempotencyKey: `gift-card-email/${card.id}`,
   });
-  if (ok) await db.update(giftCards).set({ deliveredAt: new Date() }).where(eq(giftCards.id, card.id));
+  if (ok) await db.update(giftCards).set({ deliveredAt: new Date(), deliveryChannel: "email" }).where(eq(giftCards.id, card.id));
   return ok;
 }
 
 /**
+ * At most one text per card: delivered_at is claimed before sending (so a
+ * webhook and the app's confirm racing can't both text) and cleared again if
+ * Twilio refuses, leaving it set only on success.
+ */
+async function textGiftCard(card: GiftCardRow, code: string, senderName?: string | null): Promise<boolean> {
+  const [claimed] = await db.update(giftCards).set({ deliveredAt: new Date(), deliveryChannel: "sms" })
+    .where(and(eq(giftCards.id, card.id), isNull(giftCards.deliveredAt)))
+    .returning({ id: giftCards.id });
+  if (!claimed) return false;
+  const body = giftCardSmsBody({
+    senderName, storeName: await sellerDisplayName(card.sellerId), amountCents: card.initialCents, message: card.message, code,
+  });
+  const result = await sendSms(card.recipientPhone!, body);
+  if (!result.sent) {
+    await db.update(giftCards).set({ deliveredAt: null, deliveryChannel: null }).where(eq(giftCards.id, card.id));
+    return false;
+  }
+  return true;
+}
+
+/**
  * Payment succeeded (webhook or the app's own confirm call, whichever comes
- * first): activate the card once and email the code. Returns the code only to
+ * first): activate the card once and send the code. Returns the code only to
  * the caller that actually activated it.
  */
 export async function completeGiftCardPurchase(cardId: string): Promise<{ card: GiftCardRow; code: string | null; emailed: boolean }> {
@@ -136,7 +168,11 @@ export async function completeGiftCardPurchase(cardId: string): Promise<{ card: 
       return false;
     });
   }
-  return { ...result, emailed };
+  // `emailed` means "delivered" (email or text). Re-read so the card shows how.
+  const card = emailed
+    ? (await db.select().from(giftCards).where(eq(giftCards.id, cardId)).limit(1))[0] ?? result.card
+    : result.card;
+  return { ...result, card, emailed };
 }
 
 /** payment_intent.succeeded for a gift card purchase. */
@@ -149,6 +185,27 @@ export async function handleGiftCardPaymentSucceeded(pi: { id: string }): Promis
   await completeGiftCardPurchase(card.id);
 }
 
+/**
+ * A card bought for a phone that we didn't text: the buyer sends it from
+ * Messages, so they must get its code exactly once. If the webhook activated
+ * the card first, that code was never sent anywhere, so a fresh one replaces
+ * it. Only while the card is untouched (unclaimed, unspent).
+ */
+async function handPhoneCardToBuyer(cardId: string, code: string | null): Promise<{ card: GiftCardRow; code: string } | null> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(giftCards).where(eq(giftCards.id, cardId)).for("update");
+    if (!row || row.status !== "active" || !row.recipientPhone || row.deliveredAt || row.ownerId || row.balanceCents !== row.initialCents) {
+      return null;
+    }
+    const handed = code ?? generateGiftCardCode();
+    const [updated] = await tx.update(giftCards).set({
+      codeHash: hashGiftCardCode(handed), codeLast4: giftCardLast4(handed),
+      deliveredAt: new Date(), deliveryChannel: "buyer", updatedAt: new Date(),
+    }).where(eq(giftCards.id, cardId)).returning();
+    return { card: updated, code: handed };
+  });
+}
+
 /** The buyer's app asks whether payment went through (covers a slow webhook). */
 export async function confirmGiftCardPurchase(
   stripeClient: Pick<Stripe, "paymentIntents">,
@@ -159,11 +216,15 @@ export async function confirmGiftCardPurchase(
   if (!card || card.purchaserId !== buyerId || !card.stripePaymentIntentId) {
     throw new GiftCardError(404, "NOT_FOUND", "Gift card not found.");
   }
-  if (card.status !== "pending_payment") return { status: "paid", card, code: null };
+  if (card.status !== "pending_payment") {
+    const handed = await handPhoneCardToBuyer(card.id, null);
+    return { status: "paid", card: handed?.card ?? card, code: handed?.code ?? null };
+  }
   const intent = await stripeClient.paymentIntents.retrieve(card.stripePaymentIntentId);
   if (intent.status === "succeeded") {
     const done = await completeGiftCardPurchase(card.id);
-    return { status: "paid", card: done.card, code: done.code };
+    const handed = done.emailed ? null : await handPhoneCardToBuyer(card.id, done.code);
+    return { status: "paid", card: handed?.card ?? done.card, code: handed?.code ?? done.code };
   }
   return { status: intent.status === "processing" ? "processing" : "unpaid", card, code: null };
 }

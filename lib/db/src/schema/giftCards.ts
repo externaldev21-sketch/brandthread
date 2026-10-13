@@ -19,6 +19,8 @@ export const giftCards = pgTable('gift_cards', {
   /** Set when a buyer claims the card into their wallet (or buys it for themselves). */
   ownerId:       text('owner_id'),
   recipientEmail: text('recipient_email'),
+  /** E.164, for cards sent by text message (migration 262). */
+  recipientPhone: text('recipient_phone'),
   recipientName: text('recipient_name'),
   message:       text('message'),
   /** 'pending_payment' | 'active' | 'void' */
@@ -28,6 +30,8 @@ export const giftCards = pgTable('gift_cards', {
   expiresAt:     timestamp('expires_at', { withTimezone: true }),
   stripePaymentIntentId: text('stripe_payment_intent_id').unique(),
   deliveredAt:   timestamp('delivered_at', { withTimezone: true }),
+  /** 'email' | 'sms' | 'buyer' (code handed to the buyer to text themselves). Migration 262. */
+  deliveryChannel: text('delivery_channel'),
   voidedAt:      timestamp('voided_at', { withTimezone: true }),
   voidedBy:      text('voided_by'),
   createdAt:     timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

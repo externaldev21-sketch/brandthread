@@ -4,6 +4,9 @@
  * top, amount chips, recipient name + email, message, then pay with Stripe's
  * own card field. The code goes to the recipient by email and is never stored
  * in readable form; the buyer sees it once after paying so they can share it.
+ * Sending by text follows Starbucks' eGift: an "Email | Text message" choice on
+ * the recipient step; after paying, either "Sent to •••1234" (the server texted
+ * it) or "Send by Messages", which opens the composer with the note filled in.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Share, StyleSheet, Text, View } from 'react-native';
@@ -13,7 +16,7 @@ import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@clerk/expo';
 import { BrandthreadScreen, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Button } from '@/components/ui';
+import { Button, SegmentedControl } from '@/components/ui';
 import { CheckoutField, CheckoutSection, useCheckoutColors, GUTTER, type CheckoutColors } from '@/components/checkout/CheckoutPrimitives';
 import { CardEntry, PaymentController, StripePaymentProvider, stripePaymentAvailable } from '@/components/checkout/StripePayment';
 import type { PaymentControllerApi } from '@/components/checkout/stripePaymentTypes';
@@ -25,12 +28,19 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_STORE_INFO } from '@/lib/giftCardsPreview';
-import { amountTextToCents, giftCardPurchaseIssue, type GiftCardStoreInfo } from '@/lib/giftCards';
+import { amountTextToCents, giftCardPurchaseIssue, giftCardTextBody, toE164, type GiftCardStoreInfo } from '@/lib/giftCards';
+import { openSmsComposer } from '@/lib/openSmsComposer';
 
-type Done = { cardId: string; code: string | null; email: string; storeName: string; amountCents: number };
+type Done = {
+  cardId: string; code: string | null; email: string; storeName: string; amountCents: number;
+  /** E.164 when sent by text; textedTo is its last 4 when the server already texted it. */
+  phone?: string | null; textedTo?: string | null;
+};
+type Channel = 'email' | 'text';
+const CHANNEL_OPTIONS = [{ id: 'email', label: 'Email' }, { id: 'text', label: 'Text message' }];
 
 export default function GiftCardBuyScreen() {
-  const params = useLocalSearchParams<{ sellerId?: string; name?: string }>();
+  const params = useLocalSearchParams<{ sellerId?: string; name?: string; done?: string }>();
   const sellerId = String(params.sellerId ?? '');
   const api = useApi();
   const { isSignedIn } = useAuth();
@@ -56,7 +66,10 @@ export default function GiftCardBuyScreen() {
       : <View style={styles.center}><ActivityIndicator /></View>)
     : !info.enabled
       ? <View style={styles.center}><Text style={styles.plain}>{info.storeName || params.name || 'This store'} doesn’t sell gift cards right now.</Text></View>
-      : <BuyForm info={{ ...info, storeName: info.storeName || String(params.name ?? '') }} signedIn={!!isSignedIn || preview} preview={preview} />;
+      : <BuyForm
+          info={{ ...info, storeName: info.storeName || String(params.name ?? '') }} signedIn={!!isSignedIn || preview} preview={preview}
+          previewDone={preview && isPreviewDemoMode() ? params.done : undefined}
+        />;
 
   return (
     <BrandthreadScreen scrollable noSafeTop>
@@ -66,7 +79,7 @@ export default function GiftCardBuyScreen() {
   );
 }
 
-function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedIn: boolean; preview: boolean }) {
+function BuyForm({ info, signedIn, preview, previewDone }: { info: GiftCardStoreInfo; signedIn: boolean; preview: boolean; previewDone?: string }) {
   const ck = useCheckoutColors();
   const s = useMemo(() => makeStyles(ck), [ck]);
   const api = useApi();
@@ -78,13 +91,20 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
   const [customOn, setCustomOn] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [channel, setChannel] = useState<Channel>('email');
+  const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [cardComplete, setCardComplete] = useState(false);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<Done | null>(null);
+  // Demo preview only (&demo=1&done=text|texted): the confirmation states.
+  const [done, setDone] = useState<Done | null>(() => (previewDone === 'text' || previewDone === 'texted' ? {
+    cardId: 'preview', code: 'K7QX-M4TP-9WHR-2CZN', email: '', storeName: info.storeName, amountCents: 2500,
+    phone: '+14155552671', textedTo: previewDone === 'texted' ? '2671' : null,
+  } : null));
 
-  const issue = giftCardPurchaseIssue({ amountCents, info, email });
+  const texting = channel === 'text';
+  const issue = giftCardPurchaseIssue({ amountCents, info, email, phone: texting ? phone : null });
   const cardReady = preview || cardComplete;
   const canPay = signedIn && !issue && cardReady && !paying;
 
@@ -99,7 +119,8 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
       const outcome = await controller.confirmCard(async () => {
         try {
           const started = await api.giftCards.purchase({
-            sellerId: info.sellerId, amountCents, recipientEmail: email.trim(),
+            sellerId: info.sellerId, amountCents,
+            ...(texting ? { recipientPhone: toE164(phone) ?? phone.trim() } : { recipientEmail: email.trim() }),
             ...(name.trim() ? { recipientName: name.trim() } : {}),
             ...(message.trim() ? { message: message.trim() } : {}),
             clientIdempotencyKey: keyRef.current,
@@ -111,7 +132,7 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
           return null;
         }
       }, {
-        name: name.trim() || 'Gift card buyer', email: email.trim(), phone: '',
+        name: name.trim() || 'Gift card buyer', email: texting ? '' : email.trim(), phone: '',
         address: { line1: '', line2: null, city: '', state: '', postalCode: '', country: 'US' },
       });
       if (!outcome || outcome.status === 'canceled') return;
@@ -127,22 +148,38 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
         if (confirmed?.status === 'paid') break;
         await new Promise(resolve => setTimeout(resolve, 1200));
       }
-      setDone({ cardId: giftCardId, code: confirmed?.code ?? null, email: email.trim(), storeName: info.storeName, amountCents });
+      setDone({
+        cardId: giftCardId, code: confirmed?.code ?? null, email: email.trim(), storeName: info.storeName, amountCents,
+        phone: texting ? toE164(phone) : null, textedTo: confirmed?.textedTo ?? null,
+      });
     } finally {
       setPaying(false);
     }
-  }, [amountCents, api, email, info.sellerId, info.storeName, issue, message, name]);
+  }, [amountCents, api, email, info.sellerId, info.storeName, issue, message, name, phone, texting]);
 
   if (done) {
     return (
       <View style={{ paddingHorizontal: GUTTER, paddingTop: SP.md }}>
         <GiftCardFace storeName={done.storeName} amountText={formatCents(done.amountCents)} />
-        <Text style={s.doneTitle}>Gift card sent</Text>
-        <Text style={s.plain}>We emailed it to {done.email}. They can add it under Menu, Gift cards, or enter the code at checkout.</Text>
+        <Text style={s.doneTitle}>{done.phone && !done.textedTo ? 'Gift card ready' : 'Gift card sent'}</Text>
+        <Text style={s.plain}>
+          {done.textedTo ? `Sent to •••${done.textedTo}.` : done.phone ? 'Send it by text.' : `We emailed it to ${done.email}.`}
+          {' '}They can add it under Menu, Gift cards, or enter the code at checkout.
+        </Text>
         {done.code ? (
           <View style={s.codeBox}>
             <Text style={s.codeLabel}>Code (shown once)</Text>
             <Text style={s.code} selectable>{done.code}</Text>
+            {done.phone && !done.textedTo ? (
+              <Button
+                label="Send by Messages"
+                icon="message-circle"
+                onPress={() => void openSmsComposer(
+                  giftCardTextBody({ storeName: done.storeName, amountCents: done.amountCents, code: done.code! }), done.phone,
+                ).catch(() => {})}
+                testID="gift-card-send-sms"
+              />
+            ) : null}
             <Button
               label="Share code"
               variant="secondary"
@@ -184,11 +221,19 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
       </CheckoutSection>
 
       <CheckoutSection title="Recipient" style={s.section}>
+        <SegmentedControl options={CHANNEL_OPTIONS} selectedId={channel} onChange={id => setChannel(id as Channel)} testID="gift-card-channel" style={{ marginBottom: SP.sm }} />
         <CheckoutField label="Name" value={name} onChangeText={setName} placeholder="Enter name" maxLength={80} autoCapitalize="words" />
+        {texting ? (
+          <CheckoutField
+            label="Phone number" value={phone} onChangeText={setPhone} placeholder="Enter phone number"
+            keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" maxLength={20} testID="gift-card-phone"
+          />
+        ) : (
         <CheckoutField
           label="Email" value={email} onChangeText={setEmail} placeholder="Enter email"
           keyboardType="email-address" autoCapitalize="none" autoCorrect={false} testID="gift-card-email"
         />
+        )}
         <CheckoutField
           label="Message" value={message} onChangeText={setMessage} placeholder="Enter gift message" maxLength={300}
           hint={`${message.length}/300`} multiline
@@ -216,7 +261,7 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
         </View>
       ) : null}
       {!signedIn ? <Text style={s.fine}>Sign in to buy a gift card.</Text> : null}
-      {signedIn && issue && (email.length > 0 || amountCents === null) ? <Text style={s.fine}>{issue}</Text> : null}
+      {signedIn && issue && ((texting ? phone : email).length > 0 || amountCents === null) ? <Text style={s.fine}>{issue}</Text> : null}
 
       <Button
         label={amountCents ? `Pay ${formatCents(amountCents)}` : 'Pay'}

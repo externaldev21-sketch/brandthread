@@ -19,8 +19,9 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_SELLER_CARDS, PREVIEW_SETTINGS } from '@/lib/giftCardsPreview';
 import {
-  EMAIL_PATTERN, amountTextToCents, giftCardMask, giftCardStatusLabel, type GiftCard, type GiftCardSettings,
+  EMAIL_PATTERN, GIFT_CARD_CLAIM_URL, amountTextToCents, giftCardMask, giftCardStatusLabel, type GiftCard, type GiftCardSettings,
 } from '@/lib/giftCards';
+import { openSmsComposer } from '@/lib/openSmsComposer';
 
 export default function GiftCardsManageScreen() {
   const router = useRouter();
@@ -172,6 +173,7 @@ export default function GiftCardsManageScreen() {
                   <Text style={s.fine}>{issued.emailed ? 'Emailed to the recipient. The code is shown once.' : 'The email didn’t send. Share the code yourself. It’s shown once.'}</Text>
                   <Text style={s.code} selectable>{issued.code}</Text>
                   <Button label="Share code" variant="secondary" icon="share" onPress={() => void Share.share({ message: `Your gift card code: ${issued.code}` }).catch(() => {})} />
+                  <Button label="Text it" variant="secondary" icon="message-circle" onPress={() => void openSmsComposer(`Your gift card code: ${issued.code}\nClaim it: ${GIFT_CARD_CLAIM_URL}`).catch(() => {})} />
                 </View>
               ) : null}
               <CheckoutField label="Amount" value={issueAmount} onChangeText={setIssueAmount} keyboardType="decimal-pad" placeholder="25" />
