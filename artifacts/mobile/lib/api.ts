@@ -1305,9 +1305,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Bulk product actions ("Select products") and per-product search listing (SEO). */
     productBulk: {
-      list: (params: { q?: string; status?: string } = {}) => {
+      list: (params: { q?: string; status?: string; collection?: string } = {}) => {
         const qs = new URLSearchParams();
         if (params.q) qs.set('q', params.q);
+        if (params.collection) qs.set('collection', params.collection);
         if (params.status && params.status !== 'all') qs.set('status', params.status);
         const s = qs.toString();
         return get<BulkProductList>(`/api/product-bulk/products${s ? `?${s}` : ''}`);
