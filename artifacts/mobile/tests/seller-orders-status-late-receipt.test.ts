@@ -173,30 +173,31 @@ describe('order detail section order (item 77) and status wiring (item 75)', () 
   const path = require('node:path') as typeof import('node:path');
   const detail = fs.readFileSync(path.resolve(__dirname, '../app/order-detail.tsx'), 'utf8');
   const list = fs.readFileSync(path.resolve(__dirname, '../app/(tabs)/orders.tsx'), 'utf8');
-  const overview = detail.slice(detail.indexOf('function OverviewTab('), detail.indexOf('function CustomerTab('));
+  // The integration uses the grouped fulfilment screen, not the former tab helpers.
+  const overview = detail.slice(detail.indexOf('testID="order-detail-scroll"'));
 
-  it('Overview reads buyer -> items -> shipping (+ actions) -> money -> risk / pre-order', () => {
+  it('reads buyer -> items and shipping -> money, retaining risk / pre-order warnings', () => {
     const at = (needle: string) => {
       const i = overview.indexOf(needle);
       expect(i, needle).toBeGreaterThan(-1);
       return i;
     };
     const order = [
-      at('{order.customer.name ? <Text style={s.heroCustomer}>'),
-      at('<SectionHeader title="Items" />'),
-      at('<SectionHeader title="Shipping" />'),
-      at('<OrderStatusTimeline status={order.status} />'),
-      at('{/* Action Buttons */}'),
-      at('<OrderReceipt receipt={order.receipt} />'),
-      at('{/* Risk Flags */}'),
-      at('{/* Pre-order info */}'),
+      at('testID="order-customer"'),
+      at('testID="order-fulfilled-block"'),
+      at('testID="order-tracking-box"'),
+      at('testID="order-unfulfilled-block"'),
+      at('testID="order-paid-block"'),
     ];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(overview).toContain('<OrderRiskBadge');
+    expect(overview).toContain('order.isPreOrder');
+    expect(overview).toContain('<FeesRow payment={order.payment}');
   });
 
   it('keeps every fulfil / ship / label / refund action', () => {
-    for (const action of ['Mark Processing', 'Mark Ready to Ship', 'Fulfill Order', 'Add Tracking', 'Mark Shipped', 'Ship some items', 'Cancel Order', "label=\"Refund\""]) {
-      expect(overview, action).toContain(action);
+    for (const action of ['Mark as processing', 'Mark as ready to ship', 'Fulfill items', 'Create shipping label', 'Update delivery status', 'Cancel order', "label=\"Refund\""]) {
+      expect(detail, action).toContain(action);
     }
   });
 

@@ -131,7 +131,8 @@ describe("saving posts into collections", () => {
     const patch = await call(`/api/buyer/saved/${photoPost}`, "PATCH", { collectionId: othersBoardId });
     expect(patch.status).toBe(404);
     const garbage = await call(`/api/buyer/saved/${photoPost}`, "PATCH", { collectionId: "not-a-uuid" });
-    expect(garbage.status).toBe(404);
+    // The shared request validator rejects a malformed UUID before ownership lookup.
+    expect(garbage.status).toBe(400);
     const [row] = await db.select().from(savedItems).where(eq(savedItems.targetId, photoPost));
     expect(row.collectionId).toBe(boardId);
 

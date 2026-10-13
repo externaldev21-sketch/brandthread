@@ -22,8 +22,14 @@ const { findMatcher } = require("./sharePreview.js") as {
 const { matchProductPath } = require("./seo/productPage.js") as { matchProductPath: (p: string) => string | null };
 
 const UUID = "0f8fad5b-d9cb-469f-a165-70867728950e";
+import * as dropWaitlist from "../lib/dropWaitlist";
+import * as shareLive from "../lib/shareLive";
+
 const SAMPLE_ARG: Record<string, string> = {
   buildPostUrl: UUID,
+  buildLiveUrl: UUID,
+  buildCanonicalLiveUrl: UUID,
+  buildDropWaitlistUrl: "nova_goods",
   buildStoreUrl: "nova_goods",
   buildProductUrl: UUID,
   buildProfileUrl: "jordanreyes",
@@ -41,6 +47,8 @@ const BUILDER_MODULES: Record<string, Record<string, unknown>> = {
   "lib/shareDrop.ts": shareDrop,
   "lib/shareCollection.ts": shareCollection,
   "lib/storeQr.ts": storeQr,
+  "lib/dropWaitlist.ts": dropWaitlist,
+  "lib/shareLive.ts": shareLive,
 };
 
 function builders() {

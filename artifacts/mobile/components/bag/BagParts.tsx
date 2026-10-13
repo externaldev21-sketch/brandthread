@@ -18,6 +18,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { Icon } from '@/components/ui/Icon';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { Button, QuantityStepper } from '@/components/ui';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -90,14 +92,13 @@ export function BagItemRow({
     ? item.compareAtPriceCents * item.quantity
     : null;
   const lowStock = item.isAvailable && item.maxQuantity > 0 && item.maxQuantity <= 3;
+  const [limitReached, setLimitReached] = useState(false);
 
   return (
     <View style={[s.line, rowBusy && { opacity: 0.5 }]} testID={`cart-row-${item.id}`}>
       <View style={s.lineTop}>
         <Pressable onPress={onOpen} style={s.image} accessibilityRole="button" accessibilityLabel={`Open ${item.productName}`}>
-          {item.imageUri
-            ? <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="contain" recyclingKey={item.imageUri} />
-            : <Icon name="image" size={20} color={theme.muted} />}
+          <ProductPhoto uri={item.imageUri} brand={item.sellerName} name={item.productName} style={StyleSheet.absoluteFill} contentFit="contain" recyclingKey={item.imageUri ?? undefined} />
         </Pressable>
         <View style={s.desc}>
           <Text style={s.brand} numberOfLines={1}>{item.sellerName}</Text>
@@ -122,7 +123,7 @@ export function BagItemRow({
               {item.unavailableReason ?? 'No longer available'}
             </Text>
           )}
-          {lowStock && <Text style={[s.meta, { color: theme.text }]}>Only {item.maxQuantity} left</Text>}
+          {(lowStock || (limitReached && item.isAvailable)) && <Text style={[s.meta, { color: theme.text }]} accessibilityLiveRegion="polite">Only {item.maxQuantity} left</Text>}
           <View style={s.qtyRow}>
             <QuantityStepper
               value={item.quantity}
@@ -131,6 +132,7 @@ export function BagItemRow({
               disabled={qtyBusy || rowBusy}
               onChange={(next) => (next > item.quantity ? onQtyInc() : onQtyDec())}
               onRemoveAtMin={onRemove}
+              onMaxReached={() => setLimitReached(true)}
               itemLabel={item.productName}
               testID={`cart-qty-${item.id}`}
             />
@@ -314,7 +316,7 @@ export function BagEmpty({
                 accessibilityLabel={`${p.brand} ${p.name}, ${fmt(p.priceCents)}`}
               >
                 <View style={s.arrivalImage}>
-                  {p.imageUri ? <CachedImage source={{ uri: p.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+                  <ProductPhoto uri={p.imageUri} brand={p.brand} name={p.name} style={StyleSheet.absoluteFill} />
                 </View>
                 {!!p.brand && <Text style={s.brand} numberOfLines={1}>{p.brand}</Text>}
                 <Text style={s.arrivalName} numberOfLines={2}>{p.name}</Text>
@@ -379,6 +381,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   arrivalsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SP.sm },
   arrivalsRow: { gap: SP.sm, paddingRight: SP.md },
   arrival: { width: 140, gap: 2 },
-  arrivalImage: { width: 140, height: 187, backgroundColor: '#1C1C1E', overflow: 'hidden', marginBottom: SP.xs },
+  arrivalImage: { width: 140, height: productPhotoHeight(140), backgroundColor: '#1C1C1E', overflow: 'hidden', marginBottom: SP.xs },
   arrivalName: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.text },
 });

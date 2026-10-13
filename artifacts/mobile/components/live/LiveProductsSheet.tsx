@@ -72,7 +72,7 @@ export function LiveProductsSheet({
             <View key={p.productId} style={[styles.row, { borderColor: live ? theme.text : theme.border }]}>
               <Text style={[styles.index, { color: theme.muted }, TABULAR_NUMS]}>{i + 1}</Text>
               <View style={[styles.thumb, { backgroundColor: theme.cardElevated }]}>
-                {p.imageUri ? <CachedImage source={{ uri: p.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Icon name="shopping-bag" size={18} color={theme.muted} />}
+                <ProductPhoto uri={p.imageUri} name={p.name} style={StyleSheet.absoluteFill} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 {live && (

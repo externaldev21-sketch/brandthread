@@ -43,6 +43,18 @@ const HASHTAG_RE = /^\/tag\/([\p{L}\p{N}_]{1,60})\/?$/u;
 
 const MATCHERS = [
   {
+    // Canonical live links carry streamId/hostId as query parameters.
+    // Without a path ID, unfurl the public live entry rather than guessing a host.
+    pattern: /^\/live\/?$/,
+    async load() {
+      return {
+        title: 'Live on Brandthread',
+        description: 'Watch live shopping on Brandthread.',
+        image: OG_IMAGE_FALLBACK,
+      };
+    },
+  },
+  {
     // /p/<id> is the canonical post link; /post/<id> is the long-form alias.
     pattern: /^\/(?:p|post)\/([A-Za-z0-9_-]{6,64})\/?$/,
     async load(match) {
@@ -59,8 +71,8 @@ const MATCHERS = [
     },
   },
   {
-    // /store/<handle>, and its short form /s/<handle>.
-    pattern: /^\/(?:store\/(?!product(?:\/|$))|s\/)([^/]+)\/?$/,
+    // Canonical /@handle, drop waitlist, and legacy store aliases.
+    pattern: /^\/(?:@|store\/(?!product(?:\/|$))|s\/)([^/]+)(?:\/drop)?\/?$/,
     async load(match) {
       const res = await fetchResource(`${apiBase()}/public/stores/${encodeURIComponent(match[1])}/share-preview`);
       if (res.status === 404) return NOT_FOUND;

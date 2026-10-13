@@ -73,7 +73,7 @@ import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXP
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 
 import type { ThreadComment } from '@/lib/safetyTypes';
-import { haptics, hapticDestructiveConfirm, haptic } from '@/lib/haptics';
+import { haptics, hapticDestructiveConfirm, haptic, hapticLight } from '@/lib/haptics';
 
 
 import { bumpCommentCount } from '@/lib/commentCountBus';

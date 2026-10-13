@@ -755,7 +755,7 @@ export default function CartScreen() {
               bottomInset={insets.bottom}
               busy={validating}
               disabled={selectedItems.length === 0 || validating}
-              onCheckout={handleCheckoutSelected}
+              onCheckout={() => { void startCheckout(selectedItems); }}
             />
           )}
         </>

@@ -1,7 +1,12 @@
 import React from 'react';
+const queryClientMock = vi.hoisted(() => ({
+  getQueryData: () => undefined,
+  setQueryData: vi.fn(),
+  fetchQuery: async ({ queryFn }: { queryFn: () => Promise<unknown> }) => queryFn(),
+}));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof import('@tanstack/react-query')>()),
-  useQueryClient: () => ({ getQueryData: () => undefined, setQueryData: vi.fn() }),
+  useQueryClient: () => queryClientMock,
 }));
 vi.mock('@/components/first-run-tips/FirstRunTip', () => ({ FirstRunTip: () => null }));
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
@@ -39,6 +44,7 @@ const {
     },
     reviews: {
       forProduct: vi.fn(),
+      forSeller: vi.fn().mockResolvedValue({ reviews: [], avgRating: 0, totalCount: 0 }),
     },
     publicSellers: {
       recordStoreVisit: vi.fn(),
@@ -97,6 +103,7 @@ vi.mock('react-native', async (importOriginal) => {
       Value: MockAnimatedValue,
       event: vi.fn(),
       View: nativeComponent('AnimatedView'),
+      Text: nativeComponent('AnimatedText'),
       timing: () => ({ start: (cb?: () => void) => cb?.() }),
       spring: () => ({ start: (cb?: () => void) => cb?.() }),
       sequence: () => ({ start: (cb?: () => void) => cb?.() }),
@@ -182,9 +189,15 @@ vi.mock('react-native-reanimated', () => {
   };
 
   return {
-    default: { View: el('AnimatedView'), createAnimatedComponent: (Component: unknown) => Component },
+    default: { View: el('AnimatedView'), Text: el('AnimatedText'), ScrollView: el('AnimatedScrollView'), createAnimatedComponent: (Component: unknown) => Component },
     useSharedValue: sharedValue,
     useAnimatedStyle: (fn: () => Record<string, unknown>) => fn(),
+    useReducedMotion: () => true,
+    runOnJS: (fn: (...args: any[]) => any) => fn,
+    Extrapolation: { CLAMP: 'clamp' },
+    interpolate: () => 0,
+    interpolateColor: (_value: number, _input: number[], colors: string[]) => colors[0],
+    useAnimatedScrollHandler: (handlers: any) => typeof handlers === 'function' ? handlers : handlers.onScroll,
     withSpring: (v: unknown) => v,
     withTiming: (v: unknown) => v,
     Easing: { out: (v: unknown) => v, cubic: () => {}, bezier: (..._points: number[]) => (t: number) => t },
@@ -228,6 +241,7 @@ vi.mock('@/lib/previewProducts', async (importOriginal) => {
   return {
     ...actual,
     getPreviewRelatedProducts: () => [],
+    getPreviewSellerProducts: () => [],
     getPreviewBuyerProduct: (id: string) => {
       const row = previewCatalogEnabledMock() ? previewCatalogProductMock(id) : null;
       return row ? actual.previewBuyerProductFromCatalog(row) : null;
@@ -372,6 +386,8 @@ function findTouchableByText(renderer: ReactTestRenderer, text: string): ReactTe
 
 async function flushPromises() {
   for (let i = 0; i < 6; i += 1) await Promise.resolve();
+  // React Query schedules observer notifications on the next macrotask.
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 async function renderScreen(): Promise<ReactTestRenderer> {
@@ -435,6 +451,11 @@ describe('buyer product detail when seller payments are unavailable', () => {
     renderer = await renderScreen();
 
     await act(async () => {
+      renderer.root.findByProps({ testID: 'product-size-row' }).props.onPress();
+      await flushPromises();
+    });
+
+    await act(async () => {
       findTouchableByText(renderer, 'M').props.onPress();
       await flushPromises();
     });
@@ -470,6 +491,11 @@ describe('buyer product detail when seller payments are unavailable', () => {
   it('keeps Add to Cart available when payment verification rejects, but blocks Buy Now with an unable-to-verify message', async () => {
     apiMock.buyer.sellerPaymentStatus.mockRejectedValue(new Error('payment status unavailable'));
     renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'product-size-row' }).props.onPress();
+      await flushPromises();
+    });
 
     await act(async () => {
       findTouchableByText(renderer, 'M').props.onPress();

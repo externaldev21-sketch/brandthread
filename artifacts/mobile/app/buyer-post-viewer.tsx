@@ -355,6 +355,10 @@ export default function BuyerPostViewer() {
       } else {
         await api.buyer.saved.save({ type: 'post', targetId: realPostId, title: caption || 'Post', accentColor: mediaColor1 });
         void requestContextualPushPermission(userId, api);
+        emitSaveHeartEvent({ type: 'toast', toast: savedPostToast({
+          id: realPostId, caption, creator: authorName, accentColor: mediaColor1,
+          contentType: postType, mediaUris: post?.mediaUrls?.length ? post.mediaUrls : post?.mediaUrl ? [post.mediaUrl] : [],
+        }) });
       }
     } catch {
       setSaved(wasSaved);

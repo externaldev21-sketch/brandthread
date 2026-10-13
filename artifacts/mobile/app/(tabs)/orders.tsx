@@ -161,48 +161,6 @@ function fmtMoney(cents: number): string {
   return formatCents(cents);
 }
 
-function getPaymentColor(status: string, theme: AppThemePreset): string {
-  switch (status) {
-    case 'paid': return theme.text;
-    case 'pending': case 'authorized': return theme.muted;
-    case 'refunded': case 'partially_refunded': case 'failed': case 'voided': return theme.error;
-    default: return theme.muted;
-  }
-}
-
-function getFulfillmentColor(status: string, theme: AppThemePreset): string {
-  switch (status) {
-    case 'unfulfilled': return theme.text;
-    case 'partially_fulfilled': case 'fulfilled': case 'manufacturer_pending': return theme.muted;
-    default: return theme.muted;
-  }
-}
-
-function getPaymentLabel(status: string): string {
-  switch (status) {
-    case 'paid': return 'Paid';
-    case 'pending': return 'Pending';
-    case 'authorized': return 'Authorized';
-    case 'refunded': return 'Refunded';
-    case 'partially_refunded': return 'Part. Refunded';
-    case 'failed': return 'Failed';
-    case 'voided': return 'Voided';
-    default: return status;
-  }
-}
-
-function getFulfillmentLabel(status: string): string {
-  switch (status) {
-    case 'unfulfilled': return 'To ship';
-    case 'partially_fulfilled': return 'Partial';
-    case 'fulfilled': return 'Fulfilled';
-    case 'manufacturer_pending': return 'Mfg Pending';
-    case 'returned': return 'Returned';
-    case 'cancelled': return 'Cancelled';
-    default: return status;
-  }
-}
-
 export function getCancellationReasonLabel(reason: string): string {
   if (reason === 'not_delivered_in_time') return 'Not delivered in time';
   return CANCELLATION_REASONS.find(r => r.key === reason)?.label ?? reason.replace(/_/g, ' ');

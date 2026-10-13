@@ -294,7 +294,14 @@ const DOUBLE_TAP_ZOOM = 2.5;
  * an unzoomed photo still swipes the gallery; `onZoomChange` lets the
  * gallery lock paging while a photo is zoomed.
  */
-function ZoomableGalleryImage({ uri, onZoomChange }: { uri: string; onZoomChange?: (zoomed: boolean) => void }) {
+function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange }: {
+  uri: string;
+  brand?: string;
+  name?: string;
+  onOpen?: () => void;
+  onZoomChange?: (zoomed: boolean) => void;
+}) {
+  const [failed, setFailed] = useState(false);
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const tx = useSharedValue(0);
@@ -383,7 +390,10 @@ function ZoomableGalleryImage({ uri, onZoomChange }: { uri: string; onZoomChange
       runOnJS(setZoomed)(true);
     });
 
-  const gesture = Gesture.Simultaneous(pinch, pan, doubleTap);
+  const singleTap = Gesture.Tap().numberOfTaps(1).onEnd((_event, success) => {
+    if (success && onOpen && savedScale.value <= 1) runOnJS(onOpen)();
+  });
+  const gesture = Gesture.Simultaneous(pinch, pan, Gesture.Exclusive(doubleTap, singleTap));
   const imageStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
@@ -394,10 +404,11 @@ function ZoomableGalleryImage({ uri, onZoomChange }: { uri: string; onZoomChange
 
   return (
     <GestureDetector gesture={gesture}>
-      <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }}>
+      <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }} testID="product-gallery-photo">
         <Reanimated.View style={[StyleSheet.absoluteFill, imageStyle]}>
           <CachedImage
             source={{ uri }}
+            onError={() => setFailed(true)}
             style={StyleSheet.absoluteFill}
             contentFit="contain"
             accessibilityLabel="Product photo. Pinch or double-tap to zoom."
@@ -668,7 +679,7 @@ function SizeChip({ label, selected, available, onPress, accessibilityLabel, tes
       ]}
     >
       {/* Sold out keeps its distinct shape: slash glyph + struck label. */}
-      {!available && <Feather name="slash" size={12} color={theme.subtle} />}
+      {!available && <AppIcon name="slash" size={12} color={theme.subtle} />}
       <Text
         style={[
           sizeChipStyles.label,
@@ -714,7 +725,7 @@ function InfoRow({ label, expanded, onPress, opensSheet = false, children, testI
         testID={testID}
       >
         <Text style={[infoRowStyles.label, { color: theme.text }]}>{label}</Text>
-        <Feather
+        <AppIcon
           name={opensSheet ? 'chevron-right' : expanded ? 'chevron-up' : 'chevron-down'}
           size={18}
           color={theme.muted}
@@ -2379,7 +2390,7 @@ function RelatedProducts({ productId, excludeSellerId, sellerId = excludeSellerI
         activeOpacity={0.8}
         testID={testID}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          haptics.light();
           if (usesThreadPull) {
             push({ pathname: '/thread-product-detail' as any, params: { productId: p.id } } as never);
           } else {
@@ -2392,7 +2403,7 @@ function RelatedProducts({ productId, excludeSellerId, sellerId = excludeSellerI
             <CachedImage source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={p.images[0]} />
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <Feather name="image" size={24} color={MUTED} />
+              <AppIcon name="image" size={24} color={MUTED} />
             </View>
           )}
         </View>
@@ -2521,6 +2532,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // minHeight, not height: the thumbnail rail renders under the photo inside
   // this block, and a fixed height let it overlap the brand/name below.
   imageArea: { minHeight: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
+  previewMarkerWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  previewMarker: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingHorizontal: SP.sm, paddingVertical: SP.xs, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
+  previewMarkerText: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.xs },
+  previewNote: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.meta, marginBottom: SP.md },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
   // Positioning wrappers only — the solid dark chrome and hit area come

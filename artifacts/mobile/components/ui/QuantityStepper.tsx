@@ -59,6 +59,7 @@ export function QuantityStepper({
   const sm = size === 'sm';
 
   const step = (delta: number) => {
+    hapticToggle();
     onChange(Math.min(max, Math.max(min, value + delta)));
   };
 

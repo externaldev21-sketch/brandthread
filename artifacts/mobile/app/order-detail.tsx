@@ -1,4 +1,6 @@
 import { haptics } from '@/lib/haptics';
+import { useFeeSchedule } from '@/hooks/useFeeSchedule';
+import { quoteFromSchedule } from '@/lib/feeSchedule';
 /**
  * Seller order detail — Shopify iOS order screen, 1:1 in black/white/silver:
  * header with the order number, share and ⋯; the unfulfilled items with
@@ -144,7 +146,6 @@ export function adaptApiOrder(raw: any): Order {
     discountAmountCents: 0,
     taxAmountCents:   0,
     totalCents:       (item.priceCents ?? 0) * item.quantity,
-    imageUri:         typeof item.imageUrl === 'string' && item.imageUrl ? item.imageUrl : undefined,
     fulfillmentSource: 'seller' as FulfillmentType,
     isPreOrder:       raw.isPreorder === true,
     deliverBy:        item.deliverBy ?? null,
@@ -380,9 +381,6 @@ function timelineColor(type: string, theme: ReturnType<typeof useAppTheme>['them
   }
 }
 
-function returnReasonLabel(key: string): string {
-  return RETURN_REASONS.find(r => r.key === key)?.label ?? key;
-}
 
 function cancellationReasonLabel(key: string): string {
   return CANCELLATION_REASONS.find(r => r.key === key)?.label ?? key;
@@ -1077,6 +1075,35 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
           </View>
         ))}
 
+        {/* Customer */}
+        <Block>
+          <OrderStatusDot status={order.status} paymentStatus={order.paymentStatus} />
+          <Text style={s.blockTitle}>Customer</Text>
+          <ListRow
+            title={c.name}
+            subtitle={plural(c.totalOrders, 'order')}
+            chevron={!!c.id}
+            onPress={c.id ? () => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never) : undefined}
+            testID="order-customer"
+          />
+          {c.buyerUserId ? (
+            <ListRow
+              icon="user"
+              title="View profile"
+              chevron
+              onPress={() => router.push(profileHref({ userId: c.buyerUserId!, accountType: 'buyer', name: c.name, initials: c.initials }) as never)}
+            />
+          ) : null}
+          <ListRow
+            icon="message-circle"
+            title={messagingBuyer ? 'Opening…' : 'Message buyer'}
+            onPress={handleMessageBuyer}
+            disabled={messagingBuyer || !order.customer.buyerUserId}
+            chevron
+            testID="order-message-buyer"
+          />
+        </Block>
+
         {(order.isPreOrder || (order.sellerRisk && order.sellerRisk.level !== 'normal')) ? (
           <View style={s.flagRow}>
             {order.isPreOrder ? <Pill icon="clock" label="Pre-order" /> : null}
@@ -1219,34 +1246,6 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
             ))}
           </Block>
         ) : null}
-
-        {/* Customer */}
-        <Block>
-          <Text style={s.blockTitle}>Customer</Text>
-          <ListRow
-            title={c.name}
-            subtitle={plural(c.totalOrders, 'order')}
-            chevron={!!c.id}
-            onPress={c.id ? () => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never) : undefined}
-            testID="order-customer"
-          />
-          {c.buyerUserId ? (
-            <ListRow
-              icon="user"
-              title="View profile"
-              chevron
-              onPress={() => router.push(profileHref({ userId: c.buyerUserId!, accountType: 'buyer', name: c.name, initials: c.initials }) as never)}
-            />
-          ) : null}
-          <ListRow
-            icon="message-circle"
-            title={messagingBuyer ? 'Opening…' : 'Message buyer'}
-            onPress={handleMessageBuyer}
-            disabled={messagingBuyer || !order.customer.buyerUserId}
-            chevron
-            testID="order-message-buyer"
-          />
-        </Block>
 
         <Block>
           <Text style={s.blockTitle}>Contact information</Text>

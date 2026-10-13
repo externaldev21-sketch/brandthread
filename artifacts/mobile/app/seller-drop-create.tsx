@@ -700,7 +700,7 @@ export default function SellerDropCreate() {
                 onPress={() => router.push((`/drop-waitlist?dropId=${encodeURIComponent(dropId)}`) as never)}
                 testID="drop-waitlist-entry"
               >
-                <Feather name="message-square" size={16} color={theme.text} />
+                <Icon name="message-square" size={16} color={theme.text} />
                 <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Waitlist & countdown</Text>
               </TouchableOpacity>
               <TouchableOpacity

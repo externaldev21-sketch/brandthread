@@ -172,9 +172,7 @@ export function VariantPickerSheet({
       ) : product ? (
         <>
           <View style={s.productRow}>
-            {product.imageUris[0] ? (
-              <CachedImage source={{ uri: product.imageUris[0] }} style={s.thumb} contentFit="cover" />
-            ) : <View style={[s.thumb, s.thumbPlaceholder]}><Icon name="image" size={18} color={theme.subtle} /></View>}
+            <ProductPhoto uri={product.imageUris[0]} brand={product.sellerName} name={product.name} style={s.thumb} />
             <View style={{ flex: 1 }}>
               <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
               <Text style={s.productPrice}>{formatCents(price)}</Text>
