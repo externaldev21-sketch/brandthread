@@ -37,6 +37,22 @@ export function notBlockedWith(viewerId: string | null | undefined, authorColumn
   )`;
 }
 
+/**
+ * SQL predicate for inbox lists: drop a 1:1 conversation when the other
+ * participant and `viewerId` have a block between them, either direction.
+ * Group conversations are kept (blocking one member doesn't hide the group).
+ */
+export function oneToOneNotBlockedWith(viewerId: string, conversationIdColumn: SQLWrapper, typeColumn: SQLWrapper): SQL {
+  return sql`(${typeColumn} = 'group' OR NOT EXISTS (
+    SELECT 1 FROM conversation_participants op
+    JOIN blocks b
+      ON (b.blocker_id = ${viewerId} AND b.blocked_id = op.user_id)
+      OR (b.blocker_id = op.user_id AND b.blocked_id = ${viewerId})
+    WHERE op.conversation_id = ${conversationIdColumn}
+      AND op.user_id <> ${viewerId}
+  ))`;
+}
+
 /** SQL predicate: the user in `authorColumn` is not suspended or deleted. */
 export function authorInGoodStanding(authorColumn: SQLWrapper): SQL {
   return sql`NOT EXISTS (
