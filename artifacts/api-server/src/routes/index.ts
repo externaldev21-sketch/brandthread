@@ -198,6 +198,7 @@ import storeBlocksRouter from "./storeBlocks";
 import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
 import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 import geoPostalRouter from "./geo-postal";
+import appInstallsRouter from "./app-installs";
 
 const router = Router();
 router.use(aiConsentGate);
@@ -212,6 +213,7 @@ router.use("/app",             appConfigRouter); // GET /config: min supported a
 router.use("/config/seller-plans", sellerPlanConfigRouter);
 router.use("/config/live", configLiveRouter); // public: { liveAvailable } (Agora configured)
 router.use("/geo",           geoPostalRouter); // GET /postal/US/:zip (no auth, rate-limited): ZIP → city/state for checkout
+router.use("/app/installs",    appInstallsRouter); // first-launch install ping (admin funnel), works signed out
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public",          publicWebAnnualPlansRouter); // GET /web-annual-plans (no auth; empty until a yearly web price is set)

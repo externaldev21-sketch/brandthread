@@ -42,6 +42,7 @@ export * from './checkoutExtras';
 export * from './adminMoney';
 export * from './moderationQueue';
 export * from './accountProfiles';
+export * from './launchMetrics';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { places } from './places';
 import { relations, sql } from 'drizzle-orm';

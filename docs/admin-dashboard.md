@@ -45,6 +45,7 @@ onboarding redirect).
 | Announcements | `GET/POST /admin/announcements` · `GET /admin/announcements/audience?audience=` |
 | Invite codes | `GET/POST /admin/invites` · `POST /admin/invites/:id/disable\|enable` |
 | Audit | `GET /admin/audit?actor=&action=&targetId=` |
+| Metrics | `GET /admin/metrics/today` (today vs the same time yesterday, in `ADMIN_REPORT_TIMEZONE`, default America/Chicago) · `/metrics/cohorts?months=` (30-day repeat rate by first-purchase month) · `/metrics/top?days=` (top sellers + products) · `/metrics/funnel?days=` (install → sign-up → first purchase) · `/metrics/seller-risk?days=` (refund / chargeback rate per seller, flagged above 2%) · `/metrics/inactive-sellers` (no sale, product edit, post or app open for 14+ days). Definitions: `lib/admin/launchMetrics.ts` |
 
 Nothing here deletes accounts or data. Money moves only through the audited actions above,
 which reuse the app's own money code (`lib/money/refunds.ts` for refunds, the dispute evidence

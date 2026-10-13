@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { Show, useClerk } from "@clerk/react";
-import { Activity, AlertTriangle, Banknote, Coins, Cpu, Gift, Landmark, LayoutDashboard, Megaphone, Menu, ScrollText, ShieldAlert, ShoppingBag, Sparkles, UserX, Users } from "lucide-react";
+import { Activity, AlertTriangle, Banknote, Coins, Cpu, Gift, Landmark, LayoutDashboard, Megaphone, Menu, ScrollText, ShieldAlert, ShoppingBag, Sparkles, TrendingUp, UserX, Users } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import NotFound from "@/pages/not-found";
@@ -23,9 +23,11 @@ import ThreadCashPage from "./pages/thread-cash";
 import RiskPage from "./pages/risk";
 import PayoutsPage from "./pages/payouts";
 import ProblemSellersPage from "./pages/problem-sellers";
+import MetricsPage from "./pages/metrics";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/admin/metrics", label: "Metrics", icon: TrendingUp },
   { href: "/admin/users", label: "Users & sellers", icon: Users },
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { href: "/admin/revenue", label: "Revenue", icon: Banknote },
@@ -114,6 +116,7 @@ function Gate() {
     <Shell email={data.email}>
       <Switch>
         <Route path="/admin" component={OverviewPage} />
+        <Route path="/admin/metrics" component={MetricsPage} />
         <Route path="/admin/users" component={UsersPage} />
         <Route path="/admin/orders" component={OrdersPage} />
         <Route path="/admin/revenue" component={RevenuePage} />
