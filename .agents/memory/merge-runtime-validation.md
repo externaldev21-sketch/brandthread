@@ -9,6 +9,12 @@ After resolving an upstream merge, check every tracked runtime source for confli
 
 **How to apply:** Scan tracked JavaScript and TypeScript sources after all merges, syntax-check changed JavaScript entry points, and distinguish those results from mobile and API typechecks.
 
+When a feature PR edits older, separate screen implementations, preserve the current shared screen and port the feature into it. Also inspect marker-free merge overlaps for duplicated or incomplete method bodies.
+
+**Why:** Independent PRs can target obsolete screen copies. Keeping only the current wrapper silently drops the incoming behavior, while restoring the old copy loses newer account, outbox, and navigation safeguards.
+
+**How to apply:** Resolve both behavioral intents in the canonical implementation, then check its changed actions and account boundaries rather than treating a clean merge as proof of compatibility.
+
 Make failed validation stop a batch shell command before it can stage or commit.
 
 **Why:** A shell continued past a failing conflict-marker check and committed a partly resolved file; the overall command still reported success because its final command succeeded.
