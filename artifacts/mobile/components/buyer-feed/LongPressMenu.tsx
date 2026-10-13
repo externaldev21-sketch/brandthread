@@ -33,7 +33,7 @@ export function LongPressMenu({
   onNotInterested, onReport, onClose,
 }: {
   visible: boolean;
-  /** Seller display name, used in the "Don't recommend …" reason. */
+  /** Seller display name, read out by VoiceOver on the "Don't recommend" row. */
   creator: string;
   isVideo: boolean;
   speedActive: boolean;
@@ -126,7 +126,7 @@ export function LongPressMenu({
             </View>
             <View style={styles.divider} />
             <ListAction icon="eye-off" label="Hide this video" onPress={act(() => onNotInterested('video'))} testID="feed-not-interested-video" />
-            <ListAction icon="user-x" label={`Don't recommend videos from ${creator}`} onPress={act(() => onNotInterested('creator'))} testID="feed-not-interested-creator" />
+            <ListAction icon="user-x" label="Don't recommend this seller" a11y={`Don't recommend videos from ${creator}`} onPress={act(() => onNotInterested('creator'))} testID="feed-not-interested-creator" />
           </>
         )}
       </SheetRise>
@@ -152,11 +152,11 @@ export function LongPressMenu({
     );
   }
 
-  function ListAction({ icon, label, active, onPress, testID }: { icon: FeatherName; label: string; active?: boolean; onPress: () => void; testID?: string }) {
+  function ListAction({ icon, label, a11y, active, onPress, testID }: { icon: FeatherName; label: string; a11y?: string; active?: boolean; onPress: () => void; testID?: string }) {
     return (
-      <Pressable style={({ pressed }) => [styles.listRow, pressed && styles.listRowPressed]} onPress={onPress} accessibilityRole="button" accessibilityLabel={label} testID={testID}>
+      <Pressable style={({ pressed }) => [styles.listRow, pressed && styles.listRowPressed]} onPress={onPress} accessibilityRole="button" accessibilityLabel={a11y ?? label} testID={testID}>
         <Feather name={icon} size={20} color={theme.text} />
-        <Text style={[styles.listLabel, active && styles.listLabelActive]} numberOfLines={1}>{label}</Text>
+        <Text style={[styles.listLabel, active && styles.listLabelActive]} numberOfLines={2}>{label}</Text>
         <Feather name="chevron-right" size={18} color={theme.muted} />
       </Pressable>
     );
@@ -187,7 +187,7 @@ const makeStyles = (theme: { background: string; card: string; border: string; t
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
     backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
   },
-  listRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16 },
+  listRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8 },
   listRowPressed: { backgroundColor: theme.surface },
   listLabel: { flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: 15 },
   listLabelActive: { fontFamily: FONT.semibold },
