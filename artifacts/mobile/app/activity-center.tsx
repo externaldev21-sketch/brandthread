@@ -69,7 +69,7 @@ import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-c
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
-import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticDestructiveConfirm, hapticFollow } from '@/lib/haptics';
 import {
   isPreviewActivityEnabled, getVisiblePreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri,
   isPreviewActivityId, markPreviewActivityDismissed,
@@ -1035,7 +1035,6 @@ export default function ActivityCenterScreen() {
     setFollowOverrides((prev) => ({ ...prev, [userId]: next }));
     try {
       await setSellerFollowing(userId, next);
-      if (next) hapticSuccessAction();
     } catch {
       setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
       Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
@@ -1053,7 +1052,6 @@ export default function ActivityCenterScreen() {
     if (!userId) return;
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
     if (!currentlyFollowing) {
-      hapticPrimaryAction();
       void setFollowingPerson(userId, true);
       return;
     }
@@ -1162,11 +1160,10 @@ export default function ActivityCenterScreen() {
   }, []);
 
   const handleSuggestedFollow = useCallback(async (person: SuggestedPerson) => {
-    hapticPrimaryAction();
+    hapticFollow(true);
     setSuggestedFollowState((prev) => ({ ...prev, [person.userId]: 'pending' }));
     try {
       await setSellerFollowing(person.userId, true);
-      hapticSuccessAction();
       setSuggestedFollowState((prev) => ({ ...prev, [person.userId]: 'done' }));
     } catch {
       setSuggestedFollowState((prev) => {

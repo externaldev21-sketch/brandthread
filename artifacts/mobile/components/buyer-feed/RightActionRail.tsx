@@ -21,7 +21,7 @@ import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
-import { hapticLight } from '@/lib/haptics';
+import { hapticFollow, hapticLight } from '@/lib/haptics';
 import { FONT, FS, GOLD, ON_DARK } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
@@ -205,7 +205,7 @@ export function RightActionRail({
               disabled={!!engagement?.following}
               accessibilityRole="button"
               accessibilityLabel={`Follow ${creator}`}
-              onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onFollow(); }}
+              onPress={async () => { hapticFollow(true); await onFollow(); }}
               testID={`follow-btn-${testIdBase}`}
             >
               <Feather

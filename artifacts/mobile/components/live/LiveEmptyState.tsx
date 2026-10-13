@@ -10,6 +10,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatUpcomingTime, formatViewerCount } from '@/lib/live/liveOrdering';
 import type { SuggestedCreator, UpcomingLive } from '@/lib/live/types';
+import { hapticFollow } from '@/lib/haptics';
 import { LiveHostAvatar } from './LiveOverlays';
 import { radius } from '@/constants/radii';
 
@@ -95,7 +96,7 @@ export function LiveEmptyState({
                   <Text style={[styles.cardMeta, { color: theme.muted }]}>{formatViewerCount(c.followerCount)} followers</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => onFollow(c.host.id, !c.following)}
+                  onPress={() => { hapticFollow(!c.following); onFollow(c.host.id, !c.following); }}
                   style={[styles.cardFollow, c.following
                     ? { borderColor: theme.border, borderWidth: 1 }
                     : { backgroundColor: theme.accent }]}
