@@ -153,7 +153,7 @@ export default function NotificationsSettingsScreen() {
                   icon={row.icon}
                   title={row.label}
                   subtitle={row.description}
-                  subtitleNumberOfLines={1}
+                  subtitleNumberOfLines={2}
                   toggle={{
                     value: categories[row.key] ?? true,
                     onChange: (value) => handleCategory(row.key, value),
