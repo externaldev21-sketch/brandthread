@@ -42,7 +42,8 @@ import { useLivePager, LIVE_END_ANIMATION_MS, type LiveRuntime } from '@/lib/liv
 import { liveShopSelection } from '@/lib/live/liveShop';
 import { fetchLiveCodes, describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
 import { clearLiveCheckoutContext, getLiveCheckoutContext, setLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
-import type { LiveStream } from '@/lib/live/types';
+import type { LiveProduct, LiveStream } from '@/lib/live/types';
+import { fetchLiveBag } from '@/services/liveShoppingService';
 import {
   LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail,
   type LiveHeartLayerHandle,
@@ -271,12 +272,22 @@ export default function LiveScreen() {
   // Live-only codes for the stream whose bag is open (real streams only —
   // the preview provider has no backend).
   const bagStreamId = bagFor?.id ?? null;
+  // The full live bag: host tags + products an on-stage co-host added.
+  const [bagProducts, setBagProducts] = useState<LiveProduct[] | null>(null);
   useEffect(() => {
     setLiveCodes([]);
+    setBagProducts(null);
     if (!bagStreamId || provider.id === 'preview') return undefined;
     let alive = true;
     setAppliedCode(getLiveCheckoutContext()?.streamId === bagStreamId ? getLiveCheckoutContext()?.code ?? null : null);
     fetchLiveCodes(bagStreamId).then(codes => { if (alive) setLiveCodes(codes); }).catch(() => {});
+    fetchLiveBag(bagStreamId).then(bag => {
+      if (!alive || !bag.length) return;
+      setBagProducts(bag.map(b => ({
+        productId: b.productId, name: b.productName, priceCents: b.priceCents, imageUri: b.imageUri,
+        sellerId: b.sellerId, ...(b.fromHost ? {} : { sellerName: b.sellerName }),
+      })));
+    }).catch(() => {});
     return () => { alive = false; };
   }, [bagStreamId, provider]);
 
@@ -356,13 +367,16 @@ export default function LiveScreen() {
 
   const handleGiftSent = useCallback(async (stream: LiveStream, amountCents: number) => {
     setGiftFor(null);
+    // Real lives: the server announces the gift to the room and the pager's
+    // activity poll shows it — posting a chat line too would show it twice.
+    if (provider.id !== 'preview') return;
     try {
       await pager.sendChat(`sent ${formatCents(amountCents)} Thread Cash`);
     } catch {
       // The transfer already went through — a failed chat post isn't worth
       // surfacing as an error on top of a successful gift.
     }
-  }, [pager]);
+  }, [pager, provider.id]);
 
   const handleGiftFailed = useCallback((message: string) => {
     setNotice(message);
@@ -371,7 +385,12 @@ export default function LiveScreen() {
   const buy = useCallback((stream: LiveStream, productId: string) => {
     const sel = liveShopSelection(stream, productId, provider.id === 'preview');
     if (!sel) return;
-    if (provider.id !== 'preview') setLiveCheckoutContext({ streamId: stream.id, sellerId: stream.host.id });
+    // A co-host's product is bought from the co-host's store.
+    const sellerId = stream.products.find(p => p.productId === productId)?.sellerId ?? stream.host.id;
+    // The host's live code never rides along to a co-host's store.
+    if (provider.id !== 'preview') {
+      setLiveCheckoutContext({ streamId: stream.id, sellerId, ...(sellerId === stream.host.id ? {} : { code: null }) });
+    }
     setBagFor(null);
     setShopSelection(sel);
   }, [provider.id]);
@@ -481,9 +500,9 @@ export default function LiveScreen() {
         <LiveProductsSheet
           visible
           hostName={bagFor.host.name}
-          products={bagFor.products}
+          products={bagProducts ?? bagFor.products}
           pinnedProductId={pager.runtime[bagFor.id]?.pinnedProductId ?? bagFor.pinnedProductId}
-          onBuy={pid => buy(bagFor, pid)}
+          onBuy={pid => buy(bagProducts ? { ...bagFor, products: bagProducts } : bagFor, pid)}
           onClose={() => setBagFor(null)}
           codes={liveCodes}
           appliedCode={appliedCode}

@@ -184,6 +184,11 @@ function SellerLiveNativeScreen() {
     } else if (event.type === 'comment_removed') {
       setComments(prev => prev.filter(c => c.id !== event.commentId));
       mod.handleEvent(event);
+    } else if (event.type === 'purchase' || event.type === 'gift') {
+      // "Ana just bought …" / "Ana sent $5 Thread Cash" in the host's chat (no user_id: not moderatable).
+      const a = event.type === 'purchase' ? event.purchase : event.gift;
+      setComments(prev => prev.some(c => c.id === a.id) ? prev : [...prev, { id: a.id, display_name: a.name, message: a.text, created_at: a.at }].slice(-80));
+      setTimeout(() => commentsRef.current?.scrollToEnd({ animated: true }), 100);
     } else {
       mod.handleEvent(event);
     }

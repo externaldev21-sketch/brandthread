@@ -32,7 +32,11 @@ export type LiveSocketEvent =
   | { type: 'products'; productTags: any[] }
   | { type: 'viewerCount'; count: number }
   | { type: 'pinned'; productId: string | null }
-  | { type: 'liveCode'; code: { id: string; code: string; type: string; value: number } }
+  | { type: 'liveCode'; code: { id: string; code: string; type: string; value: number; expiresAt?: string | null } }
+  // Live commerce (routes/live-shopping.ts, lib/livePurchases.ts, routes/thread-cash.ts)
+  | { type: 'purchase'; purchase: { id: string; name: string; text: string; at: string } }
+  | { type: 'gift'; gift: { id: string; name: string; text: string; at: string; amountCents: number } }
+  | { type: 'bag'; products: any[] }
   // Moderation + co-host (routes/live-moderation.ts, routes/live-cohost.ts)
   | { type: 'comment_pinned'; comment: any | null }
   | { type: 'comment_removed'; commentId: string }
