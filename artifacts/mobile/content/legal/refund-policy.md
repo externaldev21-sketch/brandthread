@@ -2,6 +2,15 @@
 
 Version: 2026-09-23
 
+## The short version
+
+- Each seller’s return and cancellation policy, shown on their store, applies along with this policy and your legal rights.
+- You can cancel an order from your order page before it ships. A preorder can be cancelled while its drop is still collecting orders.
+- Once an order ships, you can request a return from your order page. The seller approves or denies it under their return policy.
+- If a drop is cancelled or isn’t fulfilled by its deadline, every unshipped order is refunded in full automatically. You don’t need to ask.
+- Refunds go back to your original payment method. Any part you paid with Thread Cash goes back to your Thread Cash balance.
+- Problem with an order? Contact the seller first from your order, then Brandthread support at support@brandthread.app.
+
 ## Overview
 
 This policy explains how cancellations, returns and refunds work when you buy on Brandthread. It is part of our [Terms of Service](/terms). Sellers, not Brandthread, are the sellers of the products in their stores, so each seller’s own return and cancellation policy, shown on their store, applies in addition to this policy and to your legal rights.

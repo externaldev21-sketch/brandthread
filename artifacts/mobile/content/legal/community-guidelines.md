@@ -2,6 +2,16 @@
 
 Version: 2026-09-23
 
+## The short version
+
+- These rules cover everything you post, sell, say and send on Brandthread, including direct messages.
+- No harassment, hate speech, threats or doxxing. Slurs are blocked everywhere, including private messages.
+- No sexual content involving minors, no nudity or sexual solicitation, and no dangerous or illegal goods.
+- Sell honestly: no counterfeits or stolen designs, describe products accurately, and keep payments on Brandthread.
+- You can report anything, block anyone and mute words. Reports are anonymous.
+- Breaking the rules can mean removed content, a suspension or a permanent ban. We aim to act on every report within 24 hours.
+- Think we got it wrong? Email safety@brandthread.app.
+
 ## Zero tolerance for abuse and objectionable content
 
 Brandthread has no tolerance for objectionable content or abusive members. Content that breaks these Guidelines is removed, and people who post it can lose access to Brandthread permanently. These Guidelines are part of our Terms of Service, which you agree to when you create an account.

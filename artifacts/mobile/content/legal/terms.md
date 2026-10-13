@@ -2,6 +2,18 @@
 
 Version: 2026-09-23
 
+## The short version
+
+- These Terms are an agreement between you and Brandthread, Inc. Using Brandthread means you agree to them, the Community Guidelines and the Privacy Policy.
+- You need to be 13 or older to use Brandthread, and 18 or older to sell, get payouts or work with manufacturers.
+- Sellers, not Brandthread, sell the products in their stores. Each seller’s return, cancellation and shipping policies apply on top of your legal rights.
+- Money for preorders and drops is held until the seller adds tracking for your order. If a drop is cancelled, fails to reach production, or the seller can’t ship your order, you get a full refund to your original payment method.
+- Sellers pay a 5% platform fee on each marketplace order’s subtotal, not counting shipping and sales tax.
+- You own what you post and give Brandthread a license to show it. Break the Community Guidelines and we can remove content or suspend or close your account.
+- You can delete your account in Settings → Delete account. Questions: legal@brandthread.app.
+
+This summary isn’t the agreement. The full text below is.
+
 ## Agreement
 
 These Terms govern your use of the Brandthread mobile apps, brandthread.app and related services (“Brandthread”). “Brandthread,” “we,” “us” and “our” mean Brandthread, Inc. By creating an account, checking the agreement box at sign-up, or using Brandthread, you agree to these Terms, the Community Guidelines and our Privacy Policy. If you don’t agree, don’t use Brandthread.

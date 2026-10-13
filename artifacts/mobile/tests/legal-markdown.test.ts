@@ -142,6 +142,17 @@ describe('legal documents from markdown', () => {
     }
   });
 
+  it('opens every document with a plain-English summary (VOICE.md)', () => {
+    for (const id of LEGAL_ALL_DOCUMENT_ORDER) {
+      const [first] = LEGAL_DOCUMENTS[id].sections;
+      expect(first.title, id).toBe('The short version');
+      expect(first.blocks?.[0]?.type, id).toBe('bullets');
+      expect(first.bullets?.length, id).toBeGreaterThanOrEqual(4);
+      expect(first.bullets?.length, id).toBeLessThanOrEqual(7);
+      expect([...(first.bullets ?? []), ...(first.paragraphs ?? [])].join('\n'), id).not.toContain('!');
+    }
+  });
+
   it('states the fee and held-funds rules consistently with the Terms', () => {
     const seller = LEGAL_DOCUMENTS['seller-agreement'].sections.flatMap((s) => s.bullets ?? []).join('\n');
     expect(seller).toMatch(/5% of each marketplace order’s subtotal/);
