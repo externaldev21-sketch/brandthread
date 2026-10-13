@@ -161,6 +161,7 @@ import affiliatePublicRouter from "./affiliate-public";
 import affiliateCreatorRouter from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
 import growthRouter from "./growth";
+import { publicProductFeedRouter, sellerProductFeedRouter } from "./product-feed";
 import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
 import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 
@@ -171,6 +172,7 @@ router.use("/config/features", featureFlagsRouter);
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
+router.use("/public/feeds",     publicProductFeedRouter); // secret-token Meta / TikTok catalog CSV feeds (public data only)
 router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
 router.use("/access",          accessRouter); // invite-only launch: validate/waitlist public, status/redeem authed
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
@@ -397,6 +399,7 @@ router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
 // Seller growth tools: tracked UTM links, link-in-bio, store pixels.
 router.use("/growth",              tc, growthRouter);
+router.use("/seller/product-feed",  tc, sellerProductFeedRouter); // seller feed URL: view, create, regenerate
 router.use("/gift-cards",          giftCardsRouter); // buyer + seller (own auth/permission checks); no tc
 
 export default router;
