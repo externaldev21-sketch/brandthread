@@ -155,6 +155,7 @@ import sizeChartTemplatesRouter from "./size-chart-templates";
 import recentlyViewedRouter from "./recently-viewed";
 import firstRunTipsRouter from "./first-run-tips";
 import sellerLaunchChecklistRouter from "./seller-launch-checklist";
+import sellerMorningBriefRouter from "./seller-morning-brief";
 import sellerLocationsRouter from "./seller-locations";
 import sellerTerminalRouter from "./seller-terminal";
 import sellerMetafieldsRouter from "./seller-metafields";
@@ -437,6 +438,7 @@ router.use("/seller/launch-checklist",   tc, sellerLaunchChecklistRouter);
 router.use("/seller/post-purchase-offer", tc, sellerPostPurchaseOfferRouter);
 router.use("/seller/conversion-tracking", tc, sellerConversionTrackingRouter);
 router.use("/seller/terminal",           tc, sellerTerminalRouter); // Pop-up mode (Tap to Pay); 503 unless STRIPE_TERMINAL_ENABLED=1
+router.use("/seller/morning-brief",      tc, sellerMorningBriefRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
 router.use("/product-qa",                tc, productQaRouter);

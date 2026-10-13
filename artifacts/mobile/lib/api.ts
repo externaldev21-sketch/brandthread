@@ -10,6 +10,7 @@ import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
 import type { FriendsSaved } from '@/lib/friendsSaved';
 import type { PriceHistory } from '@/lib/priceHistory';
+import type { MorningBrief } from '@/lib/morningBrief';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -3130,6 +3131,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  SearchResult shape (kind='brand'|'product') compatible with searchData.ts. */
       search: (q: string, limit = 20) =>
         get<{ results: any[] }>(`/api/public/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+      /** Yesterday's sales, orders to ship and one suggestion, in the seller's own day. */
+      morningBrief: (tz: string) =>
+        get<MorningBrief>(`/api/seller/morning-brief?tz=${encodeURIComponent(tz)}`),
       launchChecklist: {
         get: () => get<LaunchChecklistResponse>('/api/seller/launch-checklist'),
         previewSeen: () => post<void>('/api/seller/launch-checklist/preview-seen', {}),
