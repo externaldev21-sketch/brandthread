@@ -48,6 +48,40 @@ export function pickWeighted(candidates: WeightedCandidate[], rng: RandomInt = c
   return eligible[eligible.length - 1]!.variantId;
 }
 
+export type PoolInput = { reveal: MysteryReveal; showOdds: boolean; items: Array<{ variantId: string; weight: number }> };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Validates the seller's PUT body shape (ownership is checked against the DB separately). */
+export function parsePoolInput(body: unknown):
+  | { ok: true; value: PoolInput }
+  | { ok: false; code: string; error: string } {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const reveal = b.reveal === undefined ? "at_purchase" : b.reveal;
+  if (!MYSTERY_REVEALS.includes(reveal as MysteryReveal)) {
+    return { ok: false, code: "INVALID_REVEAL", error: "Reveal must be at_purchase or on_delivery." };
+  }
+  if (!Array.isArray(b.items)) return { ok: false, code: "INVALID_ITEMS", error: "items required" };
+  if (b.items.length > MYSTERY_BOX_MAX_ITEMS) {
+    return { ok: false, code: "TOO_MANY_ITEMS", error: `A mystery box holds up to ${MYSTERY_BOX_MAX_ITEMS} items.` };
+  }
+  const seen = new Set<string>();
+  const items: PoolInput["items"] = [];
+  for (const raw of b.items as unknown[]) {
+    const r = (raw ?? {}) as Record<string, unknown>;
+    const variantId = typeof r.variantId === "string" ? r.variantId : "";
+    const weight = r.weight === undefined ? 1 : r.weight;
+    if (!UUID_RE.test(variantId)) return { ok: false, code: "INVALID_ITEMS", error: "Each item needs a variantId." };
+    if (typeof weight !== "number" || !Number.isInteger(weight) || weight < 1 || weight > 1000) {
+      return { ok: false, code: "INVALID_WEIGHT", error: "Weight must be a whole number from 1 to 1000." };
+    }
+    if (seen.has(variantId)) continue;
+    seen.add(variantId);
+    items.push({ variantId, weight });
+  }
+  return { ok: true, value: { reveal: reveal as MysteryReveal, showOdds: b.showOdds === true, items } };
+}
+
 function rowsOf(result: unknown): any[] {
   return (result as any)?.rows ?? [];
 }
