@@ -170,7 +170,7 @@ function buildConversationView(
       ? new Date(conv.lastMessageAt).getTime()
       : undefined,
     unreadCount:        me?.unreadCount        ?? 0,
-    isMuted:            me?.isMuted            ?? false,
+    isMuted:            !!(myMutedUntil && myMutedUntil.getTime() > Date.now()),
     isFriendshipActive: true,
     // Per-viewer Archive (migration 131) — was hardcoded false, so a client
     // archive reverted on the next refresh.
@@ -600,29 +600,6 @@ router.get("/:id", async (req, res) => {
   });
 });
 
-// ─── PATCH /api/conversations/:id/mute ───────────────────────────────────────
-router.patch("/:id/mute", validateBody(muteConversationBody), async (req, res) => {
-  const userId = (req as any).clerkUserId as string;
-  const { id } = req.params;
-  const muted = (req.body as { muted?: unknown } | undefined)?.muted;
-
-  if (typeof muted !== "boolean") {
-    return res.status(400).json({ error: "muted must be a boolean" });
-  }
-
-  const [membership] = await db.select({ userId: conversationParticipants.userId })
-    .from(conversationParticipants)
-    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
-    .limit(1);
-  if (!membership) return res.status(403).json({ error: "Not a participant" });
-
-  await db.update(conversationParticipants)
-    .set({ isMuted: muted })
-    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
-
-  return res.json({ muted });
-});
-
 // ─── GET /api/conversations/:id/messages ─────────────────────────────────────
 const lastSweepAt = new Map<string, number>();
 const SWEEP_EVERY_MS = 60_000;
@@ -667,10 +644,12 @@ router.get("/:id/messages", async (req, res) => {
   // docs/dm-flows.md) runs off the request path, at most once a minute per
   // conversation per instance. Reads used to wait on a DELETE every time.
   sweepExpiredMessages(id);
-  const notExpired = sql`(${messages.disappearAt} IS NULL OR ${messages.disappearAt} >= now())`;
+  // Unsent messages (DELETE …/messages/:id) are gone for everyone.
+  const notExpired = sql`(${messages.disappearAt} IS NULL OR ${messages.disappearAt} >= now()) AND ${messages.deletedAt} IS NULL`;
 
   const whereClause = q
-    ? and(eq(messages.conversationId, id), notExpired, afterCleared, ilike(messages.body, `%${q}%`))
+    // Search is literal: % and _ typed by the user are not wildcards.
+    ? and(eq(messages.conversationId, id), notExpired, afterCleared, ilike(messages.body, `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`))
     : before
       ? and(eq(messages.conversationId, id), notExpired, afterCleared, sql`${messages.createdAt} < ${new Date(before)}`)
       : and(eq(messages.conversationId, id), notExpired, afterCleared);
@@ -687,11 +666,26 @@ router.get("/:id/messages", async (req, res) => {
     msgs.map((m) => m.replyToId).filter((v): v is string => !!v),
   );
 
-  const adapted = msgs.reverse().map((m) => adaptMessage(
-    m,
-    reactionsByMessage.get(m.id) ?? [],
-    m.replyToId ? replyPreviewById.get(m.replyToId) : undefined,
-  ));
+  // Read receipts off (Settings > Privacy): whoever turned them off never
+  // shows "Seen" on messages sent to them. Their own view is unaffected.
+  const otherIds = parts.map((p) => p.userId).filter((pid) => pid !== userId);
+  const receiptsHidden = otherIds.length > 0 && (await db
+    .select({ id: users.clerkId })
+    .from(users)
+    .where(and(inArray(users.clerkId, otherIds), eq(users.readReceiptsEnabled, false)))
+    .limit(1)).length > 0;
+  const adapted = msgs.reverse().map((m) => {
+    const view = adaptMessage(
+      m,
+      reactionsByMessage.get(m.id) ?? [],
+      m.replyToId ? replyPreviewById.get(m.replyToId) : undefined,
+    );
+    if (receiptsHidden && m.senderId === userId && view.status === "read") {
+      view.status = "delivered";
+      view.readAt = undefined;
+    }
+    return view;
+  });
   // Product cards (item 70): always show the CURRENT price/name/image, or an
   // honest "No longer available" state — never the stale value cached on the
   // message at send time. See lib/productAttachmentInfo.ts.
@@ -1144,6 +1138,56 @@ router.delete("/:id/messages/:messageId/reactions", async (req, res) => {
   return res.json({ ok: true });
 });
 
+// ─── DELETE /api/conversations/:id/messages/:messageId ───────────────────────
+// Unsend (polish #166), Instagram's long-press "Unsend": the sender can take
+// a message back for everyone within UNSEND_WINDOW_MS of sending it. The row
+// is kept (deletedAt/deletedBy) for moderation and reports, but no reader
+// ever gets it again; if it was the latest message the inbox preview falls
+// back to the one before it.
+export const UNSEND_WINDOW_MS = 10 * 60_000;
+
+router.delete("/:id/messages/:messageId", rateLimit("messaging"), async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id, messageId } = req.params as { id: string; messageId: string };
+  if (!/^[0-9a-f-]{36}$/i.test(messageId)) return res.status(404).json({ error: "Message not found" });
+
+  const [msg] = await db.select({
+    id: messages.id, senderId: messages.senderId, createdAt: messages.createdAt, deletedAt: messages.deletedAt,
+  })
+    .from(messages)
+    .where(and(eq(messages.id, messageId), eq(messages.conversationId, id)))
+    .limit(1);
+  if (!msg) return res.status(404).json({ error: "Message not found" });
+  if (msg.senderId !== userId) return res.status(403).json({ error: "You can only unsend your own messages." });
+  if (msg.deletedAt) return res.json({ ok: true, unsent: true });
+  if (Date.now() - new Date(msg.createdAt!).getTime() > UNSEND_WINDOW_MS) {
+    return res.status(409).json({ error: "Messages can only be unsent within 10 minutes.", code: "UNSEND_WINDOW_PASSED" });
+  }
+
+  await db.update(messages)
+    .set({ deletedAt: new Date(), deletedBy: userId })
+    .where(eq(messages.id, messageId));
+
+  // Keep the inbox preview honest: point it at the newest message still there.
+  const [latest] = await db.select({ body: messages.body, attachment: messages.attachment, createdAt: messages.createdAt })
+    .from(messages)
+    .where(and(eq(messages.conversationId, id), sql`${messages.deletedAt} IS NULL`))
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  const [conv] = await db.select({ lastMessageAt: conversations.lastMessageAt })
+    .from(conversations).where(eq(conversations.id, id)).limit(1);
+  if (conv?.lastMessageAt && new Date(conv.lastMessageAt).getTime() <= new Date(msg.createdAt!).getTime() + 1000) {
+    const attachmentType = (latest?.attachment as { type?: string } | null)?.type;
+    await db.update(conversations)
+      .set({
+        lastMessage: latest ? (latest.body?.trim() || (attachmentType ? `Sent a ${attachmentType}` : "")).slice(0, 100) : "",
+        lastMessageAt: latest?.createdAt ?? conv.lastMessageAt,
+      })
+      .where(eq(conversations.id, id));
+  }
+  return res.json({ ok: true, unsent: true });
+});
+
 // ─── PATCH /api/conversations/:id/read ───────────────────────────────────────
 router.patch("/:id/read", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
@@ -1236,14 +1280,32 @@ router.patch("/:id/typing", rateLimit("mutation"), validateBody(typingBody), asy
 const MUTE_FOREVER = new Date("9999-12-31T00:00:00.000Z");
 
 // ─── PATCH /api/conversations/:id/mute ───────────────────────────────────────
-// Chat details > Mute. Body: { durationMinutes?: number | null }.
-//   - a positive number  → muted for that many minutes from now
-//   - -1                 → muted "Until I turn it back on"
-//   - null / 0 / omitted → unmuted
-router.patch("/:id/mute", validateBody(muteConversationBody), async (req, res) => {
+// Chat details > Mute and the inbox swipe "Mute". One handler (there used to
+// be two on this path; Express only ever ran the first, which 400'd the
+// app's { durationMinutes } body). Body, either shape:
+//   { durationMinutes: n > 0 }  → muted for n minutes
+//   { durationMinutes: -1 }     → muted "Until I turn it back on"
+//   { durationMinutes: null|0 } → unmuted
+//   { muted: true|false }       → muted until turned back on / unmuted
+export function resolveMuteUntil(body: unknown, now = Date.now()): { ok: true; until: Date | null } | { ok: false } {
+  const b = (body ?? {}) as { durationMinutes?: unknown; muted?: unknown };
+  if (typeof b.muted === "boolean") return { ok: true, until: b.muted ? MUTE_FOREVER : null };
+  const d = b.durationMinutes;
+  if (d === undefined || d === null || d === 0) return { ok: true, until: null };
+  if (d === -1) return { ok: true, until: MUTE_FOREVER };
+  if (typeof d === "number" && Number.isInteger(d) && d > 0 && d <= 60 * 24 * 366) {
+    return { ok: true, until: new Date(now + d * 60_000) };
+  }
+  return { ok: false };
+}
+
+router.patch("/:id/mute", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
-  const { durationMinutes } = req.body as { durationMinutes?: number | null };
+  const parsed = resolveMuteUntil(req.body);
+  if (!parsed.ok) {
+    return res.status(400).json({ error: "durationMinutes must be a positive whole number, -1, or null" });
+  }
 
   const [isMember] = await db.select({ userId: conversationParticipants.userId })
     .from(conversationParticipants)
@@ -1251,17 +1313,12 @@ router.patch("/:id/mute", validateBody(muteConversationBody), async (req, res) =
     .limit(1);
   if (!isMember) return res.status(404).json({ error: "Conversation not found" });
 
-  const mutedUntil = durationMinutes == null || durationMinutes <= 0
-    ? null
-    : durationMinutes === -1
-      ? MUTE_FOREVER
-      : new Date(Date.now() + durationMinutes * 60_000);
-
+  const mutedUntil = parsed.until;
   await db.update(conversationParticipants)
-    .set({ mutedUntil })
+    .set({ mutedUntil, isMuted: mutedUntil === MUTE_FOREVER })
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
 
-  return res.json({ ok: true, mutedUntil: mutedUntil?.toISOString() ?? null });
+  return res.json({ ok: true, muted: mutedUntil !== null, mutedUntil: mutedUntil?.toISOString() ?? null });
 });
 
 // ─── PATCH /api/conversations/:id/pin ────────────────────────────────────────

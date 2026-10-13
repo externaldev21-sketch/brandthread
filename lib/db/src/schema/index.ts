@@ -78,6 +78,8 @@ export const users = pgTable('users', {
   inviteLastClickedAt: timestamp('invite_last_clicked_at', { withTimezone: true }),
   // DM privacy: 'requests' (default) | 'followers_only'
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
+  // Read receipts (migration 290): false hides "Seen" from people who message you.
+  readReceiptsEnabled: boolean('read_receipts_enabled').notNull().default(true),
   // Private account (buyers only): new followers need approval (follow_requests).
   isPrivate:      boolean('is_private').notNull().default(false),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).

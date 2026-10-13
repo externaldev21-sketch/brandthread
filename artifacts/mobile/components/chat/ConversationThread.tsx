@@ -75,6 +75,7 @@ import {
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { useChatDraft } from '@/hooks/useChatDraft';
+import { canUnsend } from '@/lib/unsend';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
@@ -358,6 +359,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const [messages, setMessages] = useState<Message[]>(() => peekWarmThread(userId, params.id)?.messages ?? []);
   const [text, setText] = useState('');
   useChatDraft(userId ? conv?.id ?? params.id : null, text, setText, userId ?? null);
+  const currentThreadIdRef = useRef(params.id ?? conv?.id);
+  currentThreadIdRef.current = params.id ?? conv?.id;
   const { showUndo } = useUndoToast();
   const textInputRef = useRef<TextInput>(null);
   // Request-mode UI state (see the bottom RequestActionPanel below):
@@ -1809,6 +1812,24 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     closeMessageSheet();
   }
 
+  function sheetUnsend() {
+    const msg = activeSheetMsg;
+    closeMessageSheet();
+    if (!conv || !msg || isPreviewId(conv.id)) return;
+    const threadId = conv.id;
+    const ownerId = userId;
+    const stillCurrent = () => currentUserRef.current === ownerId && currentThreadIdRef.current === threadId;
+    setMessages(previous => previous.filter(item => item.id !== msg.id));
+    void api.conversations.unsend(threadId, msg.id).catch(() => {
+      if (!stillCurrent()) return;
+      setMessages(previous => previous.some(item => item.id === msg.id)
+        ? previous : [...previous, msg].sort((a, b) => a.ts - b.ts));
+      Alert.alert("Couldn't unsend", 'Messages can be unsent for 10 minutes after sending.');
+    }).finally(() => {
+      void getMessages(threadId).then(next => { if (stillCurrent()) setMessages(next); }).catch(() => {});
+    });
+  }
+
   function sheetDelete() {
     const msg = activeSheetMsg;
     closeMessageSheet();
@@ -3126,10 +3147,13 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
           [
             { key: 'reply', label: 'Reply', icon: 'corner-up-left', onPress: sheetReply },
             { key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy },
+            canUnsend(activeSheetMsg, isOwnSheetMsg && !isPreviewId(conv?.id ?? ''))
+              ? { key: 'unsend', label: 'Unsend', icon: 'rotate-ccw', destructive: true, onPress: sheetUnsend }
+              : null,
             isOwnSheetMsg
               ? { key: 'delete', label: 'Delete for me', icon: 'trash-2', destructive: true, onPress: sheetDelete }
               : { key: 'report', label: 'Report message', icon: 'flag', destructive: true, onPress: sheetReport },
-          ] as ReactionOverlayMenuItem[]
+          ].filter(Boolean) as ReactionOverlayMenuItem[]
         ) : []}
         onClose={closeMessageSheet}
       />

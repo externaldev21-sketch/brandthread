@@ -64,12 +64,14 @@ export default function BuyerPrivacySettings() {
 
   useFocusEffect(
     useCallback(() => {
-      getPrivacySettings().then(setSettings);
-      // Load server-side DM privacy setting
-      api.privacy.get().then(({ dmPrivacy: p, isPrivate }) => {
-        setDmPrivacy(p);
-        if (typeof isPrivate === 'boolean') setServerPrivate(isPrivate);
-      }).catch(() => {});
+      // Server values (DM privacy, read receipts) win over the local copy.
+      Promise.all([getPrivacySettings(), api.privacy.get().catch(() => null)]).then(([local, server]) => {
+        if (server) {
+          setDmPrivacy(server.dmPrivacy);
+          if (typeof server.isPrivate === 'boolean') setServerPrivate(server.isPrivate);
+        }
+        setSettings(typeof server?.readReceipts === 'boolean' ? { ...local, readReceiptsEnabled: server.readReceipts } : local);
+      });
       api.followRequests.list(50, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
     }, [])
   );
@@ -84,8 +86,9 @@ export default function BuyerPrivacySettings() {
     try {
       // Save local settings (stored in AsyncStorage)
       await updatePrivacySettings(settings);
-      // Save server-side DM privacy setting
-      await api.privacy.update({ dmPrivacy });
+      // Server-side: DM privacy, and read receipts (enforced when the other
+      // person loads the chat — they stop seeing "Seen").
+      await api.privacy.update({ dmPrivacy, readReceipts: settings.readReceiptsEnabled });
       setHasChanges(false);
       setSaveError(null);
     } catch {
