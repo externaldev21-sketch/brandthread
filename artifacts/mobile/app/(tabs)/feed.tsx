@@ -11,7 +11,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather, FontAwesome } from '@expo/vector-icons';
-import { useRouter, useIsFocused } from 'expo-router';
+import { useRouter, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
 import { useSignInGate } from '@/hooks/useSignInGate';
@@ -2116,6 +2116,15 @@ export default function FeedScreen({
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
+  // `?tab=following` (the weekly followed-brands digest push) opens Home on
+  // Following. Cleared once applied so the next push can select it again.
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  useEffect(() => {
+    if (creatorFeed || tabParam !== 'following') return;
+    setFeedTab('following');
+    router.setParams({ tab: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam]);
   // Following|Threads content cross-fade: a soft 150ms dissolve on the
   // list's own opacity when the tab (and therefore its underlying data)
   // changes, instead of the new content just popping in. Gated by

@@ -12,7 +12,7 @@ const ONBOARDING_OWNER_KEY = 'onboarding_owner_id';
 const requestedKey = (userId: string) => `bt:push:permission-requested:v1:${userId}`;
 
 type PushApi = {
-  push: { register: (body: { token: string; platform?: string }) => Promise<unknown> };
+  push: { register: (body: { token: string; platform?: string; timezone?: string }) => Promise<unknown> };
 };
 
 async function isOnboardedUser(userId: string): Promise<boolean> {
@@ -25,7 +25,16 @@ async function isOnboardedUser(userId: string): Promise<boolean> {
 
 async function registerToken(api: PushApi): Promise<void> {
   const token = await Notifications.getExpoPushTokenAsync();
-  await api.push.register({ token: token.data, platform: 'expo' });
+  await api.push.register({ token: token.data, platform: 'expo', timezone: deviceTimeZone() });
+}
+
+/** The device's IANA timezone, for pushes sent at a local time (weekly digest). */
+export function deviceTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

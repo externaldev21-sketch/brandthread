@@ -652,3 +652,28 @@ describe('delete with undo', () => {
     expect(onFailed).toHaveBeenCalledWith(['n2']);
   });
 });
+
+describe('retention pushes (weekly digest, order anniversary)', () => {
+  const base = { id: 'n1', category: 'social', title: 't', body: 'b', isRead: false, createdAt: '2026-10-18T22:30:00Z' };
+
+  it('gives both types their own icon', () => {
+    expect(activityIcon({ type: 'digest', category: 'social' })).toBe('layers');
+    expect(activityIcon({ type: 'order_anniversary', category: 'social' })).toBe('calendar');
+  });
+
+  it('opens Home on the Following tab for the digest', () => {
+    expect(activityHref({ ...base, type: 'digest', targetType: 'following_feed' })).toBe('/(buyer)?tab=following');
+  });
+
+  it("opens the brand's profile for an order anniversary", () => {
+    expect(activityHref({
+      ...base, type: 'order_anniversary', targetType: 'user', targetId: 'seller 1', actorName: 'Acme Studio',
+    })).toBe('/buyer-other-profile?userId=seller%201&name=Acme%20Studio');
+  });
+
+  it('shows both under All, not Orders', () => {
+    expect(activityCategory({ type: 'digest', category: 'social' })).toBe('other');
+    expect(matchesActivityChip({ type: 'order_anniversary', category: 'social' }, 'all')).toBe(true);
+    expect(matchesActivityChip({ type: 'order_anniversary', category: 'social' }, 'orders')).toBe(false);
+  });
+});

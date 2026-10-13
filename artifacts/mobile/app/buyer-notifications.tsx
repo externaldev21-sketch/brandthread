@@ -30,6 +30,7 @@ import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { useUser } from '@clerk/expo';
+import { activityHref } from '@/lib/activity';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,8 @@ function notifIcon(type: Notification['type']): string {
     case 'live_started': return 'video';
     case 'product_restocked': return 'refresh-cw';
     case 'price_drop': return 'trending-down';
+    case 'digest': return 'layers';
+    case 'order_anniversary': return 'calendar';
     case 'saved_product_update': return 'bookmark';
     case 'new_friend_message': return 'message-circle';
     case 'new_order_message': return 'package';
@@ -196,6 +199,14 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
     case 'saved_product_update':
       router.navigate('/(buyer)/discover' as any);
       break;
+    case 'digest':
+    case 'order_anniversary': {
+      // Same destination as the push: Home's Following tab, or the brand's profile.
+      const href = activityHref(notif);
+      if (href) router.push(href as any);
+      else router.navigate('/(buyer)/inbox' as any);
+      break;
+    }
     case 'new_friend_message':
     case 'new_order_message':
     case 'new_seller_reply':
