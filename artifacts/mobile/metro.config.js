@@ -18,10 +18,17 @@ config.resolver.blockList = [
 // The native SDK uses CodeGen native components that cannot bundle for web.
 // The seller-live and buyer-live screens degrade gracefully when the module is null.
 const agoraShim = path.resolve(__dirname, 'shims/react-native-agora.js');
+// Every `expo-haptics` import resolves to the gated wrapper, which honors
+// Settings → Accessibility → "Disable haptic feedback". The wrapper's own
+// import of `expo-haptics` falls through to the real package.
+const hapticsShim = path.resolve(__dirname, 'shims/expo-haptics.ts');
 const _orig = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === 'react-native-agora' && platform === 'web') {
     return { filePath: agoraShim, type: 'sourceFile' };
+  }
+  if (moduleName === 'expo-haptics' && context.originModulePath !== hapticsShim) {
+    return { filePath: hapticsShim, type: 'sourceFile' };
   }
   if (_orig) return _orig(context, moduleName, platform);
   return context.resolveRequest(context, moduleName, platform);

@@ -11,6 +11,7 @@ import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ListRow } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { setHapticsDisabled } from '@/lib/hapticsPreference';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
@@ -43,7 +44,7 @@ const CONFIG: Record<string, Config> = {
     { label: 'Friend activity', sub: 'Requests, follows, and social activity', toggle: 'friendActivity' },
     { label: 'Email & in-app', sub: 'Choose what reaches your inbox and your activity feed', icon: 'mail', action: () => router?.push('/notification-channels' as never) },
   ] },
-  accessibility: { title: 'Accessibility', items: s => [{ label: 'Reduce motion', toggle: 'reduceMotion' }, { label: 'Always show captions', toggle: 'captions' }, { label: 'Text size', value: 'Default' }, { label: 'High contrast icons', value: 'Off' }] },
+  accessibility: { title: 'Accessibility', items: s => [{ label: 'Reduce motion', toggle: 'reduceMotion' }, { label: 'Always show captions', toggle: 'captions' }, { label: 'Text size', value: 'Default' }, { label: 'High contrast icons', value: 'Off' }, { label: 'Disable haptic feedback', toggle: 'disableHaptics' }] },
   language: { title: 'Language', items: s => [{ label: 'App language', value: s.language }, { label: 'Translation language', value: 'English' }, { label: 'Auto-translate captions', value: 'On' }] },
   media: { title: 'Media quality and data usage', items: s => [{ label: 'Use less cellular data', toggle: 'dataSaver' }, { label: 'Upload at highest quality', toggle: 'highQualityUploads' }, { label: 'Autoplay videos', toggle: 'autoplayVideos' }] },
   appearance: { title: 'Appearance', items: s => [{ label: 'Theme', value: s.theme }, { label: 'Reduce motion', toggle: 'reduceMotion' }] },
@@ -96,6 +97,7 @@ export default function BuyerSettingsDetail() {
         if (category) await api.notificationPrefs.update({ categories: { [category]: value } });
       }
       const next = await patchBuyerSettings({ [key]: value } as Partial<BuyerSettingsState>);
+      if (key === 'disableHaptics') setHapticsDisabled(value);
       setSettings(next);
     } catch {
       setSettings(prior);
