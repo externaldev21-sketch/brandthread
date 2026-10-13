@@ -76,7 +76,8 @@ describe('Feed video list virtualization bounds', () => {
     // a real `useVideoPlayer`; everything else renders a poster-only cell.
     expect(feed).toContain('if (props.isActive || props.preload) return <LiveVideoVisual {...props} />;');
     expect(feed).toContain('return <PosterOnlyVisual {...props} />;');
-    expect(feed).toContain('preload={Math.abs(contentIndex - activeContentIndex) === 1}');
+    // Data saver (#154) can only narrow this to the active page alone.
+    expect(feed).toContain('preload={!userDataSaver && Math.abs(contentIndex - activeContentIndex) === 1}');
     const posterOnlyBody = feed.slice(feed.indexOf('function PosterOnlyVisual'), feed.indexOf('function LiveVideoVisual'));
     expect(posterOnlyBody).not.toContain('useVideoPlayer');
   });
