@@ -74,7 +74,7 @@ API (`cd artifacts/api-server && TEST_DATABASE_URL=postgres://postgres:postgres@
   - A non-public post shows no thumbnail.
   - Sign-in is required.
 - Re-run unchanged: `collections.integration.test.ts`, `connectivity-commerce-social`, `social-audit-foryou`, `well-known-deep-links`.
-- Result: RESULTS_API
+- Result: **5 files, 33 tests passed** (6 of them new).
 
 Mobile:
 - `pnpm exec vitest run lib/saved/__tests__/savedPostToast.test.ts` covers the bar contents, title fallback, and the thumbnail rule (video poster only, never a local asset). Result: **3 passed**.
