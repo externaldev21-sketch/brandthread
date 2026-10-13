@@ -36,6 +36,7 @@ import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
+import type { WholesaleMyStatus, WholesalePrice, WholesaleSellerOverview, WholesaleSettings, WholesaleStoreInfo } from '@/lib/wholesale';
 import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
 
@@ -3215,6 +3216,22 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         startsAt: string | null; endsAt: string | null; active: boolean;
       }>) => patch<any>(`/api/sales/${id}`, data),
       delete: (id: string) => del<any>(`/api/sales/${id}`),
+    },
+    /** Wholesale price list (approved business buyers). Rules live server-side (lib/pricing/wholesale.ts). */
+    wholesale: {
+      store: (sellerId: string) => get<WholesaleStoreInfo>(`/api/wholesale/store/${encodeURIComponent(sellerId)}`),
+      me: (sellerId: string) => freshGet<WholesaleMyStatus>(`/api/wholesale/store/${encodeURIComponent(sellerId)}/me`),
+      apply: (sellerId: string, businessName: string) =>
+        post<{ status: string; businessName: string }>(`/api/wholesale/store/${encodeURIComponent(sellerId)}/apply`, { businessName }),
+      seller: {
+        overview: () => freshGet<WholesaleSellerOverview>('/api/wholesale/seller'),
+        saveSettings: (body: Partial<WholesaleSettings>) => put<WholesaleSettings>('/api/wholesale/seller/settings', body),
+        savePrice: (body: { productId: string; variantId?: string | null; priceCents: number | null; minQuantity: number }) =>
+          put<WholesalePrice>('/api/wholesale/seller/prices', body),
+        deletePrice: (id: string) => del<{ ok: true }>(`/api/wholesale/seller/prices/${encodeURIComponent(id)}`),
+        decide: (id: string, status: 'approved' | 'declined') =>
+          patch<{ id: string; status: string }>(`/api/wholesale/seller/buyers/${encodeURIComponent(id)}`, { status }),
+      },
     },
     /** Seller follower push broadcasts (1 per rolling 24h, enforced server-side). */
     sellerPush: {

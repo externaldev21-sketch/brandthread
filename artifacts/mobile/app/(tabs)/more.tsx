@@ -55,6 +55,7 @@ const STORE_ITEMS: NavItem[] = [
   { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: 'warning', route: '/discounts' },
   { icon: 'percent', label: 'Sales',         desc: 'Automatic sale prices',        accent: 'warning', route: '/sales' },
   { icon: 'gift',   label: 'Gift cards',    desc: 'Sell and manage store gift cards', accent: 'accentLight', route: '/gift-cards-manage' },
+  { icon: 'briefcase', label: 'Wholesale',  desc: 'Price list for business buyers', accent: 'secondary', route: '/wholesale' },
 ];
 
 const STUDIO_ITEMS: NavItem[] = [
