@@ -4,7 +4,7 @@
  * Reads the same notifications feed as the buyer Activity Center, narrowed to
  * what happens around a seller's content and profile (likes, comments,
  * replies, mentions and tags, reposts and shares, saves, new followers) and
- * grouped Today / This week / Earlier. Orders, payouts and inventory alerts
+ * grouped New / Today / This week / Earlier. Orders, payouts and inventory alerts
  * stay in Orders; they are not Activity.
  */
 import {
@@ -54,23 +54,12 @@ export function hasUnreadSellerActivity(items: readonly Pick<ActivityItem, 'type
   return items.some((item) => !item.isRead && !item.isMuted && isSellerActivityItem(item));
 }
 
-export type SellerSectionKey = 'today' | 'this_week' | 'earlier';
+export type SellerSectionKey = 'new' | 'today' | 'this_week' | 'earlier';
 export type SellerActivitySection = ActivitySection<ActivityRow> & { key: SellerSectionKey; data: ActivityRow[] };
 
-const TITLES: Record<SellerSectionKey, string> = { today: 'Today', this_week: 'This week', earlier: 'Earlier' };
-
-/** Today / This week / Earlier — unread-regardless-of-age folds into Today, month into Earlier. */
+/** New / Today / This week / Earlier — the same sections as the buyer Activity Center. */
 export function buildSellerActivitySections(items: readonly ActivityItem[], now: Date = new Date()): SellerActivitySection[] {
-  const buckets: Record<SellerSectionKey, ActivityRow[]> = { today: [], this_week: [], earlier: [] };
-  for (const section of buildActivitySections(items, now)) {
-    const key: SellerSectionKey = section.key === 'new' || section.key === 'today'
-      ? 'today'
-      : section.key === 'this_week' ? 'this_week' : 'earlier';
-    buckets[key].push(...section.items);
-  }
-  return (['today', 'this_week', 'earlier'] as const)
-    .filter((key) => buckets[key].length > 0)
-    .map((key) => ({ key, title: TITLES[key], items: buckets[key], data: buckets[key] }));
+  return buildActivitySections(items, now).map((section) => ({ ...section, data: section.items }));
 }
 
 export function sellerChipEmpty(chip: SellerActivityChip): { icon: string; title: string; message: string } {

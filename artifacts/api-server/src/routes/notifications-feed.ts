@@ -21,6 +21,7 @@ import { isChannelEnabledForUser } from "../lib/notificationChannels";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import { emitToUsers } from "../ws/messagesHub";
+import { firstItemImageByOrder, orderIdsMissingImage, storedOrOrderImage } from "../lib/orderNotificationImages";
 import {
   normalizePushEventCategory,
   sendPushToUser,
@@ -188,8 +189,13 @@ buyerRouter.get("/", async (req, res) => {
     .orderBy(desc(notificationsFeed.createdAt), desc(notificationsFeed.id))
     .limit(limit)
     .offset(offset);
+  // Order rows without a stored thumbnail show their product photo.
+  const orderImages = await firstItemImageByOrder(orderIdsMissingImage(rows)).catch((err) => {
+    logger.debug({ err }, "Could not load order photos for the feed");
+    return new Map<string, string>();
+  });
   const [images, avatars, followingActors] = await Promise.all([
-    Promise.all(rows.map((row) => resolveTargetImage(row.targetImageUrl ?? null))),
+    Promise.all(rows.map((row) => resolveTargetImage(storedOrOrderImage(row, orderImages)))),
     resolveActorAvatars(rows.map((row) => row.actorId).filter((id): id is string => !!id)),
     viewerFollowingFollowers(userId, rows),
   ]);

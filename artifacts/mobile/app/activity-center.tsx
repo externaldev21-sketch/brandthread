@@ -105,6 +105,7 @@ import { ChipRow } from '@/components/ui/ChipRow';
 
 import { dismissActivity, dismissSuggestedPerson, getActivity, getSuggestedPeople, markActivityRead, markAllActivityRead, watchActivityRealtime, type SuggestedPerson } from '@/services/activityService';
 
+import { isOrderUpdateRow, unreadRowTint } from '@/lib/activity';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
 
 import { radius } from '@/constants/radii';
@@ -114,16 +115,7 @@ const LIVE_TOP_SLOP = 48;
 const AVATAR_SIZE = 40;
 
 type Styles = ReturnType<typeof makeStyles>;
-// Instagram's own Activity taxonomy (Highlights pinned, then Today /
-// Yesterday / Last 7 days / Last 30 days) — see docs/activity-flows.md §1
-// for why this is derived here rather than in lib/activity.ts's own
-// (already-tested) New/Today/This week/This month/Earlier bucket keys.
-type DisplaySectionKey = 'highlights' | 'today' | 'yesterday' | 'last_7_days' | 'last_30_days' | 'earlier';
-type ListSection = { key: DisplaySectionKey; title: string; items: ActivityRow[]; data: ActivityRow[] };
-const DISPLAY_TITLES: Record<DisplaySectionKey, string> = {
-  highlights: 'Highlights', today: 'Today', yesterday: 'Yesterday',
-  last_7_days: 'Last 7 days', last_30_days: 'Last 30 days', earlier: 'Earlier',
-};
+type ListSection = { key: ActivitySectionKey | 'highlights'; title: string; items: ActivityRow[]; data: ActivityRow[] };
 
 // A row's tap area is drawn ≥40pt tall inside 16pt row padding → pad to 44.
 const ROW_TAP_HIT_SLOP = minHitSlop({ height: 40 });
@@ -272,17 +264,15 @@ function Avatar({ actor, size, styles }: {
 }
 
 /**
- * One actor: a single avatar with the small type badge. Exactly two actors
- * ("Jay and Mina liked your post"): Threads-style stacked double avatars,
- * still with the badge on the front (most recent) one. Three or more
- * ("Jay and 12 others…"): back to a single avatar — the "and N others" part
- * already lives in the row's text (`activityMessage`), so a deeper stack or
- * a "+N" chip would just repeat it in the chrome.
+ * One actor: a single avatar with the small type badge. Two or more
+ * ("Jay and Mina…", "Jay and 12 others liked your post"): Instagram's two
+ * stacked avatars — the two most recent people — with the badge on the
+ * front one. The "and N others" count lives in the row's text.
  */
 function ActivityAvatarStack({ row, styles }: { row: ActivityRow; styles: Styles }) {
   const [first, second] = row.actors;
   if (!first) return null;
-  if (row.actorCount === 2 && second) {
+  if (row.actorCount >= 2 && second) {
     return (
       <View style={styles.leading}>
         <View style={styles.stackBack}>
@@ -361,7 +351,10 @@ export const ActivityRowView = React.memo(function ActivityRowView({
   // exclusive, but both must render through the SAME sibling slot at the
   // `row` level — never nested inside `tapArea` — so every row's trailing
   // item lands on the identical right edge regardless of which one it is.
-  const trailingThumb = showFollowControl || row.type === 'thread_cash_received'
+  // Order updates lead with the product photo instead of an icon, so the
+  // same photo isn't repeated on the right.
+  const orderPhoto = isOrderUpdateRow(row.type) && row.actors.length === 0 ? row.targetImageUrl : null;
+  const trailingThumb = showFollowControl || row.type === 'thread_cash_received' || orderPhoto
     ? null
     : row.targetImageUrl ? (
       <CachedImage
@@ -400,7 +393,7 @@ export const ActivityRowView = React.memo(function ActivityRowView({
 
   return (
     <SwipeRow rowId={row.key} trailing={swipeActions}>
-    <View style={styles.row}>
+    <View style={[styles.row, unread && styles.rowUnread]} testID={unread ? `activity-unread-${row.key}` : undefined}>
       {/*
         The Follow back / Following control is a real interactive element,
         so it must be a sibling of the row's own tap target rather than
@@ -427,6 +420,15 @@ export const ActivityRowView = React.memo(function ActivityRowView({
       >
         {row.actors.length > 0 ? (
           <ActivityAvatarStack row={row} styles={styles} />
+        ) : orderPhoto ? (
+          <View style={styles.leading}>
+            <CachedImage
+              source={{ uri: orderPhoto }}
+              style={styles.orderPhoto}
+              recyclingKey={`${row.key}-order`}
+              accessibilityIgnoresInvertColors
+            />
+          </View>
         ) : (
           <View style={styles.leading}>
             <View style={styles.iconCircle}>
@@ -440,7 +442,8 @@ export const ActivityRowView = React.memo(function ActivityRowView({
         <View style={styles.center}>
           <Text style={styles.message} numberOfLines={2}>
             {parts.map((part, index) => (
-              <Text key={index} style={part.bold ? styles.messageBold : styles.messageMuted}>{part.text}</Text>
+              // Order status is plain white text, not the gray verb tone.
+              <Text key={index} style={part.bold ? styles.messageBold : isOrderUpdateRow(row.type) ? undefined : styles.messageMuted}>{part.text}</Text>
             ))}
             <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
           </Text>
@@ -487,14 +490,14 @@ export function SkeletonRows({ styles }: { styles: Styles }) {
       <SkeletonBlock width={72} height={12} style={{ marginBottom: SP.md }} />
       {Array.from({ length: 7 }).map((_, index) => (
         <View key={index} style={styles.skeletonRow}>
-          {/* Matches the real row's 40pt avatar / 44pt 8-radius thumbnail
+          {/* Matches the real row's 40pt avatar / 44pt 4-radius thumbnail
               exactly, so there's no size jump when the real content lands. */}
           <SkeletonBlock width={AVATAR_SIZE} height={AVATAR_SIZE} radius={AVATAR_SIZE / 2} />
           <View style={{ flex: 1, gap: SP.xs + 2 }}>
             <SkeletonBlock width={index % 2 ? '72%' : '86%'} height={13} />
             <SkeletonBlock width={index % 3 ? '38%' : '52%'} height={11} />
           </View>
-          <SkeletonBlock width={44} height={44} radius={8} />
+          <SkeletonBlock width={44} height={44} radius={4} />
         </View>
       ))}
     </View>
@@ -950,41 +953,12 @@ export default function ActivityCenterScreen() {
       }
     }
 
-    // Today / Yesterday / Last 7 days / Last 30 days: New+Today fold into
-    // Today; the "this week" bucket (1-6 days old) splits by calendar day
-    // into Yesterday vs the rest of Last 7 days; This month is Last 30 days
-    // and anything older is Earlier (see docs/activity-flows.md §1).
-    const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const yesterdayStart = dayStart(new Date(now - 24 * 60 * 60 * 1000));
-    const todayStart = dayStart(new Date(now));
-
-    const buckets: Record<Exclude<DisplaySectionKey, 'highlights'>, ActivityRow[]> = {
-      today: [], yesterday: [], last_7_days: [], last_30_days: [], earlier: [],
-    };
-    for (const section of raw) {
-      for (const row of section.items) {
-        if (highlightIds.has(row.key)) continue;
-        if (section.key === 'new' || section.key === 'today') {
-          buckets.today.push(row);
-        } else if (section.key === 'this_week') {
-          const createdDay = dayStart(new Date(row.createdAt));
-          if (createdDay >= yesterdayStart && createdDay < todayStart) buckets.yesterday.push(row);
-          else buckets.last_7_days.push(row);
-        } else if (section.key === 'this_month') {
-          buckets.last_30_days.push(row);
-        } else {
-          // Older than 30 days (lib/activity's "Earlier" bucket) never sits
-          // under "Last 30 days".
-          buckets.earlier.push(row);
-        }
-      }
-    }
-
     const result: ListSection[] = [];
-    if (highlights.length > 0) result.push({ key: 'highlights', title: DISPLAY_TITLES.highlights, items: highlights, data: highlights });
-    (['today', 'yesterday', 'last_7_days', 'last_30_days', 'earlier'] as const).forEach((key) => {
-      if (buckets[key].length > 0) result.push({ key, title: DISPLAY_TITLES[key], items: buckets[key], data: buckets[key] });
-    });
+    if (highlights.length) result.push({ key: 'highlights', title: 'Highlights', items: highlights, data: highlights });
+    for (const section of raw) {
+      const items = section.items.filter(row => !highlightIds.has(row.key));
+      if (items.length) result.push({ ...section, items, data: items });
+    }
     return result;
   }, [filteredItems, sessionNew, now]);
 
@@ -1508,31 +1482,11 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     // absolute` sibling above a plain static one regardless of DOM order.
     backgroundColor: theme.background,
   },
-  // Inline before the trailing pill/thumbnail (inside the 16pt gutter, not
-  // out in it). Theme text colour — white, not an accent.
-  // Zero-width anchor that cancels its own row gap, so the dot sits in the
-  // existing 12pt gap before the trailing pill/thumbnail and never takes
-  // width from the text (which would push a timestamp onto its own line).
-  unreadDotAnchor: {
-    width: 0,
-    marginLeft: -(SP.sm + 4),
-    alignSelf: 'stretch',
-    justifyContent: 'center',
-  },
-  // No trailing pill/thumbnail: the dot is the row's last item, in flow, so
-  // it stays inside the content edge instead of drifting into the gutter.
-  unreadDotTrailing: {
-    width: 6,
-    alignSelf: 'stretch',
-    justifyContent: 'center',
-  },
-  unreadDot: {
-    position: 'absolute',
-    left: 3,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.text,
+  // Unread rows get a faint lift (#FFFFFF08 over the page) instead of a dot
+  // or bold text. Pre-blended to an opaque colour so the swipe actions
+  // behind the row still never show through.
+  rowUnread: {
+    backgroundColor: unreadRowTint(theme.background),
   },
   // The Follow back / Following control (or the trailing thumbnail — see
   // `trailingThumb` at the call site) renders as a sibling of this
@@ -1594,6 +1548,12 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.bold,
     letterSpacing: 0.2,
   },
+  orderPhoto: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: 4,
+    backgroundColor: theme.cardElevated,
+  },
   iconCircle: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
@@ -1652,13 +1612,13 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   thumb: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 4,
     backgroundColor: theme.cardElevated,
   },
   thumbFallback: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 4,
     backgroundColor: theme.card,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.borderSubtle,
