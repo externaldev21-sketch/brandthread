@@ -44,6 +44,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
+import { AddToWalletButton } from '@/components/orders/AddToWalletButton';
 import { BuyerOrderView, cancellationReasonLabel, OrderStatus, TrackingStatus } from '@/services/orderTypes';
 import type { BuyerOrderApiRow, BuyerOrderItemApiRow } from '@/services/orderService';
 import { useApi } from '@/hooks/useApi';
@@ -1349,6 +1350,7 @@ export default function BuyerOrderDetailScreen() {
                 <StatusBadge label="IN PRODUCTION" variant="info" />
               </View>
             </GradientCard>
+            <AddToWalletButton orderId={order.id} />
           </View>
         )}
 

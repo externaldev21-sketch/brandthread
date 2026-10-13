@@ -2179,6 +2179,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           '/api/shopify/products/import', { shopifyProductIds, publishStatus },
         ),
     },
+    /** Apple Wallet passes for pre-orders (off until the server has its Apple keys). */
+    wallet: {
+      status: () => get<{ enabled: boolean }>('/api/wallet/status'),
+      passLink: (orderId: string) => post<{ path: string }>(`/api/wallet/orders/${encodeURIComponent(orderId)}/link`, {}),
+    },
     buyer: {
       /** Saved sizes / preferences. GET returns defaults when nothing is saved; update is a partial merge (null clears a size). */
       preferences: {

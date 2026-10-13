@@ -221,6 +221,8 @@ router.use("/config/live", configLiveRouter); // public: { liveAvailable } (Agor
 router.use("/geo",           geoPostalRouter); // GET /postal/US/:zip (no auth, rate-limited): ZIP → city/state for checkout
 router.use("/app/installs",    appInstallsRouter); // first-launch install ping (admin funnel), works signed out
 router.use(killSwitchGate); // Live / Payments / AI kill switches (Admin → Kill switches); write entry points only
+// Apple Wallet pre-order passes: status + signed download are public, the link route requires auth itself.
+router.use("/wallet",          walletPassesRouter);
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public",          publicWebAnnualPlansRouter); // GET /web-annual-plans (no auth; empty until a yearly web price is set)
@@ -493,6 +495,7 @@ router.use("/live",                      tc, liveCommerceRouter); // Pin / live 
 router.use("/live",                      tc, liveRouter);
 import liveReplaysRouter from "./live-replays";
 import liveTipsRouter from "./live-tips";
+import walletPassesRouter from "./walletPasses";
 router.use("/live-replays",              tc, liveReplaysRouter);
 router.use("/live-tips",                 tc, liveTipsRouter);
 
