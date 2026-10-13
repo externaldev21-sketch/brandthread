@@ -25,7 +25,7 @@ import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   SectionHeader, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getProject, exportProject } from '@/services/designService';
+import { getProject, exportProject, whenDesignServiceReady } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 
 const THUMB_SIZE = 144;
@@ -85,7 +85,8 @@ export default function DesignExportScreen() {
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
     let cancelled = false;
-    getProject(projectId)
+    whenDesignServiceReady()
+      .then(() => getProject(projectId))
       .then(p => { if (!cancelled) setProject(p); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });

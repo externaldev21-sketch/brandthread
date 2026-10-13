@@ -43,6 +43,65 @@ export function initDesignService(userId: string | null, storeContext: string | 
   if (nextUser !== 'anon') fireAndForget(drainVerifiedUploadQueue(captureSyncContext()));
 }
 
+// ─── Identity readiness ───────────────────────────────────────────────────────
+//
+// Storage keys are scoped by the signed-in user (K() above), and that scope is
+// only correct once app/_layout.tsx's ServiceConfigurer has called
+// initDesignService with the resolved Clerk identity. A route screen that
+// mounts on a COLD load (deep link / page reload straight to
+// /design-mockup-preview?projectId=…, /design-export, /design-canvas?id=…)
+// runs its own mount effect BEFORE ServiceConfigurer's — React fires effects
+// in tree order and the route Stack sits above the configurer — so its
+// getProject() read the 'anon' namespace, found nothing, and showed
+// "Open a garment project…" for a project that absolutely exists. In-app
+// navigation never hit this because the configurer had long since run.
+//
+// Fix at the root: the configurer marks identity as resolved, and the
+// cold-load readers await that mark before touching storage. Bounded so a
+// surface that mounts without the configurer (tests, an unexpected tree) can
+// never hang on a spinner — it falls through after DESIGN_READY_TIMEOUT_MS
+// and warns, which is the pre-existing behaviour made visible, not hidden.
+
+export const DESIGN_READY_TIMEOUT_MS = 8000;
+
+let _identityResolved = false;
+let _resolveReady: (() => void) | null = null;
+let _readyPromise: Promise<void> = new Promise<void>(resolve => { _resolveReady = resolve; });
+
+/** Called by the app shell once initDesignService has run with the resolved Clerk identity. */
+export function markDesignIdentityResolved(): void {
+  _identityResolved = true;
+  _resolveReady?.();
+}
+
+/** True once the app shell has scoped storage to the real identity. */
+export function isDesignIdentityResolved(): boolean {
+  return _identityResolved;
+}
+
+/**
+ * Resolves once storage is scoped to the real identity (or after
+ * `timeoutMs`, with a warning, so no screen can hang). Readers that can
+ * mount on a cold load await this before their first getProject().
+ */
+export function whenDesignServiceReady(timeoutMs: number = DESIGN_READY_TIMEOUT_MS): Promise<void> {
+  if (_identityResolved) return Promise.resolve();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<void>(resolve => {
+    timer = setTimeout(() => {
+      if (!_identityResolved) console.warn('[designService] identity not resolved after', timeoutMs, 'ms; reading storage as-is');
+      resolve();
+    }, timeoutMs);
+  });
+  return Promise.race([_readyPromise, timeout]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
+/** Test-only: forget the resolved mark so a cold-load sequence can be replayed. */
+export function __resetDesignIdentityForTests(): void {
+  _identityResolved = false;
+  _readyPromise = new Promise<void>(resolve => { _resolveReady = resolve; });
+}
+
 function K(userId = _designUserId, storeContext = _designStoreContext) {
   // Demo-mode preview data must live in its own storage namespace, never the
   // same keys real (or fresh-preview) data uses. Without this, seedIfEmpty()
