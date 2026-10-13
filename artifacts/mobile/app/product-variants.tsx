@@ -6,6 +6,8 @@
  * on the right, tap to expand price / SKU / low-stock level), then stock rules.
  * Size and colour stay on the variant columns; fit and custom options are
  * stored server-side per variant (see routes/product-variants.ts).
+ * Select mode (Shopify's variant bulk select) lives in
+ * components/product-variants/VariantBulkSelect.tsx + lib/variantSelection.ts.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -22,11 +24,22 @@ import {
 import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { hapticSuccess } from '@/lib/haptics';
+import {
+  allSelected, buildBulkUpdates, pruneSelection, quickSelects, sharedValue, toggleIds, toggleOne, variantValues,
+  type BulkField,
+} from '@/lib/variantSelection';
+import {
+  VARIANT_BULK_BAR_HEIGHT, VariantBulkBar, VariantBulkEditSheet, VariantQuickSelects, VariantSelectRow,
+} from '@/components/product-variants/VariantBulkSelect';
 
 interface Axis { name: string; values: string[] }
 interface Variant {
   id: string; sku: string; size: string | null; color: string | null;
   options: Record<string, string>; priceCents: number; stock: number; lowStockThreshold: number;
+  compareAtCents?: number | null;
 }
 interface Rules {
   lowStockThresholdDefault: number | null;
@@ -55,16 +68,6 @@ const toCents = (text: string): number | null => {
 const toInt = (text: string): number | null => (/^\d+$/.test(text.trim()) ? Number(text.trim()) : null);
 const centsToInput = (c: number) => (c / 100).toFixed(2);
 
-function variantValues(v: Variant, axes: Axis[]): string[] {
-  if (axes.length === 0) return [v.size, v.color, ...Object.values(v.options)].filter(Boolean) as string[];
-  return axes.map((a) => {
-    const key = a.name.trim().toLowerCase();
-    if (key === 'size') return v.size ?? '';
-    if (key === 'color' || key === 'colour') return v.color ?? '';
-    return v.options[a.name] ?? '';
-  });
-}
-
 export default function ProductVariantsScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -91,11 +94,24 @@ export default function ProductVariantsScreen() {
   const [editionText, setEditionText] = useState('');
   const [counterText, setCounterText] = useState('');
   const [applyLow, setApplyLow] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulkField, setBulkField] = useState<BulkField | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const tabBarMetrics = useTabBarMetrics(2);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const t = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const applyState = useCallback((data: any) => {
     if (data.product?.name) setProductName(data.product.name);
     setAxes(data.axes ?? []);
     setVariants(data.variants ?? []);
+    setSelected((prev) => (prev.size ? pruneSelection(prev, data.variants ?? []) : prev));
     if (data.stockRules) {
       const r = data.stockRules as Rules;
       setRules(r);
@@ -196,6 +212,46 @@ export default function ProductVariantsScreen() {
     }
   }
 
+  const quick = useMemo(() => quickSelects(axes, variants), [axes, variants]);
+  const selectedIds = useMemo(() => variants.filter((v) => selected.has(v.id)).map((v) => v.id), [variants, selected]);
+
+  function startSelecting() {
+    setExpanded(null);
+    setSelected(new Set());
+    setSelecting(true);
+  }
+
+  async function applyBulk(field: BulkField, text: string, clear = false) {
+    if (!productId) return;
+    const built = buildBulkUpdates(field, text, selectedIds, variants, { clear });
+    if (!built.ok) { setBulkError(built.error); return; }
+    const done = () => {
+      // The value just saved replaces any unsaved inline edit of the same field on those rows.
+      const key = field === 'price' ? 'price' : field === 'stock' ? 'stock' : null;
+      if (key) {
+        setEdits((prev) => {
+          const next = { ...prev };
+          for (const id of selectedIds) if (next[id]) next[id] = { ...next[id], [key]: undefined };
+          return next;
+        });
+      }
+      setBulkField(null);
+      setBulkError(null);
+    };
+    if (built.updates.length === 0) { done(); return; }
+    setBusy('save');
+    try {
+      applyState(await api.productVariants.bulkUpdate(productId, built.updates));
+      done();
+      hapticSuccess();
+      setToast(`${built.updates.length} variant${built.updates.length === 1 ? '' : 's'} updated`);
+    } catch (err) {
+      setBulkError(errText(err, "Couldn't save. Nothing was changed."));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function saveRules() {
     if (!productId || !rules) return;
     const low = lowDefaultText.trim() === '' ? null : toInt(lowDefaultText);
@@ -265,7 +321,7 @@ export default function ProductVariantsScreen() {
   return (
     <View style={st.root}>
       {header}
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={st.scroll}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[st.scroll, selecting && { paddingBottom: tabBarMetrics.occupiedHeight + 140 }]}>
         {!!productName && <Text style={st.productName} numberOfLines={2}>{productName}</Text>}
 
         <SectionHeader title="OPTIONS" style={st.sh} />
@@ -358,7 +414,22 @@ export default function ProductVariantsScreen() {
                   <Text style={[st.sortText, sort === key && st.sortTextOn]}>{key === 'name' ? 'Options' : 'Lowest stock'}</Text>
                 </Pressable>
               ))}
+              <PressableScale style={st.selectBtn} noMinHeight hitSlop={8} onPress={selecting ? () => setSelecting(false) : startSelecting}
+                accessibilityRole="button" accessibilityLabel={selecting ? 'Done selecting' : 'Select variants'}>
+                <Text style={st.selectBtnText}>{selecting ? 'Done' : 'Select'}</Text>
+              </PressableScale>
             </View>
+            {selecting && (
+              <VariantQuickSelects
+                quick={quick}
+                isOn={(q) => allSelected(selected, q.ids)}
+                allOn={selectedIds.length === variants.length}
+                noneOn={selectedIds.length === 0}
+                onAll={() => setSelected(new Set(variants.map((v) => v.id)))}
+                onNone={() => setSelected(new Set())}
+                onToggle={(q) => setSelected((prev) => toggleIds(prev, q.ids))}
+              />
+            )}
             <BrandthreadCard style={[st.card, { paddingVertical: 0, gap: 0 }]}>
               {groups.map((group) => (
                 <View key={group.title || 'all'}>
@@ -369,13 +440,21 @@ export default function ProductVariantsScreen() {
                     const stockText = e.stock ?? String(v.stock);
                     const shortLabel = groupByFirst ? variantValues(v, axes).slice(1).join(' / ') || label : label;
                     const out = v.stock === 0; const low = !out && v.stock <= v.lowStockThreshold;
+                    const was = v.compareAtCents ? <Text style={st.was}>{formatCents(v.compareAtCents)}</Text> : null;
+                    if (selecting) {
+                      return (
+                        <VariantSelectRow key={v.id} label={shortLabel} checked={selected.has(v.id)}
+                          onPress={() => setSelected((prev) => toggleOne(prev, v.id))}
+                          detail={<>{formatCents(v.priceCents)}{was ? ' ' : ''}{was} · {v.stock} available</>} />
+                      );
+                    }
                     return (
                       <View key={v.id} style={st.variantRow}>
                         <View style={st.rowBetween}>
                           <Pressable style={{ flex: 1 }} onPress={() => setExpanded(open ? null : v.id)} accessibilityLabel={`${label}, ${open ? 'collapse' : 'edit details'}`}>
                             <Text style={st.variantName} numberOfLines={1}>{shortLabel}</Text>
                             <Text style={st.muted} numberOfLines={1}>
-                              {formatCents(v.priceCents)}{out ? ' · Sold out' : low ? ' · Low stock' : ''}
+                              {formatCents(v.priceCents)}{was ? ' ' : ''}{was}{out ? ' · Sold out' : low ? ' · Low stock' : ''}
                             </Text>
                           </Pressable>
                           <TextInput style={st.stockPill} value={stockText} keyboardType="number-pad" selectTextOnFocus
@@ -480,6 +559,22 @@ export default function ProductVariantsScreen() {
           </>
         )}
       </ScrollView>
+      {selecting && variants.length > 0 && (
+        <VariantBulkBar count={selectedIds.length} bottom={tabBarMetrics.occupiedHeight + SP.sm}
+          onEdit={(field) => { setBulkError(null); setBulkField(field); }} />
+      )}
+      <VariantBulkEditSheet
+        field={bulkField}
+        count={selectedIds.length}
+        initial={bulkField ? sharedValue(bulkField, selectedIds, variants) : ''}
+        canClear={variants.some((v) => selected.has(v.id) && v.compareAtCents != null)}
+        saving={busy === 'save'}
+        error={bulkError}
+        onCancel={() => { setBulkField(null); setBulkError(null); }}
+        onSave={(text) => { if (bulkField) void applyBulk(bulkField, text); }}
+        onClear={() => void applyBulk('compareAt', '', true)}
+      />
+      <Snackbar visible={!!toast} message={toast ?? ''} onDismiss={() => setToast(null)} bottomOffset={tabBarMetrics.occupiedHeight + SP.sm + (selecting ? VARIANT_BULK_BAR_HEIGHT + SP.sm : 0)} />
     </View>
   );
 }
@@ -505,7 +600,10 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   fieldLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: c.mutedForeground, marginBottom: 4 },
   addOption: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, paddingVertical: 12, paddingHorizontal: SP.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' },
   addOptionText: { fontFamily: FONT.medium, fontSize: FS.base, color: c.foreground },
-  sortRow: { flexDirection: 'row', gap: SP.xs, marginHorizontal: SP.md, marginBottom: SP.sm },
+  sortRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginHorizontal: SP.md, marginBottom: SP.sm },
+  selectBtn: { marginLeft: 'auto', paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: c.border },
+  selectBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: c.foreground },
+  was: { textDecorationLine: 'line-through', color: c.mutedForeground },
   sortChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: c.border },
   sortChipOn: { backgroundColor: c.foreground, borderColor: c.foreground },
   sortText: { fontFamily: FONT.medium, fontSize: FS.sm, color: c.mutedForeground },

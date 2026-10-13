@@ -3413,7 +3413,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         put<any>(`/api/product-variants/${encodeURIComponent(productId)}/axes`, { axes }),
       generate: (productId: string, data: { priceCents?: number; stock?: number; lowStockThreshold?: number; baseSku?: string }) =>
         post<any>(`/api/product-variants/${encodeURIComponent(productId)}/generate`, data),
-      bulkUpdate: (productId: string, updates: Array<{ variantId: string; priceCents?: number; stock?: number; sku?: string; lowStockThreshold?: number }>) =>
+      bulkUpdate: (productId: string, updates: Array<{ variantId: string; priceCents?: number; stock?: number; sku?: string; lowStockThreshold?: number; compareAtCents?: number | null }>) =>
         patch<any>(`/api/product-variants/${encodeURIComponent(productId)}/variants/bulk`, { updates }),
       getStockRules: (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`),
       putStockRules: (productId: string, data: Record<string, unknown>) =>
