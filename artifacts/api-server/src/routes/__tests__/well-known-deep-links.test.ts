@@ -38,3 +38,27 @@ describe("apple-app-site-association", () => {
     expect(r.body.applinks.details).toEqual([]);
   });
 });
+
+describe("apple-app-site-association — App Clip", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("claims referral invite links so they open the app", async () => {
+    const r = await aasa({ APPLE_TEAM_ID: "ABCDE12345" });
+    expect(r.body.applinks.details[0].paths).toContain("/invite/*");
+  });
+
+  it("omits appclips until APP_CLIP_BUNDLE_ID is set", async () => {
+    const r = await aasa({ APPLE_TEAM_ID: "ABCDE12345", APP_CLIP_BUNDLE_ID: "" });
+    expect(r.body.appclips).toBeUndefined();
+  });
+
+  it("omits appclips without a team id even when the clip bundle id is set", async () => {
+    const r = await aasa({ APPLE_TEAM_ID: "", APP_CLIP_BUNDLE_ID: "com.brandthread.mobile.Clip" });
+    expect(r.body.appclips).toBeUndefined();
+  });
+
+  it("advertises the App Clip when both are set", async () => {
+    const r = await aasa({ APPLE_TEAM_ID: "ABCDE12345", APP_CLIP_BUNDLE_ID: "com.brandthread.mobile.Clip" });
+    expect(r.body.appclips).toEqual({ apps: ["ABCDE12345.com.brandthread.mobile.Clip"] });
+  });
+});

@@ -32,6 +32,8 @@ const REQUIRED_VARS: RequiredVar[] = [
 // shipping labels, ...) rather than the whole server, so a missing one is
 // worth a warning but never a boot failure.
 const OPTIONAL_VARS = [
+  // App Clip bundle id (e.g. com.brandthread.mobile.Clip) — adds `appclips` to the AASA file.
+  "APP_CLIP_BUNDLE_ID",
   "REDIS_URL",
   "AGORA_APP_ID",
   "AGORA_APP_CERTIFICATE",

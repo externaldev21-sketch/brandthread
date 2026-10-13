@@ -12,6 +12,10 @@ const path = require('path');
 const zlib = require('zlib');
 const { renderSharePreview } = require('./sharePreview');
 const { landingPathFor, shouldServeLanding } = require('./landing');
+const { renderCrawlFile, renderWellKnown } = require('./seo/crawl');
+const { renderNewThisWeekPage } = require('./seo/newThisWeek');
+const { renderProductSeoPage } = require('./seo/productPage');
+const { withAppBanner } = require('./seo/appBanner');
 
 const STATIC_ROOT = path.resolve(
   __dirname,
@@ -143,6 +147,40 @@ const server = http.createServer(async (req, res) => {
   }
   const acceptEncoding = String(req.headers['accept-encoding'] || '');
 
+  // Crawl files (robots.txt, sitemap index + per-kind sitemaps) and the
+  // universal-link / App Clip verification files. These take precedence over
+  // the build's static robots.txt / sitemap.xml (see seo/crawl.js).
+  const seoPath = /^\/(?:robots\.txt|sitemap(?:-[a-z]+)?\.xml|\.well-known\/.+|new\/?)$/.test(requestedPath);
+  if (seoPath && (req.method === 'GET' || req.method === 'HEAD')) {
+    const crawl = (await renderWellKnown(requestedPath).catch(() => null))
+      || (await renderCrawlFile(requestedPath, STATIC_ROOT).catch(() => null));
+    if (crawl) {
+      res.writeHead(crawl.status, { 'content-type': crawl.contentType, 'cache-control': crawl.cacheControl });
+      res.end(req.method === 'HEAD' ? undefined : crawl.body);
+      return;
+    }
+
+    // Public "New this week" page — server-rendered, same for every visitor.
+    if (/^\/new\/?$/.test(requestedPath)) {
+      const page = await renderNewThisWeekPage(requestUrl.searchParams).catch(() => null);
+      if (page) {
+        if (page.status === 301) {
+          res.writeHead(301, page.headers);
+          res.end();
+          return;
+        }
+        const gzip = /\bgzip\b/.test(acceptEncoding);
+        res.writeHead(page.status, {
+          'content-type': 'text/html; charset=utf-8',
+          ...page.headers,
+          ...(gzip ? { 'content-encoding': 'gzip', vary: 'Accept-Encoding' } : {}),
+        });
+        res.end(req.method === 'HEAD' ? undefined : (gzip ? zlib.gzipSync(page.html) : page.html));
+        return;
+      }
+    }
+  }
+
   // Public account-deletion page (Google Play requires a URL that works
   // without the app). Plain HTML, not part of the SPA, so it never depends on
   // a signed-in session; it calls /api/public/account-deletion/*.
@@ -199,8 +237,13 @@ const server = http.createServer(async (req, res) => {
     const shellPath = path.join(STATIC_ROOT, 'index.html');
     if (fs.existsSync(shellPath)) {
       const shellHtml = fs.readFileSync(shellPath, 'utf8');
-      const preview = await renderSharePreview(requestedPath, shellHtml).catch(() => null);
-      sendHtml(res, preview ? preview.status : 200, preview ? preview.html : shellHtml, acceptEncoding);
+      // Product pages get full SEO (schema.org Product, noscript body);
+      // everything else (or the API being unreachable) keeps the share card.
+      const preview = (await renderProductSeoPage(requestedPath, shellHtml).catch(() => null))
+        || (await renderSharePreview(requestedPath, shellHtml).catch(() => null));
+      const html = preview ? preview.html : shellHtml;
+      const status = preview ? preview.status : 200;
+      sendHtml(res, status, status === 200 ? withAppBanner(html, requestedPath) : html, acceptEncoding);
       return;
     }
   }
