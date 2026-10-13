@@ -94,8 +94,9 @@ import {
   createReadTracker,
   createDeferredDelete,
   ACTIVITY_UNDO_MS,
-  isFollowBackRow,
+  isOrderUpdateRow,
   relativeTime,
+  unreadRowTint,
   type ActivityActor,
   type ActivityItem,
   type ActivityRow,
@@ -120,16 +121,10 @@ const LIVE_TOP_SLOP = 48;
 const AVATAR_SIZE = 40;
 
 type Styles = ReturnType<typeof makeStyles>;
-// Instagram's own Activity taxonomy (Highlights pinned, then Today /
-// Yesterday / Last 7 days / Last 30 days) — see docs/activity-flows.md §1
-// for why this is derived here rather than in lib/activity.ts's own
-// (already-tested) New/Today/This week/This month/Earlier bucket keys.
-type DisplaySectionKey = 'highlights' | 'today' | 'yesterday' | 'last_7_days' | 'last_30_days';
-type ListSection = { key: DisplaySectionKey; title: string; items: ActivityRow[]; data: ActivityRow[] };
-const DISPLAY_TITLES: Record<DisplaySectionKey, string> = {
-  highlights: 'Highlights', today: 'Today', yesterday: 'Yesterday',
-  last_7_days: 'Last 7 days', last_30_days: 'Last 30 days',
-};
+// Instagram's Notifications sections — New / Today / This week / Earlier
+// (https://mobbin.com/flows/374133d6-fd99-418b-ae02-f92694ae4fe0), straight
+// from lib/activity.ts's buildActivitySections.
+type ListSection = { key: ActivitySectionKey; title: string; items: ActivityRow[]; data: ActivityRow[] };
 
 // ─── Filter chips ───────────────────────────────────────────────────────────
 // A horizontally scrolling row of pill chips below the header — Threads'
@@ -260,17 +255,15 @@ function Avatar({ actor, size, styles }: {
 }
 
 /**
- * One actor: a single avatar with the small type badge. Exactly two actors
- * ("Jay and Mina liked your post"): Threads-style stacked double avatars,
- * still with the badge on the front (most recent) one. Three or more
- * ("Jay and 12 others…"): back to a single avatar — the "and N others" part
- * already lives in the row's text (`activityMessage`), so a deeper stack or
- * a "+N" chip would just repeat it in the chrome.
+ * One actor: a single avatar with the small type badge. Two or more
+ * ("Jay and Mina…", "Jay and 12 others liked your post"): Instagram's two
+ * stacked avatars — the two most recent people — with the badge on the
+ * front one. The "and N others" count lives in the row's text.
  */
 function ActivityAvatarStack({ row, styles }: { row: ActivityRow; styles: Styles }) {
   const [first, second] = row.actors;
   if (!first) return null;
-  if (row.actorCount === 2 && second) {
+  if (row.actorCount >= 2 && second) {
     return (
       <View style={styles.leading}>
         <View style={styles.stackBack}>
@@ -349,7 +342,10 @@ export const ActivityRowView = React.memo(function ActivityRowView({
   // exclusive, but both must render through the SAME sibling slot at the
   // `row` level — never nested inside `tapArea` — so every row's trailing
   // item lands on the identical right edge regardless of which one it is.
-  const trailingThumb = showFollowControl || row.type === 'thread_cash_received'
+  // Order updates lead with the product photo instead of an icon, so the
+  // same photo isn't repeated on the right.
+  const orderPhoto = isOrderUpdateRow(row.type) && row.actors.length === 0 ? row.targetImageUrl : null;
+  const trailingThumb = showFollowControl || row.type === 'thread_cash_received' || orderPhoto
     ? null
     : row.targetImageUrl ? (
       <CachedImage
@@ -390,12 +386,7 @@ export const ActivityRowView = React.memo(function ActivityRowView({
 
   return (
     <SwipeableActions actions={swipeActions} backgroundColor={theme.background}>
-    <View style={styles.row}>
-      {/* Unread dot — LinkedIn-style leading dot in the row's own 16pt
-          gutter (https://mobbin.com/screens/e455bcf1-7b85-4c0b-b4fd-76df1241fd5f),
-          white not blue: monochrome brand. Absolutely positioned, so rows
-          never shift when it appears or clears. */}
-      {unread ? <View style={styles.unreadDot} testID={`activity-unread-dot-${row.key}`} /> : null}
+    <View style={[styles.row, unread && styles.rowUnread]} testID={unread ? `activity-unread-${row.key}` : undefined}>
       {/*
         The Follow back / Following control is a real interactive element,
         so it must be a sibling of the row's own tap target rather than
@@ -421,6 +412,15 @@ export const ActivityRowView = React.memo(function ActivityRowView({
       >
         {row.actors.length > 0 ? (
           <ActivityAvatarStack row={row} styles={styles} />
+        ) : orderPhoto ? (
+          <View style={styles.leading}>
+            <CachedImage
+              source={{ uri: orderPhoto }}
+              style={styles.orderPhoto}
+              recyclingKey={`${row.key}-order`}
+              accessibilityIgnoresInvertColors
+            />
+          </View>
         ) : (
           <View style={styles.leading}>
             <View style={styles.iconCircle}>
@@ -472,14 +472,14 @@ export function SkeletonRows({ styles }: { styles: Styles }) {
       <SkeletonBlock width={72} height={12} style={{ marginBottom: SP.md }} />
       {Array.from({ length: 7 }).map((_, index) => (
         <View key={index} style={styles.skeletonRow}>
-          {/* Matches the real row's 40pt avatar / 44pt 8-radius thumbnail
+          {/* Matches the real row's 40pt avatar / 44pt 4-radius thumbnail
               exactly, so there's no size jump when the real content lands. */}
           <SkeletonBlock width={AVATAR_SIZE} height={AVATAR_SIZE} radius={AVATAR_SIZE / 2} />
           <View style={{ flex: 1, gap: SP.xs + 2 }}>
             <SkeletonBlock width={index % 2 ? '72%' : '86%'} height={13} />
             <SkeletonBlock width={index % 3 ? '38%' : '52%'} height={11} />
           </View>
-          <SkeletonBlock width={44} height={44} radius={8} />
+          <SkeletonBlock width={44} height={44} radius={4} />
         </View>
       ))}
     </View>
@@ -906,52 +906,7 @@ export default function ActivityCenterScreen() {
       new Date(now),
     );
 
-    // Highlights: unread, single-actor, still-actionable follow-back rows —
-    // pinned above everything else (Mobbin's Activity tab reference), pulled
-    // out of whatever recency bucket they'd otherwise land in so they don't
-    // also render a second time down in Today.
-    const highlightIds = new Set<string>();
-    const highlights: ActivityRow[] = [];
-    for (const section of raw) {
-      for (const row of section.items) {
-        if (isFollowBackRow(row) && !highlights.some((h) => h.key === row.key)) {
-          highlights.push(row);
-          highlightIds.add(row.key);
-        }
-      }
-    }
-
-    // Today / Yesterday / Last 7 days / Last 30 days: New+Today fold into
-    // Today; the "this week" bucket (1-6 days old) splits by calendar day
-    // into Yesterday vs the rest of Last 7 days; This month + Earlier both
-    // fold into Last 30 days (see docs/activity-flows.md §1).
-    const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const yesterdayStart = dayStart(new Date(now - 24 * 60 * 60 * 1000));
-    const todayStart = dayStart(new Date(now));
-
-    const buckets: Record<Exclude<DisplaySectionKey, 'highlights'>, ActivityRow[]> = {
-      today: [], yesterday: [], last_7_days: [], last_30_days: [],
-    };
-    for (const section of raw) {
-      for (const row of section.items) {
-        if (highlightIds.has(row.key)) continue;
-        if (section.key === 'new' || section.key === 'today') {
-          buckets.today.push(row);
-        } else if (section.key === 'this_week') {
-          const createdDay = dayStart(new Date(row.createdAt));
-          if (createdDay >= yesterdayStart && createdDay < todayStart) buckets.yesterday.push(row);
-          else buckets.last_7_days.push(row);
-        } else {
-          buckets.last_30_days.push(row);
-        }
-      }
-    }
-
-    const result: ListSection[] = [];
-    if (highlights.length > 0) result.push({ key: 'highlights', title: DISPLAY_TITLES.highlights, items: highlights, data: highlights });
-    (['today', 'yesterday', 'last_7_days', 'last_30_days'] as const).forEach((key) => {
-      if (buckets[key].length > 0) result.push({ key, title: DISPLAY_TITLES[key], items: buckets[key], data: buckets[key] });
-    });
+    const result: ListSection[] = raw.map((section) => ({ ...section, data: section.items }));
     return result;
   }, [filteredItems, sessionNew, now]);
 
@@ -1471,17 +1426,11 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     // absolute` sibling above a plain static one regardless of DOM order.
     backgroundColor: theme.background,
   },
-  // Sits in the row's left gutter (16pt padding), vertically centred, so the
-  // avatar/text never move. Theme text colour — white, not an accent.
-  unreadDot: {
-    position: 'absolute',
-    left: 5,
-    top: '50%',
-    marginTop: -3,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.text,
+  // Unread rows get a faint lift (#FFFFFF08 over the page) instead of a dot
+  // or bold text. Pre-blended to an opaque colour so the swipe actions
+  // behind the row still never show through.
+  rowUnread: {
+    backgroundColor: unreadRowTint(theme.background),
   },
   // The Follow back / Following control (or the trailing thumbnail — see
   // `trailingThumb` at the call site) renders as a sibling of this
@@ -1543,6 +1492,12 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.bold,
     letterSpacing: 0.2,
   },
+  orderPhoto: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: 4,
+    backgroundColor: theme.cardElevated,
+  },
   iconCircle: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
@@ -1600,13 +1555,13 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   thumb: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 4,
     backgroundColor: theme.cardElevated,
   },
   thumbFallback: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 4,
     backgroundColor: theme.card,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.borderSubtle,
