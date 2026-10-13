@@ -34,6 +34,7 @@ import { useApi } from '@/lib/api';
 
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 
+import { useLiveUsernameCheck } from '@/hooks/useLiveUsernameCheck';
 import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/profile/ImageSourceSheet';
 
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -168,6 +169,7 @@ export default function BuyerEditProfileScreen() {
 
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'ok' | 'taken' | 'invalid'>('idle');
   const [usernameError, setUsernameError] = useState('');
+  const liveUsername = useLiveUsernameCheck(fields.username, initial.username, checkUsernameAvailability);
 
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const toastOpacity = useRef(new Animated.Value(0)).current;
@@ -208,6 +210,7 @@ export default function BuyerEditProfileScreen() {
     }
     try {
       const result = await api.auth.checkUsername(u);
+      if (liveUsername.current !== u) return result.available; // the field moved on; a newer check owns the status
       if (result.available) {
         setUsernameStatus('ok');
         setUsernameError('');
@@ -602,7 +605,7 @@ export default function BuyerEditProfileScreen() {
             </View>
             <Divider theme={theme} />
 
-            {/* Username — format validated live, availability checked on blur */}
+            {/* Username — format validated live, availability checked as you type */}
             <View>
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Username</Text>

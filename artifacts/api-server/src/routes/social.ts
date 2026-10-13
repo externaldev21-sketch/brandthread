@@ -666,6 +666,7 @@ router.get("/profile/:userId", async (req, res) => {
     iBlockedThem,
     // Private accounts: header data stays visible; content is follower-only.
     isPrivate: user.isPrivate === true,
+    pronouns: user.pronouns ?? null,
     followRequested: !!reqRow,
     contentHidden: user.isPrivate === true && other !== myId && !isFollowing,
     // Bio link (profile endpoint only — formatUser stays unchanged).

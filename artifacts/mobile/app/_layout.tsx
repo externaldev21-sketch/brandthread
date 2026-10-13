@@ -1182,6 +1182,7 @@ function ServiceConfigurer() {
           name: profile.displayName || profile.name,
           username: profile.username,
           bio: profile.bio,
+          pronouns: profile.pronouns,
         }, socialKeysForUser(newUserId));
       })
       .catch((error) => {

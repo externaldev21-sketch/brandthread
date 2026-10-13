@@ -1,5 +1,5 @@
 /** @handle change cooldown (migration 117: users.username_changed_at). */
-export const USERNAME_COOLDOWN_DAYS = 30;
+export const USERNAME_COOLDOWN_DAYS = 14;
 export const USERNAME_COOLDOWN_MS = USERNAME_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 
 /**
@@ -14,6 +14,9 @@ export function usernameNextChangeAt(changedAt: Date | string | null | undefined
   const next = new Date(changed.getTime() + USERNAME_COOLDOWN_MS);
   return next.getTime() > now.getTime() ? next : null;
 }
+
+/** Server copy for a blocked change, kept next to the constant it names. */
+export const USERNAME_COOLDOWN_MESSAGE = `You can change your username once every ${USERNAME_COOLDOWN_DAYS} days.`;
 
 export type UsernameChangeDecision =
   | { kind: "unchanged" }

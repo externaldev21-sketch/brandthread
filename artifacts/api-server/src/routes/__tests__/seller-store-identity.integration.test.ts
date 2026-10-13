@@ -9,6 +9,7 @@ import { eq, inArray } from "drizzle-orm";
 const suffix = crypto.randomBytes(5).toString("hex");
 const me = `store-identity-me-${suffix}`;
 const other = `store-identity-other-${suffix}`;
+const fresh = `store-identity-fresh-${suffix}`;
 const authState = vi.hoisted(() => ({ clerkUserId: "" }));
 
 vi.mock("../../middlewares/requireAuth", () => ({
@@ -26,6 +27,7 @@ beforeAll(async () => {
   await db.insert(users).values([
     { clerkId: me, email: `${me}@test.local`, name: "Me", displayName: "Me", role: "seller", accountType: "seller", brandName: `Mine ${suffix}`, username: `mine_${suffix}`, socialLinks: { website: "keep" } as any },
     { clerkId: other, email: `${other}@test.local`, name: "Other", displayName: "Other", role: "seller", accountType: "seller", brandName: `Taken Name ${suffix}`, username: `taken_${suffix}` },
+    { clerkId: fresh, email: `${fresh}@test.local`, name: "Fresh", displayName: "Fresh", role: "seller", accountType: "seller" },
   ]);
   const { default: router } = await import("../seller-profile");
   const app = express();
@@ -36,7 +38,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(users).where(inArray(users.clerkId, [me, other]));
+  await db.delete(users).where(inArray(users.clerkId, [me, other, fresh]));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
@@ -86,6 +88,46 @@ describe("PUT /identity", () => {
     expect(r.body).toEqual({ brandName: `Fresh Label ${suffix}`, username: `fresh_${suffix}` });
     const [row] = await db.select({ username: users.username }).from(users).where(eq(users.clerkId, me));
     expect(row.username).toBe(`fresh_${suffix}`);
+  });
+});
+
+describe("@handle change cooldown on PUT /identity", () => {
+  it("blocks a second handle change inside 14 days, on save and on the live check", async () => {
+    // The previous test changed the handle once and started the clock.
+    const [row] = await db.select({ changedAt: users.usernameChangedAt }).from(users).where(eq(users.clerkId, me));
+    expect(row.changedAt).toBeInstanceOf(Date);
+    const check = await call("GET", `/identity/check?handle=again_${suffix}`);
+    expect(check.body.handle).toMatchObject({ available: false, code: "USERNAME_COOLDOWN" });
+    expect(typeof check.body.handle.nextChangeAt).toBe("string");
+    const r = await call("PUT", "/identity", { brandName: `Fresh Label ${suffix}`, handle: `again_${suffix}` });
+    expect(r.status).toBe(429);
+    expect(r.body).toMatchObject({ code: "USERNAME_COOLDOWN", field: "handle" });
+    const [after] = await db.select({ username: users.username }).from(users).where(eq(users.clerkId, me));
+    expect(after.username).toBe(`fresh_${suffix}`);
+  });
+
+  it("keeping the same handle while renaming the store is not a change", async () => {
+    const r = await call("PUT", "/identity", { brandName: `Renamed ${suffix}`, handle: `fresh_${suffix}` });
+    expect(r.status).toBe(200);
+  });
+
+  it("allows the change again once 14 days have passed", async () => {
+    await db.update(users).set({ usernameChangedAt: new Date(Date.now() - 15 * 86_400_000) }).where(eq(users.clerkId, me));
+    const r = await call("PUT", "/identity", { brandName: `Renamed ${suffix}`, handle: `later_${suffix}` });
+    expect(r.status).toBe(200);
+    const [row] = await db.select({ changedAt: users.usernameChangedAt }).from(users).where(eq(users.clerkId, me));
+    expect(Date.now() - row.changedAt!.getTime()).toBeLessThan(60_000);
+  });
+
+  it("lets a seller with no handle claim their first one during onboarding", async () => {
+    authState.clerkUserId = fresh;
+    try {
+      const r = await call("PUT", "/identity", { brandName: `First Store ${suffix}`, handle: `first_${suffix}` });
+      expect(r.status).toBe(200);
+      expect(r.body.username).toBe(`first_${suffix}`);
+    } finally {
+      authState.clerkUserId = me;
+    }
   });
 });
 

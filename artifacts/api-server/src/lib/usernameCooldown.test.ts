@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideUsernameChange, usernameNextChangeAt, USERNAME_COOLDOWN_MS } from "./usernameCooldown";
+import { decideUsernameChange, usernameNextChangeAt, USERNAME_COOLDOWN_DAYS, USERNAME_COOLDOWN_MESSAGE, USERNAME_COOLDOWN_MS } from "./usernameCooldown";
 
 const DAY = 24 * 60 * 60 * 1000;
 const now = new Date("2026-09-30T12:00:00Z");
@@ -8,12 +8,12 @@ describe("usernameNextChangeAt", () => {
   it("is null when never changed", () => {
     expect(usernameNextChangeAt(null, now)).toBeNull();
   });
-  it("blocks at 29 days and allows at 30 days", () => {
-    expect(usernameNextChangeAt(new Date(now.getTime() - 29 * DAY), now)).not.toBeNull();
-    expect(usernameNextChangeAt(new Date(now.getTime() - 30 * DAY), now)).toBeNull();
-    expect(usernameNextChangeAt(new Date(now.getTime() - 30 * DAY + 1000), now)).not.toBeNull();
+  it("blocks at 13 days and allows at 14 days", () => {
+    expect(usernameNextChangeAt(new Date(now.getTime() - 13 * DAY), now)).not.toBeNull();
+    expect(usernameNextChangeAt(new Date(now.getTime() - 14 * DAY), now)).toBeNull();
+    expect(usernameNextChangeAt(new Date(now.getTime() - 14 * DAY + 1000), now)).not.toBeNull();
   });
-  it("reports exactly changedAt + 30 days", () => {
+  it("reports exactly changedAt + 14 days", () => {
     const changed = new Date(now.getTime() - 5 * DAY);
     expect(usernameNextChangeAt(changed, now)?.getTime()).toBe(changed.getTime() + USERNAME_COOLDOWN_MS);
   });
@@ -35,16 +35,16 @@ describe("decideUsernameChange", () => {
     expect(decideUsernameChange({ current: "maya", requested: "maya2", changedAt: null, now }))
       .toEqual({ kind: "allowed", stamp: true });
   });
-  it("blocks a change at 29 days with nextChangeAt", () => {
-    const changedAt = new Date(now.getTime() - 29 * DAY);
+  it("blocks a change at 13 days with nextChangeAt", () => {
+    const changedAt = new Date(now.getTime() - 13 * DAY);
     const decision = decideUsernameChange({ current: "maya", requested: "maya2", changedAt, now });
     expect(decision.kind).toBe("blocked");
     if (decision.kind === "blocked") {
-      expect(decision.nextChangeAt.getTime()).toBe(changedAt.getTime() + 30 * DAY);
+      expect(decision.nextChangeAt.getTime()).toBe(changedAt.getTime() + 14 * DAY);
     }
   });
-  it("allows a change at 30 days", () => {
-    expect(decideUsernameChange({ current: "maya", requested: "maya2", changedAt: new Date(now.getTime() - 30 * DAY), now }))
+  it("allows a change at 14 days", () => {
+    expect(decideUsernameChange({ current: "maya", requested: "maya2", changedAt: new Date(now.getTime() - 14 * DAY), now }))
       .toEqual({ kind: "allowed", stamp: true });
   });
   it("clearing is always allowed and stamps only when the clock is not running", () => {
@@ -58,5 +58,13 @@ describe("decideUsernameChange", () => {
   it("re-setting after clearing cannot dodge the cooldown", () => {
     const clearedAt = new Date(now.getTime() - DAY);
     expect(decideUsernameChange({ current: null, requested: "maya", changedAt: clearedAt, now }).kind).toBe("blocked");
+  });
+});
+
+describe("cooldown length", () => {
+  it("is 14 days and the message names it", () => {
+    expect(USERNAME_COOLDOWN_DAYS).toBe(14);
+    expect(USERNAME_COOLDOWN_MS).toBe(14 * DAY);
+    expect(USERNAME_COOLDOWN_MESSAGE).toBe("You can change your username once every 14 days.");
   });
 });
